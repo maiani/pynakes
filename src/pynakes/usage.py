@@ -8,11 +8,25 @@ export a subset library containing only the cited entries.
 """
 
 import re
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Iterator, Union
+from typing import Union
 
-from pynakes.model import BibEntry, BibLibrary, EntryCollection
+from pynakes.editing import append_delimited_field, splice_into_text
+from pynakes.model import BibLibrary, EntryCollection
+
+__all__ = [
+    "UsageReport",
+    "extract_keys_from_aux",
+    "extract_keys_from_tex",
+    "collect_cited_keys",
+    "analyze_usage",
+    "subset_library",
+    "tag_with_group",
+    "tag_with_keyword",
+    "splice_into_text",
+]
 
 # ``\citation{key,key2}`` lines emitted by LaTeX into .aux files.
 _AUX_CITATION_RE = re.compile(r"\\citation\s*\{([^}]*)\}")
@@ -234,71 +248,8 @@ def _tag(
     keyset = set(keys)
     count = 0
     for entry in lib.entries.values():
-        if entry.key in keyset and _add_field_value(entry, field_name, value, delim, join):
+        if entry.key in keyset and append_delimited_field(
+            entry, field_name, value, delim, join
+        ):
             count += 1
     return count
-
-
-def splice_into_text(
-    original_text: str, edits: Iterable[tuple[str, str]]
-) -> Union[str, None]:
-    """Splice surgically-edited entry blocks back into the original file text.
-
-    Each edit is ``(old_raw, new_raw)``. Because surgical edits change only the
-    tagged field, replacing the entry's exact original block in the source text
-    preserves all other formatting (inter-entry blank lines, comment spacing),
-    yielding a minimal diff. Returns ``None`` if any block cannot be located, so
-    the caller can fall back to a full re-serialization.
-    """
-    text = original_text
-    for old_raw, new_raw in edits:
-        if old_raw == new_raw:
-            continue
-        if not old_raw or old_raw not in text:
-            return None
-        text = text.replace(old_raw, new_raw, 1)
-    return text
-
-
-def _add_field_value(
-    entry: BibEntry, field_name: str, value: str, delim: str, join: str
-) -> bool:
-    """Append ``value`` to a delimited field, de-duplicating. Returns True if changed."""
-    existing = entry.fields.get(field_name, "")
-    items = [p.strip() for p in existing.split(delim) if p.strip()]
-    if value in items:
-        return False
-
-    items.append(value)
-    new_value = join.join(items)
-    entry.fields[field_name] = new_value
-
-    if entry.raw_content:
-        # Surgically edit the raw text so untouched fields keep their exact
-        # formatting (only the tagged field changes in the diff).
-        entry.raw_content = _set_raw_field(entry.raw_content, field_name, new_value)
-    else:
-        # Constructed entry with no raw text: let the writer reconstruct it.
-        entry.modified = True
-    return True
-
-
-def _set_raw_field(raw: str, field_name: str, new_value: str) -> str:
-    """Set ``field_name = {new_value}`` in raw entry text, in place if present."""
-    line_ending = "\r\n" if "\r\n" in raw else "\n"
-    pattern = re.compile(
-        r"(\b" + re.escape(field_name) + r"\s*=\s*)(\{[^{}]*\}|\"[^\"]*\"|[^,}\r\n]*)",
-        re.IGNORECASE,
-    )
-    match = pattern.search(raw)
-    if match:
-        return raw[: match.start(2)] + "{" + new_value + "}" + raw[match.end(2) :]
-
-    # Field not present: insert it just before the entry's closing brace.
-    close = raw.rfind("}")
-    if close == -1:
-        return raw
-    body = raw[:close].rstrip()
-    if not body.endswith(","):
-        body += ","
-    return f"{body}{line_ending}  {field_name} = {{{new_value}}}{line_ending}{raw[close:]}"

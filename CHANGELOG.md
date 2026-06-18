@@ -8,6 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Phase 2 core operations** and their CLI commands:
+  - **`groups`** (`groups.py`): `list_groups`, `list_entries_in_group`,
+    `add_to_group`, `remove_from_group`. CLI: `pynakes groups list`,
+    `groups add-entry`, `groups remove-entry`.
+  - **`keys`** (`keys.py`): deterministic `AuthorYearTitle` key generation,
+    duplicate detection, and duplicate repair (numeric `_2` suffixes that avoid
+    existing keys). CLI: `pynakes keys check`, `keys generate`, `keys repair`.
+  - **`fields`** (`fields.py`): `rename`, `move` (non-clobbering), `append`
+    (de-duplicating), and `clear`, each with an optional `--where` query filter
+    (`FIELD contains "x"`, `FIELD = "x"`, `FIELD exists`, plus `type`). CLI:
+    `pynakes fields rename|move|append|clear`.
+  - **`lint`** (`lint.py`): duplicate keys, missing required fields (per entry
+    type, tolerating BibTeX/BibLaTeX variants like journal/journaltitle and
+    year/date), malformed/missing DOI, and malformed JabRef `groups`. CLI:
+    `pynakes lint`.
+  - **`inspect`** (CLI): structure, encoding, line ending, duplicate keys, and
+    lint issues, with `--json`.
+  - All modifying commands support `--dry-run`, `--diff`, and `--json`, with
+    `.bak` backups and atomic, re-parse-validated writes.
+- **`editing.py`** — shared surgical raw-text editing primitives
+  (`set_raw_field`, `remove_raw_field`, `rename_raw_field`, `set_raw_key`,
+  `splice_into_text`) and entry-level helpers that keep an entry's `fields`
+  dict and `raw_content` in sync. Edits touch only the changed field/key, so
+  diffs stay minimal and all other formatting is byte-preserved. The `used`
+  tagging code and all Phase 2 operations build on this single implementation.
 - **`pynakes used`** — detect which entries are cited across a collection of
   `.tex`/`.aux` files (or directories, scanned recursively). Reports
   used/unused/missing keys; handles the natbib & biblatex `\cite` families,

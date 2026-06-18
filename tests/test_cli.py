@@ -83,3 +83,121 @@ class TestUsedCommand:
         assert "Smith2020" in exported
         assert "Brown2022" in exported
         assert "Green2023" not in exported  # not cited
+
+
+def _copy(tmp_path: Path, name: str) -> Path:
+    dst = tmp_path / "refs.bib"
+    dst.write_text((FIXTURES / name).read_text())
+    return dst
+
+
+class TestInspectAndLint:
+    def test_inspect_json(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(app, ["inspect", str(bib), "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["entry_count"] == 5
+        assert {e["key"] for e in data["entries"]} >= {"Smith2020", "Jones2021"}
+
+    def test_lint_json_reports_duplicates(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "duplicate_entries.bib")
+        result = runner.invoke(app, ["lint", str(bib), "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["errors"] >= 1
+        assert any(i["type"] == "duplicate_key" for i in data["issues"])
+
+
+class TestGroupsCommand:
+    def test_list_groups(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "jabref_groups.bib")
+        result = runner.invoke(app, ["groups", "list", str(bib), "--json"])
+        assert result.exit_code == 0, result.output
+        groups = json.loads(result.output)["groups"]
+        assert "Machine Learning" in groups
+
+    def test_add_entry_dry_run_does_not_write(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        original = bib.read_text()
+        result = runner.invoke(
+            app, ["groups", "add-entry", str(bib), "Smith2020", "Fav", "--dry-run"]
+        )
+        assert result.exit_code == 0, result.output
+        assert bib.read_text() == original
+
+    def test_add_entry_writes(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(app, ["groups", "add-entry", str(bib), "Smith2020", "Fav"])
+        assert result.exit_code == 0, result.output
+        assert "groups = {Fav}" in bib.read_text()
+
+    def test_add_entry_unknown_key_errors(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(app, ["groups", "add-entry", str(bib), "Nope", "Fav"])
+        assert result.exit_code == 1
+
+
+class TestKeysCommand:
+    def test_check_reports_duplicates(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "duplicate_entries.bib")
+        result = runner.invoke(app, ["keys", "check", str(bib), "--json"])
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["has_duplicates"] is True
+
+    def test_repair_dry_run_diff(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "duplicate_entries.bib")
+        original = bib.read_text()
+        result = runner.invoke(
+            app, ["keys", "repair", str(bib), "--dry-run", "--diff", "--json"]
+        )
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["renames"]
+        assert "diff" in data
+        assert bib.read_text() == original  # dry-run wrote nothing
+
+    def test_repair_writes_unique_keys(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "duplicate_entries.bib")
+        result = runner.invoke(app, ["keys", "repair", str(bib)])
+        assert result.exit_code == 0, result.output
+        from pynakes.bibtex_parser import parse_bib
+
+        assert parse_bib(bib.read_text()).entries.duplicate_keys() == {}
+
+
+class TestFieldsCommand:
+    def test_rename_with_diff(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(
+            app, ["fields", "rename", str(bib), "journal", "journaltitle", "--diff", "--json"]
+        )
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["modified"] is True
+        assert "journaltitle = {Nature Machine Intelligence}" in bib.read_text()
+
+    def test_append_with_where_filter(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(
+            app,
+            ["fields", "append", str(bib), "keywords", "vision",
+             "--where", 'title contains "Computer Vision"'],
+        )
+        assert result.exit_code == 0, result.output
+        text = bib.read_text()
+        assert "keywords = {vision}" in text
+        assert text.count("keywords = {vision}") == 1
+
+    def test_clear_field(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(app, ["fields", "clear", str(bib), "doi"])
+        assert result.exit_code == 0, result.output
+        assert "doi =" not in bib.read_text()
+
+    def test_invalid_query_errors(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(
+            app, ["fields", "clear", str(bib), "doi", "--where", "garbage <> nonsense"]
+        )
+        assert result.exit_code == 1

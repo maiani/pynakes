@@ -144,12 +144,12 @@ pynakes inspect tests/fixtures/simple.bib
 ### Tasks
 
 #### 2.1 Group management (`groups.py`)
-- [ ] Implement `list_groups(lib: BibLibrary) -> list[str]`
-- [ ] Implement `add_to_group(lib: BibLibrary, key: str, group: str) -> BibLibrary`
-- [ ] Implement `remove_from_group(lib: BibLibrary, key: str, group: str) -> BibLibrary`
-- [ ] Implement `list_entries_in_group(lib: BibLibrary, group: str) -> list[str]`
-- [ ] Parse `groups` field (semicolon-delimited)
-- [ ] Preserve JabRef group metadata comments
+- [x] Implement `list_groups(lib: BibLibrary) -> list[str]`
+- [x] Implement `add_to_group(lib: BibLibrary, key: str, group: str) -> BibLibrary`
+- [x] Implement `remove_from_group(lib: BibLibrary, key: str, group: str) -> BibLibrary`
+- [x] Implement `list_entries_in_group(lib: BibLibrary, group: str) -> list[str]`
+- [x] Parse `groups` field (semicolon-delimited)
+- [x] Preserve JabRef group metadata comments
 
 **Success criteria:**
 - Can list, add, remove groups
@@ -158,10 +158,10 @@ pynakes inspect tests/fixtures/simple.bib
 - No data loss on round-trip
 
 #### 2.2 Citation keys (`keys.py`)
-- [ ] Implement `detect_duplicate_keys(lib: BibLibrary) -> list[tuple[str, str]]`
-- [ ] Implement `generate_key(entry: BibEntry) -> str` (AuthorYearTitle pattern)
-- [ ] Implement `has_duplicate_keys(lib: BibLibrary) -> bool`
-- [ ] Implement `repair_duplicate_keys(lib: BibLibrary) -> (BibLibrary, list[str])` (rename strategy)
+- [x] Implement `detect_duplicate_keys(lib: BibLibrary) -> list[tuple[str, str]]`
+- [x] Implement `generate_key(entry: BibEntry) -> str` (AuthorYearTitle pattern)
+- [x] Implement `has_duplicate_keys(lib: BibLibrary) -> bool`
+- [x] Implement `repair_duplicate_keys(lib: BibLibrary) -> (BibLibrary, list[str])` (rename strategy)
 
 **Generation pattern**: `[First author last name][4-digit year][first significant title word]`
 
@@ -174,11 +174,11 @@ Example: `Smith2020BigData`
 - Tests pass with various author/year/title formats
 
 #### 2.3 Field operations (`fields.py`)
-- [ ] Implement `rename_field(lib: BibLibrary, old: str, new: str, where: QueryFilter = None) -> BibLibrary`
-- [ ] Implement `move_field(lib: BibLibrary, old: str, new: str, where: QueryFilter = None) -> BibLibrary`
-- [ ] Implement `append_field(lib: BibLibrary, field: str, value: str, where: QueryFilter = None) -> BibLibrary`
-- [ ] Implement `clear_field(lib: BibLibrary, field: str, where: QueryFilter = None) -> BibLibrary`
-- [ ] Support simple query filters (`QueryFilter` = `Optional[Callable[[BibEntry], bool]]`)
+- [x] Implement `rename_field(lib: BibLibrary, old: str, new: str, where: QueryFilter = None) -> BibLibrary`
+- [x] Implement `move_field(lib: BibLibrary, old: str, new: str, where: QueryFilter = None) -> BibLibrary`
+- [x] Implement `append_field(lib: BibLibrary, field: str, value: str, where: QueryFilter = None) -> BibLibrary`
+- [x] Implement `clear_field(lib: BibLibrary, field: str, where: QueryFilter = None) -> BibLibrary`
+- [x] Support simple query filters (`QueryFilter` = `Optional[Callable[[BibEntry], bool]]`)
 
 **Success criteria:**
 - Field operations work on single and multiple entries
@@ -187,12 +187,12 @@ Example: `Smith2020BigData`
 - Test with various field names and values
 
 #### 2.4 Linting (`lint.py`)
-- [ ] Implement `lint(lib: BibLibrary) -> list[Lint Issue]`
-- [ ] Check for duplicate keys
-- [ ] Check for missing required fields (article, book, inproceedings, thesis)
-- [ ] Check for malformed DOI (basic regex)
-- [ ] Check for missing DOI (warning, not error)
-- [ ] Check for broken groups field formatting
+- [x] Implement `lint(lib: BibLibrary) -> list[Lint Issue]`
+- [x] Check for duplicate keys
+- [x] Check for missing required fields (article, book, inproceedings, thesis)
+- [x] Check for malformed DOI (basic regex)
+- [x] Check for missing DOI (warning, not error)
+- [x] Check for broken groups field formatting
 
 **Required fields by type:**
 - `article`: author, title, journal, year
@@ -207,16 +207,16 @@ Example: `Smith2020BigData`
 - Tests pass with various entry types
 
 #### 2.5 CLI commands (Phase 2 additions to `cli.py`)
-- [ ] Add `pynakes inspect <file>`
-- [ ] Add `pynakes groups list <file>`
-- [ ] Add `pynakes groups add-entry <file> <key> <group> [--dry-run]`
-- [ ] Add `pynakes groups remove-entry <file> <key> <group> [--dry-run]`
-- [ ] Add `pynakes keys check <file>`
-- [ ] Add `pynakes keys generate <file> [--dry-run]`
-- [ ] Add `pynakes keys repair <file> [--dry-run]`
-- [ ] Add `pynakes fields rename <file> <old> <new> [--dry-run]`
-- [ ] Add `pynakes fields append <file> <field> <value> [--where <query>] [--dry-run]`
-- [ ] Add `pynakes lint <file>`
+- [x] Add `pynakes inspect <file>`
+- [x] Add `pynakes groups list <file>`
+- [x] Add `pynakes groups add-entry <file> <key> <group> [--dry-run]`
+- [x] Add `pynakes groups remove-entry <file> <key> <group> [--dry-run]`
+- [x] Add `pynakes keys check <file>`
+- [x] Add `pynakes keys generate <file> [--dry-run]`
+- [x] Add `pynakes keys repair <file> [--dry-run]`
+- [x] Add `pynakes fields rename <file> <old> <new> [--dry-run]`
+- [x] Add `pynakes fields append <file> <field> <value> [--where <query>] [--dry-run]`
+- [x] Add `pynakes lint <file>`
 
 **Features:**
 - `--dry-run` flag shows changes without modifying file
@@ -231,9 +231,11 @@ Example: `Smith2020BigData`
 - Errors are clear and actionable
 
 #### 2.6 Diff and output (`diff.py`)
-- [ ] Implement `unified_diff(original: str, modified: str) -> str`
-- [ ] Implement `json_output(status: str, action: str, file: str, modified: bool, details: dict) -> dict`
-- [ ] Use standard Python `difflib` for diffs
+- [x] Implement `unified_diff(original: str, modified: str) -> str` (as `diff.generate_diff`)
+- [x] Implement consistent JSON output across commands (via the `cli._emit`
+  helper, which assembles `{status, action, file, dry_run, modified,
+  modified_entries, ...}` per command; not a standalone `diff.json_output`)
+- [x] Use standard Python `difflib` for diffs
 
 **Success criteria:**
 - Diffs are readable and match expectations
@@ -241,11 +243,11 @@ Example: `Smith2020BigData`
 - Both human and JSON formats work
 
 #### 2.7 Tests for Phase 2
-- [ ] `test_groups.py`: list, add, remove, JabRef compatibility
-- [ ] `test_keys.py`: generation, duplicate detection, repair
-- [ ] `test_fields.py`: rename, move, append, clear with queries
-- [ ] `test_lint.py`: all lint issue types, no false positives
-- [ ] `test_cli.py`: smoke tests for all Phase 2 commands
+- [x] `test_groups.py`: list, add, remove, JabRef compatibility
+- [x] `test_keys.py`: generation, duplicate detection, repair
+- [x] `test_fields.py`: rename, move, append, clear with queries
+- [x] `test_lint.py`: all lint issue types, no false positives
+- [x] `test_cli.py`: smoke tests for all Phase 2 commands
 
 **Success criteria:**
 - All tests pass
