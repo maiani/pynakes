@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Phase 4 test hardening.** Added `hypothesis` as a dev dependency and a new
+  property-based suite (`tests/test_property.py`) asserting parse→write→parse
+  preserves every key/type/field, that unmodified entries write back verbatim,
+  and that the parser never raises anything but `ParseError` on arbitrary input.
+  New `tests/test_stress.py` (large libraries, mass key-repair),
+  `tests/test_error_recovery.py` (parse errors with line numbers, latin-1
+  fallback, atomic-write backup restoration), `tests/test_workflows.py`
+  (end-to-end CLI sequences, dry-run/actual parity, the structured-error/exit-code
+  contract), and `tests/test_editing.py` (direct unit tests of the surgical
+  raw-text primitives). Overall coverage is now 93%.
+
+### Changed
+- **Consolidated journal duplication** (follow-up to the earlier audit):
+  `load_journal_table` and `load_ltwa_table` now share a single `_sniff_rows`
+  CSV/TSV reader, and the `unknown_journal` warning shape lives once in
+  `journals.unknown_journal_warnings`, used by both the `journals` CLI commands
+  and the `normalize` routine (previously duplicated in `cli.py` and
+  `normalize.py`).
+
+### Added
 - **`journals`** sub-app: dedicated `pynakes journals abbreviate`/`expand`
   (both honoring `--dry-run`/`--diff`/`--json` and accepting `--journal-table`
   /`--ltwa-table`) plus a read-only `pynakes journals check [--json]` that

@@ -822,7 +822,7 @@ def normalize(
     )
 
 
-# --- convert (Phase 3) -----------------------------------------------------
+# --- convert -----------------------------------------------------
 
 
 @app.command()
@@ -863,18 +863,7 @@ def convert(
     )
 
 
-# --- journals (Phase 3) ----------------------------------------------------
-
-
-def _journal_unknown_warnings(unknown: list[str]) -> list[dict[str, str]]:
-    return [
-        {
-            "type": "unknown_journal",
-            "message": f"No journal abbreviation source resolved {title!r}",
-            "journal": title,
-        }
-        for title in unknown
-    ]
+# --- journals ----------------------------------------------------
 
 
 def _run_journal_op(
@@ -907,7 +896,7 @@ def _run_journal_op(
         diff,
         json_output,
         human,
-        warnings=_journal_unknown_warnings(report.unknown),
+        warnings=journals_ops.unknown_journal_warnings(report.unknown),
         resolved=report.resolved,
         unknown=report.unknown,
     )
@@ -993,7 +982,7 @@ def journals_check(
         typer.echo(f"  [{item['status']:>7}] {item['journal']}")
 
 
-# --- capabilities (Phase 3) ------------------------------------------------
+# --- capabilities ------------------------------------------------
 
 
 @app.command()

@@ -1,5 +1,7 @@
 """Tests for citation-key generation, duplicate detection, and repair."""
 
+import pytest
+
 from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.keys import (
@@ -90,6 +92,34 @@ class TestGenerateKey:
             assert "unknownSpecial" in str(exc)
         else:
             raise AssertionError("expected unsupported pattern error")
+
+    def test_marker_variants(self) -> None:
+        e = _entry(
+            author="John Smith and Jane Doe and Bob Roe",
+            year="2024",
+            title="A Practical Study of Things",
+        )
+        assert generate_key_from_pattern(e, "[auth3]") == "Smi"  # truncated last name
+        assert generate_key_from_pattern(e, "[authors]") == "SmithDoeRoe"
+        assert generate_key_from_pattern(e, "[shortyear]") == "24"
+        assert generate_key_from_pattern(e, "[shorttitle]") == "PracticalStudyThings"
+        assert generate_key_from_pattern(e, "[camel2]") == "APractical"
+        assert generate_key_from_pattern(e, "[entrytype]") == "Article"
+
+    def test_modifier_variants(self) -> None:
+        e = _entry(
+            author="John Smith", year="2024", title="A Practical Study", journal="test journal"
+        )
+        assert generate_key_from_pattern(e, "[auth:lower]") == "smith"
+        assert generate_key_from_pattern(e, "[auth:upper]") == "SMITH"
+        assert generate_key_from_pattern(e, "[journal:abbr]") == "tj"
+        assert generate_key_from_pattern(e, "[journal:capitalize]") == "TestJournal"
+        assert generate_key_from_pattern(e, "[auth:truncate3]") == "Smi"
+
+    def test_unsupported_modifier_errors(self) -> None:
+        e = _entry(author="John Smith", year="2024", title="A Study")
+        with pytest.raises(UnsupportedCitationKeyPatternError, match="modifier"):
+            generate_key_from_pattern(e, "[auth:bogusmod]")
 
 
 class TestDuplicateDetection:

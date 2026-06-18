@@ -154,6 +154,32 @@ def _first_present(row: dict[str, str], names: tuple[str, ...]) -> str:
     return ""
 
 
+def _sniff_rows(path: Path) -> list[dict[str, str]]:
+    """Read a CSV/TSV file into row dicts, sniffing the delimiter (`,`/tab/`;`)."""
+    sample = path.read_text(encoding="utf-8-sig").splitlines()
+    if not sample:
+        return []
+    dialect = csv.Sniffer().sniff("\n".join(sample[:5]), delimiters=",\t;")
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        return list(csv.DictReader(handle, dialect=dialect))
+
+
+def unknown_journal_warnings(titles: list[str]) -> list[dict[str, str]]:
+    """Build the standard ``unknown_journal`` warning dicts for unresolved titles.
+
+    Single source of truth for the warning shape shared by ``pynakes journals``
+    and the ``normalize`` routine.
+    """
+    return [
+        {
+            "type": "unknown_journal",
+            "message": f"No journal abbreviation source resolved {title!r}",
+            "journal": title,
+        }
+        for title in titles
+    ]
+
+
 def add_mapping(sources: JournalSources, mapping: JournalMapping) -> None:
     """Add a title/ISSN mapping. Later mappings for the same key win."""
     sources.title_mappings[_journal_key(mapping.title)] = mapping
@@ -186,52 +212,39 @@ def load_journal_table(path: str | Path, sources: JournalSources | None = None) 
     """
     target = sources or JournalSources()
     table_path = Path(path)
-    sample = table_path.read_text(encoding="utf-8-sig").splitlines()
-    if not sample:
-        return target
-    dialect = csv.Sniffer().sniff("\n".join(sample[:5]), delimiters=",\t;")
-    with table_path.open(encoding="utf-8-sig", newline="") as handle:
-        reader = csv.DictReader(handle, dialect=dialect)
-        for row in reader:
-            title = _first_present(row, ("title", "full", "full_title", "journal"))
-            abbreviated = _first_present(
-                row,
-                ("abbreviation", "abbreviated", "abbrev", "short", "short_title"),
-            )
-            if not title or not abbreviated:
-                continue
-            issn = _first_present(row, ("issn", "eissn", "e-issn")) or None
-            add_mapping(
-                target,
-                JournalMapping(
-                    title=title,
-                    abbreviated=abbreviated,
-                    issn=issn,
-                    source=str(table_path),
-                ),
-            )
+    for row in _sniff_rows(table_path):
+        title = _first_present(row, ("title", "full", "full_title", "journal"))
+        abbreviated = _first_present(
+            row,
+            ("abbreviation", "abbreviated", "abbrev", "short", "short_title"),
+        )
+        if not title or not abbreviated:
+            continue
+        issn = _first_present(row, ("issn", "eissn", "e-issn")) or None
+        add_mapping(
+            target,
+            JournalMapping(
+                title=title,
+                abbreviated=abbreviated,
+                issn=issn,
+                source=str(table_path),
+            ),
+        )
     return target
 
 
 def load_ltwa_table(path: str | Path, sources: JournalSources | None = None) -> JournalSources:
     """Load title-word abbreviations from an LTWA-style CSV/TSV export."""
     target = sources or JournalSources()
-    table_path = Path(path)
-    sample = table_path.read_text(encoding="utf-8-sig").splitlines()
-    if not sample:
-        return target
-    dialect = csv.Sniffer().sniff("\n".join(sample[:5]), delimiters=",\t;")
-    with table_path.open(encoding="utf-8-sig", newline="") as handle:
-        reader = csv.DictReader(handle, dialect=dialect)
-        for row in reader:
-            word = _first_present(row, ("word", "title word", "title_word"))
-            abbreviation = _first_present(row, ("abbreviation", "abbr", "short"))
-            if not word:
-                continue
-            if abbreviation.lower() == "none":
-                abbreviation = word
-            if abbreviation:
-                target.ltwa_words[_journal_key(word)] = abbreviation
+    for row in _sniff_rows(Path(path)):
+        word = _first_present(row, ("word", "title word", "title_word"))
+        abbreviation = _first_present(row, ("abbreviation", "abbr", "short"))
+        if not word:
+            continue
+        if abbreviation.lower() == "none":
+            abbreviation = word
+        if abbreviation:
+            target.ltwa_words[_journal_key(word)] = abbreviation
     return target
 
 

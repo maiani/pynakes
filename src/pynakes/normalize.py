@@ -168,13 +168,6 @@ def normalize_library(lib: BibLibrary, options: NormalizeOptions | None = None) 
     journal_sources = journal_ops.load_sources(journal_table, ltwa_table)
     journal_result = journal_ops.normalize_journals(lib, journal_style, journal_sources)
     result.journals = journal_result.changed
-    result.warnings.extend(
-        {
-            "type": "unknown_journal",
-            "message": f"No journal abbreviation source resolved {title!r}",
-            "journal": title,
-        }
-        for title in journal_result.unknown
-    )
+    result.warnings.extend(journal_ops.unknown_journal_warnings(journal_result.unknown))
 
     return result

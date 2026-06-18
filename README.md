@@ -136,13 +136,15 @@ Additionally:
 
 ## Current status
 
-> **v0.1 is in active development.** The core BibTeX maintenance workflow is
-> usable: inspect, lint, edit fields/groups, repair keys, import by DOI, and
-> analyze cited/unused entries. The top-level `normalize` routine now provides
-> a daily maintenance pass for titles, JabRef-style author/editor lists, DOI fields, and
-> known journal titles. Merge-oriented features are still pending. See
-> [DEVPLAN.md](DEVPLAN.md) for the phased build plan and
-> [ARCHITECTURE.md](ARCHITECTURE.md) for the design.
+> **v0.1 is feature-complete and in the testing/polish phase (Phase 4).** The
+> full BibTeX maintenance workflow is usable: inspect, lint, edit fields/groups,
+> repair keys, import by DOI, analyze cited/unused entries, convert between
+> BibTeX and BibLaTeX, and abbreviate/expand journal titles. The top-level
+> `normalize` routine provides a daily maintenance pass for titles, JabRef-style
+> author/editor lists, DOI fields, and known journal titles, and `capabilities`
+> exposes a machine-readable description of the tool for agents. Merge-oriented
+> features are still pending. See [DEVPLAN.md](DEVPLAN.md) for the phased build
+> plan and [ARCHITECTURE.md](ARCHITECTURE.md) for the design.
 
 ### Implemented
 
@@ -157,6 +159,9 @@ Additionally:
 - [x] Top-level `normalize` command for title protection, JabRef-style author/editor list normalization, DOI normalization, exact journal mappings, and LTWA-style journal abbreviation/expansion
 - [x] Lint: duplicate keys, missing DOI, malformed DOI, malformed groups, missing required fields
 - [x] DOI import via DOI resolver BibTeX content negotiation
+- [x] BibTeX ↔ BibLaTeX conversion (`convert`), preserving unknown fields, groups, and comments
+- [x] Journal title abbreviation/expansion (`journals abbreviate|expand|check`) with exact, user, and LTWA-style sources
+- [x] Machine-readable capability introspection (`capabilities --json`) matching the agent contract
 - [x] AUX/TeX citation analysis, unused/missing reporting, group/keyword tagging, and subset export
 - [x] Dry-run, unified diff, and JSON output for modifying commands
 - [x] Atomic writes, validation-before-write, and `.bak` backups
@@ -165,8 +170,6 @@ Additionally:
 ### Still planned
 
 - [ ] Full JabRef library metadata support: parse, preserve, inspect, and safely update known `jabref-meta` blocks
-- [ ] Capabilities introspection JSON matching the agent contract
-- [ ] Conservative BibTeX → BibLaTeX conversion
 - [ ] Deduplication and merge workflows
 - [ ] Linked-file checking and repair
 - [ ] Advanced search/query DSL
@@ -189,7 +192,6 @@ Additionally:
 - Full JabRef metadata compatibility pass
 - Deduplication and merge
 - Provider-specific DOI fallbacks/enrichment
-- Capabilities introspection JSON
 
 ### v0.2
 - Conservative BibTeX → BibLaTeX conversion

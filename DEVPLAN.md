@@ -406,11 +406,11 @@ pynakes capabilities --json | python -m json.tool
 ### Tasks
 
 #### 4.1 Comprehensive testing
-- [ ] Add property-based tests (hypothesis) for parser robustness
-- [ ] Add stress tests (large files, many entries)
-- [ ] Add error recovery tests (malformed input, permission errors)
-- [ ] Add end-to-end workflow tests (multi-operation sequences)
-- [ ] Ensure coverage >90% across all modules
+- [x] Add property-based tests (hypothesis) for parser robustness
+- [x] Add stress tests (large files, many entries)
+- [x] Add error recovery tests (malformed input, atomic-write/backup failures)
+- [x] Add end-to-end workflow tests (multi-operation sequences)
+- [x] Ensure coverage >90% across all modules (93% overall)
 
 **Success criteria:**
 - `pytest --cov` shows >90% coverage
@@ -418,10 +418,10 @@ pynakes capabilities --json | python -m json.tool
 - No unexpected failures on fuzzing
 
 #### 4.2 Error handling improvements
-- [ ] Ensure all error messages are clear and actionable
-- [ ] Add file:line context to all parse errors
-- [ ] Add suggestions for common issues
-- [ ] Test error paths thoroughly
+- [x] Ensure all error messages are clear and actionable (routed through `_safe`)
+- [x] Add file:line context to all parse errors (`ParseError.line`, surfaced in CLI JSON)
+- [x] Add suggestions for common issues (e.g. duplicate DOI → retry with `--allow-duplicate`)
+- [x] Test error paths thoroughly (`test_error_recovery.py`, `test_workflows.py`)
 
 **Success criteria:**
 - Error messages are helpful
@@ -429,12 +429,12 @@ pynakes capabilities --json | python -m json.tool
 - User can fix issues based on error message
 
 #### 4.3 Documentation
-- [ ] Ensure README is accurate and complete
-- [ ] Ensure ARCHITECTURE.md covers all design decisions
-- [ ] Ensure AGENTS.md (contributor guide) is accurate
-- [ ] Ensure docs/guides/llm-integration.md (runtime usage) has clear examples
-- [ ] Add docstrings to all public functions
-- [ ] Add type hints throughout
+- [x] Ensure README is accurate and complete (Phase 3 features moved out of "planned")
+- [x] Ensure ARCHITECTURE.md covers all design decisions
+- [x] Ensure AGENTS.md (contributor guide) is accurate
+- [x] Ensure docs/guides/llm-integration.md (runtime usage) has clear examples
+- [x] Add docstrings to all public functions
+- [x] Add type hints throughout
 
 **Success criteria:**
 - README examples all work
@@ -443,10 +443,10 @@ pynakes capabilities --json | python -m json.tool
 - All public functions have docstrings
 
 #### 4.4 Code quality
-- [ ] Run `ruff check .` and fix all issues
-- [ ] Run `ruff format .` for consistent formatting
-- [ ] Remove any debug code or TODOs
-- [ ] Review code for clarity and simplicity
+- [x] Run `ruff check .` and fix all issues
+- [x] Run `ruff format .` for consistent formatting
+- [x] Remove any debug code or TODOs (none present)
+- [x] Review code for clarity and simplicity (journals dedup consolidation)
 
 **Success criteria:**
 - `ruff check .` passes with no errors
@@ -454,10 +454,10 @@ pynakes capabilities --json | python -m json.tool
 - Code is readable and maintainable
 
 #### 4.5 Final integration tests
-- [ ] Test all CLI commands with real files
-- [ ] Test all fixture files work end-to-end
-- [ ] Test dry-run vs actual execution matches
-- [ ] Test error handling with malformed input
+- [x] Test all CLI commands with real files
+- [x] Test all fixture files work end-to-end
+- [x] Test dry-run vs actual execution matches
+- [x] Test error handling with malformed input
 
 **Success criteria:**
 - All CLI commands work
@@ -465,12 +465,13 @@ pynakes capabilities --json | python -m json.tool
 - Errors are handled gracefully
 
 #### 4.6 Release checklist
-- [ ] Update `pyproject.toml` with version 0.1.0
-- [ ] Update README with "Current status" section
-- [ ] Update CHANGELOG.md with v0.1.0 release notes
-- [ ] Verify `pip install -e .` works from scratch
-- [ ] Verify all tests pass
-- [ ] Verify `ruff check .` and `ruff format .` pass
+- [x] Update `pyproject.toml` with version 0.1.0
+- [x] Update README with "Current status" section
+- [x] Update CHANGELOG.md with v0.1.0 release notes (in `[Unreleased]`; stamp the
+  dated `[0.1.0]` section at tag time)
+- [x] Verify `pip install -e .` works from scratch
+- [x] Verify all tests pass
+- [x] Verify `ruff check .` and `ruff format .` pass
 
 **Success criteria:**
 - Package installs cleanly

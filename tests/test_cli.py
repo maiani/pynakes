@@ -228,6 +228,57 @@ class TestDOICommand:
         assert data["status"] == "conflict"
         assert data["existing_keys"] == ["Smith2020"]
 
+    def test_import_citation_key_conflict(self, tmp_path: Path, monkeypatch) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        monkeypatch.setattr(doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
+
+        result = runner.invoke(
+            app,
+            ["doi", "import", str(bib), "10.5555/provider", "--key", "Smith2020", "--json"],
+        )
+
+        assert result.exit_code == 2, result.output
+        data = json.loads(result.output)
+        assert data["status"] == "conflict"
+        assert data["error"] == "CitationKeyConflict"
+        assert data["key"] == "Smith2020"
+
+    def test_import_citation_key_conflict_human(self, tmp_path: Path, monkeypatch) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        monkeypatch.setattr(doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
+
+        result = runner.invoke(
+            app, ["doi", "import", str(bib), "10.5555/provider", "--key", "Smith2020"]
+        )
+        assert result.exit_code == 2, result.output
+        assert "CitationKeyConflict" in result.output
+
+    def test_import_malformed_doi_errors(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(app, ["doi", "import", str(bib), "not-a-doi", "--json"])
+        assert result.exit_code == 1, result.output
+        assert json.loads(result.output)["error"] == "InvalidDOI"
+
+    def test_import_provider_failure_errors(self, tmp_path: Path, monkeypatch) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+
+        def _boom(doi: str) -> str:
+            raise doi_ops.DOIImportError("resolver offline")
+
+        monkeypatch.setattr(doi_ops, "fetch_bibtex_for_doi", _boom)
+        result = runner.invoke(app, ["doi", "import", str(bib), "10.5555/provider", "--json"])
+        assert result.exit_code == 1, result.output
+        assert json.loads(result.output)["error"] == "DOIImportError"
+
+    def test_import_duplicate_doi_human_output(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(
+            app, ["doi", "import", str(bib), "https://doi.org/10.1234/nature.ml.2020"]
+        )
+        assert result.exit_code == 2, result.output
+        assert "DuplicateDOI" in result.output
+        assert "--allow-duplicate" in result.output
+
 
 class TestGroupsCommand:
     def test_list_groups(self, tmp_path: Path) -> None:
