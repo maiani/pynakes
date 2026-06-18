@@ -2,12 +2,10 @@
 
 import functools
 import json as _json
-from pathlib import Path
 from typing import Optional
 
 import typer
 
-from pynakes import convert as convert_ops
 from pynakes import doi as doi_ops
 from pynakes import fields as fields_ops
 from pynakes import files as files_ops
@@ -17,15 +15,16 @@ from pynakes import journals as journals_ops
 from pynakes import keys as keys_ops
 from pynakes import normalize as normalize_ops
 from pynakes.bibtex_parser import ParseError
-from pynakes.bibtex_writer import write_bib
 from pynakes.capabilities import get_capabilities
 from pynakes.diff import generate_diff
-from pynakes.editing import splice_into_text
-from pynakes.io import load_bib, save_bib, save_text
+from pynakes.engine import ExternalModificationError, Volume
+from pynakes.io import load_bib, save_bib, save_plain_text
 from pynakes.lint import lint as lint_lib
 from pynakes.usage import (
     analyze_usage,
     collect_cited_keys,
+    iter_tex_files,
+    rename_citation_key_in_tex,
     subset_library,
     tag_with_group,
     tag_with_keyword,
@@ -51,42 +50,6 @@ app.add_typer(metadata_app, name="metadata")
 # --- shared helpers --------------------------------------------------------
 
 
-def _snapshot(lib) -> dict[int, Optional[str]]:
-    """Capture each entry's raw text so edits can be diffed against it."""
-    return {id(e): e.raw_content for e in lib.entries.values()}
-
-
-def _commit(
-    bib_file: str, lib, pre_raw: dict[int, Optional[str]], dry_run: bool
-) -> tuple[int, str, bool]:
-    """Splice surgical edits back into the original file and (unless dry-run) write.
-
-    Returns ``(changed_entries, diff_text, modified)``. Entries whose
-    ``raw_content`` differs from the pre-edit snapshot are spliced into the
-    original text for a minimal diff; if any block can't be located we fall back
-    to full re-serialization.
-    """
-    original_text = Path(bib_file).read_text(encoding=lib.encoding, errors="replace")
-    edits: list[tuple[str, str]] = []
-    for entry in lib.entries.values():
-        before = pre_raw.get(id(entry))
-        if before is not None and entry.raw_content is not None and entry.raw_content != before:
-            edits.append((before, entry.raw_content))
-
-    if edits:
-        new_text = splice_into_text(original_text, edits)
-        if new_text is None:
-            new_text = write_bib(lib)
-    else:
-        new_text = original_text
-
-    modified = new_text != original_text
-    diff_text = generate_diff(original_text, new_text, Path(bib_file).name) if modified else ""
-    if modified and not dry_run:
-        save_text(new_text, bib_file, encoding=lib.encoding)
-    return len(edits), diff_text, modified
-
-
 def _emit(
     json_output: bool,
     result: dict,
@@ -108,17 +71,6 @@ def _emit(
 
 def _entries(count: int) -> str:
     return "entry" if count == 1 else "entries"
-
-
-def _append_entry_text(original_text: str, entry_text: str, line_ending: str) -> str:
-    """Append a BibTeX entry while preserving existing file text."""
-    if not original_text:
-        return entry_text + line_ending
-    if original_text.endswith(line_ending * 2):
-        return original_text + entry_text + line_ending
-    if original_text.endswith(line_ending):
-        return original_text + line_ending + entry_text + line_ending
-    return original_text + line_ending + line_ending + entry_text + line_ending
 
 
 def _emit_error(json_output: bool, error: str, message: str, code: int = 1, **extra) -> None:
@@ -163,6 +115,23 @@ def _safe(fn):
             _emit_error(json_output, "FileNotFound", str(exc))
         except ParseError as exc:
             _emit_error(json_output, "ParseError", exc.message, line=exc.line)
+        except ExternalModificationError as exc:
+            _emit_conflict(
+                json_output,
+                "ExternalModification",
+                str(exc),
+                file=str(exc.path),
+                options=[
+                    {
+                        "id": "reload",
+                        "description": "Reload the file and retry the operation",
+                    },
+                    {
+                        "id": "manual_review",
+                        "description": "Review the on-disk changes before retrying",
+                    },
+                ],
+            )
         except ValueError as exc:
             _emit_error(json_output, "InvalidInput", str(exc))
         except OSError as exc:
@@ -172,15 +141,34 @@ def _safe(fn):
 
 
 def _finish_mod(
-    file, action, lib, pre, dry_run, diff, json_output, human, warnings=None, **details
+    file,
+    action,
+    vol: Volume,
+    dry_run,
+    diff,
+    json_output,
+    human,
+    warnings=None,
+    modified_entries: int | None = None,
+    **details,
 ) -> None:
-    """Commit surgical edits and emit the standard result for a modifying command.
+    """Preview/commit a volume and emit the standard modifying-command result.
 
     Every modifying command shares this envelope:
     ``status, action, file, dry_run, modified, modified_entries, warnings`` plus
     command-specific keys, and an optional ``diff`` when ``--diff`` is set.
     """
-    changed, diff_text, modified = _commit(file, lib, pre, dry_run)
+    if dry_run:
+        diff_text = vol.diff()
+        modified = vol.is_modified
+        changed = vol.changed_entries_count()
+    else:
+        result = vol.commit()
+        diff_text = result.diff
+        modified = result.modified
+        changed = result.changed_entries
+    if modified_entries is not None:
+        changed = modified_entries
     result = {
         "status": "success",
         "action": action,
@@ -242,27 +230,6 @@ def inspect(
 # --- metadata --------------------------------------------------------------
 
 
-def _insert_metadata_comment(original_text: str, comment: str, line_ending: str) -> str:
-    """Insert a new JabRef metadata comment at the top of a file."""
-    if not original_text:
-        return comment + line_ending
-    return comment + line_ending + original_text
-
-
-def _metadata_update_text(
-    original_text: str,
-    lib,
-    update: jabref_ops.JabRefMetadataUpdate,
-    line_ending: str,
-) -> str:
-    """Apply a raw metadata update to file text with the smallest safe change."""
-    if update.old_raw is None:
-        return _insert_metadata_comment(original_text, update.new_raw, line_ending)
-    if update.old_raw in original_text:
-        return original_text.replace(update.old_raw, update.new_raw, 1)
-    return write_bib(lib)
-
-
 @metadata_app.command("list")
 @_safe
 def metadata_list(
@@ -309,10 +276,9 @@ def metadata_set(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Set one top-level JabRef ``jabref-meta`` block."""
-    lib = load_bib(file)
-    original_text = Path(file).read_text(encoding=lib.encoding, errors="replace")
+    vol = Volume.open(file)
     try:
-        update = jabref_ops.set_metadata(lib, key, value, allow_unknown=allow_unknown)
+        update = vol.set_metadata(key, value, allow_unknown=allow_unknown)
     except jabref_ops.DuplicateJabRefMetadataError as exc:
         _emit_conflict(
             json_output,
@@ -328,30 +294,19 @@ def metadata_set(
             ],
         )
 
-    new_text = _metadata_update_text(original_text, lib, update, lib.line_ending)
-    modified = new_text != original_text
-    diff_text = generate_diff(original_text, new_text, Path(file).name) if modified else ""
-    if modified and not dry_run:
-        save_text(new_text, file, encoding=lib.encoding)
-
     verb = "Would set" if dry_run else "Set"
-    _emit(
-        json_output,
-        {
-            "status": "success",
-            "action": "metadata_set",
-            "file": file,
-            "dry_run": dry_run,
-            "modified": modified,
-            "modified_entries": 0,
-            "warnings": [],
-            "key": update.key,
-            "value": update.value.rstrip(";").strip(),
-            "created": update.created,
-        },
-        [f"{verb} JabRef metadata {update.key!r}."],
-        diff_text,
+    _finish_mod(
+        file,
+        "metadata_set",
+        vol,
+        dry_run,
         diff,
+        json_output,
+        [f"{verb} JabRef metadata {update.key!r}."],
+        modified_entries=0,
+        key=update.key,
+        value=update.value.rstrip(";").strip(),
+        created=update.created,
     )
 
 
@@ -464,9 +419,12 @@ def doi_import(
         )
 
     try:
-        lib = load_bib(file)
-        entry = doi_ops.prepare_imported_entry(
-            lib, doi, key=key, key_source=key_source, allow_duplicate_doi=allow_duplicate
+        vol = Volume.open(file)
+        entry = vol.import_doi(
+            doi,
+            key=key,
+            key_source=key_source,
+            allow_duplicate_doi=allow_duplicate,
         )
     except ValueError as exc:
         _emit_error(json_output, "InvalidDOI", str(exc))
@@ -521,33 +479,19 @@ def doi_import(
     except doi_ops.DOIImportError as exc:
         _emit_error(json_output, "DOIImportError", str(exc))
 
-    original_text = Path(file).read_text(encoding=lib.encoding, errors="replace")
-    entry_text = doi_ops.render_entry(entry, lib.line_ending)
-    new_text = _append_entry_text(original_text, entry_text, lib.line_ending)
-    modified = new_text != original_text
-    diff_text = generate_diff(original_text, new_text, Path(file).name) if modified else ""
-    if modified and not dry_run:
-        save_text(new_text, file, encoding=lib.encoding)
-
     verb = "Would import" if dry_run else "Imported"
-    _emit(
-        json_output,
-        {
-            "status": "success",
-            "action": "doi_import",
-            "file": file,
-            "dry_run": dry_run,
-            "modified": modified,
-            "modified_entries": 1 if modified else 0,
-            "warnings": [],
-            "doi": entry.fields["doi"],
-            "key": entry.key,
-            "key_source": "user" if key else key_source,
-            "entry_type": entry.type,
-        },
-        [f"{verb} DOI {entry.fields['doi']} as {entry.key}."],
-        diff_text,
+    _finish_mod(
+        file,
+        "doi_import",
+        vol,
+        dry_run,
         diff,
+        json_output,
+        [f"{verb} DOI {entry.fields['doi']} as {entry.key}."],
+        doi=entry.fields["doi"],
+        key=entry.key,
+        key_source="user" if key else key_source,
+        entry_type=entry.type,
     )
 
 
@@ -597,16 +541,14 @@ def groups_add_entry(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Add an entry to a group."""
-    lib = load_bib(file)
-    _require_key(lib, key, json_output)
-    pre = _snapshot(lib)
-    count = groups_ops.add_to_group(lib, key, group)
+    vol = Volume.open(file)
+    _require_key(vol.lib, key, json_output)
+    count = vol.add_to_group(key, group)
     verb = "Would add" if dry_run else "Added"
     _finish_mod(
         file,
         "groups_add_entry",
-        lib,
-        pre,
+        vol,
         dry_run,
         diff,
         json_output,
@@ -627,16 +569,14 @@ def groups_remove_entry(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Remove an entry from a group."""
-    lib = load_bib(file)
-    _require_key(lib, key, json_output)
-    pre = _snapshot(lib)
-    count = groups_ops.remove_from_group(lib, key, group)
+    vol = Volume.open(file)
+    _require_key(vol.lib, key, json_output)
+    count = vol.remove_from_group(key, group)
     verb = "Would remove" if dry_run else "Removed"
     _finish_mod(
         file,
         "groups_remove_entry",
-        lib,
-        pre,
+        vol,
         dry_run,
         diff,
         json_output,
@@ -695,17 +635,15 @@ def keys_generate(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Regenerate all citation keys from entry metadata (AuthorYearTitle)."""
-    lib = load_bib(file)
-    pre = _snapshot(lib)
-    renames = keys_ops.regenerate_keys(lib)
+    vol = Volume.open(file)
+    renames = vol.generate_keys()
     verb = "Would rename" if dry_run else "Renamed"
     human = [f"{verb} {len(renames)} {_entries(len(renames))}."]
     human += [f"  {old} -> {new}" for old, new in renames]
     _finish_mod(
         file,
         "keys_generate",
-        lib,
-        pre,
+        vol,
         dry_run,
         diff,
         json_output,
@@ -723,22 +661,141 @@ def keys_repair(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Rename duplicate citation keys so every key is unique."""
-    lib = load_bib(file)
-    pre = _snapshot(lib)
-    renames = keys_ops.repair_duplicate_keys(lib)
+    vol = Volume.open(file)
+    renames = vol.repair_keys()
     verb = "Would repair" if dry_run else "Repaired"
     human = [f"{verb} {len(renames)} duplicate key(s)."]
     human += [f"  {old} -> {new}" for old, new in renames]
     _finish_mod(
         file,
         "keys_repair",
-        lib,
-        pre,
+        vol,
         dry_run,
         diff,
         json_output,
         human,
         **_rename_payload(renames),
+    )
+
+
+@keys_app.command("rename")
+@_safe
+def keys_rename(
+    file: str = typer.Argument(..., help="Path to the .bib file"),
+    old: str = typer.Argument(..., help="Existing citation key"),
+    new: str = typer.Argument(..., help="New citation key"),
+    sources: list[str] = typer.Argument(
+        ..., help="One or more .tex files or directories whose citations should be updated"
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Rename one citation key in a .bib file and matching TeX citations."""
+    vol = Volume.open(file)
+    keys_ops.validate_key(old)
+    keys_ops.validate_key(new)
+
+    matches = vol.lib.entries.get_all(old)
+    if not matches:
+        _emit_error(json_output, "KeyNotFound", f"No entry with key {old!r} in the library")
+    if len(matches) > 1:
+        _emit_conflict(
+            json_output,
+            "DuplicateCitationKey",
+            f"Cannot rename duplicated key {old!r}; repair duplicates first",
+            key=old,
+            count=len(matches),
+            options=[
+                {
+                    "id": "repair_duplicates",
+                    "description": "Run keys repair first, then retry with the unique key",
+                }
+            ],
+        )
+    if old != new and new in vol.lib.entries:
+        _emit_conflict(
+            json_output,
+            "CitationKeyConflict",
+            f"Cannot rename {old!r} to {new!r}: target key already exists",
+            key=new,
+            options=[
+                {"id": "choose_key", "description": "Retry with a different new key"},
+                {
+                    "id": "repair_duplicates",
+                    "description": "Run keys repair if the target is duplicated",
+                },
+            ],
+        )
+
+    bib_changed = vol.rename_key(old, new)
+    tex_files = iter_tex_files(sources)
+    if not tex_files:
+        _emit_error(json_output, "NoTeXSources", "No .tex files found in the provided sources")
+    if not dry_run and vol.externally_changed():
+        if vol.path is None:
+            raise ValueError("rename requires a bound .bib file")
+        raise ExternalModificationError(vol.path)
+
+    source_changes = []
+    source_diff_parts = []
+    total_source_occurrences = 0
+    for path in tex_files:
+        before = path.read_text(encoding="utf-8", errors="replace")
+        after, occurrences = rename_citation_key_in_tex(before, old, new)
+        modified = before != after
+        total_source_occurrences += occurrences
+        if modified:
+            source_diff_parts.append(generate_diff(before, after, path.name))
+            if not dry_run:
+                saved = save_plain_text(after, str(path), encoding="utf-8")
+                if not saved.success:
+                    raise OSError(saved.error or f"Could not write {path}")
+        source_changes.append(
+            {
+                "path": str(path),
+                "modified": modified,
+                "occurrences": occurrences,
+            }
+        )
+
+    if dry_run:
+        bib_diff = vol.diff()
+        bib_modified = vol.is_modified
+        changed_entries = vol.changed_entries_count()
+    else:
+        result = vol.commit()
+        bib_diff = result.diff
+        bib_modified = result.modified
+        changed_entries = result.changed_entries
+
+    diff_text = "\n".join(part for part in [bib_diff, *source_diff_parts] if part)
+    source_modified = any(change["modified"] for change in source_changes)
+    modified = bib_modified or source_modified
+
+    verb = "Would rename" if dry_run else "Renamed"
+    human = [
+        f"{verb} citation key {old!r} to {new!r}.",
+        f"  bib entries changed={bib_changed}, TeX citations changed={total_source_occurrences}",
+    ]
+    _emit(
+        json_output,
+        {
+            "status": "success",
+            "action": "keys_rename",
+            "file": file,
+            "dry_run": dry_run,
+            "modified": modified,
+            "modified_entries": changed_entries,
+            "warnings": [],
+            "old": old,
+            "new": new,
+            "source_occurrences": total_source_occurrences,
+            "sources": source_changes,
+        },
+        human,
+        diff_text,
+        diff,
     )
 
 
@@ -754,14 +811,12 @@ def _build_filter(where: Optional[str]):
 
 
 def _run_field_op(file, action, op, dry_run, diff, json_output, details, verb):
-    lib = load_bib(file)
-    pre = _snapshot(lib)
-    count = op(lib)
+    vol = Volume.open(file)
+    count = op(vol)
     _finish_mod(
         file,
         action,
-        lib,
-        pre,
+        vol,
         dry_run,
         diff,
         json_output,
@@ -786,7 +841,7 @@ def fields_rename(
     _run_field_op(
         file,
         "fields_rename",
-        lambda lib: fields_ops.rename_field(lib, old, new, flt),
+        lambda vol: vol.rename_field(old, new, flt),
         dry_run,
         diff,
         json_output,
@@ -811,7 +866,7 @@ def fields_move(
     _run_field_op(
         file,
         "fields_move",
-        lambda lib: fields_ops.move_field(lib, old, new, flt),
+        lambda vol: vol.move_field(old, new, flt),
         dry_run,
         diff,
         json_output,
@@ -836,7 +891,7 @@ def fields_append(
     _run_field_op(
         file,
         "fields_append",
-        lambda lib: fields_ops.append_field(lib, field, value, flt),
+        lambda vol: vol.append_field(field, value, flt),
         dry_run,
         diff,
         json_output,
@@ -860,7 +915,7 @@ def fields_clear(
     _run_field_op(
         file,
         "fields_clear",
-        lambda lib: fields_ops.clear_field(lib, field, flt),
+        lambda vol: vol.clear_field(field, flt),
         dry_run,
         diff,
         json_output,
@@ -888,7 +943,7 @@ def fields_protect_title(
     _run_field_op(
         file,
         "fields_protect_title",
-        lambda lib: fields_ops.protect_title_capitalization(lib, field, flt, terms),
+        lambda vol: vol.protect_title(field, flt, terms),
         dry_run,
         diff,
         json_output,
@@ -971,9 +1026,8 @@ def normalize(
             ltwa_table=ltwa_table,
             normalize_dois=_optional_bool(doi_normalization),
         )
-        lib = load_bib(file)
-        pre = _snapshot(lib)
-        report = normalize_ops.normalize_library(lib, options)
+        vol = Volume.open(file)
+        report = vol.normalize(options)
     except ValueError as exc:
         _emit_error(json_output, "InvalidNormalizeOption", str(exc))
 
@@ -990,8 +1044,7 @@ def normalize(
     _finish_mod(
         file,
         "normalize",
-        lib,
-        pre,
+        vol,
         dry_run,
         diff,
         json_output,
@@ -1014,9 +1067,8 @@ def convert(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Convert a library between BibTeX and BibLaTeX conventions."""
-    lib = load_bib(file)
-    pre = _snapshot(lib)
-    report = convert_ops.convert(lib, to)  # raises ValueError on an unknown target
+    vol = Volume.open(file)
+    report = vol.convert(to)  # raises ValueError on an unknown target
 
     verb = "Would convert" if dry_run else "Converted"
     human = [
@@ -1031,8 +1083,7 @@ def convert(
     _finish_mod(
         file,
         "convert",
-        lib,
-        pre,
+        vol,
         dry_run,
         diff,
         json_output,
@@ -1056,10 +1107,11 @@ def _run_journal_op(
 ) -> None:
     """Shared body for ``journals abbreviate`` / ``journals expand``."""
     verb_root = "abbreviate" if style == "abbreviated" else "expand"
-    lib = load_bib(file)
-    pre = _snapshot(lib)
-    sources = journals_ops.load_sources(journal_table, ltwa_table)
-    report = journals_ops.normalize_journals(lib, style, sources)
+    vol = Volume.open(file)
+    if style == "abbreviated":
+        report = vol.abbreviate_journals(journal_table, ltwa_table)
+    else:
+        report = vol.expand_journals(journal_table, ltwa_table)
 
     verb = f"Would {verb_root}" if dry_run else f"{verb_root.capitalize()[:-1]}ed"
     human = [f"{verb} {report.changed} journal {_entries(report.changed)}."]
@@ -1069,8 +1121,7 @@ def _run_journal_op(
     _finish_mod(
         file,
         f"journals_{verb_root}",
-        lib,
-        pre,
+        vol,
         dry_run,
         diff,
         json_output,
@@ -1203,30 +1254,37 @@ def used(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Report which entries are used in LaTeX sources; optionally tag or export them."""
-    lib = load_bib(bib_file)
+    vol = Volume.open(bib_file)
     cited, include_all, scanned = collect_cited_keys(sources)
-    report = analyze_usage(lib, cited, include_all=include_all, sources=scanned)
-
-    pre = _snapshot(lib)
+    report = analyze_usage(vol.lib, cited, include_all=include_all, sources=scanned)
 
     tagged = 0
     tag_field = None
     if group:
-        tagged = tag_with_group(lib, report.used, group)
+        tagged = tag_with_group(vol.lib, report.used, group)
         tag_field = "groups"
     elif keyword:
-        tagged = tag_with_keyword(lib, report.used, keyword)
+        tagged = tag_with_keyword(vol.lib, report.used, keyword)
         tag_field = "keywords"
+    vol.mark_dirty(tagged)
 
     bib_diff = ""
     tagged_entries = 0
     file_modified = False
     if tag_field:
-        tagged_entries, bib_diff, file_modified = _commit(bib_file, lib, pre, dry_run)
+        if dry_run:
+            tagged_entries = vol.changed_entries_count()
+            bib_diff = vol.diff()
+            file_modified = vol.is_modified
+        else:
+            result = vol.commit()
+            tagged_entries = result.changed_entries
+            bib_diff = result.diff
+            file_modified = result.modified
 
     out_written = False
     if out:
-        sub = subset_library(lib, report.used)
+        sub = subset_library(vol.lib, report.used)
         if not dry_run:
             save_bib(sub, out, backup=False)
             out_written = True

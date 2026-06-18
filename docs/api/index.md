@@ -52,6 +52,32 @@ lib = load_bib("refs.bib")
 save_bib(lib, "refs.bib", backup=True, atomic=True)
 ```
 
+## Engine Facade
+
+```python
+from pynakes.engine import ExternalModificationError, Volume
+
+vol = Volume.open("refs.bib")
+issues = vol.lint()
+renames = vol.repair_keys()
+report = vol.normalize()
+
+print(vol.diff())
+result = vol.commit()
+```
+
+`Volume` owns the load → stage → preview → commit lifecycle for one `.bib` file.
+It keeps the file as the source of truth: staged operations mutate the in-memory
+library only, `preview()` returns the would-be file text, `diff()` returns a
+unified diff, and `commit()` writes atomically through the same validation path
+as the CLI. `reset()` discards staged edits and `reload(force=True)` re-reads
+from disk.
+
+`commit()` checks a size/mtime/content fingerprint captured at `open`; if the
+file changed underneath, it raises `ExternalModificationError` instead of
+silently overwriting external edits. Call `externally_changed()` to poll the
+same check before committing.
+
 ## Parser and Writer
 
 ```python
@@ -88,14 +114,23 @@ from pynakes.keys import (
     duplicate_key_counts,
     generate_key,
     regenerate_keys,
+    rename_key,
     repair_duplicate_keys,
 )
+from pynakes.usage import rename_citation_key_in_tex
 
 entry = lib.entries["Smith2020"]
 key = generate_key(entry, lib)
 duplicates = duplicate_key_counts(lib)
 renames = regenerate_keys(lib)
+changed = rename_key(lib, "Smith2020", "Smith2020ML")
 repairs = repair_duplicate_keys(lib)
+
+source_text, occurrences = rename_citation_key_in_tex(
+    source_text,
+    "Smith2020",
+    "Smith2020ML",
+)
 ```
 
 `generate_key(entry, lib)` honors JabRef citation-key metadata in the library
@@ -141,19 +176,19 @@ move_field(lib, "school", "institution")
 ## DOI Import
 
 ```python
-from pynakes.doi import prepare_imported_entry, render_entry
+from pynakes.engine import Volume
 
-entry = prepare_imported_entry(
-    lib,
+vol = Volume.open("refs.bib")
+entry = vol.import_doi(
     "10.5555/example",
     key_source="generated",
 )
-
-entry_text = render_entry(entry, lib.line_ending)
+print(vol.diff())
 ```
 
-The CLI handles appending the rendered entry to the original file. Library code
-can use `prepare_imported_entry` when composing a custom workflow.
+For lower-level workflows, `pynakes.doi.prepare_imported_entry` and
+`pynakes.doi.render_entry` remain available. `Volume.import_doi()` stages the
+append and lets `diff()`/`commit()` handle preservation and atomic writes.
 
 ## Linked Files
 

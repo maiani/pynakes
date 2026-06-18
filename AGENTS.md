@@ -21,12 +21,13 @@ src/pynakes/
   model.py            BibEntry, BibLibrary, EntryCollection (duplicate-key tolerant)
   bibtex_parser.py    parse_bib() — custom parser, preserves raw_content
   bibtex_writer.py    write_bib() — raw_content for unmodified, reconstruct for modified
-  io.py               load_bib / save_bib / save_text (atomic write + .bak + re-parse validate)
+  io.py               load_bib / save_bib / save_text / save_plain_text (atomic writes)
   editing.py          surgical raw-text field/key edits + entry-level helpers
+  engine.py           Volume lifecycle: open, stage, preview/diff, commit, reload
   groups.py keys.py fields.py files.py lint.py
   authors.py journals.py doi.py normalize.py format operations
   jabref.py           structured JabRef library metadata helpers
-  usage.py            cited-entry detection/tagging from .tex/.aux
+  usage.py            cited-entry detection/tagging and TeX citation-key rewrites
   capabilities.py     machine-readable capability description
   diff.py cli.py
 tests/                pytest suite + tests/fixtures/*.bib

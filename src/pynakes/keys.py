@@ -271,3 +271,31 @@ def repair_duplicate_keys(lib: BibLibrary) -> list[tuple[str, str]]:
         seen.add(new_key)
         renames.append((base, new_key))
     return renames
+
+
+def validate_key(key: str) -> None:
+    """Validate a citation key for safe BibTeX/LaTeX rewriting."""
+    if not key:
+        raise ValueError("citation key must not be empty")
+    if re.search(r"[\s,{}\\]", key):
+        raise ValueError(f"citation key {key!r} contains whitespace or reserved characters")
+
+
+def rename_key(lib: BibLibrary, old: str, new: str) -> int:
+    """Rename one unique citation key.
+
+    Returns 1 when the key changed, 0 for a no-op. Raises ``ValueError`` when
+    the old key is absent, duplicated, or the new key already exists.
+    """
+    validate_key(old)
+    validate_key(new)
+    matches = lib.entries.get_all(old)
+    if not matches:
+        raise ValueError(f"No entry with key {old!r} in the library")
+    if len(matches) > 1:
+        raise ValueError(f"Cannot rename duplicated key {old!r}; repair duplicates first")
+    if old == new:
+        return 0
+    if new in lib.entries:
+        raise ValueError(f"Cannot rename {old!r} to {new!r}: target key already exists")
+    return 1 if rename_entry_key(matches[0], new) else 0

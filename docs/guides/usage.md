@@ -58,7 +58,7 @@ pynakes groups remove-entry refs.bib KEY "GroupName"
 
 ## keys
 
-Check, generate, and repair citation keys.
+Check, generate, rename, and repair citation keys.
 
 ```bash
 pynakes keys check refs.bib
@@ -66,6 +66,7 @@ pynakes keys check refs.bib --json
 
 pynakes keys generate refs.bib --dry-run --diff
 pynakes keys repair refs.bib --dry-run --diff
+pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/ --dry-run --diff
 ```
 
 Generated keys default to `AuthorYearTitle`. JabRef metadata is honored when
@@ -78,6 +79,11 @@ present:
 
 Unsupported JabRef key-pattern markers fail explicitly instead of silently
 generating incorrect keys.
+
+`keys rename` updates the entry key in the `.bib` file and matching keys inside
+recognized TeX citation commands in the supplied `.tex` files/directories. It
+does not edit commented-out citations, and it exits with conflict if the target
+key already exists.
 
 ## metadata
 

@@ -71,6 +71,16 @@ pynakes groups add-entry refs.bib SomeKey2024 "Economics" --dry-run --diff
 pynakes groups add-entry refs.bib SomeKey2024 "Economics"
 ```
 
+### Rename a citation key safely
+
+```bash
+# Preview the .bib key edit plus citation updates in TeX sources
+pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/ --dry-run --diff
+
+# Apply it after reviewing the diff
+pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/
+```
+
 ### Import a reference by DOI
 
 ```bash
@@ -160,16 +170,13 @@ Additionally:
 
 ## Current status
 
-> **v0.1 is feature-complete and in the testing/polish phase (Phase 4).** The
-> full BibTeX maintenance workflow is usable: inspect, lint, edit fields/groups,
-> repair keys, import by DOI, analyze cited/unused entries, convert between
-> BibTeX and BibLaTeX, abbreviate/expand journal titles, and validate JabRef
-> linked files. The top-level `normalize` routine provides a daily maintenance
-> pass for titles, JabRef-style author/editor lists, DOI fields, and known
-> journal titles, and `capabilities` exposes a machine-readable description of
-> the tool for agents. Merge-oriented features are still pending. See
-> [DEVPLAN.md](DEVPLAN.md) for the phased build plan and
-> [ARCHITECTURE.md](ARCHITECTURE.md) for the design.
+> **v0.1 is shipped and Phase 5's `Volume` engine API is implemented.** The full
+> BibTeX maintenance workflow is usable from the CLI, and modifying commands now
+> dogfood the same in-process `Volume` lifecycle: open, stage, preview/diff,
+> commit, reset, reload, and external-change detection. Merge-oriented features
+> and the multi-file `Library` API are still pending. See [DEVPLAN.md](DEVPLAN.md)
+> for the phased build plan and [ARCHITECTURE.md](ARCHITECTURE.md) for the
+> design.
 
 ### Implemented
 
@@ -178,6 +185,7 @@ Additionally:
 - [x] JabRef-compatible `groups` parsing plus list/add/remove commands
 - [x] Duplicate citation-key detection and repair
 - [x] Deterministic citation-key generation (`AuthorYearTitle` pattern)
+- [x] Consistent citation-key rename across one `.bib` file and selected `.tex` sources
 - [x] JabRef citation-key pattern metadata support (`keypatterndefault`, `keypattern_<entrytype>`)
 - [x] Full JabRef library metadata support: parse, preserve, inspect, and safely update known `jabref-meta` blocks
 - [x] Field operations: rename, move, append, clear, with simple `--where` filters
@@ -190,6 +198,7 @@ Additionally:
 - [x] Machine-readable capability introspection (`capabilities --json`) matching the agent contract
 - [x] AUX/TeX citation analysis, unused/missing reporting, group/keyword tagging, and subset export
 - [x] Linked-file validation (`files check`) for JabRef `file` fields, with `.bib` directory, `--root`, and `fileDirectory*` resolution
+- [x] `Volume` engine API for staged edits, previews/diffs, atomic commits, reset/reload, and external modification detection
 - [x] Dry-run, unified diff, and JSON output for modifying commands
 - [x] Atomic writes, validation-before-write, and `.bak` backups
 - [x] CLI commands for the implemented operations

@@ -134,6 +134,13 @@ If JabRef citation-key metadata is present, `keys generate` uses it:
 @comment{jabref-meta: keypatterndefault:[auth][shortyear][veryshorttitle];}
 ```
 
+Rename one key consistently across the `.bib` file and TeX citations:
+
+```bash
+pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/ --dry-run --diff
+pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/
+```
+
 ## Example 8: Analyze Cited and Unused Entries
 
 ```bash

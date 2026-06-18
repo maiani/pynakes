@@ -47,6 +47,8 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 - `pynakes groups remove-entry <file> <key> <group>`
 - `pynakes keys generate <file>` — regenerate every key (`AuthorYearTitle`)
 - `pynakes keys repair <file>` — make duplicate keys unique
+- `pynakes keys rename <file> <old> <new> <tex-source>...` — rename one key in
+  the `.bib` file and matching TeX citation commands
 - `pynakes fields rename <file> <old> <new> [--where ...]`
 - `pynakes fields move <file> <old> <new> [--where ...]`
 - `pynakes fields append <file> <field> <value> [--where ...]`
@@ -116,6 +118,16 @@ pynakes keys check refs.bib --json
 pynakes keys repair refs.bib --dry-run --diff --json
 pynakes keys repair refs.bib --json
 ```
+
+### Rename one key across BibTeX and TeX
+
+```bash
+pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/ --dry-run --diff --json
+pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/ --json
+```
+
+`keys rename` exits `2` if the target key already exists or the source key is
+duplicated, so an agent should report the conflict options instead of guessing.
 
 ### Inspect or update JabRef metadata
 
@@ -198,7 +210,8 @@ Field meanings (stable across commands):
 - `diff`: present only when `--diff` was passed and there is a change.
 
 Command-specific keys are added alongside these (e.g. `renames` for
-`keys generate`/`repair`, `report`/`tagged`/`exported` for `used`,
+`keys generate`/`repair`, `sources` for `keys rename`,
+`report`/`tagged`/`exported` for `used`,
 `operations` for `normalize`).
 
 **Errors** return `{"status":"error","error":"<Type>","message":"..."}` with

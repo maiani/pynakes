@@ -376,6 +376,67 @@ class TestKeysCommand:
 
         assert parse_bib(bib.read_text()).entries.duplicate_keys() == {}
 
+    def test_rename_updates_bib_and_tex_dry_run(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        tex = tmp_path / "paper.tex"
+        tex.write_text(r"\citep[see]{Smith2020, Jones2021}" "\n")
+        original_bib = bib.read_text()
+        original_tex = tex.read_text()
+
+        result = runner.invoke(
+            app,
+            [
+                "keys",
+                "rename",
+                str(bib),
+                "Smith2020",
+                "Smith2020ML",
+                str(tex),
+                "--dry-run",
+                "--diff",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["action"] == "keys_rename"
+        assert data["modified"] is True
+        assert data["modified_entries"] == 1
+        assert data["source_occurrences"] == 1
+        assert "@article{Smith2020ML," in data["diff"]
+        assert r"\citep[see]{Smith2020ML, Jones2021}" in data["diff"]
+        assert bib.read_text() == original_bib
+        assert tex.read_text() == original_tex
+
+    def test_rename_writes_bib_and_tex(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        tex = tmp_path / "paper.tex"
+        tex.write_text(r"\cite{Smith2020}" "\n" r"% \cite{Smith2020}" "\n")
+
+        result = runner.invoke(
+            app, ["keys", "rename", str(bib), "Smith2020", "Smith2020ML", str(tex)]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "@article{Smith2020ML," in bib.read_text()
+        assert r"\cite{Smith2020ML}" in tex.read_text()
+        assert r"% \cite{Smith2020}" in tex.read_text()
+
+    def test_rename_conflicts_when_target_key_exists(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        tex = tmp_path / "paper.tex"
+        tex.write_text(r"\cite{Smith2020}")
+
+        result = runner.invoke(
+            app, ["keys", "rename", str(bib), "Smith2020", "Jones2021", str(tex), "--json"]
+        )
+
+        assert result.exit_code == 2, result.output
+        data = json.loads(result.output)
+        assert data["status"] == "conflict"
+        assert data["error"] == "CitationKeyConflict"
+
 
 class TestFieldsCommand:
     def test_rename_with_diff(self, tmp_path: Path) -> None:

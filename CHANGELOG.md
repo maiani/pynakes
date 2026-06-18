@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`Volume` engine API**: `pynakes.engine.Volume` now owns the one-file
+  load → stage → preview/diff → commit lifecycle. It wraps one `BibLibrary`,
+  exposes read-only views and delegated operation methods, stages DOI imports
+  and JabRef metadata updates, writes atomically through the validated text I/O
+  path, supports `reset()`/`reload()`, and raises `ExternalModificationError`
+  when a file changed underneath before commit.
+- **Consistent citation-key rename**: new `pynakes keys rename <file> <old>
+  <new> <tex-source>...` updates one unique key in the `.bib` file and matching
+  TeX citation commands across supplied `.tex` files/directories, with
+  `--dry-run`/`--diff`/`--json`, target-key conflict detection, and backups for
+  changed source files.
 - **Linked-file validation**: new `pynakes files check` command and
   `pynakes.files` API parse JabRef `file` descriptors, including multiple
   semicolon-delimited attachments and directory links. Relative paths resolve
@@ -33,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   raw-text primitives). Overall coverage is now 93%.
 
 ### Changed
+- CLI modifying commands now dogfood `Volume` for dry-run diffs and writes while
+  preserving the existing JSON envelope and command behavior.
 - **Consolidated journal duplication** (follow-up to the earlier audit):
   `load_journal_table` and `load_ltwa_table` now share a single `_sniff_rows`
   CSV/TSV reader, and the `unknown_journal` warning shape lives once in

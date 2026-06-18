@@ -21,6 +21,8 @@ __all__ = [
     "extract_keys_from_aux",
     "extract_keys_from_tex",
     "collect_cited_keys",
+    "iter_tex_files",
+    "rename_citation_key_in_tex",
     "analyze_usage",
     "subset_library",
     "tag_with_group",
@@ -157,6 +159,85 @@ def collect_cited_keys(paths: Iterable[str]) -> tuple[set[str], bool, list[str]]
                 keys.add(key)
 
     return keys, include_all, scanned
+
+
+def iter_tex_files(paths: Iterable[str]) -> list[Path]:
+    """Return `.tex` files from the given files and/or directories."""
+    files: list[Path] = []
+    for path_str in paths:
+        path = Path(path_str)
+        if path.is_dir():
+            files.extend(sorted(path.rglob("*.tex")))
+        elif path.exists():
+            if path.suffix.lower() == ".tex":
+                files.append(path)
+        else:
+            raise FileNotFoundError(f"Source not found: {path_str}")
+    return files
+
+
+def rename_citation_key_in_tex(text: str, old: str, new: str) -> tuple[str, int]:
+    """Rename a citation key inside TeX citation commands.
+
+    Commented text is left untouched. The rewrite is intentionally narrow:
+    it updates comma-delimited keys inside commands matched by the existing
+    citation-command recognizer, preserving surrounding whitespace.
+    """
+    if old == new:
+        return text, 0
+
+    parts: list[str] = []
+    count = 0
+    for line in text.splitlines(keepends=True):
+        body, comment = _split_tex_line_comment(line)
+        renamed_body, renamed_count = _rename_citation_key_in_segment(body, old, new)
+        parts.append(renamed_body + comment)
+        count += renamed_count
+    return "".join(parts), count
+
+
+def _split_tex_line_comment(line: str) -> tuple[str, str]:
+    i = 0
+    while i < len(line):
+        if line[i] == "\\" and i + 1 < len(line):
+            i += 2
+            continue
+        if line[i] == "%":
+            return line[:i], line[i:]
+        i += 1
+    return line, ""
+
+
+def _rename_citation_key_in_segment(segment: str, old: str, new: str) -> tuple[str, int]:
+    count = 0
+
+    def replace(match: re.Match[str]) -> str:
+        nonlocal count
+        raw_keys = match.group(1)
+        renamed_keys, renamed_count = _rename_key_list(raw_keys, old, new)
+        count += renamed_count
+        return (
+            match.group(0)[: match.start(1) - match.start(0)]
+            + renamed_keys
+            + match.group(0)[match.end(1) - match.start(0) :]
+        )
+
+    return _TEX_CITE_RE.sub(replace, segment), count
+
+
+def _rename_key_list(raw: str, old: str, new: str) -> tuple[str, int]:
+    pieces = re.split(r"(,)", raw)
+    count = 0
+    for index, piece in enumerate(pieces):
+        if piece == ",":
+            continue
+        leading = piece[: len(piece) - len(piece.lstrip())]
+        trailing = piece[len(piece.rstrip()) :]
+        key = piece.strip()
+        if key == old:
+            pieces[index] = f"{leading}{new}{trailing}"
+            count += 1
+    return "".join(pieces), count
 
 
 # --- analysis --------------------------------------------------------------

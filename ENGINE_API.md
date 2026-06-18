@@ -4,9 +4,33 @@ A design sketch for the library-level API that turns pynakes into a reusable
 **bib-file engine** — the deterministic kernel that the CLI, an MCP server, a
 daemon, or a parallel stateful application all build on.
 
-Status: proposal. Nothing here is implemented yet. See
-[VISION.md](VISION.md) for the why and [ARCHITECTURE.md](ARCHITECTURE.md) for the
-design pynakes already follows.
+Status: `Volume` is implemented for one `.bib` file. It exposes read-only views,
+delegated operation methods, staged previews/diffs, atomic commits, reset/reload,
+and external-modification detection. `Library` remains future work; filesystem
+watching is intentionally *not* in core (a consumer concern — see the
+external-change section). See [VISION.md](VISION.md) for the why and
+[ARCHITECTURE.md](ARCHITECTURE.md) for the design pynakes already follows.
+
+## State model (decided): stateless core + thin reconciled handle
+
+The decision behind the lifecycle below — driven by invariant #6 (the file is
+the single source of truth) and #7 (determinism):
+
+- **The commit/diff machinery is a pure, stateless function.** Given
+  `(original_text, edited_lib, pristine_snapshot)` it returns
+  `(new_text, diff, result)`. No hidden state; trivially testable; this is the
+  load-bearing logic.
+- **`Volume` is a thin stateful *handle*** bundling `{path, lib,
+  pristine_snapshot, fingerprint, is_dirty}`. Its in-memory state is a **derived
+  buffer over the file** — never an authoritative model. `commit()` always
+  reconciles with the live file.
+- **Litmus test for any state:** *if I delete it and re-read from disk, do I lose
+  anything?* No → safe derived buffer. Yes → a second source of truth; not
+  allowed.
+
+The same object serves both consumer shapes: the CLI/MCP use it transactionally
+(`open → op → commit`, effectively stateless); a GUI/BiMaS holds it open across
+edits (stateful), but the buffer stays derived and `commit()` reconciles.
 
 ## Vocabulary
 
@@ -107,26 +131,47 @@ This generalizes the CLI's existing `snapshot → op → commit`:
    `(pristine_block, current_block)` edit; `editing.splice_into_text` patches the
    pristine file text so untouched formatting (blank lines, comments, field
    order) survives byte-for-byte. If a block can't be located, fall back to
-   `write_bib`. Appends (DOI import) and removals are handled explicitly.
+   `write_bib`. Appends (DOI import) and metadata comment edits are handled
+   explicitly.
 4. `commit()` writes via `io.save_text` (temp file → re-parse validate → `.bak`
    → atomic rename), then refreshes the pristine snapshot + fingerprint.
 
 A GUI maps this directly: staged edits ↔ an editable view, `diff()` ↔ a preview
 pane, `commit()` ↔ Save, `reset()` ↔ Discard. Many ops, one commit.
 
-### External-change detection (the concurrency story)
+### External-change detection — the VSCode model (the concurrency story)
 
-With a stateful consumer, three actors edit the same file: the app, the user's
-text editor, and an agent. So:
+Three actors edit the same file: the app, the user's text editor, and an agent.
+The behavior follows VSCode exactly — the file is truth, the buffer is derived,
+and an external change reconciles like an editor reloading a changed file:
 
-- `commit()` re-checks the fingerprint and raises `ExternalModificationError`
-  if the file changed under the volume, rather than clobbering it. The consumer
-  decides: reload, merge, or force.
-- `Volume.watch(callback)` (optional) wraps a file watcher so a GUI can react to
-  external edits and offer reload.
+- **Clean buffer + file changes on disk → reload instantly.** Nothing is staged,
+  so the buffer just mirrors the new disk content (this is the "edit a file
+  outside and see it update live" behavior).
+- **Dirty buffer + file changes on disk → conflict, never silent clobber.** The
+  consumer is notified and chooses: keep mine, take theirs, or compare. The
+  engine does not auto-resolve.
+- **`commit()` while disk changed since open → `ExternalModificationError`**
+  (unless forced), so a save can't overwrite an external edit blindly.
 
-This is the missing piece pure functions can't provide and every stateful
-consumer needs.
+The engine exposes the *primitives* that make this possible; the live-update UX
+lives in the consumer (BiMaS):
+
+- `fingerprint` / `externally_changed()` — cheap "did disk change?" check (poll).
+- `reload(force=False)` — re-read from disk; seamless when clean, raises when
+  dirty so the consumer decides.
+- `is_dirty` — are there staged edits since open/commit?
+
+These pull primitives are sufficient: a consumer's own event loop calls
+`externally_changed()` and, if `not is_dirty`, `reload()` for an instant update
+(else surfaces a conflict). **Decided: no `watch(callback)` in pynakes core** — a
+filesystem watcher is a background thread (non-deterministic, dependency-bearing,
+and a UX concern), so the *push* loop is the consumer's job. If a push helper
+ever earns its place it ships as an **opt-in extra** (`pynakes[watch]`), built
+when BiMaS needs it — never required by core.
+
+This (the pull primitives) is the piece bare functions can't provide and every
+stateful consumer needs.
 
 ## The Library API (the collection)
 
@@ -173,12 +218,12 @@ non-corrupting.**
 
 ## Migration steps
 
-1. Add `engine.py` with `Volume`, lifting `_snapshot`/`_commit` orchestration out
+1. [x] Add `engine.py` with `Volume`, lifting `_snapshot`/`_commit` orchestration out
    of `cli.py` (delegating to the existing operation modules — no new transform
    logic).
-2. Add fingerprint + `ExternalModificationError`.
-3. Rewrite `cli.py` commands as Volume consumers (dogfood; the test suite is the
+2. [x] Add fingerprint + `ExternalModificationError`.
+3. [x] Rewrite `cli.py` commands as Volume consumers (dogfood; the test suite is the
    regression guard).
-4. Add `reload()` / optional `watch()`.
-5. Add `Library` (collection over a git repo of volumes) + a derived index.
-6. Document the public API surface in `docs/` and pin it as the engine contract.
+4. [x] Add `reload()`; optional `watch()` remains deferred.
+5. [ ] Add `Library` (collection over a git repo of volumes) + a derived index.
+6. [ ] Document and pin the broader public API contract after `Library` lands.

@@ -11,6 +11,7 @@ from pynakes.usage import (
     collect_cited_keys,
     extract_keys_from_aux,
     extract_keys_from_tex,
+    rename_citation_key_in_tex,
     splice_into_text,
     subset_library,
     tag_with_group,
@@ -60,6 +61,22 @@ class TestExtraction:
     def test_missing_source_raises(self) -> None:
         with pytest.raises(FileNotFoundError):
             collect_cited_keys(["does_not_exist.tex"])
+
+    def test_rename_citation_key_in_tex_preserves_comments_and_spacing(self) -> None:
+        text = (
+            r"\citep[see][p.~3]{ Old ,Other}"
+            "\n"
+            r"% \cite{Old}"
+            "\n"
+            r"escaped 50\% \cite{Old}"
+        )
+
+        new_text, count = rename_citation_key_in_tex(text, "Old", "New")
+
+        assert count == 2
+        assert r"\citep[see][p.~3]{ New ,Other}" in new_text
+        assert r"% \cite{Old}" in new_text
+        assert r"escaped 50\% \cite{New}" in new_text
 
 
 class TestAnalysis:

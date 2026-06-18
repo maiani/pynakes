@@ -11,6 +11,7 @@ from pynakes.keys import (
     generate_key_from_pattern,
     has_duplicate_keys,
     regenerate_keys,
+    rename_key,
     repair_duplicate_keys,
 )
 from pynakes.model import BibEntry
@@ -161,6 +162,28 @@ class TestRepair:
         assert "@article{Dup," in out
         assert "@article{Dup_2," in out
         assert parse_bib(out).entries.duplicate_keys() == {}
+
+
+class TestRename:
+    def test_rename_single_key(self) -> None:
+        lib = parse_bib("@article{Old,\n  title = {T}\n}\n")
+
+        assert rename_key(lib, "Old", "New") == 1
+
+        assert "New" in lib.entries
+        assert "@article{New," in write_bib(lib)
+
+    def test_rename_rejects_existing_target(self) -> None:
+        lib = parse_bib("@article{Old,year={1}}\n@article{New,year={2}}\n")
+
+        with pytest.raises(ValueError, match="target key already exists"):
+            rename_key(lib, "Old", "New")
+
+    def test_rename_rejects_duplicated_source_key(self) -> None:
+        lib = parse_bib("@article{Old,year={1}}\n@article{Old,year={2}}\n")
+
+        with pytest.raises(ValueError, match="repair duplicates"):
+            rename_key(lib, "Old", "New")
 
 
 class TestRegenerate:

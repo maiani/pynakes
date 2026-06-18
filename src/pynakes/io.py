@@ -151,3 +151,47 @@ def save_text(
             backup_path=backup_path,
             error=str(e),
         )
+
+
+def save_plain_text(
+    content: str,
+    file_path: str,
+    encoding: str = "utf-8",
+    backup: bool = True,
+    atomic: bool = True,
+) -> SaveResult:
+    """Save arbitrary text with the same backup/atomic mechanics as BibTeX I/O."""
+    path = Path(file_path)
+    backup_path = None
+
+    try:
+        if backup and path.exists():
+            backup_path = str(path) + ".bak"
+            path.rename(backup_path)
+
+        if atomic:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                dir=path.parent,
+                delete=False,
+                encoding=encoding,
+                newline="",
+            ) as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
+            Path(tmp_path).replace(path)
+        else:
+            with open(path, "w", encoding=encoding, newline="") as f:
+                f.write(content)
+
+        return SaveResult(success=True, file_path=file_path, backup_path=backup_path, error=None)
+
+    except Exception as e:
+        if backup_path and not path.exists():
+            Path(backup_path).rename(path)
+        return SaveResult(
+            success=False,
+            file_path=file_path,
+            backup_path=backup_path,
+            error=str(e),
+        )
