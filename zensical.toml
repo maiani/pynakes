@@ -1,0 +1,32 @@
+[site]
+title = "pynakes"
+description = "Agent-friendly BibTeX library management tool"
+url = "https://pynakes.example.com"
+repo = "https://github.com/user/pynakes"
+
+[docs]
+dir = "docs"
+build_dir = "site"
+nav = [
+    { title = "Home", path = "index.md" },
+    { title = "Quick Start", path = "guides/quickstart.md" },
+    { title = "Installation", path = "guides/installation.md" },
+    { title = "Usage", path = "guides/usage.md" },
+    { title = "Architecture", path = "guides/architecture.md" },
+    { title = "API Reference", path = "api/index.md" },
+    { title = "Examples", path = "examples/index.md" },
+    { title = "FAQ", path = "guides/faq.md" },
+]
+
+[theme]
+name = "material"
+logo = "assets/logo.svg"
+favicon = "assets/favicon.ico"
+color_scheme = "slate"
+
+[markdown]
+extensions = [
+    "toc",
+    "codehilite",
+    "extra",
+]
