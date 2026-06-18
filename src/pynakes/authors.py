@@ -1,4 +1,11 @@
-"""Author/editor name-list normalization."""
+"""Author/editor name-list parsing and normalization.
+
+This module owns the single implementation of splitting an author/editor field
+into individual people and extracting a person's last name; other modules
+(e.g. key generation) build on these rather than re-deriving the logic.
+"""
+
+import re
 
 from pynakes.editing import set_entry_field
 from pynakes.model import BibLibrary
@@ -51,6 +58,30 @@ def _split_names(value: str) -> list[str]:
     if part:
         names.append(part)
     return names
+
+
+def split_name_list(value: str) -> list[str]:
+    """Split an author/editor field into individual people (brace-aware).
+
+    Separators are ``and`` (top level), ``&``, and ``;``. Braced groups are
+    preserved verbatim so corporate names like ``{World Bank}`` stay intact.
+    """
+    return _split_names(value)
+
+
+def last_name(person: str) -> str:
+    """Extract a person's last name, stripped to letters only.
+
+    Handles ``{Corporate Name}`` (taken whole), ``Last, First`` (part before
+    the comma), and ``First Last`` (final token). Returns ``""`` if empty.
+    """
+    person = person.strip()
+    if person.startswith("{") and person.endswith("}"):
+        return re.sub(r"[^A-Za-z]", "", person[1:-1])
+    if "," in person:
+        return re.sub(r"[^A-Za-z]", "", person.split(",", 1)[0])
+    parts = person.replace("{", "").replace("}", "").split()
+    return re.sub(r"[^A-Za-z]", "", parts[-1] if parts else "")
 
 
 def _split_top_level(value: str, sep: str) -> list[str]:
@@ -152,9 +183,7 @@ def normalize_name_list(value: str, style: str = "jabref") -> str:
     if normalized_style not in {"jabref", "conservative"}:
         raise ValueError(f"Unsupported author style: {style!r}")
     normalizer = (
-        _normalize_jabref_name
-        if normalized_style == "jabref"
-        else _normalize_conservative_name
+        _normalize_jabref_name if normalized_style == "jabref" else _normalize_conservative_name
     )
     return " and ".join(normalizer(name) for name in _split_names(value))
 

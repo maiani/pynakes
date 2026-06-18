@@ -40,7 +40,9 @@ class TestGenerateKey:
         assert generate_key(e) == "WorldBank2021GDP"
 
     def test_falls_back_to_editor_then_anon(self) -> None:
-        assert generate_key(_entry(editor="Ann Lee", year="2020", title="Reader")) == "Lee2020Reader"
+        assert (
+            generate_key(_entry(editor="Ann Lee", year="2020", title="Reader")) == "Lee2020Reader"
+        )
         assert generate_key(_entry(year="2020", title="Untitled")).startswith("Anon2020")
 
     def test_year_from_biblatex_date(self) -> None:
@@ -75,7 +77,9 @@ class TestGenerateKey:
         assert generate_key(lib.entries["old"], lib) == "Smith2024Practical"
 
     def test_jabref_pattern_supports_literals_and_field_markers(self) -> None:
-        e = _entry(author="John Smith", year="2024", title="A Practical Test", journal="Test Journal")
+        e = _entry(
+            author="John Smith", year="2024", title="A Practical Test", journal="Test Journal"
+        )
         assert generate_key_from_pattern(e, "[auth]-[YEAR]-[journal:abbr]") == "Smith-2024-TJ"
 
     def test_unsupported_jabref_pattern_errors(self) -> None:
@@ -112,9 +116,7 @@ class TestRepair:
         assert not has_duplicate_keys(lib)
 
     def test_repair_avoids_existing_keys(self) -> None:
-        lib = parse_bib(
-            "@article{A,year={1}}\n@article{A,year={2}}\n@article{A_2,year={3}}\n"
-        )
+        lib = parse_bib("@article{A,year={1}}\n@article{A,year={2}}\n@article{A_2,year={3}}\n")
         renames = repair_duplicate_keys(lib)
         # A_2 is taken, so the duplicate becomes A_3.
         assert renames == [("A", "A_3")]

@@ -77,9 +77,7 @@ def save_bib(
     Returns:
         SaveResult with status and paths
     """
-    return save_text(
-        write_bib(lib), file_path, encoding=lib.encoding, backup=backup, atomic=atomic
-    )
+    return save_text(write_bib(lib), file_path, encoding=lib.encoding, backup=backup, atomic=atomic)
 
 
 def save_text(
@@ -140,9 +138,7 @@ def save_text(
             with open(path, "w", encoding=encoding, newline="") as f:
                 f.write(content)
 
-        return SaveResult(
-            success=True, file_path=file_path, backup_path=backup_path, error=None
-        )
+        return SaveResult(success=True, file_path=file_path, backup_path=backup_path, error=None)
 
     except Exception as e:
         # Restore backup on error

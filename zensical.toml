@@ -1,32 +1,35 @@
-[site]
-title = "pynakes"
-description = "Agent-friendly BibTeX library management tool"
-url = "https://pynakes.example.com"
-repo = "https://github.com/user/pynakes"
+[project]
+site_name = "pynakes"
+site_description = "Agent-friendly BibTeX library management tool"
+site_author = "Andrea Maiani"
+site_url = "https://pynakes.example.com"
+repo_url = "https://github.com/user/pynakes"
+docs_dir = "docs"
+site_dir = "site"
+copyright = "Copyright &copy; 2026 The authors"
 
-[docs]
-dir = "docs"
-build_dir = "site"
 nav = [
-    { title = "Home", path = "index.md" },
-    { title = "Quick Start", path = "guides/quickstart.md" },
-    { title = "Installation", path = "guides/installation.md" },
-    { title = "Usage", path = "guides/usage.md" },
-    { title = "Architecture", path = "guides/architecture.md" },
-    { title = "API Reference", path = "api/index.md" },
-    { title = "Examples", path = "examples/index.md" },
-    { title = "FAQ", path = "guides/faq.md" },
+    { "Home" = "index.md" },
+    { "Quick Start" = "guides/quickstart.md" },
+    { "Installation" = "guides/installation.md" },
+    { "Usage" = "guides/usage.md" },
+    { "LLM Integration" = "guides/llm-integration.md" },
+    { "Architecture" = "guides/architecture.md" },
+    { "API Reference" = "api/index.md" },
+    { "Examples" = "examples/index.md" },
+    { "FAQ" = "guides/faq.md" },
 ]
 
-[theme]
-name = "material"
-logo = "assets/logo.svg"
-favicon = "assets/favicon.ico"
-color_scheme = "slate"
-
-[markdown]
-extensions = [
+markdown_extensions = [
     "toc",
     "codehilite",
     "extra",
+]
+
+[project.theme]
+name = "material"
+language = "en"
+features = [
+    "content.code.copy",
+    "navigation.footer",
 ]

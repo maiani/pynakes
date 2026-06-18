@@ -25,6 +25,10 @@ from pynakes.model import BibEntry
 # the trailing comma so the key can be swapped without touching anything else.
 _HEADER_RE = re.compile(r"(@\w+\s*\{\s*)([^,\s]+)(\s*,)")
 
+# The leading ``@type`` token, so the entry type can be swapped without touching
+# the key, braces, or anything else.
+_TYPE_RE = re.compile(r"(@)(\w+)")
+
 
 # --- locating a field within raw entry text --------------------------------
 
@@ -144,9 +148,12 @@ def set_raw_key(raw: str, new_key: str) -> str:
     return _HEADER_RE.sub(lambda m: f"{m.group(1)}{new_key}{m.group(3)}", raw, count=1)
 
 
-def splice_into_text(
-    original_text: str, edits: Iterable[tuple[str, str]]
-) -> Union[str, None]:
+def set_raw_type(raw: str, new_type: str) -> str:
+    """Replace the entry type (the ``@type`` token) in an entry's header."""
+    return _TYPE_RE.sub(lambda m: f"{m.group(1)}{new_type}", raw, count=1)
+
+
+def splice_into_text(original_text: str, edits: Iterable[tuple[str, str]]) -> Union[str, None]:
     """Splice surgically-edited entry blocks back into the original file text.
 
     Each edit is ``(old_raw, new_raw)``. Replacing each entry's exact original
@@ -202,6 +209,15 @@ def rename_entry_field(entry: BibEntry, old: str, new: str) -> bool:
     return True
 
 
+def set_entry_type(entry: BibEntry, new_type: str) -> bool:
+    """Change an entry's type (e.g. ``phdthesis`` → ``thesis``). Returns ``True`` if changed."""
+    if entry.type == new_type:
+        return False
+    entry.type = new_type
+    _apply(entry, lambda raw: set_raw_type(raw, new_type))
+    return True
+
+
 def rename_entry_key(entry: BibEntry, new_key: str) -> bool:
     """Change an entry's citation key. Returns ``True`` if changed."""
     if entry.key == new_key:
@@ -211,9 +227,7 @@ def rename_entry_key(entry: BibEntry, new_key: str) -> bool:
     return True
 
 
-def append_delimited_field(
-    entry: BibEntry, name: str, value: str, delim: str, join: str
-) -> bool:
+def append_delimited_field(entry: BibEntry, name: str, value: str, delim: str, join: str) -> bool:
     """Append ``value`` to a delimited field, de-duplicating. Returns ``True`` if changed."""
     existing = entry.fields.get(name, "")
     items = [p.strip() for p in existing.split(delim) if p.strip()]

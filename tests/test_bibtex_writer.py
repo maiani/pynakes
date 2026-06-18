@@ -131,13 +131,7 @@ class TestModifiedEntryFidelity:
 
     def test_field_order_preserved(self) -> None:
         """Reconstructed entries keep their original field order."""
-        original = (
-            "@article{k,\n"
-            "  title = {T},\n"
-            "  author = {A},\n"
-            "  year = {2020}\n"
-            "}\n"
-        )
+        original = "@article{k,\n  title = {T},\n  author = {A},\n  year = {2020}\n}\n"
         lib = parse_bib(original)
         lib.entries["k"].modified = True
 

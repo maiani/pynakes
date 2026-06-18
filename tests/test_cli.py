@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from pynakes import doi as doi_ops
@@ -18,9 +19,7 @@ class TestUsedCommand:
         bib = tmp_path / "refs.bib"
         bib.write_text((FIXTURES / "simple.bib").read_text())
 
-        result = runner.invoke(
-            app, ["used", str(bib), str(FIXTURES / "paper.aux"), "--json"]
-        )
+        result = runner.invoke(app, ["used", str(bib), str(FIXTURES / "paper.aux"), "--json"])
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         assert set(data["report"]["used"]) == {"Smith2020", "Brown2022"}
@@ -57,9 +56,7 @@ class TestUsedCommand:
         original = (FIXTURES / "simple.bib").read_text()
         bib.write_text(original)
 
-        runner.invoke(
-            app, ["used", str(bib), str(FIXTURES / "paper.aux"), "--group", "Cited"]
-        )
+        runner.invoke(app, ["used", str(bib), str(FIXTURES / "paper.aux"), "--group", "Cited"])
         new = bib.read_text()
         # Exactly the two used entries gained a group line; no entry dropped.
         assert new.count("groups = {Cited}") == 2
@@ -123,9 +120,7 @@ class TestDOICommand:
     def test_import_dry_run_diff_does_not_write(self, tmp_path: Path, monkeypatch) -> None:
         bib = _copy(tmp_path, "simple.bib")
         original = bib.read_text()
-        monkeypatch.setattr(
-            doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex
-        )
+        monkeypatch.setattr(doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
         result = runner.invoke(
             app,
@@ -140,9 +135,7 @@ class TestDOICommand:
 
     def test_import_writes_entry(self, tmp_path: Path, monkeypatch) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        monkeypatch.setattr(
-            doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex
-        )
+        monkeypatch.setattr(doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
         result = runner.invoke(app, ["doi", "import", str(bib), "10.5555/provider"])
 
@@ -156,13 +149,9 @@ class TestDOICommand:
         bib.write_text(
             "@comment{jabref-meta: keypatterndefault:[auth][shortyear][veryshorttitle];}\n"
         )
-        monkeypatch.setattr(
-            doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex
-        )
+        monkeypatch.setattr(doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
-        result = runner.invoke(
-            app, ["doi", "import", str(bib), "10.5555/provider", "--json"]
-        )
+        result = runner.invoke(app, ["doi", "import", str(bib), "10.5555/provider", "--json"])
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -172,9 +161,7 @@ class TestDOICommand:
 
     def test_import_can_use_provider_key(self, tmp_path: Path, monkeypatch) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        monkeypatch.setattr(
-            doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex
-        )
+        monkeypatch.setattr(doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
         result = runner.invoke(
             app,
@@ -188,9 +175,7 @@ class TestDOICommand:
 
     def test_import_explicit_key_wins(self, tmp_path: Path, monkeypatch) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        monkeypatch.setattr(
-            doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex
-        )
+        monkeypatch.setattr(doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
         result = runner.invoke(
             app,
@@ -283,9 +268,7 @@ class TestKeysCommand:
     def test_repair_dry_run_diff(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "duplicate_entries.bib")
         original = bib.read_text()
-        result = runner.invoke(
-            app, ["keys", "repair", str(bib), "--dry-run", "--diff", "--json"]
-        )
+        result = runner.invoke(app, ["keys", "repair", str(bib), "--dry-run", "--diff", "--json"])
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         assert data["renames"]
@@ -316,8 +299,15 @@ class TestFieldsCommand:
         bib = _copy(tmp_path, "simple.bib")
         result = runner.invoke(
             app,
-            ["fields", "append", str(bib), "keywords", "vision",
-             "--where", 'title contains "Computer Vision"'],
+            [
+                "fields",
+                "append",
+                str(bib),
+                "keywords",
+                "vision",
+                "--where",
+                'title contains "Computer Vision"',
+            ],
         )
         assert result.exit_code == 0, result.output
         text = bib.read_text()
@@ -393,9 +383,7 @@ class TestNormalizeCommand:
         )
         bib.write_text(original)
 
-        result = runner.invoke(
-            app, ["normalize", str(bib), "--dry-run", "--diff", "--json"]
-        )
+        result = runner.invoke(app, ["normalize", str(bib), "--dry-run", "--diff", "--json"])
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -439,9 +427,7 @@ class TestNormalizeCommand:
     def test_normalize_invalid_option_errors_json(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
 
-        result = runner.invoke(
-            app, ["normalize", str(bib), "--journal-style", "short", "--json"]
-        )
+        result = runner.invoke(app, ["normalize", str(bib), "--journal-style", "short", "--json"])
 
         assert result.exit_code == 1, result.output
         data = json.loads(result.output)
@@ -480,3 +466,262 @@ class TestNormalizeCommand:
         data = json.loads(result.output)
         assert data["operations"]["journals"] == 1
         assert "journal = {Can. J.}" in bib.read_text()
+
+
+class TestConvertCommand:
+    def test_convert_dry_run_diff_json(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "bibtex_classic.bib")
+        original = bib.read_text()
+
+        result = runner.invoke(
+            app, ["convert", str(bib), "--to", "biblatex", "--dry-run", "--diff", "--json"]
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["action"] == "convert"
+        assert data["modified"] is True
+        assert data["operations"]["types_changed"] == 2
+        assert "journaltitle = {Nature Machine Intelligence}" in data["diff"]
+        assert "@thesis{Green2023," in data["diff"]
+        assert bib.read_text() == original  # dry-run writes nothing
+
+    def test_convert_writes(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "bibtex_classic.bib")
+
+        result = runner.invoke(app, ["convert", str(bib)])
+
+        assert result.exit_code == 0, result.output
+        text = bib.read_text()
+        assert "@thesis{Green2023," in text
+        assert "institution = {Stanford University}" in text
+        assert "date = {2020-03}" in text
+
+    def test_convert_to_bibtex_writes(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "biblatex_sample.bib")
+
+        result = runner.invoke(app, ["convert", str(bib), "--to", "bibtex", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["operations"]["entries"] >= 1
+        text = bib.read_text()
+        assert "@phdthesis{FormattedThesis2023," in text
+        assert "journal = {Journal of Artificial Intelligence}" in text
+
+    def test_convert_unknown_target_errors_json(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "bibtex_classic.bib")
+
+        result = runner.invoke(app, ["convert", str(bib), "--to", "endnote", "--json"])
+
+        assert result.exit_code == 1, result.output
+        data = json.loads(result.output)
+        assert data["error"] == "InvalidInput"
+
+
+class TestErrorHandling:
+    """The agent contract: expected failures are structured, not tracebacks."""
+
+    def test_missing_file_json_is_structured(self, tmp_path: Path) -> None:
+        result = runner.invoke(app, ["inspect", str(tmp_path / "nope.bib"), "--json"])
+        assert result.exit_code == 1
+        data = json.loads(result.output)  # must be parseable JSON, not a traceback
+        assert data["status"] == "error"
+        assert data["error"] == "FileNotFound"
+
+    def test_missing_file_human_is_clean(self, tmp_path: Path) -> None:
+        result = runner.invoke(app, ["lint", str(tmp_path / "nope.bib")])
+        assert result.exit_code == 1
+        assert "Traceback" not in result.output
+        assert "FileNotFound" in result.output
+
+    def test_malformed_file_reports_parse_error(self, tmp_path: Path) -> None:
+        bad = tmp_path / "bad.bib"
+        bad.write_text("@article{Bad,\n  title = {Unclosed\n")
+        result = runner.invoke(app, ["inspect", str(bad), "--json"])
+        assert result.exit_code == 1
+        data = json.loads(result.output)
+        assert data["error"] == "ParseError"
+
+    def test_invalid_query_is_structured(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(
+            app, ["fields", "clear", str(bib), "doi", "--where", "garbage <> nonsense", "--json"]
+        )
+        assert result.exit_code == 1
+        assert json.loads(result.output)["status"] == "error"
+
+    def test_unknown_key_human_mode_not_json(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(app, ["groups", "add-entry", str(bib), "Nope", "Fav"])
+        assert result.exit_code == 1
+        # Human mode must not dump JSON.
+        assert not result.output.strip().startswith("{")
+        assert "KeyNotFound" in result.output
+
+
+class TestCapabilities:
+    def test_capabilities_json(self) -> None:
+        result = runner.invoke(app, ["capabilities", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["tool"] == "pynakes"
+        assert data["exit_codes"]["2"].startswith("conflict")
+        # Every advertised command is actually registered on the app.
+        registered = {
+            c.name or (c.callback.__name__ if c.callback else "") for c in app.registered_commands
+        }
+        groups = {g.name for g in app.registered_groups}
+        for name in data["commands"]:
+            assert name in registered or name in groups, name
+
+
+class TestEnvelopeConsistency:
+    """Every modifying command emits the same JSON envelope keys."""
+
+    ENVELOPE = {"status", "action", "file", "dry_run", "modified", "modified_entries", "warnings"}
+
+    def _invoke(self, tmp_path, args, fixture="simple.bib"):
+        bib = _copy(tmp_path, fixture)
+        return runner.invoke(app, [args[0], str(bib), *args[1:], "--dry-run", "--json"])
+
+    def test_groups_add_entry_envelope(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        r = runner.invoke(
+            app, ["groups", "add-entry", str(bib), "Smith2020", "X", "--dry-run", "--json"]
+        )
+        assert self.ENVELOPE <= set(json.loads(r.output))
+
+    def test_keys_repair_envelope(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "duplicate_entries.bib")
+        r = runner.invoke(app, ["keys", "repair", str(bib), "--dry-run", "--json"])
+        assert self.ENVELOPE <= set(json.loads(r.output))
+
+    def test_fields_rename_envelope(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        r = runner.invoke(
+            app, ["fields", "rename", str(bib), "journal", "journaltitle", "--dry-run", "--json"]
+        )
+        assert self.ENVELOPE <= set(json.loads(r.output))
+
+    def test_normalize_envelope(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        r = runner.invoke(app, ["normalize", str(bib), "--dry-run", "--json"])
+        assert self.ENVELOPE <= set(json.loads(r.output))
+
+    def test_used_envelope_uses_file_key(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        r = runner.invoke(
+            app,
+            ["used", str(bib), str(FIXTURES / "paper.aux"), "--group", "X", "--dry-run", "--json"],
+        )
+        data = json.loads(r.output)
+        assert self.ENVELOPE <= set(data)
+        assert "input_path" not in data  # standardized to "file"
+
+
+class TestJournalsCommand:
+    def test_abbreviate_writes(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(app, ["journals", "abbreviate", str(bib), "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["action"] == "journals_abbreviate"
+        assert data["modified_entries"] == 1
+        assert "journal = {Nat. Mach. Intell.}" in bib.read_text()
+
+    def test_expand_reverses_exact_mapping(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {X},\n  journal = {Phys. Rev. Lett.}\n}\n")
+        result = runner.invoke(app, ["journals", "expand", str(bib)])
+        assert result.exit_code == 0, result.output
+        assert "journal = {Physical Review Letters}" in bib.read_text()
+
+    def test_abbreviate_then_expand_round_trips(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        runner.invoke(app, ["journals", "abbreviate", str(bib)])
+        runner.invoke(app, ["journals", "expand", str(bib)])
+        assert "journal = {Nature Machine Intelligence}" in bib.read_text()
+
+    def test_check_reports_status(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{A,\n  title = {X},\n  journal = {Nature Machine Intelligence}\n}\n"
+            "@article{B,\n  title = {Y},\n  journal = {Some Obscure Local Gazette}\n}\n"
+        )
+        result = runner.invoke(app, ["journals", "check", str(bib), "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        statuses = {j["journal"]: j["status"] for j in data["journals"]}
+        assert statuses["Nature Machine Intelligence"] == "builtin_exact"
+        assert statuses["Some Obscure Local Gazette"] == "unknown"
+        assert data["unknown"] == ["Some Obscure Local Gazette"]
+
+    def test_check_does_not_modify(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        original = bib.read_text()
+        runner.invoke(app, ["journals", "check", str(bib)])
+        assert bib.read_text() == original
+
+    def test_abbreviate_warns_unknown(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {X},\n  journal = {Zzz Qqq Www}\n}\n")
+        result = runner.invoke(app, ["journals", "abbreviate", str(bib), "--json"])
+        data = json.loads(result.output)
+        assert data["unknown"] == ["Zzz Qqq Www"]
+        assert any(w["type"] == "unknown_journal" for w in data["warnings"])
+
+
+# Each case: (command prefix, positional suffix after <file>, fixture). The
+# runner inserts the bib path right after the prefix. Every case is chosen to
+# actually modify its fixture, so --diff must produce a diff.
+_MODIFYING_CASES = [
+    (["groups", "add-entry"], ["Smith2020", "Fav"], "simple.bib"),
+    (["keys", "repair"], [], "duplicate_entries.bib"),
+    (["keys", "generate"], [], "simple.bib"),
+    (["fields", "rename"], ["journal", "journaltitle"], "simple.bib"),
+    (["fields", "move"], ["journal", "journaltitle"], "simple.bib"),
+    (["fields", "append"], ["keywords", "test"], "simple.bib"),
+    (["fields", "clear"], ["doi"], "simple.bib"),
+    (["normalize"], [], "simple.bib"),
+    (["convert"], ["--to", "biblatex"], "bibtex_classic.bib"),
+    (["convert"], ["--to", "bibtex"], "biblatex_sample.bib"),
+    (["journals", "abbreviate"], [], "simple.bib"),
+]
+
+
+@pytest.mark.parametrize("prefix,suffix,fixture", _MODIFYING_CASES)
+class TestDryRunDiffJsonIntegration:
+    """Every modifying command honors --dry-run, --diff, and --json together."""
+
+    ENVELOPE = {"status", "action", "file", "dry_run", "modified", "modified_entries", "warnings"}
+
+    def _run(self, tmp_path, prefix, suffix, fixture, flags):
+        bib = _copy(tmp_path, fixture)
+        before = bib.read_text()
+        args = [*prefix, str(bib), *suffix, *flags]
+        return runner.invoke(app, args), bib, before
+
+    def test_dry_run_diff_json(self, tmp_path, prefix, suffix, fixture) -> None:
+        result, bib, before = self._run(
+            tmp_path, prefix, suffix, fixture, ["--dry-run", "--diff", "--json"]
+        )
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert self.ENVELOPE <= set(data)
+        assert data["dry_run"] is True
+        assert data["modified"] is True
+        assert data["diff"]  # --diff includes a non-empty unified diff
+        assert bib.read_text() == before  # dry-run never writes
+
+    def test_actual_run_matches_dry_run_diff(self, tmp_path, prefix, suffix, fixture) -> None:
+        # The diff previewed by --dry-run must equal what a real run produces.
+        preview, bib, before = self._run(
+            tmp_path, prefix, suffix, fixture, ["--dry-run", "--diff", "--json"]
+        )
+        preview_diff = json.loads(preview.output)["diff"]
+
+        result, bib2, _ = self._run(tmp_path, prefix, suffix, fixture, ["--diff", "--json"])
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["diff"] == preview_diff
+        assert bib2.read_text() != before  # real run wrote the change

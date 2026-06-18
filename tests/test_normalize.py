@@ -18,9 +18,7 @@ def test_author_list_jabref_style_rewrites_person_names() -> None:
     assert normalize_name_list("John Smith and Black Brown, Peter") == (
         "Smith, John and Black Brown, Peter"
     )
-    assert normalize_name_list("{World Bank} and John Smith") == (
-        "{World Bank} and Smith, John"
-    )
+    assert normalize_name_list("{World Bank} and John Smith") == ("{World Bank} and Smith, John")
 
 
 def test_normalize_authors_updates_author_and_editor_fields_jabref_style() -> None:
@@ -39,10 +37,7 @@ def test_normalize_authors_updates_author_and_editor_fields_jabref_style() -> No
 
 def test_journal_abbreviation_and_expansion() -> None:
     lib = parse_bib(
-        "@article{A,\n"
-        "  journal = {Nature Machine Intelligence},\n"
-        "  title = {Paper}\n"
-        "}\n"
+        "@article{A,\n  journal = {Nature Machine Intelligence},\n  title = {Paper}\n}\n"
     )
 
     abbreviated = normalize_journals(lib, "abbreviated")
@@ -116,12 +111,7 @@ def test_normalize_library_cli_options_override_metadata() -> None:
 
 
 def test_normalize_library_author_style_conservative_override() -> None:
-    lib = parse_bib(
-        "@article{A,\n"
-        "  author = {Jane Smith & John Doe},\n"
-        "  title = {Paper}\n"
-        "}\n"
-    )
+    lib = parse_bib("@article{A,\n  author = {Jane Smith & John Doe},\n  title = {Paper}\n}\n")
 
     normalize_library(
         lib,

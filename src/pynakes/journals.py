@@ -258,9 +258,7 @@ def _entry_issns(entry: BibEntry) -> list[str]:
     return values
 
 
-def _lookup_exact(
-    title: str, entry: BibEntry, sources: JournalSources
-) -> tuple[str, str] | None:
+def _lookup_exact(title: str, entry: BibEntry, sources: JournalSources) -> tuple[str, str] | None:
     for issn in _entry_issns(entry):
         mapping = sources.issn_mappings.get(_issn_key(issn))
         if mapping:
@@ -344,6 +342,21 @@ def _target_for_title(
     if generated:
         return generated, "ltwa"
     return None
+
+
+def classify_journal(title: str, entry: BibEntry, sources: JournalSources) -> str:
+    """Describe how ``title`` would resolve for abbreviation.
+
+    Returns the exact-mapping source label (e.g. ``builtin_exact`` or a table
+    path) when an exact title/ISSN mapping exists, ``ltwa`` when an abbreviation
+    can be generated from title words, or ``unknown`` otherwise.
+    """
+    exact = _lookup_exact(title, entry, sources)
+    if exact is not None:
+        return exact[1]
+    if abbreviate_title_with_ltwa(title, sources) is not None:
+        return "ltwa"
+    return "unknown"
 
 
 def normalize_journals(

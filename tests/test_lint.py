@@ -33,8 +33,7 @@ def test_missing_required_field() -> None:
 def test_biblatex_variants_satisfy_requirements() -> None:
     # journaltitle satisfies journal; date satisfies year.
     lib = parse_bib(
-        "@article{A,\n  author = {X},\n  title = {T},\n"
-        "  journaltitle = {J},\n  date = {2020}\n}\n"
+        "@article{A,\n  author = {X},\n  title = {T},\n  journaltitle = {J},\n  date = {2020}\n}\n"
     )
     assert not [i for i in lint(lib) if i.type == "missing_required_field"]
 

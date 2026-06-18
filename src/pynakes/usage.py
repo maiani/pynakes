@@ -248,8 +248,6 @@ def _tag(
     keyset = set(keys)
     count = 0
     for entry in lib.entries.values():
-        if entry.key in keyset and append_delimited_field(
-            entry, field_name, value, delim, join
-        ):
+        if entry.key in keyset and append_delimited_field(entry, field_name, value, delim, join):
             count += 1
     return count

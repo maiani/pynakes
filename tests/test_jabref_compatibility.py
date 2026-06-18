@@ -464,10 +464,7 @@ class TestExportFormatCompatibility:
         # All metadata should be preserved
         for field in ["groups", "keywords", "abstract", "file"]:
             assert field in lib2.entries["Test2020"].fields
-            assert (
-                lib2.entries["Test2020"].fields[field]
-                == entry.fields[field]
-            )
+            assert lib2.entries["Test2020"].fields[field] == entry.fields[field]
 
 
 class TestJabRefBiblatexConversion:

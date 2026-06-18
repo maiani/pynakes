@@ -8,6 +8,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`journals`** sub-app: dedicated `pynakes journals abbreviate`/`expand`
+  (both honoring `--dry-run`/`--diff`/`--json` and accepting `--journal-table`
+  /`--ltwa-table`) plus a read-only `pynakes journals check [--json]` that
+  reports, per distinct journal title, whether it resolves via an exact
+  mapping, LTWA generation, or is unknown. Backed by a new public
+  `journals.classify_journal`.
+- **`convert`** (`convert.py`): BibTeX ↔ BibLaTeX conversion in both directions
+  via `pynakes convert <file> --to biblatex|bibtex [--dry-run] [--diff]
+  [--json]`. Maps fields (`journal`↔`journaltitle`, `address`↔`location`,
+  `school`↔`institution`), thesis types (`@phdthesis`/`@mastersthesis` ↔
+  `@thesis` + `type`), and combines/splits `year`+`month` ↔ ISO `date`. Edits
+  are surgical (minimal diff); unknown fields, groups, and comments are
+  preserved; existing target fields are never clobbered (a warning is reported
+  instead), and values that cannot be safely translated are left untouched with
+  a warning.
+- **`capabilities`** (`capabilities.py`): machine-readable description of
+  supported operations and commands, kept in sync with the actual CLI.
+  `pynakes capabilities [--json]`.
+
+### Changed
+- **Split the two "agents" audiences.** `AGENTS.md` (and its `CLAUDE.md`
+  symlink) is now a contributor guide for coding agents working *on* the repo
+  (layout, checks, invariants). The runtime guide for LLMs *using* the CLI
+  moved to `docs/guides/llm-integration.md` (added to the docs nav), where its
+  stale command surface was corrected (`keys generate` signature, `used
+  --group`, capabilities now implemented; removed a nonexistent `groups
+  entries`). README/FAQ/DEVPLAN pointers updated.
+- **Unified JSON envelope across all commands**: every modifying command now
+  emits the same keys — `status, action, file, dry_run, modified,
+  modified_entries, warnings` — plus command-specific fields and an optional
+  `diff`. The `used` command no longer uses `input_path`/`would_modify_file`
+  (now `file` + `modified`), and `warnings` is always present. Documented in
+  AGENTS.md and guarded by tests.
+- **Structured error handling across all CLI commands**: a missing/unreadable
+  file, malformed BibTeX, or invalid argument is now reported as a structured
+  `{"status":"error",...}` object on stdout (honoring `--json`) with exit code
+  1, instead of a Python traceback. Deliberate conflicts (e.g. duplicate DOI)
+  still exit 2 with options. This honors the documented agent contract.
+- **Consolidated duplication** found in an audit:
+  - Author-name parsing now lives only in `authors.py` (`split_name_list`,
+    `last_name`); `keys.py` delegates to it instead of re-deriving last names.
+  - `unique_key` is defined once in `keys.py`; `doi.py` imports it.
+  - `lint.py` validates DOIs via `doi.normalize_doi` rather than a private
+    regex, so "what is a valid DOI" has a single definition.
+  - CLI modifying commands share `_finish_mod`/`_safe` helpers, cutting
+    repeated commit/emit/error scaffolding.
+
+### Added (Phase 2 core operations)
 - **Phase 2 core operations** and their CLI commands:
   - **`groups`** (`groups.py`): `list_groups`, `list_entries_in_group`,
     `add_to_group`, `remove_from_group`. CLI: `pynakes groups list`,

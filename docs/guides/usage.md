@@ -1,332 +1,221 @@
 # Usage Guide
 
-Comprehensive guide to all pynakes commands and features.
+This guide documents the currently implemented `pynakes` command surface.
 
-> **Status — v0.1 in development.** This guide documents the planned command
-> surface. Most commands are not yet functional (scaffolded stubs); see
-> `DEVPLAN.md` for current build status.
+## Command Conventions
 
-## Overview
+Modifying commands support:
 
-All commands support:
-- `--help` — Show command help
-- `--dry-run` — Preview changes without modifying the file
-- `--diff` — Show unified diff of changes
-- `--json` — Output results as JSON
+- `--dry-run`: show what would change without writing
+- `--diff`: include a unified diff
+- `--json`: emit structured output where supported
 
-## Commands
+Exit codes:
 
-### inspect
+- `0`: success
+- `1`: error, such as parse, I/O, or validation failure
+- `2`: conflict, such as duplicate DOI import without `--allow-duplicate`
 
-Inspect the structure of a BibTeX file.
+## inspect
+
+Inspect a `.bib` file.
 
 ```bash
 pynakes inspect refs.bib
 pynakes inspect refs.bib --json
 ```
 
-Output includes:
-- Total entry count
-- Entry types and counts
-- Detected encoding
-- Any issues found (duplicates, missing fields, etc.)
+JSON output includes file encoding, line ending, entries, duplicate keys, and
+lint issues.
 
-### lint
+## lint
 
-Validate entries for common issues.
+Validate entries.
 
 ```bash
 pynakes lint refs.bib
 pynakes lint refs.bib --json
 ```
 
-Checks:
-- **Duplicate keys** — Same citation key used multiple times
-- **Missing required fields** — By entry type (article, book, inproceedings, thesis)
-- **Malformed DOI** — Invalid DOI format
-- **Missing DOI** — Warning (not error) for entries without DOI
-- **Broken group metadata** — Inconsistent group field formatting
+Checks include duplicate citation keys, missing required fields by entry type,
+malformed DOI fields, missing article DOI warnings, and malformed group fields.
 
-### groups
+## groups
 
-Manage entry groups (JabRef-style organization).
-
-#### List groups
+Manage JabRef-style `groups` fields.
 
 ```bash
 pynakes groups list refs.bib
 pynakes groups list refs.bib --json
-```
 
-#### Add entry to group
-
-```bash
 pynakes groups add-entry refs.bib KEY "GroupName" --dry-run --diff
-pynakes groups add-entry refs.bib KEY "GroupName"  # Apply
-```
+pynakes groups add-entry refs.bib KEY "GroupName"
 
-#### Remove entry from group
-
-```bash
 pynakes groups remove-entry refs.bib KEY "GroupName" --dry-run --diff
+pynakes groups remove-entry refs.bib KEY "GroupName"
 ```
 
-#### List entries in group
+## keys
 
-```bash
-pynakes groups entries refs.bib "GroupName"
-```
-
-### keys
-
-Manage citation keys.
-
-#### Check for duplicates
+Check, generate, and repair citation keys.
 
 ```bash
 pynakes keys check refs.bib
 pynakes keys check refs.bib --json
-```
 
-#### Generate keys for all entries
-
-```bash
 pynakes keys generate refs.bib --dry-run --diff
-pynakes keys generate refs.bib  # Apply
-```
-
-Key format: `[First author last name][4-digit year][first significant title word]`
-
-Example: `Smith2020BigData`
-
-#### Repair duplicate keys
-
-```bash
 pynakes keys repair refs.bib --dry-run --diff
 ```
 
-Automatically renames duplicate keys by appending a suffix (e.g., `Smith2020_2`).
+Generated keys default to `AuthorYearTitle`. JabRef metadata is honored when
+present:
 
-### fields
+```bibtex
+@comment{jabref-meta: keypatterndefault:[auth][shortyear][veryshorttitle];}
+@comment{jabref-meta: keypattern_article:[auth][year][veryshorttitle];}
+```
 
-Edit entry fields.
+Unsupported JabRef key-pattern markers fail explicitly instead of silently
+generating incorrect keys.
 
-#### Rename a field
+## fields
+
+Edit fields surgically while preserving entry formatting.
 
 ```bash
 pynakes fields rename refs.bib journal journaltitle --dry-run --diff
-```
-
-#### Move a field (rename and preserve original)
-
-```bash
 pynakes fields move refs.bib journal journaltitle --dry-run --diff
-```
-
-#### Append to a field
-
-```bash
-pynakes fields append refs.bib keywords "NewKeyword" --dry-run --diff
-```
-
-With a filter condition:
-
-```bash
-pynakes fields append refs.bib keywords "CBDC" \
-  --where 'title contains "digital currency"' \
-  --dry-run --diff
-```
-
-#### Clear a field
-
-```bash
+pynakes fields append refs.bib keywords "AI" --dry-run --diff
 pynakes fields clear refs.bib abstract --dry-run --diff
 ```
 
-### convert
-
-Convert between BibTeX formats.
+Supported filters:
 
 ```bash
-pynakes convert refs.bib --to biblatex --dry-run --diff
+pynakes fields append refs.bib keywords "CBDC" \
+  --where 'title contains "digital currency"'
+
+pynakes fields clear refs.bib doi --where 'type = book'
+pynakes fields clear refs.bib note --where 'doi exists'
 ```
 
-Mappings:
-- `journal` → `journaltitle`
-- `address` → `location`
-- `school` → `institution`
-- `year` + `month` → `date` (if `date` absent)
-- `@phdthesis` → `@thesis` with `type = {phdthesis}`
-- `@mastersthesis` → `@thesis` with `type = {mathesis}`
-
-### journals
-
-Manage journal name abbreviations.
-
-#### Abbreviate journals
+Title capitalization protection:
 
 ```bash
-pynakes journals abbreviate refs.bib --dry-run --diff
+pynakes fields protect-title refs.bib --dry-run --diff
+pynakes fields protect-title refs.bib --field booktitle --term Proceedings
 ```
 
-#### Expand journals
+This protects acronyms, uppercase/digit tokens, mixed-case terms such as
+`LaTeX`, and explicit terms.
+
+## doi import
+
+Import a BibTeX entry from a DOI.
 
 ```bash
-pynakes journals expand refs.bib --dry-run --diff
+pynakes doi import refs.bib 10.5555/example --dry-run --diff
+pynakes doi import refs.bib https://doi.org/10.5555/example
 ```
 
-#### Check journal consistency
+Options:
 
 ```bash
-pynakes journals check refs.bib
+pynakes doi import refs.bib 10.5555/example --key ManualKey2026
+pynakes doi import refs.bib 10.5555/example --key-source provider
+pynakes doi import refs.bib 10.5555/example --allow-duplicate
 ```
 
-Detects inconsistent or unknown journal names.
+The command fetches BibTeX through DOI resolver content negotiation and checks
+for existing matching DOI fields before importing.
 
-### capabilities
+## normalize
 
-Show pynakes capabilities and supported operations.
+Run the daily maintenance pass.
 
 ```bash
-pynakes capabilities --json
+pynakes normalize refs.bib --dry-run --diff
+pynakes normalize refs.bib
 ```
 
-Output includes:
-- Tool version
-- Safe-by-default guarantees
-- Supported features
-- Exit codes
-- Available commands
+Default behavior:
 
-## Global Options
+- protect capitalization in title-like fields
+- normalize author/editor lists in JabRef style
+- normalize DOI values
+- abbreviate journal titles using exact mappings and LTWA-style generation
 
-### --help
-
-Show help for any command:
+Useful overrides:
 
 ```bash
-pynakes --help
-pynakes inspect --help
-pynakes groups --help
+pynakes normalize refs.bib --author-style conservative
+pynakes normalize refs.bib --journal-style none
+pynakes normalize refs.bib --journal-style full
+pynakes normalize refs.bib --title-protection off
+pynakes normalize refs.bib --doi-normalization off
 ```
 
-### --dry-run
-
-Preview changes without modifying the file:
+Journal source tables:
 
 ```bash
-pynakes fields rename refs.bib journal journaltitle --dry-run
+pynakes normalize refs.bib --journal-table journals.csv --ltwa-table ltwa.csv
 ```
 
-Always use this before applying changes to important files.
+`journals.csv` accepts `title`, `abbreviation`, and optional `issn` columns.
+LTWA tables accept `Word` and `Abbreviation` columns.
 
-### --diff
+Normalization metadata can be stored in `jabref-meta` comments, for example:
 
-Show unified diff of what will change:
+```bibtex
+@comment{jabref-meta: pynakes-normalize-journal-style:none;}
+@comment{jabref-meta: pynakes-normalize-protect-titles:false;}
+@comment{jabref-meta: pynakes-protected-terms:Proceedings,OpenAI;}
+```
+
+## used
+
+Analyze which entries are cited by `.tex` or `.aux` files.
 
 ```bash
-pynakes keys repair refs.bib --dry-run --diff
+pynakes used refs.bib paper.tex paper.aux
+pynakes used refs.bib paper.tex --json
 ```
 
-### --json
-
-Output results as JSON for automation:
+Tag cited entries:
 
 ```bash
-pynakes inspect refs.bib --json | jq .
-pynakes lint refs.bib --json | python -m json.tool
+pynakes used refs.bib paper.tex --group Cited --dry-run --diff
+pynakes used refs.bib paper.tex --keyword cited
 ```
 
-## Exit Codes
-
-- **0** — Success
-- **1** — Error (parse error, I/O error, invalid arguments)
-- **2** — Conflict (operation blocked; options returned in JSON)
-
-## Examples
-
-### Workflow: Clean up a bibliography
+Export only cited entries:
 
 ```bash
-# 1. Inspect
-pynakes inspect refs.bib --json
-
-# 2. Find issues
-pynakes lint refs.bib --json
-
-# 3. Repair duplicate keys
-pynakes keys repair refs.bib --dry-run --diff
-pynakes keys repair refs.bib
-
-# 4. Convert to BibLaTeX
-pynakes convert refs.bib --to biblatex --dry-run --diff
-pynakes convert refs.bib --to biblatex
-
-# 5. Verify
-pynakes lint refs.bib
+pynakes used refs.bib paper.tex --out cited-only.bib
 ```
 
-### Workflow: Organize into groups
+## capabilities
 
-```bash
-# List current entries
-pynakes entries refs.bib --json | jq '.entries | keys'
-
-# Add AI papers to a group
-pynakes groups add-entry refs.bib Smith2020 "AI"
-pynakes groups add-entry refs.bib Jones2021 "AI"
-
-# Verify
-pynakes groups list refs.bib
-pynakes groups entries refs.bib "AI"
-```
-
-### Workflow: Automate with agents
-
-```bash
-# Generate JSON output for agent processing
-pynakes inspect refs.bib --json > state.json
-pynakes lint refs.bib --json > issues.json
-
-# Agent decides on changes, triggers pynakes
-pynakes keys repair refs.bib --dry-run --diff --json
-```
-
-## Common Issues
-
-### File not found
-
-```bash
-pynakes inspect nonexistent.bib
-# Error: File not found: nonexistent.bib
-```
-
-### Parse error
-
-```bash
-pynakes inspect malformed.bib
-# Error: ParseError: Malformed entry at line 42: missing closing brace
-```
-
-See the line number for context and fix the syntax error.
-
-### Conflict detected
-
-```bash
-pynakes merge refs.bib Key1 Key2 --dry-run
-# Conflict: Cannot merge Key1 and Key2 (conflicting author fields)
-# Options: keep_both, keep_first, keep_second
-```
-
-Either resolve the conflict manually or pass `--resolution keep_first`.
+`pynakes capabilities` exists as a placeholder. Full capabilities JSON is still
+planned.
 
 ## Best Practices
 
-1. **Always use dry-run first** — Preview before committing
-2. **Check backups** — `.bak` files are created automatically
-3. **Use JSON for scripts** — Parse output programmatically
-4. **Validate after changes** — Run `lint` to ensure correctness
-5. **Keep encoding consistent** — Stick with UTF-8
+1. Preview modifying commands with `--dry-run --diff`.
+2. Use `--json` for scripts and agent workflows.
+3. Run `pynakes lint refs.bib` after bulk changes.
+4. Keep exact journal mappings in a local CSV when journal style matters.
+5. Commit `.bib` changes separately from unrelated edits for easy review.
+
+## Still Planned
+
+The following commands/features are not implemented yet:
+
+- `convert`
+- dedicated `journals abbreviate`, `journals expand`, and `journals check`
+- `entries`
+- `dedupe` and `merge`
+- capabilities JSON
 
 ## Next Steps
 

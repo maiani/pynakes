@@ -36,7 +36,9 @@ A: pynakes automatically creates backups before modifying files. This is intenti
 
 ### Q: Can I use pynakes with BibLaTeX?
 
-A: Yes! Use `pynakes convert` to convert between BibTeX and BibLaTeX formats. The tool understands both formats.
+A: Yes, `pynakes` can parse and preserve BibLaTeX-style fields such as
+`journaltitle` and `date`. A dedicated BibTeX → BibLaTeX conversion command is
+still planned.
 
 ### Q: How do I handle entry types that pynakes doesn't recognize?
 
@@ -59,19 +61,22 @@ Fix the syntax error and retry.
 
 ### Q: pynakes says there's a conflict. What do I do?
 
-A: Conflicts happen when an operation has multiple valid outcomes. The error message shows your options:
+A: Conflicts happen when an operation has multiple valid outcomes. For example,
+DOI import reports a conflict when the DOI is already present:
 
 ```json
 {
   "status": "conflict",
+  "error": "DuplicateDOI",
   "options": [
-    {"id": "keep_both", "description": "Keep both entries"},
-    {"id": "keep_first", "description": "Keep first entry"}
+    {"id": "keep_existing", "description": "Do not import a duplicate reference"},
+    {"id": "allow_duplicate", "description": "Retry with --allow-duplicate"}
   ]
 }
 ```
 
-Choose an option and retry with `--resolution keep_both`.
+Choose an option and retry with the documented flag, such as
+`--allow-duplicate` for DOI import.
 
 ### Q: Why does the diff show unchanged entries?
 
@@ -102,17 +107,28 @@ A: Not yet. This is planned for v0.2. For now, use the standard linting rules.
 
 ### Q: Does pynakes support JabRef metadata?
 
-A: Yes! JabRef group metadata in `@comment` lines is preserved automatically. Groups can be managed with `pynakes groups`.
+A: Yes. JabRef group metadata is preserved, and `groups` fields can be managed
+with `pynakes groups`. `pynakes` also parses JabRef citation-key pattern
+metadata such as `keypatterndefault` and `keypattern_<entrytype>` for key
+generation and DOI imports. Full structured JabRef metadata editing is still
+planned.
 
 ### Q: Can I use pynakes to fetch metadata (DOIs, abstracts)?
 
-A: Not in v0.1. This is planned for v0.1.1. For now, pynakes focuses on organizing existing metadata.
+A: DOI import is implemented:
+
+```bash
+pynakes doi import refs.bib 10.5555/example --dry-run --diff
+```
+
+Abstract/PDF metadata extraction and provider-specific enrichment are still
+planned.
 
 ## Agent & Automation
 
 ### Q: Can I use pynakes with Claude or other LLMs?
 
-A: Yes! See the [API Reference](../api/index.md) for Python usage. The `--json` output is designed for agent integration.
+A: Yes. See the [LLM Integration guide](llm-integration.md) for the command surface, JSON envelope, and recommended workflows, or the [API Reference](../api/index.md) for Python usage. The `--json` output is designed for agent integration.
 
 ### Q: How do I integrate pynakes with my automation workflow?
 

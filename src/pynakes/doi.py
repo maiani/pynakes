@@ -10,7 +10,7 @@ from urllib.request import Request, urlopen
 
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.bibtex_writer import write_bib
-from pynakes.keys import UnsupportedCitationKeyPatternError, generate_key
+from pynakes.keys import UnsupportedCitationKeyPatternError, generate_key, unique_key
 from pynakes.model import BibEntry, BibLibrary
 
 _DOI_URL_RE = re.compile(r"^https?://(?:dx\.)?doi\.org/", re.IGNORECASE)
@@ -110,16 +110,6 @@ def existing_keys_for_doi(lib: BibLibrary, doi: str) -> list[str]:
         except ValueError:
             continue
     return keys
-
-
-def unique_key(candidate: str, taken: set[str]) -> str:
-    """Return ``candidate`` made unique against ``taken`` with letter suffixes."""
-    if candidate not in taken:
-        return candidate
-    suffix = ord("a")
-    while f"{candidate}{chr(suffix)}" in taken:
-        suffix += 1
-    return f"{candidate}{chr(suffix)}"
 
 
 def prepare_imported_entry(

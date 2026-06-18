@@ -63,10 +63,7 @@ def append_field(
     The field is created if absent; duplicate values are not re-added. Returns
     the number of entries changed. Modifies ``lib`` in place.
     """
-    return sum(
-        append_delimited_field(e, field, value, delim, join)
-        for e in _selected(lib, where)
-    )
+    return sum(append_delimited_field(e, field, value, delim, join) for e in _selected(lib, where))
 
 
 def clear_field(lib: BibLibrary, field: str, where: QueryFilter = None) -> int:

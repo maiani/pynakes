@@ -1,0 +1,15 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: ruff check --fix src tests
+        language: system
+        pass_filenames: false
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format
+        entry: ruff format src tests
+        language: system
+        pass_filenames: false
+        types_or: [python, pyi]

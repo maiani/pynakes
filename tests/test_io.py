@@ -58,9 +58,7 @@ class TestLoadBib:
         """A non-UTF-8 file is detected and decoded as latin-1."""
         bib_file = tmp_path / "test.bib"
         # 0xE9 is 'é' in latin-1 but invalid as standalone UTF-8.
-        bib_file.write_bytes(
-            b"@article{k,\n  author = {Caf\xe9},\n  year = {2020}\n}\n"
-        )
+        bib_file.write_bytes(b"@article{k,\n  author = {Caf\xe9},\n  year = {2020}\n}\n")
 
         lib = load_bib(str(bib_file))
         assert lib.encoding == "latin-1"
@@ -87,7 +85,7 @@ class TestLineEndingFidelity:
         data = bib_file.read_bytes()
         assert b"\r\n" in data
         # No bare LF that isn't part of a CRLF pair.
-        assert data.replace(b"\r\n", b"") .count(b"\n") == 0
+        assert data.replace(b"\r\n", b"").count(b"\n") == 0
 
 
 class TestSaveBib:

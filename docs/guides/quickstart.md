@@ -1,132 +1,131 @@
 # Quick Start
 
-Get up and running with pynakes in 5 minutes.
-
-> **Status — v0.1 in development.** Most CLI commands shown here are still
-> scaffolded stubs. The commands below reflect the planned interface; see
-> `DEVPLAN.md` for what currently works.
+Get up and running with `pynakes` in a few minutes.
 
 ## 1. Install
+
+For local development:
+
+```bash
+git clone https://github.com/user/pynakes.git
+cd pynakes
+pip install -e ".[dev]"
+```
+
+Once published, end users will install with:
 
 ```bash
 pip install pynakes
 ```
 
-Or from source:
-
-```bash
-git clone https://github.com/user/pynakes.git
-cd pynakes
-pip install -e .
-```
-
-## 2. Inspect Your Bibliography
-
-Get an overview of your BibTeX file:
+## 2. Inspect a Bibliography
 
 ```bash
 pynakes inspect refs.bib
-```
-
-Output shows entry count, encoding, and any issues found.
-
-For JSON output (useful for scripts):
-
-```bash
 pynakes inspect refs.bib --json
 ```
 
-## 3. Check for Issues
+`inspect` reports entry count, encoding, line endings, entries, duplicate keys,
+and lint issues.
 
-Lint your bibliography for common problems:
+## 3. Check for Issues
 
 ```bash
 pynakes lint refs.bib
+pynakes lint refs.bib --json
 ```
 
-This checks for:
-- Duplicate citation keys
-- Missing required fields (by entry type)
-- Malformed DOI fields
-- Broken group metadata
+Lint currently checks duplicate keys, required fields, DOI shape, missing DOI
+warnings for articles, and broken group field formatting.
 
-## 4. Preview Changes (Dry-Run)
-
-Before making changes, preview them with `--dry-run`:
+## 4. Preview a Maintenance Pass
 
 ```bash
-pynakes keys repair refs.bib --dry-run --diff
+pynakes normalize refs.bib --dry-run --diff
 ```
 
-The `--diff` flag shows exactly what will change.
+The default normalization pass protects title capitalization, normalizes
+author/editor names in JabRef style, normalizes DOI fields, and abbreviates
+known journal titles using exact mappings and LTWA-style word rules.
 
-## 5. Apply Changes
-
-Once you're happy with the preview, run the command without `--dry-run`:
+## 5. Apply the Maintenance Pass
 
 ```bash
-pynakes keys repair refs.bib
+pynakes normalize refs.bib
 ```
 
-A backup (`.bak`) is automatically created.
-
-## 6. Organize with Groups
-
-Add entries to groups:
+To keep author names in their current order and only normalize separators:
 
 ```bash
-pynakes groups add-entry refs.bib Smith2020 "AI-Papers"
-pynakes groups add-entry refs.bib Jones2021 "AI-Papers"
+pynakes normalize refs.bib --author-style conservative
 ```
 
-List all groups:
+To use local journal data:
+
+```bash
+pynakes normalize refs.bib --journal-table journals.csv --ltwa-table ltwa.csv
+```
+
+`journals.csv` should contain `title`, `abbreviation`, and optional `issn`
+columns. LTWA tables should contain `Word` and `Abbreviation` columns.
+
+## 6. Import by DOI
+
+```bash
+pynakes doi import refs.bib 10.5555/example --dry-run --diff
+pynakes doi import refs.bib 10.5555/example
+```
+
+Citation-key choices:
+
+```bash
+pynakes doi import refs.bib 10.5555/example --key-source provider
+pynakes doi import refs.bib 10.5555/example --key ManualKey2026
+```
+
+By default, imported entries use generated keys. If the library has JabRef
+`keypatterndefault` or `keypattern_<entrytype>` metadata, that pattern is used.
+
+## 7. Organize with Groups
 
 ```bash
 pynakes groups list refs.bib
+pynakes groups add-entry refs.bib Smith2020 "Machine Learning" --dry-run --diff
+pynakes groups add-entry refs.bib Smith2020 "Machine Learning"
 ```
 
-## 7. Common Operations
-
-### Rename a field
+## 8. Common Field Operations
 
 ```bash
 pynakes fields rename refs.bib journal journaltitle --dry-run --diff
-```
-
-### Append a field to entries matching a condition
-
-```bash
 pynakes fields append refs.bib keywords "CBDC" \
   --where 'title contains "digital currency"' \
   --dry-run --diff
+pynakes fields protect-title refs.bib --dry-run --diff
 ```
 
-### Check for duplicate keys
+## 9. Citation Usage
 
 ```bash
-pynakes keys check refs.bib
+pynakes used refs.bib paper.tex paper.aux --json
+pynakes used refs.bib paper.tex --group Cited --dry-run --diff
+pynakes used refs.bib paper.tex --out cited-only.bib
 ```
 
-### Convert to BibLaTeX
+## Development Checks
 
 ```bash
-pynakes convert refs.bib --to biblatex --dry-run --diff
+ruff check src tests
+ruff format --check src tests
+pytest
 ```
 
-## 8. Capabilities
-
-See what operations pynakes supports:
+Local hooks:
 
 ```bash
-pynakes capabilities --json
+pre-commit install
+pre-commit run --all-files
 ```
-
-## Tips
-
-- **Always preview first** — use `--dry-run --diff` before applying changes
-- **Check backups** — `.bak` files are created automatically
-- **Use JSON output** — for automation and parsing by scripts/agents
-- **Check encoding** — ensure your BibTeX file is UTF-8 or compatible
 
 ## Next Steps
 

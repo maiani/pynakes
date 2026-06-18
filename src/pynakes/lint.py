@@ -6,15 +6,11 @@ Checks: duplicate keys, missing required fields (by entry type), malformed or
 missing DOIs, and malformed JabRef ``groups`` formatting.
 """
 
-import re
 from dataclasses import dataclass
 from typing import Optional
 
+from pynakes.doi import normalize_doi
 from pynakes.model import BibLibrary
-
-# A bare DOI: ``10.<registrant>/<suffix>``. URL prefixes are stripped first.
-_DOI_RE = re.compile(r"^10\.\d{4,9}/\S+$")
-_DOI_URL_RE = re.compile(r"^https?://(dx\.)?doi\.org/", re.IGNORECASE)
 
 # Required fields by entry type. Each requirement is a tuple of acceptable
 # field names (any one satisfies it), to tolerate BibTeX/BibLaTeX variants
@@ -93,7 +89,9 @@ def _lint_entry(entry) -> list[LintIssue]:
 
     doi = entry.fields.get("doi", "").strip()
     if doi:
-        if not _DOI_RE.match(_DOI_URL_RE.sub("", doi)):
+        try:
+            normalize_doi(doi)
+        except ValueError:
             issues.append(
                 LintIssue(
                     "malformed_doi",

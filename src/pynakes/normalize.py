@@ -101,18 +101,14 @@ def _resolve_choice(
 def _resolve_title_fields(lib: BibLibrary, option: list[str] | None) -> list[str]:
     if option:
         return option
-    metadata = _metadata_value(
-        lib, f"{METADATA_PREFIX}title-fields", "normalize-title-fields"
-    )
+    metadata = _metadata_value(lib, f"{METADATA_PREFIX}title-fields", "normalize-title-fields")
     return _split_metadata_list(metadata) or list(TITLE_FIELDS)
 
 
 def _resolve_terms(lib: BibLibrary, option: list[str] | None) -> list[str]:
     terms = list(option or [])
     terms.extend(
-        _split_metadata_list(
-            _metadata_value(lib, "pynakes-protected-terms", "protected-terms")
-        )
+        _split_metadata_list(_metadata_value(lib, "pynakes-protected-terms", "protected-terms"))
     )
     return terms
 
@@ -141,9 +137,7 @@ def normalize_dois(lib: BibLibrary) -> tuple[int, list[dict[str, str]]]:
     return count, warnings
 
 
-def normalize_library(
-    lib: BibLibrary, options: NormalizeOptions | None = None
-) -> NormalizeResult:
+def normalize_library(lib: BibLibrary, options: NormalizeOptions | None = None) -> NormalizeResult:
     """Apply the standard daily-driver normalization routine in-place."""
     opts = options or NormalizeOptions()
     result = NormalizeResult()

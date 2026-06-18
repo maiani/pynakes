@@ -28,7 +28,7 @@ pip install -e .
 
 ### With Development Tools
 
-Install with dev dependencies (pytest, ruff, zensical):
+Install with dev dependencies (`pytest`, `ruff`, `pre-commit`):
 
 ```bash
 pip install -e ".[dev]"
@@ -59,11 +59,32 @@ Usage: pynakes [OPTIONS] COMMAND [ARGS]...
 │ inspect       Inspect a .bib file structure.                            │
 │ groups        Manage entry groups.                                      │
 │ keys          Generate and check citation keys.                         │
-│ fields        Edit fields (rename, move, append, clear).               │
+│ fields        Edit fields (rename, move, append, clear, protect titles).│
+│ doi           Import references by DOI.                                 │
 │ lint          Validate entries.                                         │
-│ capabilities  Show tool capabilities.                                   │
+│ normalize     Run the standard bibliography normalization routine.       │
+│ used          Report cited, unused, and missing entries.                │
 ╰──────────────────────────────────────────────────────────────────────────╯
 ```
+
+## Development Checks
+
+Run the same checks as CI:
+
+```bash
+ruff check src tests
+ruff format --check src tests
+pytest
+```
+
+Install local pre-commit hooks:
+
+```bash
+pre-commit install
+pre-commit run --all-files
+```
+
+GitHub Actions runs these checks on Python 3.11, 3.12, and 3.13.
 
 ## Shell Completion
 

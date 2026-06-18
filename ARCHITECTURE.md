@@ -252,27 +252,41 @@ def save_bib(lib: BibLibrary, path: str, *,
 
 ### Layer 3: Operation modules
 
-Each operation module is small, focused, and testable:
+Each operation module is small, focused, and testable.
 
+**Implemented:**
+
+- **`editing.py`**: Surgical raw-text field/key edits (single source of truth for
+  minimal-diff modifications) plus entry-level helpers.
 - **`groups.py`**: Parse and modify the `groups` field, add/remove entries.
-- **`keys.py`**: Detect duplicate keys, generate new ones, repair conflicts.
-- **`fields.py`**: Rename, move, append, clear fields with optional query filter.
-- **`lint.py`**: Validate entries (required fields, malformed DOI, etc.).
-- **`dedupe.py`**: Detect duplicates and propose conservative merges.
-- **`convert.py`**: BibTeX ↔ BibLaTeX transformations.
-- **`journals.py`**: Abbreviate/expand journal names.
-- **`search.py`**: Query DSL and filtering logic.
-- **`special.py`**: Handle special fields (read status, relevance, ranking).
-- **`doi.py`**: DOI validation and future metadata import.
-- **`files.py`**: Validate linked file references.
-- **`cleanup.py`**: Multi-operation pipelines (future).
-- **`strings.py`**: Manage `@string` constants.
+- **`keys.py`**: Detect duplicate keys, generate new ones (`AuthorYearTitle` or a
+  JabRef citation-key pattern), repair conflicts.
+- **`fields.py`**: Rename, move, append, clear fields and protect title
+  capitalization, with an optional `--where` query filter.
+- **`authors.py`**: Author/editor name-list parsing and normalization (owns
+  name splitting and last-name extraction used by key generation).
+- **`journals.py`**: Abbreviate/expand journal names (user table, bundled exact
+  table, LTWA word generation).
+- **`doi.py`**: DOI normalization/validation and metadata import via DOI content
+  negotiation (stdlib `urllib`).
+- **`normalize.py`**: High-level routine composing title/author/journal/DOI
+  normalization.
+- **`lint.py`**: Validate entries (duplicate keys, required fields, malformed/
+  missing DOI, malformed groups).
+- **`usage.py`**: Detect/tag/export entries cited in LaTeX `.tex`/`.aux` sources.
+- **`capabilities.py`**: Machine-readable description of supported operations.
+
+**Planned (not yet built):** `dedupe.py` (merge), `convert.py` (BibTeX ↔
+BibLaTeX), `search.py` (query DSL), `files.py` (linked-file validation),
+`strings.py` (`@string` management).
 
 **Each operation module should:**
 
 - Accept `BibLibrary` as input.
-- Return a modified `BibLibrary` (never mutate in place).
-- Raise `ConflictError` if the operation cannot safely complete.
+- Mutate the library in place and return a count (or report) of what changed;
+  edits go through `editing.py` so unmodified entries stay byte-identical.
+- Raise `ConflictError` (or surface options) if the operation cannot safely
+  complete.
 - Provide a `.dry_run()` variant that returns a diff without modifying.
 - Include its own unit tests.
 
@@ -427,8 +441,9 @@ abbreviations = "~/.pynakes_journals.toml"
 ### Optional dependencies
 
 - `rich`: human-readable CLI output (colors, tables).
-- `httpx`: future DOI lookups (lazy-import only in `doi.py`).
-- `python-slugify`: citation-key generation (can be inlined if needed).
+
+DOI metadata import in `doi.py` uses the Python standard library (`urllib`); no
+third-party HTTP client is required.
 
 ### Why minimal dependencies?
 

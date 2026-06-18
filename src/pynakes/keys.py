@@ -8,13 +8,32 @@ instead. Generation is deterministic — the same entry always yields the same k
 
 import re
 
+from pynakes.authors import last_name as _last_name
+from pynakes.authors import split_name_list as _split_name_list
 from pynakes.editing import rename_entry_key
 from pynakes.model import BibEntry, BibLibrary
 
 # Common title words skipped when picking the "first significant" word.
 _TITLE_STOPWORDS = {
-    "a", "an", "the", "on", "of", "for", "and", "in", "to", "with",
-    "from", "by", "at", "as", "is", "are", "into", "over", "via",
+    "a",
+    "an",
+    "the",
+    "on",
+    "of",
+    "for",
+    "and",
+    "in",
+    "to",
+    "with",
+    "from",
+    "by",
+    "at",
+    "as",
+    "is",
+    "are",
+    "into",
+    "over",
+    "via",
 }
 
 _PATTERN_MARKER_RE = re.compile(r"\[([^\[\]]+)\]")
@@ -34,24 +53,15 @@ def duplicate_key_counts(lib: BibLibrary) -> dict[str, int]:
     return lib.entries.duplicate_keys()
 
 
-def _first_author_last_name(entry: BibEntry) -> str:
+def _author_last_names(entry: BibEntry) -> list[str]:
+    """Return the last names of every author/editor (author preferred)."""
     raw = entry.fields.get("author") or entry.fields.get("editor") or ""
-    if not raw.strip():
-        return "Anon"
-    first = re.split(r"\s+and\s+", raw)[0].strip()
-    # A wholly brace-protected author (e.g. ``{World Bank}``) is a single
-    # corporate name; take it verbatim rather than splitting off a "last word".
-    if first.startswith("{") and first.endswith("}"):
-        name = re.sub(r"[^A-Za-z]", "", first[1:-1])
-        return name or "Anon"
-    first = first.replace("{", "").replace("}", "").strip()
-    if "," in first:
-        last = first.split(",", 1)[0]
-    else:
-        parts = first.split()
-        last = parts[-1] if parts else ""
-    last = re.sub(r"[^A-Za-z]", "", last)
-    return last or "Anon"
+    return [name for name in (_last_name(p) for p in _split_name_list(raw)) if name]
+
+
+def _first_author_last_name(entry: BibEntry) -> str:
+    names = _author_last_names(entry)
+    return names[0] if names else "Anon"
 
 
 def _year(entry: BibEntry) -> str:
@@ -89,22 +99,7 @@ def _field_value(entry: BibEntry, field: str) -> str:
 
 
 def _all_author_last_names(entry: BibEntry) -> list[str]:
-    raw = entry.fields.get("author") or entry.fields.get("editor") or ""
-    names: list[str] = []
-    for person in re.split(r"\s+and\s+", raw):
-        person = person.strip()
-        if not person:
-            continue
-        if person.startswith("{") and person.endswith("}"):
-            cleaned = re.sub(r"[^A-Za-z]", "", person[1:-1])
-        elif "," in person:
-            cleaned = re.sub(r"[^A-Za-z]", "", person.split(",", 1)[0])
-        else:
-            parts = person.replace("{", "").replace("}", "").split()
-            cleaned = re.sub(r"[^A-Za-z]", "", parts[-1] if parts else "")
-        if cleaned:
-            names.append(cleaned)
-    return names
+    return _author_last_names(entry)
 
 
 def _resolve_marker(entry: BibEntry, marker: str) -> str:
@@ -223,7 +218,7 @@ def generate_key(entry: BibEntry, lib: BibLibrary | None = None) -> str:
     return generate_fallback_key(entry)
 
 
-def _unique(candidate: str, taken: set[str]) -> str:
+def unique_key(candidate: str, taken: set[str]) -> str:
     """Return ``candidate`` made unique against ``taken`` with letter suffixes."""
     if candidate not in taken:
         return candidate
@@ -243,7 +238,7 @@ def regenerate_keys(lib: BibLibrary) -> list[tuple[str, str]]:
     renames: list[tuple[str, str]] = []
     taken: set[str] = set()
     for entry in lib.entries.values():
-        new_key = _unique(generate_key(entry, lib), taken)
+        new_key = unique_key(generate_key(entry, lib), taken)
         taken.add(new_key)
         old_key = entry.key
         if rename_entry_key(entry, new_key):

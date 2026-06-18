@@ -21,7 +21,9 @@ Breakdown of v0.1 implementation into phases with clear milestones and dependenc
 #### 1.1 Project setup
 - [ ] Initialize `pyproject.toml` with dependencies (`typer`, `rich`)
 - [ ] Set up `src/pynakes/` layout
-- [ ] Configure `pytest` and `ruff`
+- [x] Configure `pytest` and `ruff`
+- [x] Add local `pre-commit` hooks for Ruff lint/format
+- [x] Add GitHub Actions CI for Python 3.11, 3.12, and 3.13
 - [ ] Initialize `__init__.py`, `__main__.py`, `cli.py`
 - [x] Write README (done)
 - [x] Write ARCHITECTURE.md (done)
@@ -275,18 +277,21 @@ pynakes keys repair tests/fixtures/duplicate_entries.bib --dry-run --diff
 
 ### Tasks
 
-#### 3.1 BibTeX to BibLaTeX conversion (`convert.py`)
-- [ ] Implement `convert_to_biblatex(lib: BibLibrary) -> BibLibrary`
-- [ ] Field mappings:
-  - `journal` → `journaltitle`
-  - `address` → `location`
-  - `school` → `institution`
-  - `year` + `month` → `date` (if `date` absent)
-- [ ] Entry type mappings:
-  - `@phdthesis` → `@thesis` with `type = {phdthesis}`
-  - `@mastersthesis` → `@thesis` with `type = {mathesis}`
-- [ ] Preserve unknown fields
-- [ ] Preserve groups and comments
+#### 3.1 BibTeX ↔ BibLaTeX conversion (`convert.py`)
+- [x] Implement `convert_to_biblatex(lib: BibLibrary) -> ConvertResult` (mutates
+  in place per invariant #3, returning a report rather than a new library)
+- [x] Implement `convert_to_bibtex(lib: BibLibrary) -> ConvertResult` (reverse
+  direction) and a `convert(lib, target)` dispatcher
+- [x] Field mappings (both directions, never clobbering an existing target):
+  - `journal` ↔ `journaltitle`
+  - `address` ↔ `location`
+  - `school` ↔ `institution` (the reverse only inside a thesis)
+  - `year` + `month` → `date` (if `date` absent); `date` → `year` + `month`
+- [x] Entry type mappings (both directions):
+  - `@phdthesis` ↔ `@thesis` with `type = {phdthesis}`
+  - `@mastersthesis` ↔ `@thesis` with `type = {mathesis}`
+- [x] Preserve unknown fields
+- [x] Preserve groups and comments
 
 **Success criteria:**
 - Conversions are correct and complete
@@ -320,8 +325,8 @@ pynakes keys repair tests/fixtures/duplicate_entries.bib --dry-run --diff
 - Tests cover common journals
 
 #### 3.3 Capabilities metadata (`capabilities.py`)
-- [ ] Implement `get_capabilities() -> dict`
-- [ ] Return structure:
+- [x] Implement `get_capabilities() -> dict`
+- [x] Return structure:
   ```json
   {
     "tool": "pynakes",
@@ -341,9 +346,12 @@ pynakes keys repair tests/fixtures/duplicate_entries.bib --dry-run --diff
 - Can be parsed by agents
 
 #### 3.4 Safe diff and JSON for all operations
-- [ ] Update all Phase 2 operations to support `--dry-run`, `--diff`, `--json`
-- [ ] Ensure JSON output is consistent across all commands
-- [ ] Test with all operation types
+- [x] Update all Phase 2 operations to support `--dry-run`, `--diff`, `--json`
+  (read-only `inspect`/`lint`/`groups list`/`keys check` support `--json`)
+- [x] Ensure JSON output is consistent across all commands (shared
+  `_finish_mod`/`_emit` envelope)
+- [x] Test with all operation types (parametrized integration tests in
+  `tests/test_cli.py`)
 
 **Success criteria:**
 - All commands respect `--dry-run`, `--diff`, `--json`
@@ -351,13 +359,13 @@ pynakes keys repair tests/fixtures/duplicate_entries.bib --dry-run --diff
 - JSON is valid and parseable
 
 #### 3.5 CLI commands (Phase 3 additions)
-- [ ] Add `pynakes capabilities --json`
-- [ ] Add `pynakes convert <file> --to biblatex [--dry-run] [--diff]`
+- [x] Add `pynakes capabilities --json`
+- [x] Add `pynakes convert <file> --to biblatex|bibtex [--dry-run] [--diff] [--json]`
 - [x] Add `pynakes normalize <file> [--dry-run] [--diff] [--json]`
-- [ ] Add dedicated `pynakes journals abbreviate <file> [--dry-run]`
-- [ ] Add dedicated `pynakes journals expand <file> [--dry-run]`
-- [ ] Add `pynakes journals check <file>`
-- [ ] Update all Phase 2 commands to support `--json`
+- [x] Add dedicated `pynakes journals abbreviate <file> [--dry-run] [--diff] [--json]`
+- [x] Add dedicated `pynakes journals expand <file> [--dry-run] [--diff] [--json]`
+- [x] Add `pynakes journals check <file> [--json]`
+- [x] Update all Phase 2 commands to support `--json`
 
 **Success criteria:**
 - All commands work
@@ -365,11 +373,11 @@ pynakes keys repair tests/fixtures/duplicate_entries.bib --dry-run --diff
 - Help text is clear
 
 #### 3.6 Tests for Phase 3
-- [ ] `test_convert.py`: BibTeX to BibLaTeX mappings, field preservation
+- [x] `test_convert.py`: BibTeX ↔ BibLaTeX mappings, field preservation, round-trip
 - [x] `test_normalize.py`: author normalization, DOI normalization, journal abbreviation/expansion, metadata overrides
 - [x] `test_journals.py`: source priority, LTWA generation, expansion, unknown warnings
-- [ ] `test_capabilities.py`: structure and accuracy of capabilities output
-- [ ] Integration tests: dry-run + diff + JSON for all Phase 2-3 operations
+- [x] `test_capabilities.py`: structure and accuracy of capabilities output
+- [x] Integration tests: dry-run + diff + JSON for all Phase 2-3 operations
 
 **Success criteria:**
 - All tests pass
@@ -423,14 +431,15 @@ pynakes capabilities --json | python -m json.tool
 #### 4.3 Documentation
 - [ ] Ensure README is accurate and complete
 - [ ] Ensure ARCHITECTURE.md covers all design decisions
-- [ ] Ensure AGENTS.md has clear examples
+- [ ] Ensure AGENTS.md (contributor guide) is accurate
+- [ ] Ensure docs/guides/llm-integration.md (runtime usage) has clear examples
 - [ ] Add docstrings to all public functions
 - [ ] Add type hints throughout
 
 **Success criteria:**
 - README examples all work
 - ARCHITECTURE can be followed by new contributors
-- AGENTS.md examples are accurate
+- LLM integration guide examples are accurate
 - All public functions have docstrings
 
 #### 4.4 Code quality
@@ -570,7 +579,10 @@ pynakes inspect tests/fixtures/simple.bib
   - Add fixtures from current JabRef exports covering library properties, key patterns,
     groups, selectors, file directories, save actions, and unknown metadata.
   - Add round-trip tests proving unmodified JabRef metadata writes back with zero diff.
-- DOI import integration
+- ~~DOI import integration~~ — **done early** as `pynakes doi import`
+  (Crossref-first DOI metadata import, registrant `application/x-bibtex`
+  fallback, duplicate DOI conflict detection, and citation-key selection from
+  explicit CLI key, provider key, or local generation with JabRef metadata).
 - Deduplication and merge
 - ~~AUX extraction~~ — **done early** as `pynakes used` (cite detection across
   `.tex`/`.aux`, subset export, group/keyword tagging). See CHANGELOG.
@@ -582,6 +594,9 @@ pynakes inspect tests/fixtures/simple.bib
   conservative option, DOI normalization, and built-in journal
   abbreviation/expansion, with `jabref-meta` overrides for pynakes
   normalization settings).
+- ~~Repository automation~~ — **done early** with local pre-commit Ruff hooks
+  and GitHub Actions CI running Ruff lint, Ruff format check, and pytest on
+  Python 3.11, 3.12, and 3.13.
 
 ### v0.2 (feature expansion, ~2 weeks)
 - Configuration profiles

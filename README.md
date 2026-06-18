@@ -209,9 +209,12 @@ Additionally:
 
 - **Structured output**: `--json` returns machine-readable results with status, warnings, and errors.
 - **Dry-run by default for exploration**: Use `--dry-run` to preview any operation.
-- **Capabilities introspection**: planned; see the current-status checklist above.
+- **Capabilities introspection**: `pynakes capabilities --json` describes supported operations.
 - **Atomic operations**: Each command is idempotent and composable; you can chain operations safely.
 - **Clear error codes**: Exit code 0 = success; 1 = error; 2 = conflict (safe to retry with user input).
+
+See the **[LLM Integration guide](docs/guides/llm-integration.md)** for the full
+command surface, the JSON envelope, and recommended workflows.
 
 Example: using `pynakes` with Claude via MCP (future):
 
@@ -223,7 +226,7 @@ claude.invoke_tool("pynakes.groups.add_entry", {
   "group": "CBDC / Banking",
   "dry_run": True
 })
-# Returns: {"would_modify": True, "diff": "...", "warnings": [...]}
+# Returns: {"status": "success", "modified": True, "diff": "...", "warnings": [...]}
 
 # Then Claude can ask the user to confirm
 # Or apply it directly if already authorized
@@ -241,6 +244,12 @@ claude.invoke_tool("pynakes.groups.add_entry", {
 
 ## Development
 
+Install with development tools:
+
+```bash
+pip install -e ".[dev]"
+```
+
 Run tests:
 
 ```bash
@@ -250,9 +259,19 @@ pytest
 Lint and format:
 
 ```bash
-ruff check .
-ruff format .
+ruff check src tests
+ruff format src tests
 ```
+
+Install local pre-commit hooks:
+
+```bash
+pre-commit install
+pre-commit run --all-files
+```
+
+GitHub Actions runs `ruff check`, `ruff format --check`, and `pytest` on
+Python 3.11, 3.12, and 3.13 for pushes and pull requests.
 
 ## License
 

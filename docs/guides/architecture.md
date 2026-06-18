@@ -23,9 +23,11 @@ pynakes is built with **safety**, **composability**, and **agent compatibility**
 │  - groups.py   (group management)              │
 │  - keys.py     (citation keys)                 │
 │  - fields.py   (field operations)              │
-│  - lint.py     (validation)                    │
-│  - convert.py  (format conversion)             │
-│  - journals.py (journal abbreviation)          │
+│  - lint.py      (validation)                   │
+│  - doi.py       (DOI import)                   │
+│  - normalize.py (maintenance routine)          │
+│  - journals.py  (journal abbreviation sources) │
+│  - usage.py     (citation usage analysis)      │
 └──────────────────┬──────────────────────────────┘
                    │
 ┌──────────────────▼──────────────────────────────┐
@@ -64,7 +66,7 @@ class BibEntry:
 ```python
 @dataclass
 class BibLibrary:
-    entries: dict[str, BibEntry]             # All entries
+    entries: EntryCollection                 # All entries, duplicate-key tolerant
     strings: dict[str, str] = field(...)     # @string definitions
     preamble: list[str] = field(...)         # @preamble declarations
     raw_comments: list[str] = field(...)     # File-level comments
@@ -93,7 +95,7 @@ This ensures maximum format preservation and makes debugging easy.
 
 Operations are independent:
 - Each operation reads from disk, modifies in memory, writes to disk
-- Operations can be chained: `lint` → `repair` → `convert` → `verify`
+- Operations can be chained: `lint` → `keys repair` → `normalize` → `verify`
 - Agents can dry-run each step before committing
 
 ### 4. Agent Compatibility
@@ -124,13 +126,15 @@ Operations are independent:
 | `fields.py` | Field operations (rename, move, append, clear) |
 | `lint.py` | Validation and issue detection |
 
-### Format & Metadata (Phase 3)
+### Metadata and Normalization
 
 | Module | Responsibility |
 |--------|-----------------|
-| `convert.py` | BibTeX ↔ BibLaTeX conversion |
-| `journals.py` | Journal name abbreviation/expansion |
-| `capabilities.py` | Tool introspection |
+| `doi.py` | DOI import and DOI normalization helpers |
+| `authors.py` | JabRef-style and conservative author/editor normalization |
+| `journals.py` | Exact journal mappings and LTWA-style abbreviation |
+| `normalize.py` | Daily maintenance orchestration |
+| `usage.py` | AUX/TeX citation usage analysis |
 
 ### CLI (Phase 2-4)
 
@@ -191,11 +195,11 @@ def write_bib(lib: BibLibrary) -> str:
 All operations follow the same pattern:
 
 ```python
-def operation(lib: BibLibrary, args) -> (BibLibrary, OperationResult):
+def operation(lib: BibLibrary, args) -> int:
     # 1. Validate inputs
-    # 2. Build modified copy of lib
-    # 3. Return (modified_lib, result_metadata)
-    # Caller decides: save or dry-run
+    # 2. Mutate lib in place using surgical field/key edits
+    # 3. Return changed count or operation-specific result
+    # CLI handles dry-run, diff, JSON, and writeback
 ```
 
 This separation lets the CLI handle `--dry-run`, `--diff`, and `--json` consistently.
@@ -206,18 +210,18 @@ This separation lets the CLI handle `--dry-run`, `--diff`, and `--json` consiste
 # Load
 lib = load_bib(args.file)
 
-# Dry-run
+# Snapshot raw entry text for minimal diffs
+pre = _snapshot(lib)
+
+# Run operation
+result = operation(lib, args)
+
+# Dry-run/write
 if args.dry_run:
-    modified, result = operation(lib, args)
-    if args.diff:
-        print(unified_diff(write_bib(lib), write_bib(modified)))
-    if args.json:
-        print(json.dumps(result_to_json(result)))
+    changed, diff_text, modified = _commit(file, lib, pre, dry_run=True)
     exit(0)
 
-# Committed write
-modified, result = operation(lib, args)
-save_bib(modified, args.file, backup=True, atomic=True)
+changed, diff_text, modified = _commit(file, lib, pre, dry_run=False)
 ```
 
 ## Exit Codes
@@ -231,12 +235,11 @@ Conflicts are reported in JSON with available options:
 ```json
 {
   "status": "conflict",
-  "error": "ConflictError",
-  "message": "Cannot merge Smith2020 and Smith2020b: conflicting authors",
+  "error": "DuplicateDOI",
+  "message": "DOI 10.5555/example already exists",
   "options": [
-    {"id": "keep_both", "description": "Keep both, rename Smith2020b"},
-    {"id": "keep_first", "description": "Keep Smith2020, discard Smith2020b"},
-    {"id": "keep_second", "description": "Keep Smith2020b, discard Smith2020"}
+    {"id": "keep_existing", "description": "Do not import a duplicate reference"},
+    {"id": "allow_duplicate", "description": "Retry with --allow-duplicate"}
   ]
 }
 ```
@@ -268,7 +271,7 @@ Conflicts are reported in JSON with available options:
 # profiles.yaml
 profiles:
   ieee:
-    journal_abbreviation: true
+    journal_style: abbreviated
     field_case: title_case
     required_fields: [author, title, journal, year, pages]
 ```
@@ -278,7 +281,7 @@ profiles:
 # pynakes_mcp.py provides tools for Claude SDK
 tools = [
   Tool("inspect_bibliography", inspect_bib),
-  Tool("find_duplicates", find_duplicates),
+  Tool("normalize_bibliography", normalize_library),
   Tool("repair_keys", repair_keys),
 ]
 ```

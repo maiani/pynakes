@@ -1,118 +1,76 @@
 # pynakes
 
-Agent-friendly BibTeX library management tool.
+Agent-friendly BibTeX, BibLaTeX, and JabRef-compatible bibliography maintenance.
 
-> **Status — v0.1 in development.** The features, commands, and APIs in these
-> docs describe the *planned* v0.1 surface. The core library (parser, writer,
-> model, I/O) is implemented; most CLI commands are still scaffolded stubs.
-> See `DEVPLAN.md` and `CHANGELOG.md` in the repo for current build status, and
-> treat command examples as the target design until then.
+> **Status — v0.1 in development.** The core command-line workflow is usable:
+> inspect, lint, groups, citation keys, fields, DOI import, citation-usage
+> analysis, and normalization. Merge workflows, conversion, capabilities JSON,
+> and linked-file repair are still planned.
 
 ## Overview
 
-**pynakes** is a command-line tool for managing BibTeX bibliographies with safety-first design:
+`pynakes` is designed for researchers, scripts, and LLM-assisted workflows that
+need reviewable changes to `.bib` files:
 
-- **Deterministic**: Same input always produces the same output
-- **Dry-run by default**: Preview changes with `--dry-run` before committing
-- **Structured output**: JSON output for easy automation
-- **Safe conflicts**: Conflicts are reported with options, not guesses
-- **Atomic operations**: Each operation is independent and composable
-
-Perfect for:
-- Organizing large BibTeX libraries
-- Cleaning up metadata and citations
-- Converting between BibTeX formats
-- Automated bibliography curation with agents (Claude, etc.)
+- **Safe previews**: modifying commands support `--dry-run` and `--diff`
+- **Structured output**: commands support `--json` where useful
+- **Round-trip preservation**: unmodified entries, comments, and JabRef metadata stay intact
+- **Deterministic behavior**: operations are explicit and testable
+- **Conflict-aware**: unsafe cases return errors or conflicts rather than guessing
 
 ## Quick Start
 
 ```bash
-# Install
-pip install pynakes
+pip install -e ".[dev]"
 
-# Inspect a bibliography
-pynakes inspect refs.bib --json
-
-# List groups
-pynakes groups list refs.bib
-
-# Lint for issues
-pynakes lint refs.bib
-
-# Preview a change
-pynakes keys repair refs.bib --dry-run --diff
-
-# Apply the change
-pynakes keys repair refs.bib
+pynakes inspect refs.bib
+pynakes lint refs.bib --json
+pynakes normalize refs.bib --dry-run --diff
+pynakes normalize refs.bib
 ```
 
-## Features
+## Implemented Features
 
-### Core Operations (v0.1)
-- **Parse & write** with round-trip fidelity
-- **Group management** (add, remove, list)
-- **Citation key repair** (detect duplicates, generate keys)
-- **Field operations** (rename, move, append, clear)
-- **Linting** (validate required fields, detect issues)
-- **Format conversion** (BibTeX ↔ BibLaTeX)
-- **Journal abbreviation** (expand/abbreviate journal names)
+- BibTeX parsing/writing with duplicate-key preserving entry storage
+- JabRef group fields and selected `jabref-meta` parsing/preservation
+- JabRef citation-key pattern metadata for key generation and DOI imports
+- Group list/add/remove commands
+- Citation-key check/generate/repair commands
+- Field rename/move/append/clear and title-capitalization protection
+- DOI import via DOI resolver BibTeX content negotiation
+- AUX/TeX citation analysis with used/unused/missing reporting
+- Daily `normalize` routine:
+  - title capitalization protection
+  - JabRef-style author/editor normalization
+  - DOI normalization
+  - exact journal mappings and LTWA-style journal abbreviation
+- Local pre-commit hooks and GitHub Actions CI
 
-### Future (v0.2+)
-- DOI import integration
-- Deduplication and merge
-- Configuration profiles
+## Still Planned
+
+- Capabilities introspection JSON
+- Conservative BibTeX to BibLaTeX conversion
+- Deduplication and merge workflows
+- Linked-file validation and repair
 - Advanced query DSL
 - MCP server integration
-
-## Installation
-
-```bash
-pip install -e .           # Development install
-pip install -e ".[dev]"    # With development tools
-```
 
 ## Documentation
 
 - [Installation Guide](guides/installation.md)
 - [Quick Start](guides/quickstart.md)
 - [Usage Guide](guides/usage.md)
-- [Architecture](guides/architecture.md)
 - [API Reference](api/index.md)
 - [Examples](examples/index.md)
-
-## Project Status
-
-**Phase 1** (Foundation): In progress
-- [x] Project setup
-- [x] Data model
-- [ ] Parser
-- [ ] Writer
-- [ ] I/O orchestration
-- [ ] Test fixtures
-
-Target: v0.1.0 release in ~4 weeks with 12 core features.
-
-See [DEVPLAN.md](https://github.com/user/pynakes/blob/main/DEVPLAN.md) for the full development roadmap.
+- [Architecture](guides/architecture.md)
 
 ## Why pynakes?
 
-BibTeX libraries grow unwieldy: duplicate entries, inconsistent formatting, missing metadata. Existing tools are either too rigid or too unsafe. **pynakes** gives you:
-
-1. **Safety first** — preview changes, atomic writes, backup creation
-2. **Agent-friendly** — deterministic, structured output, clear exit codes
-3. **Composable** — chain operations, dry-run to verify, apply when ready
-4. **Transparent** — see exactly what will change before it happens
+BibTeX libraries grow unwieldy: duplicate entries, inconsistent fields, fragile
+title casing, and mixed metadata conventions. `pynakes` gives you small,
+inspectable operations that preserve human-curated data while making routine
+maintenance scriptable.
 
 ## License
 
-MIT License. See [LICENSE](https://github.com/user/pynakes/blob/main/LICENSE) for details.
-
-## Contributing
-
-Contributions welcome! See [CONTRIBUTING.md](https://github.com/user/pynakes/blob/main/CONTRIBUTING.md) for guidelines.
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/user/pynakes/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/user/pynakes/discussions)
-- **Email**: [andrea.maiani@su.se](mailto:andrea.maiani@su.se)
+MIT License. See `LICENSE` in the repository.

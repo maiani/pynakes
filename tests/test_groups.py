@@ -76,9 +76,7 @@ def test_round_trip_preserves_other_fields() -> None:
 
 
 def test_add_to_all_duplicates_of_a_key() -> None:
-    lib = parse_bib(
-        "@article{Dup,\n  year = {2020}\n}\n\n@article{Dup,\n  year = {2021}\n}\n"
-    )
+    lib = parse_bib("@article{Dup,\n  year = {2020}\n}\n\n@article{Dup,\n  year = {2021}\n}\n")
     count = add_to_group(lib, "Dup", "X")
     assert count == 2
     assert all(e.fields.get("groups") == "X" for e in lib.entries.get_all("Dup"))

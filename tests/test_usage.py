@@ -64,9 +64,7 @@ class TestExtraction:
 
 class TestAnalysis:
     def _lib(self):
-        return parse_bib(
-            "@article{Used,year={2020}}\n@article{Unused,year={2021}}\n"
-        )
+        return parse_bib("@article{Used,year={2020}}\n@article{Unused,year={2021}}\n")
 
     def test_used_unused_missing(self) -> None:
         lib = self._lib()

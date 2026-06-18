@@ -1,18 +1,14 @@
 # API Reference
 
-Python API for programmatic usage of pynakes.
+Python API for programmatic usage of `pynakes`.
 
-> **Status — v0.1 in development.** The core library (`model`, `bibtex_parser`,
-> `bibtex_writer`, `io`, `diff`) is implemented; operation modules (groups,
-> keys, fields, lint, convert, journals) are planned. Note `BibLibrary.entries`
-> is an `EntryCollection` (duplicate-key tolerant), not a plain dict — see
-> `ARCHITECTURE.md`.
+The command-line interface is the primary supported surface, but the operation
+modules are also usable directly. Most operations mutate a `BibLibrary` in place
+and return counts or operation-specific results.
 
-## Core Data Models
+## Data Models
 
 ### BibEntry
-
-Represents a single BibTeX entry.
 
 ```python
 from pynakes.model import BibEntry
@@ -24,285 +20,229 @@ entry = BibEntry(
         "author": "John Smith",
         "title": "A Great Paper",
         "journal": "Nature",
-        "year": "2020"
-    }
+        "year": "2020",
+    },
 )
-
-# Access fields
-print(entry.key)        # "Smith2020"
-print(entry.type)       # "article"
-print(entry.fields["author"])  # "John Smith"
-
-# Modify
-entry.fields["doi"] = "10.1234/example"
-entry.modified = True
 ```
 
 ### BibLibrary
 
-Represents a complete BibTeX library.
-
 ```python
-from pynakes.model import BibLibrary
+from pynakes.model import BibLibrary, EntryCollection
 
-lib = BibLibrary(
-    entries={"Smith2020": entry},
-    strings={"IEEE": "IEEE Transactions"},
-    encoding="utf-8"
-)
-
-# Access
-print(len(lib.entries))  # 1
-print(lib.strings["IEEE"])  # "IEEE Transactions"
+lib = BibLibrary(entries=EntryCollection([entry]))
+print(len(lib.entries))
 ```
 
-## I/O Functions
+`BibLibrary.entries` is an `EntryCollection`, not a plain dict. It preserves
+duplicate citation keys while exposing dict-like access to the first matching
+entry.
 
-### load_bib
-
-Load a BibTeX file.
+## I/O
 
 ```python
-from pynakes.io import load_bib
+from pynakes.io import load_bib, save_bib
 
 lib = load_bib("refs.bib")
-print(f"Loaded {len(lib.entries)} entries")
+save_bib(lib, "refs.bib", backup=True, atomic=True)
 ```
 
-### save_bib
-
-Save a library to a file.
-
-```python
-from pynakes.io import save_bib
-
-save_bib(lib, "output.bib", backup=True, atomic=True)
-# Creates output.bib with automatic .bak backup
-```
-
-## Parser
-
-### parse_bib
-
-Parse BibTeX text.
+## Parser and Writer
 
 ```python
 from pynakes.bibtex_parser import parse_bib
+from pynakes.bibtex_writer import write_bib
 
-text = """
+lib = parse_bib("""
 @article{Smith2020,
   author = {John Smith},
   title = {A Great Paper},
   journal = {Nature},
   year = {2020}
 }
-"""
-
-lib = parse_bib(text)
-```
-
-## Writer
-
-### write_bib
-
-Serialize library to BibTeX text.
-
-```python
-from pynakes.bibtex_writer import write_bib
+""")
 
 text = write_bib(lib)
-print(text)
 ```
 
-## Operations (Phase 2+)
-
-### groups
-
-Manage entry groups.
+## Groups
 
 ```python
-from pynakes.groups import (
-    list_groups,
-    add_to_group,
-    remove_from_group,
-)
+from pynakes.groups import add_to_group, list_entries_in_group, list_groups, remove_from_group
 
-# List groups
 groups = list_groups(lib)
-
-# Add entry to group
-lib = add_to_group(lib, "Smith2020", "AI-Papers")
-
-# Remove from group
-lib = remove_from_group(lib, "Smith2020", "AI-Papers")
+changed = add_to_group(lib, "Smith2020", "AI")
+members = list_entries_in_group(lib, "AI")
+changed = remove_from_group(lib, "Smith2020", "AI")
 ```
 
-### keys
-
-Manage citation keys.
+## Citation Keys
 
 ```python
 from pynakes.keys import (
+    duplicate_key_counts,
     generate_key,
-    detect_duplicate_keys,
+    regenerate_keys,
     repair_duplicate_keys,
 )
 
-# Generate a key for an entry
 entry = lib.entries["Smith2020"]
-key = generate_key(entry)  # "Smith2020BigData"
-
-# Find duplicates
-duplicates = detect_duplicate_keys(lib)
-
-# Repair
-lib, renamed = repair_duplicate_keys(lib)
+key = generate_key(entry, lib)
+duplicates = duplicate_key_counts(lib)
+renames = regenerate_keys(lib)
+repairs = repair_duplicate_keys(lib)
 ```
 
-### fields
+`generate_key(entry, lib)` honors JabRef citation-key metadata in the library
+when present.
 
-Edit fields.
+## Fields
 
 ```python
 from pynakes.fields import (
-    rename_field,
     append_field,
     clear_field,
+    move_field,
+    parse_query,
+    protect_title_capitalization,
+    rename_field,
 )
 
-# Rename a field
-lib = rename_field(lib, "journal", "journaltitle")
-
-# Append to a field
-lib = append_field(lib, "keywords", "AI")
-
-# Clear a field
-lib = clear_field(lib, "abstract")
+rename_field(lib, "journal", "journaltitle")
+append_field(lib, "keywords", "AI", where=parse_query('title contains "learning"'))
+clear_field(lib, "abstract", where=parse_query("type = article"))
+protect_title_capitalization(lib, terms=["OpenAI"])
+move_field(lib, "school", "institution")
 ```
 
-### lint
+## DOI Import
 
-Validate entries.
+```python
+from pynakes.doi import prepare_imported_entry, render_entry
+
+entry = prepare_imported_entry(
+    lib,
+    "10.5555/example",
+    key_source="generated",
+)
+
+entry_text = render_entry(entry, lib.line_ending)
+```
+
+The CLI handles appending the rendered entry to the original file. Library code
+can use `prepare_imported_entry` when composing a custom workflow.
+
+## Normalization
+
+```python
+from pynakes.normalize import NormalizeOptions, normalize_library
+
+report = normalize_library(
+    lib,
+    NormalizeOptions(
+        author_style="jabref",
+        journal_style="abbreviated",
+    ),
+)
+
+print(report.operations)
+print(report.warnings)
+```
+
+Author styles:
+
+- `jabref`: convert person names to JabRef-style comma form
+- `conservative`: normalize separators and whitespace only
+- `none`: skip author/editor normalization
+
+## Journals
+
+```python
+from pynakes.journals import (
+    abbreviate_title_with_ltwa,
+    load_sources,
+    normalize_journals,
+)
+
+sources = load_sources(journal_table="journals.csv", ltwa_table="ltwa.csv")
+result = normalize_journals(lib, "abbreviated", sources)
+generated = abbreviate_title_with_ltwa("Journal of Polymer Science", sources)
+```
+
+`normalize_journals` resolves abbreviations in this order:
+
+1. user exact title/ISSN table
+2. bundled exact mappings
+3. LTWA-style word abbreviation generation
+4. unknown warning
+
+## Usage Analysis
+
+```python
+from pynakes.usage import analyze_usage, collect_cited_keys, subset_library
+
+cited, include_all, sources = collect_cited_keys(["paper.tex", "paper.aux"])
+report = analyze_usage(lib, cited, include_all=include_all, sources=sources)
+sub = subset_library(lib, report.used)
+```
+
+## Lint
 
 ```python
 from pynakes.lint import lint
 
 issues = lint(lib)
 for issue in issues:
-    print(f"{issue.type}: {issue.message}")
+    print(issue.to_dict())
 ```
 
-### convert
-
-Format conversion.
+## Diffs
 
 ```python
-from pynakes.convert import convert_to_biblatex
+from pynakes.diff import generate_diff
 
-lib = convert_to_biblatex(lib)
-```
-
-### journals
-
-Journal name operations.
-
-```python
-from pynakes.journals import (
-    abbreviate_journals,
-    expand_journals,
-)
-
-lib = abbreviate_journals(lib)
-lib = expand_journals(lib)
-```
-
-## Diff Utilities
-
-### unified_diff
-
-Generate a unified diff.
-
-```python
-from pynakes.diff import unified_diff
-
-original = write_bib(lib)
-modified = write_bib(lib_modified)
-diff = unified_diff(original, modified)
-print(diff)
+diff = generate_diff(original_text, new_text, "refs.bib")
 ```
 
 ## Typical Workflow
 
 ```python
+from pathlib import Path
+
+from pynakes.bibtex_writer import write_bib
+from pynakes.diff import generate_diff
 from pynakes.io import load_bib, save_bib
-from pynakes.keys import repair_duplicate_keys
-from pynakes.lint import lint
+from pynakes.normalize import normalize_library
 
-# 1. Load
-lib = load_bib("refs.bib")
+path = Path("refs.bib")
+original = path.read_text(encoding="utf-8")
+lib = load_bib(str(path))
 
-# 2. Inspect
-issues = lint(lib)
-print(f"Found {len(issues)} issues")
+report = normalize_library(lib)
+new_text = write_bib(lib)
+print(report.operations)
+print(generate_diff(original, new_text, path.name))
 
-# 3. Repair
-lib, result = repair_duplicate_keys(lib)
-print(f"Renamed {len(result.renamed)} keys")
-
-# 4. Save
-save_bib(lib, "refs.bib")
+save_bib(lib, str(path))
 ```
 
 ## Error Handling
 
-Operations raise specific exceptions:
-
 ```python
-from pynakes.errors import (
-    ParseError,
-    ConflictError,
-    ValidationError,
-)
+from pynakes.bibtex_parser import ParseError
+from pynakes.doi import DuplicateDOIError, DOIImportError
 
 try:
     lib = load_bib("invalid.bib")
-except ParseError as e:
-    print(f"Parse error at line {e.line}: {e.message}")
+except ParseError as exc:
+    print(exc.message)
 
 try:
-    lib = merge_entries(lib, "Key1", "Key2")
-except ConflictError as e:
-    print(f"Conflict: {e.options}")
-```
-
-## JSON Serialization
-
-All models support JSON serialization via `dataclasses.asdict()`:
-
-```python
-from dataclasses import asdict
-import json
-
-lib_dict = asdict(lib)
-json_str = json.dumps(lib_dict)
-lib_restored = json.loads(json_str)
-```
-
-## Type Hints
-
-All functions are fully type-hinted:
-
-```python
-from typing import Optional
-from pynakes.model import BibLibrary, BibEntry
-
-def process_library(
-    lib: BibLibrary,
-    output_file: Optional[str] = None
-) -> BibLibrary:
-    """Process a library and optionally save it."""
-    # ...
-    return lib
+    prepare_imported_entry(lib, "10.5555/example")
+except DuplicateDOIError as exc:
+    print(exc.keys)
+except DOIImportError as exc:
+    print(str(exc))
 ```
 
 ## Next Steps

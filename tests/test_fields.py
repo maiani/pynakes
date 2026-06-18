@@ -34,7 +34,7 @@ class TestRename:
 
     def test_rename_only_where_filter_matches(self) -> None:
         lib = parse_bib(_LIB)
-        count = rename_field(lib, "year", "date", where=parse_query('type = book'))
+        count = rename_field(lib, "year", "date", where=parse_query("type = book"))
         assert count == 1
         assert "date" in lib.entries["B"].fields
         assert "year" in lib.entries["A"].fields
@@ -96,10 +96,7 @@ class TestTitleCapitalizationProtection:
 
     def test_preserves_existing_braces_and_is_idempotent(self) -> None:
         lib = parse_bib(
-            "@article{A,\n"
-            "  title = {The {NASA} study of mRNA and DNA},\n"
-            "  year = {2024}\n"
-            "}\n"
+            "@article{A,\n  title = {The {NASA} study of mRNA and DNA},\n  year = {2024}\n}\n"
         )
 
         assert protect_title_capitalization(lib) == 1
