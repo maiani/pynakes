@@ -23,8 +23,9 @@ src/pynakes/
   bibtex_writer.py    write_bib() — raw_content for unmodified, reconstruct for modified
   io.py               load_bib / save_bib / save_text (atomic write + .bak + re-parse validate)
   editing.py          surgical raw-text field/key edits + entry-level helpers
-  groups.py keys.py fields.py lint.py        core operations
-  authors.py journals.py doi.py normalize.py format/metadata operations
+  groups.py keys.py fields.py files.py lint.py
+  authors.py journals.py doi.py normalize.py format operations
+  jabref.py           structured JabRef library metadata helpers
   usage.py            cited-entry detection/tagging from .tex/.aux
   capabilities.py     machine-readable capability description
   diff.py cli.py
@@ -71,8 +72,9 @@ tests pass:
 ## Conventions
 
 - Python ≥ 3.11, type hints throughout. Ruff line length 100 (E501 ignored).
-- CLI: Typer sub-apps (`groups`, `keys`, `fields`, `doi`); one operation module
-  per concern, kept small and unit-testable independent of the CLI.
+- CLI: Typer sub-apps (`groups`, `keys`, `fields`, `files`, `doi`, `metadata`,
+  `journals`); one operation module per concern, kept small and unit-testable
+  independent of the CLI.
 - Keep a single source of truth: name parsing lives in `authors.py`, DOI
   validation in `doi.py`, key uniquing in `keys.py`. Don't re-derive them.
 - Add tests and a `CHANGELOG.md` entry with each behavioral change.

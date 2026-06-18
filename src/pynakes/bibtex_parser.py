@@ -4,7 +4,8 @@ import logging
 import re
 from typing import Optional
 
-from pynakes.model import BibEntry, BibLibrary, EntryCollection
+from pynakes.jabref import metadata_blocks_to_dict, parse_jabref_metadata_comment
+from pynakes.model import BibEntry, BibLibrary, EntryCollection, JabRefMetadataBlock
 
 logger = logging.getLogger(__name__)
 
@@ -55,14 +56,15 @@ def parse_bib(text: str) -> BibLibrary:
     strings: dict[str, str] = {}
     preambles: list[str] = []
     raw_comments: list[str] = []
-    jabref_metadata: dict[str, str] = {}
+    jabref_metadata_blocks: list[JabRefMetadataBlock] = []
 
     lines = text.split(line_ending)
 
     i = 0
     while i < len(lines):
         line_num = i + 1
-        line = lines[i].strip()
+        original_line = lines[i]
+        line = original_line.strip()
 
         if not line or line.startswith("%"):
             if line.startswith("%"):
@@ -94,11 +96,19 @@ def parse_bib(text: str) -> BibLibrary:
             continue
 
         if line.lower().startswith("@comment"):
-            comment_text = _extract_balanced_value(line, 8, i, line_ending, lines)
+            raw_comment, consumed = _collect_balanced_block(original_line, i, line_ending, lines)
+            comment_text = _extract_comment_text(raw_comment)
             if comment_text:
-                raw_comments.append(f"@comment{{{comment_text}}}")
-                jabref_metadata.update(_parse_jabref_metadata(comment_text))
-            i += 1
+                comment_index = len(raw_comments)
+                raw_comments.append(raw_comment)
+                block = parse_jabref_metadata_comment(
+                    comment_text,
+                    raw=raw_comment,
+                    comment_index=comment_index,
+                )
+                if block is not None:
+                    jabref_metadata_blocks.append(block)
+            i += consumed
             continue
 
         if line.startswith("@"):
@@ -123,28 +133,45 @@ def parse_bib(text: str) -> BibLibrary:
         strings=strings,
         preamble=preambles,
         raw_comments=raw_comments,
-        jabref_metadata=jabref_metadata,
+        jabref_metadata=metadata_blocks_to_dict(jabref_metadata_blocks),
+        jabref_metadata_blocks=jabref_metadata_blocks,
         line_ending=line_ending,
     )
 
 
 def _parse_jabref_metadata(comment_text: str) -> dict[str, str]:
     """Return structured metadata for a JabRef ``@comment`` block."""
-    prefix = "jabref-meta:"
-    stripped = comment_text.strip()
-    if stripped.startswith("{"):
-        stripped = stripped[1:].strip()
-    if not stripped.lower().startswith(prefix):
-        return {}
+    block = parse_jabref_metadata_comment(comment_text)
+    return {block.key: block.value} if block is not None else {}
 
-    body = stripped[len(prefix) :].strip()
-    if not body:
-        return {}
 
-    key, sep, value = body.partition(":")
-    if not sep:
-        return {}
-    return {key.strip(): value.strip()}
+def _collect_balanced_block(
+    first_line: str, start_line_idx: int, line_ending: str, lines: list[str]
+) -> tuple[str, int]:
+    """Collect a full top-level ``@...{...}`` block and consumed line count."""
+    full_text = first_line
+    brace_count = first_line.count("{") - first_line.count("}")
+    i = start_line_idx + 1
+
+    while i < len(lines) and brace_count > 0:
+        full_text += line_ending + lines[i]
+        brace_count += lines[i].count("{") - lines[i].count("}")
+        i += 1
+
+    return full_text, i - start_line_idx
+
+
+def _extract_comment_text(raw_comment: str) -> Optional[str]:
+    """Extract the content inside an ``@comment{...}`` block."""
+    match = re.match(r"\s*@comment\s*{\s*", raw_comment, re.IGNORECASE | re.DOTALL)
+    if not match:
+        return None
+
+    content_start = match.end()
+    content = raw_comment[content_start:]
+    if content.endswith("}"):
+        content = content[:-1]
+    return content
 
 
 def _parse_entry(

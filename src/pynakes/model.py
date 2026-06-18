@@ -6,6 +6,33 @@ from typing import Optional, Union
 
 
 @dataclass
+class JabRefMetadataBlock:
+    """Structured representation of one ``jabref-meta`` comment block."""
+
+    key: str
+    value: str
+    raw: str
+    comment_index: int
+    known: bool = False
+    category: str = "unknown"
+
+    @property
+    def normalized_value(self) -> str:
+        """Return the metadata value without JabRef's trailing semicolon."""
+        return self.value.strip().rstrip(";").strip()
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize the block to a JSON-friendly dict."""
+        return {
+            "key": self.key,
+            "value": self.normalized_value,
+            "raw_value": self.value,
+            "known": self.known,
+            "category": self.category,
+        }
+
+
+@dataclass
 class BibEntry:
     """Represents a single BibTeX entry."""
 
@@ -145,6 +172,7 @@ class BibLibrary:
     preamble: list[str] = field(default_factory=list)
     raw_comments: list[str] = field(default_factory=list)
     jabref_metadata: dict[str, str] = field(default_factory=dict)
+    jabref_metadata_blocks: list[JabRefMetadataBlock] = field(default_factory=list)
     encoding: str = "utf-8"
     line_ending: str = "\n"
 
@@ -161,6 +189,7 @@ class BibLibrary:
             "preamble": list(self.preamble),
             "raw_comments": list(self.raw_comments),
             "jabref_metadata": dict(self.jabref_metadata),
+            "jabref_metadata_blocks": [block.to_dict() for block in self.jabref_metadata_blocks],
             "encoding": self.encoding,
             "line_ending": self.line_ending,
         }

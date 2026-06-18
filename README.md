@@ -38,6 +38,19 @@ pynakes inspect refs.bib
 pynakes groups list refs.bib
 ```
 
+### Inspect or update JabRef library metadata
+
+```bash
+pynakes inspect refs.bib --json
+pynakes metadata list refs.bib --json
+
+# Preview setting a known jabref-meta block
+pynakes metadata set refs.bib databaseType biblatex --dry-run --diff
+
+# Apply it
+pynakes metadata set refs.bib databaseType biblatex
+```
+
 ### Make a safe change with preview
 
 ```bash
@@ -118,6 +131,17 @@ pynakes fields protect-title refs.bib --dry-run --diff
 pynakes fields protect-title refs.bib --field booktitle --term Proceedings
 ```
 
+### Check linked files
+
+```bash
+# Validate JabRef file fields
+pynakes files check refs.bib
+pynakes files check refs.bib --json
+
+# Resolve relative links against an additional attachment directory
+pynakes files check refs.bib --root ~/papers
+```
+
 ## Safety model
 
 Every operation that modifies a file:
@@ -139,12 +163,13 @@ Additionally:
 > **v0.1 is feature-complete and in the testing/polish phase (Phase 4).** The
 > full BibTeX maintenance workflow is usable: inspect, lint, edit fields/groups,
 > repair keys, import by DOI, analyze cited/unused entries, convert between
-> BibTeX and BibLaTeX, and abbreviate/expand journal titles. The top-level
-> `normalize` routine provides a daily maintenance pass for titles, JabRef-style
-> author/editor lists, DOI fields, and known journal titles, and `capabilities`
-> exposes a machine-readable description of the tool for agents. Merge-oriented
-> features are still pending. See [DEVPLAN.md](DEVPLAN.md) for the phased build
-> plan and [ARCHITECTURE.md](ARCHITECTURE.md) for the design.
+> BibTeX and BibLaTeX, abbreviate/expand journal titles, and validate JabRef
+> linked files. The top-level `normalize` routine provides a daily maintenance
+> pass for titles, JabRef-style author/editor lists, DOI fields, and known
+> journal titles, and `capabilities` exposes a machine-readable description of
+> the tool for agents. Merge-oriented features are still pending. See
+> [DEVPLAN.md](DEVPLAN.md) for the phased build plan and
+> [ARCHITECTURE.md](ARCHITECTURE.md) for the design.
 
 ### Implemented
 
@@ -154,6 +179,7 @@ Additionally:
 - [x] Duplicate citation-key detection and repair
 - [x] Deterministic citation-key generation (`AuthorYearTitle` pattern)
 - [x] JabRef citation-key pattern metadata support (`keypatterndefault`, `keypattern_<entrytype>`)
+- [x] Full JabRef library metadata support: parse, preserve, inspect, and safely update known `jabref-meta` blocks
 - [x] Field operations: rename, move, append, clear, with simple `--where` filters
 - [x] Title capitalization protection for acronyms, mixed-case terms, and explicit terms
 - [x] Top-level `normalize` command for title protection, JabRef-style author/editor list normalization, DOI normalization, exact journal mappings, and LTWA-style journal abbreviation/expansion
@@ -163,15 +189,15 @@ Additionally:
 - [x] Journal title abbreviation/expansion (`journals abbreviate|expand|check`) with exact, user, and LTWA-style sources
 - [x] Machine-readable capability introspection (`capabilities --json`) matching the agent contract
 - [x] AUX/TeX citation analysis, unused/missing reporting, group/keyword tagging, and subset export
+- [x] Linked-file validation (`files check`) for JabRef `file` fields, with `.bib` directory, `--root`, and `fileDirectory*` resolution
 - [x] Dry-run, unified diff, and JSON output for modifying commands
 - [x] Atomic writes, validation-before-write, and `.bak` backups
 - [x] CLI commands for the implemented operations
 
 ### Still planned
 
-- [ ] Full JabRef library metadata support: parse, preserve, inspect, and safely update known `jabref-meta` blocks
 - [ ] Deduplication and merge workflows
-- [ ] Linked-file checking and repair
+- [ ] Linked-file repair
 - [ ] Advanced search/query DSL
 - [ ] Configuration profiles
 - [ ] Provider-specific DOI fallbacks/enrichment (Crossref, DataCite)
@@ -189,7 +215,6 @@ Additionally:
 ## Roadmap
 
 ### v0.1.1
-- Full JabRef metadata compatibility pass
 - Deduplication and merge
 - Provider-specific DOI fallbacks/enrichment
 
@@ -197,7 +222,7 @@ Additionally:
 - Conservative BibTeX → BibLaTeX conversion
 - Configuration profiles
 - User-provided abbreviation tables
-- Linked-file validation
+- Linked-file repair
 
 ### Future (v0.3+)
 - MCP server (`pynakes-mcp`) for Claude and other agents
@@ -239,10 +264,6 @@ claude.invoke_tool("pynakes.groups.add_entry", {
   "dry_run": False
 })
 ```
-
-## Not affiliated with JabRef
-
-`pynakes` is compatible with JabRef-format `.bib` files and preserves JabRef-specific metadata (groups, special fields). It is **not** affiliated with, endorsed by, or derived from JabRef. It is a separate, standalone tool.
 
 ## Development
 

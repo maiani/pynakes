@@ -93,6 +93,13 @@ Or use git if your file is version controlled.
 
 ## Features & Capabilities
 
+### Q: Can pynakes check whether JabRef linked files exist?
+
+A: Yes. Use `pynakes files check refs.bib --json`. It validates JabRef `file`
+fields, including multiple attachments, directory links, relative paths,
+explicit `--root` directories, and JabRef `fileDirectory*` metadata. It is
+read-only; linked-file repair is planned separately.
+
 ### Q: What BibTeX entry types are supported?
 
 A: pynakes supports all standard BibTeX entry types:
@@ -110,8 +117,12 @@ A: Not yet. This is planned for v0.2. For now, use the standard linting rules.
 A: Yes. JabRef group metadata is preserved, and `groups` fields can be managed
 with `pynakes groups`. `pynakes` also parses JabRef citation-key pattern
 metadata such as `keypatterndefault` and `keypattern_<entrytype>` for key
-generation and DOI imports. Full structured JabRef metadata editing is still
-planned.
+generation and DOI imports.
+
+Use `pynakes metadata list refs.bib --json` to inspect structured
+`jabref-meta` blocks, and `pynakes metadata set refs.bib KEY VALUE` to update a
+known metadata block. Unknown metadata is preserved, unknown writes require
+`--allow-unknown`, and duplicate matching blocks are reported as conflicts.
 
 ### Q: Can I use pynakes to fetch metadata (DOIs, abstracts)?
 

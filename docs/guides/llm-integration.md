@@ -36,6 +36,9 @@ Read-only:
 - `pynakes lint <file> [--json]`
 - `pynakes groups list <file> [--json]`
 - `pynakes keys check <file> [--json]`
+- `pynakes metadata list <file> [--json]`
+- `pynakes files check <file> [--root ...] [--json]`
+- `pynakes journals check <file> [--json]`
 - `pynakes capabilities [--json]`
 
 Modifying (all support `--dry-run`, `--diff`, `--json`):
@@ -50,11 +53,14 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 - `pynakes fields clear <file> <field> [--where ...]`
 - `pynakes fields protect-title <file> [--field ...] [--term ...] [--where ...]`
 - `pynakes doi import <file> <doi> [--key ...] [--key-source generated|provider]`
+- `pynakes metadata set <file> <key> <value> [--allow-unknown]`
 - `pynakes normalize <file>`
+- `pynakes convert <file> --to biblatex|bibtex`
+- `pynakes journals abbreviate <file> [--journal-table ...] [--ltwa-table ...]`
+- `pynakes journals expand <file> [--journal-table ...] [--ltwa-table ...]`
 - `pynakes used <bib-file> <source>... [--out ...] [--group ...] [--keyword ...]`
 
-Planned (not implemented): `convert`, dedicated `journals` commands, `entries`,
-`dedupe`, `merge`.
+Planned (not implemented): `entries`, `dedupe`, `merge`.
 
 ## Recommended workflow
 
@@ -111,6 +117,18 @@ pynakes keys repair refs.bib --dry-run --diff --json
 pynakes keys repair refs.bib --json
 ```
 
+### Inspect or update JabRef metadata
+
+```bash
+pynakes metadata list refs.bib --json
+pynakes metadata set refs.bib databaseType biblatex --dry-run --diff --json
+pynakes metadata set refs.bib databaseType biblatex --json
+```
+
+`metadata set` rejects unknown keys unless `--allow-unknown` is passed. If
+duplicate matching metadata blocks are present, it exits `2` with a conflict
+instead of choosing one.
+
 ### Add entries to a group
 
 ```bash
@@ -125,6 +143,16 @@ pynakes groups add-entry refs.bib Smith2020 "CBDC" --json
 pynakes fields protect-title refs.bib --dry-run --diff --json
 pynakes fields protect-title refs.bib --term OpenAI --term iOS --json
 ```
+
+### Validate linked files
+
+```bash
+pynakes files check refs.bib --json
+pynakes files check refs.bib --root ~/papers --json
+```
+
+The checker is read-only. It reports `ok`, `missing`, `wrong_type`, and
+`unresolved` statuses for JabRef `file` links.
 
 ### Track cited and uncited entries
 
@@ -141,8 +169,8 @@ pynakes used refs.bib paper.tex --group Used --dry-run --diff --json
 
 ## JSON output
 
-**Every modifying command** (`groups`, `keys`, `fields`, `normalize`, `doi`,
-`used`) shares one envelope:
+**Every modifying command** (`groups`, `keys`, `fields`, `metadata`,
+`normalize`, `convert`, `journals`, `doi`, `used`) shares one envelope:
 
 ```json
 {
@@ -179,8 +207,9 @@ exit code 1 (e.g. `FileNotFound`, `ParseError` with `line`, `InvalidInput`).
 exit code 2, where `options` lists the resolutions to choose from.
 
 Read-only commands (`inspect`, `lint`, `groups list`, `keys check`,
-`capabilities`) return `status`, `action`, `file`, plus command-specific data
-(e.g. `issues`, `duplicate_keys`, `groups`).
+`metadata list`, `files check`, `journals check`, `capabilities`) return
+`status`, `action`, `file`, plus command-specific data (e.g. `issues`,
+`duplicate_keys`, `groups`, `metadata`).
 
 ## Best practices
 

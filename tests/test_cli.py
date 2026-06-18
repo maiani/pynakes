@@ -107,6 +107,48 @@ class TestInspectAndLint:
         assert any(i["type"] == "duplicate_key" for i in data["issues"])
 
 
+class TestFilesCommand:
+    def test_check_json_reports_linked_files(self, tmp_path: Path) -> None:
+        (tmp_path / "A.pdf").write_text("pdf")
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{A,\n  title = {T},\n  file = {A:A.pdf:PDF; Missing:missing.pdf:PDF}\n}\n"
+        )
+
+        result = runner.invoke(app, ["files", "check", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["checked"] == 2
+        assert data["ok"] == 1
+        assert data["missing"] == 1
+        assert data["issues"][0]["entry_key"] == "A"
+
+    def test_check_uses_root(self, tmp_path: Path) -> None:
+        root = tmp_path / "papers"
+        root.mkdir()
+        (root / "A.pdf").write_text("pdf")
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T},\n  file = {A.pdf}\n}\n")
+
+        result = runner.invoke(app, ["files", "check", str(bib), "--root", str(root), "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["ok"] == 1
+        assert data["files"][0]["resolved_path"] == str(root / "A.pdf")
+
+    def test_check_human_lists_issues(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T},\n  file = {missing.pdf}\n}\n")
+
+        result = runner.invoke(app, ["files", "check", str(bib)])
+
+        assert result.exit_code == 0, result.output
+        assert "checked 1 linked file" in result.output
+        assert "[missing] A[0]: missing.pdf" in result.output
+
+
 class TestDOICommand:
     provider_bibtex = """@article{provider-key,
   author = {Jane Smith and John Doe},

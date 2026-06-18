@@ -38,6 +38,11 @@ print(len(lib.entries))
 duplicate citation keys while exposing dict-like access to the first matching
 entry.
 
+`BibLibrary.jabref_metadata` is a backward-compatible flat dict of parsed
+`jabref-meta` values. `BibLibrary.jabref_metadata_blocks` preserves ordered,
+structured metadata blocks with raw comment text, known/unknown classification,
+and categories.
+
 ## I/O
 
 ```python
@@ -96,6 +101,24 @@ repairs = repair_duplicate_keys(lib)
 `generate_key(entry, lib)` honors JabRef citation-key metadata in the library
 when present.
 
+## JabRef Metadata
+
+```python
+from pynakes.jabref import set_metadata
+
+for block in lib.jabref_metadata_blocks:
+    print(block.key, block.normalized_value, block.category, block.known)
+
+update = set_metadata(lib, "databaseType", "biblatex")
+print(update.old_raw, update.new_raw)
+```
+
+Known metadata keys include JabRef database/save/group/file/selector/key-pattern
+blocks such as `databaseType`, `saveOrderConfig`, `saveActions`, `groupstree`,
+`fileDirectory*`, `selector_*`, `VersionDBStructure`, `keypatterndefault`, and
+`keypattern_<entrytype>`. Unknown blocks are parsed and preserved; setting an
+unknown key requires `allow_unknown=True`.
+
 ## Fields
 
 ```python
@@ -131,6 +154,22 @@ entry_text = render_entry(entry, lib.line_ending)
 
 The CLI handles appending the rendered entry to the original file. Library code
 can use `prepare_imported_entry` when composing a custom workflow.
+
+## Linked Files
+
+```python
+from pynakes.files import check_linked_files, parse_linked_files
+
+linked = parse_linked_files(lib)
+report = check_linked_files(lib, "refs.bib", roots=["~/papers"])
+
+for issue in report.issues:
+    print(issue.entry_key, issue.path, issue.status)
+```
+
+`check_linked_files` resolves relative JabRef `file` links against the
+bibliography directory, explicit roots, and JabRef `fileDirectory*` metadata.
+It reports `ok`, `missing`, `wrong_type`, and `unresolved`.
 
 ## Normalization
 

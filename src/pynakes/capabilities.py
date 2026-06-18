@@ -40,6 +40,9 @@ def get_capabilities() -> dict:
             "normalize_dois",
             "import_doi",
             "detect_used_citations",
+            "inspect_jabref_metadata",
+            "update_jabref_metadata",
+            "validate_linked_files",
         ],
         "commands": {
             "inspect": "Inspect a .bib file structure",
@@ -47,6 +50,8 @@ def get_capabilities() -> dict:
             "groups": "Manage entry groups (list, add-entry, remove-entry)",
             "keys": "Generate, check, and repair citation keys",
             "fields": "Edit fields (rename, move, append, clear, protect-title)",
+            "files": "Validate JabRef linked files",
+            "metadata": "Inspect and update top-level JabRef metadata",
             "normalize": "Run the standard normalization routine",
             "convert": "Convert a library between BibTeX and BibLaTeX conventions",
             "journals": "Abbreviate, expand, and check journal titles",

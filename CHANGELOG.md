@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Linked-file validation**: new `pynakes files check` command and
+  `pynakes.files` API parse JabRef `file` descriptors, including multiple
+  semicolon-delimited attachments and directory links. Relative paths resolve
+  against the `.bib` directory, repeated `--root` directories, and JabRef
+  `fileDirectory*` metadata. Reports `ok`, `missing`, `wrong_type`, and
+  `unresolved` statuses without modifying the library.
+- **Structured JabRef library metadata support**: top-level `jabref-meta` blocks
+  are now parsed into ordered metadata records while preserving raw comments for
+  round-trip fidelity. `inspect --json` exposes both flat metadata values and
+  structured blocks. New `pynakes metadata list` and `pynakes metadata set`
+  commands inspect/update known JabRef metadata keys; unknown keys are preserved
+  and require `--allow-unknown` to write, while duplicate matching blocks return
+  a conflict instead of guessing.
 - **Phase 4 test hardening.** Added `hypothesis` as a dev dependency and a new
   property-based suite (`tests/test_property.py`) asserting parse→write→parse
   preserves every key/type/field, that unmodified entries write back verbatim,

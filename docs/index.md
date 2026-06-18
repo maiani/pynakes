@@ -4,8 +4,9 @@ Agent-friendly BibTeX, BibLaTeX, and JabRef-compatible bibliography maintenance.
 
 > **Status — v0.1 in development.** The core command-line workflow is usable:
 > inspect, lint, groups, citation keys, fields, DOI import, citation-usage
-> analysis, and normalization. Merge workflows, conversion, capabilities JSON,
-> and linked-file repair are still planned.
+> analysis, normalization, conversion, capabilities JSON, journal title
+> commands, JabRef metadata inspection/update, and linked-file validation.
+> Merge workflows and linked-file repair are still planned.
 
 ## Overview
 
@@ -32,12 +33,14 @@ pynakes normalize refs.bib
 ## Implemented Features
 
 - BibTeX parsing/writing with duplicate-key preserving entry storage
-- JabRef group fields and selected `jabref-meta` parsing/preservation
+- JabRef group fields and structured `jabref-meta` parsing/preservation/update
 - JabRef citation-key pattern metadata for key generation and DOI imports
+- JabRef metadata list/set commands and `inspect --json` metadata output
 - Group list/add/remove commands
 - Citation-key check/generate/repair commands
 - Field rename/move/append/clear and title-capitalization protection
 - DOI import via DOI resolver BibTeX content negotiation
+- JabRef linked-file validation through `files check`
 - AUX/TeX citation analysis with used/unused/missing reporting
 - Daily `normalize` routine:
   - title capitalization protection
@@ -45,13 +48,12 @@ pynakes normalize refs.bib
   - DOI normalization
   - exact journal mappings and LTWA-style journal abbreviation
 - Local pre-commit hooks and GitHub Actions CI
+- Capability introspection JSON
 
 ## Still Planned
 
-- Capabilities introspection JSON
-- Conservative BibTeX to BibLaTeX conversion
 - Deduplication and merge workflows
-- Linked-file validation and repair
+- Linked-file repair
 - Advanced query DSL
 - MCP server integration
 

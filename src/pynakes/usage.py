@@ -212,6 +212,7 @@ def subset_library(lib: BibLibrary, keys: Iterable[str]) -> BibLibrary:
         preamble=list(lib.preamble),
         raw_comments=list(lib.raw_comments),
         jabref_metadata=dict(lib.jabref_metadata),
+        jabref_metadata_blocks=list(lib.jabref_metadata_blocks),
         encoding=lib.encoding,
         line_ending=lib.line_ending,
     )

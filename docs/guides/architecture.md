@@ -23,6 +23,7 @@ pynakes is built with **safety**, **composability**, and **agent compatibility**
 │  - groups.py   (group management)              │
 │  - keys.py     (citation keys)                 │
 │  - fields.py   (field operations)              │
+│  - files.py    (linked-file validation)        │
 │  - lint.py      (validation)                   │
 │  - doi.py       (DOI import)                   │
 │  - normalize.py (maintenance routine)          │
@@ -57,7 +58,7 @@ class BibEntry:
     fields: dict[str, str]                    # Field key-value pairs
     raw_content: Optional[str] = None         # Original BibTeX for round-trip fidelity
     raw_comments: list[str] = field(...)      # Comments from the file
-    jabref_metadata: dict[str, str] = field(...)  # JabRef metadata
+    jabref_metadata: dict[str, str] = field(...)  # Entry-local metadata (rare)
     modified: bool = False                    # Track if entry was modified
 ```
 
@@ -70,9 +71,16 @@ class BibLibrary:
     strings: dict[str, str] = field(...)     # @string definitions
     preamble: list[str] = field(...)         # @preamble declarations
     raw_comments: list[str] = field(...)     # File-level comments
+    jabref_metadata: dict[str, str] = field(...)  # Flat jabref-meta values
+    jabref_metadata_blocks: list[JabRefMetadataBlock] = field(...)
     encoding: str = "utf-8"                  # File encoding
     line_ending: str = "\n"                  # Line ending style
 ```
+
+`JabRefMetadataBlock` preserves each top-level `jabref-meta` comment with its
+raw comment text, parsed key/value, known/unknown classification, and category.
+The flat `jabref_metadata` dict remains for compatibility with key generation
+and normalization code.
 
 ## Design Principles
 
@@ -124,6 +132,7 @@ Operations are independent:
 | `groups.py` | Group management (add, remove, list) |
 | `keys.py` | Citation key repair and generation |
 | `fields.py` | Field operations (rename, move, append, clear) |
+| `files.py` | JabRef linked-file parsing and validation |
 | `lint.py` | Validation and issue detection |
 
 ### Metadata and Normalization

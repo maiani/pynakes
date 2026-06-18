@@ -26,7 +26,8 @@ pynakes inspect refs.bib --json
 ```
 
 JSON output includes file encoding, line ending, entries, duplicate keys, and
-lint issues.
+lint issues. It also includes structured JabRef library metadata under
+`jabref_metadata`.
 
 ## lint
 
@@ -78,6 +79,32 @@ present:
 Unsupported JabRef key-pattern markers fail explicitly instead of silently
 generating incorrect keys.
 
+## metadata
+
+Inspect and update top-level JabRef `jabref-meta` blocks.
+
+```bash
+pynakes metadata list refs.bib
+pynakes metadata list refs.bib --json
+```
+
+Set a known metadata block:
+
+```bash
+pynakes metadata set refs.bib databaseType biblatex --dry-run --diff
+pynakes metadata set refs.bib databaseType biblatex
+```
+
+Known blocks include JabRef library/save/group/file/selector/key-pattern
+metadata such as `databaseType`, `saveOrderConfig`, `saveActions`,
+`groupstree`, `groups-search-syntax-version`, `fileDirectory*`,
+`selector_*`, `VersionDBStructure`, `keypatterndefault`, and
+`keypattern_<entrytype>`.
+
+Unknown metadata blocks are preserved byte-for-byte. `metadata set` refuses to
+write unknown keys unless `--allow-unknown` is passed, and exits with conflict
+code `2` if duplicate blocks make an update ambiguous.
+
 ## fields
 
 Edit fields surgically while preserving entry formatting.
@@ -128,6 +155,29 @@ pynakes doi import refs.bib 10.5555/example --allow-duplicate
 
 The command fetches BibTeX through DOI resolver content negotiation and checks
 for existing matching DOI fields before importing.
+
+## files
+
+Validate JabRef linked files stored in `file` fields.
+
+```bash
+pynakes files check refs.bib
+pynakes files check refs.bib --json
+pynakes files check refs.bib --root ~/papers --json
+```
+
+The checker parses plain paths and JabRef descriptors such as:
+
+```bibtex
+file = {Paper:papers/Smith2020.pdf:PDF}
+file = {file1.pdf:path/file1.pdf:PDF; file2.pdf:path/file2.pdf:PDF}
+file = {:/path/to/folder:directory}
+```
+
+Relative paths are resolved against the `.bib` file directory, repeated
+`--root` directories, and JabRef `fileDirectory*` metadata. It reports `ok`,
+`missing`, `wrong_type`, and `unresolved` statuses. This command is read-only;
+repair is planned separately.
 
 ## normalize
 
@@ -194,10 +244,36 @@ Export only cited entries:
 pynakes used refs.bib paper.tex --out cited-only.bib
 ```
 
+## convert
+
+Convert between BibTeX and BibLaTeX field/type conventions.
+
+```bash
+pynakes convert refs.bib --to biblatex --dry-run --diff
+pynakes convert refs.bib --to bibtex
+```
+
+## journals
+
+Abbreviate, expand, or check journal titles.
+
+```bash
+pynakes journals abbreviate refs.bib --dry-run --diff
+pynakes journals expand refs.bib
+pynakes journals check refs.bib --json
+```
+
+The journal commands accept the same `--journal-table` and `--ltwa-table`
+options as `normalize`.
+
 ## capabilities
 
-`pynakes capabilities` exists as a placeholder. Full capabilities JSON is still
-planned.
+Print the machine-readable command/capability description.
+
+```bash
+pynakes capabilities
+pynakes capabilities --json
+```
 
 ## Best Practices
 
@@ -211,11 +287,9 @@ planned.
 
 The following commands/features are not implemented yet:
 
-- `convert`
-- dedicated `journals abbreviate`, `journals expand`, and `journals check`
 - `entries`
 - `dedupe` and `merge`
-- capabilities JSON
+- linked-file repair
 
 ## Next Steps
 

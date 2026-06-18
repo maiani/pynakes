@@ -10,7 +10,9 @@ import typer
 from pynakes import convert as convert_ops
 from pynakes import doi as doi_ops
 from pynakes import fields as fields_ops
+from pynakes import files as files_ops
 from pynakes import groups as groups_ops
+from pynakes import jabref as jabref_ops
 from pynakes import journals as journals_ops
 from pynakes import keys as keys_ops
 from pynakes import normalize as normalize_ops
@@ -33,13 +35,17 @@ app = typer.Typer(help="Agent-friendly BibTeX library management tool")
 groups_app = typer.Typer(help="Manage entry groups")
 keys_app = typer.Typer(help="Generate and check citation keys")
 fields_app = typer.Typer(help="Edit fields (rename, move, append, clear, protect titles)")
+files_app = typer.Typer(help="Validate JabRef linked files")
 doi_app = typer.Typer(help="Import references by DOI")
 journals_app = typer.Typer(help="Abbreviate, expand, and check journal titles")
+metadata_app = typer.Typer(help="Inspect and update JabRef library metadata")
 app.add_typer(groups_app, name="groups")
 app.add_typer(keys_app, name="keys")
 app.add_typer(fields_app, name="fields")
+app.add_typer(files_app, name="files")
 app.add_typer(doi_app, name="doi")
 app.add_typer(journals_app, name="journals")
+app.add_typer(metadata_app, name="metadata")
 
 
 # --- shared helpers --------------------------------------------------------
@@ -125,6 +131,18 @@ def _emit_error(json_output: bool, error: str, message: str, code: int = 1, **ex
     raise typer.Exit(code=code)
 
 
+def _emit_conflict(json_output: bool, error: str, message: str, **extra) -> None:
+    if json_output:
+        typer.echo(
+            _json.dumps(
+                {"status": "conflict", "error": error, "message": message, **extra}, indent=2
+            )
+        )
+    else:
+        typer.echo(f"{error}: {message}")
+    raise typer.Exit(code=2)
+
+
 def _safe(fn):
     """Turn expected failures into structured exit-1 errors instead of tracebacks.
 
@@ -202,6 +220,10 @@ def inspect(
                 {"key": e.key, "type": e.type, "fields": dict(e.fields)}
                 for e in lib.entries.values()
             ],
+            "jabref_metadata": {
+                "values": dict(lib.jabref_metadata),
+                "blocks": [block.to_dict() for block in lib.jabref_metadata_blocks],
+            },
             "duplicate_keys": duplicates,
             "issues": [i.to_dict() for i in issues],
         }
@@ -215,6 +237,122 @@ def inspect(
     if duplicates:
         typer.echo(f"Duplicate keys: {', '.join(f'{k} ×{n}' for k, n in duplicates.items())}")
     typer.echo(f"Issues: {len(issues)}")
+
+
+# --- metadata --------------------------------------------------------------
+
+
+def _insert_metadata_comment(original_text: str, comment: str, line_ending: str) -> str:
+    """Insert a new JabRef metadata comment at the top of a file."""
+    if not original_text:
+        return comment + line_ending
+    return comment + line_ending + original_text
+
+
+def _metadata_update_text(
+    original_text: str,
+    lib,
+    update: jabref_ops.JabRefMetadataUpdate,
+    line_ending: str,
+) -> str:
+    """Apply a raw metadata update to file text with the smallest safe change."""
+    if update.old_raw is None:
+        return _insert_metadata_comment(original_text, update.new_raw, line_ending)
+    if update.old_raw in original_text:
+        return original_text.replace(update.old_raw, update.new_raw, 1)
+    return write_bib(lib)
+
+
+@metadata_app.command("list")
+@_safe
+def metadata_list(
+    file: str = typer.Argument(..., help="Path to the .bib file"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """List top-level JabRef ``jabref-meta`` blocks."""
+    lib = load_bib(file)
+    blocks = [block.to_dict() for block in lib.jabref_metadata_blocks]
+
+    if json_output:
+        typer.echo(
+            _json.dumps(
+                {
+                    "status": "success",
+                    "action": "metadata_list",
+                    "file": file,
+                    "metadata": {"values": dict(lib.jabref_metadata), "blocks": blocks},
+                },
+                indent=2,
+            )
+        )
+        return
+
+    if not blocks:
+        typer.echo(f"{file}: no JabRef metadata found.")
+        return
+    for block in lib.jabref_metadata_blocks:
+        marker = "known" if block.known else "unknown"
+        typer.echo(f"  [{marker}:{block.category}] {block.key} = {block.normalized_value}")
+
+
+@metadata_app.command("set")
+@_safe
+def metadata_set(
+    file: str = typer.Argument(..., help="Path to the .bib file"),
+    key: str = typer.Argument(..., help="JabRef metadata key"),
+    value: str = typer.Argument(..., help="Metadata value"),
+    allow_unknown: bool = typer.Option(
+        False, "--allow-unknown", help="Allow setting unrecognized metadata keys"
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Set one top-level JabRef ``jabref-meta`` block."""
+    lib = load_bib(file)
+    original_text = Path(file).read_text(encoding=lib.encoding, errors="replace")
+    try:
+        update = jabref_ops.set_metadata(lib, key, value, allow_unknown=allow_unknown)
+    except jabref_ops.DuplicateJabRefMetadataError as exc:
+        _emit_conflict(
+            json_output,
+            "DuplicateJabRefMetadata",
+            str(exc),
+            key=exc.key,
+            count=exc.count,
+            options=[
+                {
+                    "id": "manual_edit",
+                    "description": "Resolve duplicate metadata blocks manually, then retry",
+                }
+            ],
+        )
+
+    new_text = _metadata_update_text(original_text, lib, update, lib.line_ending)
+    modified = new_text != original_text
+    diff_text = generate_diff(original_text, new_text, Path(file).name) if modified else ""
+    if modified and not dry_run:
+        save_text(new_text, file, encoding=lib.encoding)
+
+    verb = "Would set" if dry_run else "Set"
+    _emit(
+        json_output,
+        {
+            "status": "success",
+            "action": "metadata_set",
+            "file": file,
+            "dry_run": dry_run,
+            "modified": modified,
+            "modified_entries": 0,
+            "warnings": [],
+            "key": update.key,
+            "value": update.value.rstrip(";").strip(),
+            "created": update.created,
+        },
+        [f"{verb} JabRef metadata {update.key!r}."],
+        diff_text,
+        diff,
+    )
 
 
 # --- lint ------------------------------------------------------------------
@@ -252,6 +390,47 @@ def lint(
         loc = f"{issue.key}: " if issue.key else ""
         typer.echo(f"  [{issue.severity}] {loc}{issue.message}")
     typer.echo(f"{len(issues)} issue(s): {errors} error(s), {warnings} warning(s).")
+
+
+# --- files -----------------------------------------------------------------
+
+
+@files_app.command("check")
+@_safe
+def files_check(
+    file: str = typer.Argument(..., help="Path to the .bib file"),
+    root: Optional[list[str]] = typer.Option(
+        None,
+        "--root",
+        help="Additional directory to resolve relative linked-file paths; can be repeated",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Validate JabRef linked files stored in ``file`` fields."""
+    lib = load_bib(file)
+    report = files_ops.check_linked_files(lib, file, root)
+
+    if json_output:
+        typer.echo(
+            _json.dumps(
+                {
+                    "status": "success",
+                    "action": "files_check",
+                    "file": file,
+                    **report.to_dict(),
+                },
+                indent=2,
+            )
+        )
+        return
+
+    typer.echo(
+        f"{file}: checked {report.checked} linked file(s); "
+        f"ok={report.ok}, missing={report.missing}, "
+        f"wrong_type={report.wrong_type}, unresolved={report.unresolved}."
+    )
+    for issue in report.issues:
+        typer.echo(f"  [{issue.status}] {issue.entry_key}[{issue.index}]: {issue.path}")
 
 
 # --- doi -------------------------------------------------------------------
