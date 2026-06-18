@@ -14,6 +14,7 @@ from pynakes.editing import (
     append_delimited_field,
     remove_entry_field,
     rename_entry_field,
+    set_entry_field,
 )
 from pynakes.model import BibEntry, BibLibrary
 
@@ -71,6 +72,88 @@ def append_field(
 def clear_field(lib: BibLibrary, field: str, where: QueryFilter = None) -> int:
     """Remove ``field`` from matching entries. Returns the number changed."""
     return sum(remove_entry_field(e, field) for e in _selected(lib, where))
+
+
+# --- title capitalization protection ---------------------------------------
+
+_TITLE_TOKEN_RE = re.compile(r"(?:[A-Z]\.){2,}|[A-Za-z][A-Za-z0-9]*(?:[-+][A-Za-z0-9]+)*")
+
+
+def _protect_token(token: str, terms: set[str]) -> bool:
+    """Return whether ``token`` should be brace-protected in a BibTeX title."""
+    if token in terms:
+        return True
+    if re.fullmatch(r"(?:[A-Z]\.){2,}", token):
+        return True
+
+    letters = [ch for ch in token if ch.isalpha()]
+    if len(letters) >= 2 and all(ch.isupper() for ch in letters):
+        return True
+    if any(ch.isdigit() for ch in token) and any(ch.isupper() for ch in token):
+        return True
+
+    for i, ch in enumerate(token):
+        if i > 0 and ch.isupper():
+            return True
+    return False
+
+
+def _protect_title_value(value: str, terms: set[str]) -> str:
+    """Brace-protect capitalization-sensitive tokens outside existing braces."""
+    out: list[str] = []
+    depth = 0
+    i = 0
+
+    while i < len(value):
+        ch = value[i]
+        if ch == "{":
+            depth += 1
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "}":
+            depth = max(0, depth - 1)
+            out.append(ch)
+            i += 1
+            continue
+
+        if depth == 0:
+            match = _TITLE_TOKEN_RE.match(value, i)
+            if match:
+                token = match.group(0)
+                out.append(f"{{{token}}}" if _protect_token(token, terms) else token)
+                i = match.end()
+                continue
+
+        out.append(ch)
+        i += 1
+
+    return "".join(out)
+
+
+def protect_title_capitalization(
+    lib: BibLibrary,
+    field: str = "title",
+    where: QueryFilter = None,
+    terms: list[str] | None = None,
+) -> int:
+    """Brace-protect capitalization-sensitive tokens in title-like fields.
+
+    Existing brace groups are preserved and never nested again. By default, this
+    protects all-uppercase acronyms, dotted acronyms, mixed-case technical names,
+    and uppercase/digit tokens such as ``GPT-4``. ``terms`` can be used for
+    explicit case-sensitive matches.
+    """
+    count = 0
+    protected_terms = set(terms or [])
+    for entry in _selected(lib, where):
+        if field not in entry.fields:
+            continue
+        old_value = entry.fields[field]
+        new_value = _protect_title_value(old_value, protected_terms)
+        if set_entry_field(entry, field, new_value):
+            count += 1
+    return count
 
 
 # --- query filters ---------------------------------------------------------

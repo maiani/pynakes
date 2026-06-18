@@ -9,6 +9,7 @@ from pynakes.fields import (
     clear_field,
     move_field,
     parse_query,
+    protect_title_capitalization,
     rename_field,
 )
 
@@ -72,6 +73,66 @@ class TestClear:
         assert count == 1
         assert "keywords" not in lib.entries["A"].fields
         assert "keywords = {ml}" not in write_bib(lib)
+
+
+class TestTitleCapitalizationProtection:
+    def test_protects_acronyms_and_mixed_case_terms(self) -> None:
+        lib = parse_bib(
+            "@article{A,\n"
+            "  title = {DNA repair with GPT-4, LaTeX, eBay and Machine Learning},\n"
+            "  year = {2024}\n"
+            "}\n"
+        )
+
+        count = protect_title_capitalization(lib)
+
+        assert count == 1
+        assert (
+            lib.entries["A"].fields["title"]
+            == "{DNA} repair with {GPT-4}, {LaTeX}, {eBay} and Machine Learning"
+        )
+        out = write_bib(lib)
+        assert "title = {{DNA} repair with {GPT-4}, {LaTeX}, {eBay} and Machine Learning}" in out
+
+    def test_preserves_existing_braces_and_is_idempotent(self) -> None:
+        lib = parse_bib(
+            "@article{A,\n"
+            "  title = {The {NASA} study of mRNA and DNA},\n"
+            "  year = {2024}\n"
+            "}\n"
+        )
+
+        assert protect_title_capitalization(lib) == 1
+        assert lib.entries["A"].fields["title"] == "The {NASA} study of {mRNA} and {DNA}"
+        assert protect_title_capitalization(lib) == 0
+        assert lib.entries["A"].fields["title"] == "The {NASA} study of {mRNA} and {DNA}"
+
+    def test_can_protect_explicit_terms_and_other_title_fields(self) -> None:
+        lib = parse_bib(
+            "@inproceedings{A,\n"
+            "  title = {A paper},\n"
+            "  booktitle = {Proceedings of JabRefConf},\n"
+            "  year = {2024}\n"
+            "}\n"
+        )
+
+        count = protect_title_capitalization(lib, field="booktitle", terms=["Proceedings"])
+
+        assert count == 1
+        assert lib.entries["A"].fields["title"] == "A paper"
+        assert lib.entries["A"].fields["booktitle"] == "{Proceedings} of {JabRefConf}"
+
+    def test_where_filter_limits_protection(self) -> None:
+        lib = parse_bib(
+            "@article{A,\n  title = {DNA repair},\n  year = {2024}\n}\n\n"
+            "@book{B,\n  title = {DNA repair},\n  year = {2024}\n}\n"
+        )
+
+        count = protect_title_capitalization(lib, where=parse_query("type = article"))
+
+        assert count == 1
+        assert lib.entries["A"].fields["title"] == "{DNA} repair"
+        assert lib.entries["B"].fields["title"] == "DNA repair"
 
 
 class TestQueryFilter:

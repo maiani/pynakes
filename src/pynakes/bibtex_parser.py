@@ -97,8 +97,7 @@ def parse_bib(text: str) -> BibLibrary:
             comment_text = _extract_balanced_value(line, 8, i, line_ending, lines)
             if comment_text:
                 raw_comments.append(f"@comment{{{comment_text}}}")
-                if comment_text.lower().startswith("jabref"):
-                    jabref_metadata[f"comment_{len(jabref_metadata)}"] = comment_text
+                jabref_metadata.update(_parse_jabref_metadata(comment_text))
             i += 1
             continue
 
@@ -127,6 +126,25 @@ def parse_bib(text: str) -> BibLibrary:
         jabref_metadata=jabref_metadata,
         line_ending=line_ending,
     )
+
+
+def _parse_jabref_metadata(comment_text: str) -> dict[str, str]:
+    """Return structured metadata for a JabRef ``@comment`` block."""
+    prefix = "jabref-meta:"
+    stripped = comment_text.strip()
+    if stripped.startswith("{"):
+        stripped = stripped[1:].strip()
+    if not stripped.lower().startswith(prefix):
+        return {}
+
+    body = stripped[len(prefix) :].strip()
+    if not body:
+        return {}
+
+    key, sep, value = body.partition(":")
+    if not sep:
+        return {}
+    return {key.strip(): value.strip()}
 
 
 def _parse_entry(
@@ -271,7 +289,8 @@ def _extract_preamble(
     if not match:
         return None
 
-    return _extract_balanced_value(line, match.end() - 1, line_idx, line_ending, lines)
+    content = _extract_balanced_value(line, match.end() - 1, line_idx, line_ending, lines)
+    return f"@preamble{{{content}}}" if content is not None else None
 
 
 def _extract_balanced_value(
@@ -286,12 +305,16 @@ def _extract_balanced_value(
     while i < len(current_line):
         char = current_line[i]
         if char == "{":
+            if brace_count > 0:
+                content += char
             brace_count += 1
         elif char == "}":
             brace_count -= 1
             if brace_count == 0:
                 return content
-        content += char
+            content += char
+        else:
+            content += char
         i += 1
 
     # Continue to next lines
@@ -300,12 +323,16 @@ def _extract_balanced_value(
         current_line = lines[line_idx]
         for char in current_line:
             if char == "{":
+                if brace_count > 0:
+                    content += char
                 brace_count += 1
             elif char == "}":
                 brace_count -= 1
                 if brace_count == 0:
                     return content
-            content += char
+                content += char
+            else:
+                content += char
         content += line_ending
         line_idx += 1
 

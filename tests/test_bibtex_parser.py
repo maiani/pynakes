@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from pynakes.bibtex_parser import ParseError, parse_bib
+from pynakes.bibtex_writer import write_bib
 
 
 @pytest.fixture
@@ -168,6 +169,38 @@ class TestPreamble:
         """
         lib = parse_bib(text)
         assert len(lib.preamble) > 0
+
+
+class TestJabRefCitationKeyMetadata:
+    """Test structured parsing of JabRef metadata comments."""
+
+    def test_parse_citation_key_patterns(self) -> None:
+        text = """
+        @comment{jabref-meta: keypatterndefault:[auth][year];}
+        @comment{jabref-meta: keypattern_article:[auth][shortyear][veryshorttitle];}
+
+        @article{Smith2020,
+          author = {John Smith},
+          title = {A Paper},
+          journal = {Journal},
+          year = {2020}
+        }
+        """
+        lib = parse_bib(text)
+        assert lib.jabref_metadata["keypatterndefault"] == "[auth][year];"
+        assert lib.jabref_metadata["keypattern_article"] == "[auth][shortyear][veryshorttitle];"
+
+    def test_jabref_comment_round_trips_without_extra_braces(self) -> None:
+        text = (
+            "@comment{jabref-meta: keypatterndefault:[auth][year];}\n\n"
+            "@article{Smith2020,\n"
+            "  author = {John Smith},\n"
+            "  title = {A Paper},\n"
+            "  journal = {Journal},\n"
+            "  year = {2020}\n"
+            "}\n"
+        )
+        assert write_bib(parse_bib(text)) == text
 
 
 class TestEncodingAndLineEndings:

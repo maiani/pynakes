@@ -6,9 +6,11 @@ from typing import Optional
 
 import typer
 
+from pynakes import doi as doi_ops
 from pynakes import fields as fields_ops
 from pynakes import groups as groups_ops
 from pynakes import keys as keys_ops
+from pynakes import normalize as normalize_ops
 from pynakes.bibtex_writer import write_bib
 from pynakes.diff import generate_diff
 from pynakes.editing import splice_into_text
@@ -25,10 +27,12 @@ from pynakes.usage import (
 app = typer.Typer(help="Agent-friendly BibTeX library management tool")
 groups_app = typer.Typer(help="Manage entry groups")
 keys_app = typer.Typer(help="Generate and check citation keys")
-fields_app = typer.Typer(help="Edit fields (rename, move, append, clear)")
+fields_app = typer.Typer(help="Edit fields (rename, move, append, clear, protect titles)")
+doi_app = typer.Typer(help="Import references by DOI")
 app.add_typer(groups_app, name="groups")
 app.add_typer(keys_app, name="keys")
 app.add_typer(fields_app, name="fields")
+app.add_typer(doi_app, name="doi")
 
 
 # --- shared helpers --------------------------------------------------------
@@ -91,6 +95,26 @@ def _emit(
 
 def _entries(count: int) -> str:
     return "entry" if count == 1 else "entries"
+
+
+def _append_entry_text(original_text: str, entry_text: str, line_ending: str) -> str:
+    """Append a BibTeX entry while preserving existing file text."""
+    if not original_text:
+        return entry_text + line_ending
+    if original_text.endswith(line_ending * 2):
+        return original_text + entry_text + line_ending
+    if original_text.endswith(line_ending):
+        return original_text + line_ending + entry_text + line_ending
+    return original_text + line_ending + line_ending + entry_text + line_ending
+
+
+def _emit_error(json_output: bool, error: str, message: str, code: int = 1, **extra) -> None:
+    if json_output:
+        typer.echo(_json.dumps({"status": "error", "error": error, "message": message, **extra},
+                               indent=2))
+    else:
+        typer.echo(f"{error}: {message}")
+    raise typer.Exit(code=code)
 
 
 # --- inspect ---------------------------------------------------------------
@@ -167,6 +191,118 @@ def lint(
         loc = f"{issue.key}: " if issue.key else ""
         typer.echo(f"  [{issue.severity}] {loc}{issue.message}")
     typer.echo(f"{len(issues)} issue(s): {errors} error(s), {warnings} warning(s).")
+
+
+# --- doi -------------------------------------------------------------------
+
+
+@doi_app.command("import")
+def doi_import(
+    file: str = typer.Argument(..., help="Path to the .bib file"),
+    doi: str = typer.Argument(..., help="DOI or DOI URL to import"),
+    key: Optional[str] = typer.Option(None, "--key", help="Citation key to use"),
+    key_source: str = typer.Option(
+        "generated",
+        "--key-source",
+        help="Citation key source when --key is absent: generated or provider",
+    ),
+    allow_duplicate: bool = typer.Option(
+        False, "--allow-duplicate", help="Import even if the DOI already exists"
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Import a reference from a DOI."""
+    if key_source not in doi_ops.KEY_SOURCES:
+        _emit_error(
+            json_output,
+            "InvalidKeySource",
+            f"Invalid key source {key_source!r}; expected one of: "
+            f"{', '.join(sorted(doi_ops.KEY_SOURCES))}",
+        )
+
+    try:
+        lib = load_bib(file)
+        entry = doi_ops.prepare_imported_entry(
+            lib, doi, key=key, key_source=key_source, allow_duplicate_doi=allow_duplicate
+        )
+    except ValueError as exc:
+        _emit_error(json_output, "InvalidDOI", str(exc))
+    except doi_ops.DuplicateDOIError as exc:
+        if json_output:
+            typer.echo(_json.dumps(
+                {
+                    "status": "conflict",
+                    "error": "DuplicateDOI",
+                    "message": str(exc),
+                    "doi": exc.doi,
+                    "existing_keys": exc.keys,
+                    "options": [
+                        {
+                            "id": "keep_existing",
+                            "description": "Do not import a duplicate reference",
+                        },
+                        {
+                            "id": "allow_duplicate",
+                            "description": "Retry with --allow-duplicate",
+                        },
+                    ],
+                },
+                indent=2,
+            ))
+        else:
+            typer.echo(f"DuplicateDOI: {exc}")
+            typer.echo("Retry with --allow-duplicate to import another copy.")
+        raise typer.Exit(code=2) from exc
+    except doi_ops.CitationKeyConflictError as exc:
+        if json_output:
+            typer.echo(_json.dumps(
+                {
+                    "status": "conflict",
+                    "error": "CitationKeyConflict",
+                    "message": str(exc),
+                    "key": exc.key,
+                    "options": [
+                        {"id": "choose_key", "description": "Retry with a different --key"},
+                        {"id": "auto_key", "description": "Retry without --key"},
+                    ],
+                },
+                indent=2,
+            ))
+        else:
+            typer.echo(f"CitationKeyConflict: {exc}")
+        raise typer.Exit(code=2) from exc
+    except doi_ops.DOIImportError as exc:
+        _emit_error(json_output, "DOIImportError", str(exc))
+
+    original_text = Path(file).read_text(encoding=lib.encoding, errors="replace")
+    entry_text = doi_ops.render_entry(entry, lib.line_ending)
+    new_text = _append_entry_text(original_text, entry_text, lib.line_ending)
+    modified = new_text != original_text
+    diff_text = generate_diff(original_text, new_text, Path(file).name) if modified else ""
+    if modified and not dry_run:
+        save_text(new_text, file, encoding=lib.encoding)
+
+    verb = "Would import" if dry_run else "Imported"
+    _emit(
+        json_output,
+        {
+            "status": "success",
+            "action": "doi_import",
+            "file": file,
+            "dry_run": dry_run,
+            "modified": modified,
+            "modified_entries": 1 if modified else 0,
+            "doi": entry.fields["doi"],
+            "key": entry.key,
+            "key_source": "user" if key else key_source,
+            "entry_type": entry.type,
+        },
+        [f"{verb} DOI {entry.fields['doi']} as {entry.key}."],
+        diff_text,
+        diff,
+    )
 
 
 # --- groups ----------------------------------------------------------------
@@ -447,6 +583,139 @@ def fields_clear(
         dry_run, diff, json_output,
         {"field": field, "where": where},
         f"{'Would clear' if dry_run else 'Cleared'} field {field!r}",
+    )
+
+
+@fields_app.command("protect-title")
+def fields_protect_title(
+    file: str = typer.Argument(...),
+    field: str = typer.Option("title", "--field", help="Title-like field to protect"),
+    term: Optional[list[str]] = typer.Option(
+        None, "--term", help="Additional exact term to brace-protect"
+    ),
+    where: Optional[str] = typer.Option(None, "--where", help="Filter expression"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    diff: bool = typer.Option(False, "--diff"),
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
+    """Brace-protect capitalization-sensitive tokens in title-like fields."""
+    flt = _build_filter(where)
+    terms = term or []
+    _run_field_op(
+        file, "fields_protect_title",
+        lambda lib: fields_ops.protect_title_capitalization(lib, field, flt, terms),
+        dry_run, diff, json_output,
+        {"field": field, "terms": terms, "where": where},
+        f"{'Would protect' if dry_run else 'Protected'} capitalization in field {field!r}",
+    )
+
+
+# --- normalize -------------------------------------------------------------
+
+
+def _optional_bool(value: str) -> bool | None:
+    normalized = value.lower()
+    if normalized == "metadata":
+        return None
+    if normalized in {"on", "true", "yes", "1"}:
+        return True
+    if normalized in {"off", "false", "no", "0"}:
+        return False
+    raise ValueError("expected metadata, on, or off")
+
+
+@app.command()
+def normalize(
+    file: str = typer.Argument(..., help="Path to the .bib file"),
+    title_protection: str = typer.Option(
+        "metadata",
+        "--title-protection",
+        help="metadata, on, or off",
+    ),
+    title_field: Optional[list[str]] = typer.Option(
+        None,
+        "--title-field",
+        help="Title-like field to brace-protect; can be repeated",
+    ),
+    term: Optional[list[str]] = typer.Option(
+        None,
+        "--term",
+        help="Additional exact title term to brace-protect; can be repeated",
+    ),
+    author_style: str = typer.Option(
+        "metadata",
+        "--author-style",
+        help="metadata, jabref, conservative, bibtex, biblatex, or none",
+    ),
+    journal_style: str = typer.Option(
+        "metadata",
+        "--journal-style",
+        help="metadata, abbreviated, full, or none",
+    ),
+    journal_table: Optional[str] = typer.Option(
+        None,
+        "--journal-table",
+        help="CSV/TSV with title, abbreviation, and optional ISSN mappings",
+    ),
+    ltwa_table: Optional[str] = typer.Option(
+        None,
+        "--ltwa-table",
+        help="CSV/TSV LTWA word abbreviation table",
+    ),
+    doi_normalization: str = typer.Option(
+        "metadata",
+        "--doi-normalization",
+        help="metadata, on, or off",
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Run the standard bibliography normalization routine."""
+    try:
+        options = normalize_ops.NormalizeOptions(
+            protect_titles=_optional_bool(title_protection),
+            title_fields=title_field,
+            protected_terms=term,
+            author_style=author_style,
+            journal_style=journal_style,
+            journal_table=journal_table,
+            ltwa_table=ltwa_table,
+            normalize_dois=_optional_bool(doi_normalization),
+        )
+        lib = load_bib(file)
+        pre = _snapshot(lib)
+        report = normalize_ops.normalize_library(lib, options)
+    except ValueError as exc:
+        _emit_error(json_output, "InvalidNormalizeOption", str(exc))
+
+    changed, diff_text, modified = _commit(file, lib, pre, dry_run)
+    verb = "Would normalize" if dry_run else "Normalized"
+    warnings = report.warnings
+    human = [f"{verb} {changed} {_entries(changed)}."]
+    human.append(
+        "  "
+        f"titles={sum(report.title_fields.values())}, "
+        f"authors={report.authors}, journals={report.journals}, dois={report.dois}"
+    )
+    if warnings:
+        human.append(f"  {len(warnings)} warning(s).")
+
+    _emit(
+        json_output,
+        {
+            "status": "success",
+            "action": "normalize",
+            "file": file,
+            "dry_run": dry_run,
+            "modified": modified,
+            "modified_entries": changed,
+            "operations": report.operations,
+            "warnings": warnings,
+        },
+        human,
+        diff_text,
+        diff,
     )
 
 

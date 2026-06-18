@@ -58,6 +58,22 @@ pynakes groups add-entry refs.bib SomeKey2024 "Economics" --dry-run --diff
 pynakes groups add-entry refs.bib SomeKey2024 "Economics"
 ```
 
+### Import a reference by DOI
+
+```bash
+# Preview the imported BibTeX entry
+pynakes doi import refs.bib 10.5555/example --dry-run --diff
+
+# Use the provider's citation key instead of generating one
+pynakes doi import refs.bib 10.5555/example --key-source provider
+
+# Force an explicit citation key
+pynakes doi import refs.bib 10.5555/example --key Example2024
+
+# Apply it
+pynakes doi import refs.bib 10.5555/example
+```
+
 ### Lint your library
 
 ```bash
@@ -68,10 +84,38 @@ pynakes lint refs.bib
 pynakes lint refs.bib --json
 ```
 
-### Convert BibTeX to BibLaTeX (preview only)
+### Normalize your library
 
 ```bash
-pynakes convert refs.bib --to biblatex --dry-run --diff
+# Preview the standard maintenance pass
+pynakes normalize refs.bib --dry-run --diff
+
+# Apply title protection, author/editor normalization, DOI normalization,
+# exact journal mappings, and LTWA-style journal abbreviation
+pynakes normalize refs.bib
+
+# Override the library metadata/default journal behavior
+pynakes normalize refs.bib --journal-style none
+
+# Keep author names in their current order and only normalize separators
+pynakes normalize refs.bib --author-style conservative
+
+# Prefer a local exact journal table and/or LTWA word table
+pynakes normalize refs.bib --journal-table journals.csv --ltwa-table ltwa.csv
+```
+
+Journal tables are CSV/TSV files with `title`, `abbreviation`, and optional
+`issn` columns. LTWA tables use `Word` and `Abbreviation` columns, matching the
+ISSN LTWA export shape.
+
+### Protect title capitalization
+
+```bash
+# Protect acronyms and mixed-case terms in title fields
+pynakes fields protect-title refs.bib --dry-run --diff
+
+# Protect a title-like field and an explicit term
+pynakes fields protect-title refs.bib --field booktitle --term Proceedings
 ```
 
 ## Safety model
@@ -88,40 +132,46 @@ Additionally:
 
 - **Preserves user data**: Unknown fields, comments, file formatting, and JabRef metadata are preserved during round-trip parsing and writing.
 - **Backups on write**: When a file is modified, a `.bak` file is created automatically (configurable; can be disabled).
-- **Reports conflicts**: When an operation cannot safely decide between options (e.g., merging two entries with conflicting authors), it reports the conflict and exits with code 2 rather than guessing.
+- **Reports conflicts**: When an operation cannot safely decide between options (e.g., importing an already-present DOI), it reports the conflict and exits with code 2 rather than guessing.
 
 ## Current status
 
-> **v0.1 is in active development.** The package is not yet usable; the items
-> below are the v0.1 targets. See [DEVPLAN.md](DEVPLAN.md) for the phased build
-> plan and [ARCHITECTURE.md](ARCHITECTURE.md) for the design. This list is the
-> source of truth for what "done" means — check items off as they land.
+> **v0.1 is in active development.** The core BibTeX maintenance workflow is
+> usable: inspect, lint, edit fields/groups, repair keys, import by DOI, and
+> analyze cited/unused entries. The top-level `normalize` routine now provides
+> a daily maintenance pass for titles, JabRef-style author/editor lists, DOI fields, and
+> known journal titles. Merge-oriented features are still pending. See
+> [DEVPLAN.md](DEVPLAN.md) for the phased build plan and
+> [ARCHITECTURE.md](ARCHITECTURE.md) for the design.
 
-### Planned for v0.1
+### Implemented
 
-- [ ] Core data model (`BibEntry`, `BibLibrary`)
-- [ ] Read/write with round-trip preservation
-- [ ] Parse `groups` field; list groups; add/remove entries to groups
-- [ ] Detect duplicate citation keys
-- [ ] Generate citation keys (simple: `AuthorYearTitle` pattern)
-- [ ] Field operations: rename, move, append, clear
-- [ ] Lint: duplicate keys, missing DOI, malformed DOI, missing required fields
+- [x] Core data model (`BibEntry`, `BibLibrary`, duplicate-preserving entry collection)
+- [x] BibTeX read/write with round-trip preservation for unmodified entries
+- [x] JabRef-compatible `groups` parsing plus list/add/remove commands
+- [x] Duplicate citation-key detection and repair
+- [x] Deterministic citation-key generation (`AuthorYearTitle` pattern)
+- [x] JabRef citation-key pattern metadata support (`keypatterndefault`, `keypattern_<entrytype>`)
+- [x] Field operations: rename, move, append, clear, with simple `--where` filters
+- [x] Title capitalization protection for acronyms, mixed-case terms, and explicit terms
+- [x] Top-level `normalize` command for title protection, JabRef-style author/editor list normalization, DOI normalization, exact journal mappings, and LTWA-style journal abbreviation/expansion
+- [x] Lint: duplicate keys, missing DOI, malformed DOI, malformed groups, missing required fields
+- [x] DOI import via DOI resolver BibTeX content negotiation
+- [x] AUX/TeX citation analysis, unused/missing reporting, group/keyword tagging, and subset export
+- [x] Dry-run, unified diff, and JSON output for modifying commands
+- [x] Atomic writes, validation-before-write, and `.bak` backups
+- [x] CLI commands for the implemented operations
+
+### Still planned
+
+- [ ] Full JabRef library metadata support: parse, preserve, inspect, and safely update known `jabref-meta` blocks
+- [ ] Capabilities introspection JSON matching the agent contract
 - [ ] Conservative BibTeX → BibLaTeX conversion
-- [ ] Journal abbreviation (built-in table)
-- [ ] Dry-run, diff, and JSON output
-- [ ] Atomic writes and backups
-- [ ] CLI scaffold with all command groups
-
-### Deferred to later versions
-
-- [ ] DOI import (command structure ready; network call stubbed)
-- [ ] Deduplication and merge (algorithms designed; not integrated)
-- [ ] AUX/TeX-based sublibrary extraction (command ready)
+- [ ] Deduplication and merge workflows
 - [ ] Linked-file checking and repair
 - [ ] Advanced search/query DSL
 - [ ] Configuration profiles
-- [ ] User-provided journal abbreviation tables
-- [ ] Title capitalization protection
+- [ ] Provider-specific DOI fallbacks/enrichment (Crossref, DataCite)
 
 ### Out of scope
 
@@ -136,14 +186,15 @@ Additionally:
 ## Roadmap
 
 ### v0.1.1
-- DOI import integration (network calls)
+- Full JabRef metadata compatibility pass
 - Deduplication and merge
-- AUX extraction
+- Provider-specific DOI fallbacks/enrichment
+- Capabilities introspection JSON
 
 ### v0.2
+- Conservative BibTeX → BibLaTeX conversion
 - Configuration profiles
 - User-provided abbreviation tables
-- Title capitalization protection
 - Linked-file validation
 
 ### Future (v0.3+)
@@ -158,7 +209,7 @@ Additionally:
 
 - **Structured output**: `--json` returns machine-readable results with status, warnings, and errors.
 - **Dry-run by default for exploration**: Use `--dry-run` to preview any operation.
-- **Capabilities introspection**: `pynakes capabilities --json` lists supported operations.
+- **Capabilities introspection**: planned; see the current-status checklist above.
 - **Atomic operations**: Each command is idempotent and composable; you can chain operations safely.
 - **Clear error codes**: Exit code 0 = success; 1 = error; 2 = conflict (safe to retry with user input).
 

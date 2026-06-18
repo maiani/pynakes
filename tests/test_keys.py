@@ -3,8 +3,10 @@
 from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.keys import (
+    UnsupportedCitationKeyPatternError,
     duplicate_key_counts,
     generate_key,
+    generate_key_from_pattern,
     has_duplicate_keys,
     regenerate_keys,
     repair_duplicate_keys,
@@ -48,6 +50,42 @@ class TestGenerateKey:
     def test_deterministic(self) -> None:
         e = _entry(author="Smith", year="2020", title="Data")
         assert generate_key(e) == generate_key(e)
+
+    def test_jabref_default_pattern_from_library_metadata(self) -> None:
+        lib = parse_bib(
+            "@comment{jabref-meta: keypatterndefault:[auth][shortyear][veryshorttitle];}\n"
+            "@article{old,\n"
+            "  author = {John Smith},\n"
+            "  year = {2024},\n"
+            "  title = {A Practical Test}\n"
+            "}\n"
+        )
+        assert generate_key(lib.entries["old"], lib) == "Smith24Practical"
+
+    def test_jabref_entry_type_pattern_overrides_default(self) -> None:
+        lib = parse_bib(
+            "@comment{jabref-meta: keypatterndefault:[auth][year];}\n"
+            "@comment{jabref-meta: keypattern_article:[auth][year][veryshorttitle];}\n"
+            "@article{old,\n"
+            "  author = {John Smith},\n"
+            "  year = {2024},\n"
+            "  title = {A Practical Test}\n"
+            "}\n"
+        )
+        assert generate_key(lib.entries["old"], lib) == "Smith2024Practical"
+
+    def test_jabref_pattern_supports_literals_and_field_markers(self) -> None:
+        e = _entry(author="John Smith", year="2024", title="A Practical Test", journal="Test Journal")
+        assert generate_key_from_pattern(e, "[auth]-[YEAR]-[journal:abbr]") == "Smith-2024-TJ"
+
+    def test_unsupported_jabref_pattern_errors(self) -> None:
+        e = _entry(author="John Smith", year="2024", title="A Practical Test")
+        try:
+            generate_key_from_pattern(e, "[auth][unknownSpecial]")
+        except UnsupportedCitationKeyPatternError as exc:
+            assert "unknownSpecial" in str(exc)
+        else:
+            raise AssertionError("expected unsupported pattern error")
 
 
 class TestDuplicateDetection:
@@ -110,3 +148,12 @@ class TestRegenerate:
         renames = regenerate_keys(lib)
         new_keys = [n for _, n in renames]
         assert new_keys == ["Smith2020Data", "Smith2020Dataa"]
+
+    def test_regenerate_uses_jabref_pattern_metadata(self) -> None:
+        lib = parse_bib(
+            "@comment{jabref-meta: keypatterndefault:[auth][shortyear];}\n"
+            "@article{old,\n  author = {John Smith},\n  year = {2024},\n"
+            "  title = {Data}\n}\n"
+        )
+        renames = regenerate_keys(lib)
+        assert renames == [("old", "Smith24")]

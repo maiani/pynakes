@@ -295,20 +295,27 @@ pynakes keys repair tests/fixtures/duplicate_entries.bib --dry-run --diff
 - Round-trip parse → convert → write works
 
 #### 3.2 Journal abbreviation (`journals.py`)
-- [ ] Implement `abbreviate_journals(lib: BibLibrary) -> BibLibrary`
-- [ ] Implement `expand_journals(lib: BibLibrary) -> BibLibrary`
-- [ ] Built-in abbreviation table (small, common journals):
+- [x] Implement journal abbreviation through `normalize_journals(lib, "abbreviated")`
+- [x] Implement journal expansion through `normalize_journals(lib, "full")`
+- [x] Implement source priority:
+  - user-provided exact title/ISSN table
+  - bundled exact title mappings for common exceptions
+  - LTWA-style word abbreviation generation
+  - unchanged with warning
+- [x] Support optional LTWA CSV/TSV word tables with `Word` and `Abbreviation` columns
+- [x] Keep a small built-in exact table for common journals and exceptions:
   - `Physical Review B` ↔ `Phys. Rev. B`
   - `Physical Review Letters` ↔ `Phys. Rev. Lett.`
   - `Journal of Money, Credit and Banking` ↔ `J. Money Credit Bank.`
   - `American Economic Review` ↔ `Am. Econ. Rev.`
-  - (Add ~10-15 more common economics/physics journals)
-- [ ] Work on both `journal` and `journaltitle` fields
-- [ ] Detect inconsistent journal naming (warn if no match found)
+- [x] Work on both `journal` and `journaltitle` fields
+- [x] Use `issn`, `eissn`, and `e-issn` fields for exact user-table lookup
+- [x] Detect unknown journal names and report warnings
 
 **Success criteria:**
-- Abbreviations are correct
-- Expansions reverse abbreviations
+- User exact mappings override generated abbreviations
+- LTWA-style generation handles unseen titles when enough words are known
+- Expansions reverse exact mappings
 - Warnings for unknown journals
 - Tests cover common journals
 
@@ -346,8 +353,9 @@ pynakes keys repair tests/fixtures/duplicate_entries.bib --dry-run --diff
 #### 3.5 CLI commands (Phase 3 additions)
 - [ ] Add `pynakes capabilities --json`
 - [ ] Add `pynakes convert <file> --to biblatex [--dry-run] [--diff]`
-- [ ] Add `pynakes journals abbreviate <file> [--dry-run]`
-- [ ] Add `pynakes journals expand <file> [--dry-run]`
+- [x] Add `pynakes normalize <file> [--dry-run] [--diff] [--json]`
+- [ ] Add dedicated `pynakes journals abbreviate <file> [--dry-run]`
+- [ ] Add dedicated `pynakes journals expand <file> [--dry-run]`
 - [ ] Add `pynakes journals check <file>`
 - [ ] Update all Phase 2 commands to support `--json`
 
@@ -358,7 +366,8 @@ pynakes keys repair tests/fixtures/duplicate_entries.bib --dry-run --diff
 
 #### 3.6 Tests for Phase 3
 - [ ] `test_convert.py`: BibTeX to BibLaTeX mappings, field preservation
-- [ ] `test_journals.py`: abbreviation, expansion, detection of inconsistent names
+- [x] `test_normalize.py`: author normalization, DOI normalization, journal abbreviation/expansion, metadata overrides
+- [x] `test_journals.py`: source priority, LTWA generation, expansion, unknown warnings
 - [ ] `test_capabilities.py`: structure and accuracy of capabilities output
 - [ ] Integration tests: dry-run + diff + JSON for all Phase 2-3 operations
 
@@ -544,15 +553,38 @@ pynakes inspect tests/fixtures/simple.bib
 ## Next steps after v0.1
 
 ### v0.1.1 (quick wins, ~1 week)
+- **Done: JabRef citation-key pattern metadata**
+  - [x] Parse `@Comment{jabref-meta: keypatterndefault:...;}`.
+  - [x] Parse entry-type-specific `@Comment{jabref-meta: keypattern_<entrytype>:...;}`.
+  - [x] Use library-specific JabRef patterns for `pynakes keys generate` and DOI imports.
+  - [x] Fall back to the current `AuthorYearTitle` generator when no JabRef pattern is present.
+  - [x] Error on unsupported pattern markers instead of silently generating wrong keys.
+- **Priority: full JabRef metadata support**
+  - Introduce a structured JabRef metadata model instead of only storing raw comment text.
+  - Parse and preserve known `jabref-meta` blocks: `databaseType`, `saveOrderConfig`,
+    `saveActions`, `grouping`/`groupstree`, `groups-search-syntax-version`,
+    `fileDirectory*`, `protectedFlag`, `selector_*`, `VersionDBStructure`,
+    `keypatterndefault`, and `keypattern_<entrytype>`.
+  - Preserve unknown `jabref-meta` items byte-for-byte.
+  - Expose metadata in `pynakes inspect --json` without forcing rewrites.
+  - Add fixtures from current JabRef exports covering library properties, key patterns,
+    groups, selectors, file directories, save actions, and unknown metadata.
+  - Add round-trip tests proving unmodified JabRef metadata writes back with zero diff.
 - DOI import integration
 - Deduplication and merge
 - ~~AUX extraction~~ — **done early** as `pynakes used` (cite detection across
   `.tex`/`.aux`, subset export, group/keyword tagging). See CHANGELOG.
+- ~~Title capitalization protection~~ — **done early** as `pynakes fields
+  protect-title` (protects acronyms, mixed-case terms, and explicit terms in
+  title-like fields).
+- ~~Daily normalization routine~~ — **done early** as `pynakes normalize`
+  (title protection, JabRef-style author/editor list normalization with a
+  conservative option, DOI normalization, and built-in journal
+  abbreviation/expansion, with `jabref-meta` overrides for pynakes
+  normalization settings).
 
 ### v0.2 (feature expansion, ~2 weeks)
 - Configuration profiles
-- User-provided journal tables
-- Title capitalization protection
 - Linked-file validation
 
 ### v0.3+ (long-term)
