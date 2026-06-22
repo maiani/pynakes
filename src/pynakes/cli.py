@@ -144,16 +144,27 @@ def _safe(fn):
     return wrapper
 
 
-def _preview_or_commit(coll: Collection, dry_run: bool) -> tuple[str, bool, int]:
+def _preview_or_commit(
+    coll: Collection, dry_run: bool, backup: bool = False
+) -> tuple[str, bool, int]:
     """Return ``(diff, modified, changed_entries)`` for a staged collection.
 
     In ``--dry-run`` mode this previews without writing; otherwise it commits
     (atomic write + re-parse validation) and reports the committed outcome.
+    Pass ``backup=True`` to also leave a ``<file>.bak`` copy behind.
     """
     if dry_run:
         return coll.diff(), coll.is_modified, coll.changed_entries_count()
-    result = coll.commit()
+    result = coll.commit(backup=backup)
     return result.diff, result.modified, result.changed_entries
+
+
+_BACKUP_OPTION = typer.Option(
+    False,
+    "--backup",
+    help="Also write a <file>.bak copy before overwriting (off by default; "
+    "writes are already atomic and re-parse-validated)",
+)
 
 
 def _finish_mod(
@@ -166,6 +177,7 @@ def _finish_mod(
     human,
     warnings=None,
     modified_entries: int | None = None,
+    backup: bool = False,
     **details,
 ) -> None:
     """Preview/commit a collection and emit the standard modifying-command result.
@@ -174,7 +186,7 @@ def _finish_mod(
     ``status, action, file, dry_run, modified, modified_entries, warnings`` plus
     command-specific keys, and an optional ``diff`` when ``--diff`` is set.
     """
-    diff_text, modified, changed = _preview_or_commit(coll, dry_run)
+    diff_text, modified, changed = _preview_or_commit(coll, dry_run, backup)
     if modified_entries is not None:
         changed = modified_entries
     result = {
@@ -1381,7 +1393,7 @@ def normalize(
     journal_style: str = typer.Option(
         "metadata",
         "--journal-style",
-        help="metadata, abbreviated, full, or none",
+        help="metadata, abbreviated, full, or none (default: no change unless metadata sets it)",
     ),
     journal_table: Optional[str] = typer.Option(
         None,
@@ -1398,9 +1410,15 @@ def normalize(
         "--doi-normalization",
         help="metadata, on, or off",
     ),
+    metadata_formatting: str = typer.Option(
+        "metadata",
+        "--metadata-formatting",
+        help="Consolidate jabref-meta to the file end, sorted (metadata, on, or off)",
+    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+    backup: bool = _BACKUP_OPTION,
 ) -> None:
     """Run the standard bibliography normalization routine."""
     try:
@@ -1413,6 +1431,7 @@ def normalize(
             journal_table=journal_table,
             ltwa_table=ltwa_table,
             normalize_dois=_optional_bool(doi_normalization),
+            format_metadata=_optional_bool(metadata_formatting),
         )
         coll = Collection.open(file)
         report = coll.normalize(options)
@@ -1439,6 +1458,7 @@ def normalize(
         human,
         warnings=report.warnings,
         operations=report.operations,
+        backup=backup,
     )
 
 
@@ -1453,6 +1473,7 @@ def convert(
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+    backup: bool = _BACKUP_OPTION,
 ) -> None:
     """Convert a library between BibTeX and BibLaTeX conventions."""
     coll = Collection.open(file)
@@ -1478,6 +1499,7 @@ def convert(
         human,
         warnings=report.warnings,
         operations=report.operations,
+        backup=backup,
     )
 
 
@@ -1492,6 +1514,7 @@ def _run_journal_op(
     dry_run: bool,
     diff: bool,
     json_output: bool,
+    backup: bool = False,
 ) -> None:
     """Shared body for ``journals abbreviate`` / ``journals expand``."""
     verb_root = "abbreviate" if style == "abbreviated" else "expand"
@@ -1517,6 +1540,7 @@ def _run_journal_op(
         warnings=journals_ops.unknown_journal_warnings(report.unknown),
         resolved=report.resolved,
         unknown=report.unknown,
+        backup=backup,
     )
 
 
@@ -1533,9 +1557,12 @@ def journals_abbreviate(
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+    backup: bool = _BACKUP_OPTION,
 ) -> None:
     """Abbreviate journal titles (journal/journaltitle)."""
-    _run_journal_op(file, "abbreviated", journal_table, ltwa_table, dry_run, diff, json_output)
+    _run_journal_op(
+        file, "abbreviated", journal_table, ltwa_table, dry_run, diff, json_output, backup
+    )
 
 
 @journals_app.command("expand")
@@ -1551,9 +1578,10 @@ def journals_expand(
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+    backup: bool = _BACKUP_OPTION,
 ) -> None:
     """Expand abbreviated journal titles back to their full form."""
-    _run_journal_op(file, "full", journal_table, ltwa_table, dry_run, diff, json_output)
+    _run_journal_op(file, "full", journal_table, ltwa_table, dry_run, diff, json_output, backup)
 
 
 @journals_app.command("check")

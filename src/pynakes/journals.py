@@ -172,14 +172,45 @@ def _first_present(row: dict[str, str], names: tuple[str, ...]) -> str:
     return ""
 
 
+TITLE_COLUMNS = ("title", "full", "full_title", "journal")
+ABBREV_COLUMNS = ("abbreviation", "abbreviated", "abbrev", "short", "short_title")
+TABLE_ISSN_COLUMNS = ("issn", "eissn", "e-issn")
+
+
+def _sniff_dialect(sample: list[str]) -> csv.Dialect | type[csv.Dialect]:
+    return csv.Sniffer().sniff("\n".join(sample[:5]), delimiters=",\t;")
+
+
 def _sniff_rows(path: Path) -> list[dict[str, str]]:
     """Read a CSV/TSV file into row dicts, sniffing the delimiter (`,`/tab/`;`)."""
     sample = path.read_text(encoding="utf-8-sig").splitlines()
     if not sample:
         return []
-    dialect = csv.Sniffer().sniff("\n".join(sample[:5]), delimiters=",\t;")
+    dialect = _sniff_dialect(sample)
     with path.open(encoding="utf-8-sig", newline="") as handle:
         return list(csv.DictReader(handle, dialect=dialect))
+
+
+def _read_table_rows(path: Path) -> list[list[str]]:
+    """Read a CSV/TSV file into raw cell lists, sniffing the delimiter."""
+    sample = path.read_text(encoding="utf-8-sig").splitlines()
+    if not sample:
+        return []
+    dialect = _sniff_dialect(sample)
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        return [row for row in csv.reader(handle, dialect=dialect) if row]
+
+
+def _looks_like_header(row: list[str]) -> bool:
+    """Whether the first row names columns rather than carrying data.
+
+    JabRef's own abbreviation lists (from ``abbrv.jabref.org``) are headerless
+    — ``"Full Name","Abbreviation"[,"Shortest unique abbreviation"]`` — so we
+    treat a file as having a header only when the first row contains both a
+    recognized title column *and* a recognized abbreviation column.
+    """
+    cells = {cell.strip().lower() for cell in row}
+    return bool(cells & set(TITLE_COLUMNS)) and bool(cells & set(ABBREV_COLUMNS))
 
 
 def unknown_journal_warnings(titles: list[str]) -> list[dict[str, str]]:
@@ -223,32 +254,56 @@ def builtin_sources() -> JournalSources:
 def load_journal_table(path: str | Path, sources: JournalSources | None = None) -> JournalSources:
     """Load exact journal mappings from CSV/TSV.
 
-    Recognized columns:
-    ``title``/``full``/``full_title``/``journal``,
-    ``abbreviation``/``abbreviated``/``abbrev``/``short``/``short_title``,
-    and optional ``issn``/``eissn``.
+    Two layouts are accepted:
+
+    * **Headed** — a first row naming the columns. Recognized names:
+      ``title``/``full``/``full_title``/``journal``,
+      ``abbreviation``/``abbreviated``/``abbrev``/``short``/``short_title``,
+      and optional ``issn``/``eissn``.
+    * **Headerless** — JabRef's own ``abbrv.jabref.org`` format,
+      ``"Full Name","Abbreviation"[,"Shortest unique abbreviation"]``. The
+      first two columns are used; any third column is ignored.
     """
     target = sources or JournalSources()
     table_path = Path(path)
-    for row in _sniff_rows(table_path):
-        title = _first_present(row, ("title", "full", "full_title", "journal"))
-        abbreviated = _first_present(
-            row,
-            ("abbreviation", "abbreviated", "abbrev", "short", "short_title"),
-        )
-        if not title or not abbreviated:
-            continue
-        issn = _first_present(row, ("issn", "eissn", "e-issn")) or None
-        add_mapping(
-            target,
-            JournalMapping(
-                title=title,
-                abbreviated=abbreviated,
-                issn=issn,
-                source=str(table_path),
-            ),
-        )
+    rows = _read_table_rows(table_path)
+    if not rows:
+        return target
+
+    if _looks_like_header(rows[0]):
+        header = [cell.strip() for cell in rows[0]]
+        for raw in rows[1:]:
+            record = dict(zip(header, raw))
+            title = _first_present(record, TITLE_COLUMNS)
+            abbreviated = _first_present(record, ABBREV_COLUMNS)
+            issn = _first_present(record, TABLE_ISSN_COLUMNS) or None
+            _add_table_mapping(target, table_path, title, abbreviated, issn)
+    else:
+        for raw in rows:
+            title = _clean_cell(raw[0]) if raw else ""
+            abbreviated = _clean_cell(raw[1]) if len(raw) > 1 else ""
+            _add_table_mapping(target, table_path, title, abbreviated, None)
     return target
+
+
+def _add_table_mapping(
+    target: JournalSources,
+    table_path: Path,
+    title: str,
+    abbreviated: str,
+    issn: str | None,
+) -> None:
+    if not title or not abbreviated:
+        return
+    add_mapping(
+        target,
+        JournalMapping(
+            title=title,
+            abbreviated=abbreviated,
+            issn=issn,
+            source=str(table_path),
+        ),
+    )
 
 
 def load_ltwa_table(path: str | Path, sources: JournalSources | None = None) -> JournalSources:
@@ -312,10 +367,13 @@ def _word_abbreviation(word: str, sources: JournalSources) -> str | None:
     key = _journal_key(word)
     if not key:
         return ""
-    if key in LTWA_OMIT_WORDS:
-        return ""
+    # Single capital letters are section/series identifiers ("Phys. Rev. A",
+    # "Series B") and must be kept verbatim — including "A", which would
+    # otherwise be swallowed by the omitted stop word "a".
     if len(word) == 1 and word.isupper():
         return word
+    if key in LTWA_OMIT_WORDS:
+        return ""
     if word.isupper() and len(word) <= 6:
         return word
     return sources.ltwa_words.get(key)
@@ -324,8 +382,11 @@ def _word_abbreviation(word: str, sources: JournalSources) -> str | None:
 def abbreviate_title_with_ltwa(title: str, sources: JournalSources | None = None) -> str | None:
     """Generate an ISO-4-style abbreviation from title words.
 
-    Returns ``None`` if no title word could be abbreviated or omitted, because
-    that usually means the LTWA source lacks enough information to be useful.
+    Returns ``None`` (meaning "leave unchanged and warn") when the title cannot
+    be abbreviated *in full*: if any significant word is missing from the
+    abbreviation sources we decline rather than emit a half-abbreviated,
+    inconsistent title such as ``Nat. Nanotechnology``. ``None`` is likewise
+    returned when nothing actually changes (already-abbreviated input).
     """
     active = sources or builtin_sources()
     tokens = re.findall(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*|[^\w\s]", title)
@@ -334,9 +395,13 @@ def abbreviate_title_with_ltwa(title: str, sources: JournalSources | None = None
 
     for token in tokens:
         if re.fullmatch(r"[^\w\s]", token):
-            if output and output[-1] not in {"-", "/", ":"}:
-                output[-1] = output[-1].rstrip()
-            output.append(token)
+            # Punctuation attaches to the preceding word with no leading space;
+            # skip a doubled separator when the abbreviation already carries one
+            # (e.g. "Commun." followed by a source period).
+            if not output:
+                output.append(token)
+            elif not output[-1].endswith(token):
+                output[-1] = output[-1] + token
             continue
         parts = token.split("-")
         abbreviated_parts: list[str] = []
@@ -346,7 +411,9 @@ def abbreviate_title_with_ltwa(title: str, sources: JournalSources | None = None
                 changed = True
                 continue
             if abbreviation is None:
-                abbreviation = part
+                # An unresolved significant word means we cannot build a
+                # trustworthy abbreviation; decline the whole title.
+                return None
             if abbreviation != part:
                 changed = True
             abbreviated_parts.append(abbreviation)
@@ -355,7 +422,7 @@ def abbreviate_title_with_ltwa(title: str, sources: JournalSources | None = None
 
     if not changed:
         return None
-    return " ".join(part for part in output if part).replace(" ,", ",").replace(" :", ":")
+    return " ".join(part for part in output if part)
 
 
 def _target_for_title(

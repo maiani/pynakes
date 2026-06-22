@@ -112,7 +112,7 @@ def test_volume_normalize_and_convert() -> None:
         "}\n"
     )
 
-    norm = coll.normalize(NormalizeOptions(author_style="none"))
+    norm = coll.normalize(NormalizeOptions(author_style="none", journal_style="abbreviated"))
     conv = coll.convert("biblatex")
 
     entry = coll.entries["A"]

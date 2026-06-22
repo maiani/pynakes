@@ -29,12 +29,19 @@ KNOWN_EXACT_KEYS = {
     "protectedflag": "library",
     "versiondbstructure": "library",
     "keypatterndefault": "citation-key",
+    # pynakes normalization settings written with the canonical bare prefix.
+    "protected-terms": "pynakes",
+    "journal-table": "pynakes",
+    "ltwa-table": "pynakes",
 }
 
 KNOWN_PREFIXES = {
     "filedirectory": "files",
     "selector_": "selectors",
     "keypattern_": "citation-key",
+    # pynakes' own settings: the canonical ``normalize-`` prefix and the older
+    # ``pynakes-`` spelling (which also covers the ``pynakes-normalize-`` alias).
+    "normalize-": "pynakes",
     "pynakes-": "pynakes",
 }
 
@@ -224,6 +231,58 @@ def format_metadata_comment(key: str, value: str, namespace: str = "jabref") -> 
         value = f"{value};"
     prefix = PYNAKES_PREFIX if namespace == "pynakes" else JABREF_PREFIX
     return f"@comment{{{prefix} {key.strip()}:{value}}}"
+
+
+def consolidate_metadata(lib: BibFile, text: str, line_ending: str = "\n") -> str | None:
+    """Relocate every metadata comment into one canonical section at file end.
+
+    JabRef writes its ``@Comment{jabref-meta: ...}`` blocks contiguously at the
+    bottom of the file, sorted by key. A library that has been hand-edited (or
+    had entries appended after a JabRef save) ends up with metadata stranded in
+    the middle. This gathers all jabref-meta/pynakes-meta blocks — preserving
+    each block's content verbatim, including JabRef's multi-line ``grouping``
+    formatting — and rewrites them as a single sorted section at the end,
+    separated from the entries and from each other by one blank line.
+
+    Returns the rewritten text, or ``None`` when the file is already in this
+    canonical layout (so callers can treat it as a no-op).
+    """
+    blocks = lib.metadata_blocks
+    if not blocks:
+        return None
+
+    stripped = text
+    for block in blocks:
+        index = stripped.find(block.raw)
+        if index == -1:
+            # The raw text isn't where we expect (e.g. it was rewritten by a
+            # prior edit); decline rather than corrupt the file.
+            return None
+        end = index + len(block.raw)
+        if stripped[end : end + len(line_ending)] == line_ending:
+            end += len(line_ending)
+        stripped = stripped[:index] + stripped[end:]
+
+    # Collapse blank-line runs left behind by the removals.
+    triple = line_ending * 3
+    while triple in stripped:
+        stripped = stripped.replace(triple, line_ending * 2)
+
+    # jabref-meta first (keeps JabRef's own keys grouped), then pynakes-meta;
+    # alphabetical by key within each, stable for repeated keys (legacy groups).
+    ordered = sorted(
+        enumerate(blocks),
+        key=lambda pair: (0 if pair[1].namespace == "jabref" else 1, pair[1].key.lower(), pair[0]),
+    )
+    section = (line_ending + line_ending).join(block.raw for _, block in ordered)
+
+    body = stripped.rstrip()
+    if body:
+        result = body + line_ending + line_ending + section + line_ending
+    else:
+        result = section + line_ending
+
+    return result if result != text else None
 
 
 def set_metadata(

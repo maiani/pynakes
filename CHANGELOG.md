@@ -8,6 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`normalize` consolidates JabRef metadata to the file end (on by default).**
+  A new step gathers every `@Comment{jabref-meta: ...}` / `pynakes-meta` block —
+  including blocks stranded mid-file after entries were appended to a JabRef
+  save — and rewrites them as one section at the end, sorted by key and
+  separated by blank lines, preserving each block's content verbatim (including
+  JabRef's multi-line `grouping`). It is idempotent and a no-op on
+  already-canonical files. Toggle with `--metadata-formatting on|off|metadata`
+  or the `pynakes-normalize-format-metadata` metadata key.
+- **Journal tables accept JabRef's own headerless CSV format.** `--journal-table`
+  (and the `pynakes-journal-table` metadata key) now load files from
+  [abbrv.jabref.org](https://github.com/JabRef/abbrv.jabref.org) directly —
+  `"Full Name","Abbreviation"[,"Shortest unique abbreviation"]` with no header
+  row — in addition to the existing headed CSV/TSV. This makes
+  `journals abbreviate` and `journals expand` round-trip using the same lists
+  JabRef uses. Previously a headerless file loaded zero mappings silently.
+- **`--backup` flag** on `normalize`, `convert`, and `journals abbreviate`/`expand`
+  to opt back into a `<file>.bak` copy (see *Changed* — backups are now off by
+  default).
 - **JabRef-parity field formatters + golden-vector test suite**: new
   `pynakes.formatters` implements `normalize_date` (→ ISO `yyyy-mm-dd`/`yyyy-mm`),
   `normalize_month` (→ `#mmm#`), and `normalize_page_numbers` (→ `start--end`)
@@ -100,6 +118,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   raw-text primitives). Overall coverage is now 93%.
 
 ### Fixed
+- **Journal abbreviation no longer mangles already-correct titles.** Three
+  defects in the LTWA word-generation fallback are fixed: (1) `Phys. Rev. A`
+  became `Phys . Rev .` — the section letter `A` was dropped because it collided
+  with the omitted stop word `a`, and punctuation was rejoined with stray spaces
+  (only `,`/`:` were handled, not `.`); single capital letters are now preserved
+  and punctuation attaches cleanly. (2) Partially-known titles such as
+  `Nature Nanotechnology` became `Nat. Nanotechnology`; generation now declines
+  (leaves the title unchanged and reports it `unknown`) unless every significant
+  word resolves, instead of emitting a half-abbreviated, inconsistent title.
 - **Empty-citation-key entries are no longer silently dropped.** The parser
   required at least one key character (`@article{,` was discarded from the
   model while surviving on disk via surgical writes), hiding the most-broken
@@ -115,6 +142,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `no_entries` warning instead of reporting `0 issues`.
 
 ### Changed
+- **`metadata set` appends new blocks at the file end, not the top.** A newly
+  created metadata comment now lands at JabRef's canonical bottom position
+  (consistent with `normalize --metadata-formatting`), instead of being
+  prepended above the first entry. Updating an existing block is still a
+  surgical in-place edit.
+- **Normalize metadata keys drop the redundant `pynakes-` prefix.** The
+  canonical settings keys are now `normalize-journal-style`,
+  `normalize-author-style`, `normalize-protect-titles`, `normalize-title-fields`,
+  `protected-terms`, `journal-table`, and `ltwa-table` (all written to
+  `pynakes-meta`). The previous `pynakes-normalize-*` / `pynakes-*` spellings
+  remain supported as aliases; when both a canonical key and its alias are
+  present, the canonical key wins.
+- **`normalize` no longer abbreviates journal titles by default.** Journal
+  abbreviation/expansion is opinionated and not reversible without the right
+  table, so `normalize` now leaves journals untouched unless a style is
+  configured — via `--journal-style abbreviated|full` or a
+  `pynakes-normalize-journal-style` metadata key. The standalone
+  `journals abbreviate`/`expand` commands are unchanged.
+- **Backups are now opt-in, not automatic.** Modifying commands no longer write
+  a `<file>.bak` on every save — writes are already atomic and
+  re-parse-validated, so the silent `.bak` was redundant and surprising. Pass
+  `--backup` to restore the previous behavior per-run.
 - **Renamed the core nouns for a coherent library metaphor.** The single-`.bib`
   engine handle `Volume` is now **`Collection`** (the working unit — "a slice of
   references covering one aspect of a topic"); a future directory of Collections

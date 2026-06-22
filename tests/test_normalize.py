@@ -64,15 +64,58 @@ def test_normalize_library_runs_standard_pass() -> None:
     entry = lib.entries["A"]
     assert entry.fields["author"] == "Smith, Jane and Doe, John"
     assert entry.fields["title"] == "{DNA} repair with {eBay}"
-    assert entry.fields["journal"] == "Nat. Mach. Intell."
+    # Journal abbreviation is off by default; the title is left as-is.
+    assert entry.fields["journal"] == "Nature Machine Intelligence"
     assert entry.fields["doi"] == "10.5555/ABC"
     assert report.operations == {
         "title_fields": {"title": 1},
         "authors": 1,
-        "journals": 1,
+        "journals": 0,
         "dois": 1,
         "save_action_fields": 0,
     }
+
+
+def test_normalize_abbreviates_journals_only_when_style_configured() -> None:
+    src = "@article{A,\n  title = {Paper},\n  journal = {Nature Machine Intelligence}\n}\n"
+
+    # Default: journals untouched.
+    default_lib = parse_bib(src)
+    assert normalize_library(default_lib).journals == 0
+    assert default_lib.entries["A"].fields["journal"] == "Nature Machine Intelligence"
+
+    # Metadata opts in.
+    meta_lib = parse_bib(
+        "@comment{jabref-meta: pynakes-normalize-journal-style:abbreviated;}\n" + src
+    )
+    assert normalize_library(meta_lib).journals == 1
+    assert meta_lib.entries["A"].fields["journal"] == "Nat. Mach. Intell."
+
+    # CLI option opts in.
+    cli_lib = parse_bib(src)
+    normalize_library(cli_lib, NormalizeOptions(journal_style="abbreviated"))
+    assert cli_lib.entries["A"].fields["journal"] == "Nat. Mach. Intell."
+
+
+def test_normalize_metadata_key_canonical_and_legacy_alias() -> None:
+    src = "@article{A,\n  title = {Paper},\n  journal = {Nature Machine Intelligence}\n}\n"
+
+    # Canonical bare key.
+    canonical = parse_bib("@comment{pynakes-meta: normalize-journal-style:abbreviated;}\n" + src)
+    assert normalize_library(canonical).journals == 1
+
+    # Legacy pynakes-normalize- alias still honored.
+    legacy = parse_bib(
+        "@comment{pynakes-meta: pynakes-normalize-journal-style:abbreviated;}\n" + src
+    )
+    assert normalize_library(legacy).journals == 1
+
+    # When both are present, the canonical key wins.
+    both = parse_bib(
+        "@comment{pynakes-meta: normalize-journal-style:none;}\n"
+        "@comment{pynakes-meta: pynakes-normalize-journal-style:abbreviated;}\n" + src
+    )
+    assert normalize_library(both).journals == 0
 
 
 def test_normalize_honors_jabref_saveactions_for_authors() -> None:

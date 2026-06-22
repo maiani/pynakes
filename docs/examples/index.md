@@ -214,9 +214,9 @@ settings JabRef has no place for. A library that carries both looks like this:
 @comment{jabref-meta: keypatterndefault:[auth][year];}
 @comment{jabref-meta: fileDirectory:/home/me/papers;}
 
-@comment{pynakes-meta: pynakes-normalize-journal-style:abbreviated;}
-@comment{pynakes-meta: pynakes-normalize-author-style:jabref;}
-@comment{pynakes-meta: pynakes-protected-terms:DNA,RNA,CRISPR;}
+@comment{pynakes-meta: normalize-journal-style:abbreviated;}
+@comment{pynakes-meta: normalize-author-style:jabref;}
+@comment{pynakes-meta: protected-terms:DNA,RNA,CRISPR;}
 
 @article{Doe2021,
   author = {Jane Doe},
@@ -244,9 +244,9 @@ pynakes metadata list refs.bib
 #   [jabref:known:library] databaseType = biblatex
 #   [jabref:known:citation-key] keypatterndefault = [auth][year]
 #   [jabref:known:files] fileDirectory = /home/me/papers
-#   [pynakes:known:pynakes] pynakes-normalize-journal-style = abbreviated
-#   [pynakes:known:pynakes] pynakes-normalize-author-style = jabref
-#   [pynakes:known:pynakes] pynakes-protected-terms = DNA,RNA,CRISPR
+#   [pynakes:known:pynakes] normalize-journal-style = abbreviated
+#   [pynakes:known:pynakes] normalize-author-style = jabref
+#   [pynakes:known:pynakes] protected-terms = DNA,RNA,CRISPR
 ```
 
 Add a preference. A JabRef-native key lands in `jabref-meta` (so JabRef keeps

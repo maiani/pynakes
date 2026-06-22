@@ -17,8 +17,8 @@ structured JSON contract. It is written for a program (or an agent) that calls
 - **Conflicts return options, not guesses.** Blocked operations exit `2` with a
   list of resolutions.
 - **Safe writes.** Modifications are atomic (temp file → re-parse validation →
-  rename) with an automatic `.bak` backup, and edits are surgical so unmodified
-  entries stay byte-for-byte identical.
+  rename), and edits are surgical so unmodified entries stay byte-for-byte
+  identical. Pass `--backup` to also keep a `<file>.bak` copy (off by default).
 
 ## Capabilities introspection
 

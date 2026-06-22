@@ -30,9 +30,12 @@ A: Yes! Use `--json` for programmatic output and check exit codes:
 
 A: `--dry-run` shows what *would* happen without modifying the file. Always use it to preview before committing. After reviewing the diff, run the command without `--dry-run` to apply.
 
-### Q: Why do I get a ".bak" file?
+### Q: Does pynakes create a ".bak" file?
 
-A: pynakes automatically creates backups before modifying files. This is intentional for safety. You can delete `.bak` files after verifying the changes.
+A: Not by default. Writes are atomic (write-to-temp-then-rename) and
+re-parse-validated, so the original is never left half-written. If you also want
+a `<file>.bak` copy of the previous contents, pass `--backup` to the modifying
+command (`normalize`, `convert`, `journals abbreviate`, `journals expand`).
 
 ### Q: Can I use pynakes with BibLaTeX?
 
@@ -84,12 +87,13 @@ A: If you see entries in the diff that didn't change, it might be due to whitesp
 
 ### Q: Can I undo a change?
 
-A: Yes! The `.bak` file is the automatic backup. Restore it:
+A: Preview first with `--dry-run`, and use version control. If you ran the
+command with `--backup`, restore the `.bak` copy:
 ```bash
 cp refs.bib.bak refs.bib
 ```
 
-Or use git if your file is version controlled.
+Otherwise use git (or your editor's history) to revert.
 
 ## Features & Capabilities
 

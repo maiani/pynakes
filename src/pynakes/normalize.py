@@ -15,7 +15,11 @@ from pynakes.model import BibFile
 _NAME_FIELDS = ("author", "editor")
 _DOI_FORMATTERS = ("clean_up_doi", "short_doi")
 
-METADATA_PREFIX = "pynakes-normalize-"
+# Normalize settings live under the ``normalize-`` key prefix; the older
+# ``pynakes-normalize-`` spelling stays supported as an alias (the canonical
+# form is preferred and wins when both are present).
+METADATA_PREFIX = "normalize-"
+LEGACY_METADATA_PREFIX = "pynakes-normalize-"
 TITLE_FIELDS = ("title", "booktitle", "maintitle", "subtitle")
 
 
@@ -37,6 +41,7 @@ class NormalizeOptions:
     journal_table: str | None = None
     ltwa_table: str | None = None
     normalize_dois: bool | None = None
+    format_metadata: bool | None = None
 
 
 @dataclass
@@ -66,11 +71,22 @@ class NormalizeResult:
 
 
 def _metadata_value(lib: BibFile, *names: str) -> str | None:
-    wanted = {name.lower() for name in names}
-    for key, value in lib.metadata.items():
-        if key.lower() in wanted:
+    """Return the first present metadata value, trying ``names`` in order.
+
+    Order matters: earlier names win, so callers list the canonical key first
+    and aliases after.
+    """
+    lowered = {key.lower(): value for key, value in lib.metadata.items()}
+    for name in names:
+        value = lowered.get(name.lower())
+        if value is not None:
             return value.rstrip(";").strip()
     return None
+
+
+def _normalize_setting(lib: BibFile, name: str) -> str | None:
+    """Look up a normalize setting by its canonical and legacy-aliased keys."""
+    return _metadata_value(lib, f"{METADATA_PREFIX}{name}", f"{LEGACY_METADATA_PREFIX}{name}")
 
 
 def _split_metadata_list(value: str | None) -> list[str]:
@@ -94,10 +110,7 @@ def _metadata_bool(value: str | None, default: bool) -> bool:
 def _resolve_bool(lib: BibFile, option: bool | None, name: str, default: bool) -> bool:
     if option is not None:
         return option
-    return _metadata_bool(
-        _metadata_value(lib, f"{METADATA_PREFIX}{name}", f"normalize-{name}"),
-        default,
-    )
+    return _metadata_bool(_normalize_setting(lib, name), default)
 
 
 def _resolve_choice(
@@ -108,7 +121,7 @@ def _resolve_choice(
     default: str,
 ) -> str:
     if option is None or option == "metadata":
-        value = _metadata_value(lib, f"{METADATA_PREFIX}{name}", f"normalize-{name}")
+        value = _normalize_setting(lib, name)
         resolved = value.lower() if value else default
     else:
         resolved = option.lower()
@@ -123,16 +136,25 @@ def _resolve_choice(
 def _resolve_title_fields(lib: BibFile, option: list[str] | None) -> list[str]:
     if option:
         return option
-    metadata = _metadata_value(lib, f"{METADATA_PREFIX}title-fields", "normalize-title-fields")
+    metadata = _normalize_setting(lib, "title-fields")
     return _split_metadata_list(metadata) or list(TITLE_FIELDS)
 
 
 def _resolve_terms(lib: BibFile, option: list[str] | None) -> list[str]:
     terms = list(option or [])
     terms.extend(
-        _split_metadata_list(_metadata_value(lib, "pynakes-protected-terms", "protected-terms"))
+        _split_metadata_list(_metadata_value(lib, "protected-terms", "pynakes-protected-terms"))
     )
     return terms
+
+
+def resolve_format_metadata(lib: BibFile, option: bool | None) -> bool:
+    """Resolve whether to consolidate metadata to the file end (default on).
+
+    An explicit CLI value wins; otherwise a ``pynakes-normalize-format-metadata``
+    (or ``normalize-format-metadata``) metadata key, else the default ``True``.
+    """
+    return _resolve_bool(lib, option, "format-metadata", True)
 
 
 def normalize_dois(lib: BibFile) -> tuple[int, list[dict[str, str]]]:
@@ -191,13 +213,17 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
         result.dois, doi_warnings = normalize_dois(lib)
         result.warnings.extend(doi_warnings)
 
+    # Journal abbreviation/expansion is *off* by default: it is opinionated and
+    # not reversible without the right table, so it runs only when a style is
+    # configured explicitly (CLI ``--journal-style`` or a ``normalize-journal-style``
+    # metadata key). The standalone ``journals`` commands are unaffected.
     journal_style = _resolve_choice(
-        lib, opts.journal_style, "journal-style", journal_ops.JOURNAL_STYLES, "abbreviated"
+        lib, opts.journal_style, "journal-style", journal_ops.JOURNAL_STYLES, "none"
     )
     journal_table = opts.journal_table or _metadata_value(
-        lib, "pynakes-journal-table", "journal-table"
+        lib, "journal-table", "pynakes-journal-table"
     )
-    ltwa_table = opts.ltwa_table or _metadata_value(lib, "pynakes-ltwa-table", "ltwa-table")
+    ltwa_table = opts.ltwa_table or _metadata_value(lib, "ltwa-table", "pynakes-ltwa-table")
     journal_sources = journal_ops.load_sources(journal_table, ltwa_table)
     journal_result = journal_ops.normalize_journals(lib, journal_style, journal_sources)
     result.journals = journal_result.changed

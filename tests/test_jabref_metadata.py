@@ -10,6 +10,7 @@ from pynakes.bibtex_writer import write_bib
 from pynakes.cli import app
 from pynakes.metadata import (
     DuplicateJabRefMetadataError,
+    consolidate_metadata,
     library_save_actions,
     parse_save_actions,
     set_metadata,
@@ -17,6 +18,52 @@ from pynakes.metadata import (
 from pynakes.usage import subset_library
 
 runner = CliRunner()
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def test_consolidate_metadata_moves_stranded_blocks_to_end_sorted() -> None:
+    text = (
+        "@Comment{jabref-meta: saveOrderConfig:specified;year;false;}\n"
+        "\n"
+        "@article{A,\n  author = {Smith, John},\n  title = {T}\n}\n"
+        "\n"
+        "@Comment{jabref-meta: databaseType:bibtex;}\n"
+        "\n"
+        "@article{B,\n  author = {Doe, Jane},\n  title = {U}\n}\n"
+    )
+    lib = parse_bib(text)
+
+    result = consolidate_metadata(lib, text)
+
+    assert result is not None
+    # Both entries survive, in order, before the metadata section.
+    a, b = result.index("@article{A,"), result.index("@article{B,")
+    first_meta = result.index("@Comment{jabref-meta")
+    assert a < b < first_meta
+    # Metadata is sorted by key (databaseType before saveOrderConfig).
+    assert result.index("databaseType") < result.index("saveOrderConfig")
+    # One blank line separates the two metadata blocks.
+    assert "databaseType:bibtex;}\n\n@Comment{jabref-meta: saveOrderConfig" in result
+    # Ends with a single trailing newline.
+    assert result.endswith(";}\n") and not result.endswith(";}\n\n")
+
+
+def test_consolidate_metadata_is_idempotent() -> None:
+    text = (
+        "@article{A,\n  author = {Smith, John},\n  title = {T}\n}\n"
+        "\n"
+        "@Comment{jabref-meta: databaseType:bibtex;}\n"
+    )
+    lib = parse_bib(text)
+
+    # Already canonical: nothing to do.
+    assert consolidate_metadata(lib, text) is None
+
+
+def test_consolidate_metadata_no_blocks_is_noop() -> None:
+    text = "@article{A,\n  title = {T}\n}\n"
+    assert consolidate_metadata(parse_bib(text), text) is None
 
 
 def test_parse_known_and_unknown_jabref_metadata_blocks() -> None:
@@ -291,7 +338,10 @@ def test_metadata_set_appends_missing_block(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["created"] is True
-    assert bib.read_text().startswith("@comment{jabref-meta: keypatterndefault:[auth][year];}\n")
+    text = bib.read_text()
+    # New metadata is appended at the canonical bottom position, after the entry.
+    assert text.index("@article{A,") < text.index("@comment{jabref-meta:")
+    assert text.rstrip().endswith("@comment{jabref-meta: keypatterndefault:[auth][year];}")
 
 
 def test_metadata_set_unknown_key_goes_to_pynakes(tmp_path: Path) -> None:

@@ -537,7 +537,18 @@ class TestNormalizeCommand:
         )
         bib.write_text(original)
 
-        result = runner.invoke(app, ["normalize", str(bib), "--dry-run", "--diff", "--json"])
+        result = runner.invoke(
+            app,
+            [
+                "normalize",
+                str(bib),
+                "--journal-style",
+                "abbreviated",
+                "--dry-run",
+                "--diff",
+                "--json",
+            ],
+        )
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -549,6 +560,19 @@ class TestNormalizeCommand:
         assert "title = {{DNA} repair with {eBay}}" in data["diff"]
         assert "journal = {Nat. Mach. Intell.}" in data["diff"]
         assert bib.read_text() == original
+
+    def test_normalize_leaves_journals_untouched_by_default(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{A,\n  title = {Paper},\n  journal = {Nature Machine Intelligence}\n}\n"
+        )
+
+        result = runner.invoke(app, ["normalize", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["operations"]["journals"] == 0
+        assert "journal = {Nature Machine Intelligence}" in bib.read_text()
 
     def test_normalize_writes_with_overrides(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -604,6 +628,8 @@ class TestNormalizeCommand:
             [
                 "normalize",
                 str(bib),
+                "--journal-style",
+                "abbreviated",
                 "--journal-table",
                 str(table),
                 "--author-style",
@@ -620,6 +646,72 @@ class TestNormalizeCommand:
         data = json.loads(result.output)
         assert data["operations"]["journals"] == 1
         assert "journal = {Can. J.}" in bib.read_text()
+
+    def test_normalize_does_not_write_backup_by_default(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  author = {Smith, Jane & Doe, John},\n  title = {Paper}\n}\n")
+
+        result = runner.invoke(app, ["normalize", str(bib)])
+
+        assert result.exit_code == 0, result.output
+        assert not (tmp_path / "refs.bib.bak").exists()
+
+    def test_normalize_backup_flag_writes_bak(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        original = "@article{A,\n  author = {Smith, Jane & Doe, John},\n  title = {Paper}\n}\n"
+        bib.write_text(original)
+
+        result = runner.invoke(app, ["normalize", str(bib), "--backup"])
+
+        assert result.exit_code == 0, result.output
+        backup = tmp_path / "refs.bib.bak"
+        assert backup.exists()
+        assert backup.read_text() == original
+
+    def test_normalize_consolidates_metadata_to_end_by_default(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@Comment{jabref-meta: databaseType:bibtex;}\n"
+            "\n"
+            "@article{A,\n  author = {Smith, John},\n  title = {T}\n}\n"
+        )
+
+        result = runner.invoke(app, ["normalize", str(bib)])
+
+        assert result.exit_code == 0, result.output
+        text = bib.read_text()
+        # Metadata now follows the entry instead of preceding it.
+        assert text.index("@article{A,") < text.index("@Comment{jabref-meta")
+
+    def test_normalize_metadata_formatting_off_leaves_position(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        original = (
+            "@Comment{jabref-meta: databaseType:bibtex;}\n"
+            "\n"
+            "@article{A,\n  author = {Smith, John},\n  title = {T}\n}\n"
+        )
+        bib.write_text(original)
+
+        result = runner.invoke(
+            app,
+            [
+                "normalize",
+                str(bib),
+                "--metadata-formatting",
+                "off",
+                "--author-style",
+                "none",
+                "--title-protection",
+                "off",
+                "--journal-style",
+                "none",
+                "--doi-normalization",
+                "off",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert bib.read_text() == original
 
 
 class TestConvertCommand:

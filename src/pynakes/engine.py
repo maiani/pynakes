@@ -92,6 +92,7 @@ class Collection:
     _appended_entries: list[BibEntry] = field(default_factory=list)
     _removed_entries: list[BibEntry] = field(default_factory=list)
     _text_replacements: list[tuple[str | None, str]] = field(default_factory=list)
+    _consolidate_metadata: bool = False
 
     @classmethod
     def open(cls, path: str | Path) -> "Collection":
@@ -175,8 +176,12 @@ class Collection:
             return False
         return _fingerprint(self.path) != self._fingerprint
 
-    def commit(self, *, force: bool = False) -> CommitResult:
-        """Write staged edits to the bound file and refresh the collection snapshot."""
+    def commit(self, *, force: bool = False, backup: bool = False) -> CommitResult:
+        """Write staged edits to the bound file and refresh the collection snapshot.
+
+        Writes are atomic and re-parse-validated, so a ``.bak`` is opt-in:
+        pass ``backup=True`` to also leave a ``<file>.bak`` copy behind.
+        """
         if self.path is None:
             raise ValueError("commit requires a collection path")
         if (
@@ -191,7 +196,7 @@ class Collection:
         new_text = self.preview()
         modified = new_text != self._pristine_text
         if modified:
-            result = save_text(new_text, str(self.path), encoding=self.lib.encoding)
+            result = save_text(new_text, str(self.path), encoding=self.lib.encoding, backup=backup)
             if not result.success:
                 raise OSError(result.error or f"Could not write {self.path}")
         self._refresh_from_text(new_text, fingerprint=_fingerprint(self.path))
@@ -206,6 +211,7 @@ class Collection:
         self._appended_entries.clear()
         self._removed_entries.clear()
         self._text_replacements.clear()
+        self._consolidate_metadata = False
         self._dirty = False
 
     def reload(self, *, force: bool = False) -> None:
@@ -221,6 +227,7 @@ class Collection:
         self._appended_entries.clear()
         self._removed_entries.clear()
         self._text_replacements.clear()
+        self._consolidate_metadata = False
         self._dirty = False
 
     def _refresh_from_text(self, text: str, fingerprint: FileFingerprint | None = None) -> None:
@@ -233,6 +240,7 @@ class Collection:
         self._appended_entries.clear()
         self._removed_entries.clear()
         self._text_replacements.clear()
+        self._consolidate_metadata = False
         self._dirty = False
 
     def _entry_edits(self) -> list[tuple[str, str]]:
@@ -253,6 +261,12 @@ class Collection:
         return edits
 
     def _render_text(self) -> str:
+        text = self._render_entry_text()
+        if self._consolidate_metadata:
+            text = metadata_ops.consolidate_metadata(self.lib, text, self.lib.line_ending) or text
+        return text
+
+    def _render_entry_text(self) -> str:
         text = self._apply_text_replacements(self._pristine_text)
         if text is None:
             return write_bib(self.lib)
@@ -452,13 +466,18 @@ class Collection:
         options: normalize_ops.NormalizeOptions | None = None,
     ) -> normalize_ops.NormalizeResult:
         """Run the standard normalization routine in memory."""
-        report = normalize_ops.normalize_library(self.lib, options)
+        opts = options or normalize_ops.NormalizeOptions()
+        report = normalize_ops.normalize_library(self.lib, opts)
+        self._consolidate_metadata = normalize_ops.resolve_format_metadata(
+            self.lib, opts.format_metadata
+        )
         self._mark(
             bool(
                 report.authors
                 or report.journals
                 or report.dois
                 or sum(report.title_fields.values())
+                or self._consolidate_metadata
             )
         )
         return report
@@ -596,7 +615,13 @@ def _append_entry_text(original_text: str, entry_text: str, line_ending: str) ->
 
 
 def _insert_metadata_comment(original_text: str, comment: str, line_ending: str) -> str:
-    """Insert a new JabRef metadata comment at the top of a file."""
+    """Append a new metadata comment at the file end (the canonical position).
+
+    JabRef writes its ``@Comment{...-meta: ...}`` blocks at the bottom of the
+    file, so a newly-created block is appended there — separated from the
+    preceding content by one blank line — rather than prepended.
+    """
     if not original_text:
         return comment + line_ending
-    return comment + line_ending + original_text
+    body = original_text.rstrip("\r\n")
+    return body + line_ending + line_ending + comment + line_ending

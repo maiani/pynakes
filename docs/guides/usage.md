@@ -124,7 +124,7 @@ goes to `pynakes-meta`. Force a target with `--namespace jabref|pynakes`.
 
 ```bash
 # pynakes-only setting → lands in pynakes-meta automatically
-pynakes metadata set refs.bib pynakes-normalize-journal-style abbreviated
+pynakes metadata set refs.bib normalize-journal-style abbreviated
 # force a key into jabref-meta (requires --allow-unknown if JabRef won't know it)
 pynakes metadata set refs.bib myKey myValue --namespace jabref --allow-unknown
 ```
@@ -244,12 +244,14 @@ pynakes normalize refs.bib --journal-table journals.csv --ltwa-table ltwa.csv
 LTWA tables accept `Word` and `Abbreviation` columns.
 
 Normalization preferences live in metadata. pynakes-specific settings (no
-JabRef equivalent) go in `pynakes-meta`:
+JabRef equivalent) go in `pynakes-meta`. The canonical keys use a bare
+`normalize-` prefix; the older `pynakes-normalize-` spelling is still accepted
+as an alias:
 
 ```bibtex
-@comment{pynakes-meta: pynakes-normalize-journal-style:none;}
-@comment{pynakes-meta: pynakes-normalize-protect-titles:false;}
-@comment{pynakes-meta: pynakes-protected-terms:Proceedings,OpenAI;}
+@comment{pynakes-meta: normalize-journal-style:none;}
+@comment{pynakes-meta: normalize-protect-titles:false;}
+@comment{pynakes-meta: protected-terms:Proceedings,OpenAI;}
 ```
 
 Where JabRef already has a setting, pynakes uses **that**: if the library has
@@ -308,6 +310,19 @@ pynakes journals check refs.bib --json
 
 The journal commands accept the same `--journal-table` and `--ltwa-table`
 options as `normalize`.
+
+To use the same lists as JabRef, download a CSV from
+[abbrv.jabref.org](https://github.com/JabRef/abbrv.jabref.org) (e.g.
+`journals/journal_abbreviations_general.csv`) and pass it directly — pynakes
+reads JabRef's headerless `"Full Name","Abbreviation"` format as-is:
+
+```bash
+pynakes journals abbreviate refs.bib --journal-table journal_abbreviations_general.csv
+pynakes journals expand   refs.bib --journal-table journal_abbreviations_general.csv
+```
+
+The same table drives both directions: `abbreviate` maps full → short, `expand`
+maps short → full.
 
 ## capabilities
 
