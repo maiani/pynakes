@@ -114,8 +114,10 @@ golden vectors lifted from JabRef's own tests in `tests/test_jabref_parity.py`.
 - [ ] Audit `KNOWN_EXACT_KEYS`/`KNOWN_PREFIXES` against a **pinned JabRef
       version** so every current JabRef metadata key classifies as `known`
       (record the version checked against).
-- [ ] Decide whether `convert` defaults its target from `databaseType` (record
-      the decision either way).
+- [x] `convert` does not infer its target from `databaseType`; callers must
+      explicitly choose `--to biblatex` or `--to bibtex`. `databaseType`
+      describes the source library and may be stale or mixed, not the desired
+      conversion target.
 
 **Done when**: a library carrying JabRef `saveActions` round-trips through
 `pynakes normalize` with the same field changes JabRef would make on save

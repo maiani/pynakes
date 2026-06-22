@@ -317,6 +317,8 @@ pynakes used refs.bib paper.tex --out cited-only.bib
 ## convert
 
 Convert between BibTeX and BibLaTeX field/type conventions.
+The target is required: pynakes does not infer it from JabRef's
+`databaseType` metadata.
 
 ```bash
 pynakes convert refs.bib --to biblatex --dry-run --diff

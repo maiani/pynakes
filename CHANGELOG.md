@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`convert` now requires an explicit target.** Pass `--to biblatex` or
+  `--to bibtex`; the command no longer defaults to BibLaTeX or infers a target
+  from JabRef's `databaseType` metadata.
+
 ### Added
 - **Canonical identifier casing.** `normalize` now lowercases entry types and
   field names while preserving the surrounding entry text byte-for-byte. It is

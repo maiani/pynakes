@@ -831,16 +831,15 @@ class TestConvertCommand:
         assert "@thesis{Green2023," in data["diff"]
         assert bib.read_text() == original  # dry-run writes nothing
 
-    def test_convert_writes(self, tmp_path: Path) -> None:
+    def test_convert_requires_explicit_target(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "bibtex_classic.bib")
 
-        result = runner.invoke(app, ["convert", str(bib)])
+        result = runner.invoke(app, ["convert", str(bib), "--json"])
 
-        assert result.exit_code == 0, result.output
-        text = bib.read_text()
-        assert "@thesis{Green2023," in text
-        assert "institution = {Stanford University}" in text
-        assert "date = {2020-03}" in text
+        assert result.exit_code == 1, result.output
+        data = json.loads(result.output)
+        assert data["error"] == "MissingConvertTarget"
+        assert bib.read_text() == (FIXTURES / "bibtex_classic.bib").read_text()
 
     def test_convert_to_bibtex_writes(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "biblatex_sample.bib")
