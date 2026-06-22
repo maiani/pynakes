@@ -91,6 +91,26 @@ recognized TeX citation commands in the supplied `.tex` files/directories. It
 does not edit commented-out citations, and it exits with conflict if the target
 key already exists.
 
+### Linked TeX sources
+
+Record the `.tex` files that cite a library once, and the citation-key commands
+reuse them — no need to pass paths every time:
+
+```bash
+pynakes metadata set refs.bib tex-sources "paper.tex, chapters_src/"
+```
+
+```bibtex
+@comment{pynakes-meta: tex-sources:paper.tex, chapters_src/;}
+```
+
+Paths are stored relative to the `.bib` (so the library stays portable). With it
+set, `keys rename refs.bib Old New` updates the linked sources automatically, and
+`used refs.bib` scans them when no paths are given. Explicit arguments still
+override the metadata. `keys repair` consults the list too, but only to **warn**
+when a de-duplicated key is still cited (the citation is ambiguous, so it is not
+rewritten).
+
 ## metadata
 
 pynakes recognizes **two** structurally identical top-level comment namespaces:

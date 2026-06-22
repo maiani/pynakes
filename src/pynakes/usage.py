@@ -27,8 +27,39 @@ __all__ = [
     "subset_library",
     "tag_with_group",
     "tag_with_keyword",
+    "tex_sources_from_metadata",
     "splice_into_text",
 ]
+
+# Linked-source metadata key (canonical) and its namespaced alias.
+TEX_SOURCES_KEYS = ("tex-sources", "pynakes-tex-sources")
+
+
+def tex_sources_from_metadata(lib: BibFile, base_dir: str | Path) -> list[str]:
+    """Resolve the ``tex-sources`` metadata list to paths under ``base_dir``.
+
+    The metadata value is a comma/semicolon-separated list of ``.tex`` files or
+    directories, stored relative to the library so it stays portable. Relative
+    entries are resolved against ``base_dir`` (normally the ``.bib``'s folder);
+    absolute entries are used as-is. Returns ``[]`` when the key is unset.
+    """
+    wanted = {key.lower() for key in TEX_SOURCES_KEYS}
+    raw = next(
+        (value for key, value in lib.metadata.items() if key.lower() in wanted),
+        None,
+    )
+    if not raw:
+        return []
+    base = Path(base_dir)
+    resolved: list[str] = []
+    for part in re.split(r"[;,]", raw.rstrip(";")):
+        candidate = part.strip()
+        if not candidate:
+            continue
+        path = Path(candidate)
+        resolved.append(str(path if path.is_absolute() else base / path))
+    return resolved
+
 
 # ``\citation{key,key2}`` lines emitted by LaTeX into .aux files.
 _AUX_CITATION_RE = re.compile(r"\\citation\s*\{([^}]*)\}")

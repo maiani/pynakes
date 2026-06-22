@@ -51,6 +51,31 @@ class TestUsedCommand:
         # Only used entries are tagged.
         assert text.count("groups = {Cited}") == 2
 
+    def test_used_falls_back_to_tex_sources_metadata(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex;}\n"
+            "@article{Smith2020,\n  title = {T}\n}\n"
+            "@article{Unused2019,\n  title = {U}\n}\n"
+        )
+        (tmp_path / "paper.tex").write_text(r"\cite{Smith2020}" "\n")
+
+        # No sources argument: scan the files listed in tex-sources metadata.
+        result = runner.invoke(app, ["used", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["report"]["used"] == ["Smith2020"]
+
+    def test_used_without_sources_or_metadata_errors(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n")
+
+        result = runner.invoke(app, ["used", str(bib), "--json"])
+
+        assert result.exit_code == 1, result.output
+        assert json.loads(result.output)["error"] == "NoSources"
+
     def test_inplace_tag_preserves_untouched_entries(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         original = (FIXTURES / "simple.bib").read_text()
@@ -422,6 +447,52 @@ class TestKeysCommand:
         assert "@article{Smith2020ML," in bib.read_text()
         assert r"\cite{Smith2020ML}" in tex.read_text()
         assert r"% \cite{Smith2020}" in tex.read_text()
+
+    def test_rename_falls_back_to_tex_sources_metadata(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex;}\n"
+            "@article{Smith2020,\n  title = {T}\n}\n"
+        )
+        tex = tmp_path / "paper.tex"
+        tex.write_text(r"\cite{Smith2020}" "\n")
+
+        # No sources argument: the library's tex-sources metadata is used.
+        result = runner.invoke(app, ["keys", "rename", str(bib), "Smith2020", "Smith2020ML"])
+
+        assert result.exit_code == 0, result.output
+        assert "@article{Smith2020ML," in bib.read_text()
+        assert r"\cite{Smith2020ML}" in tex.read_text()
+
+    def test_rename_without_sources_or_metadata_errors(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{Smith2020,\n  title = {T}\n}\n")
+
+        result = runner.invoke(
+            app, ["keys", "rename", str(bib), "Smith2020", "Smith2020ML", "--json"]
+        )
+
+        assert result.exit_code == 1, result.output
+        assert json.loads(result.output)["error"] == "NoTeXSources"
+
+    def test_repair_warns_about_ambiguous_tex_citations(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex;}\n"
+            "@article{Smith2020,\n  title = {A}\n}\n"
+            "@article{Smith2020,\n  title = {B}\n}\n"
+        )
+        (tmp_path / "paper.tex").write_text(r"\cite{Smith2020}" "\n")
+
+        result = runner.invoke(app, ["keys", "repair", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["renames"]
+        ambiguous = [w for w in data["warnings"] if w["type"] == "ambiguous_citation"]
+        assert ambiguous and ambiguous[0]["key"] == "Smith2020"
+        # repair does not rewrite the .tex (the citation is ambiguous).
+        assert r"\cite{Smith2020}" in (tmp_path / "paper.tex").read_text()
 
     def test_rename_conflicts_when_target_key_exists(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")

@@ -33,6 +33,9 @@ KNOWN_EXACT_KEYS = {
     "protected-terms": "pynakes",
     "journal-table": "pynakes",
     "ltwa-table": "pynakes",
+    # Linked LaTeX sources that cite this library; consulted by the citation-key
+    # commands so .tex edits stay consistent without re-specifying the files.
+    "tex-sources": "pynakes",
 }
 
 KNOWN_PREFIXES = {

@@ -3,6 +3,7 @@
 import functools
 import json as _json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable, Optional
 
 import typer
@@ -25,11 +26,13 @@ from pynakes.lint import lint as lint_lib
 from pynakes.usage import (
     analyze_usage,
     collect_cited_keys,
+    extract_keys_from_tex,
     iter_tex_files,
     rename_citation_key_in_tex,
     subset_library,
     tag_with_group,
     tag_with_keyword,
+    tex_sources_from_metadata,
 )
 
 app = typer.Typer(help="Agent-friendly BibTeX library management tool")
@@ -207,8 +210,6 @@ def _metadata_cache_dir(file: str, cache_dir: Optional[str], online: bool) -> st
         return cache_dir
     if not online:
         return None
-    from pathlib import Path
-
     return str(Path(file).resolve().parent / ".pynakes-cache")
 
 
@@ -1074,6 +1075,14 @@ def keys_repair(
     verb = "Would repair" if dry_run else "Repaired"
     human = [f"{verb} {len(renames)} duplicate key(s)."]
     human += [f"  {old} -> {new}" for old, new in renames]
+
+    # A repaired key still exists on the first (kept) entry, so a TeX
+    # `\cite{key}` is now ambiguous rather than simply renamed — rewriting it
+    # would be a guess. Instead, warn when a linked source cites a repaired key.
+    warnings = _repaired_citation_warnings(coll.lib, file, renames)
+    if warnings:
+        human.append(f"  {len(warnings)} citation(s) now ambiguous in linked TeX sources.")
+
     _finish_mod(
         file,
         "keys_repair",
@@ -1082,8 +1091,38 @@ def keys_repair(
         diff,
         json_output,
         human,
+        warnings=warnings,
         **_rename_payload(renames),
     )
+
+
+def _repaired_citation_warnings(lib, file: str, renames: list[tuple[str, str]]) -> list[dict]:
+    """Flag linked-TeX citations of keys that ``keys repair`` made ambiguous."""
+    if not renames:
+        return []
+    sources = tex_sources_from_metadata(lib, Path(file).parent)
+    if not sources:
+        return []
+    repaired = {old for old, _ in renames}
+    warnings: list[dict] = []
+    for path in iter_tex_files(sources):
+        try:
+            cited = set(extract_keys_from_tex(path.read_text(encoding="utf-8", errors="replace")))
+        except OSError:
+            continue
+        for key in sorted(repaired & cited):
+            warnings.append(
+                {
+                    "type": "ambiguous_citation",
+                    "message": (
+                        f"{path.name} cites {key!r}, which was duplicated and repaired; "
+                        "review the citation and point it at the intended entry"
+                    ),
+                    "key": key,
+                    "source": str(path),
+                }
+            )
+    return warnings
 
 
 @keys_app.command("rename")
@@ -1092,8 +1131,10 @@ def keys_rename(
     file: str = typer.Argument(..., help="Path to the .bib file"),
     old: str = typer.Argument(..., help="Existing citation key"),
     new: str = typer.Argument(..., help="New citation key"),
-    sources: list[str] = typer.Argument(
-        ..., help="One or more .tex files or directories whose citations should be updated"
+    sources: Optional[list[str]] = typer.Argument(
+        None,
+        help="One or more .tex files or directories whose citations should be updated "
+        "(defaults to the library's 'tex-sources' metadata)",
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
@@ -1137,9 +1178,16 @@ def keys_rename(
         )
 
     bib_changed = coll.rename_key(old, new)
-    tex_files = iter_tex_files(sources)
+    resolved_sources = (
+        list(sources) if sources else tex_sources_from_metadata(coll.lib, Path(file).parent)
+    )
+    tex_files = iter_tex_files(resolved_sources)
     if not tex_files:
-        _emit_error(json_output, "NoTeXSources", "No .tex files found in the provided sources")
+        _emit_error(
+            json_output,
+            "NoTeXSources",
+            "No .tex files found in the provided sources or the library's 'tex-sources' metadata",
+        )
     if not dry_run and coll.externally_changed():
         if coll.path is None:
             raise ValueError("rename requires a bound .bib file")
@@ -1653,8 +1701,10 @@ def capabilities(
 @_safe
 def used(
     bib_file: str = typer.Argument(..., help="Path to the .bib library"),
-    sources: list[str] = typer.Argument(
-        ..., help="One or more .tex/.aux files or directories to scan"
+    sources: Optional[list[str]] = typer.Argument(
+        None,
+        help="One or more .tex/.aux files or directories to scan "
+        "(defaults to the library's 'tex-sources' metadata)",
     ),
     out: Optional[str] = typer.Option(
         None, "--out", help="Write a subset .bib containing only the used entries"
@@ -1671,7 +1721,16 @@ def used(
 ) -> None:
     """Report which entries are used in LaTeX sources; optionally tag or export them."""
     coll = Collection.open(bib_file)
-    cited, include_all, scanned = collect_cited_keys(sources)
+    resolved_sources = (
+        list(sources) if sources else tex_sources_from_metadata(coll.lib, Path(bib_file).parent)
+    )
+    if not resolved_sources:
+        _emit_error(
+            json_output,
+            "NoSources",
+            "No sources given and no 'tex-sources' metadata to fall back to",
+        )
+    cited, include_all, scanned = collect_cited_keys(resolved_sources)
     report = analyze_usage(coll.lib, cited, include_all=include_all, sources=scanned)
 
     tagged = 0

@@ -16,7 +16,28 @@ from pynakes.usage import (
     subset_library,
     tag_with_group,
     tag_with_keyword,
+    tex_sources_from_metadata,
 )
+
+
+def test_tex_sources_from_metadata_resolves_relative_to_base() -> None:
+    lib = parse_bib(
+        "@comment{pynakes-meta: tex-sources:paper.tex, sections/;}\n@article{A,\n  title = {T}\n}\n"
+    )
+
+    assert tex_sources_from_metadata(lib, "/proj") == ["/proj/paper.tex", "/proj/sections"]
+
+
+def test_tex_sources_from_metadata_absolute_kept_and_legacy_alias() -> None:
+    lib = parse_bib(
+        "@comment{pynakes-meta: pynakes-tex-sources:/abs/main.tex;}\n@article{A,\n  title = {T}\n}\n"
+    )
+    assert tex_sources_from_metadata(lib, "/proj") == ["/abs/main.tex"]
+
+
+def test_tex_sources_from_metadata_absent_is_empty() -> None:
+    lib = parse_bib("@article{A,\n  title = {T}\n}\n")
+    assert tex_sources_from_metadata(lib, "/proj") == []
 
 
 @pytest.fixture

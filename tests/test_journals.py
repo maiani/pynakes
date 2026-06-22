@@ -11,8 +11,6 @@ from pynakes.journals import (
     normalize_journals,
 )
 
-FIXTURES = Path(__file__).parent / "fixtures"
-
 
 def test_ltwa_generation_for_unseen_title() -> None:
     assert abbreviate_title_with_ltwa("Journal of Polymer Science") == "J. Polym. Sci."
@@ -45,8 +43,25 @@ def test_partial_coverage_declines_instead_of_half_abbreviating() -> None:
     assert abbreviate_title_with_ltwa("Communications Physics") == "Commun. Phys."
 
 
-def test_long_fixture_abbreviation_never_produces_spaced_dots_or_dropped_letters() -> None:
-    lib = parse_bib((FIXTURES / "long.bib").read_text(encoding="utf-8"))
+def test_abbreviation_never_produces_spaced_dots_or_dropped_letters() -> None:
+    # A spread of real-world journals that previously tripped the LTWA fallback:
+    # already-abbreviated series titles, period-bearing forms, and partially
+    # known full titles.
+    titles = [
+        "Phys. Rev. A",
+        "Phys. Rev. B",
+        "Phys. Rev. Lett.",
+        "Phys. Rev. Applied",
+        "Nature Nanotechnology",
+        "Nature Materials",
+        "Communications Physics",
+        "Materials Science and Engineering: R: Reports",
+    ]
+    src = "".join(
+        f"@article{{e{i},\n  journal = {{{title}}},\n  title = {{T}}\n}}\n"
+        for i, title in enumerate(titles)
+    )
+    lib = parse_bib(src)
 
     result = normalize_journals(lib, "abbreviated")
 
@@ -58,6 +73,7 @@ def test_long_fixture_abbreviation_never_produces_spaced_dots_or_dropped_letters
     journals = [e.fields.get("journal", "") for e in lib.entries.values()]
     assert "Phys . Rev ." not in journals
     assert "Phys. Rev. A" in journals  # preserved verbatim
+    assert "Nature Nanotechnology" in journals  # partial coverage → left alone
 
 
 def test_builtin_exact_mapping_overrides_word_generation() -> None:

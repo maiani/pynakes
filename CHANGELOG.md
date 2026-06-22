@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Linked LaTeX sources via a `tex-sources` metadata key.** A library can record
+  the `.tex` files/directories that cite it
+  (`@comment{pynakes-meta: tex-sources:paper.tex, chapters_src/;}`, paths relative to
+  the `.bib`). The citation-key commands then consult it so `.tex` edits stay
+  consistent without re-specifying the files:
+  - `keys rename` makes its `sources` argument optional, falling back to
+    `tex-sources` (explicit arguments still win).
+  - `used` scans `tex-sources` when no source paths are given.
+  - `keys repair` warns (`ambiguous_citation`) when a linked `.tex` cites a key
+    it just de-duplicated — it does **not** rewrite, because the repaired key
+    still names the kept entry, so the citation is ambiguous rather than stale.
+  Set it with `pynakes metadata set refs.bib tex-sources "paper.tex,chapters_src/"`.
 - **`normalize` consolidates JabRef metadata to the file end (on by default).**
   A new step gathers every `@Comment{jabref-meta: ...}` / `pynakes-meta` block —
   including blocks stranded mid-file after entries were appended to a JabRef
