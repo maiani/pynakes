@@ -477,6 +477,8 @@ class Collection:
                 or report.journals
                 or report.dois
                 or sum(report.title_fields.values())
+                or report.entry_types
+                or report.field_names
                 or self._consolidate_metadata
             )
         )

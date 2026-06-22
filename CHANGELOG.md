@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Canonical identifier casing.** `normalize` now lowercases entry types and
+  field names while preserving the surrounding entry text byte-for-byte. It is
+  enabled by default and can be controlled with
+  `--identifier-case on|off|metadata` or the `normalize-identifier-case`
+  metadata key. `lint` reports remaining mixed-case entry types and field names
+  as advisory warnings.
 - **Linked LaTeX sources via a `tex-sources` metadata key.** A library can record
   the `.tex` files/directories that cite it
   (`@comment{pynakes-meta: tex-sources:paper.tex, chapters_src/;}`, paths relative to
@@ -154,6 +160,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `no_entries` warning instead of reporting `0 issues`.
 
 ### Changed
+- **`capabilities.VERSION` now derives from the installed package metadata**
+  (`importlib.metadata.version("pynakes")`) instead of a hand-maintained literal,
+  so it can never drift from `pyproject`. The `version` field in `capabilities`
+  output is now the full `pyproject` version (e.g. `0.1.0` rather than `0.1`).
 - **`metadata set` appends new blocks at the file end, not the top.** A newly
   created metadata comment now lands at JabRef's canonical bottom position
   (consistent with `normalize --metadata-formatting`), instead of being

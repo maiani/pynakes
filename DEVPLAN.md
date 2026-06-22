@@ -1,6 +1,6 @@
 # pynakes development plan
 
-This plan is organized around the project [VISION.md](VISION.md): pynakes is a
+This plan is organized around the project [vision](docs/vision.md): pynakes is a
 **standalone bib-file engine** — a Python library + CLI that is complete and
 valuable on its own. The lifelong bibliography-management system (**BiMaS**,
 working name) is a **separate, downstream project built on top of pynakes** and
@@ -35,7 +35,8 @@ stored preferences a lintable contract, pinning the public API, and releasing.
 
 ## Guiding principles (non-negotiable)
 
-Invariants from [ARCHITECTURE.md](ARCHITECTURE.md) and [CLAUDE.md](CLAUDE.md):
+Invariants from [docs/guides/architecture.md](docs/guides/architecture.md) and
+[CLAUDE.md](CLAUDE.md):
 
 1. **Round-trip fidelity** — unmodified entries write back byte-for-byte.
 2. **Edits go through `editing.py`** — surgical, minimal-diff.
@@ -65,22 +66,29 @@ complete," pull it forward into a milestone below.)
 
 ## Road to 1.0
 
-Five milestones. Each is independently shippable; A unblocks distribution and
-can ship immediately, B is the substantive feature work, C–E close out 1.0.
+Five milestones. A proves the package is release-ready but stays **private** —
+the first public upload is the **0.9 testing release** in Milestone E, not
+before. B is the substantive feature work; C–E close out 1.0.
 
-### Milestone A — 0.2.0 interim release (unblock everything)
+### Milestone A — Packaging readiness (private; no public release yet)
 
-Ship the large post-v0.1 surface under a real version so the work is installable
-and citable while 1.0 lands. Move-zero; nothing here is hard.
+Keep the repository **private** and do **not** publish to public PyPI yet. The
+first public release is the **0.9 testing release** (see Milestone E); this
+milestone only proves the package is releasable so that, when the time comes,
+publishing is a one-command step.
 
 - [x] Set the real repository URL (`github.com/maiani/pynakes`) in
       `[project.urls]`, `zensical.toml`, the pre-commit hook docs, and guides.
-- [ ] Bump version to **0.2.0**; sync `capabilities.VERSION`.
-- [ ] `python -m build && twine check && twine upload` (fresh-venv install
-      already verified; packaging metadata is clean).
-- [ ] Tag `v0.2.0`; confirm the pre-commit hook `rev:` in docs points at it.
+- [x] `capabilities.VERSION` now derives from the installed distribution
+      metadata (`importlib.metadata.version("pynakes")`), so it can never drift
+      from `pyproject`.
+- [x] `python -m build && twine check` pass cleanly; the built wheel installs
+      and runs (`pynakes capabilities`, `normalize`) in a fresh venv. No public
+      `twine upload`, no public tag.
 
-**Done when**: `pip install pynakes` installs the current engine from PyPI.
+**Done when** ✅: `python -m build` produces a wheel/sdist that passes `twine
+check` and installs and runs in a clean venv — all without publishing publicly.
+**Milestone A complete (private).**
 
 ### Milestone B — Complete JabRef feature parity (the 1.0 bar)
 
@@ -151,9 +159,12 @@ non-conformant library, with a clear per-entry reason.
 **Done when**: `docs/` has an authoritative "public API & stability" page and
 the names are settled.
 
-### Milestone E — 1.0.0 release & launch
+### Milestone E — 0.9 testing release → 1.0.0 launch
 
-- [ ] Bump to **1.0.0**; sync `capabilities.VERSION`; tag `v1.0.0`.
+- [ ] **First public release**: make the GitHub repo public, bump to **0.9.0**
+      (a pre-1.0 testing release — sync `capabilities.VERSION`), `twine upload`,
+      tag `v0.9.0`, and point the pre-commit hook `rev:` in docs at it. Gather
+      feedback before committing to the 1.0 API.
 - [ ] A 30-second demo (asciinema/GIF): "messy `.bib` → clean `.bib` with a
       reviewable diff", and an agent cleaning a bibliography via pynakes.
 - [ ] Lead the README/launch with the agent-tool + reviewable-diff story.
@@ -222,7 +233,8 @@ pynakes **CLI** directly. So the MCP belongs downstream (BiMaS or a thin
 - [ ] Stored preferences honored by both `normalize` and `lint` (Milestone C).
 - [ ] Public Python API + CLI/JSON contract documented, pinned, and named for
       stability; semver policy stated (Milestone D).
-- [ ] Published to PyPI as 1.0.0 with a demo (Milestones A, E).
+- [ ] Published to PyPI — first as the 0.9 testing release, then 1.0.0 with a
+      demo (Milestone E). No public release before 0.9.
 - [ ] All guiding principles intact; coverage ≥90%; `ruff` clean.
 
 When this is met, pynakes 1.0 is stable and complete as a standalone single-file

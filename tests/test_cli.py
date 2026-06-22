@@ -645,6 +645,34 @@ class TestNormalizeCommand:
         assert data["operations"]["journals"] == 0
         assert "journal = {Nature Machine Intelligence}" in bib.read_text()
 
+    def test_normalize_identifier_case_can_be_disabled(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        original = "@Article{A,\n  TITLE = {Paper}\n}\n"
+        bib.write_text(original)
+
+        result = runner.invoke(
+            app,
+            [
+                "normalize",
+                str(bib),
+                "--title-protection",
+                "off",
+                "--author-style",
+                "none",
+                "--doi-normalization",
+                "off",
+                "--identifier-case",
+                "off",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["operations"]["entry_types"] == 0
+        assert data["operations"]["field_names"] == 0
+        assert bib.read_text() == original
+
     def test_normalize_writes_with_overrides(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text(

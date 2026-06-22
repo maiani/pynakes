@@ -15,6 +15,7 @@ nav = [
     { "Usage" = "guides/usage.md" },
     { "LLM Integration" = "guides/llm-integration.md" },
     { "Git Workflows" = "guides/git-workflows.md" },
+    { "Vision" = "vision.md" },
     { "Architecture" = "guides/architecture.md" },
     { "API Reference" = "api/index.md" },
     { "Examples" = "examples/index.md" },

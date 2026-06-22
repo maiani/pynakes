@@ -6,7 +6,7 @@ from pynakes import authors as author_ops
 from pynakes import doi as doi_ops
 from pynakes import fields as field_ops
 from pynakes import journals as journal_ops
-from pynakes.editing import set_entry_field
+from pynakes.editing import normalize_entry_field_names, set_entry_field, set_entry_type
 from pynakes.formatters import FIELD_FORMATTERS
 from pynakes.metadata import library_save_actions
 from pynakes.model import BibFile
@@ -41,6 +41,7 @@ class NormalizeOptions:
     journal_table: str | None = None
     ltwa_table: str | None = None
     normalize_dois: bool | None = None
+    identifier_case: bool | None = None
     format_metadata: bool | None = None
 
 
@@ -57,6 +58,8 @@ class NormalizeResult:
     journals: int = 0
     dois: int = 0
     save_action_fields: int = 0
+    entry_types: int = 0
+    field_names: int = 0
     warnings: list[dict[str, str]] = field(default_factory=list)
 
     @property
@@ -67,6 +70,8 @@ class NormalizeResult:
             "journals": self.journals,
             "dois": self.dois,
             "save_action_fields": self.save_action_fields,
+            "entry_types": self.entry_types,
+            "field_names": self.field_names,
         }
 
 
@@ -235,7 +240,21 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
     if save_actions is not None and save_actions.enabled:
         result.save_action_fields = _apply_save_action_formatters(lib, save_actions)
 
+    if _resolve_bool(lib, opts.identifier_case, "identifier-case", True):
+        result.entry_types, result.field_names = normalize_identifier_case(lib)
+
     return result
+
+
+def normalize_identifier_case(lib: BibFile) -> tuple[int, int]:
+    """Lowercase entry types and field names while preserving entry layout."""
+    entry_types = 0
+    field_names = 0
+    for entry in lib.entries.values():
+        if set_entry_type(entry, entry.type.lower()):
+            entry_types += 1
+        field_names += normalize_entry_field_names(entry)
+    return entry_types, field_names
 
 
 def _apply_save_action_formatters(lib: BibFile, save_actions) -> int:

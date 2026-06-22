@@ -219,7 +219,8 @@ Additionally:
 > lifecycle (open, stage, preview/diff, commit, reset, reload, external-change
 > detection). Remaining 1.0 work — full JabRef author-name normalization parity,
 > public-API pinning, and the PyPI release — is tracked in [DEVPLAN.md](DEVPLAN.md);
-> [ARCHITECTURE.md](ARCHITECTURE.md) covers the design. Not yet published to PyPI.
+> [docs/guides/architecture.md](docs/guides/architecture.md) covers the design.
+> Not yet published to PyPI.
 
 ### Implemented
 

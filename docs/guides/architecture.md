@@ -1,102 +1,307 @@
 # Architecture
 
-This page introduces the design of pynakes. The repository-root `ARCHITECTURE.md` is the canonical contributor document; the [API reference](../api/index.md) gives direct Python examples.
+The design reference for pynakes contributors and maintainers. For task-oriented
+usage see the [Usage guide](usage.md); for direct Python use see the
+[API reference](../api/index.md).
 
-## Design in one sentence
+## Purpose and constraints
 
-pynakes treats a .bib file as the source of truth and provides a conservative in-memory model plus surgical editing and atomic write paths around it.
+pynakes is a headless maintenance engine for BibTeX, BibLaTeX, and
+JabRef-compatible .bib files. It makes small, reviewable changes without
+discarding information a reference manager or a human placed in the file.
+
+1. **Preserve before normalizing.** Unknown fields, duplicate citation keys,
+   comments, JabRef metadata, line endings, and source encodings remain data,
+   not parser errors.
+2. **Make minimal edits.** Entry mutations go through `editing.py`, which changes
+   the relevant raw field/key text while keeping the rest of the entry intact.
+3. **Be explicit about uncertainty.** Dedupe, metadata enrichment, and DOI import
+   report conflicts instead of silently selecting a value.
+4. **Keep the file authoritative.** In-memory state is a derived working view;
+   there is no database or persistent sidecar state of record.
+5. **Remain deterministic by default.** Network access is explicit (with
+   `--online` where supported) and provider responses can be cached.
+
+## Domain vocabulary and core concepts
+
+The model has three nested concepts: **entry** < **collection** < future
+**library**.
+
+| Concept | Implemented class | Meaning |
+| --- | --- | --- |
+| Entry | BibEntry | One bibliographic record plus the raw entry text needed to preserve its layout. |
+| Entry collection | EntryStore | Ordered, duplicate-key-tolerant container for a file's entries. Dict-like lookup returns the first match; explicit methods expose all duplicates. |
+| File model | BibFile | Semantic content of one parsed .bib file: entries, declarations, comments, structured JabRef metadata, encoding, and line-ending style. |
+| Metadata block | JabRefMetadataBlock | One top-level metadata comment — `@comment{jabref-meta: ...}` or pynakes' superset `@comment{pynakes-meta: ...}` (tagged by `namespace`) — represented both structurally and as raw text. |
+| Collection (working unit) | Collection | A staged, reconciled handle over one `.bib` file — "a slice of references covering one aspect of a topic". Supports operations, preview, diff, commit, reset, reload, and external-change detection. |
+| Library (corpus) | — (planned) | A directory/repository of Collections — the lifelong corpus. Not implemented yet (see [Beyond 1.0](../../DEVPLAN.md) and the [Vision](../vision.md)). |
+| Catalogue (index) | — (planned) | A derived, rebuildable search index over the Library (e.g. SQLite FTS). Never a competing source of truth; the Collections are. Not implemented yet. |
+
+### BibEntry: record plus preservation state
+
+`BibEntry.fields` is intentionally an unrestricted `dict[str, str]`: standard,
+BibLaTeX, JabRef, and user-defined fields all belong in the same model. An entry
+also carries `raw_content`, its original source block. For a parsed entry,
+`editing.py` synchronizes `fields` and `raw_content` so a single field edit has a
+single-field diff. Entries created only in memory have no raw source and are
+marked modified; the writer reconstructs them when necessary.
+
+### EntryStore: a safe alternative to a dict
+
+A plain `dict[str, BibEntry]` cannot represent a broken but common bibliography
+state: two entries with the same citation key. EntryStore stores entries in
+source order and accepts duplicates. It offers familiar `keys()`, `values()`,
+`items()`, `get()`, and `[]` access, with **first match wins** semantics. Code
+that needs lossless behavior uses `values()`, `get_all(key)`, or
+`duplicate_keys()`.
+
+This distinction is load-bearing: parsing duplicate keys must not discard an
+entry, while key repair and linting must see every occurrence.
+
+### BibFile: one file's semantic view
+
+BibFile owns the set of entries and top-level BibTeX constructs: `@string`
+definitions, `@preamble` blocks, comments, and metadata. Metadata lives in two
+namespaces — `jabref_metadata(_blocks)` for `jabref-meta` and
+`pynakes_metadata(_blocks)` for the `pynakes-meta` superset — with the `metadata`
+property exposing the merged effective view operations read (pynakes overrides
+jabref). Its `encoding` and `line_ending` record the source representation for
+safe I/O.
+
+The BibFile is mutable by design. Operations change it in place and return a
+count or domain report; they do not return a replacement BibFile.
+
+### Collection: lifecycle and optimistic concurrency
+
+Collection is the engine facade for one .bib file. It binds the mutable BibFile
+to pristine text, entry snapshots, and a file fingerprint. A collection is a
+*derived editing buffer*, not a second source of truth.
 
 ~~~text
-CLI / programmatic caller
-            |
-            v
-     Collection lifecycle facade
-            |
-            v
- domain operations and reports
-            |
-            v
- model + editing + parser/writer + I/O
-            |
-            v
-          .bib file
+open / from_text / from_bibfile
+             |
+             v
+  stage operation methods (in memory only)
+             |
+      +------+------+
+      |             |
+      v             v
+ preview()/diff()  reset() -> restore pristine state
+      |
+      v
+ commit() -> check fingerprint -> validate/write atomically -> refresh snapshot
 ~~~
 
-The layers have distinct responsibilities:
+`commit()` rejects an externally modified bound file with
+`ExternalModificationError` unless `force=True` is selected deliberately.
+`externally_changed()` exposes the same check to long-lived consumers; `reload()`
+refuses to discard dirty staged state without `force=True`.
 
-- The parser turns source text into an in-memory model without rejecting duplicate keys or unfamiliar fields.
-- Domain modules mutate that model in place and return counts or report objects.
-- The editing layer keeps a mutation localized to the changed field/key whenever raw source text is available.
-- Collection stages operations, produces previews/diffs, detects external changes, and commits safely.
-- The CLI handles arguments plus the stable JSON and exit-code contract.
+`FileFingerprint` is the observed state used by that optimistic-concurrency
+check; `CommitResult` reports whether a commit wrote, its staged diff, and the
+number of changed entries.
 
-## Core concepts
+#### State model: a thin handle over a file-derived buffer
 
-| Concept | Class | What it represents |
-| --- | --- | --- |
-| Bibliographic entry | BibEntry | One record, its fields, and its original raw entry text. |
-| Duplicate-tolerant collection | EntryStore | Source-ordered entries. Dict-like access returns the first matching citation key, while get_all() and duplicate_keys() retain visibility of every duplicate. |
-| Parsed file | BibFile | Entries plus comments, strings, preambles, JabRef metadata, encoding, and line-ending style for one .bib file. |
-| JabRef metadata | JabRefMetadataBlock | One raw-aware top-level jabref-meta comment block. |
-| Collection (working unit) | Collection | The staged handle for one `.bib` file — a slice of references on one aspect of a topic: open, stage, preview/diff, commit, reset, and reload. |
-| Library (corpus, planned) | Library (planned) | A directory/repository of Collections — the lifelong corpus. Does not exist yet (Beyond 1.0). |
-| Catalogue (index, planned) | Catalogue (planned) | A derived, rebuildable search index over the Library. The Collections stay the source of truth. Does not exist yet (Beyond 1.0). |
+The lifecycle above follows directly from constraints #4 (the file is the source
+of truth) and #5 (determinism):
 
-### Why EntryStore is not a dictionary
+- **Collection is a thin stateful *handle*** bundling `{path, lib, pristine
+  snapshot, fingerprint, is_dirty}`. Its in-memory state is a derived buffer over
+  the file, never an authoritative model.
+- **Rendering and diffing are derived from explicit snapshots.** Collection
+  retains pristine text and per-entry snapshots, then derives preview text and a
+  diff from its staged library.
+- **Litmus test for any state:** *if I delete it and re-read from disk, do I lose
+  anything?* No → a safe derived buffer. Yes → a second source of truth, which is
+  not allowed.
 
-A real bibliography can contain duplicate citation keys. Replacing that state with a normal dictionary silently loses an entry, which prevents the linter and key-repair operation from doing their job. EntryStore preserves every entry in source order and only provides first-match lookup as a convenience.
+The same object serves both consumer shapes: the CLI uses it transactionally
+(`open → op → commit`); a long-lived application may hold it open across edits.
+In both cases the buffer stays derived and `commit()` reconciles with the live
+file.
 
-### How preservation works
+#### External-change detection
 
-Parsed entries retain raw_content. Editing helpers update both the fields mapping and that raw text, so a field change normally affects only the relevant text span. Collection splices those changed entry blocks into the pristine file text, retaining unrelated entries, comments, blank lines, and formatting.
+Several actors can edit the same file — the application, the user's text editor,
+and an agent — so the engine treats the file as truth and the buffer as derived,
+reconciling like an editor reloading a changed file:
 
-The lower-level writer also emits an unmodified entry's raw text verbatim, but direct whole-library serialization may reassemble top-level constructs. Use Collection when the goal is the smallest practical file diff.
+- **Clean buffer + file changed on disk → reload cleanly.** Nothing is staged, so
+  the buffer can mirror the new disk content.
+- **Dirty buffer + file changed on disk → conflict, never silent clobber.** The
+  consumer is notified and decides; the engine does not auto-resolve.
+- **`commit()` while the disk changed since open → `ExternalModificationError`**
+  (unless forced), so a save can't overwrite an external edit blindly.
 
-## Collection lifecycle
+The engine exposes only the *pull* primitives this needs — `fingerprint` /
+`externally_changed()`, `reload(force=False)`, and `is_dirty`. A push-style
+filesystem watcher is intentionally **not** in core: it is a background thread
+(non-deterministic, dependency-bearing, and a UX concern), so the watch loop is a
+consumer's job. If a push helper ever earns its place it would ship as an opt-in
+extra, never required by core.
 
-~~~python
-from pynakes.engine import Collection
+## Layers and dependency direction
 
-collection = Collection.open("refs.bib")
-collection.rename_field("journal", "journaltitle")
-
-print(collection.diff())       # no file write
-result = collection.commit()   # validated atomic write and backup
+~~~text
+CLI / external callers
+          |
+          v
+Collection lifecycle facade (engine.py)
+          |
+          v
+Domain operations (groups, keys, fields, dedupe, integrity, ...)
+          |
+          v
+Editing + model + parser/writer + I/O
+          |
+          v
+                         .bib file
 ~~~
 
-Collection stores a snapshot and a size/mtime/content fingerprint when it opens a path. A commit refuses to overwrite a file changed externally, raising ExternalModificationError unless the caller explicitly passes force=True. reset() discards staged work; reload() obtains current disk state and refuses to discard a dirty buffer unless forced.
+The CLI is intentionally thin: it opens a Collection, invokes an operation,
+previews or commits it, and emits the stable output envelope. Domain modules
+depend on the model and editing helpers, not on CLI behavior. Collection
+delegates to those modules rather than duplicating transformation rules — which
+is also the proof the boundary is correct: a downstream consumer can drive the
+same `open → op → diff/commit` flow the CLI does.
 
-## Module ownership
+## Parsing, preservation, and writing
 
-| Module | Owns |
+### Parsing
+
+`bibtex_parser.parse_bib(text)` is a custom parser. It constructs
+BibFile/BibEntry instances, keeps duplicate keys, captures each entry's raw text,
+collects top-level comments and declarations, detects line endings, and parses
+JabRef metadata blocks. It deliberately does not use a general BibTeX dependency:
+round-trip control is more important than normalizing an input into another
+library's data model.
+
+Parsing is conservative, not a formatter. Field values are represented as
+strings, unknown entry fields survive, and malformed structural input raises
+`ParseError` with source context.
+
+### Surgical edits
+
+`editing.py` is the only mutation boundary for entry fields, entry keys, and
+entry types. Its raw-text functions make localized changes; its entry-level
+helpers also update `BibEntry.fields` and modification state. Operation modules
+must use these helpers instead of assigning `raw_content` directly or rebuilding
+entries.
+
+`splice_into_text()` applies known raw-entry replacements to the original file
+text. Collection uses it so untouched text between entries remains stable during
+a normal staged commit.
+
+### Writing and I/O
+
+`bibtex_writer.write_bib()` serializes a BibFile. Unmodified entries with
+`raw_content` are emitted verbatim; modified or source-less entries are
+reconstructed with their insertion field order. This is an **entry-level**
+round-trip guarantee. Direct whole-library serialization can reassemble top-level
+constructs, so callers wanting the smallest possible file diff should use
+Collection.
+
+`io.load_bib()` detects UTF-8 or Latin-1 from bytes before parsing. `save_bib()`
+and `save_text()` support backup creation, temporary-file writes, re-parse
+validation for BibTeX text, and replacement of the destination. They return
+`SaveResult` rather than exposing ordinary write failures as raw tracebacks to
+the CLI.
+
+## Domain modules
+
+| Module | Concept it owns |
 | --- | --- |
-| groups.py | JabRef group fields |
-| keys.py | Citation-key creation, validation, repair, and rename |
-| fields.py | Field edits, simple filters, title capitalization |
-| authors.py | Person-list parsing and normalization |
-| doi.py | DOI parsing, canonicalization, and import preparation |
-| metadata.py | jabref-meta + pynakes-meta parsing and safe updates |
-| journals.py | Exact and LTWA-style journal title resolution |
-| normalize.py | Composed title/author/journal/DOI normalization policy |
-| convert.py | Conservative BibTeX/BibLaTeX conversion |
-| files.py | JabRef linked-file parsing and validation |
-| usage.py | AUX/TeX citation analysis and subset/tagging operations |
-| lint.py | Local validation findings |
-| dedupe.py | Duplicate-work clustering and conflict-first merges |
-| integrity.py | Opt-in metadata verification, enrichment, and preprint checks |
+| groups.py | JabRef-compatible membership stored in an entry groups field. |
+| keys.py | Citation-key generation, validation, duplicate detection/repair, and key renames. |
+| fields.py | Generic field changes, simple predicates, and title capitalization protection. |
+| authors.py | BibTeX name-list splitting, last-name extraction, and conservative/JabRef-style normalization. |
+| doi.py | DOI canonicalization and import preparation; it is the DOI parsing authority. |
+| metadata.py | Structured top-level metadata: parses both jabref-meta and pynakes-meta, classifies, and applies safe namespace-routed updates. |
+| journals.py | Exact title/ISSN mapping plus LTWA-style journal abbreviation/expansion. |
+| normalize.py | Policy orchestration over title, author, journal, and DOI operations. |
+| convert.py | Conservative BibTeX/BibLaTeX convention conversion. |
+| files.py | Parsing and resolution/validation of JabRef linked-file descriptors. |
+| usage.py | LaTeX/AUX citation extraction, library-usage analysis, tagging, and subset projection. |
+| lint.py | Local structural/semantic findings such as missing required fields, malformed DOI, groups, and duplicate keys. |
+| dedupe.py | Duplicate-work clustering and conflict-first merge planning. |
+| integrity.py | Opt-in provider-backed verification, conservative enrichment, and preprint publication checks. |
+| diff.py | Unified diff generation. |
+| cli.py, cli_common.py, cli_commands/ | Thin Typer application assembly, shared JSON/error/check plumbing, and one command module per command family. |
+| capabilities.py | Machine-readable declaration of the implemented CLI surface. |
 
-The detailed [API reference](../api/index.md#result-and-analysis-objects) maps each public report class to its domain concept.
+### Result and report objects
 
-## Safety and automation
+Report dataclasses make mutable operations inspectable without hiding their
+effects. They provide `to_dict()` where structured output is needed. The
+[API reference](../api/index.md#result-and-analysis-objects) documents each
+class's behavior.
 
-All modifying CLI commands use a consistent output envelope and support dry-run/diff review. They exit 0 on success, 1 on errors, and 2 on conflicts that need a decision. The [LLM integration guide](llm-integration.md) defines that machine contract.
+| Area | Classes | Concept |
+| --- | --- | --- |
+| Normalization/conversion/journals | NormalizeOptions, NormalizeResult, ConvertResult, JournalMapping, JournalSources, JournalResult | Configured policy, source layers, applied transformations, and warnings. |
+| Dedupe | WorkIdentity, DuplicateCluster, MergeConflict, ClusterMerge, DedupeMergeReport | Evidence that records describe one work, conservative merge outcomes, and unresolved ambiguity. |
+| Integrity | IntegrityIssue, VerifyReport, FieldUpdate, EnrichReport, PublishedCandidate, PublishedReport | Remote-check findings and intentionally applied metadata changes. |
+| File/usage/lint | LinkedFile, FileCheckReport, UsageReport, LintIssue | Read-only analysis findings and summaries. |
+| Metadata/I/O | JabRefMetadataUpdate, SaveResult | A precise raw metadata replacement and a write outcome with backup/error context. |
 
-Network access is not implicit. DOI import performs a requested lookup; integrity commands require --online for provider checks and support cached responses.
+## Errors, conflicts, and CLI contract
 
-## Boundaries
+There is no artificial global exception hierarchy. Each domain exposes a specific
+exception where callers need structured recovery:
 
-pynakes intentionally does not own a database, GUI, cloud sync, PDF extraction, or LLM calls. An MCP server is a downstream transport option: the CLI already supplies the safe machine-readable interface.
+| Condition | Exception / outcome |
+| --- | --- |
+| Structurally malformed BibTeX | ParseError |
+| DOI import failure, duplicate DOI, explicit key conflict | DOIImportError, DuplicateDOIError, CitationKeyConflictError |
+| Unsupported JabRef key pattern | UnsupportedCitationKeyPatternError |
+| Duplicate/ambiguous JabRef metadata block | DuplicateJabRefMetadataError |
+| Ambiguous duplicate-work merge | DedupeConflictError with MergeConflict values |
+| Failed provider lookup or parse | MetadataFetchError |
+| Concurrent file modification during a collection commit | ExternalModificationError |
+
+The CLI converts expected failures into the documented JSON/error envelope:
+success is exit code 0, errors exit 1, and conflicts exit 2 with options where an
+interactive choice is possible. Modifying command responses share `status`,
+`action`, `file`, `dry_run`, `modified`, `modified_entries`, and `warnings`;
+`--diff` adds a unified diff. The complete contract is in the
+[LLM integration guide](llm-integration.md).
+
+## Network boundary
+
+Only DOI import and integrity workflows contact providers. The latter require an
+explicit `online=True`/`--online` opt-in and support deterministic caching.
+Network parsing lives in `doi.py` and `integrity.py`; tests mock or fixture this
+boundary so the normal suite never relies on external availability.
+
+## Testing and change discipline
+
+Tests cover model behavior, parser/writer fidelity, operation modules, the
+Collection lifecycle, CLI JSON/exit contracts, and regression fixtures. The
+critical tests are parse → edit → write → parse paths and staged collection
+diffs: they guard preservation, not merely semantic field values.
+
+Every behavioral change must add tests and update CHANGELOG.md. Before a change
+is complete, run:
+
+~~~bash
+pytest
+ruff check src tests
+ruff format --check src tests
+~~~
+
+## Deliberate non-goals and future boundaries
+
+The core does not own a database of record, GUI, cloud sync, PDF extraction,
+arbitrary shell execution, or LLM API calls. An MCP server is similarly a
+downstream transport concern: the CLI already provides a machine-readable, safe
+agent interface.
+
+The next structural extension is a `Library` over multiple Collections, with
+rebuildable cross-file indexes and no competing source of truth. It is planned,
+not part of the current public implementation — see the [Vision](../vision.md)
+for the destination and [DEVPLAN.md](../../DEVPLAN.md) for the roadmap.
 
 - [API reference](../api/index.md)
 - [Usage guide](usage.md)
-- The repository-root `ARCHITECTURE.md` and `DEVPLAN.md` contain contributor-level design and roadmap detail.
+- [Vision](../vision.md) and [DEVPLAN](../../DEVPLAN.md) for direction and roadmap.

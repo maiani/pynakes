@@ -40,7 +40,9 @@ pynakes lint refs.bib chapters/*.bib --strict   # multi-file CI gate
 ```
 
 Checks include duplicate citation keys, missing required fields by entry type,
-malformed DOI fields, missing article DOI warnings, and malformed group fields.
+malformed DOI fields, missing article DOI warnings, malformed group fields, and
+mixed-case entry types or field names. Casing findings are warnings; run
+`normalize` to repair them surgically.
 
 `lint` (along with `keys check`, `files check`, `dedupe check`, and `verify`)
 accepts multiple files and supports `--strict`, which exits `1` when a finding
@@ -242,6 +244,7 @@ Default behavior:
 - protect capitalization in title-like fields
 - normalize author/editor lists in JabRef style
 - normalize DOI values
+- lowercase entry types and field names
 - abbreviate journal titles using exact mappings and LTWA-style generation
 
 Useful overrides:
@@ -252,6 +255,7 @@ pynakes normalize refs.bib --journal-style none
 pynakes normalize refs.bib --journal-style full
 pynakes normalize refs.bib --title-protection off
 pynakes normalize refs.bib --doi-normalization off
+pynakes normalize refs.bib --identifier-case off
 ```
 
 Journal source tables:
@@ -271,6 +275,7 @@ as an alias:
 ```bibtex
 @comment{pynakes-meta: normalize-journal-style:none;}
 @comment{pynakes-meta: normalize-protect-titles:false;}
+@comment{pynakes-meta: normalize-identifier-case:false;}
 @comment{pynakes-meta: protected-terms:Proceedings,OpenAI;}
 ```
 

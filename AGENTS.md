@@ -11,8 +11,9 @@ Guidance for coding agents (and humans) **developing** this repository.
 
 `pynakes` is a headless, JabRef-compatible BibTeX/BibLaTeX maintenance toolkit
 with a custom parser built for round-trip fidelity. See
-[ARCHITECTURE.md](ARCHITECTURE.md) for the design and [DEVPLAN.md](DEVPLAN.md)
-for the phased plan.
+[docs/guides/architecture.md](docs/guides/architecture.md) for the design,
+[docs/vision.md](docs/vision.md) for the long-term direction, and
+[DEVPLAN.md](DEVPLAN.md) for the phased plan.
 
 ## Layout
 

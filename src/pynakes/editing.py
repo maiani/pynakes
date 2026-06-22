@@ -30,6 +30,7 @@ _HEADER_RE = re.compile(r"(@\w+\s*\{\s*)([^,\s]*)(\s*,)")
 # The leading ``@type`` token, so the entry type can be swapped without touching
 # the key, braces, or anything else.
 _TYPE_RE = re.compile(r"(@)(\w+)")
+_FIELD_NAME_RE = re.compile(r"([A-Za-z][A-Za-z0-9_:-]*)\s*=")
 
 
 # --- locating a field within raw entry text --------------------------------
@@ -87,6 +88,69 @@ def _find_field(raw: str, field_name: str) -> Optional[tuple[int, int, int]]:
         if k < 0 or raw[k] in "{,":
             return m.start(), m.end(), _scan_value_end(raw, m.end())
     return None
+
+
+def _raw_field_name_spans(raw: str) -> list[tuple[int, int]]:
+    """Return spans of field names in an entry's top-level assignments.
+
+    A regex alone would also find ``name =`` text inside a braced or quoted
+    value. This small scanner stays at the entry body's top level, so it is
+    safe to use for cosmetic field-name edits and lint findings.
+    """
+    header = re.match(r"@\w+\s*\{\s*[^,]*,", raw, re.IGNORECASE | re.DOTALL)
+    if not header:
+        return []
+
+    spans: list[tuple[int, int]] = []
+    depth = 0
+    in_quotes = False
+    i = header.end()
+    while i < len(raw):
+        char = raw[i]
+        if in_quotes:
+            if char == '"' and (i == 0 or raw[i - 1] != "\\"):
+                in_quotes = False
+            i += 1
+            continue
+        if char == '"':
+            in_quotes = True
+            i += 1
+            continue
+        if char == "{":
+            depth += 1
+            i += 1
+            continue
+        if char == "}":
+            if depth == 0:
+                break
+            depth -= 1
+            i += 1
+            continue
+        if depth == 0:
+            match = _FIELD_NAME_RE.match(raw, i)
+            if match:
+                spans.append((match.start(1), match.end(1)))
+                i = match.end()
+                continue
+        i += 1
+    return spans
+
+
+def raw_field_names(raw: str) -> list[str]:
+    """Return the source spelling of each top-level field name in ``raw``."""
+    return [raw[start:end] for start, end in _raw_field_name_spans(raw)]
+
+
+def normalize_raw_field_names(raw: str) -> tuple[str, int]:
+    """Lowercase field names in raw entry text, preserving all other bytes."""
+    replacements = [
+        (start, end, raw[start:end].lower())
+        for start, end in _raw_field_name_spans(raw)
+        if raw[start:end] != raw[start:end].lower()
+    ]
+    for start, end, replacement in reversed(replacements):
+        raw = raw[:start] + replacement + raw[end:]
+    return raw, len(replacements)
 
 
 # --- pure raw-text edits ---------------------------------------------------
@@ -209,6 +273,29 @@ def rename_entry_field(entry: BibEntry, old: str, new: str) -> bool:
     entry.fields = {(new if k == old else k): v for k, v in entry.fields.items()}
     _apply(entry, lambda raw: rename_raw_field(raw, old, new))
     return True
+
+
+def normalize_entry_field_names(entry: BibEntry) -> int:
+    """Lowercase an entry's field names, returning the number changed.
+
+    Parsed entries retain their original spelling only in ``raw_content``;
+    update that text directly while keeping the already-canonical fields map
+    intact. Entries constructed without raw text are normalized in the map
+    when doing so cannot collapse two distinct field names.
+    """
+    if entry.raw_content:
+        updated, changed = normalize_raw_field_names(entry.raw_content)
+        if changed:
+            entry.raw_content = updated
+        return changed
+
+    changed = sum(name != name.lower() for name in entry.fields)
+    normalized = {name.lower(): value for name, value in entry.fields.items()}
+    if len(normalized) != len(entry.fields) or normalized == entry.fields:
+        return 0
+    entry.fields = normalized
+    entry.modified = True
+    return changed
 
 
 def set_entry_type(entry: BibEntry, new_type: str) -> bool:

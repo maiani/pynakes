@@ -3,13 +3,15 @@
 Reports issues as a flat list of :class:`LintIssue` objects, each tagged with a
 severity (``error`` or ``warning``), the offending entry key, and a message.
 Checks: duplicate keys, missing required fields (by entry type), malformed or
-missing DOIs, and malformed JabRef ``groups`` formatting.
+missing DOIs, malformed JabRef ``groups`` formatting, and noncanonical
+entry-type / field-name casing.
 """
 
 from dataclasses import dataclass
 from typing import Optional
 
 from pynakes.doi import normalize_doi
+from pynakes.editing import raw_field_names
 from pynakes.model import BibFile
 
 # Required fields by entry type. Each requirement is a tuple of acceptable
@@ -87,6 +89,30 @@ def lint(lib: BibFile) -> list[LintIssue]:
 def _lint_entry(entry) -> list[LintIssue]:
     issues: list[LintIssue] = []
     etype = entry.type.lower()
+
+    if entry.type != etype:
+        issues.append(
+            LintIssue(
+                "noncanonical_entry_type_case",
+                "warning",
+                f"Entry {entry.key!r} uses mixed-case entry type {entry.type!r}; use {etype!r}",
+                key=entry.key,
+            )
+        )
+
+    field_names = raw_field_names(entry.raw_content) if entry.raw_content else entry.fields.keys()
+    for name in field_names:
+        canonical = name.lower()
+        if name != canonical:
+            issues.append(
+                LintIssue(
+                    "noncanonical_field_name_case",
+                    "warning",
+                    f"Entry {entry.key!r} uses mixed-case field name {name!r}; use {canonical!r}",
+                    key=entry.key,
+                    field=canonical,
+                )
+            )
 
     if not entry.key.strip():
         issues.append(

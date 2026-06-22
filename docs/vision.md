@@ -1,4 +1,4 @@
-# pynakes vision
+# Vision
 
 **pynakes is a tool for humans and machines collaborating creatively on
 research, over a corpus of `.bib` files collected across a lifetime.**
@@ -85,13 +85,14 @@ Three nested units — **entry ⊂ collection ⊂ library**:
 
 - **Entry** — one bib record.
 - **Collection** — one `.bib` file (a single πίναξ): the load → stage → preview →
-  commit lifecycle with external-change detection. See
-  [ENGINE_API.md](ENGINE_API.md).
+  commit lifecycle with external-change detection. See the
+  [Architecture guide](guides/architecture.md) for the design and the
+  [API reference](api/index.md) for the implemented `Collection` API.
 - **Library** — the collection: a git repo of collections. This is your *Pinakes* —
   the catalog. Its API adds global search, cross-file identity and dedup,
   "which collections use this key", and promotion between inbox / canonical /
   projections, backed by a **derived index** (rebuildable from the files, never
-  a competing source of truth).
+  a competing source of truth). It is planned for [Beyond 1.0](../DEVPLAN.md).
 
 The tool, `pynakes`, is the librarian; the `Library` is what it tends.
 

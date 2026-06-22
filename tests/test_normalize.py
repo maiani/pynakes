@@ -73,7 +73,60 @@ def test_normalize_library_runs_standard_pass() -> None:
         "journals": 0,
         "dois": 1,
         "save_action_fields": 0,
+        "entry_types": 0,
+        "field_names": 0,
     }
+
+
+def test_normalize_lowercases_entry_types_and_field_names_surgically() -> None:
+    original = (
+        "@Article{A,\n"
+        "  TITLE = {A Field},\n"
+        "  DOI = {10.1234/ABC},\n"
+        "  note = {Preserve FIELD = text}\n"
+        "}\n"
+    )
+    lib = parse_bib(original)
+
+    report = normalize_library(
+        lib,
+        NormalizeOptions(
+            protect_titles=False,
+            author_style="none",
+            journal_style="none",
+            normalize_dois=False,
+        ),
+    )
+
+    assert report.entry_types == 1
+    assert report.field_names == 2
+    assert lib.entries["A"].raw_content == (
+        original.replace("@Article", "@article")
+        .replace("  TITLE", "  title")
+        .replace("  DOI", "  doi")
+        .rstrip()
+    )
+
+
+def test_normalize_identifier_case_honors_metadata_setting() -> None:
+    lib = parse_bib(
+        "@comment{pynakes-meta: normalize-identifier-case:false;}\n"
+        "@Article{A,\n  TITLE = {Paper}\n}\n"
+    )
+
+    report = normalize_library(
+        lib,
+        NormalizeOptions(
+            protect_titles=False,
+            author_style="none",
+            journal_style="none",
+            normalize_dois=False,
+        ),
+    )
+
+    assert report.entry_types == 0
+    assert report.field_names == 0
+    assert lib.entries["A"].raw_content.startswith("@Article")
 
 
 def test_normalize_abbreviates_journals_only_when_style_configured() -> None:

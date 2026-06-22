@@ -96,6 +96,22 @@ def test_no_false_positives_on_clean_entry() -> None:
     assert lint(lib) == []
 
 
+def test_reports_noncanonical_identifier_case_without_inspecting_values() -> None:
+    lib = parse_bib(
+        "@Article{A,\n  TITLE = {A field-like phrase: FIELD = value},\n  DOI = {10.1234/abc}\n}\n"
+    )
+
+    issues = lint(lib)
+    assert [(issue.type, issue.field) for issue in issues] == [
+        ("noncanonical_entry_type_case", None),
+        ("noncanonical_field_name_case", "title"),
+        ("noncanonical_field_name_case", "doi"),
+        ("missing_required_field", "author"),
+        ("missing_required_field", "journal"),
+        ("missing_required_field", "year"),
+    ]
+
+
 def test_fixtures_lint_without_errors() -> None:
     # simple.bib should produce no error-severity issues (only DOI warnings).
     lib = parse_bib((FIXTURES / "simple.bib").read_text())
