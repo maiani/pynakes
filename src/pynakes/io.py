@@ -7,12 +7,16 @@ from typing import Optional
 
 from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
-from pynakes.model import BibLibrary
+from pynakes.model import BibFile
 
 
 @dataclass
 class SaveResult:
-    """Result of a save operation."""
+    """Structured outcome of a file write, including backup/error context.
+
+    I/O functions return this value for expected write failures so CLI and
+    engine layers can present a controlled error rather than a traceback.
+    """
 
     success: bool
     file_path: str
@@ -36,14 +40,14 @@ def _decode_bytes(data: bytes) -> tuple[str, str]:
     return data.decode("utf-8", errors="replace"), "utf-8"
 
 
-def load_bib(file_path: str) -> BibLibrary:
+def load_bib(file_path: str) -> BibFile:
     """Load a BibTeX file.
 
     Args:
         file_path: Path to .bib file
 
     Returns:
-        Parsed BibLibrary, with the detected encoding recorded on it.
+        Parsed BibFile, with the detected encoding recorded on it.
 
     Raises:
         FileNotFoundError: If file doesn't exist
@@ -61,15 +65,13 @@ def load_bib(file_path: str) -> BibLibrary:
     return lib
 
 
-def save_bib(
-    lib: BibLibrary, file_path: str, backup: bool = True, atomic: bool = True
-) -> SaveResult:
-    """Save a BibLibrary to a file.
+def save_bib(lib: BibFile, file_path: str, backup: bool = True, atomic: bool = True) -> SaveResult:
+    """Save a BibFile to a file.
 
     Supports atomic writes (write to temp file, then rename) and automatic backups.
 
     Args:
-        lib: BibLibrary to save
+        lib: BibFile to save
         file_path: Path to write to
         backup: Create .bak file before overwriting
         atomic: Use atomic write (write to temp, then rename)

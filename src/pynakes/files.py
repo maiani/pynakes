@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from pynakes.model import BibEntry, BibLibrary
+from pynakes.model import BibEntry, BibFile
 
 FILE_FIELD = "file"
 DIRECTORY_KINDS = {"directory", "folder", "dir"}
@@ -140,7 +140,7 @@ def parse_file_field(entry: BibEntry) -> list[LinkedFile]:
     return linked
 
 
-def parse_linked_files(lib: BibLibrary) -> list[LinkedFile]:
+def parse_linked_files(lib: BibFile) -> list[LinkedFile]:
     """Parse all linked files in a library."""
     linked: list[LinkedFile] = []
     for entry in lib.entries.values():
@@ -148,10 +148,10 @@ def parse_linked_files(lib: BibLibrary) -> list[LinkedFile]:
     return linked
 
 
-def metadata_file_directories(lib: BibLibrary, bib_dir: Path) -> list[Path]:
+def metadata_file_directories(lib: BibFile, bib_dir: Path) -> list[Path]:
     """Return JabRef ``fileDirectory*`` roots from library metadata."""
     roots: list[Path] = []
-    for block in lib.jabref_metadata_blocks:
+    for block in lib.metadata_blocks:
         if not block.key.lower().startswith("filedirectory"):
             continue
         value = block.normalized_value
@@ -189,9 +189,7 @@ def _status_for_existing(path: Path, link: LinkedFile) -> str:
     return "wrong_type" if path.is_dir() else "ok"
 
 
-def resolve_linked_file(
-    link: LinkedFile, bib_path: Path, roots: list[Path], lib: BibLibrary
-) -> None:
+def resolve_linked_file(link: LinkedFile, bib_path: Path, roots: list[Path], lib: BibFile) -> None:
     """Resolve one linked file in place."""
     if not link.path:
         link.status = "unresolved"
@@ -214,7 +212,7 @@ def resolve_linked_file(
 
 
 def check_linked_files(
-    lib: BibLibrary, bib_file: str | Path, roots: list[str | Path] | None = None
+    lib: BibFile, bib_file: str | Path, roots: list[str | Path] | None = None
 ) -> FileCheckReport:
     """Validate linked files in ``lib``.
 

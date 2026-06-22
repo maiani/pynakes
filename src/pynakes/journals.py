@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Optional
 
 from pynakes.editing import set_entry_field
-from pynakes.model import BibEntry, BibLibrary
+from pynakes.model import BibEntry, BibFile
 
 JOURNAL_FIELDS = ("journal", "journaltitle")
 ISSN_FIELDS = ("issn", "eissn", "e-issn")
@@ -111,6 +111,12 @@ LTWA_OMIT_WORDS = {
 
 @dataclass(frozen=True)
 class JournalMapping:
+    """One authoritative mapping between a full journal title and abbreviation.
+
+    ``issn`` disambiguates titles when available; ``source`` records whether
+    the mapping came from a user table, bundled data, or another loader.
+    """
+
     title: str
     abbreviated: str
     issn: Optional[str] = None
@@ -119,6 +125,12 @@ class JournalMapping:
 
 @dataclass
 class JournalSources:
+    """The layered lookup index used to resolve journal-title conventions.
+
+    Exact title and ISSN mappings take precedence over ``ltwa_words`` because
+    a journal-specific abbreviation is less ambiguous than word-level rules.
+    """
+
     title_mappings: dict[str, JournalMapping] = dataclass_field(default_factory=dict)
     issn_mappings: dict[str, JournalMapping] = dataclass_field(default_factory=dict)
     ltwa_words: dict[str, str] = dataclass_field(default_factory=lambda: dict(BUILTIN_LTWA_WORDS))
@@ -126,6 +138,12 @@ class JournalSources:
 
 @dataclass
 class JournalResult:
+    """Outcome of an in-place journal-title normalization pass.
+
+    ``resolved`` records the mappings applied; ``unknown`` records titles left
+    intact because none of the configured sources could resolve them.
+    """
+
     changed: int = 0
     unknown: list[str] = dataclass_field(default_factory=list)
     resolved: list[dict[str, str]] = dataclass_field(default_factory=list)
@@ -173,7 +191,7 @@ def unknown_journal_warnings(titles: list[str]) -> list[dict[str, str]]:
     return [
         {
             "type": "unknown_journal",
-            "message": f"No journal abbreviation source resolved {title!r}",
+            "message": f"No abbreviation table entry for journal {title!r}; left unchanged",
             "journal": title,
         }
         for title in titles
@@ -373,7 +391,7 @@ def classify_journal(title: str, entry: BibEntry, sources: JournalSources) -> st
 
 
 def normalize_journals(
-    lib: BibLibrary,
+    lib: BibFile,
     style: str = "abbreviated",
     sources: JournalSources | None = None,
 ) -> JournalResult:

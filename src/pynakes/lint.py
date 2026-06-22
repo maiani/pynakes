@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from pynakes.doi import normalize_doi
-from pynakes.model import BibLibrary
+from pynakes.model import BibFile
 
 # Required fields by entry type. Each requirement is a tuple of acceptable
 # field names (any one satisfies it), to tolerate BibTeX/BibLaTeX variants
@@ -50,11 +50,25 @@ class LintIssue:
         }
 
 
-def lint(lib: BibLibrary) -> list[LintIssue]:
+def lint(lib: BibFile) -> list[LintIssue]:
     """Run all validation checks and return the issues found."""
     issues: list[LintIssue] = []
 
+    if len(lib.entries) == 0:
+        # An empty parse usually means the wrong file or non-BibTeX content was
+        # passed; a clean "0 issues" bill of health would be misleading.
+        issues.append(
+            LintIssue(
+                "no_entries",
+                "warning",
+                "No BibTeX entries were found (is this the right file?)",
+            )
+        )
+
     for key, count in lib.entries.duplicate_keys().items():
+        if not key.strip():
+            # Empty keys are reported per-entry below, not as a duplicate set.
+            continue
         issues.append(
             LintIssue(
                 "duplicate_key",
@@ -73,6 +87,17 @@ def lint(lib: BibLibrary) -> list[LintIssue]:
 def _lint_entry(entry) -> list[LintIssue]:
     issues: list[LintIssue] = []
     etype = entry.type.lower()
+
+    if not entry.key.strip():
+        issues.append(
+            LintIssue(
+                "empty_key",
+                "error",
+                f"{etype} entry has an empty citation key "
+                f"(title: {entry.fields.get('title', '').strip() or '?'!r})",
+                key=entry.key,
+            )
+        )
 
     for alternatives in _REQUIRED.get(etype, []):
         if not any(entry.fields.get(name, "").strip() for name in alternatives):

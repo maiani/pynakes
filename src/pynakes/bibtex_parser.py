@@ -4,8 +4,8 @@ import logging
 import re
 from typing import Optional
 
-from pynakes.jabref import metadata_blocks_to_dict, parse_jabref_metadata_comment
-from pynakes.model import BibEntry, BibLibrary, EntryCollection, JabRefMetadataBlock
+from pynakes.metadata import metadata_blocks_to_dict, parse_jabref_metadata_comment
+from pynakes.model import BibEntry, BibFile, EntryStore, JabRefMetadataBlock
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +34,8 @@ def detect_line_ending(text: str) -> str:
     return "\n"
 
 
-def parse_bib(text: str) -> BibLibrary:
-    """Parse BibTeX text into a BibLibrary.
+def parse_bib(text: str) -> BibFile:
+    """Parse BibTeX text into a BibFile.
 
     Preserves formatting and metadata for round-trip fidelity. Duplicate
     citation keys are preserved (not an error): they are surfaced via
@@ -45,18 +45,19 @@ def parse_bib(text: str) -> BibLibrary:
         text: BibTeX file content as string
 
     Returns:
-        BibLibrary with parsed entries
+        BibFile with parsed entries
 
     Raises:
         ParseError: If BibTeX is structurally malformed (e.g. unbalanced braces)
     """
     line_ending = detect_line_ending(text)
 
-    entries = EntryCollection()
+    entries = EntryStore()
     strings: dict[str, str] = {}
     preambles: list[str] = []
     raw_comments: list[str] = []
     jabref_metadata_blocks: list[JabRefMetadataBlock] = []
+    pynakes_metadata_blocks: list[JabRefMetadataBlock] = []
 
     lines = text.split(line_ending)
 
@@ -107,7 +108,10 @@ def parse_bib(text: str) -> BibLibrary:
                     comment_index=comment_index,
                 )
                 if block is not None:
-                    jabref_metadata_blocks.append(block)
+                    if block.namespace == "pynakes":
+                        pynakes_metadata_blocks.append(block)
+                    else:
+                        jabref_metadata_blocks.append(block)
             i += consumed
             continue
 
@@ -128,21 +132,17 @@ def parse_bib(text: str) -> BibLibrary:
 
         i += 1
 
-    return BibLibrary(
+    return BibFile(
         entries=entries,
         strings=strings,
         preamble=preambles,
         raw_comments=raw_comments,
         jabref_metadata=metadata_blocks_to_dict(jabref_metadata_blocks),
         jabref_metadata_blocks=jabref_metadata_blocks,
+        pynakes_metadata=metadata_blocks_to_dict(pynakes_metadata_blocks),
+        pynakes_metadata_blocks=pynakes_metadata_blocks,
         line_ending=line_ending,
     )
-
-
-def _parse_jabref_metadata(comment_text: str) -> dict[str, str]:
-    """Return structured metadata for a JabRef ``@comment`` block."""
-    block = parse_jabref_metadata_comment(comment_text)
-    return {block.key: block.value} if block is not None else {}
 
 
 def _collect_balanced_block(
@@ -182,8 +182,11 @@ def _parse_entry(
     Returns:
         (BibEntry, lines_consumed) or (None, 0) on error
     """
-    # Extract entry type and key
-    match = re.match(r"@(\w+)\s*{\s*([^,]+),", first_line, re.IGNORECASE)
+    # Extract entry type and key. The key part is ``[^,]*`` (not ``+``) so an
+    # entry with an empty/missing citation key (``@article{,``) is still
+    # captured: dropping it would silently lose data and hide the most-broken
+    # entry from inspect/lint. The empty key surfaces as a lint error instead.
+    match = re.match(r"@(\w+)\s*{\s*([^,]*),", first_line, re.IGNORECASE)
     if not match:
         return None, 0
 
@@ -222,8 +225,8 @@ def _parse_fields(entry_text: str) -> dict[str, str]:
     """Extract field=value pairs from entry text, preserving order."""
     fields: dict[str, str] = {}
 
-    # Remove entry type and key part
-    match = re.match(r"@\w+\s*{\s*[^,]+,\s*", entry_text, re.IGNORECASE | re.DOTALL)
+    # Remove entry type and key part (``[^,]*`` tolerates an empty key)
+    match = re.match(r"@\w+\s*{\s*[^,]*,\s*", entry_text, re.IGNORECASE | re.DOTALL)
     if not match:
         return fields
 

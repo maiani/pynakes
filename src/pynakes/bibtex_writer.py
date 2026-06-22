@@ -1,16 +1,16 @@
 """BibTeX file writer with round-trip preservation."""
 
-from pynakes.model import BibEntry, BibLibrary
+from pynakes.model import BibEntry, BibFile
 
 
-def write_bib(lib: BibLibrary) -> str:
-    """Serialize BibLibrary to BibTeX text.
+def write_bib(lib: BibFile) -> str:
+    """Serialize BibFile to BibTeX text.
 
     Uses raw_content for unmodified entries (zero-diff guarantee).
     Reconstructs modified entries from fields, preserving field order.
 
     Args:
-        lib: BibLibrary to serialize
+        lib: BibFile to serialize
 
     Returns:
         BibTeX formatted text

@@ -11,7 +11,7 @@ import re
 from pynakes.authors import last_name as _last_name
 from pynakes.authors import split_name_list as _split_name_list
 from pynakes.editing import rename_entry_key
-from pynakes.model import BibEntry, BibLibrary
+from pynakes.model import BibEntry, BibFile
 
 # Common title words skipped when picking the "first significant" word.
 _TITLE_STOPWORDS = {
@@ -43,12 +43,12 @@ class UnsupportedCitationKeyPatternError(ValueError):
     """Raised when a JabRef citation-key pattern uses unsupported syntax."""
 
 
-def has_duplicate_keys(lib: BibLibrary) -> bool:
+def has_duplicate_keys(lib: BibFile) -> bool:
     """Return ``True`` if any citation key appears more than once."""
     return bool(lib.entries.duplicate_keys())
 
 
-def duplicate_key_counts(lib: BibLibrary) -> dict[str, int]:
+def duplicate_key_counts(lib: BibFile) -> dict[str, int]:
     """Return ``{key: count}`` for keys that appear more than once."""
     return lib.entries.duplicate_keys()
 
@@ -187,14 +187,14 @@ def _strip_jabref_value(value: str) -> str:
     return value.strip().rstrip(";").strip()
 
 
-def get_jabref_key_pattern(lib: BibLibrary, entry_type: str) -> str | None:
+def get_jabref_key_pattern(lib: BibFile, entry_type: str) -> str | None:
     """Return the JabRef citation-key pattern for ``entry_type`` if stored."""
     type_key = f"keypattern_{entry_type.lower()}"
-    for key, value in lib.jabref_metadata.items():
+    for key, value in lib.metadata.items():
         normalized = key.lower()
         if normalized == type_key:
             return _strip_jabref_value(value)
-    for key, value in lib.jabref_metadata.items():
+    for key, value in lib.metadata.items():
         if key.lower() == "keypatterndefault":
             return _strip_jabref_value(value)
     return None
@@ -205,7 +205,7 @@ def generate_fallback_key(entry: BibEntry) -> str:
     return f"{_first_author_last_name(entry)}{_year(entry)}{_first_title_word(entry)}"
 
 
-def generate_key(entry: BibEntry, lib: BibLibrary | None = None) -> str:
+def generate_key(entry: BibEntry, lib: BibFile | None = None) -> str:
     """Generate a citation key for an entry.
 
     If ``lib`` stores JabRef citation-key metadata, the matching library pattern
@@ -228,7 +228,7 @@ def unique_key(candidate: str, taken: set[str]) -> str:
     return f"{candidate}{chr(suffix)}"
 
 
-def regenerate_keys(lib: BibLibrary) -> list[tuple[str, str]]:
+def regenerate_keys(lib: BibFile) -> list[tuple[str, str]]:
     """Regenerate every entry's key from its metadata.
 
     Collisions among generated keys are disambiguated with letter suffixes
@@ -246,7 +246,7 @@ def regenerate_keys(lib: BibLibrary) -> list[tuple[str, str]]:
     return renames
 
 
-def repair_duplicate_keys(lib: BibLibrary) -> list[tuple[str, str]]:
+def repair_duplicate_keys(lib: BibFile) -> list[tuple[str, str]]:
     """Rename duplicate keys so every key is unique.
 
     The first entry with a given key keeps it; later duplicates gain a numeric
@@ -281,7 +281,7 @@ def validate_key(key: str) -> None:
         raise ValueError(f"citation key {key!r} contains whitespace or reserved characters")
 
 
-def rename_key(lib: BibLibrary, old: str, new: str) -> int:
+def rename_key(lib: BibFile, old: str, new: str) -> int:
     """Rename one unique citation key.
 
     Returns 1 when the key changed, 0 for a no-op. Raises ``ValueError`` when

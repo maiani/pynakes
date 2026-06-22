@@ -18,15 +18,15 @@ for the phased plan.
 
 ```
 src/pynakes/
-  model.py            BibEntry, BibLibrary, EntryCollection (duplicate-key tolerant)
+  model.py            BibEntry, BibFile, EntryStore (duplicate-key tolerant)
   bibtex_parser.py    parse_bib() — custom parser, preserves raw_content
   bibtex_writer.py    write_bib() — raw_content for unmodified, reconstruct for modified
   io.py               load_bib / save_bib / save_text / save_plain_text (atomic writes)
   editing.py          surgical raw-text field/key edits + entry-level helpers
-  engine.py           Volume lifecycle: open, stage, preview/diff, commit, reload
+  engine.py           Collection lifecycle: open, stage, preview/diff, commit, reload
   groups.py keys.py fields.py files.py lint.py
   authors.py journals.py doi.py normalize.py format operations
-  jabref.py           structured JabRef library metadata helpers
+  metadata.py         jabref-meta + pynakes-meta parsing, classification, safe updates
   usage.py            cited-entry detection/tagging and TeX citation-key rewrites
   capabilities.py     machine-readable capability description
   diff.py cli.py
@@ -57,7 +57,7 @@ tests pass:
    helpers so only the changed line appears in a diff. Do not hand-edit
    `raw_content` or rebuild entries from scratch in operation modules.
 3. **Operations mutate in place and return a count/report** (not a new
-   `BibLibrary`). Keep `fields`/`raw_content` in sync via the `editing.py`
+   `BibFile`). Keep `fields`/`raw_content` in sync via the `editing.py`
    helpers, which handle the "no raw_content → mark modified" fallback.
 4. **The JSON envelope + exit-code contract is stable.** Modifying commands emit
    `status, action, file, dry_run, modified, modified_entries, warnings` (+
@@ -68,7 +68,7 @@ tests pass:
    [docs/guides/llm-integration.md](docs/guides/llm-integration.md) and guarded
    by tests in `tests/test_cli.py`.
 5. **Duplicate citation keys are tolerated, not an error** — the parser keeps
-   them; `EntryCollection` exposes them via `get_all()` / `duplicate_keys()`.
+   them; `EntryStore` exposes them via `get_all()` / `duplicate_keys()`.
 
 ## Conventions
 

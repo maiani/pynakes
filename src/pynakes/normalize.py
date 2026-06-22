@@ -7,7 +7,13 @@ from pynakes import doi as doi_ops
 from pynakes import fields as field_ops
 from pynakes import journals as journal_ops
 from pynakes.editing import set_entry_field
-from pynakes.model import BibLibrary
+from pynakes.formatters import FIELD_FORMATTERS
+from pynakes.metadata import library_save_actions
+from pynakes.model import BibFile
+
+# JabRef saveActions formatter keys mapped to pynakes normalization concerns.
+_NAME_FIELDS = ("author", "editor")
+_DOI_FORMATTERS = ("clean_up_doi", "short_doi")
 
 METADATA_PREFIX = "pynakes-normalize-"
 TITLE_FIELDS = ("title", "booktitle", "maintitle", "subtitle")
@@ -15,6 +21,14 @@ TITLE_FIELDS = ("title", "booktitle", "maintitle", "subtitle")
 
 @dataclass
 class NormalizeOptions:
+    """Optional overrides for the composed normalization policy.
+
+    ``None`` delegates to compatible JabRef/pynakes metadata and then the
+    built-in default. Explicit values take precedence. This object configures
+    the orchestration only; individual transformations remain in their domain
+    modules (titles, authors, journals, and DOIs).
+    """
+
     protect_titles: bool | None = None
     title_fields: list[str] | None = None
     protected_terms: list[str] | None = None
@@ -27,10 +41,17 @@ class NormalizeOptions:
 
 @dataclass
 class NormalizeResult:
+    """Per-domain counts and non-fatal warnings from normalization.
+
+    ``operations`` is the stable compact view used by callers that need a
+    single structured summary without inspecting the individual fields.
+    """
+
     title_fields: dict[str, int] = field(default_factory=dict)
     authors: int = 0
     journals: int = 0
     dois: int = 0
+    save_action_fields: int = 0
     warnings: list[dict[str, str]] = field(default_factory=list)
 
     @property
@@ -40,12 +61,13 @@ class NormalizeResult:
             "authors": self.authors,
             "journals": self.journals,
             "dois": self.dois,
+            "save_action_fields": self.save_action_fields,
         }
 
 
-def _metadata_value(lib: BibLibrary, *names: str) -> str | None:
+def _metadata_value(lib: BibFile, *names: str) -> str | None:
     wanted = {name.lower() for name in names}
-    for key, value in lib.jabref_metadata.items():
+    for key, value in lib.metadata.items():
         if key.lower() in wanted:
             return value.rstrip(";").strip()
     return None
@@ -69,7 +91,7 @@ def _metadata_bool(value: str | None, default: bool) -> bool:
     return default
 
 
-def _resolve_bool(lib: BibLibrary, option: bool | None, name: str, default: bool) -> bool:
+def _resolve_bool(lib: BibFile, option: bool | None, name: str, default: bool) -> bool:
     if option is not None:
         return option
     return _metadata_bool(
@@ -79,7 +101,7 @@ def _resolve_bool(lib: BibLibrary, option: bool | None, name: str, default: bool
 
 
 def _resolve_choice(
-    lib: BibLibrary,
+    lib: BibFile,
     option: str | None,
     name: str,
     allowed: set[str],
@@ -98,14 +120,14 @@ def _resolve_choice(
     return resolved
 
 
-def _resolve_title_fields(lib: BibLibrary, option: list[str] | None) -> list[str]:
+def _resolve_title_fields(lib: BibFile, option: list[str] | None) -> list[str]:
     if option:
         return option
     metadata = _metadata_value(lib, f"{METADATA_PREFIX}title-fields", "normalize-title-fields")
     return _split_metadata_list(metadata) or list(TITLE_FIELDS)
 
 
-def _resolve_terms(lib: BibLibrary, option: list[str] | None) -> list[str]:
+def _resolve_terms(lib: BibFile, option: list[str] | None) -> list[str]:
     terms = list(option or [])
     terms.extend(
         _split_metadata_list(_metadata_value(lib, "pynakes-protected-terms", "protected-terms"))
@@ -113,7 +135,7 @@ def _resolve_terms(lib: BibLibrary, option: list[str] | None) -> list[str]:
     return terms
 
 
-def normalize_dois(lib: BibLibrary) -> tuple[int, list[dict[str, str]]]:
+def normalize_dois(lib: BibFile) -> tuple[int, list[dict[str, str]]]:
     """Normalize DOI fields, leaving invalid values untouched with warnings."""
     count = 0
     warnings: list[dict[str, str]] = []
@@ -137,10 +159,21 @@ def normalize_dois(lib: BibLibrary) -> tuple[int, list[dict[str, str]]]:
     return count, warnings
 
 
-def normalize_library(lib: BibLibrary, options: NormalizeOptions | None = None) -> NormalizeResult:
+def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> NormalizeResult:
     """Apply the standard daily-driver normalization routine in-place."""
     opts = options or NormalizeOptions()
     result = NormalizeResult()
+
+    # JabRef's own saveActions, when present, drive the *defaults* for the
+    # functionalities JabRef can express (author-name normalization, DOI
+    # cleanup) — per the principle of using a native JabRef setting where one
+    # exists. An explicit CLI option or a pynakes-meta key still overrides.
+    save_actions = library_save_actions(lib)
+    if save_actions is not None and save_actions.enabled:
+        author_default = "jabref" if save_actions.has("normalize_names", _NAME_FIELDS) else "none"
+        doi_default = save_actions.has(_DOI_FORMATTERS, ("doi",))
+    else:
+        author_default, doi_default = "jabref", True
 
     if _resolve_bool(lib, opts.protect_titles, "protect-titles", True):
         terms = _resolve_terms(lib, opts.protected_terms)
@@ -150,11 +183,11 @@ def normalize_library(lib: BibLibrary, options: NormalizeOptions | None = None) 
                 result.title_fields[field] = changed
 
     author_style = _resolve_choice(
-        lib, opts.author_style, "author-style", author_ops.AUTHOR_STYLES, "jabref"
+        lib, opts.author_style, "author-style", author_ops.AUTHOR_STYLES, author_default
     )
     result.authors = author_ops.normalize_authors(lib, author_style)
 
-    if _resolve_bool(lib, opts.normalize_dois, "dois", True):
+    if _resolve_bool(lib, opts.normalize_dois, "dois", doi_default):
         result.dois, doi_warnings = normalize_dois(lib)
         result.warnings.extend(doi_warnings)
 
@@ -170,4 +203,29 @@ def normalize_library(lib: BibLibrary, options: NormalizeOptions | None = None) 
     result.journals = journal_result.changed
     result.warnings.extend(journal_ops.unknown_journal_warnings(journal_result.unknown))
 
+    # Apply the remaining JabRef saveActions field formatters (date/month/pages)
+    # exactly where the file configures them. There is no pynakes-meta or CLI
+    # equivalent: these run because JabRef's own saveActions ask for them.
+    if save_actions is not None and save_actions.enabled:
+        result.save_action_fields = _apply_save_action_formatters(lib, save_actions)
+
     return result
+
+
+def _apply_save_action_formatters(lib: BibFile, save_actions) -> int:
+    """Apply supported saveActions field formatters per the file's field map."""
+    changed = 0
+    for field_name, formatter_keys in save_actions.cleanups.items():
+        funcs = [FIELD_FORMATTERS[k] for k in formatter_keys if k in FIELD_FORMATTERS]
+        if not funcs:
+            continue
+        for entry in lib.entries.values():
+            value = entry.fields.get(field_name)
+            if not value:
+                continue
+            new_value = value
+            for func in funcs:
+                new_value = func(new_value)
+            if new_value != value and set_entry_field(entry, field_name, new_value):
+                changed += 1
+    return changed

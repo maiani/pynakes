@@ -8,8 +8,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **`Volume` engine API**: `pynakes.engine.Volume` now owns the one-file
-  load → stage → preview/diff → commit lifecycle. It wraps one `BibLibrary`,
+- **JabRef-parity field formatters + golden-vector test suite**: new
+  `pynakes.formatters` implements `normalize_date` (→ ISO `yyyy-mm-dd`/`yyyy-mm`),
+  `normalize_month` (→ `#mmm#`), and `normalize_page_numbers` (→ `start--end`)
+  to match JabRef exactly. `normalize` applies them per the file's `saveActions`
+  field map. `tests/test_jabref_parity.py` locks behavior with input→expected
+  vectors lifted from JabRef's own formatter tests (JabRef, MIT License);
+  remaining `normalize_names` AuthorList-parser parity is captured as `xfail`
+  vectors and tracked in DEVPLAN as a 1.0 gap.
+- **JabRef `saveActions` drive `normalize` defaults (feature-parity step toward
+  1.0)**: `normalize` now reads JabRef's own `saveActions` field-formatter
+  configuration so a JabRef-configured library normalizes consistently — when
+  `saveActions` is enabled, `normalize_names` on a name field enables author
+  normalization and `clean_up_doi`/`short_doi` on `doi` enables DOI cleanup;
+  if those formatters are absent, pynakes defers and leaves the field alone.
+  Explicit CLI flags and `pynakes-meta` keys still override. New
+  `metadata.parse_save_actions` / `SaveActions` / `library_save_actions`. Also
+  recognizes the `saveOrder` and `blgFilePath` JabRef metadata keys. The
+  remaining parity gaps (date/month/page normalization, encoding formatters) are
+  tracked in DEVPLAN as the 1.0 gate.
+- **`pynakes-meta` metadata namespace (superset of `jabref-meta`)**: pynakes now
+  reads and writes a second, structurally identical top-level comment,
+  `@comment{pynakes-meta: key:value;}`, for settings JabRef cannot represent.
+  Parsing scans both namespaces; `BibFile` exposes `pynakes_metadata(_blocks)`
+  alongside `jabref_metadata(_blocks)` plus a merged `metadata` property
+  (pynakes overrides jabref on conflict) and `metadata_blocks` (both, in source
+  order) — the view `lint`, `normalize`, and key generation read. `metadata set`
+  routes a key automatically for maximum JabRef compatibility (JabRef-native
+  keys → `jabref-meta`, everything else → `pynakes-meta`), overridable with
+  `--namespace jabref|pynakes`; unknown keys are accepted into `pynakes-meta`
+  but still require `--allow-unknown` for `jabref-meta`. `inspect`/`metadata
+  list` report both namespaces. The `jabref.py` module is renamed `metadata.py`.
+- **Git-workflow gating**: the read-only checks `lint`, `keys check`,
+  `files check`, and `dedupe check` gained a `--strict` flag (exit `1` on a
+  finding) — joining the existing `verify --strict` — so any of them can gate a
+  build. All five gate checks now accept **multiple `.bib` files**: a single
+  file keeps its byte-stable per-file JSON envelope, while multiple files emit
+  an aggregate `{status, action, strict, files, summary}` envelope (an
+  unreadable file becomes a per-file error object and always fails the run).
+  Capabilities advertises this via `supports_multiple_files` and `gate_commands`.
+- **pre-commit integration**: a `.pre-commit-hooks.yaml` ships
+  `pynakes-lint`, `pynakes-keys-check`, `pynakes-files-check`, and
+  `pynakes-dedupe-check` hooks. A new [Git Workflows](docs/guides/git-workflows.md)
+  guide documents pre-commit and GitHub Actions recipes.
+- **Integrity and enrichment workflows**: new `pynakes.integrity` API and
+  top-level `verify`, `published`, and `enrich` commands. Provider metadata
+  access is opt-in via `--online`, cached deterministically, and covered by
+  fixture-stubbed tests. `verify --strict` is CI-friendly, `enrich` only fills
+  missing fields, and `published --apply` can add arXiv-published DOI/journal
+  metadata while preserving the preprint pointer.
+- **Deduplication and merge**: new `pynakes.dedupe` API and
+  `pynakes dedupe check|merge` CLI detect duplicate works by normalized stable
+  identifiers (DOI, arXiv, PMID, PMCID, ISBN) and conservative fuzzy
+  title+author+year matching. `merge` keeps the first entry, copies missing or
+  safely richer data, unions delimited fields, removes duplicate entry blocks,
+  supports `--dry-run`/`--diff`/`--json`, and exits 2 with field-level conflict
+  reports instead of guessing on ambiguous values.
+- **`Collection` engine API**: `pynakes.engine.Collection` now owns the one-file
+  load → stage → preview/diff → commit lifecycle. It wraps one `BibFile`,
   exposes read-only views and delegated operation methods, stages DOI imports
   and JabRef metadata updates, writes atomically through the validated text I/O
   path, supports `reset()`/`reload()`, and raises `ExternalModificationError`
@@ -43,9 +99,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   contract), and `tests/test_editing.py` (direct unit tests of the surgical
   raw-text primitives). Overall coverage is now 93%.
 
+### Fixed
+- **Empty-citation-key entries are no longer silently dropped.** The parser
+  required at least one key character (`@article{,` was discarded from the
+  model while surviving on disk via surgical writes), hiding the most-broken
+  entry from `inspect`/`lint`. Such entries are now parsed with an empty key,
+  round-trip byte-for-byte, are reported by `lint` as an `empty_key` error, and
+  get a real key from `keys generate`.
+- **Unified diffs are no longer double-spaced.** `generate_diff` joined
+  newline-terminated lines with an extra `\n`, doubling every line in the
+  `diff` field of every modifying command; output is now a standard unified
+  diff.
+- **`lint` no longer gives non-BibTeX input a clean bill of health.** A file
+  that parses to zero entries (wrong file or junk content) now emits a
+  `no_entries` warning instead of reporting `0 issues`.
+
 ### Changed
-- CLI modifying commands now dogfood `Volume` for dry-run diffs and writes while
+- **Renamed the core nouns for a coherent library metaphor.** The single-`.bib`
+  engine handle `Volume` is now **`Collection`** (the working unit — "a slice of
+  references covering one aspect of a topic"); a future directory of Collections
+  is the **`Library`** (the corpus) and its derived search index is the
+  **`Catalogue`** (Phase 7). Supporting model renames cleared the resulting
+  collisions: `BibLibrary` → `BibFile` (it models one file, not a library) and
+  `EntryCollection` → `EntryStore` (freeing "Collection" for the concept layer).
+  `VolumeCommitResult` → `CommitResult` and `Collection.from_library` →
+  `Collection.from_bibfile`. CLI behavior and the JSON envelope are unchanged.
+- **`--where` filters can now target an entry by citation key** (`key == "..."`)
+  and by `key exists`, alongside the existing `type` and field conditions. This
+  makes the manual resolution suggested by `dedupe merge` executable through the
+  CLI. The `--where` grammar is now documented in the LLM integration guide.
+- Clarified the `unknown_journal` warning message (now "No abbreviation table
+  entry for journal '…'; left unchanged") so it no longer reads as a failure to
+  produce output.
+- CLI modifying commands now dogfood `Collection` for dry-run diffs and writes while
   preserving the existing JSON envelope and command behavior.
+- **Consolidated CLI boilerplate and removed dead code** (no behavior change):
+  a shared `_preview_or_commit()` helper replaces the repeated dry-run/commit
+  branching in `_finish_mod`, `keys rename`, and `used`; the `doi import`
+  citation-key conflict now routes through the existing `_emit_conflict` helper;
+  the `used` command reuses the `_entries()` pluralizer; and the unused
+  `_parse_jabref_metadata` wrapper in `bibtex_parser.py` was deleted.
 - **Consolidated journal duplication** (follow-up to the earlier audit):
   `load_journal_table` and `load_ltwa_table` now share a single `_sniff_rows`
   CSV/TSV reader, and the `unknown_journal` warning shape lives once in
@@ -141,17 +234,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project initialization and CLI command scaffold (`inspect`, `groups`, `keys`,
   `fields`, `lint`, `capabilities` — currently stubs).
 - `pyproject.toml` with dependencies and metadata; pytest + ruff configuration.
-- **Phase 1 foundation**: data model (`BibEntry`, `BibLibrary`), custom BibTeX
+- **Phase 1 foundation**: data model (`BibEntry`, `BibFile`), custom BibTeX
   parser and writer with round-trip preservation, atomic file I/O with backups,
   and unified-diff utilities.
-- `EntryCollection`: an ordered, duplicate-key-tolerant container backing
-  `BibLibrary.entries`, with `get_all()` and `duplicate_keys()` helpers. Enables
+- `EntryStore`: an ordered, duplicate-key-tolerant container backing
+  `BibFile.entries`, with `get_all()` and `duplicate_keys()` helpers. Enables
   the planned duplicate-key detection/repair features.
 - Regression tests for round-trip fidelity (capitalization braces, field order,
   CRLF line endings, empty field values, latin-1 detection).
 
 ### Changed
-- `BibLibrary.entries` is now an `EntryCollection` rather than a `dict`; it keeps
+- `BibFile.entries` is now an `EntryStore` rather than a `dict`; it keeps
   a dict-like read API (first match wins) while preserving duplicate keys.
 - Parser no longer raises on duplicate citation keys; it preserves them and logs
   a warning, leaving detection/repair to the linter.
@@ -169,7 +262,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   round-trip.
 - Empty field values (e.g. `note = {}`) are preserved instead of being dropped.
 - Removed dead `jabref_metadata` extraction that was collected then discarded;
-  it is now attached to `BibLibrary`.
+  it is now attached to `BibFile`.
 
 ### Security
 

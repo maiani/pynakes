@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from pynakes.io import load_bib, save_bib
-from pynakes.model import BibEntry, BibLibrary
+from pynakes.model import BibEntry, BibFile
 
 
 class TestLoadBib:
@@ -98,7 +98,7 @@ class TestSaveBib:
             type="article",
             fields={"author": "A", "title": "T", "journal": "J", "year": "2020"},
         )
-        lib = BibLibrary(entries={"Test": entry})
+        lib = BibFile(entries={"Test": entry})
         output_file = tmp_path / "output.bib"
 
         result = save_bib(lib, str(output_file))
@@ -116,7 +116,7 @@ class TestSaveBib:
             type="article",
             fields={"author": "B", "title": "U", "journal": "K", "year": "2021"},
         )
-        lib = BibLibrary(entries={"New": entry})
+        lib = BibFile(entries={"New": entry})
 
         result = save_bib(lib, str(bib_file), backup=True)
 
@@ -133,7 +133,7 @@ class TestSaveBib:
             type="article",
             fields={"author": "A", "title": "T", "journal": "J", "year": "2020"},
         )
-        lib = BibLibrary(entries={"Test": entry})
+        lib = BibFile(entries={"Test": entry})
         output_file = tmp_path / "new.bib"
 
         result = save_bib(lib, str(output_file), backup=True)
@@ -148,7 +148,7 @@ class TestSaveBib:
             type="article",
             fields={"author": "A", "title": "T", "journal": "J", "year": "2020"},
         )
-        lib = BibLibrary(entries={"Test": entry})
+        lib = BibFile(entries={"Test": entry})
         output_file = tmp_path / "output.bib"
 
         result = save_bib(lib, str(output_file), atomic=True)
@@ -171,7 +171,7 @@ class TestSaveBib:
                 "year": "2020",
             },
         )
-        lib = BibLibrary(entries={"Smith2020": entry})
+        lib = BibFile(entries={"Smith2020": entry})
         output_file = tmp_path / "roundtrip.bib"
 
         save_result = save_bib(lib, str(output_file))
@@ -190,7 +190,7 @@ class TestSaveBib:
             type="article",
             fields={"author": "José", "title": "Título", "journal": "Revista", "year": "2020"},
         )
-        lib = BibLibrary(entries={"Test": entry}, encoding="utf-8")
+        lib = BibFile(entries={"Test": entry}, encoding="utf-8")
         output_file = tmp_path / "utf8.bib"
 
         result = save_bib(lib, str(output_file))
@@ -208,7 +208,7 @@ class TestSaveBib:
             type="article",
             fields={"author": "A", "title": "T", "journal": "J", "year": "2020"},
         )
-        lib = BibLibrary(entries={"Test": entry}, line_ending="\r\n")
+        lib = BibFile(entries={"Test": entry}, line_ending="\r\n")
         output_file = tmp_path / "windows.bib"
 
         result = save_bib(lib, str(output_file))
@@ -228,7 +228,7 @@ class TestSaveErrors:
             type="article",
             fields={"author": "A", "title": "T", "journal": "J", "year": "2020"},
         )
-        lib = BibLibrary(entries={"Test": entry})
+        lib = BibFile(entries={"Test": entry})
 
         result = save_bib(lib, "/nonexistent/directory/output.bib")
         assert not result.success
@@ -246,7 +246,7 @@ class TestSaveErrors:
             type="article",
             fields={"author": "A", "title": "T", "journal": "J", "year": "2020"},
         )
-        lib = BibLibrary(entries={"Test": entry})
+        lib = BibFile(entries={"Test": entry})
 
         # Save (with atomic=False to test backup restoration more directly)
         result = save_bib(lib, str(bib_file), backup=True, atomic=False)
@@ -270,7 +270,7 @@ class TestMultipleOperations:
             type="article",
             fields={"author": "A", "title": "T", "journal": "J", "year": "2020"},
         )
-        lib1 = BibLibrary(entries={"First": entry1})
+        lib1 = BibFile(entries={"First": entry1})
         result1 = save_bib(lib1, str(output_file))
         assert result1.success
 
@@ -280,7 +280,7 @@ class TestMultipleOperations:
             type="book",
             fields={"author": "B", "title": "U", "publisher": "P", "year": "2021"},
         )
-        lib2 = BibLibrary(entries={"Second": entry2})
+        lib2 = BibFile(entries={"Second": entry2})
         result2 = save_bib(lib2, str(output_file))
         assert result2.success
         assert result2.backup_path is not None

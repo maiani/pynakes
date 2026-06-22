@@ -36,10 +36,16 @@ Validate entries.
 ```bash
 pynakes lint refs.bib
 pynakes lint refs.bib --json
+pynakes lint refs.bib chapters/*.bib --strict   # multi-file CI gate
 ```
 
 Checks include duplicate citation keys, missing required fields by entry type,
 malformed DOI fields, missing article DOI warnings, and malformed group fields.
+
+`lint` (along with `keys check`, `files check`, `dedupe check`, and `verify`)
+accepts multiple files and supports `--strict`, which exits `1` when a finding
+is present so it can gate a build. See [Git Workflows](git-workflows.md) for
+pre-commit and CI recipes.
 
 ## groups
 
@@ -87,29 +93,46 @@ key already exists.
 
 ## metadata
 
-Inspect and update top-level JabRef `jabref-meta` blocks.
+pynakes recognizes **two** structurally identical top-level comment namespaces:
+
+- `@comment{jabref-meta: key:value;}` — JabRef's own library settings.
+- `@comment{pynakes-meta: key:value;}` — pynakes' **superset**, for settings
+  JabRef cannot represent (pynakes is a superset of JabRef metadata).
+
+`metadata list` shows both, tagged by namespace; reads (`lint`, `normalize`,
+key generation) use the **merged** view, where `pynakes-meta` overrides
+`jabref-meta` on a conflicting key.
 
 ```bash
 pynakes metadata list refs.bib
 pynakes metadata list refs.bib --json
 ```
 
-Set a known metadata block:
+Set a metadata value:
 
 ```bash
 pynakes metadata set refs.bib databaseType biblatex --dry-run --diff
 pynakes metadata set refs.bib databaseType biblatex
 ```
 
-Known blocks include JabRef library/save/group/file/selector/key-pattern
-metadata such as `databaseType`, `saveOrderConfig`, `saveActions`,
-`groupstree`, `groups-search-syntax-version`, `fileDirectory*`,
-`selector_*`, `VersionDBStructure`, `keypatterndefault`, and
-`keypattern_<entrytype>`.
+By default `metadata set` **routes the key automatically for maximum JabRef
+compatibility**: keys JabRef understands (library/save/group/file/selector/
+key-pattern, e.g. `databaseType`, `saveOrderConfig`, `saveActions`,
+`groupstree`, `fileDirectory*`, `selector_*`, `keypatterndefault`,
+`keypattern_<entrytype>`) go to `jabref-meta`; anything JabRef cannot represent
+goes to `pynakes-meta`. Force a target with `--namespace jabref|pynakes`.
 
-Unknown metadata blocks are preserved byte-for-byte. `metadata set` refuses to
-write unknown keys unless `--allow-unknown` is passed, and exits with conflict
-code `2` if duplicate blocks make an update ambiguous.
+```bash
+# pynakes-only setting → lands in pynakes-meta automatically
+pynakes metadata set refs.bib pynakes-normalize-journal-style abbreviated
+# force a key into jabref-meta (requires --allow-unknown if JabRef won't know it)
+pynakes metadata set refs.bib myKey myValue --namespace jabref --allow-unknown
+```
+
+Unknown metadata blocks are preserved byte-for-byte. Writing an unrecognized key
+into `jabref-meta` requires `--allow-unknown` (so JabRef's namespace is not
+polluted); `pynakes-meta` accepts any key. `metadata set` exits with conflict
+code `2` if duplicate blocks in the target namespace make an update ambiguous.
 
 ## fields
 
@@ -220,12 +243,26 @@ pynakes normalize refs.bib --journal-table journals.csv --ltwa-table ltwa.csv
 `journals.csv` accepts `title`, `abbreviation`, and optional `issn` columns.
 LTWA tables accept `Word` and `Abbreviation` columns.
 
-Normalization metadata can be stored in `jabref-meta` comments, for example:
+Normalization preferences live in metadata. pynakes-specific settings (no
+JabRef equivalent) go in `pynakes-meta`:
 
 ```bibtex
-@comment{jabref-meta: pynakes-normalize-journal-style:none;}
-@comment{jabref-meta: pynakes-normalize-protect-titles:false;}
-@comment{jabref-meta: pynakes-protected-terms:Proceedings,OpenAI;}
+@comment{pynakes-meta: pynakes-normalize-journal-style:none;}
+@comment{pynakes-meta: pynakes-normalize-protect-titles:false;}
+@comment{pynakes-meta: pynakes-protected-terms:Proceedings,OpenAI;}
+```
+
+Where JabRef already has a setting, pynakes uses **that**: if the library has
+JabRef `saveActions` enabled, `normalize` honors them — a `normalize_names`
+formatter on a name field drives author normalization and a
+`clean_up_doi`/`short_doi` formatter on `doi` drives DOI cleanup; their absence
+disables those steps. An explicit flag or a `pynakes-meta` key overrides.
+
+```bibtex
+@comment{jabref-meta: saveActions:enabled;
+author[normalize_names]
+doi[clean_up_doi]
+;}
 ```
 
 ## used
@@ -281,6 +318,35 @@ pynakes capabilities
 pynakes capabilities --json
 ```
 
+## dedupe
+
+Detect and conservatively merge duplicate works.
+
+```bash
+pynakes dedupe check refs.bib
+pynakes dedupe merge refs.bib --dry-run --diff
+```
+
+`merge` exits with code `2` when field values disagree and cannot be safely
+resolved.
+
+## verify / enrich / published
+
+Integrity and enrichment commands never use the network unless `--online` is
+passed. Online provider responses are cached beside the `.bib` file by default,
+or in `--cache-dir` when supplied.
+
+```bash
+pynakes verify refs.bib --online --strict --json
+pynakes enrich refs.bib --online --dry-run --diff
+pynakes published refs.bib --online --json
+pynakes published refs.bib --online --apply --dry-run --diff
+```
+
+`verify --strict` exits with code `1` when warnings or errors are reported.
+`enrich` only fills missing fields. `published --apply` preserves the preprint
+identifier and only adds missing DOI/journal metadata.
+
 ## Best Practices
 
 1. Preview modifying commands with `--dry-run --diff`.
@@ -294,7 +360,6 @@ pynakes capabilities --json
 The following commands/features are not implemented yet:
 
 - `entries`
-- `dedupe` and `merge`
 - linked-file repair
 
 ## Next Steps

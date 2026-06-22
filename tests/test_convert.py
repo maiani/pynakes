@@ -7,16 +7,16 @@ import pytest
 from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.convert import convert, convert_to_biblatex, convert_to_bibtex
-from pynakes.model import BibEntry, BibLibrary
+from pynakes.model import BibEntry, BibFile
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-def _load() -> BibLibrary:
+def _load() -> BibFile:
     return parse_bib((FIXTURES / "bibtex_classic.bib").read_text())
 
 
-def _load_biblatex() -> BibLibrary:
+def _load_biblatex() -> BibFile:
     return parse_bib((FIXTURES / "biblatex_sample.bib").read_text())
 
 
@@ -112,7 +112,7 @@ class TestDateCombination:
         assert "year" not in entry.fields
 
     def test_unparseable_month_left_untouched(self) -> None:
-        lib = BibLibrary(
+        lib = BibFile(
             entries=[
                 BibEntry(
                     key="Weird2020",
@@ -202,7 +202,7 @@ class TestToBibtex:
         assert lib.entries["FormattedArticle2020"].fields["year"] == "2020"
 
     def test_unmapped_thesis_left_with_warning(self) -> None:
-        lib = BibLibrary(entries=[BibEntry(key="T", type="thesis", fields={"title": "X"})])
+        lib = BibFile(entries=[BibEntry(key="T", type="thesis", fields={"title": "X"})])
         result = convert_to_bibtex(lib)
         assert lib.entries["T"].type == "thesis"
         assert any(w["type"] == "unmapped_thesis" for w in result.warnings)

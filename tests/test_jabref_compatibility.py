@@ -13,7 +13,7 @@ import pytest
 from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.io import load_bib, save_bib
-from pynakes.model import BibEntry, BibLibrary
+from pynakes.model import BibEntry, BibFile
 
 
 @pytest.fixture
@@ -409,7 +409,7 @@ class TestExportFormatCompatibility:
                 "groups": "Test Group",
             },
         )
-        lib = BibLibrary(entries={"Test2020": entry})
+        lib = BibFile(entries={"Test2020": entry})
 
         output = write_bib(lib)
 
@@ -430,7 +430,7 @@ class TestExportFormatCompatibility:
                 "year": "2020",
             },
         )
-        lib = BibLibrary(entries={"Test2020": entry})
+        lib = BibFile(entries={"Test2020": entry})
 
         output = write_bib(lib)
 
@@ -456,7 +456,7 @@ class TestExportFormatCompatibility:
                 "file": "test.pdf:path/test.pdf:PDF",
             },
         )
-        lib = BibLibrary(entries={"Test2020": entry})
+        lib = BibFile(entries={"Test2020": entry})
 
         output = write_bib(lib)
         lib2 = parse_bib(output)

@@ -8,7 +8,7 @@ into individual people and extracting a person's last name; other modules
 import re
 
 from pynakes.editing import set_entry_field
-from pynakes.model import BibLibrary
+from pynakes.model import BibFile
 
 NAME_FIELDS = ("author", "editor")
 AUTHOR_STYLES = {"jabref", "conservative", "bibtex", "biblatex", "none"}
@@ -188,7 +188,7 @@ def normalize_name_list(value: str, style: str = "jabref") -> str:
     return " and ".join(normalizer(name) for name in _split_names(value))
 
 
-def normalize_authors(lib: BibLibrary, style: str = "jabref") -> int:
+def normalize_authors(lib: BibFile, style: str = "jabref") -> int:
     """Normalize author/editor fields across a library."""
     normalized_style = _normalize_style(style)
     if normalized_style == "none":

@@ -63,10 +63,10 @@ docs = [
 
 # NOTE: update these URLs to the real repository slug before publishing.
 [project.urls]
-Homepage = "https://github.com/andreamaiani/pynakes"
-Repository = "https://github.com/andreamaiani/pynakes"
-Issues = "https://github.com/andreamaiani/pynakes/issues"
-Changelog = "https://github.com/andreamaiani/pynakes/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/maiani/pynakes"
+Repository = "https://github.com/maiani/pynakes"
+Issues = "https://github.com/maiani/pynakes/issues"
+Changelog = "https://github.com/maiani/pynakes/blob/main/CHANGELOG.md"
 
 [project.scripts]
 pynakes = "pynakes.cli:app"

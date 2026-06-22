@@ -1,519 +1,177 @@
 # pynakes architecture
 
-This document describes the internal design of pynakes, intended for contributors and maintainers.
-
-## Design philosophy
-
-**pynakes is a data-preservation tool, not a parser tool.**
-
-The BibTeX format is messy and forgiving; `.bib` files are typically small (<10MB). The value of pynakes is not parsing speed but semantic fidelity: making explicit, reviewable, safe edits while preserving everything the user has written (comments, unknown fields, formatting, JabRef metadata).
-
-This shapes every architectural choice:
-
-- **Round-trip fidelity first**: A parse→edit→write cycle should be invisible to the user (no fields reordered, no comments lost, no reformatting).
-- **Explicit over implicit**: Operations are small and atomic. No "rewrite this entire file" functions.
-- **Preserve data by default**: Unknown fields, custom fields, comments, and raw formatting are kept, not discarded.
-- **Fail safely**: Better to refuse an operation and report a conflict than to silently discard data or guess.
-
-## Core data structures
-
-All operation modules work with these types:
-
-### BibEntry
-
-```python
-@dataclass
-class BibEntry:
-    key: str                          # citation key (e.g. "Smith2020")
-    type: str                         # entry type (e.g. "article", "book")
-    fields: dict[str, str]            # all fields (standard and custom)
-    raw_comments: list[str]           # preserve @comment lines verbatim
-    jabref_metadata: dict[str, str]   # extracted key=value from comments
-```
-
-**Design notes:**
-
-- No distinction between "standard" and "custom" fields in the `fields` dict. This allows round-trip preservation: if we don't understand a field, we keep it as-is.
-- `raw_comments` preserves the original text of JabRef metadata comments so they can be written back exactly.
-- `jabref_metadata` is a convenience dict extracted from `raw_comments` for programmatic access (e.g., `jabref_metadata["groups"]`).
-
-### BibLibrary
-
-```python
-@dataclass
-class BibLibrary:
-    entries: dict[str, BibEntry]      # keyed by citation key
-    strings: dict[str, str]           # @string constants
-    preamble: list[str]               # @preamble blocks
-    raw_comments: list[str]           # file-level comments
-    encoding: str                     # detected or specified (default: utf-8)
-    line_ending: str                  # \n or \r\n, preserved on write
-```
-
-**Design notes:**
-
-- `entries` is a dict for O(1) lookup by key; order is preserved in Python 3.7+.
-- `raw_comments` at the library level preserve any comments that appear between entries or at the top of the file.
-- `encoding` and `line_ending` are explicitly tracked so they can be reproduced on write.
-
-## Layer architecture
-
-### Layer 1: Custom parser (`bibtex_parser.py`)
-
-pynakes implements a minimal custom BibTeX parser. This is intentional:
-
-**Why not use an external library?**
-
-- Round-trip fidelity is critical. External libraries often normalize or lose formatting.
-- BibTeX is small and forgiving; the parsing logic is straightforward.
-- Custom parser gives full control over preservation guarantees.
-- No dependencies means fewer maintenance headaches and API breakages.
-
-**Parser design:**
-
-```python
-# bibtex_parser.py
-
-def parse_bib(text: str) -> BibLibrary:
-    """Parse BibTeX text, preserving all formatting and comments."""
-    entries = {}
-    strings = {}
-    preambles = []
-    comments = []
-    
-    lines = text.split('\n')
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        stripped = line.strip()
-        
-        # @string
-        if stripped.lower().startswith('@string'):
-            key, value = _extract_string(line)
-            strings[key] = value
-            i += 1
-        
-        # @preamble
-        elif stripped.lower().startswith('@preamble'):
-            preambles.append(line)
-            i += 1
-        
-        # @comment
-        elif stripped.lower().startswith('@comment'):
-            comments.append(line)
-            i += 1
-        
-        # Entry (@article, @book, etc.)
-        elif stripped.startswith('@'):
-            raw_lines = [line]
-            i += 1
-            brace_depth = line.count('{') - line.count('}')
-            
-            # Collect lines until entry closes
-            while i < len(lines) and brace_depth > 0:
-                raw_lines.append(lines[i])
-                brace_depth += lines[i].count('{') - lines[i].count('}')
-                i += 1
-            
-            # Parse entry
-            raw_text = '\n'.join(raw_lines)
-            entry_type, key = _extract_entry_header(raw_text)
-            fields = _extract_fields(raw_text)
-            
-            entries[key] = BibEntry(
-                key=key,
-                type=entry_type,
-                fields=fields,
-                raw_content=raw_text  # preserve for round-trip
-            )
-        else:
-            i += 1
-    
-    return BibLibrary(
-        entries=entries,
-        strings=strings,
-        preamble=preambles,
-        raw_comments=comments,
-        encoding=detect_encoding(text),
-        line_ending=detect_line_ending(text)
-    )
-```
-
-**Key properties:**
-
-- No normalization. Unknown fields are preserved as-is.
-- Comments and blank lines are kept.
-- Each entry stores `raw_content` so unmodified entries write back identically.
-- Field values are stored as strings; no attempt to "parse" them further.
-- Parse errors are reported with line numbers and context.
-
-**Writer strategy:**
-
-```python
-# bibtex_writer.py
-
-def write_bib(lib: BibLibrary) -> str:
-    """Serialize BibLibrary back to BibTeX, minimizing diffs."""
-    output = []
-    
-    # Write comments and preambles
-    for comment in lib.raw_comments:
-        output.append(comment)
-    
-    for preamble in lib.preamble:
-        output.append(preamble)
-    
-    # Write strings
-    for key, value in lib.strings.items():
-        output.append(f'@string{{{key} = {value}}}')
-    
-    # Write entries
-    for key, entry in lib.entries.items():
-        if entry.raw_content and not entry.modified:
-            # Unmodified entry: write back raw content
-            output.append(entry.raw_content)
-        else:
-            # Modified entry: reconstruct from fields
-            output.append(_serialize_entry(entry))
-    
-    text = '\n'.join(output)
-    
-    # Restore original line ending
-    if lib.line_ending == '\r\n':
-        text = text.replace('\n', '\r\n')
-    
-    return text
-```
-
-**Future extensibility:**
-
-If parsing becomes a bottleneck or you need advanced features:
-
-1. Define a `ParserBackend` protocol.
-2. Move custom parser behind it.
-3. Allow swapping in a different backend (bibtexparser v3, or a faster parser).
-4. The rest of pynakes doesn't change.
-
-### Layer 2: Core I/O (`bibtex_parser.py`, `bibtex_writer.py`, `io.py`)
-
-**`bibtex_parser.py`**: Custom BibTeX parser.
-
-- Line-by-line parsing with entry detection via regex.
-- Extracts entry type, key, and fields.
-- Preserves `raw_content` for each entry (for round-trip fidelity).
-- Detects JabRef metadata from comments.
-- Handles encoding and line-ending detection.
-- Reports parse errors with line numbers and context.
-
-**`bibtex_writer.py`**: Serialization back to BibTeX.
-
-- For unmodified entries: writes back `raw_content` exactly (zero diff).
-- For modified entries: reconstructs BibTeX from `fields` dict.
-- Preserves `raw_comments`, preambles, and `@string` constants.
-- Respects `line_ending` setting (normalizes `\n` / `\r\n`).
-- Proper escaping and quoting of field values.
-
-**`io.py`**: Orchestration layer.
-
-```python
-def load_bib(path: str) -> BibLibrary:
-    """Load a .bib file, returning a BibLibrary."""
-    text = read_file(path, encoding='utf-8-sig')  # detect encoding
-    lib = bibtex_parser.parse_bib(text)
-    return lib
-    
-def save_bib(lib: BibLibrary, path: str, *, 
-             backup: bool = True, 
-             atomic: bool = True) -> SaveResult:
-    """Save a BibLibrary to file with optional backup and atomic write."""
-    # Serialize to text
-    text = bibtex_writer.write_bib(lib)
-    
-    # Validate by re-parsing
-    _validate_by_reparsing(text)
-    
-    # Atomic write: temp → backup + atomic rename
-    temp_path = path + '.tmp'
-    write_file(temp_path, text, encoding='utf-8')
-    
-    if backup and path.exists():
-        backup_path = path + '.bak'
-        path.rename(backup_path)
-    
-    temp_path.rename(path)  # atomic on POSIX/Windows
-    return SaveResult(success=True, backup=backup_path)
-```
-
-- Handles file I/O, encoding detection, backup creation.
-- Atomic write: write to temp file, validate, then rename.
-- Backup: creates `.bak` file before overwriting.
-- Error handling: reports I/O errors with context.
-- No external parser dependencies.
-
-### Layer 3: Operation modules
-
-Each operation module is small, focused, and testable.
-
-**Implemented:**
-
-- **`editing.py`**: Surgical raw-text field/key edits (single source of truth for
-  minimal-diff modifications) plus entry-level helpers.
-- **`groups.py`**: Parse and modify the `groups` field, add/remove entries.
-- **`keys.py`**: Detect duplicate keys, generate new ones (`AuthorYearTitle` or a
-  JabRef citation-key pattern), repair conflicts.
-- **`fields.py`**: Rename, move, append, clear fields and protect title
-  capitalization, with an optional `--where` query filter.
-- **`authors.py`**: Author/editor name-list parsing and normalization (owns
-  name splitting and last-name extraction used by key generation).
-- **`journals.py`**: Abbreviate/expand journal names (user table, bundled exact
-  table, LTWA word generation).
-- **`doi.py`**: DOI normalization/validation and metadata import via DOI content
-  negotiation (stdlib `urllib`).
-- **`normalize.py`**: High-level routine composing title/author/journal/DOI
-  normalization.
-- **`lint.py`**: Validate entries (duplicate keys, required fields, malformed/
-  missing DOI, malformed groups).
-- **`usage.py`**: Detect/tag/export entries cited in LaTeX `.tex`/`.aux` sources.
-- **`capabilities.py`**: Machine-readable description of supported operations.
-
-**Planned (not yet built):** `dedupe.py` (merge), `convert.py` (BibTeX ↔
-BibLaTeX), `search.py` (query DSL), `files.py` (linked-file validation),
-`strings.py` (`@string` management).
-
-**Each operation module should:**
-
-- Accept `BibLibrary` as input.
-- Mutate the library in place and return a count (or report) of what changed;
-  edits go through `editing.py` so unmodified entries stay byte-identical.
-- Raise `ConflictError` (or surface options) if the operation cannot safely
-  complete.
-- Provide a `.dry_run()` variant that returns a diff without modifying.
-- Include its own unit tests.
-
-Example:
-
-```python
-def rename_field(lib: BibLibrary, 
-                old_name: str, 
-                new_name: str,
-                where: Optional[QueryFilter] = None) -> (BibLibrary, list[str]):
-    """Rename a field, optionally filtering by query.
-    
-    Returns:
-        (modified_library, list_of_affected_keys)
-    
-    Raises:
-        ValidationError: if new_name conflicts with existing field.
-    """
-```
-
-### Layer 4: CLI (`cli.py`)
-
-The CLI is a thin wrapper over operation modules:
-
-```bash
-pynakes groups add-entry refs.bib KEY "Group Name" [--dry-run] [--diff] [--json]
-pynakes fields rename refs.bib old_field new_field [--where QUERY] [--dry-run] [--diff]
-pynakes lint refs.bib [--json] [--strict]
-```
-
-- Maps commands to operation functions.
-- Handles `--dry-run`, `--diff`, `--json`, `--backup` flags.
-- Formats output (human-readable text or JSON).
-- Reports errors clearly with exit codes.
-- All file I/O goes through `io.py`.
-
-## Error handling
-
-### Exception hierarchy
-
-```python
-class PynakesError(Exception):
-    """Base exception for all pynakes errors."""
-
-class ParseError(PynakesError):
-    """Unrecoverable parse error in a .bib file."""
-    file: str
-    line: int
-    reason: str
-
-class ValidationError(PynakesError):
-    """Semantic error detected (missing field, malformed value)."""
-    entry_key: Optional[str]
-    field: Optional[str]
-    reason: str
-    severity: Literal["warning", "error"]  # warnings are reported but non-fatal
-
-class ConflictError(PynakesError):
-    """Operation cannot safely complete; user input required."""
-    reason: str
-    options: list[dict]  # list of proposed resolutions
-
-class OperationNotSupported(PynakesError):
-    """Feature is scaffolded but not yet implemented."""
-    operation: str
-```
-
-### Error handling rules
-
-1. **Parse errors** are fatal. Report to stderr with file:line context and exit code 1.
-2. **Validation warnings** are reported but do not block the operation. Use `--strict` flag to make warnings fatal.
-3. **Conflicts** are reported with exit code 2 and a JSON output explaining the options. The user can then re-run with a disambiguating flag or decide to abort.
-4. **Dry-run validation**: A dry-run validates the operation fully but does not write. It can succeed while the actual write fails (e.g., file permissions).
-5. **Atomic write failures**: If the write fails after validation, roll back by restoring the backup and report the error atomically.
-
-## Testing strategy
-
-### Test fixtures
-
-Fixtures are committed to the repo under `tests/fixtures/`:
-
-- `simple.bib`: minimal BibTeX with 2–3 entries.
-- `jabref_groups.bib`: entries with JabRef group metadata.
-- `biblatex_sample.bib`: BibLaTeX-formatted entries.
-- `duplicate_entries.bib`: entries that match on DOI, arXiv, or title+author+year.
-- `linked_files.bib`: entries with linked file references.
-- `with_custom_fields.bib`: entries with user-defined fields.
-- `with_comments.bib`: file-level and entry-level comments.
-
-### Test organization
-
-- `test_parser.py`: Backend abstraction and parsing logic.
-- `test_model.py`: Data structure behavior.
-- `test_io.py`: File load/save, encoding, round-trip preservation.
-- `test_groups.py`: Group parsing and modification.
-- `test_keys.py`: Key generation and duplicate detection.
-- `test_fields.py`: Field operations.
-- `test_lint.py`: Validation logic.
-- `test_dedupe.py`: Duplicate detection and merge logic.
-- `test_convert.py`: BibTeX ↔ BibLaTeX conversion.
-- `test_search.py`: Query DSL and filtering.
-- `test_cli.py`: CLI integration tests (fixtures, not actual files).
-
-### Coverage targets
-
-- Core I/O (parser, writer, io): 100% (data preservation is critical).
-- Operation modules: 95%+ (each operation tested with fixtures).
-- CLI: 80%+ (integration tests for main command paths).
-
-### Testing practices
-
-- No network access in tests. DOI fetches are stubbed or mocked.
-- Fixtures are small, stable, and version-controlled.
-- Each test is independent and can run in isolation.
-- Round-trip tests (parse → modify → write → parse) verify that formatting is preserved.
-
-## Configuration (future)
-
-Configuration is not required for v0.1 but the architecture should support it:
-
-**Config file location**: `~/.pynakesrc` (TOML)
-
-**Environment override**: `PYNAKES_CONFIG` env var
-
-**Planned sections** (v0.2+):
-
-```toml
-[defaults]
-dry_run = false           # default to --dry-run for all commands
-backup = true             # create .bak files
-output_format = "text"    # or "json"
-
-[profiles]
-default = "preserve_all"  # cleanup profile to apply on save
-econ = "econ_conventions" # domain-specific profile
-
-[journals]
-# Custom journal abbreviation table
-abbreviations = "~/.pynakes_journals.toml"
-
-[special_fields]
-# Define how to handle special metadata (read status, etc.)
-```
-
-## Dependency management
-
-### Direct dependencies (v0.1)
-
-- `typer`: CLI framework (lightweight, well-maintained).
-- No parsing library (custom BibTeX parser included).
-
-### Optional dependencies
-
-- `rich`: human-readable CLI output (colors, tables).
-
-DOI metadata import in `doi.py` uses the Python standard library (`urllib`); no
-third-party HTTP client is required.
-
-### Why minimal dependencies?
-
-- Reduces maintenance burden and security surface.
-- Easier to install and redistribute.
-- Clearer ownership of behavior (we control what happens).
-
-## Future architecture points
-
-### ParserBackend abstraction (if needed)
-
-Today, the custom parser is directly embedded. If parsing becomes a bottleneck or you want to experiment with different parser implementations:
-
-1. Define a `ParserBackend` protocol with methods like `parse_string()`, `write_entries()`.
-2. Move custom parser behind the interface.
-3. Write adapters for alternative parsers (bibtexparser v3, or a faster implementation).
-4. The rest of pynakes is unaffected.
-
-This is a *future* optimization, not a requirement for v0.1. Premature abstraction adds complexity without benefit.
-
-### MCP server (`pynakes-mcp`)
-
-A future MCP (Model Context Protocol) server will expose pynakes operations as tools for Claude and other agents:
-
-```json
-{
-  "tool": "pynakes.groups.add_entry",
-  "description": "Add an entry to a group in a BibTeX library.",
-  "parameters": {
-    "file": "path to .bib file",
-    "entry_key": "citation key",
-    "group": "group name",
-    "dry_run": "boolean"
-  }
-}
-```
-
-The MCP server will:
-
-- Use the same operation modules as the CLI.
-- Default to `--dry-run` for safety (Claude must explicitly request write).
-- Return structured JSON for all operations.
-- Support streaming for large diffs.
-
-### Streaming and large files
-
-Today's design assumes files fit in memory. If very large files become common:
-
-1. Implement streaming parser for read-only operations (lint, search).
-2. Keep in-memory model for write operations (files are usually small).
-3. Add a `stream=True` flag to lazy-load entries on demand.
-
-### Advanced query DSL
-
-Currently, queries are simple string filters. A future query language could support:
-
-```
-author contains "Smith" AND year >= 2020 AND groups contains "CBDC"
-doi missing OR doi malformed
-read status != "read"
-```
-
-Implementation: a small query parser in `search.py` that builds filter functions.
-
-## Code style and conventions
-
-- Type hints throughout (PEP 484).
-- Dataclasses for simple data structures; use them for purity.
-- Avoid mutation: operations return new objects, not modified in place.
-- Prefer explicit over implicit: no magic, no decorators with side effects.
-- Short functions, focused modules.
-- Comments only for the "why", not the "what" (code should be self-documenting).
-- Tests as documentation: a test shows how to use a function.
+This is the canonical internal architecture document for contributors and maintainers. The documentation-site [architecture guide](docs/guides/architecture.md) is a shorter introduction; the [API reference](docs/api/index.md) describes direct Python use.
+
+## Purpose and constraints
+
+pynakes is a headless maintenance engine for BibTeX, BibLaTeX, and JabRef-compatible .bib files. It makes small, reviewable changes without discarding information a reference manager or a human placed in the file.
+
+1. **Preserve before normalizing.** Unknown fields, duplicate citation keys, comments, JabRef metadata, line endings, and source encodings remain data, not parser errors.
+2. **Make minimal edits.** Entry mutations go through editing.py, which changes the relevant raw field/key text while keeping the rest of the entry intact.
+3. **Be explicit about uncertainty.** Dedupe, metadata enrichment, and DOI import report conflicts instead of silently selecting a value.
+4. **Keep the file authoritative.** In-memory state is a derived working view; there is no database or persistent sidecar state of record.
+5. **Remain deterministic by default.** Network access is explicit (with --online where supported) and provider responses can be cached.
+
+## Domain vocabulary and core concepts
+
+The model has three nested concepts: **entry** < **collection** < future **library collection**.
+
+| Concept | Implemented class | Meaning |
+| --- | --- | --- |
+| Entry | BibEntry | One bibliographic record plus the raw entry text needed to preserve its layout. |
+| Entry collection | EntryStore | Ordered, duplicate-key-tolerant container for a file's entries. Dict-like lookup returns the first match; explicit methods expose all duplicates. |
+| File model | BibFile | Semantic content of one parsed .bib file: entries, declarations, comments, structured JabRef metadata, encoding, and line-ending style. |
+| Metadata block | JabRefMetadataBlock | One top-level metadata comment — `@comment{jabref-meta: ...}` or pynakes' superset `@comment{pynakes-meta: ...}` (tagged by `namespace`) — represented both structurally and as raw text. |
+| Collection (working unit) | Collection | A staged, reconciled handle over one `.bib` file — "a slice of references covering one aspect of a topic". Supports operations, preview, diff, commit, reset, reload, and external-change detection. |
+| Library (corpus) | — (planned) | A directory/repository of Collections — the lifelong corpus. Not implemented yet (Beyond 1.0). |
+| Catalogue (index) | — (planned) | A derived, rebuildable search index over the Library (e.g. SQLite FTS). Never a competing source of truth; the Collections are. Not implemented yet (Beyond 1.0). |
+
+### BibEntry: record plus preservation state
+
+BibEntry.fields is intentionally an unrestricted dict[str, str]: standard, BibLaTeX, JabRef, and user-defined fields all belong in the same model. An entry also carries raw_content, its original source block. For a parsed entry, editing.py synchronizes fields and raw_content so a single field edit has a single-field diff. Entries created only in memory have no raw source and are marked modified; the writer reconstructs them when necessary.
+
+### EntryStore: a safe alternative to a dict
+
+A plain dict[str, BibEntry] cannot represent a broken but common bibliography state: two entries with the same citation key. EntryStore stores entries in source order and accepts duplicates. It offers familiar keys(), values(), items(), get(), and [] access, with **first match wins** semantics. Code that needs lossless behavior uses values(), get_all(key), or duplicate_keys().
+
+This distinction is load-bearing: parsing duplicate keys must not discard an entry, while key repair and linting must see every occurrence.
+
+### BibFile: one file's semantic view
+
+BibFile owns the set of entries and top-level BibTeX constructs: @string definitions, @preamble blocks, comments, and metadata. Metadata lives in two namespaces — jabref_metadata(_blocks) for `jabref-meta` and pynakes_metadata(_blocks) for the `pynakes-meta` superset — with the `metadata` property exposing the merged effective view operations read (pynakes overrides jabref). Its encoding and line_ending record the source representation for safe I/O.
+
+The BibFile is mutable by design. Operations change it in place and return a count or domain report; they do not return a replacement BibFile.
+
+### Collection: lifecycle and optimistic concurrency
+
+Collection is the engine facade for one .bib file. It binds the mutable BibFile to pristine text, entry snapshots, and a file fingerprint. A collection is a derived editing buffer, not a second source of truth.
+
+~~~text
+open / from_text / from_bibfile
+             |
+             v
+  stage operation methods (in memory only)
+             |
+      +------+------+
+      |             |
+      v             v
+ preview()/diff()  reset() -> restore pristine state
+      |
+      v
+ commit() -> check fingerprint -> validate/write atomically -> refresh snapshot
+~~~
+
+commit() rejects an externally modified bound file with ExternalModificationError unless force=True is selected deliberately. externally_changed() exposes the same check to long-lived consumers; reload() refuses to discard dirty staged state without force=True.
+
+FileFingerprint is the observed state used by that optimistic-concurrency check; CommitResult reports whether a commit wrote, its staged diff, and the number of changed entries.
+
+## Layers and dependency direction
+
+~~~text
+CLI / external callers
+          |
+          v
+Collection lifecycle facade (engine.py)
+          |
+          v
+Domain operations (groups, keys, fields, dedupe, integrity, ...)
+          |
+          v
+Editing + model + parser/writer + I/O
+          |
+          v
+                         .bib file
+~~~
+
+The CLI is intentionally thin: it opens a Collection, invokes an operation, previews or commits it, and emits the stable output envelope. Domain modules depend on the model and editing helpers, not on CLI behavior. Collection delegates to those modules rather than duplicating transformation rules.
+
+## Parsing, preservation, and writing
+
+### Parsing
+
+bibtex_parser.parse_bib(text) is a custom parser. It constructs BibFile/BibEntry instances, keeps duplicate keys, captures each entry's raw text, collects top-level comments and declarations, detects line endings, and parses JabRef metadata blocks. It deliberately does not use a general BibTeX dependency: round-trip control is more important than normalizing an input into another library's data model.
+
+Parsing is conservative, not a formatter. Field values are represented as strings, unknown entry fields survive, and malformed structural input raises ParseError with source context.
+
+### Surgical edits
+
+editing.py is the only mutation boundary for entry fields, entry keys, and entry types. Its raw-text functions make localized changes; its entry-level helpers also update BibEntry.fields and modification state. Operation modules must use these helpers instead of assigning raw_content directly or rebuilding entries.
+
+splice_into_text() applies known raw-entry replacements to the original file text. Collection uses it so untouched text between entries remains stable during a normal staged commit.
+
+### Writing and I/O
+
+bibtex_writer.write_bib() serializes a BibFile. Unmodified entries with raw_content are emitted verbatim; modified or source-less entries are reconstructed with their insertion field order. This is an **entry-level** round-trip guarantee. Direct whole-library serialization can reassemble top-level constructs, so callers wanting the smallest possible file diff should use Collection.
+
+io.load_bib() detects UTF-8 or Latin-1 from bytes before parsing. save_bib() and save_text() support backup creation, temporary-file writes, re-parse validation for BibTeX text, and replacement of the destination. They return SaveResult rather than exposing ordinary write failures as raw tracebacks to the CLI.
+
+## Domain modules
+
+| Module | Concept it owns |
+| --- | --- |
+| groups.py | JabRef-compatible membership stored in an entry groups field. |
+| keys.py | Citation-key generation, validation, duplicate detection/repair, and key renames. |
+| fields.py | Generic field changes, simple predicates, and title capitalization protection. |
+| authors.py | BibTeX name-list splitting, last-name extraction, and conservative/JabRef-style normalization. |
+| doi.py | DOI canonicalization and import preparation; it is the DOI parsing authority. |
+| metadata.py | Structured top-level metadata: parses both jabref-meta and pynakes-meta, classifies, and applies safe namespace-routed updates. |
+| journals.py | Exact title/ISSN mapping plus LTWA-style journal abbreviation/expansion. |
+| normalize.py | Policy orchestration over title, author, journal, and DOI operations. |
+| convert.py | Conservative BibTeX/BibLaTeX convention conversion. |
+| files.py | Parsing and resolution/validation of JabRef linked-file descriptors. |
+| usage.py | LaTeX/AUX citation extraction, library-usage analysis, tagging, and subset projection. |
+| lint.py | Local structural/semantic findings such as missing required fields, malformed DOI, groups, and duplicate keys. |
+| dedupe.py | Duplicate-work clustering and conflict-first merge planning. |
+| integrity.py | Opt-in provider-backed verification, conservative enrichment, and preprint publication checks. |
+| diff.py | Unified diff generation. |
+| capabilities.py | Machine-readable declaration of the implemented CLI surface. |
+
+### Result and report objects
+
+Report dataclasses make mutable operations inspectable without hiding their effects. They provide to_dict() where structured output is needed.
+
+| Area | Classes | Concept |
+| --- | --- | --- |
+| Normalization/conversion/journals | NormalizeOptions, NormalizeResult, ConvertResult, JournalMapping, JournalSources, JournalResult | Configured policy, source layers, applied transformations, and warnings. |
+| Dedupe | WorkIdentity, DuplicateCluster, MergeConflict, ClusterMerge, DedupeMergeReport | Evidence that records describe one work, conservative merge outcomes, and unresolved ambiguity. |
+| Integrity | IntegrityIssue, VerifyReport, FieldUpdate, EnrichReport, PublishedCandidate, PublishedReport | Remote-check findings and intentionally applied metadata changes. |
+| File/usage/lint | LinkedFile, FileCheckReport, UsageReport, LintIssue | Read-only analysis findings and summaries. |
+| Metadata/I/O | JabRefMetadataUpdate, SaveResult | A precise raw metadata replacement and a write outcome with backup/error context. |
+
+## Errors, conflicts, and CLI contract
+
+There is no artificial global exception hierarchy. Each domain exposes a specific exception where callers need structured recovery:
+
+| Condition | Exception / outcome |
+| --- | --- |
+| Structurally malformed BibTeX | ParseError |
+| DOI import failure, duplicate DOI, explicit key conflict | DOIImportError, DuplicateDOIError, CitationKeyConflictError |
+| Unsupported JabRef key pattern | UnsupportedCitationKeyPatternError |
+| Duplicate/ambiguous JabRef metadata block | DuplicateJabRefMetadataError |
+| Ambiguous duplicate-work merge | DedupeConflictError with MergeConflict values |
+| Failed provider lookup or parse | MetadataFetchError |
+| Concurrent file modification during a collection commit | ExternalModificationError |
+
+The CLI converts expected failures into the documented JSON/error envelope: success is exit code 0, errors exit 1, and conflicts exit 2 with options where an interactive choice is possible. Modifying command responses share status, action, file, dry_run, modified, modified_entries, and warnings; --diff adds a unified diff. The complete contract is in [docs/guides/llm-integration.md](docs/guides/llm-integration.md).
+
+## Network boundary
+
+Only DOI import and integrity workflows contact providers. The latter require an explicit online=True/--online opt-in and support deterministic caching. Network parsing lives in doi.py and integrity.py; tests mock or fixture this boundary so the normal suite never relies on external availability.
+
+## Testing and change discipline
+
+Tests cover model behavior, parser/writer fidelity, operation modules, the Collection lifecycle, CLI JSON/exit contracts, and regression fixtures. The critical tests are parse → edit → write → parse paths and staged collection diffs: they guard preservation, not merely semantic field values.
+
+Every behavioral change must add tests and update CHANGELOG.md. Before a change is complete, run:
+
+~~~bash
+pytest
+ruff check src tests
+ruff format --check src tests
+~~~
+
+## Deliberate non-goals and future boundaries
+
+The core does not own a database of record, GUI, cloud sync, PDF extraction, arbitrary shell execution, or LLM API calls. An MCP server is similarly a downstream transport concern: the CLI already provides a machine-readable, safe agent interface.
+
+The next structural extension is a Library collection over multiple collections, with rebuildable cross-file indexes and no competing source of truth. It is planned, not part of the current public implementation; see DEVPLAN.md.

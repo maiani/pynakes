@@ -1,26 +1,26 @@
 # pynakes as a bib-file engine
 
 A design sketch for the library-level API that turns pynakes into a reusable
-**bib-file engine** — the deterministic kernel that the CLI, an MCP server, a
-daemon, or a parallel stateful application all build on.
+**bib-file engine** — the deterministic kernel used by the CLI and available to
+other in-process consumers such as a daemon or stateful application.
 
-Status: `Volume` is implemented for one `.bib` file. It exposes read-only views,
+Status: `Collection` is implemented for one `.bib` file. It exposes read-only views,
 delegated operation methods, staged previews/diffs, atomic commits, reset/reload,
 and external-modification detection. `Library` remains future work; filesystem
 watching is intentionally *not* in core (a consumer concern — see the
 external-change section). See [VISION.md](VISION.md) for the why and
 [ARCHITECTURE.md](ARCHITECTURE.md) for the design pynakes already follows.
 
-## State model (decided): stateless core + thin reconciled handle
+## State model: thin reconciled handle over a file-derived buffer
 
 The decision behind the lifecycle below — driven by invariant #6 (the file is
 the single source of truth) and #7 (determinism):
 
-- **The commit/diff machinery is a pure, stateless function.** Given
-  `(original_text, edited_lib, pristine_snapshot)` it returns
-  `(new_text, diff, result)`. No hidden state; trivially testable; this is the
-  load-bearing logic.
-- **`Volume` is a thin stateful *handle*** bundling `{path, lib,
+- **Rendering and diffing are derived from explicit snapshots.** `Collection`
+  retains pristine text and entry snapshots, then derives preview text and a
+  diff from its staged library. The implementation keeps this logic private to
+  the facade, but tests exercise it through `preview()` and `diff()`.
+- **`Collection` is a thin stateful *handle*** bundling `{path, lib,
   pristine_snapshot, fingerprint, is_dirty}`. Its in-memory state is a **derived
   buffer over the file** — never an authoritative model. `commit()` always
   reconciles with the live file.
@@ -28,18 +28,18 @@ the single source of truth) and #7 (determinism):
   anything?* No → safe derived buffer. Yes → a second source of truth; not
   allowed.
 
-The same object serves both consumer shapes: the CLI/MCP use it transactionally
-(`open → op → commit`, effectively stateless); a GUI/BiMaS holds it open across
-edits (stateful), but the buffer stays derived and `commit()` reconciles.
+The same object serves both consumer shapes: the CLI uses it transactionally
+(`open → op → commit`); a GUI or downstream application may hold it open across
+edits. In both cases the buffer stays derived and `commit()` reconciles.
 
 ## Vocabulary
 
-The system has three nested units (entry ⊂ volume ⊂ library):
+The system has three nested units (entry ⊂ collection ⊂ library):
 
 - **Entry** — one bib record (the existing `BibEntry`).
-- **Volume** — one `.bib` file (a single πίναξ): the load → edit → preview →
+- **Collection** — one `.bib` file (a single πίναξ): the load → edit → preview →
   commit lifecycle for that file.
-- **Library** — the collection: a directory / git repo of volumes. This is the
+- **Library** — the collection: a directory / git repo of collections. This is the
   *Pinakes* — your catalog. (The tool, `pynakes`, is the librarian; the
   `Library` is what it tends.)
 
@@ -63,59 +63,59 @@ consumer should get those guarantees for free.
 ## Layering
 
 ```
-operation modules        pure functions on BibLibrary (mutate in place,
+operation modules        functions on BibFile (mutate in place,
 (groups, fields, ...)     return a count/report) — already exist, unit-tested
         │
         ▼
-Volume (engine.py)        binds one file: parse, stage edits, diff, commit,
-                          external-change detection — NEW, the boundary
+Collection (engine.py)        binds one file: parse, stage edits, diff, commit,
+                          external-change detection — implemented boundary
         │
         ▼
-Library (engine.py)       a git repo of volumes: search, identity/dedup across
-                          files, locate-key, inbox→canonical→projection — NEW
+Library (planned)         a git repo of collections: search, identity/dedup across
+                          files, locate-key, inbox→canonical→projection
         │
    ┌────┼─────────┬───────────────┐
    ▼    ▼         ▼               ▼
-  CLI  MCP     daemon/server   parallel app   (thin consumers; all share
-                                               the same contract)
+  CLI       daemon/server   parallel app   (thin consumers; all share
+                                           the same contract)
 ```
 
-The CLI is rewritten as a Volume consumer. That rewrite is the proof the
+The CLI is rewritten as a Collection consumer. That rewrite is the proof the
 boundary is correct: if `cli.py` reduces to "open → call op → diff/commit", a
 parallel project can do the same.
 
-## The Volume API (one file)
+## The Collection API (one file)
 
 ```python
-from pynakes.engine import Volume
+from pynakes.engine import Collection
 
-# Bind a file. Parses it, remembers the original bytes + a fingerprint
-# (size+mtime, falling back to a content hash) for change detection.
-vol = Volume.open("refs.bib")               # raises FileNotFoundError / ParseError
+# Bind a file. Parses it and captures the source text plus a fingerprint
+# (size, mtime, and content hash) for change detection.
+coll = Collection.open("refs.bib")               # raises FileNotFoundError / ParseError
 
 # --- read-only views (no staging) ---------------------------------------
-vol.entries                                  # EntryCollection (duplicate-tolerant)
-vol.lint()                                   # -> list[Issue]
-vol.duplicate_keys()                         # -> dict[str, int]
-vol.is_dirty                                 # any staged edits since open/commit?
+coll.entries                                  # EntryStore (duplicate-tolerant)
+coll.lint()                                   # -> list[Issue]
+coll.duplicate_keys()                         # -> dict[str, int]
+coll.is_dirty                                 # any staged edits since open/commit?
 
 # --- staged edits (mutate in memory; nothing is written) -----------------
-# Each returns a Change: affected-entry count + warnings; the cumulative diff
-# is read from the volume, not the individual call.
-vol.rename_field("journal", "journaltitle", where=None)
-vol.add_to_group("Smith2020", "Economics")
-vol.convert(to="biblatex")
-vol.normalize(options)
-vol.import_doi("10.5555/x", key_source="generated")   # append, not splice
+# Each operation returns its existing count or domain report; the cumulative
+# staged diff is read from the collection, not an individual operation.
+coll.rename_field("journal", "journaltitle", where=None)
+coll.add_to_group("Smith2020", "Economics")
+coll.convert("biblatex")
+coll.normalize(options)
+coll.import_doi("10.5555/x", key_source="generated")   # append, not splice
 
 # --- preview ------------------------------------------------------------
-vol.diff()                                   # unified diff of ALL staged edits vs disk
-vol.preview()                                # the would-be file text
+coll.diff()                                   # unified diff of ALL staged edits vs disk
+coll.preview()                                # the would-be file text
 
 # --- commit / discard ---------------------------------------------------
-result = vol.commit()                        # atomic write + .bak + re-parse validate
-vol.reset()                                  # drop staged edits, back to disk state
-vol.reload()                                 # re-read from disk (raises if dirty,
+result = coll.commit()                        # atomic write + .bak + re-parse validate
+coll.reset()                                  # drop staged edits, back to disk state
+coll.reload()                                 # re-read from disk (raises if dirty,
                                              # unless reload(force=True))
 ```
 
@@ -123,9 +123,9 @@ vol.reload()                                 # re-read from disk (raises if dirt
 
 This generalizes the CLI's existing `snapshot → op → commit`:
 
-1. `Volume.open` captures the pristine on-disk text and a per-entry snapshot of
+1. `Collection.open` captures the pristine on-disk text and a per-entry snapshot of
    `raw_content` (keyed by entry identity).
-2. Operations mutate the in-memory `BibLibrary` through `editing.py`, exactly as
+2. Operations mutate the in-memory `BibFile` through `editing.py`, exactly as
    today — only changed fields' `raw_content` differ from the snapshot.
 3. `diff()` / `preview()` / `commit()` are *derived*: each changed entry yields a
    `(pristine_block, current_block)` edit; `editing.splice_into_text` patches the
@@ -175,55 +175,57 @@ stateful consumer needs.
 
 ## The Library API (the collection)
 
-A `Library` is a directory / git repo of volumes — the Pinakes. It adds the
-cross-file operations a single volume can't express:
+A `Library` is a directory / git repo of collections — the Pinakes. It adds the
+cross-file operations a single collection can't express. **This API is a future
+design sketch, not an implemented importable class:**
 
 ```python
 from pynakes.engine import Library
 
 lib = Library.open("~/research/refs")        # a directory / git repo of .bib files
 
-lib.volumes()                                # -> list[Volume]
-lib.volume("topics/ml.bib")                  # open one volume in the collection
+lib.collections()                                # -> list[Collection]
+lib.collection("topics/ml.bib")                  # open one collection in the collection
 lib.search("attention transformer 2017")     # global query (via the derived index)
-lib.find_key("Vaswani2017")                  # -> which volumes contain it
+lib.find_key("Vaswani2017")                  # -> which collections contain it
 lib.duplicates()                             # cross-file identity/dedup candidates
 lib.promote(entry, to="canonical/ml.bib")    # inbox → canonical, or → a projection
 lib.reindex()                                # rebuild the derived search index
 ```
 
 - **Identity** is by stable id (DOI / arXiv / OpenAlex) so the same work in two
-  volumes is recognized as one; dedup *reports* conflicts rather than guessing.
+  collections is recognized as one; dedup *reports* conflicts rather than guessing.
 - **The index is a derived cache** (e.g. SQLite FTS), rebuildable from the
-  volumes at any time — never a competing source of truth.
+  collections at any time — never a competing source of truth.
 - **Projections** (per-project bibfiles) are views derived from the canonical
-  volumes; `pynakes used --out` is today's primitive for this.
+  collections; `pynakes used --out` is today's primitive for this.
 
 ## Transport sugar (all wrap the same engine)
 
-- **CLI**: `_finish_mod` becomes `vol.<op>(...)` + `vol.commit()`; the JSON
+- **CLI**: `_finish_mod` becomes `coll.<op>(...)` + `coll.commit()`; the JSON
   envelope is a serialization of `Change`/`SaveResult`.
-- **MCP**: each tool is `open → op → (dry_run ? diff() : commit())`. Dry-run is
-  the default; write requires explicit opt-in — same safety posture as the CLI.
-- **Daemon/server**: holds open volumes/libraries to avoid re-parsing on every
+- **Downstream adapters**: a server or tool wrapper can use
+  `open → op → (dry_run ? diff() : commit())`. It remains outside the core;
+  the CLI is the supported machine-facing interface today.
+- **Daemon/server**: holds open collections/libraries to avoid re-parsing on every
   call for a chatty frontend; same API, just long-lived.
 
 ## What a parallel project builds against
 
 The parallel project owns state + UX (capture, PDF, search index, sync, GUI) and
-treats `lib`/`vol.entries` as its derived, rebuildable view. It never persists a
+treats `lib`/`coll.entries` as its derived, rebuildable view. It never persists a
 competing source of truth. In return it inherits, for free, the property no
 from-scratch manager has: **every edit is surgical, validated, atomic, and
 non-corrupting.**
 
 ## Migration steps
 
-1. [x] Add `engine.py` with `Volume`, lifting `_snapshot`/`_commit` orchestration out
+1. [x] Add `engine.py` with `Collection`, lifting `_snapshot`/`_commit` orchestration out
    of `cli.py` (delegating to the existing operation modules — no new transform
    logic).
 2. [x] Add fingerprint + `ExternalModificationError`.
-3. [x] Rewrite `cli.py` commands as Volume consumers (dogfood; the test suite is the
+3. [x] Rewrite `cli.py` commands as Collection consumers (dogfood; the test suite is the
    regression guard).
 4. [x] Add `reload()`; optional `watch()` remains deferred.
-5. [ ] Add `Library` (collection over a git repo of volumes) + a derived index.
+5. [ ] Add `Library` (collection over a git repo of collections) + a derived index.
 6. [ ] Document and pin the broader public API contract after `Library` lands.

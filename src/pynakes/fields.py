@@ -16,18 +16,18 @@ from pynakes.editing import (
     rename_entry_field,
     set_entry_field,
 )
-from pynakes.model import BibEntry, BibLibrary
+from pynakes.model import BibEntry, BibFile
 
 QueryFilter = Optional[Callable[[BibEntry], bool]]
 
 
-def _selected(lib: BibLibrary, where: QueryFilter) -> Iterator[BibEntry]:
+def _selected(lib: BibFile, where: QueryFilter) -> Iterator[BibEntry]:
     for entry in lib.entries.values():
         if where is None or where(entry):
             yield entry
 
 
-def rename_field(lib: BibLibrary, old: str, new: str, where: QueryFilter = None) -> int:
+def rename_field(lib: BibFile, old: str, new: str, where: QueryFilter = None) -> int:
     """Rename field ``old`` to ``new`` on matching entries.
 
     Returns the number of entries changed. Entries already using ``new`` (and
@@ -36,7 +36,7 @@ def rename_field(lib: BibLibrary, old: str, new: str, where: QueryFilter = None)
     return sum(rename_entry_field(e, old, new) for e in _selected(lib, where))
 
 
-def move_field(lib: BibLibrary, old: str, new: str, where: QueryFilter = None) -> int:
+def move_field(lib: BibFile, old: str, new: str, where: QueryFilter = None) -> int:
     """Move field ``old`` to ``new``, but only where ``new`` is not already set.
 
     Unlike :func:`rename_field`, this never clobbers an existing target field;
@@ -51,7 +51,7 @@ def move_field(lib: BibLibrary, old: str, new: str, where: QueryFilter = None) -
 
 
 def append_field(
-    lib: BibLibrary,
+    lib: BibFile,
     field: str,
     value: str,
     where: QueryFilter = None,
@@ -66,7 +66,7 @@ def append_field(
     return sum(append_delimited_field(e, field, value, delim, join) for e in _selected(lib, where))
 
 
-def clear_field(lib: BibLibrary, field: str, where: QueryFilter = None) -> int:
+def clear_field(lib: BibFile, field: str, where: QueryFilter = None) -> int:
     """Remove ``field`` from matching entries. Returns the number changed."""
     return sum(remove_entry_field(e, field) for e in _selected(lib, where))
 
@@ -129,7 +129,7 @@ def _protect_title_value(value: str, terms: set[str]) -> str:
 
 
 def protect_title_capitalization(
-    lib: BibLibrary,
+    lib: BibFile,
     field: str = "title",
     where: QueryFilter = None,
     terms: list[str] | None = None,
@@ -156,7 +156,8 @@ def protect_title_capitalization(
 # --- query filters ---------------------------------------------------------
 
 # Supports: `FIELD contains "x"`, `FIELD = "x"` / `FIELD == "x"`, `FIELD exists`.
-# The special field name `type` matches the entry type rather than a field.
+# The special field names `type` and `key` match the entry type and citation
+# key respectively, rather than a stored field.
 _QUERY_RE = re.compile(
     r"""^\s*(?P<field>\w+)\s+
         (?P<op>contains|==|=|exists)
@@ -173,6 +174,7 @@ def parse_query(expr: str) -> Callable[[BibEntry], bool]:
 
         title contains "digital currency"
         type = article
+        key == "Smith2020"
         doi exists
 
     Raises:
@@ -193,10 +195,12 @@ def parse_query(expr: str) -> Callable[[BibEntry], bool]:
     def get(entry: BibEntry) -> str:
         if field == "type":
             return entry.type
+        if field == "key":
+            return entry.key
         return entry.fields.get(field, "")
 
     if op == "exists":
-        return lambda e: field == "type" or field in e.fields
+        return lambda e: field in ("type", "key") or field in e.fields
 
     if value is None:
         raise ValueError(f"Query operator {op!r} requires a value: {expr!r}")

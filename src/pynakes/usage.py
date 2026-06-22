@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Union
 
 from pynakes.editing import append_delimited_field, splice_into_text
-from pynakes.model import BibLibrary, EntryCollection
+from pynakes.model import BibFile, EntryStore
 
 __all__ = [
     "UsageReport",
@@ -244,7 +244,7 @@ def _rename_key_list(raw: str, old: str, new: str) -> tuple[str, int]:
 
 
 def analyze_usage(
-    lib: BibLibrary,
+    lib: BibFile,
     cited_keys: set[str],
     include_all: bool = False,
     sources: Union[list[str], None] = None,
@@ -275,25 +275,27 @@ def analyze_usage(
 # --- subset export ---------------------------------------------------------
 
 
-def subset_library(lib: BibLibrary, keys: Iterable[str]) -> BibLibrary:
+def subset_library(lib: BibFile, keys: Iterable[str]) -> BibFile:
     """Return a new library containing only entries whose key is in ``keys``.
 
     Library-level data (strings, preamble, comments, encoding, line ending) is
     preserved so the subset stays a valid, JabRef-compatible file.
     """
     keyset = set(keys)
-    subset = EntryCollection()
+    subset = EntryStore()
     for entry in lib.entries.values():
         if entry.key in keyset:
             subset.add(entry)
 
-    return BibLibrary(
+    return BibFile(
         entries=subset,
         strings=dict(lib.strings),
         preamble=list(lib.preamble),
         raw_comments=list(lib.raw_comments),
         jabref_metadata=dict(lib.jabref_metadata),
         jabref_metadata_blocks=list(lib.jabref_metadata_blocks),
+        pynakes_metadata=dict(lib.pynakes_metadata),
+        pynakes_metadata_blocks=list(lib.pynakes_metadata_blocks),
         encoding=lib.encoding,
         line_ending=lib.line_ending,
     )
@@ -302,7 +304,7 @@ def subset_library(lib: BibLibrary, keys: Iterable[str]) -> BibLibrary:
 # --- tagging ---------------------------------------------------------------
 
 
-def tag_with_group(lib: BibLibrary, keys: Iterable[str], group: str) -> int:
+def tag_with_group(lib: BibFile, keys: Iterable[str], group: str) -> int:
     """Add ``group`` to the JabRef ``groups`` field of the given entries.
 
     Returns the number of entries newly tagged (already-tagged entries are
@@ -311,7 +313,7 @@ def tag_with_group(lib: BibLibrary, keys: Iterable[str], group: str) -> int:
     return _tag(lib, keys, "groups", group, _GROUPS_DELIM, _GROUPS_JOIN)
 
 
-def tag_with_keyword(lib: BibLibrary, keys: Iterable[str], keyword: str) -> int:
+def tag_with_keyword(lib: BibFile, keys: Iterable[str], keyword: str) -> int:
     """Add ``keyword`` to the ``keywords`` field of the given entries.
 
     Returns the number of entries newly tagged. Modifies ``lib`` in place.
@@ -320,7 +322,7 @@ def tag_with_keyword(lib: BibLibrary, keys: Iterable[str], keyword: str) -> int:
 
 
 def _tag(
-    lib: BibLibrary,
+    lib: BibFile,
     keys: Iterable[str],
     field_name: str,
     value: str,

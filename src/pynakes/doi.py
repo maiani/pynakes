@@ -11,7 +11,7 @@ from urllib.request import Request, urlopen
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.keys import UnsupportedCitationKeyPatternError, generate_key, unique_key
-from pynakes.model import BibEntry, BibLibrary
+from pynakes.model import BibEntry, BibFile
 
 _DOI_URL_RE = re.compile(r"^https?://(?:dx\.)?doi\.org/", re.IGNORECASE)
 _DOI_RE = re.compile(r"^10\.\d{4,9}/\S+$", re.IGNORECASE)
@@ -96,7 +96,7 @@ def entry_from_bibtex(text: str) -> BibEntry:
     return entry
 
 
-def existing_keys_for_doi(lib: BibLibrary, doi: str) -> list[str]:
+def existing_keys_for_doi(lib: BibFile, doi: str) -> list[str]:
     """Return citation keys already using ``doi`` in ``lib``."""
     target = canonical_doi(doi)
     keys: list[str] = []
@@ -113,7 +113,7 @@ def existing_keys_for_doi(lib: BibLibrary, doi: str) -> list[str]:
 
 
 def prepare_imported_entry(
-    lib: BibLibrary,
+    lib: BibFile,
     doi: str,
     *,
     key: str | None = None,
@@ -162,5 +162,5 @@ def prepare_imported_entry(
 
 def render_entry(entry: BibEntry, line_ending: str = "\n") -> str:
     """Render a single entry as BibTeX text."""
-    lib = BibLibrary(entries=[entry], line_ending=line_ending)
+    lib = BibFile(entries=[entry], line_ending=line_ending)
     return write_bib(lib).rstrip("\r\n")

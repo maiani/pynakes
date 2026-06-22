@@ -3,7 +3,7 @@
 import json
 from dataclasses import asdict
 
-from pynakes.model import BibEntry, BibLibrary, EntryCollection
+from pynakes.model import BibEntry, BibFile, EntryStore
 
 
 class TestBibEntry:
@@ -108,11 +108,11 @@ class TestBibEntry:
 
 
 class TestBibLibrary:
-    """Tests for BibLibrary dataclass."""
+    """Tests for BibFile dataclass."""
 
     def test_empty_library(self) -> None:
         """Test creating an empty library."""
-        lib = BibLibrary(entries={})
+        lib = BibFile(entries={})
         assert len(lib.entries) == 0
         assert lib.strings == {}
         assert lib.preamble == []
@@ -124,14 +124,14 @@ class TestBibLibrary:
         """Test creating a library with entries."""
         entry1 = BibEntry(key="Smith2020", type="article", fields={})
         entry2 = BibEntry(key="Jones2021", type="book", fields={})
-        lib = BibLibrary(entries={"Smith2020": entry1, "Jones2021": entry2})
+        lib = BibFile(entries={"Smith2020": entry1, "Jones2021": entry2})
         assert len(lib.entries) == 2
         assert lib.entries["Smith2020"].key == "Smith2020"
         assert lib.entries["Jones2021"].key == "Jones2021"
 
     def test_library_with_strings(self) -> None:
         """Test library with string definitions."""
-        lib = BibLibrary(
+        lib = BibFile(
             entries={},
             strings={"IEEE": "IEEE Transactions", "ACM": "ACM Computing Surveys"},
         )
@@ -140,7 +140,7 @@ class TestBibLibrary:
 
     def test_library_with_preamble(self) -> None:
         """Test library with preamble."""
-        lib = BibLibrary(
+        lib = BibFile(
             entries={},
             preamble=["@preamble{Acknowledgments}"],
         )
@@ -148,7 +148,7 @@ class TestBibLibrary:
 
     def test_library_with_comments(self) -> None:
         """Test library with comments."""
-        lib = BibLibrary(
+        lib = BibFile(
             entries={},
             raw_comments=["% BibTeX file", "% Created by pynakes"],
         )
@@ -156,21 +156,21 @@ class TestBibLibrary:
 
     def test_library_encoding_variants(self) -> None:
         """Test library with different encodings."""
-        lib_utf8 = BibLibrary(entries={}, encoding="utf-8")
-        lib_latin1 = BibLibrary(entries={}, encoding="latin-1")
+        lib_utf8 = BibFile(entries={}, encoding="utf-8")
+        lib_latin1 = BibFile(entries={}, encoding="latin-1")
         assert lib_utf8.encoding == "utf-8"
         assert lib_latin1.encoding == "latin-1"
 
     def test_library_line_ending_variants(self) -> None:
         """Test library with different line endings."""
-        lib_unix = BibLibrary(entries={}, line_ending="\n")
-        lib_windows = BibLibrary(entries={}, line_ending="\r\n")
+        lib_unix = BibFile(entries={}, line_ending="\n")
+        lib_windows = BibFile(entries={}, line_ending="\r\n")
         assert lib_unix.line_ending == "\n"
         lib_windows.line_ending == "\r\n"
 
     def test_library_modification(self) -> None:
         """Test modifying library contents."""
-        lib = BibLibrary(entries={})
+        lib = BibFile(entries={})
         entry = BibEntry(key="Smith2020", type="article", fields={})
         lib.entries["Smith2020"] = entry
         assert len(lib.entries) == 1
@@ -179,7 +179,7 @@ class TestBibLibrary:
     def test_library_repr(self) -> None:
         """Test __repr__ for debugging."""
         entry = BibEntry(key="Smith2020", type="article", fields={})
-        lib = BibLibrary(entries={"Smith2020": entry})
+        lib = BibFile(entries={"Smith2020": entry})
         repr_str = repr(lib)
         assert "entries=1" in repr_str
         assert "encoding='utf-8'" in repr_str
@@ -187,7 +187,7 @@ class TestBibLibrary:
     def test_library_to_dict(self) -> None:
         """Test converting library to dictionary."""
         entry = BibEntry(key="Smith2020", type="article", fields={"author": "John"})
-        lib = BibLibrary(
+        lib = BibFile(
             entries={"Smith2020": entry},
             strings={"IEEE": "IEEE Transactions"},
             encoding="utf-8",
@@ -200,7 +200,7 @@ class TestBibLibrary:
     def test_library_to_json(self) -> None:
         """Test round-trip library to JSON."""
         entry = BibEntry(key="Smith2020", type="article", fields={"author": "John"})
-        lib = BibLibrary(
+        lib = BibFile(
             entries={"Smith2020": entry},
             strings={"IEEE": "IEEE Transactions"},
         )
@@ -225,7 +225,7 @@ class TestBibLibrary:
                 fields={"author": "Jane Jones", "title": "Book 1"},
             ),
         }
-        lib = BibLibrary(
+        lib = BibFile(
             entries=entries,
             strings={"IEEE": "IEEE Transactions"},
             preamble=["@preamble{Acknowledgments}"],
@@ -247,7 +247,7 @@ class TestEntryCollection:
         return BibEntry(key=key, type="article", fields={"author": author})
 
     def test_dict_like_access_first_match(self) -> None:
-        coll = EntryCollection()
+        coll = EntryStore()
         coll.add(self._entry("k", "first"))
         coll.add(self._entry("k", "second"))
 
@@ -256,7 +256,7 @@ class TestEntryCollection:
         assert coll.get("missing") is None
 
     def test_preserves_duplicates(self) -> None:
-        coll = EntryCollection()
+        coll = EntryStore()
         coll.add(self._entry("k", "first"))
         coll.add(self._entry("k", "second"))
 
@@ -265,16 +265,16 @@ class TestEntryCollection:
         assert coll.duplicate_keys() == {"k": 2}
 
     def test_no_duplicates_reports_empty(self) -> None:
-        coll = EntryCollection([self._entry("a", "x"), self._entry("b", "y")])
+        coll = EntryStore([self._entry("a", "x"), self._entry("b", "y")])
         assert coll.duplicate_keys() == {}
         assert coll.keys() == ["a", "b"]
 
     def test_setitem_replaces_first(self) -> None:
-        coll = EntryCollection([self._entry("k", "old")])
+        coll = EntryStore([self._entry("k", "old")])
         coll["k"] = self._entry("k", "new")
         assert coll["k"].fields["author"] == "new"
         assert len(coll) == 1
 
     def test_construct_from_dict(self) -> None:
-        coll = EntryCollection({"k": self._entry("k", "x")})
+        coll = EntryStore({"k": self._entry("k", "x")})
         assert coll["k"].fields["author"] == "x"

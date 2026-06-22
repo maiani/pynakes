@@ -7,7 +7,7 @@ Get up and running with `pynakes` in a few minutes.
 For local development:
 
 ```bash
-git clone https://github.com/user/pynakes.git
+git clone https://github.com/maiani/pynakes.git
 cd pynakes
 pip install -e ".[dev]"
 ```

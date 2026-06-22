@@ -203,6 +203,60 @@ pynakes normalize refs.bib --dry-run --diff --json > normalize-preview.json
 An agent or script can inspect `normalize-preview.json`, show the diff to a
 user, and then run the same command without `--dry-run` after approval.
 
+## Example 12: A `.bib` file with library metadata
+
+pynakes reads two top-level metadata namespaces. JabRef writes its own settings
+as `@comment{jabref-meta: …}`; pynakes adds `@comment{pynakes-meta: …}` for
+settings JabRef has no place for. A library that carries both looks like this:
+
+```bibtex
+@comment{jabref-meta: databaseType:biblatex;}
+@comment{jabref-meta: keypatterndefault:[auth][year];}
+@comment{jabref-meta: fileDirectory:/home/me/papers;}
+
+@comment{pynakes-meta: pynakes-normalize-journal-style:abbreviated;}
+@comment{pynakes-meta: pynakes-normalize-author-style:jabref;}
+@comment{pynakes-meta: pynakes-protected-terms:DNA,RNA,CRISPR;}
+
+@article{Doe2021,
+  author = {Jane Doe},
+  title  = {On {CRISPR} and {DNA} repair},
+  journaltitle = {Nature Reviews Genetics},
+  date   = {2021},
+  doi    = {10.1000/example}
+}
+```
+
+These settings act as **defaults** when you run operations — no flags needed:
+
+```bash
+# Honors keypatterndefault from jabref-meta:
+pynakes keys generate refs.bib --dry-run --diff
+
+# Honors journal-style/author-style/protected-terms from pynakes-meta:
+pynakes normalize refs.bib --dry-run --diff
+```
+
+Inspect both namespaces (the merged "effective" view is what operations read):
+
+```bash
+pynakes metadata list refs.bib
+#   [jabref:known:library] databaseType = biblatex
+#   [jabref:known:citation-key] keypatterndefault = [auth][year]
+#   [jabref:known:files] fileDirectory = /home/me/papers
+#   [pynakes:known:pynakes] pynakes-normalize-journal-style = abbreviated
+#   [pynakes:known:pynakes] pynakes-normalize-author-style = jabref
+#   [pynakes:known:pynakes] pynakes-protected-terms = DNA,RNA,CRISPR
+```
+
+Add a preference. A JabRef-native key lands in `jabref-meta` (so JabRef keeps
+seeing it); a pynakes-only key lands in `pynakes-meta` — automatically:
+
+```bash
+pynakes metadata set refs.bib databaseType bibtex            # → jabref-meta
+pynakes metadata set refs.bib pynakes-normalize-dois on      # → pynakes-meta
+```
+
 ## Next Steps
 
 - [Usage Guide](../guides/usage.md)

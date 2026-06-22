@@ -71,7 +71,45 @@ def test_normalize_library_runs_standard_pass() -> None:
         "authors": 1,
         "journals": 1,
         "dois": 1,
+        "save_action_fields": 0,
     }
+
+
+def test_normalize_honors_jabref_saveactions_for_authors() -> None:
+    # saveActions is enabled but configures no name normalization, so pynakes
+    # defers to JabRef and leaves author names untouched (only journal runs).
+    lib = parse_bib(
+        "@comment{jabref-meta: saveActions:enabled;\ntitle[html_to_latex]\n;}\n"
+        "@article{A,\n  author = {John Smith},\n  title = {T},\n  journal = {J}\n}\n"
+    )
+
+    normalize_library(lib)
+
+    assert lib.entries["A"].fields["author"] == "John Smith"  # not rewritten
+
+
+def test_normalize_saveactions_normalize_names_enables_author_style() -> None:
+    lib = parse_bib(
+        "@comment{jabref-meta: saveActions:enabled;\nauthor[normalize_names]\n;}\n"
+        "@article{A,\n  author = {John Smith},\n  title = {T},\n  journal = {J}\n}\n"
+    )
+
+    normalize_library(lib)
+
+    assert lib.entries["A"].fields["author"] == "Smith, John"
+
+
+def test_pynakes_meta_author_style_overrides_saveactions() -> None:
+    # An explicit pynakes-meta author-style wins over JabRef's saveActions.
+    lib = parse_bib(
+        "@comment{jabref-meta: saveActions:enabled;\ntitle[html_to_latex]\n;}\n"
+        "@comment{pynakes-meta: pynakes-normalize-author-style:jabref;}\n"
+        "@article{A,\n  author = {John Smith},\n  title = {T},\n  journal = {J}\n}\n"
+    )
+
+    normalize_library(lib)
+
+    assert lib.entries["A"].fields["author"] == "Smith, John"
 
 
 def test_normalize_library_honors_metadata_overrides() -> None:

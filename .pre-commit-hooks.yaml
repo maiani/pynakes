@@ -1,0 +1,49 @@
+# pynakes pre-commit hooks.
+#
+# Add to a repository's .pre-commit-config.yaml:
+#
+#   repos:
+#     - repo: https://github.com/maiani/pynakes
+#       rev: v0.1.0
+#       hooks:
+#         - id: pynakes-lint
+#         - id: pynakes-keys-check
+#         - id: pynakes-files-check   # opt-in: validates linked-file paths
+#         - id: pynakes-dedupe-check  # opt-in: flags duplicate works
+#
+# Every hook is read-only, offline, and deterministic. pre-commit passes the
+# staged .bib files as arguments; --strict makes a finding fail the commit.
+
+- id: pynakes-lint
+  name: pynakes lint
+  description: Validate BibTeX entries and fail on errors (duplicate/empty keys, missing required fields).
+  entry: pynakes lint --strict
+  language: python
+  files: \.bib$
+  types: [file]
+
+- id: pynakes-keys-check
+  name: pynakes keys check
+  description: Fail if any citation key is duplicated.
+  entry: pynakes keys check --strict
+  language: python
+  files: \.bib$
+  types: [file]
+
+- id: pynakes-files-check
+  name: pynakes files check
+  description: Fail if any JabRef linked file is missing or the wrong type.
+  entry: pynakes files check --strict
+  language: python
+  files: \.bib$
+  types: [file]
+  stages: [manual]
+
+- id: pynakes-dedupe-check
+  name: pynakes dedupe check
+  description: Fail if duplicate works (same DOI/arXiv/title) are present.
+  entry: pynakes dedupe check --strict
+  language: python
+  files: \.bib$
+  types: [file]
+  stages: [manual]

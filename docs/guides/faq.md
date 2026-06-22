@@ -12,7 +12,7 @@ A: pynakes requires **Python 3.11 or later**. It uses modern Python features lik
 
 A: Clone the repo and use editable install:
 ```bash
-git clone https://github.com/user/pynakes.git
+git clone https://github.com/maiani/pynakes.git
 cd pynakes
 pip install -e ".[dev]"
 ```
@@ -132,8 +132,9 @@ A: DOI import is implemented:
 pynakes doi import refs.bib 10.5555/example --dry-run --diff
 ```
 
-Abstract/PDF metadata extraction and provider-specific enrichment are still
-planned.
+`verify`, `enrich`, and `published` also support opt-in provider lookups with
+`--online`; responses are cached and modifying enrichment commands support
+`--dry-run --diff`. Abstract/PDF metadata extraction is still out of scope.
 
 ## Agent & Automation
 
@@ -151,9 +152,14 @@ pynakes lint refs.bib --json > issues.json
 
 Parse the JSON and make decisions in your workflow.
 
-### Q: Can pynakes be used as an MCP server?
+### Q: Does pynakes have an MCP server?
 
-A: Not yet. This is planned for v0.3 as `pynakes-mcp`. For now, use the Python API directly.
+A: No, and it isn't planned for the core. pynakes' agent interface *is* the CLI —
+`pynakes capabilities --json`, the stable JSON envelope, exit codes, and
+`--dry-run`. An agent drives pynakes by calling the CLI as a tool (see the
+[LLM integration guide](llm-integration.md)). An MCP server is a downstream
+concern — it suits querying a personal library/corpus, which belongs to a
+corpus-management app or a thin companion built on pynakes' pinned API.
 
 ## Performance
 
@@ -173,7 +179,7 @@ A: Tested up to 100k entries without issues. Memory usage scales linearly with l
 
 ### Q: How can I contribute?
 
-A: See [CONTRIBUTING.md](https://github.com/user/pynakes/blob/main/CONTRIBUTING.md) for guidelines. Areas we need help:
+A: See [CONTRIBUTING.md](https://github.com/maiani/pynakes/blob/main/CONTRIBUTING.md) for guidelines. Areas we need help:
 - Testing with diverse BibTeX files
 - New operation implementations
 - Documentation and examples
@@ -181,7 +187,7 @@ A: See [CONTRIBUTING.md](https://github.com/user/pynakes/blob/main/CONTRIBUTING.
 
 ### Q: How do I report a bug?
 
-A: Open an issue on [GitHub Issues](https://github.com/user/pynakes/issues) with:
+A: Open an issue on [GitHub Issues](https://github.com/maiani/pynakes/issues) with:
 - Your pynakes version (`pynakes --version`)
 - The command you ran
 - Your BibTeX file (if possible, a minimal reproducer)
@@ -189,13 +195,13 @@ A: Open an issue on [GitHub Issues](https://github.com/user/pynakes/issues) with
 
 ### Q: Can I request a feature?
 
-A: Yes! Open a [GitHub Discussion](https://github.com/user/pynakes/discussions) or create an issue. Check the roadmap in [DEVPLAN.md](https://github.com/user/pynakes/blob/main/DEVPLAN.md) to see what's planned.
+A: Yes! Open a [GitHub Discussion](https://github.com/maiani/pynakes/discussions) or create an issue. Check the roadmap in [DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md) to see what's planned.
 
 ## Licensing
 
 ### Q: What license is pynakes under?
 
-A: MIT License. See [LICENSE](https://github.com/user/pynakes/blob/main/LICENSE) for details.
+A: MIT License. See [LICENSE](https://github.com/maiani/pynakes/blob/main/LICENSE) for details.
 
 ### Q: Can I use pynakes in a commercial project?
 
@@ -207,8 +213,8 @@ A: Yes, MIT is permissive. You can use, modify, and distribute pynakes freely, i
 
 A: 
 - **Quick questions**: Check this FAQ
-- **Issues**: Report bugs on [GitHub Issues](https://github.com/user/pynakes/issues)
-- **Discussions**: Ask questions on [GitHub Discussions](https://github.com/user/pynakes/discussions)
+- **Issues**: Report bugs on [GitHub Issues](https://github.com/maiani/pynakes/issues)
+- **Discussions**: Ask questions on [GitHub Discussions](https://github.com/maiani/pynakes/discussions)
 - **Email**: [andrea.maiani@su.se](mailto:andrea.maiani@su.se)
 
 ### Q: Is there a Slack/Discord community?

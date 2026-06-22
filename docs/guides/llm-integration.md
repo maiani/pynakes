@@ -33,13 +33,23 @@ pynakes capabilities --json
 Read-only:
 
 - `pynakes inspect <file> [--json]`
-- `pynakes lint <file> [--json]`
+- `pynakes lint <file>... [--strict] [--json]`
 - `pynakes groups list <file> [--json]`
-- `pynakes keys check <file> [--json]`
+- `pynakes keys check <file>... [--strict] [--json]`
 - `pynakes metadata list <file> [--json]`
-- `pynakes files check <file> [--root ...] [--json]`
+- `pynakes files check <file>... [--root ...] [--strict] [--json]`
 - `pynakes journals check <file> [--json]`
+- `pynakes dedupe check <file>... [--strict] [--json]`
+- `pynakes verify <file>... [--online] [--strict] [--json]`
+- `pynakes published <file> [--online] [--json]`
 - `pynakes capabilities [--json]`
+
+The five gate checks (`lint`, `keys check`, `files check`, `dedupe check`,
+`verify`) accept multiple `.bib` files and support `--strict` to exit `1` on a
+finding — the primitives for CI and pre-commit gating. See
+[Git Workflows](git-workflows.md). A single file keeps its per-file JSON
+envelope; multiple files emit an aggregate `{status, action, strict, files,
+summary}` envelope.
 
 Modifying (all support `--dry-run`, `--diff`, `--json`):
 
@@ -54,15 +64,43 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 - `pynakes fields append <file> <field> <value> [--where ...]`
 - `pynakes fields clear <file> <field> [--where ...]`
 - `pynakes fields protect-title <file> [--field ...] [--term ...] [--where ...]`
-- `pynakes doi import <file> <doi> [--key ...] [--key-source generated|provider]`
+- `pynakes doi import <file> <doi> [--key ...] [--key-source generated|provider] [--allow-duplicate]`
 - `pynakes metadata set <file> <key> <value> [--allow-unknown]`
 - `pynakes normalize <file>`
 - `pynakes convert <file> --to biblatex|bibtex`
 - `pynakes journals abbreviate <file> [--journal-table ...] [--ltwa-table ...]`
 - `pynakes journals expand <file> [--journal-table ...] [--ltwa-table ...]`
+- `pynakes dedupe merge <file>` — conservatively merge duplicate-work clusters
+- `pynakes enrich <file> [--online]` — conservatively fill missing metadata
+- `pynakes published <file> --apply [--online]` — apply safe published-version metadata
 - `pynakes used <bib-file> <source>... [--out ...] [--group ...] [--keyword ...]`
 
-Planned (not implemented): `entries`, `dedupe`, `merge`.
+Planned (not implemented): `entries`.
+
+## The `--where` filter
+
+The `fields` subcommands accept a `--where` expression to restrict which
+entries are touched. The grammar is a single condition:
+
+```
+FIELD contains "text"      # case-insensitive substring match on the field value
+FIELD == "value"           # case-insensitive exact match (FIELD = "value" also works)
+FIELD exists               # the field is present on the entry
+```
+
+`FIELD` is any field name (`title`, `author`, `journal`, …) plus two special
+names: `type` matches the entry type (`article`, `book`, …) and `key` matches
+the citation key. Quote values containing spaces. Examples:
+
+```bash
+pynakes fields append refs.bib keywords ml --where 'type == "article"'
+pynakes fields clear  refs.bib abstract  --where 'key == "Smith2020"'
+pynakes fields rename refs.bib url doi    --where 'doi exists'
+```
+
+Targeting `key == "..."` is the way to edit one specific entry — including the
+manual resolution `dedupe merge` suggests for an ambiguous duplicate-work
+cluster.
 
 ## Recommended workflow
 

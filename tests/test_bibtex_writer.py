@@ -2,7 +2,7 @@
 
 from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
-from pynakes.model import BibEntry, BibLibrary
+from pynakes.model import BibEntry, BibFile
 
 
 class TestBasicWriting:
@@ -20,7 +20,7 @@ class TestBasicWriting:
                 "year": "2020",
             },
         )
-        lib = BibLibrary(entries={"Smith2020": entry})
+        lib = BibFile(entries={"Smith2020": entry})
         output = write_bib(lib)
 
         assert "@article{Smith2020" in output
@@ -42,7 +42,7 @@ class TestBasicWriting:
                 fields={"author": "Jane", "title": "Book", "publisher": "Pub", "year": "2021"},
             ),
         }
-        lib = BibLibrary(entries=entries)
+        lib = BibFile(entries=entries)
         output = write_bib(lib)
 
         assert "@article{Smith2020" in output
@@ -50,7 +50,7 @@ class TestBasicWriting:
 
     def test_write_strings(self) -> None:
         """Test writing @string definitions."""
-        lib = BibLibrary(
+        lib = BibFile(
             entries={},
             strings={"IEEE": "IEEE Transactions", "ACM": "ACM Review"},
         )
@@ -61,14 +61,14 @@ class TestBasicWriting:
 
     def test_write_preamble(self) -> None:
         """Test writing @preamble."""
-        lib = BibLibrary(entries={}, preamble=["@preamble{Acknowledgments}"])
+        lib = BibFile(entries={}, preamble=["@preamble{Acknowledgments}"])
         output = write_bib(lib)
 
         assert "@preamble{Acknowledgments}" in output
 
     def test_write_comments(self) -> None:
         """Test writing comments."""
-        lib = BibLibrary(
+        lib = BibFile(
             entries={},
             raw_comments=["% BibTeX file", "% Created by pynakes"],
         )
@@ -179,7 +179,7 @@ class TestLineEndings:
             type="article",
             fields={"author": "A", "title": "T", "journal": "J", "year": "2020"},
         )
-        lib = BibLibrary(entries={"Test": entry}, line_ending="\n")
+        lib = BibFile(entries={"Test": entry}, line_ending="\n")
         output = write_bib(lib)
 
         assert "\r\n" not in output
@@ -192,7 +192,7 @@ class TestLineEndings:
             type="article",
             fields={"author": "A", "title": "T", "journal": "J", "year": "2020"},
         )
-        lib = BibLibrary(entries={"Test": entry}, line_ending="\r\n")
+        lib = BibFile(entries={"Test": entry}, line_ending="\r\n")
         output = write_bib(lib)
 
         assert "\r\n" in output
@@ -213,7 +213,7 @@ class TestFieldFormatting:
                 "year": "2020",
             },
         )
-        lib = BibLibrary(entries={"Test": entry})
+        lib = BibFile(entries={"Test": entry})
         output = write_bib(lib)
 
         # Values should be in braces or quotes
@@ -232,7 +232,7 @@ class TestFieldFormatting:
                 "year": "2020",
             },
         )
-        lib = BibLibrary(entries={"Test": entry})
+        lib = BibFile(entries={"Test": entry})
         output = write_bib(lib)
 
         # Should escape braces
@@ -244,7 +244,7 @@ class TestSpecialCases:
 
     def test_empty_library(self) -> None:
         """Test writing empty library."""
-        lib = BibLibrary(entries={})
+        lib = BibFile(entries={})
         output = write_bib(lib)
 
         # Should not crash
@@ -258,7 +258,7 @@ class TestSpecialCases:
             fields={"author": "A", "title": "T", "journal": "J", "year": "2020"},
             raw_content="@article{Test, author={A}, ...}",
         )
-        lib = BibLibrary(entries={"Test": entry})
+        lib = BibFile(entries={"Test": entry})
         output = write_bib(lib)
 
         # Should use raw_content
@@ -272,7 +272,7 @@ class TestSpecialCases:
             fields={"author": "A", "title": "T", "journal": "J", "year": "2020"},
             raw_content=None,
         )
-        lib = BibLibrary(entries={"Test": entry})
+        lib = BibFile(entries={"Test": entry})
         output = write_bib(lib)
 
         # Should reconstruct from fields
@@ -286,7 +286,7 @@ class TestSpecialCases:
             type="article",
             fields={"author": "A", "title": "T", "journal": "J", "year": "2020"},
         )
-        lib = BibLibrary(entries={"Test": entry})
+        lib = BibFile(entries={"Test": entry})
         output = write_bib(lib)
 
         assert output.endswith("\n")

@@ -1,24 +1,25 @@
 # pynakes
 
-`pynakes` is a headless bibliography-maintenance toolkit for BibTeX, BibLaTeX, and JabRef-compatible `.bib` libraries.
+**A headless, round-trip-faithful maintenance toolkit for BibTeX, BibLaTeX, and JabRef-compatible `.bib` libraries.**
 
-It is designed for researchers, scripts, and LLM-assisted workflows that need to make small, explicit, reviewable changes to bibliography files without corrupting human-curated metadata.
+`pynakes` makes small, explicit, reviewable changes to bibliography files — without reformatting, reordering, or corrupting the metadata a human or reference manager curated. It is built for researchers, scripts, CI pipelines, and LLM-assisted workflows.
 
-Named after the ancient Greek *Pinakes*, the bibliographic catalog of the Library of Alexandria.
+Named after the *Pinakes*, Callimachus's catalog of the Library of Alexandria — antiquity's first bibliography.
 
-## Key principles
+## Why pynakes
 
-- **Safe by default**: Never silently destroy data. Preserve unknown fields, custom fields, comments, and file formatting.
-- **Explicit operations**: No monolithic "rewrite this file" function. Each operation is atomic, testable, and composable.
-- **Inspectable**: All modifying commands support `--dry-run`, `--diff`, and `--json` output for verification before commit.
-- **Conservative transformations**: Format conversions and deduplication report conflicts rather than guessing.
+- **Round-trip fidelity.** An entry you don't touch is written back byte-for-byte. pynakes never normalizes whitespace, reorders fields, or re-quotes values behind your back — so diffs stay tiny and reviewable.
+- **JabRef-compatible — and a superset.** It reads JabRef's own metadata and `saveActions`, normalizing the way JabRef would; it adds the `pynakes-meta` namespace only where JabRef has no equivalent.
+- **Reviewable by design.** Every modifying command previews as a unified diff (`--dry-run --diff`) before anything is written, then writes atomically with a `.bak` backup.
+- **Conservative.** Conversions, deduplication, and enrichment report conflicts and exit `2` rather than guessing.
+- **Built for agents and CI.** Stable JSON output and exit codes, machine-readable `capabilities`, and `--strict` / pre-commit gates that lint a bibliography like source code.
 
 ## Installation
 
 For local development:
 
 ```bash
-git clone https://github.com/your/pynakes.git
+git clone https://github.com/maiani/pynakes.git
 cd pynakes
 pip install -e ".[dev]"
 ```
@@ -107,6 +108,47 @@ pynakes lint refs.bib
 pynakes lint refs.bib --json
 ```
 
+### Gate a repository (pre-commit / CI)
+
+```bash
+# Fail the build if any .bib has errors (duplicate/empty keys, missing fields).
+# The read-only checks accept multiple files and a --strict exit gate.
+pynakes lint refs.bib chapters/*.bib --strict
+```
+
+pynakes ships a `.pre-commit-hooks.yaml`, so a paper repo can keep its
+bibliography clean automatically. See **[Git workflows: pre-commit & CI](docs/guides/git-workflows.md)**.
+
+### Detect and merge duplicate works
+
+```bash
+# Report duplicate clusters by DOI/arXiv/other IDs and fuzzy title matching
+pynakes dedupe check refs.bib --json
+
+# Preview a conservative merge
+pynakes dedupe merge refs.bib --dry-run --diff
+
+# Apply it after reviewing conflicts/diff
+pynakes dedupe merge refs.bib
+```
+
+### Verify and enrich references
+
+```bash
+# Local DOI checks only
+pynakes verify refs.bib --json
+
+# Opt in to provider metadata, cached beside the .bib file
+pynakes verify refs.bib --online --strict --json
+
+# Fill missing DOI/date/journal fields conservatively
+pynakes enrich refs.bib --online --dry-run --diff
+
+# Check arXiv preprints for published DOI/journal metadata
+pynakes published refs.bib --online --json
+pynakes published refs.bib --online --apply --dry-run --diff
+```
+
 ### Normalize your library
 
 ```bash
@@ -170,24 +212,26 @@ Additionally:
 
 ## Current status
 
-> **v0.1 is shipped and Phase 5's `Volume` engine API is implemented.** The full
-> BibTeX maintenance workflow is usable from the CLI, and modifying commands now
-> dogfood the same in-process `Volume` lifecycle: open, stage, preview/diff,
-> commit, reset, reload, and external-change detection. Merge-oriented features
-> and the multi-file `Library` API are still pending. See [DEVPLAN.md](DEVPLAN.md)
-> for the phased build plan and [ARCHITECTURE.md](ARCHITECTURE.md) for the
-> design.
+> **pynakes is feature-complete as a single-file engine and approaching 1.0.** The
+> full maintenance workflow — including dedupe/merge, integrity/enrichment, the
+> JabRef `jabref-meta` + `pynakes-meta` superset with `saveActions` parity, and
+> pre-commit/CI gating — runs from the CLI, dogfooding the in-process `Collection`
+> lifecycle (open, stage, preview/diff, commit, reset, reload, external-change
+> detection). Remaining 1.0 work — full JabRef author-name normalization parity,
+> public-API pinning, and the PyPI release — is tracked in [DEVPLAN.md](DEVPLAN.md);
+> [ARCHITECTURE.md](ARCHITECTURE.md) covers the design. Not yet published to PyPI.
 
 ### Implemented
 
-- [x] Core data model (`BibEntry`, `BibLibrary`, duplicate-preserving entry collection)
+- [x] Core data model (`BibEntry`, `BibFile`, duplicate-preserving entry collection)
 - [x] BibTeX read/write with round-trip preservation for unmodified entries
 - [x] JabRef-compatible `groups` parsing plus list/add/remove commands
 - [x] Duplicate citation-key detection and repair
 - [x] Deterministic citation-key generation (`AuthorYearTitle` pattern)
 - [x] Consistent citation-key rename across one `.bib` file and selected `.tex` sources
 - [x] JabRef citation-key pattern metadata support (`keypatterndefault`, `keypattern_<entrytype>`)
-- [x] Full JabRef library metadata support: parse, preserve, inspect, and safely update known `jabref-meta` blocks
+- [x] Dual metadata namespaces: `jabref-meta` plus the `pynakes-meta` superset — parsed, merged (pynakes wins), preserved, and updated by `metadata set` with automatic namespace routing
+- [x] JabRef `saveActions` parity: `normalize`'s author/DOI defaults and the `normalize_date`/`normalize_month`/`normalize_page_numbers` formatters follow the file's configured save actions
 - [x] Field operations: rename, move, append, clear, with simple `--where` filters
 - [x] Title capitalization protection for acronyms, mixed-case terms, and explicit terms
 - [x] Top-level `normalize` command for title protection, JabRef-style author/editor list normalization, DOI normalization, exact journal mappings, and LTWA-style journal abbreviation/expansion
@@ -198,18 +242,22 @@ Additionally:
 - [x] Machine-readable capability introspection (`capabilities --json`) matching the agent contract
 - [x] AUX/TeX citation analysis, unused/missing reporting, group/keyword tagging, and subset export
 - [x] Linked-file validation (`files check`) for JabRef `file` fields, with `.bib` directory, `--root`, and `fileDirectory*` resolution
-- [x] `Volume` engine API for staged edits, previews/diffs, atomic commits, reset/reload, and external modification detection
+- [x] `Collection` engine API for staged edits, previews/diffs, atomic commits, reset/reload, and external modification detection
+- [x] Deduplication and conservative merge workflows (`dedupe check|merge`)
+- [x] Integrity/enrichment workflows (`verify`, `published`, `enrich`) with opt-in cached provider lookups
+- [x] Git-workflow gating: multi-file `--strict` checks (`lint`, `keys check`, `files check`, `dedupe check`, `verify`) and a `.pre-commit-hooks.yaml`
 - [x] Dry-run, unified diff, and JSON output for modifying commands
 - [x] Atomic writes, validation-before-write, and `.bak` backups
 - [x] CLI commands for the implemented operations
 
-### Still planned
+### Still planned (toward 1.0 — see [DEVPLAN.md](DEVPLAN.md))
 
-- [ ] Deduplication and merge workflows
-- [ ] Linked-file repair
-- [ ] Advanced search/query DSL
-- [ ] Configuration profiles
-- [ ] Provider-specific DOI fallbacks/enrichment (Crossref, DataCite)
+- [ ] Full JabRef author-name (`AuthorList`) normalization parity
+- [ ] Remaining JabRef `saveActions` formatters (encoding/case conversions)
+- [ ] Public-API pinning + 1.0 PyPI release
+- [ ] Linked-file repair and provider-specific DOI search fallbacks
+
+Beyond 1.0: a multi-file `Library`/`Catalogue` corpus engine and CSL-JSON/RIS interop.
 
 ### Out of scope
 
@@ -223,21 +271,15 @@ Additionally:
 
 ## Roadmap
 
-### v0.1.1
-- Deduplication and merge
-- Provider-specific DOI fallbacks/enrichment
+The detailed, current plan lives in **[DEVPLAN.md](DEVPLAN.md)**. In short, pynakes
+is heading to **1.0**: complete JabRef feature parity, a pinned public API, and a
+PyPI release. The multi-file `Library`/`Catalogue` corpus engine and CSL-JSON/RIS
+interop come after 1.0.
 
-### v0.2
-- Conservative BibTeX → BibLaTeX conversion
-- Configuration profiles
-- User-provided abbreviation tables
-- Linked-file repair
-
-### Future (v0.3+)
-- MCP server (`pynakes-mcp`) for Claude and other agents
-- Advanced search/query DSL
-- Batch operations from files
-- Cross-library linking
+pynakes' agent interface is the **CLI itself** (capabilities introspection, JSON
+output, dry-run, stable exit codes — see below). An MCP server is a *downstream*
+concern — a companion built on the pinned API, or part of a corpus-management app —
+not a planned part of the core engine.
 
 ## For scripted and LLM-assisted workflows
 
@@ -252,26 +294,16 @@ Additionally:
 See the **[LLM Integration guide](docs/guides/llm-integration.md)** for the full
 command surface, the JSON envelope, and recommended workflows.
 
-Example: using `pynakes` with Claude via MCP (future):
+Example: an agent drives `pynakes` by calling the CLI as a tool — preview,
+then apply:
 
-```python
-# Claude can call pynakes operations atomically
-claude.invoke_tool("pynakes.groups.add_entry", {
-  "file": "refs.bib",
-  "entry_key": "Andolfatto2021",
-  "group": "CBDC / Banking",
-  "dry_run": True
-})
-# Returns: {"status": "success", "modified": True, "diff": "...", "warnings": [...]}
+```bash
+# 1. Preview the change and show the diff to the user.
+pynakes groups add-entry refs.bib Andolfatto2021 "CBDC / Banking" --dry-run --diff --json
+# → {"status": "success", "modified": true, "diff": "...", "warnings": [...]}
 
-# Then Claude can ask the user to confirm
-# Or apply it directly if already authorized
-claude.invoke_tool("pynakes.groups.add_entry", {
-  "file": "refs.bib",
-  "entry_key": "Andolfatto2021",
-  "group": "CBDC / Banking",
-  "dry_run": False
-})
+# 2. Once authorized, re-run without --dry-run to apply it.
+pynakes groups add-entry refs.bib Andolfatto2021 "CBDC / Banking" --json
 ```
 
 ## Development

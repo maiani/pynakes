@@ -1,4 +1,4 @@
-"""Data models for BibTeX library representation."""
+"""Data models representing one parsed BibTeX file."""
 
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -7,7 +7,14 @@ from typing import Optional, Union
 
 @dataclass
 class JabRefMetadataBlock:
-    """Structured representation of one ``jabref-meta`` comment block."""
+    """Structured representation of one metadata comment block.
+
+    pynakes recognizes two structurally identical comment namespaces:
+    ``@comment{jabref-meta: key:value;}`` (JabRef's own) and
+    ``@comment{pynakes-meta: key:value;}`` (pynakes' superset, for settings
+    JabRef cannot represent). ``namespace`` records which one this block came
+    from; everything else is identical between the two.
+    """
 
     key: str
     value: str
@@ -15,6 +22,7 @@ class JabRefMetadataBlock:
     comment_index: int
     known: bool = False
     category: str = "unknown"
+    namespace: str = "jabref"  # "jabref" | "pynakes"
 
     @property
     def normalized_value(self) -> str:
@@ -29,12 +37,21 @@ class JabRefMetadataBlock:
             "raw_value": self.value,
             "known": self.known,
             "category": self.category,
+            "namespace": self.namespace,
         }
 
 
 @dataclass
 class BibEntry:
-    """Represents a single BibTeX entry."""
+    """One bibliographic record and its preservation state.
+
+    ``fields`` is deliberately open-ended: it holds standard BibTeX/BibLaTeX
+    fields and user-defined fields alike. ``raw_content`` is the original
+    entry text used to retain formatting for untouched entries; mutation
+    helpers in :mod:`pynakes.editing` keep it synchronized with ``fields``.
+    ``modified`` selects writer reconstruction only when no surgical raw edit
+    is available.
+    """
 
     key: str
     type: str
@@ -57,8 +74,8 @@ class BibEntry:
         )
 
 
-class EntryCollection:
-    """Ordered collection of BibEntry objects that tolerates duplicate keys.
+class EntryStore:
+    """Ordered store of BibEntry objects that tolerates duplicate keys.
 
     Bibliography files in the wild contain duplicate citation keys, and
     detecting/repairing them is a core feature. A plain ``dict`` keyed by
@@ -71,12 +88,12 @@ class EntryCollection:
 
     def __init__(
         self,
-        entries: Union["EntryCollection", dict[str, BibEntry], list[BibEntry], None] = None,
+        entries: Union["EntryStore", dict[str, BibEntry], list[BibEntry], None] = None,
     ) -> None:
         self._entries: list[BibEntry] = []
         if entries is None:
             return
-        if isinstance(entries, EntryCollection):
+        if isinstance(entries, EntryStore):
             self._entries = list(entries._entries)
         elif isinstance(entries, dict):
             self._entries = list(entries.values())
@@ -136,6 +153,10 @@ class EntryCollection:
         """Append an entry, preserving any existing entry with the same key."""
         self._entries.append(entry)
 
+    def remove(self, entry: BibEntry) -> None:
+        """Remove one entry object from the store."""
+        self._entries.remove(entry)
+
     def get_all(self, key: str) -> list[BibEntry]:
         """Return every entry with the given citation key, in order."""
         return [entry for entry in self._entries if entry.key == key]
@@ -160,29 +181,61 @@ class EntryCollection:
     def __repr__(self) -> str:
         dupes = self.duplicate_keys()
         suffix = f", duplicates={dupes}" if dupes else ""
-        return f"EntryCollection({len(self._entries)} entries{suffix})"
+        return f"EntryStore({len(self._entries)} entries{suffix})"
 
 
 @dataclass
-class BibLibrary:
-    """Represents a complete BibTeX library."""
+class BibFile:
+    """The complete in-memory representation of one ``.bib`` file.
 
-    entries: EntryCollection = field(default_factory=EntryCollection)
+    A ``BibFile`` is a semantic view plus the preservation data needed to write
+    it back safely. ``entries`` is an :class:`EntryStore`, so duplicate keys
+    remain representable; top-level declarations and comments are retained in
+    their own lists. JabRef metadata is available both as ordered raw blocks and
+    as a compatibility mapping. Encoding and line-ending metadata let I/O
+    reproduce the source file's representation.
+    """
+
+    entries: EntryStore = field(default_factory=EntryStore)
     strings: dict[str, str] = field(default_factory=dict)
     preamble: list[str] = field(default_factory=list)
     raw_comments: list[str] = field(default_factory=list)
+    # ``jabref_metadata``/``jabref_metadata_blocks`` hold the JabRef namespace
+    # only (back-compatible). ``pynakes_metadata``/``pynakes_metadata_blocks``
+    # hold pynakes' superset namespace. Use the ``metadata`` property for the
+    # effective merged view that consumers read.
     jabref_metadata: dict[str, str] = field(default_factory=dict)
     jabref_metadata_blocks: list[JabRefMetadataBlock] = field(default_factory=list)
+    pynakes_metadata: dict[str, str] = field(default_factory=dict)
+    pynakes_metadata_blocks: list[JabRefMetadataBlock] = field(default_factory=list)
     encoding: str = "utf-8"
     line_ending: str = "\n"
 
     def __post_init__(self) -> None:
         # Allow constructing from a dict or list for ergonomics/back-compat.
-        if not isinstance(self.entries, EntryCollection):
-            self.entries = EntryCollection(self.entries)
+        if not isinstance(self.entries, EntryStore):
+            self.entries = EntryStore(self.entries)
+
+    @property
+    def metadata(self) -> dict[str, str]:
+        """Effective merged metadata; ``pynakes-meta`` overrides ``jabref-meta``.
+
+        This is the view operations (``lint``, ``normalize``, key generation)
+        should read: pynakes settings take precedence as the authoritative
+        namespace, while JabRef-native keys remain visible.
+        """
+        return {**self.jabref_metadata, **self.pynakes_metadata}
+
+    @property
+    def metadata_blocks(self) -> list[JabRefMetadataBlock]:
+        """All metadata blocks, both namespaces, in source order."""
+        return sorted(
+            [*self.jabref_metadata_blocks, *self.pynakes_metadata_blocks],
+            key=lambda block: block.comment_index,
+        )
 
     def to_dict(self) -> dict:
-        """Serialize the library to a JSON-friendly dict."""
+        """Serialize the bib file to a JSON-friendly dict."""
         return {
             "entries": self.entries.to_dict(),
             "strings": dict(self.strings),
@@ -190,14 +243,16 @@ class BibLibrary:
             "raw_comments": list(self.raw_comments),
             "jabref_metadata": dict(self.jabref_metadata),
             "jabref_metadata_blocks": [block.to_dict() for block in self.jabref_metadata_blocks],
+            "pynakes_metadata": dict(self.pynakes_metadata),
+            "pynakes_metadata_blocks": [block.to_dict() for block in self.pynakes_metadata_blocks],
             "encoding": self.encoding,
             "line_ending": self.line_ending,
         }
 
     def __repr__(self) -> str:
-        """Return a debug representation of the library."""
+        """Return a debug representation of the bib file."""
         return (
-            f"BibLibrary(entries={len(self.entries)}, "
+            f"BibFile(entries={len(self.entries)}, "
             f"strings={len(self.strings)}, "
             f"preamble={len(self.preamble)}, "
             f"encoding={self.encoding!r}, "

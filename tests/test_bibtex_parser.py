@@ -363,6 +363,21 @@ class TestErrorHandling:
         # And the duplicate is reported for the linter to act on.
         assert lib.entries.duplicate_keys() == {"Smith2020": 2}
 
+    def test_empty_key_entry_is_captured_and_roundtrips(self) -> None:
+        """An entry with an empty citation key is kept (not silently dropped).
+
+        Dropping it would lose data and hide the most-broken entry from
+        inspect/lint; capturing it with an empty key surfaces it as a lint
+        error while still round-tripping byte-for-byte.
+        """
+        text = "@article{,\n  author = {Bob White},\n  title = {No Key}\n}\n"
+        lib = parse_bib(text)
+        assert len(lib.entries) == 1
+        entry = lib.entries.values()[0]
+        assert entry.key == ""
+        assert entry.fields["author"] == "Bob White"
+        assert write_bib(lib) == text
+
     def test_unmatched_braces_error(self) -> None:
         """Test that unmatched braces raise ParseError."""
         text = """

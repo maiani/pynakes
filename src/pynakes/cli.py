@@ -2,22 +2,24 @@
 
 import functools
 import json as _json
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Callable, Optional
 
 import typer
 
+from pynakes import dedupe as dedupe_ops
 from pynakes import doi as doi_ops
 from pynakes import fields as fields_ops
 from pynakes import files as files_ops
 from pynakes import groups as groups_ops
-from pynakes import jabref as jabref_ops
 from pynakes import journals as journals_ops
 from pynakes import keys as keys_ops
+from pynakes import metadata as metadata_ops
 from pynakes import normalize as normalize_ops
 from pynakes.bibtex_parser import ParseError
 from pynakes.capabilities import get_capabilities
 from pynakes.diff import generate_diff
-from pynakes.engine import ExternalModificationError, Volume
+from pynakes.engine import Collection, ExternalModificationError
 from pynakes.io import load_bib, save_bib, save_plain_text
 from pynakes.lint import lint as lint_lib
 from pynakes.usage import (
@@ -36,6 +38,7 @@ keys_app = typer.Typer(help="Generate and check citation keys")
 fields_app = typer.Typer(help="Edit fields (rename, move, append, clear, protect titles)")
 files_app = typer.Typer(help="Validate JabRef linked files")
 doi_app = typer.Typer(help="Import references by DOI")
+dedupe_app = typer.Typer(help="Detect and merge duplicate works")
 journals_app = typer.Typer(help="Abbreviate, expand, and check journal titles")
 metadata_app = typer.Typer(help="Inspect and update JabRef library metadata")
 app.add_typer(groups_app, name="groups")
@@ -43,6 +46,7 @@ app.add_typer(keys_app, name="keys")
 app.add_typer(fields_app, name="fields")
 app.add_typer(files_app, name="files")
 app.add_typer(doi_app, name="doi")
+app.add_typer(dedupe_app, name="dedupe")
 app.add_typer(journals_app, name="journals")
 app.add_typer(metadata_app, name="metadata")
 
@@ -140,10 +144,22 @@ def _safe(fn):
     return wrapper
 
 
+def _preview_or_commit(coll: Collection, dry_run: bool) -> tuple[str, bool, int]:
+    """Return ``(diff, modified, changed_entries)`` for a staged collection.
+
+    In ``--dry-run`` mode this previews without writing; otherwise it commits
+    (atomic write + re-parse validation) and reports the committed outcome.
+    """
+    if dry_run:
+        return coll.diff(), coll.is_modified, coll.changed_entries_count()
+    result = coll.commit()
+    return result.diff, result.modified, result.changed_entries
+
+
 def _finish_mod(
     file,
     action,
-    vol: Volume,
+    coll: Collection,
     dry_run,
     diff,
     json_output,
@@ -152,21 +168,13 @@ def _finish_mod(
     modified_entries: int | None = None,
     **details,
 ) -> None:
-    """Preview/commit a volume and emit the standard modifying-command result.
+    """Preview/commit a collection and emit the standard modifying-command result.
 
     Every modifying command shares this envelope:
     ``status, action, file, dry_run, modified, modified_entries, warnings`` plus
     command-specific keys, and an optional ``diff`` when ``--diff`` is set.
     """
-    if dry_run:
-        diff_text = vol.diff()
-        modified = vol.is_modified
-        changed = vol.changed_entries_count()
-    else:
-        result = vol.commit()
-        diff_text = result.diff
-        modified = result.modified
-        changed = result.changed_entries
+    diff_text, modified, changed = _preview_or_commit(coll, dry_run)
     if modified_entries is not None:
         changed = modified_entries
     result = {
@@ -180,6 +188,113 @@ def _finish_mod(
         **details,
     }
     _emit(json_output, result, human, diff_text, diff)
+
+
+def _metadata_cache_dir(file: str, cache_dir: Optional[str], online: bool) -> str | None:
+    if cache_dir is not None:
+        return cache_dir
+    if not online:
+        return None
+    from pathlib import Path
+
+    return str(Path(file).resolve().parent / ".pynakes-cache")
+
+
+# --- read-only checks (single- or multi-file) ------------------------------
+
+
+@dataclass
+class CheckOutcome:
+    """The result of running one read-only check over a single file.
+
+    ``result`` is the historical per-file JSON envelope (emitted unchanged when
+    a single file is given). ``human`` are the human-readable lines for that
+    file. ``failed`` is whether the file trips a ``--strict`` gate. ``summary``
+    contributes integer counters to the multi-file aggregate.
+    """
+
+    result: dict
+    human: list[str]
+    failed: bool = False
+    summary: dict = field(default_factory=dict)
+
+
+def _run_checks(
+    files: list[str],
+    action: str,
+    check_one: Callable[[str], CheckOutcome],
+    json_output: bool,
+    strict: bool,
+) -> None:
+    """Run a read-only check over one or more files and emit the result.
+
+    A single file preserves the exact historical per-file envelope and human
+    output (the documented, byte-stable contract). Multiple files emit an
+    aggregate ``{status, action, strict, files: [...], summary}`` envelope, with
+    each element the same per-file envelope (or a per-file error object).
+
+    Exit code: ``1`` if any file could not be read/parsed, or — when
+    ``--strict`` — if any file tripped its gate; otherwise ``0``.
+    """
+    if len(files) == 1:
+        outcome = check_one(files[0])
+        if json_output:
+            typer.echo(_json.dumps(outcome.result, indent=2))
+        else:
+            for line in outcome.human:
+                typer.echo(line)
+        if strict and outcome.failed:
+            raise typer.Exit(code=1)
+        return
+
+    results: list[dict] = []
+    totals: dict = {}
+    error_files = 0
+    findings_failed = 0
+    for path in files:
+        try:
+            outcome = check_one(path)
+        except (FileNotFoundError, ParseError, OSError, ValueError) as exc:
+            error_files += 1
+            err = {
+                "status": "error",
+                "file": path,
+                "error": type(exc).__name__,
+                "message": getattr(exc, "message", str(exc)),
+            }
+            if isinstance(exc, ParseError):
+                err["line"] = exc.line
+            results.append(err)
+            if not json_output:
+                typer.echo(f"# {path}")
+                typer.echo(f"  [error] {err['message']}")
+        else:
+            results.append(outcome.result)
+            if outcome.failed:
+                findings_failed += 1
+            for key, value in outcome.summary.items():
+                totals[key] = totals.get(key, 0) + value
+            if not json_output:
+                typer.echo(f"# {path}")
+                for line in outcome.human:
+                    typer.echo(line)
+
+    failed_files = error_files + findings_failed
+    aggregate = {
+        "status": "error" if error_files else "success",
+        "action": action,
+        "strict": strict,
+        "files": results,
+        "summary": {"files": len(files), "failed_files": failed_files, **totals},
+    }
+    if json_output:
+        typer.echo(_json.dumps(aggregate, indent=2))
+    else:
+        typer.echo(
+            f"{len(files)} file(s) checked; {failed_files} with findings, {error_files} unreadable."
+        )
+    if error_files or (strict and findings_failed):
+        raise typer.Exit(code=1)
 
 
 # --- inspect ---------------------------------------------------------------
@@ -212,6 +327,10 @@ def inspect(
                 "values": dict(lib.jabref_metadata),
                 "blocks": [block.to_dict() for block in lib.jabref_metadata_blocks],
             },
+            "pynakes_metadata": {
+                "values": dict(lib.pynakes_metadata),
+                "blocks": [block.to_dict() for block in lib.pynakes_metadata_blocks],
+            },
             "duplicate_keys": duplicates,
             "issues": [i.to_dict() for i in issues],
         }
@@ -236,9 +355,9 @@ def metadata_list(
     file: str = typer.Argument(..., help="Path to the .bib file"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """List top-level JabRef ``jabref-meta`` blocks."""
+    """List top-level metadata blocks (both jabref-meta and pynakes-meta)."""
     lib = load_bib(file)
-    blocks = [block.to_dict() for block in lib.jabref_metadata_blocks]
+    all_blocks = lib.metadata_blocks
 
     if json_output:
         typer.echo(
@@ -247,39 +366,62 @@ def metadata_list(
                     "status": "success",
                     "action": "metadata_list",
                     "file": file,
-                    "metadata": {"values": dict(lib.jabref_metadata), "blocks": blocks},
+                    "metadata": {
+                        "values": dict(lib.jabref_metadata),
+                        "blocks": [b.to_dict() for b in lib.jabref_metadata_blocks],
+                    },
+                    "pynakes_metadata": {
+                        "values": dict(lib.pynakes_metadata),
+                        "blocks": [b.to_dict() for b in lib.pynakes_metadata_blocks],
+                    },
+                    "effective": dict(lib.metadata),
                 },
                 indent=2,
             )
         )
         return
 
-    if not blocks:
-        typer.echo(f"{file}: no JabRef metadata found.")
+    if not all_blocks:
+        typer.echo(f"{file}: no metadata found.")
         return
-    for block in lib.jabref_metadata_blocks:
+    for block in all_blocks:
         marker = "known" if block.known else "unknown"
-        typer.echo(f"  [{marker}:{block.category}] {block.key} = {block.normalized_value}")
+        typer.echo(
+            f"  [{block.namespace}:{marker}:{block.category}] "
+            f"{block.key} = {block.normalized_value}"
+        )
 
 
 @metadata_app.command("set")
 @_safe
 def metadata_set(
     file: str = typer.Argument(..., help="Path to the .bib file"),
-    key: str = typer.Argument(..., help="JabRef metadata key"),
+    key: str = typer.Argument(..., help="Metadata key"),
     value: str = typer.Argument(..., help="Metadata value"),
+    namespace: Optional[str] = typer.Option(
+        None,
+        "--namespace",
+        help="Target comment: jabref or pynakes. Default: auto (JabRef-native keys "
+        "→ jabref-meta, everything else → pynakes-meta)",
+    ),
     allow_unknown: bool = typer.Option(
-        False, "--allow-unknown", help="Allow setting unrecognized metadata keys"
+        False, "--allow-unknown", help="Allow writing an unrecognized key into jabref-meta"
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Set one top-level JabRef ``jabref-meta`` block."""
-    vol = Volume.open(file)
+    """Set one top-level metadata block (jabref-meta or pynakes-meta)."""
+    if namespace is not None and namespace not in {"jabref", "pynakes"}:
+        _emit_error(
+            json_output,
+            "InvalidNamespace",
+            f"Invalid namespace {namespace!r}; expected jabref or pynakes",
+        )
+    coll = Collection.open(file)
     try:
-        update = vol.set_metadata(key, value, allow_unknown=allow_unknown)
-    except jabref_ops.DuplicateJabRefMetadataError as exc:
+        update = coll.set_metadata(key, value, namespace=namespace, allow_unknown=allow_unknown)
+    except metadata_ops.DuplicateJabRefMetadataError as exc:
         _emit_conflict(
             json_output,
             "DuplicateJabRefMetadata",
@@ -298,94 +440,118 @@ def metadata_set(
     _finish_mod(
         file,
         "metadata_set",
-        vol,
+        coll,
         dry_run,
         diff,
         json_output,
-        [f"{verb} JabRef metadata {update.key!r}."],
+        [f"{verb} {update.namespace}-meta {update.key!r}."],
         modified_entries=0,
         key=update.key,
         value=update.value.rstrip(";").strip(),
         created=update.created,
+        namespace=update.namespace,
     )
 
 
 # --- lint ------------------------------------------------------------------
 
 
-@app.command()
-@_safe
-def lint(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
-) -> None:
-    """Validate entries and report issues."""
+def _lint_one(file: str) -> CheckOutcome:
     lib = load_bib(file)
     issues = lint_lib(lib)
     errors = sum(1 for i in issues if i.severity == "error")
     warnings = sum(1 for i in issues if i.severity == "warning")
-
-    if json_output:
-        result = {
-            "status": "success",
-            "action": "lint",
-            "file": file,
-            "issue_count": len(issues),
-            "errors": errors,
-            "warnings": warnings,
-            "issues": [i.to_dict() for i in issues],
-        }
-        typer.echo(_json.dumps(result, indent=2))
-        return
-
+    result = {
+        "status": "success",
+        "action": "lint",
+        "file": file,
+        "issue_count": len(issues),
+        "errors": errors,
+        "warnings": warnings,
+        "issues": [i.to_dict() for i in issues],
+    }
     if not issues:
-        typer.echo(f"{file}: no issues found.")
-        return
-    for issue in issues:
-        loc = f"{issue.key}: " if issue.key else ""
-        typer.echo(f"  [{issue.severity}] {loc}{issue.message}")
-    typer.echo(f"{len(issues)} issue(s): {errors} error(s), {warnings} warning(s).")
+        human = [f"{file}: no issues found."]
+    else:
+        human = [
+            f"  [{issue.severity}] {f'{issue.key}: ' if issue.key else ''}{issue.message}"
+            for issue in issues
+        ]
+        human.append(f"{len(issues)} issue(s): {errors} error(s), {warnings} warning(s).")
+    # Only errors gate a --strict build; lint warnings (e.g. a missing DOI) are
+    # advisory. (verify --strict is broader because its warnings flag integrity
+    # mismatches against authoritative metadata.)
+    return CheckOutcome(
+        result=result,
+        human=human,
+        failed=errors > 0,
+        summary={"issues": len(issues), "errors": errors, "warnings": warnings},
+    )
+
+
+@app.command()
+@_safe
+def lint(
+    files: list[str] = typer.Argument(..., help="One or more .bib files"),
+    strict: bool = typer.Option(False, "--strict", help="Exit 1 if any errors are found"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Validate entries and report issues (accepts multiple files for CI gating)."""
+    _run_checks(files, "lint", _lint_one, json_output, strict)
 
 
 # --- files -----------------------------------------------------------------
 
 
+def _files_check_one(file: str, root: Optional[list[str]]) -> CheckOutcome:
+    lib = load_bib(file)
+    report = files_ops.check_linked_files(lib, file, root)
+    result = {
+        "status": "success",
+        "action": "files_check",
+        "file": file,
+        **report.to_dict(),
+    }
+    human = [
+        f"{file}: checked {report.checked} linked file(s); "
+        f"ok={report.ok}, missing={report.missing}, "
+        f"wrong_type={report.wrong_type}, unresolved={report.unresolved}."
+    ]
+    human += [
+        f"  [{issue.status}] {issue.entry_key}[{issue.index}]: {issue.path}"
+        for issue in report.issues
+    ]
+    bad = report.missing + report.wrong_type + report.unresolved
+    return CheckOutcome(
+        result=result,
+        human=human,
+        failed=bad > 0,
+        summary={
+            "checked": report.checked,
+            "ok": report.ok,
+            "missing": report.missing,
+            "wrong_type": report.wrong_type,
+            "unresolved": report.unresolved,
+        },
+    )
+
+
 @files_app.command("check")
 @_safe
 def files_check(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
+    files: list[str] = typer.Argument(..., help="One or more .bib files"),
     root: Optional[list[str]] = typer.Option(
         None,
         "--root",
         help="Additional directory to resolve relative linked-file paths; can be repeated",
     ),
+    strict: bool = typer.Option(
+        False, "--strict", help="Exit 1 if any linked file is missing or wrong-type"
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Validate JabRef linked files stored in ``file`` fields."""
-    lib = load_bib(file)
-    report = files_ops.check_linked_files(lib, file, root)
-
-    if json_output:
-        typer.echo(
-            _json.dumps(
-                {
-                    "status": "success",
-                    "action": "files_check",
-                    "file": file,
-                    **report.to_dict(),
-                },
-                indent=2,
-            )
-        )
-        return
-
-    typer.echo(
-        f"{file}: checked {report.checked} linked file(s); "
-        f"ok={report.ok}, missing={report.missing}, "
-        f"wrong_type={report.wrong_type}, unresolved={report.unresolved}."
-    )
-    for issue in report.issues:
-        typer.echo(f"  [{issue.status}] {issue.entry_key}[{issue.index}]: {issue.path}")
+    """Validate JabRef linked files (accepts multiple files for CI gating)."""
+    _run_checks(files, "files_check", lambda f: _files_check_one(f, root), json_output, strict)
 
 
 # --- doi -------------------------------------------------------------------
@@ -419,8 +585,8 @@ def doi_import(
         )
 
     try:
-        vol = Volume.open(file)
-        entry = vol.import_doi(
+        coll = Collection.open(file)
+        entry = coll.import_doi(
             doi,
             key=key,
             key_source=key_source,
@@ -457,25 +623,16 @@ def doi_import(
             typer.echo("Retry with --allow-duplicate to import another copy.")
         raise typer.Exit(code=2) from exc
     except doi_ops.CitationKeyConflictError as exc:
-        if json_output:
-            typer.echo(
-                _json.dumps(
-                    {
-                        "status": "conflict",
-                        "error": "CitationKeyConflict",
-                        "message": str(exc),
-                        "key": exc.key,
-                        "options": [
-                            {"id": "choose_key", "description": "Retry with a different --key"},
-                            {"id": "auto_key", "description": "Retry without --key"},
-                        ],
-                    },
-                    indent=2,
-                )
-            )
-        else:
-            typer.echo(f"CitationKeyConflict: {exc}")
-        raise typer.Exit(code=2) from exc
+        _emit_conflict(
+            json_output,
+            "CitationKeyConflict",
+            str(exc),
+            key=exc.key,
+            options=[
+                {"id": "choose_key", "description": "Retry with a different --key"},
+                {"id": "auto_key", "description": "Retry without --key"},
+            ],
+        )
     except doi_ops.DOIImportError as exc:
         _emit_error(json_output, "DOIImportError", str(exc))
 
@@ -483,7 +640,7 @@ def doi_import(
     _finish_mod(
         file,
         "doi_import",
-        vol,
+        coll,
         dry_run,
         diff,
         json_output,
@@ -493,6 +650,244 @@ def doi_import(
         key_source="user" if key else key_source,
         entry_type=entry.type,
     )
+
+
+# --- dedupe ----------------------------------------------------------------
+
+
+def _dedupe_check_one(file: str) -> CheckOutcome:
+    coll = Collection.open(file)
+    clusters = coll.dedupe_check()
+    duplicate_entries = sum(len(cluster.entries) for cluster in clusters)
+    result = {
+        "status": "success",
+        "action": "dedupe_check",
+        "file": file,
+        "has_duplicates": bool(clusters),
+        "cluster_count": len(clusters),
+        "duplicate_entries": duplicate_entries,
+        "clusters": [cluster.to_dict() for cluster in clusters],
+    }
+    if not clusters:
+        human = [f"{file}: no duplicate works found."]
+    else:
+        human = [f"{file}: {len(clusters)} duplicate work cluster(s)."]
+        for cluster in clusters:
+            identity = f"{cluster.identity.kind}:{cluster.identity.value}"
+            keys = ", ".join(e.key for e in cluster.entries)
+            human.append(f"  [{cluster.reason}] {identity}: {keys}")
+    return CheckOutcome(
+        result=result,
+        human=human,
+        failed=bool(clusters),
+        summary={"clusters": len(clusters), "duplicate_entries": duplicate_entries},
+    )
+
+
+@dedupe_app.command("check")
+@_safe
+def dedupe_check(
+    files: list[str] = typer.Argument(..., help="One or more .bib files"),
+    strict: bool = typer.Option(False, "--strict", help="Exit 1 if duplicate works are found"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Report duplicate works by DOI/arXiv/other IDs and fuzzy title matches."""
+    _run_checks(files, "dedupe_check", _dedupe_check_one, json_output, strict)
+
+
+@dedupe_app.command("merge")
+@_safe
+def dedupe_merge(
+    file: str = typer.Argument(..., help="Path to the .bib file"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Conservatively merge duplicate works into their first entry."""
+    coll = Collection.open(file)
+    try:
+        report = coll.dedupe_merge()
+    except dedupe_ops.DedupeConflictError as exc:
+        _emit_conflict(
+            json_output,
+            "DedupeConflict",
+            str(exc),
+            conflicts=[conflict.to_dict() for conflict in exc.conflicts],
+            clusters=[cluster.to_dict() for cluster in exc.clusters],
+            options=[
+                {
+                    "id": "manual_edit",
+                    "description": "Resolve the conflicting field values manually, then retry",
+                },
+                {
+                    "id": "keep_duplicates",
+                    "description": "Leave these entries as separate records",
+                },
+            ],
+        )
+
+    verb = "Would merge" if dry_run else "Merged"
+    human = [
+        f"{verb} {report.merged_clusters} duplicate work cluster(s).",
+        f"  removed_entries={report.removed_entry_count}, field_changes={report.field_changes}",
+    ]
+    _finish_mod(
+        file,
+        "dedupe_merge",
+        coll,
+        dry_run,
+        diff,
+        json_output,
+        human,
+        modified_entries=report.modified_entries,
+        **report.to_dict(),
+    )
+
+
+# --- integrity / enrichment -------------------------------------------------
+
+
+def _verify_one(file: str, online: bool, cache_dir: Optional[str], strict: bool) -> CheckOutcome:
+    coll = Collection.open(file)
+    report = coll.verify(online=online, cache_dir=_metadata_cache_dir(file, cache_dir, online))
+    result = {
+        "status": "success",
+        "action": "verify",
+        "file": file,
+        "online": online,
+        "strict": strict,
+        **report.to_dict(),
+    }
+    human = [
+        f"{file}: verified {report.checked} DOI-backed {_entries(report.checked)}.",
+        f"  errors={report.errors}, warnings={report.warnings}, infos={report.infos}",
+    ]
+    human += [f"  [{issue.severity}] {issue.key}: {issue.message}" for issue in report.issues]
+    return CheckOutcome(
+        result=result,
+        human=human,
+        failed=bool(report.errors or report.warnings),
+        summary={
+            "checked": report.checked,
+            "errors": report.errors,
+            "warnings": report.warnings,
+            "infos": report.infos,
+        },
+    )
+
+
+@app.command()
+@_safe
+def verify(
+    files: list[str] = typer.Argument(..., help="One or more .bib files"),
+    online: bool = typer.Option(
+        False, "--online", help="Fetch DOI provider metadata; otherwise only local checks run"
+    ),
+    cache_dir: Optional[str] = typer.Option(
+        None, "--cache-dir", help="Directory for deterministic provider-response cache"
+    ),
+    strict: bool = typer.Option(False, "--strict", help="Exit 1 if warnings or errors are found"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Verify DOI-backed entries against authoritative metadata (accepts multiple files)."""
+    _run_checks(
+        files,
+        "verify",
+        lambda f: _verify_one(f, online, cache_dir, strict),
+        json_output,
+        strict,
+    )
+
+
+@app.command()
+@_safe
+def enrich(
+    file: str = typer.Argument(..., help="Path to the .bib file"),
+    online: bool = typer.Option(
+        False,
+        "--online",
+        help="Fetch DOI provider metadata; otherwise only local DOI URLs are used",
+    ),
+    cache_dir: Optional[str] = typer.Option(
+        None, "--cache-dir", help="Directory for deterministic provider-response cache"
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Conservatively fill missing DOI/date/identifier metadata."""
+    coll = Collection.open(file)
+    report = coll.enrich(online=online, cache_dir=_metadata_cache_dir(file, cache_dir, online))
+    verb = "Would enrich" if dry_run else "Enriched"
+    human = [
+        f"{verb} {report.changed_entries} {_entries(report.changed_entries)}.",
+        f"  field_updates={report.changed_fields}",
+    ]
+    _finish_mod(
+        file,
+        "enrich",
+        coll,
+        dry_run,
+        diff,
+        json_output,
+        human,
+        warnings=report.warnings,
+        **report.to_dict(),
+    )
+
+
+@app.command()
+@_safe
+def published(
+    file: str = typer.Argument(..., help="Path to the .bib file"),
+    online: bool = typer.Option(
+        False, "--online", help="Fetch preprint provider metadata; otherwise only local checks run"
+    ),
+    apply: bool = typer.Option(False, "--apply", help="Apply safe published DOI/journal updates"),
+    cache_dir: Optional[str] = typer.Option(
+        None, "--cache-dir", help="Directory for deterministic provider-response cache"
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Report preprints that have published-version metadata available."""
+    coll = Collection.open(file)
+    cache = _metadata_cache_dir(file, cache_dir, online)
+    if apply:
+        report = coll.apply_published(online=online, cache_dir=cache)
+        verb = "Would apply" if dry_run else "Applied"
+        human = [
+            f"{verb} published metadata to {report.changed_entries} {_entries(report.changed_entries)}.",
+            f"  checked={report.checked}, published={report.published}",
+        ]
+        _finish_mod(
+            file,
+            "published_apply",
+            coll,
+            dry_run,
+            diff,
+            json_output,
+            human,
+            warnings=report.warnings,
+            **report.to_dict(),
+        )
+        return
+
+    report = coll.published_check(online=online, cache_dir=cache)
+    result = {
+        "status": "success",
+        "action": "published",
+        "file": file,
+        "online": online,
+        "warnings": report.warnings,
+        **report.to_dict(),
+    }
+    human = [
+        f"{file}: checked {report.checked} preprint {_entries(report.checked)}.",
+        f"  published={report.published}",
+    ]
+    _emit(json_output, result, human)
 
 
 # --- groups ----------------------------------------------------------------
@@ -541,14 +936,14 @@ def groups_add_entry(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Add an entry to a group."""
-    vol = Volume.open(file)
-    _require_key(vol.lib, key, json_output)
-    count = vol.add_to_group(key, group)
+    coll = Collection.open(file)
+    _require_key(coll.lib, key, json_output)
+    count = coll.add_to_group(key, group)
     verb = "Would add" if dry_run else "Added"
     _finish_mod(
         file,
         "groups_add_entry",
-        vol,
+        coll,
         dry_run,
         diff,
         json_output,
@@ -569,14 +964,14 @@ def groups_remove_entry(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Remove an entry from a group."""
-    vol = Volume.open(file)
-    _require_key(vol.lib, key, json_output)
-    count = vol.remove_from_group(key, group)
+    coll = Collection.open(file)
+    _require_key(coll.lib, key, json_output)
+    count = coll.remove_from_group(key, group)
     verb = "Would remove" if dry_run else "Removed"
     _finish_mod(
         file,
         "groups_remove_entry",
-        vol,
+        coll,
         dry_run,
         diff,
         json_output,
@@ -589,37 +984,38 @@ def groups_remove_entry(
 # --- keys ------------------------------------------------------------------
 
 
+def _keys_check_one(file: str) -> CheckOutcome:
+    lib = load_bib(file)
+    duplicates = keys_ops.duplicate_key_counts(lib)
+    result = {
+        "status": "success",
+        "action": "keys_check",
+        "file": file,
+        "has_duplicates": bool(duplicates),
+        "duplicate_keys": duplicates,
+    }
+    if not duplicates:
+        human = [f"{file}: all citation keys are unique."]
+    else:
+        human = [f"  {key}: appears {count} times" for key, count in duplicates.items()]
+        human.append(f"{len(duplicates)} duplicated key(s).")
+    return CheckOutcome(
+        result=result,
+        human=human,
+        failed=bool(duplicates),
+        summary={"duplicate_keys": len(duplicates)},
+    )
+
+
 @keys_app.command("check")
 @_safe
 def keys_check(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
+    files: list[str] = typer.Argument(..., help="One or more .bib files"),
+    strict: bool = typer.Option(False, "--strict", help="Exit 1 if duplicate keys are found"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Report duplicate citation keys."""
-    lib = load_bib(file)
-    duplicates = keys_ops.duplicate_key_counts(lib)
-
-    if json_output:
-        typer.echo(
-            _json.dumps(
-                {
-                    "status": "success",
-                    "action": "keys_check",
-                    "file": file,
-                    "has_duplicates": bool(duplicates),
-                    "duplicate_keys": duplicates,
-                },
-                indent=2,
-            )
-        )
-        return
-
-    if not duplicates:
-        typer.echo(f"{file}: all citation keys are unique.")
-        return
-    for key, count in duplicates.items():
-        typer.echo(f"  {key}: appears {count} times")
-    typer.echo(f"{len(duplicates)} duplicated key(s).")
+    """Report duplicate citation keys (accepts multiple files for CI gating)."""
+    _run_checks(files, "keys_check", _keys_check_one, json_output, strict)
 
 
 def _rename_payload(renames: list[tuple[str, str]]) -> dict:
@@ -635,15 +1031,15 @@ def keys_generate(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Regenerate all citation keys from entry metadata (AuthorYearTitle)."""
-    vol = Volume.open(file)
-    renames = vol.generate_keys()
+    coll = Collection.open(file)
+    renames = coll.generate_keys()
     verb = "Would rename" if dry_run else "Renamed"
     human = [f"{verb} {len(renames)} {_entries(len(renames))}."]
     human += [f"  {old} -> {new}" for old, new in renames]
     _finish_mod(
         file,
         "keys_generate",
-        vol,
+        coll,
         dry_run,
         diff,
         json_output,
@@ -661,15 +1057,15 @@ def keys_repair(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Rename duplicate citation keys so every key is unique."""
-    vol = Volume.open(file)
-    renames = vol.repair_keys()
+    coll = Collection.open(file)
+    renames = coll.repair_keys()
     verb = "Would repair" if dry_run else "Repaired"
     human = [f"{verb} {len(renames)} duplicate key(s)."]
     human += [f"  {old} -> {new}" for old, new in renames]
     _finish_mod(
         file,
         "keys_repair",
-        vol,
+        coll,
         dry_run,
         diff,
         json_output,
@@ -692,11 +1088,11 @@ def keys_rename(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Rename one citation key in a .bib file and matching TeX citations."""
-    vol = Volume.open(file)
+    coll = Collection.open(file)
     keys_ops.validate_key(old)
     keys_ops.validate_key(new)
 
-    matches = vol.lib.entries.get_all(old)
+    matches = coll.lib.entries.get_all(old)
     if not matches:
         _emit_error(json_output, "KeyNotFound", f"No entry with key {old!r} in the library")
     if len(matches) > 1:
@@ -713,7 +1109,7 @@ def keys_rename(
                 }
             ],
         )
-    if old != new and new in vol.lib.entries:
+    if old != new and new in coll.lib.entries:
         _emit_conflict(
             json_output,
             "CitationKeyConflict",
@@ -728,14 +1124,14 @@ def keys_rename(
             ],
         )
 
-    bib_changed = vol.rename_key(old, new)
+    bib_changed = coll.rename_key(old, new)
     tex_files = iter_tex_files(sources)
     if not tex_files:
         _emit_error(json_output, "NoTeXSources", "No .tex files found in the provided sources")
-    if not dry_run and vol.externally_changed():
-        if vol.path is None:
+    if not dry_run and coll.externally_changed():
+        if coll.path is None:
             raise ValueError("rename requires a bound .bib file")
-        raise ExternalModificationError(vol.path)
+        raise ExternalModificationError(coll.path)
 
     source_changes = []
     source_diff_parts = []
@@ -759,15 +1155,7 @@ def keys_rename(
             }
         )
 
-    if dry_run:
-        bib_diff = vol.diff()
-        bib_modified = vol.is_modified
-        changed_entries = vol.changed_entries_count()
-    else:
-        result = vol.commit()
-        bib_diff = result.diff
-        bib_modified = result.modified
-        changed_entries = result.changed_entries
+    bib_diff, bib_modified, changed_entries = _preview_or_commit(coll, dry_run)
 
     diff_text = "\n".join(part for part in [bib_diff, *source_diff_parts] if part)
     source_modified = any(change["modified"] for change in source_changes)
@@ -811,12 +1199,12 @@ def _build_filter(where: Optional[str]):
 
 
 def _run_field_op(file, action, op, dry_run, diff, json_output, details, verb):
-    vol = Volume.open(file)
-    count = op(vol)
+    coll = Collection.open(file)
+    count = op(coll)
     _finish_mod(
         file,
         action,
-        vol,
+        coll,
         dry_run,
         diff,
         json_output,
@@ -841,7 +1229,7 @@ def fields_rename(
     _run_field_op(
         file,
         "fields_rename",
-        lambda vol: vol.rename_field(old, new, flt),
+        lambda coll: coll.rename_field(old, new, flt),
         dry_run,
         diff,
         json_output,
@@ -866,7 +1254,7 @@ def fields_move(
     _run_field_op(
         file,
         "fields_move",
-        lambda vol: vol.move_field(old, new, flt),
+        lambda coll: coll.move_field(old, new, flt),
         dry_run,
         diff,
         json_output,
@@ -891,7 +1279,7 @@ def fields_append(
     _run_field_op(
         file,
         "fields_append",
-        lambda vol: vol.append_field(field, value, flt),
+        lambda coll: coll.append_field(field, value, flt),
         dry_run,
         diff,
         json_output,
@@ -915,7 +1303,7 @@ def fields_clear(
     _run_field_op(
         file,
         "fields_clear",
-        lambda vol: vol.clear_field(field, flt),
+        lambda coll: coll.clear_field(field, flt),
         dry_run,
         diff,
         json_output,
@@ -943,7 +1331,7 @@ def fields_protect_title(
     _run_field_op(
         file,
         "fields_protect_title",
-        lambda vol: vol.protect_title(field, flt, terms),
+        lambda coll: coll.protect_title(field, flt, terms),
         dry_run,
         diff,
         json_output,
@@ -1026,8 +1414,8 @@ def normalize(
             ltwa_table=ltwa_table,
             normalize_dois=_optional_bool(doi_normalization),
         )
-        vol = Volume.open(file)
-        report = vol.normalize(options)
+        coll = Collection.open(file)
+        report = coll.normalize(options)
     except ValueError as exc:
         _emit_error(json_output, "InvalidNormalizeOption", str(exc))
 
@@ -1044,7 +1432,7 @@ def normalize(
     _finish_mod(
         file,
         "normalize",
-        vol,
+        coll,
         dry_run,
         diff,
         json_output,
@@ -1067,8 +1455,8 @@ def convert(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Convert a library between BibTeX and BibLaTeX conventions."""
-    vol = Volume.open(file)
-    report = vol.convert(to)  # raises ValueError on an unknown target
+    coll = Collection.open(file)
+    report = coll.convert(to)  # raises ValueError on an unknown target
 
     verb = "Would convert" if dry_run else "Converted"
     human = [
@@ -1083,7 +1471,7 @@ def convert(
     _finish_mod(
         file,
         "convert",
-        vol,
+        coll,
         dry_run,
         diff,
         json_output,
@@ -1107,11 +1495,11 @@ def _run_journal_op(
 ) -> None:
     """Shared body for ``journals abbreviate`` / ``journals expand``."""
     verb_root = "abbreviate" if style == "abbreviated" else "expand"
-    vol = Volume.open(file)
+    coll = Collection.open(file)
     if style == "abbreviated":
-        report = vol.abbreviate_journals(journal_table, ltwa_table)
+        report = coll.abbreviate_journals(journal_table, ltwa_table)
     else:
-        report = vol.expand_journals(journal_table, ltwa_table)
+        report = coll.expand_journals(journal_table, ltwa_table)
 
     verb = f"Would {verb_root}" if dry_run else f"{verb_root.capitalize()[:-1]}ed"
     human = [f"{verb} {report.changed} journal {_entries(report.changed)}."]
@@ -1121,7 +1509,7 @@ def _run_journal_op(
     _finish_mod(
         file,
         f"journals_{verb_root}",
-        vol,
+        coll,
         dry_run,
         diff,
         json_output,
@@ -1254,37 +1642,29 @@ def used(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Report which entries are used in LaTeX sources; optionally tag or export them."""
-    vol = Volume.open(bib_file)
+    coll = Collection.open(bib_file)
     cited, include_all, scanned = collect_cited_keys(sources)
-    report = analyze_usage(vol.lib, cited, include_all=include_all, sources=scanned)
+    report = analyze_usage(coll.lib, cited, include_all=include_all, sources=scanned)
 
     tagged = 0
     tag_field = None
     if group:
-        tagged = tag_with_group(vol.lib, report.used, group)
+        tagged = tag_with_group(coll.lib, report.used, group)
         tag_field = "groups"
     elif keyword:
-        tagged = tag_with_keyword(vol.lib, report.used, keyword)
+        tagged = tag_with_keyword(coll.lib, report.used, keyword)
         tag_field = "keywords"
-    vol.mark_dirty(tagged)
+    coll.mark_dirty(tagged)
 
     bib_diff = ""
     tagged_entries = 0
     file_modified = False
     if tag_field:
-        if dry_run:
-            tagged_entries = vol.changed_entries_count()
-            bib_diff = vol.diff()
-            file_modified = vol.is_modified
-        else:
-            result = vol.commit()
-            tagged_entries = result.changed_entries
-            bib_diff = result.diff
-            file_modified = result.modified
+        bib_diff, file_modified, tagged_entries = _preview_or_commit(coll, dry_run)
 
     out_written = False
     if out:
-        sub = subset_library(vol.lib, report.used)
+        sub = subset_library(coll.lib, report.used)
         if not dry_run:
             save_bib(sub, out, backup=False)
             out_written = True
@@ -1324,15 +1704,10 @@ def used(
 
     if tag_field:
         verb = "Would tag" if dry_run else "Tagged"
-        typer.echo(
-            f"{verb} {tagged} entr{'y' if tagged == 1 else 'ies'} "
-            f'with {tag_field} = "{group or keyword}".'
-        )
+        typer.echo(f'{verb} {tagged} {_entries(tagged)} with {tag_field} = "{group or keyword}".')
     if out:
         verb = "Would write" if dry_run else "Wrote"
-        typer.echo(
-            f"{verb} {len(report.used)} entr{'y' if len(report.used) == 1 else 'ies'} to {out}."
-        )
+        typer.echo(f"{verb} {len(report.used)} {_entries(len(report.used))} to {out}.")
     if diff and bib_diff:
         typer.echo("")
         typer.echo(bib_diff)

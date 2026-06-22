@@ -6,31 +6,34 @@ valuable on its own. The lifelong bibliography-management system (**BiMaS**,
 working name) is a **separate, downstream project built on top of pynakes** and
 is explicitly *not* in this plan.
 
-## Status
+This document is the **road to 1.0**. Completed phases are summarized in
+"Where we are" and recorded in [CHANGELOG.md](CHANGELOG.md) and the git log;
+they are no longer tracked here. Everything under "Road to 1.0" is open work.
 
-**v0.1 is shipped, and we are past it.** Beyond the original v0.1 scope, the tree
-now also has: `convert`, `journals`, `files check`, structured JabRef `metadata`,
-and — newly — the **`Volume` engine** with the CLI dogfooding it (Phase 5). The
-package is **PyPI-release-ready** (clean metadata, `py.typed`, `twine check`
-passing, fresh-venv install verified). 407 tests pass; coverage ≥90%; ruff clean.
+## Where we are
 
-### Shipped capabilities (standalone pynakes)
+The single-file engine is feature-rich and released-ready in all but name:
 
-- Custom round-trip BibTeX/BibLaTeX parser + writer; atomic, re-parse-validated
-  writes with `.bak` backups; surgical minimal-diff editing (`editing.py`).
-- `inspect`, `lint`, `groups`, `keys` (generate/check/repair/rename + JabRef key
-  patterns), `fields` (rename/move/append/clear/protect-title with `--where`).
-- `convert` (BibTeX ↔ BibLaTeX), `journals` (abbreviate/expand/check),
-  `files check` (linked-file validation), `metadata` (structured JabRef blocks).
-- `doi import`, `used` (cited/unused/missing + tag + subset export), `normalize`.
-- `capabilities` (machine-readable agent contract); unified JSON envelope and
-  exit codes (0 ok / 1 error / 2 conflict).
-- **`engine.Volume`**: the in-process load → stage → preview → commit lifecycle
-  with external-change detection; the CLI is a thin `Volume` consumer.
+- **Parser/writer** with byte-for-byte round-trip fidelity; atomic,
+  re-parse-validated writes with `.bak` backups; surgical minimal-diff editing.
+- **`engine.Collection`** — the load → stage → preview/diff → commit lifecycle
+  with external-change detection; the CLI is a thin consumer.
+- **Operations**: `inspect`, `lint`, `groups`, `keys` (generate/check/repair/
+  rename + JabRef key patterns), `fields` (with `--where`), `convert`,
+  `journals`, `files check`, `normalize`, `doi import`, `used`, `dedupe`,
+  `verify`/`published`/`enrich` (opt-in `--online`, cached, fixture-stubbed).
+- **Metadata**: two namespaces — `jabref-meta` and the `pynakes-meta` superset —
+  parsed, merged (pynakes wins), and round-tripped; `metadata set` routes by key.
+  JabRef `saveActions` already drive `normalize`'s author/DOI defaults.
+- **Agent/CI surface**: stable JSON envelope + exit codes (0/1/2), `--dry-run`/
+  `--diff`/`--json`, `capabilities`, multi-file `--strict` gate checks, and a
+  `.pre-commit-hooks.yaml`.
+- **Quality**: 455 tests, coverage ≥90%, `ruff` clean, docs site builds.
 
-For the per-phase v0.1 history see the git log and [CHANGELOG.md](CHANGELOG.md).
+What's missing for a credible **1.0** is below: finishing JabRef parity, making
+stored preferences a lintable contract, pinning the public API, and releasing.
 
-## Guiding principles (carried into all future work)
+## Guiding principles (non-negotiable)
 
 Invariants from [ARCHITECTURE.md](ARCHITECTURE.md) and [CLAUDE.md](CLAUDE.md):
 
@@ -42,159 +45,185 @@ Invariants from [ARCHITECTURE.md](ARCHITECTURE.md) and [CLAUDE.md](CLAUDE.md):
 6. **The file is the single source of truth; preserve, don't impose.**
 7. **Determinism** — no time/randomness/ordering in core logic; network is
    opt-in and isolated.
+8. **Prefer a native JabRef setting over a pynakes one** — introduce a
+   `pynakes-meta` key only where JabRef has no equivalent.
 
-## Scope boundary: what "complete standalone pynakes" means
+## What "pynakes 1.0" is
 
-Everything below is **pure bib-file work** — no UI, capture, PDF, reading, or
-sync. The goal is a standalone engine whose public API is stable enough that
-BiMaS (and any consumer: CLI, MCP, app) can build on it without reaching inside.
-**No BiMaS work begins until this roadmap is done and the engine API is pinned.**
+**A polished, JabRef-compatible, single-file maintenance engine, with a pinned
+public API, released on PyPI.** The unit of work is one `Collection` (one
+`.bib`). 1.0 means: it does single-file maintenance excellently, reaches JabRef
+feature parity, promises API stability (semver), and is installable.
 
----
-
-## Phase 5: Engine API — `Volume` — ✅ done
-
-**Goal**: lift the load → stage → preview → commit lifecycle into a reusable
-in-process object and dogfood the CLI on it. See [ENGINE_API.md](ENGINE_API.md).
-
-**Decided & implemented: stateless core + thin reconciled handle.** The file is
-truth; `Volume`'s buffer is derived and reconciled on `commit`; VSCode-style
-reload semantics (clean → reload, dirty → conflict, save-on-changed →
-`ExternalModificationError`).
-
-- [x] `engine.py` with `Volume` (`open`/`from_text`/`from_library`), read-only
-      views, staged edits delegating to the operation modules, `preview`/`diff`.
-- [x] `commit(force=)` (atomic + `.bak` + re-parse validate), `reset`, `reload`,
-      fingerprint + `externally_changed` + `ExternalModificationError`.
-- [x] `cli.py` modifying commands rewritten as `Volume` consumers; full suite
-      passes unchanged (no behavior/envelope change). `tests/test_engine.py`.
-- [x] **Decided: no `Volume.watch(callback)` in core.** A filesystem watcher is
-      a non-deterministic background thread and a UX concern, so the *push* loop
-      is the consumer's job; the pull primitives (`externally_changed`,
-      `reload`, `is_dirty`) already enable VSCode-style live reload from the
-      consumer's own event loop. A push helper, if ever needed, ships as an
-      opt-in extra (`pynakes[watch]`) built when BiMaS needs it.
-
-## Phase 6: Deduplication & merge
-
-**Goal**: detect and safely merge duplicate works within a library — the major
-missing standalone operation.
-
-- [ ] `dedupe.py`: stable work identity (DOI / arXiv / other IDs first, then
-      fuzzy title+author+year), surfaced as duplicate clusters.
-- [ ] Conservative merge: prefer richer values, never silently discard data.
-- [ ] **Report conflicts (exit 2) rather than guessing** when ambiguous.
-- [ ] CLI: `pynakes dedupe check|merge` (`--dry-run`/`--diff`/`--json`).
-
-## Phase 7: Engine API — `Library` (collection)
-
-**Goal**: extend the engine from one file to a collection (a directory / git
-repo of volumes) — the structure the lifelong corpus needs.
-
-- [ ] `Library.open(dir)`; `volumes()`, `volume(path)`.
-- [ ] Cross-file `search`, `find_key`, cross-file dedup (reuses Phase 6 identity).
-- [ ] **Derived index** (e.g. SQLite FTS), rebuildable from the volumes — never a
-      competing source of truth.
-- [ ] Projections: formalize subset export (today's `used --out`) as a
-      first-class "view of the collection".
-
-## Phase 8: Interoperability
-
-**Goal**: stop being a BibTeX island while keeping fidelity.
-
-- [ ] CSL-JSON import/export (Zotero / pandoc / citeproc lingua franca).
-- [ ] RIS import/export.
-- [ ] First-class stable identifiers (DOI / arXiv / OpenAlex / ORCID) shared by
-      dedup, import, and verify.
-
-## Phase 9 (candidate): Integrity & enrichment
-
-**Goal**: catch fabricated/incorrect references, fill gaps, and flag preprints
-that now have a published version — high-value in the LLM era.
-**Network-discipline decision required**: extends network beyond `doi import`;
-calls must be opt-in and cached, tests stubbed against fixtures.
-
-- [ ] `verify`: check entries against authoritative metadata (DOI resolves,
-      title/author/year match, retraction flags); report discrepancies.
-- [ ] `published` (preprint → published): detect preprint entries (arXiv /
-      bioRxiv / medRxiv / SSRN eprints, preprint-registrant DOIs) and check
-      whether a peer-reviewed version now exists (arXiv `journal-ref`/DOI,
-      Crossref / OpenAlex version relations). Report it, and optionally upgrade
-      the entry (→ `@article` with journal/volume/pages/doi/year) while
-      preserving the preprint pointer. Conservative; conflict on ambiguity.
-      Reuses the stable-identity machinery (Phase 6/8).
-- [ ] `enrich`: fill missing DOIs/dates/identifiers conservatively, reviewably.
-- [ ] CI-friendly `verify --strict` (gate a paper repo on citation integrity).
-
-## Phase 10: Agent interface & API pinning — the BiMaS handoff
-
-**Goal**: make the engine first-class for agents and freeze the contract BiMaS
-(and ChatGPT/Claude) build on. **This is also the top adoption lever** (see
-Distribution): an MCP server is how agents autonomously call pynakes.
-
-- [ ] `pynakes-mcp`: expose operations as MCP tools over the `Volume`/`Library`
-      engine (`open → op → dry_run ? diff() : commit()`), dry-run by default,
-      write opt-in. Reuses `capabilities.py`.
-- [ ] Pin and document the public Python API (`Volume`, `Library`, operations)
-      as the stable engine contract in `docs/`.
-- [ ] Version bump signaling API stability.
-
-**Gate**: when this is met, pynakes is stable and complete, and BiMaS may begin —
-not before.
+**Explicitly *not* in 1.0** (deferred to [Beyond 1.0](#beyond-10-toward-bimas)):
+the multi-file `Library`/`Catalogue` corpus engine and CSL-JSON/RIS interop.
+These are larger, more corpus-flavored, and are the natural bridge to BiMaS — so
+1.0 is not gated on them. (If we decide either is essential to "standalone
+complete," pull it forward into a milestone below.)
 
 ---
 
-## Distribution & traction (near-term, parallel track)
+## Road to 1.0
 
-Impact does **not** come from publishing on GitHub alone; LLMs don't discover
-tools by crawling repos. The realistic order (traction first, citability later):
+Five milestones. Each is independently shippable; A unblocks distribution and
+can ship immediately, B is the substantive feature work, C–E close out 1.0.
 
-- [ ] **PyPI release.** Move zero, and a prerequisite for everything. Packaging
-      is ready; remaining: set the real repo URL in `[project.urls]` (currently a
-      placeholder), decide the release version (suggest **0.2.0** to reflect the
-      post-v0.1 surface), then `python -m build && twine upload`.
-- [ ] **A 30-second demo** (asciinema/GIF): "messy `.bib` → clean `.bib` with a
-      reviewable diff", and Claude cleaning a bibliography via pynakes. Shows the
-      safety/diff story better than prose.
-- [ ] **MCP server as the shareable hook** (Phase 10): both the autonomous-use
-      mechanism *and* novel enough right now to attract the agent-tooling crowd.
-- [ ] **Post where the pain lives**: r/LaTeX, JabRef community, LaTeX/academia
-      corners of Bluesky/Mastodon, a Show HN once the demo is crisp. Ten of the
-      right users beats a thousand impressions.
-- [ ] **Deferred to after traction (Stage 2)**: Zenodo DOI (citable), then JOSS —
-      JOSS explicitly requires demonstrated use, so it is downstream of adoption.
+### Milestone A — 0.2.0 interim release (unblock everything)
 
-Keep the agent-trust invariants sacred (deterministic, dry-run, JSON, no
-corruption): they're why an agent that meets pynakes once keeps using it.
+Ship the large post-v0.1 surface under a real version so the work is installable
+and citable while 1.0 lands. Move-zero; nothing here is hard.
 
-## Out of scope (downstream / BiMaS)
+- [x] Set the real repository URL (`github.com/maiani/pynakes`) in
+      `[project.urls]`, `zensical.toml`, the pre-commit hook docs, and guides.
+- [ ] Bump version to **0.2.0**; sync `capabilities.VERSION`.
+- [ ] `python -m build && twine check && twine upload` (fresh-venv install
+      already verified; packaging metadata is clean).
+- [ ] Tag `v0.2.0`; confirm the pre-commit hook `rev:` in docs points at it.
 
-In a **separate** project, only after the roadmap: capture (web/DOI/PDF),
-reading/annotation, GUI, sync orchestration, and the lifelong-corpus workflow
-(inbox → canonical → projections, provenance as a product feature). Permanently
-out of scope for pynakes: a database of record, cloud service, PDF library,
-arbitrary shell execution.
+**Done when**: `pip install pynakes` installs the current engine from PyPI.
+
+### Milestone B — Complete JabRef feature parity (the 1.0 bar)
+
+Finish honoring JabRef's own settings so a JabRef-configured library normalizes
+the same way under pynakes. The `saveActions` reader and the author/DOI mappings
+already exist; the formatters below are driven per the file's `saveActions`
+field map (`pynakes.formatters`, applied in `normalize`). Parity is locked by
+golden vectors lifted from JabRef's own tests in `tests/test_jabref_parity.py`.
+
+- [x] `normalize_date` → ISO date normalization (`yyyy-mm-dd` / `yyyy-mm`).
+- [x] `normalize_month` → BibTeX `#mmm#` month normalization.
+- [x] `normalize_page_numbers` → `--`/comma page-range normalization.
+- [x] Golden-vector parity harness (`tests/test_jabref_parity.py`) + the
+      `saveActions`-driven `normalize` pass.
+- [ ] **`normalize_names` full parity** — pynakes' author normalizer is not yet
+      a full JabRef `AuthorList` parser (initials expansion `Smith SH` →
+      `Smith, S. H.`, name affixes, LaTeX-brace names, comma-separated lists).
+      The gap is captured as `xfail` parity vectors; closing it trips an xpass.
+- [ ] Encoding/case formatters: `latex_cleanup`, `unicode_to_latex` /
+      `latex_to_unicode`, `html_to_latex` / `html_to_unicode`, the case
+      changers, `ordinals_to_superscript`, `units_to_latex`. Apply only the
+      formatters the file's `saveActions` actually configures, per field.
+- [ ] Audit `KNOWN_EXACT_KEYS`/`KNOWN_PREFIXES` against a **pinned JabRef
+      version** so every current JabRef metadata key classifies as `known`
+      (record the version checked against).
+- [ ] Decide whether `convert` defaults its target from `databaseType` (record
+      the decision either way).
+
+**Done when**: a library carrying JabRef `saveActions` round-trips through
+`pynakes normalize` with the same field changes JabRef would make on save
+(name parity included), and pynakes recognizes the full pinned-version JabRef
+metadata vocabulary.
+
+### Milestone C — Preferences as a lintable contract
+
+`normalize` already reads stored preferences (jabref-meta + pynakes-meta merged)
+as defaults. Close the loop you asked for: make `lint` honor the same profile so
+stored preferences become a checkable contract, pairing with the `lint --strict`
+CI gate.
+
+- [ ] `lint` reads the merged metadata profile and flags deviations: journal not
+      in the configured style, citation key not matching `keypattern*`, a field
+      the profile marks required is missing, title not brace-protected per
+      `protect-titles`.
+- [ ] Deviations are `warning`-severity by default; `lint --strict` makes them
+      fail, so a repo can gate "stays conformant to its own profile."
+- [ ] Document the full profile schema (every `pynakes-meta` key + the JabRef
+      keys consulted) in one place in `docs/`.
+
+**Done when**: setting a profile and running `lint --strict` fails a
+non-conformant library, with a clear per-entry reason.
+
+### Milestone D — Pin the public API (the 1.0 promise)
+
+1.0 is a stability commitment. Freeze the contract consumers build on.
+
+- [ ] Document and pin the public Python API (`Collection`, the operation
+      modules, `model.BibFile`/`BibEntry`, `metadata`) as stable in `docs/`,
+      alongside the already-stable CLI/JSON contract.
+- [ ] Mark private surface explicitly (leading `_`; document the `_`-rule).
+- [ ] Optional consistency pass: rename `JabRefMetadataBlock`/
+      `JabRefMetadataUpdate`/`DuplicateJabRefMetadataError` → `Metadata*`
+      (they now cover pynakes-meta too) **before** the API freezes, or
+      consciously keep the names. Decide now; renames after 1.0 are breaking.
+- [ ] State the semver policy: post-1.0, breaking the pinned API or the JSON
+      envelope requires a major bump.
+
+**Done when**: `docs/` has an authoritative "public API & stability" page and
+the names are settled.
+
+### Milestone E — 1.0.0 release & launch
+
+- [ ] Bump to **1.0.0**; sync `capabilities.VERSION`; tag `v1.0.0`.
+- [ ] A 30-second demo (asciinema/GIF): "messy `.bib` → clean `.bib` with a
+      reviewable diff", and an agent cleaning a bibliography via pynakes.
+- [ ] Lead the README/launch with the agent-tool + reviewable-diff story.
+- [ ] Post where the pain lives: r/LaTeX, JabRef community, LaTeX/academia
+      Bluesky/Mastodon, a Show HN once the demo is crisp.
+- [ ] Deferred to after traction: Zenodo DOI, then JOSS (JOSS requires
+      demonstrated use, so it follows adoption).
+
+**Done when**: 1.0.0 is on PyPI with a demo and the launch posts are out.
+
+### Quality gate (cross-cutting, every PR)
+
+- [ ] `pytest && ruff check src tests && ruff format --check src tests` green.
+- [ ] Coverage stays ≥90%; new behavior has tests and a `CHANGELOG.md` entry.
+- [ ] All eight guiding principles intact; `capabilities`, README, and this plan
+      stay honest (no stub described as shipped).
+
+---
+
+## Beyond 1.0 (toward BiMaS)
+
+Out of 1.0, in roughly this order. The `Library`/`Catalogue` is the bridge from
+the single-file engine to the lifelong corpus, and therefore to BiMaS.
+
+- **Interoperability** — CSL-JSON import/export (Zotero/pandoc/citeproc lingua
+  franca), RIS import/export, and first-class stable identifiers (DOI / arXiv /
+  OpenAlex / ORCID) shared by dedup, import, and verify.
+- **`Library` (corpus)** — `Library.open(dir)`; `collections()`,
+  `collection(path)`; cross-file `search`/`find_key`/dedup (reusing the existing
+  stable-identity machinery).
+- **`Catalogue` (index)** — a derived, rebuildable search index (e.g. SQLite
+  FTS) over the Library; strictly derived, never a competing source of truth.
+- **Projections** — formalize subset export (today's `used --out`) as a
+  first-class "view of the Library".
+- **BiMaS** — a separate downstream project, built on the pinned engine + the
+  Library/Catalogue. Begins only after the above.
+
+## Out of scope (permanently, for pynakes)
+
+A database of record, a cloud service, a PDF library, arbitrary shell
+execution, a GUI, capture (web/DOI/PDF), and reading/annotation. These are
+BiMaS or never.
+
+**MCP server — downstream.** An MCP fits an agent interrogating a **personal
+corpus** ("what do I already have on X") — i.e. queries over the
+`Library`/`Catalogue`, which is BiMaS territory. Manuscript-time edits use the
+pynakes **CLI** directly. So the MCP belongs downstream (BiMaS or a thin
+`pynakes-mcp` companion on the pinned API), not in the lean, deterministic core.
 
 ## Risks & mitigations
 
-- **Dedup/merge correctness** → identity by stable IDs first; report conflicts
-  instead of guessing; minimal-diff merges only.
-- **Index drift** (Phase 7) → strictly derived and rebuildable; files are truth.
-- **Network determinism** (Phase 9) → opt-in + cached + fixture-stubbed tests;
-  decide explicitly before extending beyond `doi import`.
-- **Scope creep into BiMaS** → the vision informs API shape only; no application
-  concerns enter pynakes.
+- **`saveActions` format drift** (Milestone B) → JabRef is itself reworking the
+  format toward embedded JSON; parse tolerantly (regex over `field[formatter]`),
+  pin the JabRef version audited against, and keep formatters individually
+  testable.
+- **API pin too early/late** (Milestone D) → settle names (incl. the optional
+  `JabRefMetadata*` rename) and the `_`-private rule *before* tagging 1.0;
+  breaking changes after are major-version only.
+- **Scope creep** → Library/Catalogue and interop stay Beyond 1.0 unless
+  consciously pulled forward; no application concerns enter pynakes.
 
-## Definition of done (standalone pynakes)
+## Definition of done — 1.0
 
-- [x] `Volume` engine implemented and the CLI dogfoods it.
-- [ ] `Library` (collection) engine implemented.
-- [ ] Deduplication/merge shipped.
-- [ ] Interop (CSL-JSON/RIS) shipped.
-- [ ] Integrity/enrichment shipped or explicitly deferred with a recorded decision.
-- [ ] MCP interface shipped; public API documented and pinned.
-- [ ] Published to PyPI.
-- [ ] Invariants intact; coverage ≥90%; `ruff` clean.
+- [ ] JabRef feature parity complete (Milestone B); recognized-key set audited
+      against a pinned JabRef version.
+- [ ] Stored preferences honored by both `normalize` and `lint` (Milestone C).
+- [ ] Public Python API + CLI/JSON contract documented, pinned, and named for
+      stability; semver policy stated (Milestone D).
+- [ ] Published to PyPI as 1.0.0 with a demo (Milestones A, E).
+- [ ] All guiding principles intact; coverage ≥90%; `ruff` clean.
 
-When this is met, pynakes is stable and complete, and BiMaS development may start
-on top of the pinned engine API.
+When this is met, pynakes 1.0 is stable and complete as a standalone single-file
+engine, and Beyond-1.0 / BiMaS work may build on the pinned API.

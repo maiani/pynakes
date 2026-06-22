@@ -16,7 +16,7 @@ scope of pynakes itself.
 - **pynakes** is a standalone Python library + CLI — the deterministic bib-file
   engine. It is complete and valuable on its own (researchers, scripts, agents),
   with no dependency on anything above it. It provides *mechanisms* over `.bib`
-  files: parse/edit/lint/convert/normalize, and the cross-file `Volume` /
+  files: parse/edit/lint/convert/normalize, and the cross-file `Collection` /
   `Library` / search / dedup / subset operations — all pure bibfile work, no UI,
   capture, PDF, or sync.
 - **BiMaS** (working name) is a **separate, downstream project built on top of
@@ -81,15 +81,15 @@ them consistent.
 
 ## Vocabulary & engine trajectory
 
-Three nested units — **entry ⊂ volume ⊂ library**:
+Three nested units — **entry ⊂ collection ⊂ library**:
 
 - **Entry** — one bib record.
-- **Volume** — one `.bib` file (a single πίναξ): the load → stage → preview →
+- **Collection** — one `.bib` file (a single πίναξ): the load → stage → preview →
   commit lifecycle with external-change detection. See
   [ENGINE_API.md](ENGINE_API.md).
-- **Library** — the collection: a git repo of volumes. This is your *Pinakes* —
+- **Library** — the collection: a git repo of collections. This is your *Pinakes* —
   the catalog. Its API adds global search, cross-file identity and dedup,
-  "which volumes use this key", and promotion between inbox / canonical /
+  "which collections use this key", and promotion between inbox / canonical /
   projections, backed by a **derived index** (rebuildable from the files, never
   a competing source of truth).
 

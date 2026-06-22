@@ -3,8 +3,12 @@
 Python API for programmatic usage of `pynakes`.
 
 The command-line interface is the primary supported surface, but the operation
-modules are also usable directly. Most operations mutate a `BibLibrary` in place
+modules are also usable directly. Most operations mutate a `BibFile` in place
 and return counts or operation-specific results.
+
+The Python API is the implementation boundary used by the CLI. Its object model
+and behavior are documented here; stable versioned API pinning remains planned,
+so consumers should avoid private names (those beginning with `_`).
 
 ## Data Models
 
@@ -25,23 +29,56 @@ entry = BibEntry(
 )
 ```
 
-### BibLibrary
+### BibFile
 
 ```python
-from pynakes.model import BibLibrary, EntryCollection
+from pynakes.model import BibFile, EntryStore
 
-lib = BibLibrary(entries=EntryCollection([entry]))
+lib = BibFile(entries=EntryStore([entry]))
 print(len(lib.entries))
 ```
 
-`BibLibrary.entries` is an `EntryCollection`, not a plain dict. It preserves
+`BibFile.entries` is an `EntryStore`, not a plain dict. It preserves
 duplicate citation keys while exposing dict-like access to the first matching
 entry.
 
-`BibLibrary.jabref_metadata` is a backward-compatible flat dict of parsed
-`jabref-meta` values. `BibLibrary.jabref_metadata_blocks` preserves ordered,
-structured metadata blocks with raw comment text, known/unknown classification,
-and categories.
+`BibFile.jabref_metadata` / `.jabref_metadata_blocks` hold the `jabref-meta`
+namespace; `BibFile.pynakes_metadata` / `.pynakes_metadata_blocks` hold the
+`pynakes-meta` superset. `BibFile.metadata` is the effective merged view
+(pynakes overrides jabref) that operations read, and `BibFile.metadata_blocks`
+returns both namespaces in source order. Each block preserves its raw comment
+text, namespace, known/unknown classification, and category.
+
+### Core model concepts
+
+| Class | Concept | Important behavior |
+| --- | --- | --- |
+| `BibEntry` | One record plus source-preservation state | `fields` accepts standard and custom fields alike; `raw_content` lets an untouched source entry be emitted verbatim. |
+| `EntryStore` | Lossless collection of a file's entries | Maintains source order and duplicate keys. `get()`/`[]` use first-match lookup; `values()`, `get_all()`, and `duplicate_keys()` are duplicate-aware. |
+| `BibFile` | Parsed semantic view of one `.bib` file | Holds entries, top-level declarations/comments, JabRef blocks, encoding, and line ending. |
+| `JabRefMetadataBlock` | One structured top-level `jabref-meta` comment | Keeps the raw comment alongside parsed key/value/category data. |
+| `Collection` | The working unit: a staged handle over one `.bib` file | Provides the lifecycle around a `BibFile`, not a second persistent source of truth. |
+
+## Result and Analysis Objects
+
+Operation reports describe what an in-place operation did; they do not contain a
+replacement `BibFile`. Where present, `to_dict()` is the JSON-friendly form used
+by the CLI.
+
+| Domain | Classes | Concept |
+| --- | --- | --- |
+| Engine and I/O | `FileFingerprint`, `CommitResult`, `SaveResult` | External-change state, staged-commit outcome, and backup/write outcome. |
+| Normalization and conversion | `NormalizeOptions`, `NormalizeResult`, `ConvertResult` | Policy overrides, per-domain change counts, and conservative conversion warnings. |
+| Journals | `JournalMapping`, `JournalSources`, `JournalResult` | One exact mapping, the precedence-ordered lookup sources, and normalization outcome. |
+| Dedupe | `WorkIdentity`, `DuplicateCluster`, `MergeConflict`, `ClusterMerge`, `DedupeMergeReport` | Evidence records describe the same work, merge decisions, and ambiguity that blocks guessing. |
+| Integrity | `IntegrityIssue`, `VerifyReport`, `FieldUpdate`, `EnrichReport`, `PublishedCandidate`, `PublishedReport` | Provider-backed findings and the explicitly applied metadata changes. |
+| Files, usage, and lint | `LinkedFile`, `FileCheckReport`, `UsageReport`, `LintIssue` | Read-only analysis items and summaries. |
+| JabRef metadata | `JabRefMetadataUpdate` | The exact raw comment replacement/insertion needed for a minimal-diff update. |
+
+Domain exceptions communicate recoverable failure categories: `ParseError` for
+invalid BibTeX; DOI import errors; `DuplicateJabRefMetadataError`; a
+`DedupeConflictError` containing `MergeConflict` values; `MetadataFetchError`;
+and `ExternalModificationError` for a concurrent collection commit.
 
 ## I/O
 
@@ -49,24 +86,30 @@ and categories.
 from pynakes.io import load_bib, save_bib
 
 lib = load_bib("refs.bib")
-save_bib(lib, "refs.bib", backup=True, atomic=True)
+result = save_bib(lib, "refs.bib", backup=True, atomic=True)
+if not result.success:
+    raise OSError(result.error)
 ```
+
+`SaveResult` records the destination, optional `.bak` path, and controlled
+error information. `load_bib` records the detected file encoding on the
+returned library.
 
 ## Engine Facade
 
 ```python
-from pynakes.engine import ExternalModificationError, Volume
+from pynakes.engine import ExternalModificationError, Collection
 
-vol = Volume.open("refs.bib")
-issues = vol.lint()
-renames = vol.repair_keys()
-report = vol.normalize()
+coll = Collection.open("refs.bib")
+issues = coll.lint()
+renames = coll.repair_keys()
+report = coll.normalize()
 
-print(vol.diff())
-result = vol.commit()
+print(coll.diff())
+result = coll.commit()
 ```
 
-`Volume` owns the load → stage → preview → commit lifecycle for one `.bib` file.
+`Collection` owns the load → stage → preview → commit lifecycle for one `.bib` file.
 It keeps the file as the source of truth: staged operations mutate the in-memory
 library only, `preview()` returns the would-be file text, `diff()` returns a
 unified diff, and `commit()` writes atomically through the same validation path
@@ -77,6 +120,10 @@ from disk.
 file changed underneath, it raises `ExternalModificationError` instead of
 silently overwriting external edits. Call `externally_changed()` to poll the
 same check before committing.
+
+`FileFingerprint` is that optimistic-concurrency snapshot. A
+`CommitResult` contains the pre-commit staged diff, whether content was
+written, and the changed-entry count.
 
 ## Parser and Writer
 
@@ -139,7 +186,7 @@ when present.
 ## JabRef Metadata
 
 ```python
-from pynakes.jabref import set_metadata
+from pynakes.metadata import set_metadata
 
 for block in lib.jabref_metadata_blocks:
     print(block.key, block.normalized_value, block.category, block.known)
@@ -176,18 +223,18 @@ move_field(lib, "school", "institution")
 ## DOI Import
 
 ```python
-from pynakes.engine import Volume
+from pynakes.engine import Collection
 
-vol = Volume.open("refs.bib")
-entry = vol.import_doi(
+coll = Collection.open("refs.bib")
+entry = coll.import_doi(
     "10.5555/example",
     key_source="generated",
 )
-print(vol.diff())
+print(coll.diff())
 ```
 
 For lower-level workflows, `pynakes.doi.prepare_imported_entry` and
-`pynakes.doi.render_entry` remain available. `Volume.import_doi()` stages the
+`pynakes.doi.render_entry` remain available. `Collection.import_doi()` stages the
 append and lets `diff()`/`commit()` handle preservation and atomic writes.
 
 ## Linked Files
@@ -249,6 +296,28 @@ generated = abbreviate_title_with_ltwa("Journal of Polymer Science", sources)
 2. bundled exact mappings
 3. LTWA-style word abbreviation generation
 4. unknown warning
+
+`JournalMapping` represents an exact full-title/abbreviation association;
+`JournalSources` is the precedence-ordered index used for lookups; and
+`JournalResult` records changed, resolved, and unresolved titles.
+
+## Dedupe and Integrity
+
+```python
+from pynakes.dedupe import find_duplicate_clusters, merge_duplicates
+from pynakes.integrity import verify_library
+
+clusters = find_duplicate_clusters(lib)
+merge_report = merge_duplicates(lib, clusters)  # raises DedupeConflictError if ambiguous
+verification = verify_library(lib, online=False)
+```
+
+`WorkIdentity` is a stable identifier (such as a DOI or arXiv identifier) used
+to explain a `DuplicateCluster`. A merge reports the selected primary record as
+`ClusterMerge`; a conflicting field/type is a `MergeConflict`, never an
+automatic loss of data. Integrity report objects keep provider findings separate
+from `FieldUpdate` records, so callers can distinguish an observation from an
+applied enrichment.
 
 ## Usage Analysis
 

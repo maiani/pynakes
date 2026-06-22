@@ -23,7 +23,9 @@ from pynakes.model import BibEntry
 
 # Entry header: ``@type{ key ,`` — groups the part before the key, the key, and
 # the trailing comma so the key can be swapped without touching anything else.
-_HEADER_RE = re.compile(r"(@\w+\s*\{\s*)([^,\s]+)(\s*,)")
+# The key group is ``*`` (not ``+``) so an empty key (``@article{,``) can be
+# filled in by ``keys generate``.
+_HEADER_RE = re.compile(r"(@\w+\s*\{\s*)([^,\s]*)(\s*,)")
 
 # The leading ``@type`` token, so the entry type can be swapped without touching
 # the key, braces, or anything else.

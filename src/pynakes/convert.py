@@ -16,7 +16,7 @@ from pynakes.editing import (
     set_entry_field,
     set_entry_type,
 )
-from pynakes.model import BibEntry, BibLibrary
+from pynakes.model import BibEntry, BibFile
 
 TO_BIBLATEX = "biblatex"
 TO_BIBTEX = "bibtex"
@@ -98,7 +98,11 @@ _DATE_RE = re.compile(r"^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?$")
 
 @dataclass
 class ConvertResult:
-    """Counts and warnings from a dialect conversion."""
+    """Auditable summary of a BibTeX/BibLaTeX dialect conversion.
+
+    Counters describe the semantic transformations made in place; ``warnings``
+    records fields deliberately left unchanged to avoid overwriting data.
+    """
 
     target: str = ""
     entries: int = 0
@@ -196,7 +200,7 @@ def _combine_date(entry: BibEntry, result: ConvertResult) -> bool:
     return True
 
 
-def convert_to_biblatex(lib: BibLibrary) -> ConvertResult:
+def convert_to_biblatex(lib: BibFile) -> ConvertResult:
     """Convert a BibTeX library to BibLaTeX conventions in-place.
 
     Applies field renames (``journal`` → ``journaltitle``, ``address`` →
@@ -294,7 +298,7 @@ def _split_date(entry: BibEntry, result: ConvertResult) -> bool:
     return True
 
 
-def convert_to_bibtex(lib: BibLibrary) -> ConvertResult:
+def convert_to_bibtex(lib: BibFile) -> ConvertResult:
     """Convert a BibLaTeX library to BibTeX conventions in-place.
 
     Applies field renames (``journaltitle`` → ``journal``, ``location`` →
@@ -315,7 +319,7 @@ def convert_to_bibtex(lib: BibLibrary) -> ConvertResult:
     return result
 
 
-def convert(lib: BibLibrary, target: str) -> ConvertResult:
+def convert(lib: BibFile, target: str) -> ConvertResult:
     """Convert ``lib`` in-place to ``target`` (``"biblatex"`` or ``"bibtex"``)."""
     normalized = target.lower()
     if normalized == TO_BIBLATEX:

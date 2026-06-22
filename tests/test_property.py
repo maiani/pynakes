@@ -7,7 +7,7 @@ guarantees are checked:
 1. **Round-trip fidelity** — for generated valid BibTeX, ``parse → write →
    parse`` preserves every key, type, and field/value pair.
 2. **No tracebacks on garbage** — ``parse_bib`` over arbitrary text either
-   returns a ``BibLibrary`` or raises the declared ``ParseError`` (never an
+   returns a ``BibFile`` or raises the declared ``ParseError`` (never an
    unexpected exception).
 """
 
@@ -84,7 +84,7 @@ def test_unmodified_entries_write_back_verbatim(text: str) -> None:
 @settings(max_examples=300, suppress_health_check=[HealthCheck.too_slow])
 @given(st.text(max_size=200))
 def test_parser_never_crashes_on_arbitrary_text(text: str) -> None:
-    """Arbitrary input yields a BibLibrary or a declared ParseError — never a traceback."""
+    """Arbitrary input yields a BibFile or a declared ParseError — never a traceback."""
     try:
         lib = parse_bib(text)
     except ParseError:

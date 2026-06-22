@@ -8,7 +8,12 @@ from typer.testing import CliRunner
 from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.cli import app
-from pynakes.jabref import DuplicateJabRefMetadataError, set_metadata
+from pynakes.metadata import (
+    DuplicateJabRefMetadataError,
+    library_save_actions,
+    parse_save_actions,
+    set_metadata,
+)
 from pynakes.usage import subset_library
 
 runner = CliRunner()
@@ -45,6 +50,99 @@ def test_parse_known_and_unknown_jabref_metadata_blocks() -> None:
     assert write_bib(lib) == text
 
 
+def test_parse_save_actions_reads_jabref_formatters() -> None:
+    sa = parse_save_actions("enabled;\nauthor[normalize_names]\npages[normalize_page_numbers]\n;")
+    assert sa is not None
+    assert sa.enabled is True
+    assert sa.cleanups == {"author": ["normalize_names"], "pages": ["normalize_page_numbers"]}
+    assert sa.has("normalize_names", ("author", "editor")) is True
+    assert sa.has("normalize_names", ("title",)) is False
+    assert sa.has(("clean_up_doi", "short_doi"), ("doi",)) is False
+
+
+def test_parse_save_actions_disabled_and_absent() -> None:
+    assert parse_save_actions(None) is None
+    assert parse_save_actions("") is None
+    disabled = parse_save_actions("disabled;\nauthor[normalize_names]\n;")
+    assert disabled is not None and disabled.enabled is False
+
+
+def test_library_save_actions_reads_from_metadata() -> None:
+    lib = parse_bib(
+        "@comment{jabref-meta: saveActions:enabled;\ndoi[clean_up_doi]\n;}\n"
+        "@article{A,\n  title = {T},\n  year = {2020}\n}\n"
+    )
+    sa = library_save_actions(lib)
+    assert sa is not None
+    assert sa.has(("clean_up_doi", "short_doi"), ("doi",)) is True
+
+
+def test_parse_both_namespaces_and_merge_precedence() -> None:
+    text = (
+        "@comment{jabref-meta: databaseType:bibtex;}\n"
+        "@comment{jabref-meta: keypatterndefault:[auth][year];}\n"
+        "@comment{pynakes-meta: keypatterndefault:[auth][shorttitle];}\n"
+        "@comment{pynakes-meta: pynakes-normalize-journal-style:full;}\n\n"
+        "@article{Smith2020,\n  author = {John Smith},\n  title = {A Paper},\n  year = {2020}\n}\n"
+    )
+
+    lib = parse_bib(text)
+
+    # Blocks are split by namespace.
+    assert [b.key for b in lib.jabref_metadata_blocks] == ["databaseType", "keypatterndefault"]
+    assert [b.key for b in lib.pynakes_metadata_blocks] == [
+        "keypatterndefault",
+        "pynakes-normalize-journal-style",
+    ]
+    assert lib.pynakes_metadata_blocks[0].namespace == "pynakes"
+    # Merged view: pynakes-meta wins on a conflicting key.
+    assert lib.metadata["keypatterndefault"] == "[auth][shorttitle];"
+    assert lib.metadata["databaseType"] == "bibtex;"
+    assert lib.metadata["pynakes-normalize-journal-style"] == "full;"
+    # metadata_blocks returns both namespaces in source order.
+    assert [b.key for b in lib.metadata_blocks] == [
+        "databaseType",
+        "keypatterndefault",
+        "keypatterndefault",
+        "pynakes-normalize-journal-style",
+    ]
+    # Round-trip is byte-for-byte.
+    assert write_bib(lib) == text
+
+
+def test_pynakes_meta_round_trips_after_set(tmp_path: Path) -> None:
+    lib = parse_bib("@comment{jabref-meta: databaseType:bibtex;}\n")
+    # Native key updates jabref-meta in place; pynakes-only key appends pynakes-meta.
+    set_metadata(lib, "databaseType", "biblatex")
+    set_metadata(lib, "pynakes-normalize-journal-style", "abbreviated")
+
+    out = write_bib(lib)
+    assert "@comment{jabref-meta: databaseType:biblatex;}" in out
+    assert "@comment{pynakes-meta: pynakes-normalize-journal-style:abbreviated;}" in out
+    # Re-parsing yields the same split + merged view.
+    reparsed = parse_bib(out)
+    assert reparsed.jabref_metadata["databaseType"] == "biblatex;"
+    assert reparsed.metadata["pynakes-normalize-journal-style"] == "abbreviated;"
+
+
+def test_normalize_honors_pynakes_meta_journal_style(tmp_path: Path) -> None:
+    # journal-style preference stored in pynakes-meta drives `normalize`.
+    text = (
+        "@comment{pynakes-meta: pynakes-normalize-journal-style:full;}\n\n"
+        "@article{S,\n  author = {A. Author},\n  title = {T},\n"
+        "  journal = {Phys. Rev. Lett.},\n  year = {2020}\n}\n"
+    )
+    bib = tmp_path / "refs.bib"
+    bib.write_text(text)
+
+    result = runner.invoke(app, ["normalize", str(bib), "--json"])
+    assert result.exit_code == 0, result.output
+    # With journal-style=full from pynakes-meta, the abbreviation is expanded
+    # (or left unchanged if unknown) — the point is normalize read the preference
+    # without a --journal-style flag and did not abbreviate.
+    assert "Phys. Rev. Lett." not in bib.read_text() or "Physical Review Letters" in bib.read_text()
+
+
 def test_set_metadata_updates_known_block_without_touching_unknown() -> None:
     lib = parse_bib(
         "@comment{jabref-meta: databaseType:bibtex;}\n@comment{jabref-meta: unknownThing:keep;}\n"
@@ -73,15 +171,31 @@ def test_set_metadata_appends_missing_known_block() -> None:
     assert lib.jabref_metadata["keypatterndefault"] == "[auth][year];"
 
 
-def test_set_metadata_rejects_unknown_by_default() -> None:
+def test_set_metadata_routes_unknown_to_pynakes_by_default() -> None:
+    # A key JabRef cannot represent is no longer rejected; it lands in the
+    # pynakes-meta namespace, which is pynakes' own superset.
     lib = parse_bib("")
 
+    update = set_metadata(lib, "not-a-jabref-key", "value")
+
+    assert update.namespace == "pynakes"
+    assert update.created is True
+    assert update.new_raw == "@comment{pynakes-meta: not-a-jabref-key:value;}"
+    assert lib.pynakes_metadata["not-a-jabref-key"] == "value;"
+    # ...but forcing it into jabref-meta still requires --allow-unknown.
     try:
-        set_metadata(lib, "not-a-jabref-key", "value")
+        set_metadata(lib, "another-unknown", "value", namespace="jabref")
     except ValueError as exc:
         assert "Unknown JabRef metadata key" in str(exc)
     else:
-        raise AssertionError("expected ValueError")
+        raise AssertionError("expected ValueError when forcing unknown key into jabref-meta")
+
+
+def test_set_metadata_routes_native_key_to_jabref() -> None:
+    lib = parse_bib("")
+    update = set_metadata(lib, "databaseType", "biblatex")
+    assert update.namespace == "jabref"
+    assert update.new_raw == "@comment{jabref-meta: databaseType:biblatex;}"
 
 
 def test_set_metadata_refuses_duplicate_blocks() -> None:
@@ -180,11 +294,27 @@ def test_metadata_set_appends_missing_block(tmp_path: Path) -> None:
     assert bib.read_text().startswith("@comment{jabref-meta: keypatterndefault:[auth][year];}\n")
 
 
-def test_metadata_set_unknown_key_errors(tmp_path: Path) -> None:
+def test_metadata_set_unknown_key_goes_to_pynakes(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text("")
 
     result = runner.invoke(app, ["metadata", "set", str(bib), "unknownThing", "value", "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["namespace"] == "pynakes"
+    assert data["created"] is True
+    assert "@comment{pynakes-meta: unknownThing:value;}" in bib.read_text()
+
+
+def test_metadata_set_unknown_key_into_jabref_errors(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("")
+
+    result = runner.invoke(
+        app,
+        ["metadata", "set", str(bib), "unknownThing", "value", "--namespace", "jabref", "--json"],
+    )
 
     assert result.exit_code == 1, result.output
     data = json.loads(result.output)

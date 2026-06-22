@@ -40,6 +40,8 @@ pynakes normalize refs.bib
 - Citation-key check/generate/repair commands
 - Field rename/move/append/clear and title-capitalization protection
 - DOI import via DOI resolver BibTeX content negotiation
+- Deduplication and conservative merge workflows
+- Integrity/enrichment workflows with opt-in cached provider lookups
 - JabRef linked-file validation through `files check`
 - AUX/TeX citation analysis with used/unused/missing reporting
 - Daily `normalize` routine:
@@ -52,10 +54,9 @@ pynakes normalize refs.bib
 
 ## Still Planned
 
-- Deduplication and merge workflows
 - Linked-file repair
 - Advanced query DSL
-- MCP server integration
+
 
 ## Documentation
 

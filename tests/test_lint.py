@@ -21,6 +21,25 @@ def test_detects_duplicate_keys() -> None:
     assert dupes[0].key == "A"
 
 
+def test_flags_empty_citation_key() -> None:
+    # An entry with no key must surface as an error, not be silently dropped.
+    lib = parse_bib("@article{,\n  author = {Bob White},\n  title = {No Key}\n}\n")
+    assert len(lib.entries) == 1
+    issues = [i for i in lint(lib) if i.type == "empty_key"]
+    assert len(issues) == 1
+    assert issues[0].severity == "error"
+    # ... and it is not double-reported as a duplicate-key set.
+    assert not [i for i in lint(lib) if i.type == "duplicate_key"]
+
+
+def test_warns_when_no_entries_found() -> None:
+    # Non-BibTeX / wrong-file content must not return a clean "0 issues".
+    lib = parse_bib("this is not bibtex at all }{@@@\n")
+    issues = lint(lib)
+    assert [i.type for i in issues] == ["no_entries"]
+    assert issues[0].severity == "warning"
+
+
 def test_missing_required_field() -> None:
     lib = parse_bib("@article{A,\n  title = {T},\n  year = {2020}\n}\n")
     issues = [i for i in lint(lib) if i.type == "missing_required_field"]

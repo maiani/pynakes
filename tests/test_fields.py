@@ -153,6 +153,23 @@ class TestQueryFilter:
         assert f(BibEntry("k", "article", {"doi": "x"}))
         assert not f(BibEntry("k", "article", {}))
 
+    def test_key_is_queryable(self) -> None:
+        # `key` targets the citation key, so an agent can edit one entry by key
+        # (the resolution the dedupe-merge conflict's `manual_edit` option needs).
+        from pynakes.model import BibEntry
+
+        eq = parse_query('key == "Smith2020"')
+        assert eq(BibEntry("Smith2020", "article", {}))
+        assert not eq(BibEntry("Jones2021", "article", {}))
+        assert parse_query("key exists")(BibEntry("Smith2020", "article", {}))
+
+    def test_key_filter_selects_single_entry(self) -> None:
+        lib = parse_bib("@article{A,\n  year = {2020}\n}\n\n@article{B,\n  year = {2021}\n}\n")
+        count = append_field(lib, "keywords", "x", where=parse_query('key == "B"'))
+        assert count == 1
+        assert "keywords" not in lib.entries["A"].fields
+        assert lib.entries["B"].fields["keywords"] == "x"
+
     def test_invalid_query_raises(self) -> None:
         with pytest.raises(ValueError):
             parse_query("this is not valid >< syntax")

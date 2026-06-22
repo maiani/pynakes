@@ -195,6 +195,19 @@ class TestRegenerate:
         assert renames == [("old1", "Smith2020Data")]
         assert "Smith2020Data" in lib.entries
 
+    def test_regenerate_mints_key_for_empty_key_entry(self) -> None:
+        # An entry parsed with an empty key must get a real key on generate,
+        # surgically (only the header line changes).
+        lib = parse_bib(
+            "@article{,\n  author = {Bob White},\n  year = {2022},\n  title = {Findings}\n}\n"
+        )
+        renames = regenerate_keys(lib)
+        assert renames == [("", "White2022Findings")]
+        assert "White2022Findings" in lib.entries
+        out = write_bib(lib)
+        assert out.startswith("@article{White2022Findings,")
+        assert "@article{," not in out
+
     def test_regenerate_disambiguates_collisions(self) -> None:
         lib = parse_bib(
             "@article{x,\n  author = {Smith},\n  year = {2020},\n  title = {Data}\n}\n\n"

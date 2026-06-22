@@ -21,7 +21,7 @@ pip install pynakes
 Clone the repository and install in editable mode:
 
 ```bash
-git clone https://github.com/user/pynakes.git
+git clone https://github.com/maiani/pynakes.git
 cd pynakes
 pip install -e .
 ```
