@@ -66,10 +66,10 @@ pynakes fields rename refs.bib journal journaltitle
 
 ```bash
 # See what would change
-pynakes groups add-entry refs.bib SomeKey2024 "Economics" --dry-run --diff
+pynakes groups add-entry refs.bib SomeKey2024 "Machine Learning" --dry-run --diff
 
 # Apply it
-pynakes groups add-entry refs.bib SomeKey2024 "Economics"
+pynakes groups add-entry refs.bib SomeKey2024 "Machine Learning"
 ```
 
 ### Rename a citation key safely
@@ -300,11 +300,11 @@ then apply:
 
 ```bash
 # 1. Preview the change and show the diff to the user.
-pynakes groups add-entry refs.bib Andolfatto2021 "CBDC / Banking" --dry-run --diff --json
+pynakes groups add-entry refs.bib Smith2020 "Machine Learning" --dry-run --diff --json
 # → {"status": "success", "modified": true, "diff": "...", "warnings": [...]}
 
 # 2. Once authorized, re-run without --dry-run to apply it.
-pynakes groups add-entry refs.bib Andolfatto2021 "CBDC / Banking" --json
+pynakes groups add-entry refs.bib Smith2020 "Machine Learning" --json
 ```
 
 ## Development

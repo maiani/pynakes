@@ -4,7 +4,7 @@ import logging
 import re
 from typing import Optional
 
-from pynakes.metadata import metadata_blocks_to_dict, parse_jabref_metadata_comment
+from pynakes.metadata import metadata_blocks_to_dict, parse_metadata_comment
 from pynakes.model import BibEntry, BibFile, EntryStore, MetadataBlock
 
 logger = logging.getLogger(__name__)
@@ -102,12 +102,11 @@ def parse_bib(text: str) -> BibFile:
             if comment_text:
                 comment_index = len(raw_comments)
                 raw_comments.append(raw_comment)
-                block = parse_jabref_metadata_comment(
+                for block in parse_metadata_comment(
                     comment_text,
                     raw=raw_comment,
                     comment_index=comment_index,
-                )
-                if block is not None:
+                ):
                     if block.namespace == "pynakes":
                         pynakes_metadata_blocks.append(block)
                     else:

@@ -67,7 +67,7 @@ pynakes normalize refs.bib
 - [API Reference](api/index.md)
 - [Examples](examples/index.md)
 - [Architecture](guides/architecture.md)
-- [Vision](vision.md)
+- [Philosophy](vision.md)
 
 ## Why pynakes?
 

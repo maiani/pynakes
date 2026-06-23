@@ -173,8 +173,8 @@ pynakes fields clear refs.bib abstract --dry-run --diff
 Supported filters:
 
 ```bash
-pynakes fields append refs.bib keywords "CBDC" \
-  --where 'title contains "digital currency"'
+pynakes fields append refs.bib keywords "transformers" \
+  --where 'title contains "neural network"'
 
 pynakes fields clear refs.bib doi --where 'type = book'
 pynakes fields clear refs.bib note --where 'doi exists'
@@ -271,16 +271,22 @@ pynakes normalize refs.bib --journal-table journals.csv --ltwa-table ltwa.csv
 LTWA tables accept `Word` and `Abbreviation` columns.
 
 Normalization preferences live in metadata. pynakes-specific settings (no
-JabRef equivalent) go in `pynakes-meta`. The canonical keys use a bare
-`normalize-` prefix; the older `pynakes-normalize-` spelling is still accepted
-as an alias:
+JabRef equivalent) go in `pynakes-meta`, under the `normalize-` key prefix.
+pynakes writes them as one consolidated block, one `key: value` line per setting
+(JabRef never reads this namespace, so there is no reason to repeat the prefix or
+keep JabRef's `;` terminator):
 
 ```bibtex
-@comment{pynakes-meta: normalize-journal-style:none;}
-@comment{pynakes-meta: normalize-protect-titles:false;}
-@comment{pynakes-meta: normalize-identifier-case:false;}
-@comment{pynakes-meta: protected-terms:Proceedings,OpenAI;}
+@comment{pynakes-meta:
+normalize-journal-style: none
+normalize-protect-titles: false
+normalize-identifier-case: false
+protected-terms: Proceedings,OpenAI
+}
 ```
+
+pynakes also reads the older one-comment-per-key and `key:value;` layouts, and
+`normalize` rewrites them into this consolidated block on its next pass.
 
 Where JabRef already has a setting, pynakes uses **that**: if the library has
 JabRef `saveActions` enabled, `normalize` honors them — a `normalize_names`

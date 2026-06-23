@@ -34,7 +34,7 @@ The model has three nested concepts: **entry** < **collection** < future
 | File model | BibFile | Semantic content of one parsed .bib file: entries, declarations, comments, structured JabRef metadata, encoding, and line-ending style. |
 | Metadata block | MetadataBlock | One top-level metadata comment — `@comment{jabref-meta: ...}` or pynakes' superset `@comment{pynakes-meta: ...}` (tagged by `namespace`) — represented both structurally and as raw text. |
 | Collection (working unit) | Collection | A staged, reconciled handle over one `.bib` file — "a slice of references covering one aspect of a topic". Supports operations, preview, diff, commit, reset, reload, and external-change detection. |
-| Library (corpus) | — (planned) | A directory/repository of Collections — the lifelong corpus. Not implemented yet (see [Beyond 1.0](../../DEVPLAN.md) and the [Vision](../vision.md)). |
+| Library (corpus) | — (planned) | A directory/repository of Collections. Not implemented yet (see [Beyond 1.0](../../DEVPLAN.md)). |
 | Catalogue (index) | — (planned) | A derived, rebuildable search index over the Library (e.g. SQLite FTS). Never a competing source of truth; the Collections are. Not implemented yet. |
 
 ### BibEntry: record plus preservation state
@@ -299,9 +299,9 @@ agent interface.
 
 The next structural extension is a `Library` over multiple Collections, with
 rebuildable cross-file indexes and no competing source of truth. It is planned,
-not part of the current public implementation — see the [Vision](../vision.md)
-for the destination and [DEVPLAN.md](../../DEVPLAN.md) for the roadmap.
+not part of the current public implementation — see
+[DEVPLAN.md](../../DEVPLAN.md) for the roadmap.
 
 - [API reference](../api/index.md)
 - [Usage guide](usage.md)
-- [Vision](../vision.md) and [DEVPLAN](../../DEVPLAN.md) for direction and roadmap.
+- [Philosophy](../vision.md) and [DEVPLAN](../../DEVPLAN.md) for design and roadmap.

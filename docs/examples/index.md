@@ -87,12 +87,12 @@ pynakes groups remove-entry refs.bib Smith2020 "Machine Learning" --dry-run --di
 ## Example 5: Add Keywords to Matching Papers
 
 ```bash
-pynakes fields append refs.bib keywords "CBDC" \
-  --where 'title contains "digital currency"' \
+pynakes fields append refs.bib keywords "transformers" \
+  --where 'title contains "neural network"' \
   --dry-run --diff
 
-pynakes fields append refs.bib keywords "CBDC" \
-  --where 'title contains "digital currency"'
+pynakes fields append refs.bib keywords "transformers" \
+  --where 'title contains "neural network"'
 ```
 
 The current filter syntax supports `contains`, `=`, `==`, `exists`, and the
@@ -206,22 +206,28 @@ user, and then run the same command without `--dry-run` after approval.
 ## Example 12: A `.bib` file with library metadata
 
 pynakes reads two top-level metadata namespaces. JabRef writes its own settings
-as `@comment{jabref-meta: …}`; pynakes adds `@comment{pynakes-meta: …}` for
-settings JabRef has no place for. A library that carries both looks like this:
+as `@comment{jabref-meta: …}`, one comment per key. pynakes adds a
+`@comment{pynakes-meta: …}` namespace for settings JabRef has no place for;
+because JabRef never reads it, pynakes packs all of its keys into one
+consolidated block, one setting per line. Each setting is a `key: value` line — pynakes also reads the older
+`key:value;` spelling and rewrites it to this form. A library that carries both
+namespaces looks like this:
 
 ```bibtex
 @comment{jabref-meta: databaseType:biblatex;}
 @comment{jabref-meta: keypatterndefault:[auth][year];}
 @comment{jabref-meta: fileDirectory:/home/me/papers;}
 
-@comment{pynakes-meta: normalize-journal-style:abbreviated;}
-@comment{pynakes-meta: normalize-author-style:jabref;}
-@comment{pynakes-meta: protected-terms:DNA,RNA,CRISPR;}
+@comment{pynakes-meta:
+normalize-journal-style: abbreviated
+normalize-author-style: jabref
+protected-terms: GPU,API,JSON
+}
 
-@article{Doe2021,
-  author = {Jane Doe},
-  title  = {On {CRISPR} and {DNA} repair},
-  journaltitle = {Nature Reviews Genetics},
+@article{Smith2021,
+  author = {John Smith},
+  title  = {On {GPU} acceleration and {API} design},
+  journaltitle = {Journal of Machine Learning Research},
   date   = {2021},
   doi    = {10.1000/example}
 }
@@ -246,7 +252,7 @@ pynakes metadata list refs.bib
 #   [jabref:known:files] fileDirectory = /home/me/papers
 #   [pynakes:known:pynakes] normalize-journal-style = abbreviated
 #   [pynakes:known:pynakes] normalize-author-style = jabref
-#   [pynakes:known:pynakes] protected-terms = DNA,RNA,CRISPR
+#   [pynakes:known:pynakes] protected-terms = GPU,API,JSON
 ```
 
 Add a preference. A JabRef-native key lands in `jabref-meta` (so JabRef keeps
@@ -254,7 +260,7 @@ seeing it); a pynakes-only key lands in `pynakes-meta` — automatically:
 
 ```bash
 pynakes metadata set refs.bib databaseType bibtex            # → jabref-meta
-pynakes metadata set refs.bib pynakes-normalize-dois on      # → pynakes-meta
+pynakes metadata set refs.bib normalize-dois on             # → pynakes-meta
 ```
 
 ## Next Steps

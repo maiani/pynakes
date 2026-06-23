@@ -7,7 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **Dropped pre-release metadata-key aliases.** Only the canonical profile keys
+  are recognized now: the deprecated `pynakes-normalize-<name>`,
+  `pynakes-protected-terms`, `pynakes-journal-table`, `pynakes-ltwa-table`,
+  `pynakes-tex-sources`, and `required-fields` / `required-fields-<entrytype>`
+  spellings are no longer read by `normalize`, `lint`, or `used`. Use
+  `normalize-<name>`, `protected-terms`, `journal-table`, `ltwa-table`,
+  `tex-sources`, and `lint-required-fields[-<entrytype>]`. The standalone
+  `pynakes-` metadata-key prefix is no longer classified as known. As pynakes
+  has never been publicly released, no backward compatibility is owed.
+- The `metadata set` duplicate-block conflict now reports error code
+  `DuplicateMetadata` (was `DuplicateJabRefMetadata`), matching the renamed
+  `DuplicateMetadataError`.
+
 ### Changed
+- **`pynakes-meta` is now written as one consolidated block with a simpler
+  syntax.** Because JabRef never reads the `pynakes-meta` namespace, pynakes packs
+  all of its keys into a single multi-line `@comment{pynakes-meta: …}` comment,
+  one `key: value` line per setting (no repeated prefix, no JabRef `;`
+  terminator), instead of one comment per key. `normalize`/`consolidate` produce
+  this form and merge any pre-existing separate `pynakes-meta` comments into it;
+  `metadata set` adds to it. Both the older one-comment-per-key and the
+  `key:value;` spellings are still read, so existing files keep working; the
+  `key: value` block is just the default written form. `jabref-meta` is
+  unchanged (one comment per key, for JabRef compatibility). Per-setting lines
+  keep single-setting edits to a one-line diff.
 - **Public API baseline for 1.0.** The supported Python modules, private-name
   rule, metadata type names, and post-1.0 semantic-versioning policy are now
   authoritative in `docs/guides/api-stability.md`. Metadata types were renamed

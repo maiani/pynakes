@@ -31,8 +31,8 @@ __all__ = [
     "splice_into_text",
 ]
 
-# Linked-source metadata key (canonical) and its namespaced alias.
-TEX_SOURCES_KEYS = ("tex-sources", "pynakes-tex-sources")
+# Linked-source metadata key.
+TEX_SOURCES_KEY = "tex-sources"
 
 
 def tex_sources_from_metadata(lib: BibFile, base_dir: str | Path) -> list[str]:
@@ -43,9 +43,8 @@ def tex_sources_from_metadata(lib: BibFile, base_dir: str | Path) -> list[str]:
     entries are resolved against ``base_dir`` (normally the ``.bib``'s folder);
     absolute entries are used as-is. Returns ``[]`` when the key is unset.
     """
-    wanted = {key.lower() for key in TEX_SOURCES_KEYS}
     raw = next(
-        (value for key, value in lib.metadata.items() if key.lower() in wanted),
+        (value for key, value in lib.metadata.items() if key.lower() == TEX_SOURCES_KEY),
         None,
     )
     if not raw:

@@ -1,10 +1,10 @@
 # pynakes development plan
 
-This plan is organized around the project [vision](docs/vision.md): pynakes is a
-**standalone bib-file engine** — a Python library + CLI that is complete and
-valuable on its own. The lifelong bibliography-management system (**BiMaS**,
-working name) is a **separate, downstream project built on top of pynakes** and
-is explicitly *not* in this plan.
+This plan is organized around the project [philosophy](docs/vision.md): pynakes
+is a **standalone bib-file engine** — a Python library + CLI that is complete and
+valuable on its own. Any application built on top of pynakes (capture, reading, a
+UI, sync) is a **separate, downstream project** and is explicitly *not* in this
+plan.
 
 This document is the **road to 1.0**. Completed phases are summarized in
 "Where we are" and recorded in [CHANGELOG.md](CHANGELOG.md) and the git log;
@@ -56,11 +56,11 @@ public API, released on PyPI.** The unit of work is one `Collection` (one
 `.bib`). 1.0 means: it does single-file maintenance excellently, reaches JabRef
 feature parity, promises API stability (semver), and is installable.
 
-**Explicitly *not* in 1.0** (deferred to [Beyond 1.0](#beyond-10-toward-bimas)):
+**Explicitly *not* in 1.0** (deferred to [Beyond 1.0](#beyond-10)):
 the multi-file `Library`/`Catalogue` corpus engine and CSL-JSON/RIS interop.
-These are larger, more corpus-flavored, and are the natural bridge to BiMaS — so
-1.0 is not gated on them. (If we decide either is essential to "standalone
-complete," pull it forward into a milestone below.)
+These are larger and more corpus-flavored — so 1.0 is not gated on them. (If we
+decide either is essential to "standalone complete," pull it forward into a
+milestone below.)
 
 ---
 
@@ -215,10 +215,11 @@ version 0.3.0.
 
 ---
 
-## Beyond 1.0 (toward BiMaS)
+## Beyond 1.0
 
 Out of 1.0, in roughly this order. The `Library`/`Catalogue` is the bridge from
-the single-file engine to the lifelong corpus, and therefore to BiMaS.
+the single-file engine to a cross-file corpus, and is what any downstream
+application would build on.
 
 - **Interoperability** — CSL-JSON import/export (Zotero/pandoc/citeproc lingua
   franca), RIS import/export, and first-class stable identifiers (DOI / arXiv /
@@ -230,20 +231,18 @@ the single-file engine to the lifelong corpus, and therefore to BiMaS.
   FTS) over the Library; strictly derived, never a competing source of truth.
 - **Projections** — formalize subset export (today's `used --out`) as a
   first-class "view of the Library".
-- **BiMaS** — a separate downstream project, built on the pinned engine + the
-  Library/Catalogue. Begins only after the above.
 
 ## Out of scope (permanently, for pynakes)
 
 A database of record, a cloud service, a PDF library, arbitrary shell
-execution, a GUI, capture (web/DOI/PDF), and reading/annotation. These are
-BiMaS or never.
+execution, a GUI, capture (web/DOI/PDF), and reading/annotation. These belong to
+a downstream application, not the engine.
 
 **MCP server — downstream.** An MCP fits an agent interrogating a **personal
 corpus** ("what do I already have on X") — i.e. queries over the
-`Library`/`Catalogue`, which is BiMaS territory. Manuscript-time edits use the
-pynakes **CLI** directly. So the MCP belongs downstream (BiMaS or a thin
-`pynakes-mcp` companion on the pinned API), not in the lean, deterministic core.
+`Library`/`Catalogue`. Manuscript-time edits use the pynakes **CLI** directly. So
+the MCP belongs downstream (a thin `pynakes-mcp` companion on the pinned API, or
+part of a corpus-management application), not in the lean, deterministic core.
 
 ## Risks & mitigations
 
@@ -269,4 +268,4 @@ pynakes **CLI** directly. So the MCP belongs downstream (BiMaS or a thin
 - [ ] All guiding principles intact; coverage ≥90%; `ruff` clean.
 
 When this is met, pynakes 1.0 is stable and complete as a standalone single-file
-engine, and Beyond-1.0 / BiMaS work may build on the pinned API.
+engine, and Beyond-1.0 / downstream work may build on the pinned API.

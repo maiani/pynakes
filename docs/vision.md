@@ -1,108 +1,53 @@
-# Vision
+# Philosophy
 
-**pynakes is a tool for humans and machines collaborating creatively on
-research, over a corpus of `.bib` files collected across a lifetime.**
+**pynakes makes small, explicit, reviewable changes to bibliography files —
+without reformatting, reordering, or corrupting the metadata a human or
+reference manager curated.**
 
-Your personal reference database is not an app or a service — it is the set of
-bibliography files you accumulate over your career, kept in version control.
-pynakes is the engine that keeps that corpus clean, consistent, and safe to edit,
-for both you and the agents working alongside you.
+It is a deterministic engine, not an application. These are the design beliefs
+that shape it.
 
-## Scope & sequencing: pynakes vs BiMaS
+## Bibfiles in plain text, in git
 
-This document describes the long-term destination. It does **not** expand the
-scope of pynakes itself.
+A bibliography you keep for years cannot depend on any app, vendor, format, or
+schema surviving. Plain-text `.bib` files are readable in fifty years — by
+JabRef, Zotero, `grep`, or your future self. You own the files.
 
-- **pynakes** is a standalone Python library + CLI — the deterministic bib-file
-  engine. It is complete and valuable on its own (researchers, scripts, agents),
-  with no dependency on anything above it. It provides *mechanisms* over `.bib`
-  files: parse/edit/lint/convert/normalize, and the cross-file `Collection` /
-  `Library` / search / dedup / subset operations — all pure bibfile work, no UI,
-  capture, PDF, or sync.
-- **BiMaS** (working name) is a **separate, downstream project built on top of
-  pynakes' public API.** It owns *policy, workflow, and experience*: capture
-  (web/DOI/PDF), reading/annotation, UI, sync orchestration, and the
-  lifelong-corpus workflow (inbox → canonical → projections, provenance as a
-  product feature).
-- **Sequencing.** pynakes must be **stable and complete first.** No BiMaS work
-  begins until pynakes' standalone roadmap is done and its engine API is pinned.
-  The vision flows in one direction only: it informs how pynakes' API is shaped
-  so BiMaS can build on it cleanly — it never pulls BiMaS scope into pynakes.
+That choice pays off only if the files stay diff-friendly:
 
-## The substrate: bibfiles in git
+- **Round-trip fidelity.** An entry you don't touch is written back
+  byte-for-byte. pynakes never normalizes whitespace, reorders fields, or
+  re-quotes values behind your back.
+- **Surgical edits.** Changing one field is a one-line diff — not a reformatted
+  file. This is the property most tools that touch `.bib` files destroy, and the
+  one that makes keeping your bibliography in version control actually livable.
+- **The file is the single source of truth.** In-memory state is a derived
+  working view; there is no database or persistent sidecar of record. Any index
+  or cache is rebuildable and never competes with the files.
 
-The database *is* a git repository of `.bib` files. This is a deliberate choice,
-not a limitation:
+## Safe for humans and machines
 
-- **Longevity & ownership.** A lifelong database cannot depend on any app,
-  vendor, format, or schema surviving. Plain-text bibfiles are readable in fifty
-  years — by JabRef, Zotero, `grep`, or your future self. You own the files.
-- **Git is the infrastructure, for free.** History, diff, blame, branching,
-  backup, and cross-device sync come from version control. pynakes does not
-  build a sync server; you `git pull`.
-- **Meaningful diffs.** Because pynakes round-trips unmodified entries
-  byte-for-byte and edits surgically, changing one field is a one-line git diff —
-  not a reformatted file. This is what makes "the database is bibfiles in git"
-  actually livable, and it is the property most tools that touch `.bib` files
-  destroy.
-
-## Humans and machines, collaborating
-
-The machine is a **co-author** of the corpus, not just an automation. That makes
-two things load-bearing:
+pynakes is built so that a script or an LLM agent can edit a database you care
+about without you having to trust it blindly:
 
 - **Reviewability is the substrate of trust.** Dry-run, unified diffs, atomic
-  validated writes, and *reporting conflicts instead of guessing* are what make
-  it safe for an agent to add, merge, and enrich entries in a database you care
-  about. Every machine action is previewable and reversible.
-- **Provenance.** A corpus that machines write to for years must record *who or
-  what* added or changed each entry, and from what source. Git captures the
-  timeline; entry-level provenance metadata captures the rest.
-
-"Creatively" means the corpus is a **thinking substrate**, not just storage to
-maintain: the machine surfaces related work, fills gaps, and connects ideas
-across everything you have read.
-
-## The shape
-
-```
-capture          new refs arrive (DOI, browser, PDF) → an inbox
-   │
-   ▼
-canonical store  the deduplicated master corpus — sharded bibfiles in git,
-   │             one stable identity (DOI / arXiv / OpenAlex) per work
-   ▼
-projections      per-project / per-paper bibfiles, derived from the store
-                 (today: `pynakes used --out` exports the cited subset)
-```
-
-Project bibfiles are **views, not copies** of the canonical store; pynakes keeps
-them consistent.
-
-## Vocabulary & engine trajectory
-
-Three nested units — **entry ⊂ collection ⊂ library**:
-
-- **Entry** — one bib record.
-- **Collection** — one `.bib` file (a single πίναξ): the load → stage → preview →
-  commit lifecycle with external-change detection. See the
-  [Architecture guide](guides/architecture.md) for the design and the
-  [API reference](api/index.md) for the implemented `Collection` API.
-- **Library** — the collection: a git repo of collections. This is your *Pinakes* —
-  the catalog. Its API adds global search, cross-file identity and dedup,
-  "which collections use this key", and promotion between inbox / canonical /
-  projections, backed by a **derived index** (rebuildable from the files, never
-  a competing source of truth). It is planned for [Beyond 1.0](../DEVPLAN.md).
-
-The tool, `pynakes`, is the librarian; the `Library` is what it tends.
-
-## Principles & non-goals
-
-- **The file is the single source of truth.** Any index, cache, or app state is
-  derived and rebuildable; nothing ever competes with the files.
-- **Preserve, don't impose.** The store never rejects or rewrites data on its
+  validated writes, and *reporting conflicts instead of guessing* make every
+  machine action previewable and reversible.
+- **Preserve, don't impose.** The engine never rejects or rewrites data on its
   own. Structure (required fields, identifiers) is *advisory* — enforced by
-  `lint`/`normalize` only when asked — because a lifelong schema will drift.
-- **Not a reference-manager replacement.** No database of record, no GUI, no
-  sync server, no PDF library, no cloud. Capture and reading sit on top and own
-  their own state; pynakes stays the deterministic kernel.
+  `lint` / `normalize` only when asked.
+- **Deterministic by default.** No time, randomness, or hidden ordering in core
+  logic. Network access is explicit (`--online` where supported) and isolated.
+
+## Scope
+
+pynakes is a **standalone single-file maintenance engine**: the unit of work is
+one `Collection` (one `.bib` file), with a load → stage → preview → commit
+lifecycle. It is complete and valuable on its own — for researchers, scripts,
+CI, and agents — with no dependency on any application above it.
+
+Cross-file corpus work (a `Library` over many collections, a derived search
+index, projections, format interop) is on the post-1.0 roadmap; see
+[DEVPLAN.md](../DEVPLAN.md). Application concerns — capture, reading, a GUI,
+sync, cloud — are explicitly **not** pynakes; they belong to downstream projects
+built on its pinned public API.

@@ -138,9 +138,7 @@ def test_normalize_abbreviates_journals_only_when_style_configured() -> None:
     assert default_lib.entries["A"].fields["journal"] == "Nature Machine Intelligence"
 
     # Metadata opts in.
-    meta_lib = parse_bib(
-        "@comment{jabref-meta: pynakes-normalize-journal-style:abbreviated;}\n" + src
-    )
+    meta_lib = parse_bib("@comment{pynakes-meta: normalize-journal-style:abbreviated;}\n" + src)
     assert normalize_library(meta_lib).journals == 1
     assert meta_lib.entries["A"].fields["journal"] == "Nat. Mach. Intell."
 
@@ -150,25 +148,11 @@ def test_normalize_abbreviates_journals_only_when_style_configured() -> None:
     assert cli_lib.entries["A"].fields["journal"] == "Nat. Mach. Intell."
 
 
-def test_normalize_metadata_key_canonical_and_legacy_alias() -> None:
+def test_normalize_metadata_key_canonical() -> None:
     src = "@article{A,\n  title = {Paper},\n  journal = {Nature Machine Intelligence}\n}\n"
 
-    # Canonical bare key.
     canonical = parse_bib("@comment{pynakes-meta: normalize-journal-style:abbreviated;}\n" + src)
     assert normalize_library(canonical).journals == 1
-
-    # Legacy pynakes-normalize- alias still honored.
-    legacy = parse_bib(
-        "@comment{pynakes-meta: pynakes-normalize-journal-style:abbreviated;}\n" + src
-    )
-    assert normalize_library(legacy).journals == 1
-
-    # When both are present, the canonical key wins.
-    both = parse_bib(
-        "@comment{pynakes-meta: normalize-journal-style:none;}\n"
-        "@comment{pynakes-meta: pynakes-normalize-journal-style:abbreviated;}\n" + src
-    )
-    assert normalize_library(both).journals == 0
 
 
 def test_normalize_honors_jabref_saveactions_for_authors() -> None:
@@ -240,7 +224,7 @@ def test_pynakes_meta_author_style_overrides_saveactions() -> None:
     # An explicit pynakes-meta author-style wins over JabRef's saveActions.
     lib = parse_bib(
         "@comment{jabref-meta: saveActions:enabled;\ntitle[html_to_latex]\n;}\n"
-        "@comment{pynakes-meta: pynakes-normalize-author-style:jabref;}\n"
+        "@comment{pynakes-meta: normalize-author-style:jabref;}\n"
         "@article{A,\n  author = {John Smith},\n  title = {T},\n  journal = {J}\n}\n"
     )
 
@@ -251,8 +235,8 @@ def test_pynakes_meta_author_style_overrides_saveactions() -> None:
 
 def test_normalize_library_honors_metadata_overrides() -> None:
     lib = parse_bib(
-        "@comment{jabref-meta: pynakes-normalize-journal-style:none;}\n"
-        "@comment{jabref-meta: pynakes-normalize-protect-titles:false;}\n"
+        "@comment{pynakes-meta: normalize-journal-style:none;}\n"
+        "@comment{pynakes-meta: normalize-protect-titles:false;}\n"
         "@article{A,\n"
         "  author = {Jane Smith & John Doe},\n"
         "  title = {DNA repair},\n"
@@ -272,7 +256,7 @@ def test_normalize_library_honors_metadata_overrides() -> None:
 
 def test_normalize_library_cli_options_override_metadata() -> None:
     lib = parse_bib(
-        "@comment{jabref-meta: pynakes-normalize-journal-style:none;}\n"
+        "@comment{pynakes-meta: normalize-journal-style:none;}\n"
         "@article{A,\n"
         "  title = {DNA repair},\n"
         "  journal = {Nature Machine Intelligence}\n"

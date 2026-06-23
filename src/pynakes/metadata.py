@@ -47,10 +47,8 @@ KNOWN_PREFIXES = {
     "filedirectory": "files",
     "selector_": "selectors",
     "keypattern_": "citation-key",
-    # pynakes' own settings: the canonical ``normalize-`` prefix and the older
-    # ``pynakes-`` spelling (which also covers the ``pynakes-normalize-`` alias).
+    # pynakes' own settings live under the canonical ``normalize-`` prefix.
     "normalize-": "pynakes",
-    "pynakes-": "pynakes",
     "lint-required-fields-": "pynakes",
 }
 
@@ -172,17 +170,46 @@ def default_namespace(key: str) -> str:
     return "jabref" if metadata_category(key) in JABREF_CATEGORIES else "pynakes"
 
 
-def parse_jabref_metadata_comment(
+def _make_metadata_block(
+    segment: str, namespace: str, raw: str, comment_index: int
+) -> MetadataBlock | None:
+    """Build one block from a ``key:value`` segment, or ``None`` if malformed."""
+    key, sep, value = segment.partition(":")
+    if not sep:
+        return None
+    key = key.strip()
+    if not key:
+        return None
+    category = metadata_category(key)
+    return MetadataBlock(
+        key=key,
+        value=value.strip(),
+        raw=raw,
+        comment_index=comment_index,
+        known=category != "unknown",
+        category=category,
+        namespace=namespace,
+    )
+
+
+def parse_metadata_comment(
     comment_text: str,
     *,
     raw: str | None = None,
     comment_index: int = -1,
-) -> MetadataBlock | None:
-    """Parse a top-level JabRef metadata comment.
+) -> list[MetadataBlock]:
+    """Parse a top-level metadata comment into one block per setting.
 
     ``comment_text`` is the content inside ``@comment{...}``. ``raw`` should be
     the full raw comment when available; it is used for precise replacements.
-    Both the ``jabref-meta:`` and ``pynakes-meta:`` namespaces are recognized.
+
+    A ``jabref-meta`` comment holds exactly one ``key:value`` (its value may span
+    multiple lines, e.g. ``grouping``) and yields a single block — JabRef's own
+    format is preserved verbatim. A ``pynakes-meta`` comment may carry several
+    settings, one ``key:value;`` per line, and yields one block per line, all
+    sharing the comment's raw text and ``comment_index``; the one-setting and
+    consolidated multi-line layouts parse identically. Returns ``[]`` for a
+    non-metadata comment.
     """
     stripped = comment_text.strip()
     if stripped.startswith("{"):
@@ -194,28 +221,25 @@ def parse_jabref_metadata_comment(
     elif lowered.startswith(PYNAKES_PREFIX):
         namespace, prefix = "pynakes", PYNAKES_PREFIX
     else:
-        return None
+        return []
 
     body = stripped[len(prefix) :].strip()
     if not body:
-        return None
+        return []
 
-    key, sep, value = body.partition(":")
-    if not sep:
-        return None
+    raw_text = raw if raw is not None else f"@comment{{{comment_text}}}"
 
-    key = key.strip()
-    value = value.strip()
-    category = metadata_category(key)
-    return MetadataBlock(
-        key=key,
-        value=value,
-        raw=raw if raw is not None else f"@comment{{{comment_text}}}",
-        comment_index=comment_index,
-        known=category != "unknown",
-        category=category,
-        namespace=namespace,
-    )
+    if namespace == "jabref":
+        block = _make_metadata_block(body, namespace, raw_text, comment_index)
+        return [block] if block is not None else []
+
+    # pynakes-meta: one setting per line (values are single-line).
+    blocks: list[MetadataBlock] = []
+    for line in body.splitlines():
+        block = _make_metadata_block(line.strip(), namespace, raw_text, comment_index)
+        if block is not None:
+            blocks.append(block)
+    return blocks
 
 
 def metadata_blocks_to_dict(blocks: list[MetadataBlock]) -> dict[str, str]:
@@ -242,26 +266,53 @@ def format_metadata_comment(key: str, value: str, namespace: str = "jabref") -> 
     return f"@comment{{{prefix} {key.strip()}:{value}}}"
 
 
+def format_pynakes_meta_block(items: list[tuple[str, str]], line_ending: str = "\n") -> str:
+    """Render pynakes settings as one consolidated multi-line ``pynakes-meta`` comment.
+
+    ``items`` is an ordered ``(key, value)`` list; each setting gets its own
+    ``key: value`` line so a single-setting change is still a one-line diff.
+    JabRef ignores the ``pynakes-meta`` namespace, so pynakes uses this compact
+    layout (no per-key prefix, no JabRef ``;`` terminator) rather than one comment
+    per key. The reader (:func:`parse_metadata_comment`) still accepts the older
+    ``key:value;`` spelling, so both layouts round-trip; this is the default
+    written form. Any trailing ``;`` on a value is dropped on output.
+    """
+    lines = [f"@comment{{{PYNAKES_PREFIX}"]
+    for key, value in items:
+        value = value.strip().rstrip(";").strip()
+        lines.append(f"{key.strip()}: {value}")
+    lines.append("}")
+    return line_ending.join(lines)
+
+
 def consolidate_metadata(lib: BibFile, text: str, line_ending: str = "\n") -> str | None:
     """Relocate every metadata comment into one canonical section at file end.
 
     JabRef writes its ``@Comment{jabref-meta: ...}`` blocks contiguously at the
     bottom of the file, sorted by key. A library that has been hand-edited (or
     had entries appended after a JabRef save) ends up with metadata stranded in
-    the middle. This gathers all jabref-meta/pynakes-meta blocks — preserving
-    each block's content verbatim, including JabRef's multi-line ``grouping``
-    formatting — and rewrites them as a single sorted section at the end,
-    separated from the entries and from each other by one blank line.
+    the middle. This gathers all metadata and rewrites it as one sorted section
+    at the end: each ``jabref-meta`` key as its own comment, preserved verbatim
+    (including JabRef's multi-line ``grouping`` formatting), followed by a single
+    consolidated ``pynakes-meta`` block holding every pynakes key — since JabRef
+    ignores that namespace, pynakes packs it instead of repeating the prefix.
 
     Returns the rewritten text, or ``None`` when the file is already in this
     canonical layout (so callers can treat it as a no-op).
     """
-    blocks = lib.metadata_blocks
-    if not blocks:
+    jabref_blocks = lib.jabref_metadata_blocks
+    pynakes_blocks = lib.pynakes_metadata_blocks
+    if not jabref_blocks and not pynakes_blocks:
         return None
 
+    # Remove every existing metadata comment from the text, deduping by physical
+    # comment (consolidated pynakes blocks share one comment / comment_index).
     stripped = text
-    for block in blocks:
+    seen: set[int] = set()
+    for block in lib.metadata_blocks:
+        if block.comment_index in seen:
+            continue
+        seen.add(block.comment_index)
         index = stripped.find(block.raw)
         if index == -1:
             # The raw text isn't where we expect (e.g. it was rewritten by a
@@ -277,13 +328,20 @@ def consolidate_metadata(lib: BibFile, text: str, line_ending: str = "\n") -> st
     while triple in stripped:
         stripped = stripped.replace(triple, line_ending * 2)
 
-    # jabref-meta first (keeps JabRef's own keys grouped), then pynakes-meta;
-    # alphabetical by key within each, stable for repeated keys (legacy groups).
-    ordered = sorted(
-        enumerate(blocks),
-        key=lambda pair: (0 if pair[1].namespace == "jabref" else 1, pair[1].key.lower(), pair[0]),
-    )
-    section = (line_ending + line_ending).join(block.raw for _, block in ordered)
+    # jabref-meta first, each comment verbatim and sorted by key (keeps JabRef's
+    # own keys grouped, stable for repeated keys like legacy groups)...
+    parts = [
+        block.raw for block in sorted(jabref_blocks, key=lambda b: (b.key.lower(), b.comment_index))
+    ]
+    # ...then a single consolidated pynakes-meta block (last value wins per key).
+    if pynakes_blocks:
+        merged: dict[str, str] = {}
+        for block in pynakes_blocks:
+            merged[block.key] = block.value
+        items = sorted(merged.items(), key=lambda kv: kv[0].lower())
+        parts.append(format_pynakes_meta_block(items, line_ending))
+
+    section = (line_ending + line_ending).join(parts)
 
     body = stripped.rstrip()
     if body:
@@ -322,58 +380,101 @@ def set_metadata(
     if namespace not in {"jabref", "pynakes"}:
         raise ValueError(f"Unknown metadata namespace {namespace!r}; expected jabref or pynakes")
 
-    if namespace == "jabref" and not allow_unknown and not is_known_metadata_key(key):
-        raise ValueError(
-            f"Unknown JabRef metadata key {key!r}; pass --allow-unknown to write it to "
-            "jabref-meta, or write it to pynakes-meta instead"
-        )
+    if namespace == "jabref":
+        if not allow_unknown and not is_known_metadata_key(key):
+            raise ValueError(
+                f"Unknown JabRef metadata key {key!r}; pass --allow-unknown to write it to "
+                "jabref-meta, or write it to pynakes-meta instead"
+            )
+        return _set_jabref_metadata(lib, key, value)
 
-    blocks = lib.jabref_metadata_blocks if namespace == "jabref" else lib.pynakes_metadata_blocks
+    return _set_pynakes_metadata(lib, key, value)
+
+
+def _set_jabref_metadata(lib: BibFile, key: str, value: str) -> MetadataUpdate:
+    """Set one ``jabref-meta`` key — one comment per key (JabRef's own format)."""
+    blocks = lib.jabref_metadata_blocks
 
     matches = [b for b in blocks if b.key.lower() == key.lower()]
     if len(matches) > 1:
         raise DuplicateMetadataError(key, len(matches))
 
-    new_raw = format_metadata_comment(key, value, namespace)
-    new_block = parse_jabref_metadata_comment(
-        new_raw[new_raw.find("{") + 1 : -1],
-        raw=new_raw,
-        comment_index=-1,
-    )
-    if new_block is None:
+    new_raw = format_metadata_comment(key, value, "jabref")
+    new_blocks = parse_metadata_comment(new_raw[new_raw.find("{") + 1 : -1], raw=new_raw)
+    if not new_blocks:
         raise ValueError(f"Could not render metadata key {key!r}")
-
-    def _refresh() -> None:
-        if namespace == "jabref":
-            lib.jabref_metadata = metadata_blocks_to_dict(lib.jabref_metadata_blocks)
-        else:
-            lib.pynakes_metadata = metadata_blocks_to_dict(lib.pynakes_metadata_blocks)
+    new_block = new_blocks[0]
 
     if not matches:
         new_block.comment_index = len(lib.raw_comments)
         lib.raw_comments.append(new_raw)
         blocks.append(new_block)
-        _refresh()
-        return MetadataUpdate(
-            key=key,
-            value=new_block.value,
-            old_raw=None,
-            new_raw=new_raw,
-            created=True,
-            namespace=namespace,
-        )
+        lib.jabref_metadata = metadata_blocks_to_dict(blocks)
+        return MetadataUpdate(key, new_block.value, None, new_raw, True, "jabref")
 
     old = matches[0]
     new_block.comment_index = old.comment_index
-    if old.comment_index >= 0 and old.comment_index < len(lib.raw_comments):
+    if 0 <= old.comment_index < len(lib.raw_comments):
         lib.raw_comments[old.comment_index] = new_raw
     blocks[blocks.index(old)] = new_block
-    _refresh()
-    return MetadataUpdate(
-        key=key,
-        value=new_block.value,
-        old_raw=old.raw,
-        new_raw=new_raw,
-        created=False,
-        namespace=namespace,
+    lib.jabref_metadata = metadata_blocks_to_dict(blocks)
+    return MetadataUpdate(key, new_block.value, old.raw, new_raw, False, "jabref")
+
+
+def _set_pynakes_metadata(lib: BibFile, key: str, value: str) -> MetadataUpdate:
+    """Set one ``pynakes-meta`` key inside the consolidated multi-line block.
+
+    The setting is added to (or replaced within) a single ``pynakes-meta``
+    comment rather than written as its own comment, so the file accumulates one
+    compact block. Editing one key rewrites the whole comment, but since each
+    setting is on its own line the unified diff still shows only the changed
+    line. A new key appends to the last existing ``pynakes-meta`` comment, or
+    creates one when there is none.
+    """
+    blocks = lib.pynakes_metadata_blocks
+    matches = [b for b in blocks if b.key.lower() == key.lower()]
+    if len(matches) > 1:
+        raise DuplicateMetadataError(key, len(matches))
+
+    if matches:
+        target_index: int | None = matches[0].comment_index
+    elif blocks:
+        target_index = blocks[-1].comment_index
+    else:
+        target_index = None
+
+    # Assemble the (key, value) lines for the target comment, setting ours.
+    items: list[tuple[str, str]] = []
+    replaced = False
+    if target_index is not None:
+        for block in blocks:
+            if block.comment_index != target_index:
+                continue
+            if block.key.lower() == key.lower():
+                items.append((block.key, value))
+                replaced = True
+            else:
+                items.append((block.key, block.value))
+    if not replaced:
+        items.append((key, value))
+
+    new_raw = format_pynakes_meta_block(items, lib.line_ending)
+    comment_index = target_index if target_index is not None else len(lib.raw_comments)
+    new_blocks = parse_metadata_comment(
+        new_raw[new_raw.find("{") + 1 : -1], raw=new_raw, comment_index=comment_index
     )
+
+    if target_index is None:
+        lib.raw_comments.append(new_raw)
+        blocks.extend(new_blocks)
+        old_raw: str | None = None
+    else:
+        old_raw = lib.raw_comments[comment_index]
+        lib.raw_comments[comment_index] = new_raw
+        lib.pynakes_metadata_blocks = [
+            b for b in blocks if b.comment_index != comment_index
+        ] + new_blocks
+
+    lib.pynakes_metadata = metadata_blocks_to_dict(lib.pynakes_metadata_blocks)
+    set_value = next((b.value for b in new_blocks if b.key.lower() == key.lower()), value)
+    return MetadataUpdate(key, set_value, old_raw, new_raw, not matches, "pynakes")

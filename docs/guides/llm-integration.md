@@ -183,8 +183,8 @@ instead of choosing one.
 
 ```bash
 pynakes groups list refs.bib --json
-pynakes groups add-entry refs.bib Smith2020 "CBDC" --dry-run --diff --json
-pynakes groups add-entry refs.bib Smith2020 "CBDC" --json
+pynakes groups add-entry refs.bib Smith2020 "Machine Learning" --dry-run --diff --json
+pynakes groups add-entry refs.bib Smith2020 "Machine Learning" --json
 ```
 
 ### Protect title capitalization

@@ -152,7 +152,7 @@ def test_parse_both_namespaces_and_merge_precedence() -> None:
         "@comment{jabref-meta: databaseType:bibtex;}\n"
         "@comment{jabref-meta: keypatterndefault:[auth][year];}\n"
         "@comment{pynakes-meta: keypatterndefault:[auth][shorttitle];}\n"
-        "@comment{pynakes-meta: pynakes-normalize-journal-style:full;}\n\n"
+        "@comment{pynakes-meta: normalize-journal-style:full;}\n\n"
         "@article{Smith2020,\n  author = {John Smith},\n  title = {A Paper},\n  year = {2020}\n}\n"
     )
 
@@ -163,19 +163,19 @@ def test_parse_both_namespaces_and_merge_precedence() -> None:
     assert [b.key for b in lib.jabref_metadata_blocks] == ["databaseType", "keypatterndefault"]
     assert [b.key for b in lib.pynakes_metadata_blocks] == [
         "keypatterndefault",
-        "pynakes-normalize-journal-style",
+        "normalize-journal-style",
     ]
     assert lib.pynakes_metadata_blocks[0].namespace == "pynakes"
     # Merged view: pynakes-meta wins on a conflicting key.
     assert lib.metadata["keypatterndefault"] == "[auth][shorttitle];"
     assert lib.metadata["databaseType"] == "bibtex;"
-    assert lib.metadata["pynakes-normalize-journal-style"] == "full;"
+    assert lib.metadata["normalize-journal-style"] == "full;"
     # metadata_blocks returns both namespaces in source order.
     assert [b.key for b in lib.metadata_blocks] == [
         "databaseType",
         "keypatterndefault",
         "keypatterndefault",
-        "pynakes-normalize-journal-style",
+        "normalize-journal-style",
     ]
     # Round-trip is byte-for-byte.
     assert write_bib(lib) == text
@@ -185,21 +185,103 @@ def test_pynakes_meta_round_trips_after_set(tmp_path: Path) -> None:
     lib = parse_bib("@comment{jabref-meta: databaseType:bibtex;}\n")
     # Native key updates jabref-meta in place; pynakes-only key appends pynakes-meta.
     set_metadata(lib, "databaseType", "biblatex")
-    set_metadata(lib, "pynakes-normalize-journal-style", "abbreviated")
+    set_metadata(lib, "normalize-journal-style", "abbreviated")
 
     out = write_bib(lib)
     assert "@comment{jabref-meta: databaseType:biblatex;}" in out
-    assert "@comment{pynakes-meta: pynakes-normalize-journal-style:abbreviated;}" in out
+    # pynakes-meta is written as one consolidated block, one `key: value` per line.
+    assert "@comment{pynakes-meta:\nnormalize-journal-style: abbreviated\n}" in out
     # Re-parsing yields the same split + merged view.
     reparsed = parse_bib(out)
     assert reparsed.jabref_metadata["databaseType"] == "biblatex;"
-    assert reparsed.metadata["pynakes-normalize-journal-style"] == "abbreviated;"
+    assert reparsed.metadata["normalize-journal-style"] == "abbreviated"
+
+
+def test_set_multiple_pynakes_keys_share_one_consolidated_block() -> None:
+    lib = parse_bib("")
+    set_metadata(lib, "normalize-journal-style", "abbreviated")
+    set_metadata(lib, "protected-terms", "GPU,API")
+    set_metadata(lib, "normalize-dois", "on")
+
+    out = write_bib(lib)
+    # Exactly one pynakes-meta comment, holding all three settings.
+    assert out.count("@comment{pynakes-meta:") == 1
+    assert "normalize-journal-style: abbreviated" in out
+    assert "protected-terms: GPU,API" in out
+    assert "normalize-dois: on" in out
+
+    reparsed = parse_bib(out)
+    assert reparsed.metadata["normalize-journal-style"] == "abbreviated"
+    assert reparsed.metadata["protected-terms"] == "GPU,API"
+    assert reparsed.metadata["normalize-dois"] == "on"
+
+
+def test_update_one_key_in_consolidated_block_leaves_others() -> None:
+    lib = parse_bib("")
+    set_metadata(lib, "normalize-journal-style", "abbreviated")
+    set_metadata(lib, "protected-terms", "GPU,API")
+    # Changing one key rewrites the block but preserves the other setting.
+    update = set_metadata(lib, "normalize-journal-style", "full")
+
+    assert update.created is False
+    reparsed = parse_bib(write_bib(lib))
+    assert reparsed.metadata["normalize-journal-style"] == "full"
+    assert reparsed.metadata["protected-terms"] == "GPU,API"
+
+
+def test_pynakes_block_round_trips_both_layouts_byte_for_byte() -> None:
+    # Default `key: value` layout.
+    new_form = (
+        "@comment{pynakes-meta:\n"
+        "normalize-journal-style: abbreviated\n"
+        "protected-terms: GPU,API\n"
+        "}\n"
+    )
+    lib = parse_bib(new_form)
+    assert [b.key for b in lib.pynakes_metadata_blocks] == [
+        "normalize-journal-style",
+        "protected-terms",
+    ]
+    assert lib.metadata["protected-terms"] == "GPU,API"
+    assert write_bib(lib) == new_form
+
+    # Legacy `key:value;` layout is still read, and round-trips verbatim.
+    legacy_form = (
+        "@comment{pynakes-meta:\n"
+        "normalize-journal-style:abbreviated;\n"
+        "protected-terms:GPU,API;\n"
+        "}\n"
+    )
+    legacy = parse_bib(legacy_form)
+    assert legacy.metadata["protected-terms"] == "GPU,API;"
+    assert write_bib(legacy) == legacy_form
+
+
+def test_consolidate_merges_separate_pynakes_comments_into_one_block() -> None:
+    text = (
+        "@comment{pynakes-meta: normalize-journal-style:abbreviated;}\n"
+        "@comment{jabref-meta: databaseType:biblatex;}\n"
+        "@comment{pynakes-meta: protected-terms:GPU,API;}\n\n"
+        "@article{A,\n  title = {T}\n}\n"
+    )
+    lib = parse_bib(text)
+    result = consolidate_metadata(lib, text, lib.line_ending)
+    assert result is not None
+    # jabref-meta stays its own comment; the two pynakes comments merge into one.
+    assert result.count("@comment{pynakes-meta:") == 1
+    assert result.count("@comment{jabref-meta:") == 1
+    # Legacy `key:value;` inputs are rewritten in the default `key: value` form.
+    assert "normalize-journal-style: abbreviated" in result
+    assert "protected-terms: GPU,API" in result
+    reparsed = parse_bib(result)
+    assert reparsed.metadata["normalize-journal-style"] == "abbreviated"
+    assert reparsed.metadata["protected-terms"] == "GPU,API"
 
 
 def test_normalize_honors_pynakes_meta_journal_style(tmp_path: Path) -> None:
     # journal-style preference stored in pynakes-meta drives `normalize`.
     text = (
-        "@comment{pynakes-meta: pynakes-normalize-journal-style:full;}\n\n"
+        "@comment{pynakes-meta: normalize-journal-style:full;}\n\n"
         "@article{S,\n  author = {A. Author},\n  title = {T},\n"
         "  journal = {Phys. Rev. Lett.},\n  year = {2020}\n}\n"
     )
@@ -252,8 +334,8 @@ def test_set_metadata_routes_unknown_to_pynakes_by_default() -> None:
 
     assert update.namespace == "pynakes"
     assert update.created is True
-    assert update.new_raw == "@comment{pynakes-meta: not-a-jabref-key:value;}"
-    assert lib.pynakes_metadata["not-a-jabref-key"] == "value;"
+    assert update.new_raw == "@comment{pynakes-meta:\nnot-a-jabref-key: value\n}"
+    assert lib.pynakes_metadata["not-a-jabref-key"] == "value"
     # ...but forcing it into jabref-meta still requires --allow-unknown.
     try:
         set_metadata(lib, "another-unknown", "value", namespace="jabref")
@@ -379,7 +461,7 @@ def test_metadata_set_unknown_key_goes_to_pynakes(tmp_path: Path) -> None:
     data = json.loads(result.output)
     assert data["namespace"] == "pynakes"
     assert data["created"] is True
-    assert "@comment{pynakes-meta: unknownThing:value;}" in bib.read_text()
+    assert "@comment{pynakes-meta:\nunknownThing: value\n}" in bib.read_text()
 
 
 def test_metadata_set_unknown_key_into_jabref_errors(tmp_path: Path) -> None:
@@ -407,5 +489,5 @@ def test_metadata_set_duplicate_key_conflicts(tmp_path: Path) -> None:
 
     assert result.exit_code == 2, result.output
     data = json.loads(result.output)
-    assert data["error"] == "DuplicateJabRefMetadata"
+    assert data["error"] == "DuplicateMetadata"
     assert data["count"] == 2

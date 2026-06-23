@@ -66,13 +66,12 @@ class LintProfile:
     protected_terms: tuple[str, ...] = ()
 
 
-def _metadata_value(lib: BibFile, *names: str) -> str | None:
-    """Return the first matching effective metadata value, without ``;``."""
+def _metadata_value(lib: BibFile, name: str) -> str | None:
+    """Return the effective metadata value for ``name``, without ``;``."""
     metadata = {key.lower(): value for key, value in lib.metadata.items()}
-    for name in names:
-        value = metadata.get(name.lower())
-        if value is not None:
-            return value.rstrip(";").strip()
+    value = metadata.get(name.lower())
+    if value is not None:
+        return value.rstrip(";").strip()
     return None
 
 
@@ -93,31 +92,20 @@ def _metadata_bool(value: str | None, default: bool) -> bool:
 
 
 def resolve_lint_profile(lib: BibFile) -> LintProfile:
-    """Resolve the same persisted normalization settings that lint can verify.
-
-    Canonical ``normalize-*`` names win over their legacy
-    ``pynakes-normalize-*`` aliases, matching :mod:`pynakes.normalize`.
-    """
-    journal_style = (
-        _metadata_value(lib, "normalize-journal-style", "pynakes-normalize-journal-style") or "none"
-    ).lower()
+    """Resolve the same persisted normalization settings that lint can verify."""
+    journal_style = (_metadata_value(lib, "normalize-journal-style") or "none").lower()
     title_fields = (
-        _metadata_list(
-            _metadata_value(lib, "normalize-title-fields", "pynakes-normalize-title-fields")
-        )
-        or LintProfile.title_fields
+        _metadata_list(_metadata_value(lib, "normalize-title-fields")) or LintProfile.title_fields
     )
-    protected_terms = _metadata_list(
-        _metadata_value(lib, "protected-terms", "pynakes-protected-terms")
-    )
+    protected_terms = _metadata_list(_metadata_value(lib, "protected-terms"))
     protect_titles = _metadata_bool(
-        _metadata_value(lib, "normalize-protect-titles", "pynakes-normalize-protect-titles"),
+        _metadata_value(lib, "normalize-protect-titles"),
         bool(protected_terms),
     )
     return LintProfile(
         journal_style=journal_style,
-        journal_table=_metadata_value(lib, "journal-table", "pynakes-journal-table"),
-        ltwa_table=_metadata_value(lib, "ltwa-table", "pynakes-ltwa-table"),
+        journal_table=_metadata_value(lib, "journal-table"),
+        ltwa_table=_metadata_value(lib, "ltwa-table"),
         # Normalization protects titles by default, but lint enforces only a
         # stored title preference. This keeps unprofiled libraries advisory.
         protect_titles=protect_titles,
@@ -132,17 +120,8 @@ def profile_required_fields(lib: BibFile, entry_type: str) -> tuple[str, ...]:
     ``lint-required-fields`` applies to every entry and
     ``lint-required-fields-<entrytype>`` adds type-specific requirements.
     """
-    global_fields = _metadata_list(
-        _metadata_value(lib, "lint-required-fields", "required-fields", "pynakes-required-fields")
-    )
-    type_fields = _metadata_list(
-        _metadata_value(
-            lib,
-            f"lint-required-fields-{entry_type.lower()}",
-            f"required-fields-{entry_type.lower()}",
-            f"pynakes-required-fields-{entry_type.lower()}",
-        )
-    )
+    global_fields = _metadata_list(_metadata_value(lib, "lint-required-fields"))
+    type_fields = _metadata_list(_metadata_value(lib, f"lint-required-fields-{entry_type.lower()}"))
     return global_fields + type_fields
 
 

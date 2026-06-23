@@ -15,11 +15,8 @@ from pynakes.model import BibFile
 _NAME_FIELDS = ("author", "editor")
 _DOI_FORMATTERS = ("clean_up_doi", "short_doi")
 
-# Normalize settings live under the ``normalize-`` key prefix; the older
-# ``pynakes-normalize-`` spelling stays supported as an alias (the canonical
-# form is preferred and wins when both are present).
+# Normalize settings live under the ``normalize-`` key prefix.
 METADATA_PREFIX = "normalize-"
-LEGACY_METADATA_PREFIX = "pynakes-normalize-"
 TITLE_FIELDS = ("title", "booktitle", "maintitle", "subtitle")
 
 
@@ -75,23 +72,18 @@ class NormalizeResult:
         }
 
 
-def _metadata_value(lib: BibFile, *names: str) -> str | None:
-    """Return the first present metadata value, trying ``names`` in order.
-
-    Order matters: earlier names win, so callers list the canonical key first
-    and aliases after.
-    """
+def _metadata_value(lib: BibFile, name: str) -> str | None:
+    """Return the metadata value for ``name`` (case-insensitive), or ``None``."""
     lowered = {key.lower(): value for key, value in lib.metadata.items()}
-    for name in names:
-        value = lowered.get(name.lower())
-        if value is not None:
-            return value.rstrip(";").strip()
+    value = lowered.get(name.lower())
+    if value is not None:
+        return value.rstrip(";").strip()
     return None
 
 
 def _normalize_setting(lib: BibFile, name: str) -> str | None:
-    """Look up a normalize setting by its canonical and legacy-aliased keys."""
-    return _metadata_value(lib, f"{METADATA_PREFIX}{name}", f"{LEGACY_METADATA_PREFIX}{name}")
+    """Look up a normalize setting by its canonical ``normalize-`` key."""
+    return _metadata_value(lib, f"{METADATA_PREFIX}{name}")
 
 
 def _split_metadata_list(value: str | None) -> list[str]:
@@ -147,17 +139,15 @@ def _resolve_title_fields(lib: BibFile, option: list[str] | None) -> list[str]:
 
 def _resolve_terms(lib: BibFile, option: list[str] | None) -> list[str]:
     terms = list(option or [])
-    terms.extend(
-        _split_metadata_list(_metadata_value(lib, "protected-terms", "pynakes-protected-terms"))
-    )
+    terms.extend(_split_metadata_list(_metadata_value(lib, "protected-terms")))
     return terms
 
 
 def resolve_format_metadata(lib: BibFile, option: bool | None) -> bool:
     """Resolve whether to consolidate metadata to the file end (default on).
 
-    An explicit CLI value wins; otherwise a ``pynakes-normalize-format-metadata``
-    (or ``normalize-format-metadata``) metadata key, else the default ``True``.
+    An explicit CLI value wins; otherwise a ``normalize-format-metadata``
+    metadata key, else the default ``True``.
     """
     return _resolve_bool(lib, option, "format-metadata", True)
 
@@ -225,10 +215,8 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
     journal_style = _resolve_choice(
         lib, opts.journal_style, "journal-style", journal_ops.JOURNAL_STYLES, "none"
     )
-    journal_table = opts.journal_table or _metadata_value(
-        lib, "journal-table", "pynakes-journal-table"
-    )
-    ltwa_table = opts.ltwa_table or _metadata_value(lib, "ltwa-table", "pynakes-ltwa-table")
+    journal_table = opts.journal_table or _metadata_value(lib, "journal-table")
+    ltwa_table = opts.ltwa_table or _metadata_value(lib, "ltwa-table")
     journal_sources = journal_ops.load_sources(journal_table, ltwa_table)
     journal_result = journal_ops.normalize_journals(lib, journal_style, journal_sources)
     result.journals = journal_result.changed

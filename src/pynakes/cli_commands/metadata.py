@@ -93,7 +93,7 @@ def metadata_set(
     except metadata_ops.DuplicateMetadataError as exc:
         _emit_conflict(
             json_output,
-            "DuplicateJabRefMetadata",
+            "DuplicateMetadata",
             str(exc),
             key=exc.key,
             count=exc.count,

@@ -108,8 +108,8 @@ pynakes groups add-entry refs.bib Smith2020 "Machine Learning"
 
 ```bash
 pynakes fields rename refs.bib journal journaltitle --dry-run --diff
-pynakes fields append refs.bib keywords "CBDC" \
-  --where 'title contains "digital currency"' \
+pynakes fields append refs.bib keywords "transformers" \
+  --where 'title contains "neural network"' \
   --dry-run --diff
 pynakes fields protect-title refs.bib --dry-run --diff
 ```

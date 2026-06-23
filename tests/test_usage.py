@@ -30,7 +30,7 @@ def test_tex_sources_from_metadata_resolves_relative_to_base() -> None:
 
 def test_tex_sources_from_metadata_absolute_kept_and_legacy_alias() -> None:
     lib = parse_bib(
-        "@comment{pynakes-meta: pynakes-tex-sources:/abs/main.tex;}\n@article{A,\n  title = {T}\n}\n"
+        "@comment{pynakes-meta: tex-sources:/abs/main.tex;}\n@article{A,\n  title = {T}\n}\n"
     )
     assert tex_sources_from_metadata(lib, "/proj") == ["/abs/main.tex"]
 

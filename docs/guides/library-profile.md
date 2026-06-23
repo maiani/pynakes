@@ -6,10 +6,24 @@ namespaces by key (case-insensitively); when both define the same key,
 `pynakes-meta` wins. `normalize` uses these preferences as its defaults and
 `lint` verifies the lintable subset without changing the file.
 
-Use canonical keys for new files. The legacy `pynakes-*` spellings below remain
-supported for compatibility, but the canonical key takes precedence if both
-are present. Boolean values accept `true`/`false`, `on`/`off`, `yes`/`no`,
+Boolean values accept `true`/`false`, `on`/`off`, `yes`/`no`,
 `enabled`/`disabled`, or `1`/`0`. List values are comma- or semicolon-separated.
+
+pynakes writes all `pynakes-meta` keys as a single consolidated comment, one
+`key: value` line per setting — JabRef never reads this namespace, so there is no
+need to repeat the `@comment{pynakes-meta: …}` prefix per key or keep JabRef's
+`;` terminator:
+
+```bibtex
+@comment{pynakes-meta:
+normalize-journal-style: abbreviated
+protected-terms: OpenAI,GPU
+lint-required-fields-article: url
+}
+```
+
+The older one-comment-per-key and `key:value;` layouts are still read;
+`normalize` rewrites them into this form on its next pass.
 
 ## `pynakes-meta` keys
 
@@ -29,18 +43,15 @@ are present. Boolean values accept `true`/`false`, `on`/`off`, `yes`/`no`,
 | `lint-required-fields-<entrytype>` | Extra fields required on one entry type | `lint` |
 | `tex-sources` | List of TeX files or directories, relative to the `.bib` file | `keys`, `used` |
 
-The aliases `pynakes-normalize-<name>` for every `normalize-<name>` key,
-`pynakes-protected-terms`, `pynakes-journal-table`, `pynakes-ltwa-table`, and
-`required-fields` / `required-fields-<entrytype>` are accepted. They are
-deprecated aliases, not additional settings.
-
 `lint-required-fields` values are additive to pynakes' built-in BibTeX/BibLaTeX
 requirements. For example, this makes `url` mandatory for every entry and
 `pages` mandatory for articles:
 
 ```bibtex
-@comment{pynakes-meta: lint-required-fields:url;}
-@comment{pynakes-meta: lint-required-fields-article:pages;}
+@comment{pynakes-meta:
+lint-required-fields: url
+lint-required-fields-article: pages
+}
 ```
 
 ## JabRef keys consulted
@@ -78,9 +89,11 @@ such as a missing DOI, remain non-blocking.
 
 ```bibtex
 @comment{jabref-meta: keypatterndefault:[auth][year];}
-@comment{pynakes-meta: normalize-journal-style:abbreviated;}
-@comment{pynakes-meta: protected-terms:OpenAI,DNA;}
-@comment{pynakes-meta: lint-required-fields-article:url;}
+@comment{pynakes-meta:
+normalize-journal-style: abbreviated
+protected-terms: OpenAI,GPU
+lint-required-fields-article: url
+}
 ```
 
 ```bash
