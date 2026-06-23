@@ -13,6 +13,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from JabRef's `databaseType` metadata.
 
 ### Added
+- **Completed JabRef v5.15 `saveActions` parity.** `normalize` now supports
+  `units_to_latex` and reports each configured-but-unsupported formatter as a
+  structured `unsupported_save_action_formatter` warning. Formatter pipelines
+  run in the configured order. Name normalization now covers JabRef's initials,
+  suffixes, brace protection, and comma-separated person-list forms; the
+  pinned JabRef metadata vocabulary is classified as known.
+- **JabRef `latex_cleanup` save action.** `normalize` now applies the pinned
+  JabRef v5.15 `latex_cleanup` formatter when configured for a field in
+  `saveActions`, preserving LaTeX command arguments while cleaning redundant
+  braces, math delimiters, and percent escapes.
+- **JabRef `latex_to_unicode` save action.** `normalize` now converts supported
+  LaTeX text and math-mode commands to Unicode when a field's `saveActions`
+  requests `latex_to_unicode`, while preserving unknown or unparseable input.
+- **JabRef `unicode_to_latex` save action.** `normalize` now converts supported
+  Unicode characters and combining accents to LaTeX when a field's
+  `saveActions` requests `unicode_to_latex`.
+- **JabRef `html_to_latex` save action.** `normalize` now converts supported
+  HTML tags and entities — including superscripts, subscripts, numeric entities,
+  and combining accents — to LaTeX when a field's `saveActions` requests it.
+- **JabRef `html_to_unicode` save action.** `normalize` now unescapes HTML4
+  entities and removes tags when a field's `saveActions` requests it.
+- **JabRef `capitalize` save action.** `normalize` now capitalizes unprotected
+  words while preserving LaTeX brace-protected text when configured per field.
+- **JabRef `lower_case` save action.** `normalize` now lowercases unprotected
+  text while preserving LaTeX brace-protected text when configured per field.
+- **JabRef `upper_case` save action.** `normalize` now uppercases unprotected
+  text while preserving LaTeX brace-protected text when configured per field.
+- **JabRef `sentence_case` save action.** `normalize` now sentence-cases
+  unprotected text while preserving LaTeX brace-protected text when configured
+  per field.
+- **JabRef `title_case` save action.** `normalize` now title-cases unprotected
+  text using JabRef's small-word and dash rules when configured per field.
+- **JabRef `ordinals_to_superscript` save action.** `normalize` now converts
+  ordinal suffixes such as `1st` to LaTeX superscripts when configured per field.
 - **Canonical identifier casing.** `normalize` now lowercases entry types and
   field names while preserving the surrounding entry text byte-for-byte. It is
   enabled by default and can be controlled with

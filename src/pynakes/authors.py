@@ -151,21 +151,58 @@ def _normalize_jabref_name(name: str) -> str:
 
     comma_parts = _split_top_level(collapsed, ",")
     if len(comma_parts) > 1:
-        return ", ".join(part for part in comma_parts if part)
+        return ", ".join(_normalize_initials(part) for part in comma_parts if part)
 
     tokens = collapsed.split()
     if len(tokens) < 2:
         return collapsed
 
+    # JabRef expands compact initials in both ``First Last`` and ``Last FI``
+    # forms. The latter is identifiable because its final token is all caps.
+    if _is_initials(tokens[-1]) and not _is_initials(tokens[0]):
+        return f"{tokens[0]}, {_normalize_initials(tokens[-1])}"
+
     last_start = len(tokens) - 1
     while last_start > 0 and _is_von_token(tokens[last_start - 1]):
         last_start -= 1
 
-    first_names = " ".join(tokens[:last_start])
+    first_names = " ".join(_normalize_initials(token) for token in tokens[:last_start])
     last_names = " ".join(tokens[last_start:])
     if not first_names or not last_names:
         return collapsed
     return f"{last_names}, {first_names}"
+
+
+def _is_initials(token: str) -> bool:
+    bare = token.replace(".", "")
+    return bool(bare) and bare.isalpha() and bare.upper() == bare and len(bare) <= 3
+
+
+def _normalize_initials(token: str) -> str:
+    if not _is_initials(token):
+        return token
+    return " ".join(f"{letter}." for letter in token.replace(".", ""))
+
+
+def _split_comma_name_list(value: str) -> list[str] | None:
+    """Recognize JabRef's legacy comma-separated multi-person syntax.
+
+    Plain ``Last, First`` remains a single person. A sequence of full
+    whitespace-separated names is a person list, while the conventional
+    ``Last, jr, First, Last, First`` form has an explicit suffix marker.
+    """
+    parts = _split_top_level(value, ",")
+    if len(parts) < 3:
+        return None
+    if all(len(part.split()) >= 2 for part in parts):
+        return parts
+    suffixes = {"jr", "jr.", "sr", "sr.", "ii", "iii", "iv"}
+    if len(parts) >= 5 and parts[1].lower() in suffixes:
+        return [
+            ", ".join(parts[:3]),
+            *[", ".join(parts[i : i + 2]) for i in range(3, len(parts), 2)],
+        ]
+    return None
 
 
 def normalize_name_list(value: str, style: str = "jabref") -> str:
@@ -185,7 +222,10 @@ def normalize_name_list(value: str, style: str = "jabref") -> str:
     normalizer = (
         _normalize_jabref_name if normalized_style == "jabref" else _normalize_conservative_name
     )
-    return " and ".join(normalizer(name) for name in _split_names(value))
+    names = _split_names(value)
+    if len(names) == 1 and normalized_style == "jabref":
+        names = _split_comma_name_list(names[0]) or names
+    return " and ".join(normalizer(name) for name in names)
 
 
 def normalize_authors(lib: BibFile, style: str = "jabref") -> int:

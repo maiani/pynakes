@@ -184,6 +184,47 @@ def test_normalize_honors_jabref_saveactions_for_authors() -> None:
     assert lib.entries["A"].fields["author"] == "John Smith"  # not rewritten
 
 
+def test_saveactions_apply_formatters_in_configured_order_and_warn_for_unsupported() -> None:
+    lib = parse_bib(
+        "@comment{jabref-meta: saveActions:enabled;\n"
+        "note[html_to_unicode,unicode_to_latex]\n"
+        "abstract[unknown_formatter]\n;}\n"
+        "@article{A,\n  note = {&auml;},\n  abstract = {Keep}\n}\n"
+    )
+
+    report = normalize_library(
+        lib,
+        NormalizeOptions(protect_titles=False, author_style="none", normalize_dois=False),
+    )
+
+    assert lib.entries["A"].fields["note"] == r"{\"{a}}"
+    assert report.save_action_fields == 1
+    assert report.warnings == [
+        {
+            "type": "unsupported_save_action_formatter",
+            "field": "abstract",
+            "formatter": "unknown_formatter",
+            "message": "saveActions formatter 'unknown_formatter' on field 'abstract' is not supported",
+        }
+    ]
+
+
+def test_disabled_saveactions_do_not_modify_or_warn() -> None:
+    lib = parse_bib(
+        "@comment{jabref-meta: saveActions:disabled;\nnote[html_to_unicode]\n;}\n"
+        "@article{A,\n  note = {&auml;}\n}\n"
+    )
+
+    report = normalize_library(
+        lib,
+        NormalizeOptions(protect_titles=False, author_style="none", normalize_dois=False),
+    )
+
+    assert lib.entries["A"].fields["note"] == "&auml;"
+    assert report.save_action_fields == 0
+    assert report.warnings == []
+
+
 def test_normalize_saveactions_normalize_names_enables_author_style() -> None:
     lib = parse_bib(
         "@comment{jabref-meta: saveActions:enabled;\nauthor[normalize_names]\n;}\n"

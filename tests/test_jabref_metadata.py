@@ -12,6 +12,7 @@ from pynakes.metadata import (
     DuplicateJabRefMetadataError,
     consolidate_metadata,
     library_save_actions,
+    metadata_category,
     parse_save_actions,
     set_metadata,
 )
@@ -20,6 +21,26 @@ from pynakes.usage import subset_library
 runner = CliRunner()
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def test_metadata_category_covers_pinned_jabref_metadata_constants() -> None:
+    # MetaData.java constants at JabRef v5.15, release commit 1eb3493.
+    expected_categories = {
+        "databaseType": "library",
+        "saveOrderConfig": "save",
+        "saveActions": "save",
+        "keypatterndefault": "citation-key",
+        "keypattern_article": "citation-key",
+        "grouping": "groups",
+        "groupstree": "groups",
+        "fileDirectory": "files",
+        "fileDirectoryLatex": "files",
+        "protectedFlag": "library",
+        "VersionDBStructure": "library",
+        "selector_journal": "selectors",
+        "BibDesk Static Groups": "groups",
+    }
+    assert {key: metadata_category(key) for key in expected_categories} == expected_categories
 
 
 def test_consolidate_metadata_moves_stranded_blocks_to_end_sorted() -> None:

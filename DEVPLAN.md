@@ -103,17 +103,40 @@ golden vectors lifted from JabRef's own tests in `tests/test_jabref_parity.py`.
 - [x] `normalize_page_numbers` → `--`/comma page-range normalization.
 - [x] Golden-vector parity harness (`tests/test_jabref_parity.py`) + the
       `saveActions`-driven `normalize` pass.
-- [ ] **`normalize_names` full parity** — pynakes' author normalizer is not yet
-      a full JabRef `AuthorList` parser (initials expansion `Smith SH` →
-      `Smith, S. H.`, name affixes, LaTeX-brace names, comma-separated lists).
-      The gap is captured as `xfail` parity vectors; closing it trips an xpass.
-- [ ] Encoding/case formatters: `latex_cleanup`, `unicode_to_latex` /
-      `latex_to_unicode`, `html_to_latex` / `html_to_unicode`, the case
-      changers, `ordinals_to_superscript`, `units_to_latex`. Apply only the
-      formatters the file's `saveActions` actually configures, per field.
-- [ ] Audit `KNOWN_EXACT_KEYS`/`KNOWN_PREFIXES` against a **pinned JabRef
-      version** so every current JabRef metadata key classifies as `known`
-      (record the version checked against).
+- [x] Pin `saveActions` formatter parity to [JabRef v5.15][jabref-v5.15]
+      (release commit `1eb3493f9dfe19c42b5879eb755a830757c81cba`, 2024-07-10).
+      Its [`Formatters.java`][jabref-formatters-v5.15] registry is the
+      authoritative formatter inventory and behavior source; v6 prereleases
+      are deliberately out of scope until a stable v6 release is audited.
+- [x] **`normalize_names` full parity** — initials, name affixes, LaTeX-brace
+      names, and comma-separated lists are covered by JabRef-derived vectors.
+- [x] Complete the remaining pinned `saveActions` formatter parity:
+  - [x] Add golden vectors for each remaining formatter before implementation,
+        using JabRef v5.15 tests as the behavioral source. Unimplemented
+        formatters remain as `xfail` vectors so completion produces an XPASS.
+  - [x] Implement `latex_cleanup`.
+  - [x] Implement `unicode_to_latex`.
+  - [x] Implement `latex_to_unicode`.
+  - [x] Implement `html_to_latex`.
+  - [x] Implement `html_to_unicode`.
+  - [x] Implement case conversion:
+    - [x] `capitalize`.
+    - [x] `lower_case`.
+    - [x] `sentence_case`.
+    - [x] `title_case`.
+    - [x] `upper_case`.
+  - [x] Implement typography/science conversion:
+    - [x] `ordinals_to_superscript`.
+    - [x] `units_to_latex`.
+  - [x] Register each implementation in `FIELD_FORMATTERS`; apply only the
+        formatters configured for that field, in their configured order.
+  - [x] Report configured-but-unsupported formatter keys as structured
+        normalization warnings rather than silently skipping them.
+  - [x] Add integration coverage for field selection, formatter composition
+        order, disabled `saveActions`, and byte-stable no-op behavior.
+- [x] Audit `KNOWN_EXACT_KEYS`/`KNOWN_PREFIXES` against pinned JabRef v5.15
+      (release commit `1eb3493f9dfe19c42b5879eb755a830757c81cba`) so every
+      current JabRef metadata key classifies as `known`.
 - [x] `convert` does not infer its target from `databaseType`; callers must
       explicitly choose `--to biblatex` or `--to bibtex`. `databaseType`
       describes the source library and may be stale or mixed, not the desired
@@ -123,6 +146,11 @@ golden vectors lifted from JabRef's own tests in `tests/test_jabref_parity.py`.
 `pynakes normalize` with the same field changes JabRef would make on save
 (name parity included), and pynakes recognizes the full pinned-version JabRef
 metadata vocabulary.
+
+**Milestone B complete.**
+
+[jabref-v5.15]: https://github.com/JabRef/jabref/releases/tag/v5.15
+[jabref-formatters-v5.15]: https://github.com/JabRef/jabref/blob/v5.15/src/main/java/org/jabref/logic/formatter/Formatters.java
 
 ### Milestone C — Preferences as a lintable contract
 

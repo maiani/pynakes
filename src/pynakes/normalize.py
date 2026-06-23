@@ -238,7 +238,10 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
     # exactly where the file configures them. There is no pynakes-meta or CLI
     # equivalent: these run because JabRef's own saveActions ask for them.
     if save_actions is not None and save_actions.enabled:
-        result.save_action_fields = _apply_save_action_formatters(lib, save_actions)
+        result.save_action_fields, formatter_warnings = _apply_save_action_formatters(
+            lib, save_actions
+        )
+        result.warnings.extend(formatter_warnings)
 
     if _resolve_bool(lib, opts.identifier_case, "identifier-case", True):
         result.entry_types, result.field_names = normalize_identifier_case(lib)
@@ -257,11 +260,27 @@ def normalize_identifier_case(lib: BibFile) -> tuple[int, int]:
     return entry_types, field_names
 
 
-def _apply_save_action_formatters(lib: BibFile, save_actions) -> int:
+def _apply_save_action_formatters(lib: BibFile, save_actions) -> tuple[int, list[dict[str, str]]]:
     """Apply supported saveActions field formatters per the file's field map."""
     changed = 0
+    warnings: list[dict[str, str]] = []
+    handled_elsewhere = {"normalize_names", *_DOI_FORMATTERS}
     for field_name, formatter_keys in save_actions.cleanups.items():
-        funcs = [FIELD_FORMATTERS[k] for k in formatter_keys if k in FIELD_FORMATTERS]
+        unsupported = [
+            key
+            for key in formatter_keys
+            if key not in FIELD_FORMATTERS and key not in handled_elsewhere
+        ]
+        warnings.extend(
+            {
+                "type": "unsupported_save_action_formatter",
+                "field": field_name,
+                "formatter": key,
+                "message": f"saveActions formatter {key!r} on field {field_name!r} is not supported",
+            }
+            for key in unsupported
+        )
+        funcs = [FIELD_FORMATTERS[key] for key in formatter_keys if key in FIELD_FORMATTERS]
         if not funcs:
             continue
         for entry in lib.entries.values():
@@ -273,4 +292,4 @@ def _apply_save_action_formatters(lib: BibFile, save_actions) -> int:
                 new_value = func(new_value)
             if new_value != value and set_entry_field(entry, field_name, new_value):
                 changed += 1
-    return changed
+    return changed, warnings
