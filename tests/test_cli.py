@@ -6,12 +6,22 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from pynakes import __version__
 from pynakes import doi as doi_ops
 from pynakes.cli import app
 
 runner = CliRunner()
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+
+class TestVersion:
+    @pytest.mark.parametrize("flag", ["--version", "-V"])
+    def test_prints_installed_package_version(self, flag: str) -> None:
+        result = runner.invoke(app, [flag])
+
+        assert result.exit_code == 0, result.output
+        assert result.output == f"{__version__}\n"
 
 
 class TestChangePlanEnvelope:

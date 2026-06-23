@@ -6,6 +6,7 @@ in pynakes.cli_commands, grouped by command family.
 
 import typer
 
+from pynakes import __version__
 from pynakes.cli_commands import (
     batch,
     capabilities,
@@ -35,6 +36,28 @@ doi_app = typer.Typer(help="Import references by DOI")
 dedupe_app = typer.Typer(help="Detect and merge duplicate works")
 journals_app = typer.Typer(help="Abbreviate, expand, and check journal titles")
 metadata_app = typer.Typer(help="Inspect and update JabRef library metadata")
+
+
+def _version_callback(value: bool) -> None:
+    """Print the installed package version and exit before command parsing."""
+    if value:
+        typer.echo(__version__)
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-V",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show the pynakes version and exit.",
+    ),
+) -> None:
+    """Agent-friendly BibTeX library management tool."""
+
 
 inspect.register(app)
 metadata.register(metadata_app)

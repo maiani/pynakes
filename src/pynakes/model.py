@@ -1,8 +1,50 @@
 """Data models representing one parsed BibTeX file."""
 
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Optional, Union
+
+# A bare BibTeX string reference: an identifier with no surrounding braces or
+# quotes that may resolve to a @string definition.
+_BARE_IDENTIFIER = re.compile(r"^[A-Za-z_]\w*$")
+
+
+def resolve_field_value(value: str, strings: dict[str, str]) -> str:
+    """Resolve @string references and # concatenation in a field value.
+
+    Returns the expanded string for semantic comparison (journal lookup,
+    validation) without mutating the stored value — @string references in the
+    file are always preserved on write.
+
+    Handles:
+    - Bare identifier matching a @string key: ``NMI`` → ``Nature Mach. Intell.``
+    - ``#`` concatenation: ``NMI # " Supplement"`` → ``Nature Mach. Intell. Supplement``
+    - Everything else: returned unchanged.
+    """
+    if not strings:
+        return value
+    if "#" in value:
+        parts = [p.strip() for p in value.split("#")]
+        resolved = []
+        for part in parts:
+            if part in strings:
+                resolved.append(strings[part])
+            elif (part.startswith("{") and part.endswith("}")) or (
+                part.startswith('"') and part.endswith('"')
+            ):
+                resolved.append(part[1:-1])
+            else:
+                resolved.append(part)
+        return "".join(resolved)
+    if _BARE_IDENTIFIER.match(value):
+        return strings.get(value, value)
+    return value
+
+
+def is_string_ref(value: str, strings: dict[str, str]) -> bool:
+    """Return True if *value* is a bare @string reference (not a literal)."""
+    return bool(_BARE_IDENTIFIER.match(value)) and value in strings
 
 
 @dataclass
