@@ -11,6 +11,54 @@ from pynakes.normalize import NormalizeOptions
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
+def test_change_plan_reports_field_changes() -> None:
+    coll = Collection.from_text("@article{A,\n  title = {t},\n  doi = {10.1/x}\n}\n")
+    from pynakes import fields as field_ops
+
+    field_ops.append_delimited_field(coll.lib.entries["A"], "keywords", "ml", ",", ", ")
+    coll.mark_dirty(1)
+    plan = coll.change_plan()
+    assert plan["summary"]["modified"] == 1
+    item = plan["entries"][0]
+    assert item == {
+        "change": "modified",
+        "key": "A",
+        "fields": {"keywords": {"old": None, "new": "ml"}},
+    }
+
+
+def test_change_plan_detects_rename_not_remove_add() -> None:
+    coll = Collection.from_text("@article{Old,\n  title = {t}\n}\n")
+    from pynakes import keys as key_ops
+
+    key_ops.rename_key(coll.lib, "Old", "New")
+    coll.mark_dirty(1)
+    plan = coll.change_plan()
+    assert plan["summary"] == {
+        "added": 0,
+        "removed": 0,
+        "renamed": 1,
+        "modified": 0,
+        "metadata_changed": 0,
+    }
+    assert plan["entries"] == [{"change": "renamed", "from": "Old", "to": "New"}]
+
+
+def test_change_plan_reports_metadata_changes() -> None:
+    coll = Collection.from_text("@article{A,\n  title = {t}\n}\n")
+    coll.set_metadata("normalize-dois", "on")
+    plan = coll.change_plan()
+    assert plan["summary"]["metadata_changed"] == 1
+    assert plan["metadata"] == [{"key": "normalize-dois", "old": None, "new": "on"}]
+
+
+def test_change_plan_empty_when_unmodified() -> None:
+    coll = Collection.from_text("@article{A,\n  title = {t}\n}\n")
+    plan = coll.change_plan()
+    assert plan["entries"] == []
+    assert plan["summary"]["modified"] == 0
+
+
 def test_volume_open_exposes_read_only_views(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text((FIXTURES / "duplicate_entries.bib").read_text())

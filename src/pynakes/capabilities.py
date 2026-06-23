@@ -237,6 +237,7 @@ def get_capabilities() -> dict:
             "used": "Report/tag/export entries cited in LaTeX sources",
             "merge": "Combine several .bib files into one (optionally deduping by key)",
             "split": "Combine inputs and route entries into several outputs by predicate",
+            "batch": "Apply a sequence of operations atomically (one preview, one commit)",
             "capabilities": "Show this capability description",
         },
         # Self-description for agents: the full per-command schema (args/options/
@@ -245,4 +246,12 @@ def get_capabilities() -> dict:
         "command_schemas": command_schemas(),
         "error_codes": _ERROR_CODES,
         "predicate_grammar": _PREDICATE_GRAMMAR,
+        # The operations accepted by `batch` (op name → required/optional params).
+        "batch_operations": _batch_operations(),
     }
+
+
+def _batch_operations() -> dict:
+    from pynakes.batch import operation_catalog
+
+    return operation_catalog()

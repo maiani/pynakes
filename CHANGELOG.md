@@ -45,6 +45,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from JabRef's `databaseType` metadata.
 
 ### Added
+- **`batch` — transactional multi-operation edits.** `pynakes batch <file> --ops
+  '<json array>'` (or `--ops-file`) applies a sequence of operations to one file
+  in memory, previews a single combined `diff`/`plan`, and commits them
+  atomically — all-or-nothing, so a failing operation writes nothing. Supported
+  operations and their parameters are listed in `capabilities` under
+  `batch_operations` (and exposed on the engine as `pynakes.batch`). Network and
+  conflict-prone operations (`doi import`, `dedupe merge`) are excluded.
+- **Structured change plans.** Every modifying command's JSON envelope now
+  carries a `plan` object — a machine-readable summary of the staged changes
+  (entries `added`/`removed`/`renamed`/`modified` with per-field and entry-type
+  `old`/`new` values, top-level `metadata` changes, and a rollup `summary`) —
+  alongside the textual `diff`. Computed against the pre-change baseline, so a
+  `--dry-run` plan matches the committed one. Exposed on the engine as
+  `Collection.change_plan()`.
 - **Self-describing `capabilities`.** `capabilities --json` now includes
   `command_schemas` — a per-command map (keyed by full path, e.g.
   `"groups add-entry"`, `"split"`) of help, positional `arguments`, and

@@ -7,6 +7,7 @@ in pynakes.cli_commands, grouped by command family.
 import typer
 
 from pynakes.cli_commands import (
+    batch,
     capabilities,
     convert,
     dedupe,
@@ -51,6 +52,7 @@ journals.register(journals_app)
 capabilities.register(app)
 used.register(app)
 setops.register(app)
+batch.register(app)
 
 app.add_typer(groups_app, name="groups")
 app.add_typer(keys_app, name="keys")

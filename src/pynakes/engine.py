@@ -170,6 +170,88 @@ class Collection:
         """Return how many entries have staged content changes."""
         return len(self._entry_edits()) + len(self._appended_entries) + len(self._removed_entries)
 
+    def change_plan(self) -> dict:
+        """Return a structured, machine-readable summary of the staged changes.
+
+        Compares the pristine library against the staged one by citation key and
+        reports entries ``added``, ``removed``, ``renamed`` (a removed key whose
+        record reappears under a new key), or ``modified`` (with per-field and
+        entry-type ``old``/``new`` values), plus top-level metadata key changes
+        and a rollup ``summary``. This complements the textual :meth:`diff` with
+        something an agent can reason over directly. Must be read **before**
+        :meth:`commit` (a commit refreshes the pristine baseline). Duplicate
+        citation keys are compared best-effort.
+        """
+        pristine = parse_bib(self._pristine_text)
+        before = {entry.key: entry for entry in pristine.entries.values()}
+        after = {entry.key: entry for entry in self.lib.entries.values()}
+
+        def signature(entry: BibEntry) -> tuple[str, tuple[tuple[str, str], ...]]:
+            return (entry.type.lower(), tuple(sorted(entry.fields.items())))
+
+        added_keys = [key for key in after if key not in before]
+        removed_keys = [key for key in before if key not in after]
+
+        # Pair a removed key with an added key carrying the same record → rename.
+        added_by_sig = {signature(after[key]): key for key in added_keys}
+        renamed_to: set[str] = set()
+        renames: list[dict] = []
+        plain_removed: list[str] = []
+        for key in removed_keys:
+            match = added_by_sig.get(signature(before[key]))
+            if match is not None and match not in renamed_to:
+                renames.append({"change": "renamed", "from": key, "to": match})
+                renamed_to.add(match)
+            else:
+                plain_removed.append(key)
+        added_keys = [key for key in added_keys if key not in renamed_to]
+
+        entries: list[dict] = list(renames)
+        entries += [{"change": "added", "key": key} for key in added_keys]
+        entries += [{"change": "removed", "key": key} for key in plain_removed]
+
+        modified = 0
+        for key, after_entry in after.items():
+            before_entry = before.get(key)
+            if before_entry is None:
+                continue
+            fields: dict[str, dict[str, str | None]] = {}
+            for name in sorted(set(before_entry.fields) | set(after_entry.fields)):
+                old = before_entry.fields.get(name)
+                new = after_entry.fields.get(name)
+                if old != new:
+                    fields[name] = {"old": old, "new": new}
+            type_changed = before_entry.type.lower() != after_entry.type.lower()
+            if not fields and not type_changed:
+                continue
+            modified += 1
+            item: dict = {"change": "modified", "key": key}
+            if type_changed:
+                item["type"] = {"old": before_entry.type, "new": after_entry.type}
+            if fields:
+                item["fields"] = fields
+            entries.append(item)
+
+        metadata: list[dict] = []
+        before_meta, after_meta = pristine.metadata, self.lib.metadata
+        for name in sorted(set(before_meta) | set(after_meta)):
+            old = before_meta.get(name)
+            new = after_meta.get(name)
+            if old != new:
+                metadata.append({"key": name, "old": old, "new": new})
+
+        return {
+            "summary": {
+                "added": len(added_keys),
+                "removed": len(plain_removed),
+                "renamed": len(renames),
+                "modified": modified,
+                "metadata_changed": len(metadata),
+            },
+            "entries": entries,
+            "metadata": metadata,
+        }
+
     def externally_changed(self) -> bool:
         """Return whether the bound file changed since open/commit."""
         if self.path is None or self._fingerprint is None:

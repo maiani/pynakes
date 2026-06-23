@@ -244,6 +244,7 @@ def keys_rename(
             }
         )
 
+    plan = coll.change_plan()  # before commit, which refreshes the baseline
     bib_diff, bib_modified, changed_entries = _preview_or_commit(coll, dry_run)
 
     diff_text = "\n".join(part for part in [bib_diff, *source_diff_parts] if part)
@@ -265,6 +266,7 @@ def keys_rename(
             "modified": modified,
             "modified_entries": changed_entries,
             "warnings": [],
+            "plan": plan,
             "old": old,
             "new": new,
             "source_occurrences": total_source_occurrences,

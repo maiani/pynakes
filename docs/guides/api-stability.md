@@ -21,6 +21,7 @@ removing a name or changing its documented behavior is a breaking change.
 | Bibliography operations | `pynakes.authors`, `pynakes.convert`, `pynakes.doi`, `pynakes.fields`, `pynakes.groups`, `pynakes.journals`, `pynakes.keys`, `pynakes.normalize` |
 | Analysis and maintenance | `pynakes.dedupe`, `pynakes.files`, `pynakes.integrity`, `pynakes.lint`, `pynakes.metadata`, `pynakes.usage` |
 | Set operations (projections) | `pynakes.setops` |
+| Composition | `pynakes.batch` |
 | Introspection | `pynakes.capabilities` and `pynakes.__version__` |
 
 The [API reference](../api/index.md) documents the data model, return objects,

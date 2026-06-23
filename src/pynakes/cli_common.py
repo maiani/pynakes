@@ -143,9 +143,12 @@ def _finish_mod(
     """Preview/commit a collection and emit the standard modifying-command result.
 
     Every modifying command shares this envelope:
-    ``status, action, file, dry_run, modified, modified_entries, warnings`` plus
+    ``status, action, file, dry_run, modified, modified_entries, warnings``, a
+    structured ``plan`` (machine-readable per-entry/field changes), plus
     command-specific keys, and an optional ``diff`` when ``--diff`` is set.
     """
+    # The plan must be read before commit, which refreshes the pristine baseline.
+    plan = coll.change_plan()
     diff_text, modified, changed = _preview_or_commit(coll, dry_run, backup)
     if modified_entries is not None:
         changed = modified_entries
@@ -157,6 +160,7 @@ def _finish_mod(
         "modified": modified,
         "modified_entries": changed,
         "warnings": warnings or [],
+        "plan": plan,
         **details,
     }
     _emit(json_output, result, human, diff_text, diff)

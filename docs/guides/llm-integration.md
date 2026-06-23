@@ -100,6 +100,14 @@ Projections — read inputs read-only, **create** new files (support `--dry-run`
   (against `--tex`/`--aux`), or `group "Name"`. First match wins by default;
   `--copy` routes an entry to every matching output.
 
+Transactional:
+
+- `pynakes batch <file> --ops '<json>' | --ops-file <path>` — apply a sequence
+  of operations to one file atomically (one preview, one commit; nothing is
+  written if any operation fails). The operation vocabulary (op name → required/
+  optional params) is in `capabilities` under `batch_operations`. Example:
+  `--ops '[{"op":"groups.add_entry","key":"Smith2020","group":"ML"},{"op":"journals.abbreviate"}]'`.
+
 Planned (not implemented): `entries`.
 
 ## The `--where` filter
@@ -270,7 +278,33 @@ Field meanings (stable across commands):
   change** (real run).
 - `modified_entries`: count of entries that changed.
 - `warnings`: always present; an array (empty when there are none).
+- `plan`: always present; a structured, machine-readable description of the
+  staged changes (see below).
 - `diff`: present only when `--diff` was passed and there is a change.
+
+### The `plan` object
+
+`plan` is the structured counterpart to the textual `diff` — an agent can reason
+over it directly instead of parsing a diff. It is computed against the
+pre-change state (so a `--dry-run` plan and the real-run plan match):
+
+```json
+"plan": {
+  "summary": {"added": 0, "removed": 0, "renamed": 0, "modified": 1, "metadata_changed": 0},
+  "entries": [
+    {"change": "modified", "key": "Smith2020",
+     "type": {"old": "article", "new": "misc"},
+     "fields": {"doi": {"old": "https://doi.org/10.1/x", "new": "10.1/x"}}}
+  ],
+  "metadata": [{"key": "normalize-dois", "old": null, "new": "on"}]
+}
+```
+
+Each `entries` item is one of `added` / `removed` (with `key`), `renamed` (with
+`from` / `to` — a key change whose record is otherwise unchanged), or `modified`
+(with per-field `old`/`new`, and an entry-type `old`/`new` when it changed).
+`metadata` lists top-level metadata key changes. Duplicate citation keys are
+compared best-effort.
 
 Command-specific keys are added alongside these (e.g. `renames` for
 `keys generate`/`repair`, `sources` for `keys rename`,

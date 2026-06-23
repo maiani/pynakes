@@ -22,16 +22,37 @@ The single-file engine is feature-rich and released-ready in all but name:
   rename + JabRef key patterns), `fields` (with `--where`), `convert`,
   `journals`, `files check`, `normalize`, `doi import`, `used`, `dedupe`,
   `verify`/`published`/`enrich` (opt-in `--online`, cached, fixture-stubbed).
+- **Projections & composition**: `merge` (combine files) and `split` (partition
+  entries into outputs by predicate) in `pynakes.setops`; `batch` for atomic
+  multi-operation edits (`pynakes.batch`).
 - **Metadata**: two namespaces — `jabref-meta` and the `pynakes-meta` superset —
   parsed, merged (pynakes wins), and round-tripped; `metadata set` routes by key.
-  JabRef `saveActions` already drive `normalize`'s author/DOI defaults.
-- **Agent/CI surface**: stable JSON envelope + exit codes (0/1/2), `--dry-run`/
-  `--diff`/`--json`, `capabilities`, multi-file `--strict` gate checks, and a
+  `pynakes-meta` is written as one consolidated `key: value` block (the older
+  `key:value;` layout is still read). JabRef `saveActions` drive `normalize`'s
+  author/DOI defaults.
+- **Agent-native surface**: stable JSON envelope + exit codes (0/1/2),
+  `--dry-run`/`--diff`/`--json`, structured `plan` objects on every modifying
+  command, a **self-describing `capabilities`** (per-command schemas derived from
+  the live CLI, an error-code catalog, the predicate grammar, and the `batch`
+  operation catalog), multi-file `--strict` gate checks, and a
   `.pre-commit-hooks.yaml`.
-- **Quality**: 455 tests, coverage ≥90%, `ruff` clean, docs site builds.
+- **Quality**: ~700 tests, coverage ≥90%, `ruff` clean, docs site builds.
 
 What's missing for a credible **1.0** is below: finishing JabRef parity, making
 stored preferences a lintable contract, pinning the public API, and releasing.
+(JabRef parity, lintable profiles, and the API pin — Milestones B–D — are now
+complete; the remaining gate is the public release, Milestone E.)
+
+### Recently landed (this consolidation pass, pre-0.9)
+
+Format/contract decisions that had to be made before the first public release:
+removed pre-release metadata-key aliases; simplified `pynakes-meta` to a
+consolidated `key: value` block (both layouts still read); added `merge`/`split`
+projections and the `batch` transactional command; and made the agent surface
+self-describing (per-command `capabilities` schemas, error catalog, predicate
+grammar, structured `plan` objects). Remaining **AI-native** idea not yet built:
+none from the current shortlist — MCP stays deferred until the corpus `Library`
+exists (a downstream concern; see [vision](docs/vision.md)).
 
 ## Guiding principles (non-negotiable)
 

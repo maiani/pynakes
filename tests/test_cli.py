@@ -14,6 +14,20 @@ runner = CliRunner()
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
+class TestChangePlanEnvelope:
+    def test_modifying_command_json_includes_structured_plan(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {t},\n  doi = {10.1/x}\n}\n")
+        result = runner.invoke(
+            app, ["fields", "append", str(bib), "keywords", "ml", "--dry-run", "--json"]
+        )
+        assert result.exit_code == 0, result.output
+        plan = json.loads(result.output)["plan"]
+        assert plan["summary"]["modified"] == 1
+        assert plan["entries"][0]["key"] == "A"
+        assert plan["entries"][0]["fields"]["keywords"] == {"old": None, "new": "ml"}
+
+
 class TestUsedCommand:
     def test_report_json(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
