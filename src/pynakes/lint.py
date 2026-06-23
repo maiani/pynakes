@@ -20,7 +20,7 @@ from pynakes.keys import (
     generate_key_from_pattern,
     get_jabref_key_pattern,
 )
-from pynakes.model import BibEntry, BibFile, EntryStore, is_string_ref, resolve_field_value
+from pynakes.model import BibEntry, BibFile
 
 # Required fields by entry type. Each requirement is a tuple of acceptable
 # field names (any one satisfies it), to tolerate BibTeX/BibLaTeX variants
@@ -202,7 +202,7 @@ def lint(lib: BibFile) -> list[LintIssue]:
         )
 
     for entry in lib.entries.values():
-        issues.extend(_lint_entry(entry, lib.strings, lib.entries))
+        issues.extend(_lint_entry(entry, lib.resolved_fields(entry)))
         issues.extend(_lint_profile_entry(entry, lib, profile, journal_sources))
 
     return issues
@@ -298,16 +298,11 @@ def _lint_profile_entry(
 
 def _lint_entry(
     entry: BibEntry,
-    strings: dict[str, str] | None = None,
-    entries: "EntryStore | None" = None,
+    fields: dict[str, str] | None = None,
 ) -> list[LintIssue]:
     issues: list[LintIssue] = []
-    strings = strings or {}
+    fields = fields or entry.fields
     etype = entry.type.lower()
-
-    # Resolve crossref'd entry for inherited-field checks.
-    crossref_key = entry.fields.get("crossref", "").strip()
-    crossref_entry = entries.get(crossref_key) if entries and crossref_key else None
 
     if entry.type != etype:
         issues.append(
@@ -345,12 +340,7 @@ def _lint_entry(
         )
 
     for alternatives in _REQUIRED.get(etype, []):
-        if not any(entry.fields.get(name, "").strip() for name in alternatives):
-            # A crossref'd parent entry may supply the missing field.
-            if crossref_entry and any(
-                crossref_entry.fields.get(name, "").strip() for name in alternatives
-            ):
-                continue
+        if not any(fields.get(name, "").strip() for name in alternatives):
             issues.append(
                 LintIssue(
                     "missing_required_field",

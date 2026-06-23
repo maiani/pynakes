@@ -71,10 +71,11 @@ See the [LLM Integration guide](docs/guides/llm-integration.md) for the full JSO
 
 ## Status
 
-pynakes is feature-complete as a single-file engine and approaching 1.0. The full
-maintenance workflow — deduplication/merge, integrity/enrichment, the JabRef metadata
-superset with `saveActions` parity, and pre-commit/CI gating — runs from the CLI.
-Remaining 1.0 work (public-API pinning and PyPI release) is tracked in [DEVPLAN.md](DEVPLAN.md).
+pynakes provides the full single-file maintenance workflow — deduplication/merge,
+integrity/enrichment, the JabRef metadata superset with `saveActions` parity, and
+pre-commit/CI gating — from the CLI. Parser conformance to the pinned BibTeX and
+BibLaTeX input grammars is a hard requirement before the 0.4 release; progress and
+the remaining compatibility corpus are tracked in [DEVPLAN.md](DEVPLAN.md).
 
 ## Documentation
 

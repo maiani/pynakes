@@ -57,6 +57,51 @@ def test_biblatex_variants_satisfy_requirements() -> None:
     assert not [i for i in lint(lib) if i.type == "missing_required_field"]
 
 
+def test_crossref_inherits_required_fields_without_mutating_child() -> None:
+    lib = parse_bib(
+        "@proceedings{Conference,\n"
+        "  title = {Proceedings},\n"
+        "  booktitle = {Conference Book},\n"
+        "  year = {2024}\n"
+        "}\n"
+        "@inproceedings{Paper,\n"
+        "  author = {A. Author},\n"
+        "  title = {Paper},\n"
+        "  crossref = {Conference}\n"
+        "}\n"
+    )
+
+    assert lib.entries["Paper"].fields.get("booktitle") is None
+    assert lib.resolved_fields("Paper")["booktitle"] == "Conference Book"
+    assert not [issue for issue in lint(lib) if issue.type == "missing_required_field"]
+
+
+def test_crossref_child_fields_override_inherited_values() -> None:
+    lib = parse_bib(
+        "@proceedings{Parent, booktitle = {Parent Book}, year = {2024}}\n"
+        "@inproceedings{Child,\n"
+        "  author = {A. Author},\n"
+        "  title = {Paper},\n"
+        "  booktitle = {Child Book},\n"
+        "  crossref = {Parent}\n"
+        "}\n"
+    )
+
+    assert lib.resolved_fields("Child")["booktitle"] == "Child Book"
+
+
+def test_crossref_cycle_is_tolerated() -> None:
+    lib = parse_bib(
+        "@inproceedings{First, author = {A. Author}, title = {Paper}, crossref = {Second}}\n"
+        "@proceedings{Second, booktitle = {Proceedings}, crossref = {First}}\n"
+    )
+
+    fields = lib.resolved_fields("First")
+
+    assert fields["author"] == "A. Author"
+    assert fields["booktitle"] == "Proceedings"
+
+
 def test_malformed_doi() -> None:
     lib = parse_bib(
         "@article{A,\n  author={X},\n  title={T},\n  journal={J},\n  year={2020},\n"

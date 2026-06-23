@@ -1,0 +1,31 @@
+% Core input cases derived from the BibLaTeX 3.20 data model.
+@xdata{SharedMetadata,
+  publisher = {Example Press},
+  location = {Stockholm},
+  langid = {english}
+}
+
+@online{UnicodeDataset,
+  author = {Ångström, Anders},
+  title = {Données, 数据, and data},
+  date = {2025-02-28},
+  url = {https://example.test/dataset?part={a,b}},
+  urldate = {2025-03-01},
+  xdata = {SharedMetadata},
+  custom:field = {A project-defined value}
+}
+
+@set{DatasetSet,
+  entryset = {UnicodeDataset},
+  entrysubtype = {research-data}
+}
+
+@article{InheritedArticle,
+  author = {Doe, Jane},
+  title = {An inherited record},
+  journaltitle = {Journal of Tests},
+  date = {2025},
+  xref = {UnicodeDataset},
+  related = {UnicodeDataset},
+  relatedtype = {dataset}
+}

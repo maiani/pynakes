@@ -24,8 +24,12 @@ def write_bib(lib: BibFile) -> str:
     if lib.raw_comments:
         output_parts.append("")
 
-    # Write @string definitions (brace-quoted to tolerate any value content)
-    if lib.strings:
+    # Parsed @string definitions retain their original expression syntax. New
+    # in-memory definitions fall back to a safe brace-quoted representation.
+    if lib.raw_strings:
+        output_parts.extend(lib.raw_strings)
+        output_parts.append("")
+    elif lib.strings:
         for key, value in lib.strings.items():
             output_parts.append(f"@string{{{key} = {{{value}}}}}")
         output_parts.append("")

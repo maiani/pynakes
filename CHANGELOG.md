@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Pinned parser conformance baseline**: TeX Live 2025 — BibTeX 0.99d,
+  BibLaTeX 3.20 (2024-03-21), and Biber 2.20. The 0.4 release remains gated on
+  a versioned corpus validated against this baseline.
+- **Versioned parser core corpus** under `tests/fixtures/conformance/`, with a
+  machine-readable baseline manifest and round-trip checks for BibTeX 0.99d and
+  BibLaTeX 3.20 syntax. The upstream-example corpus and Biber CI validation are
+  still required before the conformance gate can close.
+- **Vendored upstream conformance fixtures and CI validation**: BibTeX 0.99d's
+  `xampl.bib` and BibLaTeX 3.20's `biblatex-examples.bib` are checksum-pinned
+  and semantic-round-tripped in tests. A TeX Live 2025 CI job validates them
+  with BibTeX and Biber 2.20's default data model.
+- **Grammar-aware parser foundation**: parses `@entry{...}` and `@entry(...)`
+  constructs with nested/quoted values, TeX comments, multiline content, and
+  source-faithful `@string`/`@preamble` declarations. Standard BibTeX month
+  macros resolve semantically without being injected into source declarations.
+- **BibTeX value resolution**: `@string` references (including nested,
+  case-insensitive definitions) and top-level `#` concatenation are resolved
+  for parsed field consumers while the original entry text remains available
+  for round-trip-safe writes. `BibFile.resolved_fields()` also provides a
+  non-mutating, cycle-safe `crossref` inheritance view; `lint` uses it for
+  required-field validation.
+
 ## [0.3.0] - 2026-06-23
 
 First feature-complete pre-release. The full single-file maintenance engine is

@@ -5,7 +5,14 @@ import re
 from typing import Optional
 
 from pynakes.metadata import metadata_blocks_to_dict, parse_metadata_comment
-from pynakes.model import BibEntry, BibFile, EntryStore, MetadataBlock
+from pynakes.model import (
+    BibEntry,
+    BibFile,
+    EntryStore,
+    MetadataBlock,
+    resolve_field_value,
+    resolve_string_definitions,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,86 +61,82 @@ def parse_bib(text: str) -> BibFile:
 
     entries = EntryStore()
     strings: dict[str, str] = {}
+    raw_strings: list[str] = []
     preambles: list[str] = []
     raw_comments: list[str] = []
     jabref_metadata_blocks: list[MetadataBlock] = []
     pynakes_metadata_blocks: list[MetadataBlock] = []
 
-    lines = text.split(line_ending)
-
-    i = 0
-    while i < len(lines):
-        line_num = i + 1
-        original_line = lines[i]
-        line = original_line.strip()
-
-        if not line or line.startswith("%"):
-            if line.startswith("%"):
-                raw_comments.append(line)
-            i += 1
+    position = 0
+    while position < len(text):
+        char = text[position]
+        if char == "%" and not _is_escaped(text, position):
+            line_end = _line_end(text, position)
+            raw_comments.append(text[position:line_end])
+            position = line_end
+            continue
+        if char != "@":
+            position += 1
             continue
 
-        if line.lower().startswith("@string"):
-            # Collect full @string across lines if needed
-            full_line = line
-            j = i
-            brace_count = line.count("{") - line.count("}")
-            while j < len(lines) - 1 and brace_count > 0:
-                j += 1
-                full_line += line_ending + lines[j]
-                brace_count += lines[j].count("{") - lines[j].count("}")
+        header = _TOP_LEVEL_HEADER.match(text, position)
+        if header is None:
+            position += 1
+            continue
 
-            key, value = _parse_string_def(full_line)
+        entry_type = header.group("type")
+        normalized_type = entry_type.lower()
+        opener = header.group("opener")
+        block_end = _find_block_end(text, header.start("opener"))
+        if block_end is None:
+            line = _line_number(text, position)
+            message = "Unmatched braces" if opener == "{" else "Unmatched parentheses"
+            raise ParseError(f"{message} in {normalized_type} block", line)
+
+        raw_block = text[position:block_end]
+        body = text[header.end() : block_end - 1]
+        line_num = _line_number(text, position)
+
+        if normalized_type == "string":
+            key, value = _parse_string_def(body)
             if key is not None and value is not None:
                 strings[key] = value
-            i = j + 1
-            continue
+                raw_strings.append(raw_block)
+        elif normalized_type == "preamble":
+            # ``preamble`` deliberately retains its source delimiter and
+            # formatting; it has no field/key structure to normalize.
+            preambles.append(raw_block)
+        elif normalized_type == "comment":
+            _record_comment(
+                raw_block,
+                body,
+                raw_comments,
+                jabref_metadata_blocks,
+                pynakes_metadata_blocks,
+            )
+        else:
+            entry = _parse_entry(entry_type, body, raw_block)
+            if entry.key in entries:
+                logger.warning(
+                    "Duplicate citation key %r (line %d); preserving both entries",
+                    entry.key,
+                    line_num,
+                )
+            entries.add(entry)
 
-        if line.lower().startswith("@preamble"):
-            preamble_text = _extract_preamble(line, i, line_ending, lines)
-            if preamble_text:
-                preambles.append(preamble_text)
-            i += 1
-            continue
+        position = block_end
 
-        if line.lower().startswith("@comment"):
-            raw_comment, consumed = _collect_balanced_block(original_line, i, line_ending, lines)
-            comment_text = _extract_comment_text(raw_comment)
-            if comment_text:
-                comment_index = len(raw_comments)
-                raw_comments.append(raw_comment)
-                for block in parse_metadata_comment(
-                    comment_text,
-                    raw=raw_comment,
-                    comment_index=comment_index,
-                ):
-                    if block.namespace == "pynakes":
-                        pynakes_metadata_blocks.append(block)
-                    else:
-                        jabref_metadata_blocks.append(block)
-            i += consumed
-            continue
-
-        if line.startswith("@"):
-            entry, lines_consumed = _parse_entry(line, i, line_ending, lines)
-            if entry:
-                if entry.key in entries:
-                    logger.warning(
-                        "Duplicate citation key %r (line %d); preserving both entries",
-                        entry.key,
-                        line_num,
-                    )
-                entries.add(entry)
-                i += lines_consumed
-            else:
-                i += 1
-            continue
-
-        i += 1
+    resolved_strings = resolve_string_definitions(strings)
+    for entry in entries.values():
+        entry.fields = {
+            name: resolve_field_value(value, resolved_strings)
+            for name, value in entry.fields.items()
+        }
 
     return BibFile(
         entries=entries,
-        strings=strings,
+        strings=resolved_strings,
+        raw_strings=raw_strings,
         preamble=preambles,
         raw_comments=raw_comments,
         jabref_metadata=metadata_blocks_to_dict(jabref_metadata_blocks),
@@ -144,225 +147,199 @@ def parse_bib(text: str) -> BibFile:
     )
 
 
-def _collect_balanced_block(
-    first_line: str, start_line_idx: int, line_ending: str, lines: list[str]
-) -> tuple[str, int]:
-    """Collect a full top-level ``@...{...}`` block and consumed line count."""
-    full_text = first_line
-    brace_count = first_line.count("{") - first_line.count("}")
-    i = start_line_idx + 1
-
-    while i < len(lines) and brace_count > 0:
-        full_text += line_ending + lines[i]
-        brace_count += lines[i].count("{") - lines[i].count("}")
-        i += 1
-
-    return full_text, i - start_line_idx
+_TOP_LEVEL_HEADER = re.compile(
+    r"@(?P<type>[A-Za-z][A-Za-z0-9_:-]*)\s*(?P<opener>[{(])", re.IGNORECASE
+)
 
 
-def _extract_comment_text(raw_comment: str) -> Optional[str]:
-    """Extract the content inside an ``@comment{...}`` block."""
-    match = re.match(r"\s*@comment\s*{\s*", raw_comment, re.IGNORECASE | re.DOTALL)
-    if not match:
-        return None
-
-    content_start = match.end()
-    content = raw_comment[content_start:]
-    if content.endswith("}"):
-        content = content[:-1]
-    return content
+def _parse_entry(entry_type: str, body: str, raw_content: str) -> BibEntry:
+    """Parse an entry body after its outer delimiter has been scanned."""
+    key_part, fields_part = _split_once_top_level(_strip_tex_comments(body), ",")
+    key = key_part.strip()
+    fields = _parse_fields(fields_part) if fields_part is not None else {}
+    return BibEntry(key=key, type=entry_type, fields=fields, raw_content=raw_content)
 
 
-def _parse_entry(
-    first_line: str, start_line_idx: int, line_ending: str, lines: list[str]
-) -> tuple[Optional[BibEntry], int]:
-    """Parse a single BibTeX entry across multiple lines.
-
-    Returns:
-        (BibEntry, lines_consumed) or (None, 0) on error
-    """
-    # Extract entry type and key. The key part is ``[^,]*`` (not ``+``) so an
-    # entry with an empty/missing citation key (``@article{,``) is still
-    # captured: dropping it would silently lose data and hide the most-broken
-    # entry from inspect/lint. The empty key surfaces as a lint error instead.
-    match = re.match(r"@(\w+)\s*{\s*([^,]*),", first_line, re.IGNORECASE)
-    if not match:
-        return None, 0
-
-    entry_type = match.group(1)
-    key = match.group(2).strip()
-
-    # Collect full entry text
-    full_text = first_line
-    i = start_line_idx + 1
-    brace_count = first_line.count("{") - first_line.count("}")
-
-    while i < len(lines) and brace_count > 0:
-        next_line = lines[i]
-        full_text += line_ending + next_line
-        brace_count += next_line.count("{") - next_line.count("}")
-        i += 1
-
-    if brace_count != 0:
-        raise ParseError(f"Unmatched braces in entry {key}", start_line_idx + 1)
-
-    # Parse fields (field order is preserved by dict insertion order)
-    fields = _parse_fields(full_text)
-
-    entry = BibEntry(
-        key=key,
-        type=entry_type,
-        fields=fields,
-        raw_content=full_text,
-        modified=False,
-    )
-
-    return entry, i - start_line_idx
-
-
-def _parse_fields(entry_text: str) -> dict[str, str]:
-    """Extract field=value pairs from entry text, preserving order."""
+def _parse_fields(content: str) -> dict[str, str]:
+    """Extract field assignments, respecting nested braces and quoted values."""
     fields: dict[str, str] = {}
-
-    # Remove entry type and key part (``[^,]*`` tolerates an empty key)
-    match = re.match(r"@\w+\s*{\s*[^,]*,\s*", entry_text, re.IGNORECASE | re.DOTALL)
-    if not match:
-        return fields
-
-    content = entry_text[match.end() : -1].strip()
-
-    # Split by top-level commas
-    parts = _split_fields(content)
-
-    for part in parts:
-        part = part.strip()
-        if "=" not in part:
-            continue
-
-        field_name, field_value = part.split("=", 1)
-        field_name = field_name.strip().lower()
-        field_value = _unquote_value(field_value.strip())
-
-        # Preserve the field even if its value is empty (e.g. ``note = {}``);
-        # discard only nameless fragments.
+    for part in _split_top_level(content, ","):
+        name, value = _split_once_top_level(part, "=")
+        field_name = name.strip().lower()
         if field_name:
-            fields[field_name] = field_value
-
+            fields[field_name] = value.strip() if value is not None else ""
     return fields
 
 
-def _split_fields(content: str) -> list[str]:
-    """Split field assignments by top-level commas."""
-    parts = []
-    current = ""
-    depth = 0
+def _parse_string_def(body: str) -> tuple[Optional[str], Optional[str]]:
+    """Parse the body of a ``@string`` declaration."""
+    key, value = _split_once_top_level(_strip_tex_comments(body), "=")
+    key = key.strip()
+    if not key or value is None:
+        return None, None
+    # Keep the complete value expression until all definitions have been
+    # collected: it may concatenate literals and macros declared later.
+    return key, value.strip()
+
+
+def _record_comment(
+    raw_comment: str,
+    body: str,
+    raw_comments: list[str],
+    jabref_metadata_blocks: list[MetadataBlock],
+    pynakes_metadata_blocks: list[MetadataBlock],
+) -> None:
+    """Store one ``@comment`` block and classify any metadata it contains."""
+    comment_index = len(raw_comments)
+    raw_comments.append(raw_comment)
+    for block in parse_metadata_comment(
+        body,
+        raw=raw_comment,
+        comment_index=comment_index,
+    ):
+        if block.namespace == "pynakes":
+            pynakes_metadata_blocks.append(block)
+        else:
+            jabref_metadata_blocks.append(block)
+
+
+def _find_block_end(text: str, opener_index: int) -> int | None:
+    """Return the position after a balanced top-level BibTeX block.
+
+    BibTeX permits both ``{...}`` and ``(...)`` outer delimiters. Braces in a
+    quoted value do not affect the enclosing block, while parentheses inside a
+    braced value are ordinary text. TeX comments are likewise ignored for
+    structural scanning.
+    """
+    opener = text[opener_index]
+    if opener not in "{(":
+        return None
+
+    brace_depth = 1 if opener == "{" else 0
+    paren_depth = 1 if opener == "(" else 0
     in_quotes = False
+    in_comment = False
 
-    for char in content:
-        if char == '"' and (not current or current[-1] != "\\"):
+    for index in range(opener_index + 1, len(text)):
+        char = text[index]
+        if in_comment:
+            if char in "\r\n":
+                in_comment = False
+            continue
+        if char == "%" and not in_quotes and not _is_escaped(text, index):
+            in_comment = True
+            continue
+
+        quote_allowed = (opener == "{" and brace_depth == 1) or (opener == "(" and brace_depth == 0)
+        if char == '"' and quote_allowed and not _is_escaped(text, index):
             in_quotes = not in_quotes
-        elif not in_quotes:
-            if char in "{(":
-                depth += 1
-            elif char in "})":
-                depth -= 1
-            elif char == "," and depth == 0:
-                parts.append(current)
-                current = ""
-                continue
+            continue
+        if in_quotes:
+            continue
 
-        current += char
+        if brace_depth:
+            if char == "{":
+                brace_depth += 1
+            elif char == "}":
+                brace_depth -= 1
+                if brace_depth == 0 and opener == "{":
+                    return index + 1
+            continue
 
-    if current.strip():
-        parts.append(current)
+        if opener == "(":
+            if char == "{":
+                brace_depth = 1
+            elif char == "(":
+                paren_depth += 1
+            elif char == ")":
+                paren_depth -= 1
+                if paren_depth == 0:
+                    return index + 1
+    return None
 
+
+def _split_top_level(text: str, separator: str) -> list[str]:
+    """Split text on one separator outside braced/quoted value syntax."""
+    parts: list[str] = []
+    start = 0
+    brace_depth = 0
+    paren_depth = 0
+    in_quotes = False
+    in_comment = False
+
+    for index, char in enumerate(text):
+        if in_comment:
+            if char in "\r\n":
+                in_comment = False
+            continue
+        if char == "%" and not in_quotes and not _is_escaped(text, index):
+            in_comment = True
+            continue
+        if char == '"' and brace_depth == 0 and not _is_escaped(text, index):
+            in_quotes = not in_quotes
+            continue
+        if in_quotes:
+            continue
+        if char == "{":
+            brace_depth += 1
+        elif char == "}" and brace_depth:
+            brace_depth -= 1
+        elif brace_depth == 0:
+            if char == "(":
+                paren_depth += 1
+            elif char == ")" and paren_depth:
+                paren_depth -= 1
+            elif char == separator and paren_depth == 0:
+                parts.append(text[start:index])
+                start = index + 1
+    parts.append(text[start:])
     return parts
 
 
-def _unquote_value(value: str) -> str:
-    """Remove quotes from field value."""
-    value = value.strip()
-
-    # Remove outer braces
-    if value.startswith("{") and value.endswith("}"):
-        return value[1:-1]
-
-    # Remove outer quotes
-    if (value.startswith('"') and value.endswith('"')) or (
-        value.startswith("'") and value.endswith("'")
-    ):
-        return value[1:-1]
-
-    return value
+def _split_once_top_level(text: str, separator: str) -> tuple[str, str | None]:
+    """Split *text* at its first top-level separator, if it has one."""
+    parts = _split_top_level(text, separator)
+    if len(parts) == 1:
+        return parts[0], None
+    return parts[0], separator.join(parts[1:])
 
 
-def _parse_string_def(line: str) -> tuple[Optional[str], Optional[str]]:
-    """Parse @string definition."""
-    # Match @string{key = value}
-    match = re.match(r"@string\s*\{\s*(\w+)\s*=\s*(.+)\s*\}", line, re.IGNORECASE | re.DOTALL)
-    if not match:
-        return None, None
-
-    key = match.group(1)
-    value_str = match.group(2).strip()
-    value = _unquote_value(value_str)
-
-    return key, value
-
-
-def _extract_preamble(
-    line: str, line_idx: int, line_ending: str, lines: list[str]
-) -> Optional[str]:
-    """Extract @preamble content."""
-    match = re.match(r"@preamble\s*{\s*", line, re.IGNORECASE)
-    if not match:
-        return None
-
-    content = _extract_balanced_value(line, match.end() - 1, line_idx, line_ending, lines)
-    return f"@preamble{{{content}}}" if content is not None else None
+def _strip_tex_comments(text: str) -> str:
+    """Remove unescaped TeX comments while retaining line boundaries."""
+    output: list[str] = []
+    in_comment = False
+    for index, char in enumerate(text):
+        if in_comment:
+            if char in "\r\n":
+                in_comment = False
+                output.append(char)
+            continue
+        if char == "%" and not _is_escaped(text, index):
+            in_comment = True
+            continue
+        output.append(char)
+    return "".join(output)
 
 
-def _extract_balanced_value(
-    line: str, start_pos: int, line_idx: int, line_ending: str, lines: list[str]
-) -> Optional[str]:
-    """Extract content within balanced braces from starting position."""
-    content = ""
-    brace_count = 0
-    i = start_pos
-    current_line = line
+def _is_escaped(text: str, index: int) -> bool:
+    """Whether the character at *index* has an odd number of backslashes."""
+    backslashes = 0
+    index -= 1
+    while index >= 0 and text[index] == "\\":
+        backslashes += 1
+        index -= 1
+    return bool(backslashes % 2)
 
-    while i < len(current_line):
-        char = current_line[i]
-        if char == "{":
-            if brace_count > 0:
-                content += char
-            brace_count += 1
-        elif char == "}":
-            brace_count -= 1
-            if brace_count == 0:
-                return content
-            content += char
-        else:
-            content += char
-        i += 1
 
-    # Continue to next lines
-    line_idx += 1
-    while line_idx < len(lines) and brace_count > 0:
-        current_line = lines[line_idx]
-        for char in current_line:
-            if char == "{":
-                if brace_count > 0:
-                    content += char
-                brace_count += 1
-            elif char == "}":
-                brace_count -= 1
-                if brace_count == 0:
-                    return content
-                content += char
-            else:
-                content += char
-        content += line_ending
-        line_idx += 1
+def _line_end(text: str, start: int) -> int:
+    """Return the position just after the current physical line."""
+    newline = text.find("\n", start)
+    if newline != -1:
+        return newline + 1
+    carriage_return = text.find("\r", start)
+    return carriage_return + 1 if carriage_return != -1 else len(text)
 
-    return content if brace_count == 0 else None
+
+def _line_number(text: str, position: int) -> int:
+    """Return the one-based line number at *position* for any line ending."""
+    return len(text[:position].splitlines()) + 1

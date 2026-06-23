@@ -21,15 +21,15 @@ from typing import Optional, Union
 
 from pynakes.model import BibEntry
 
-# Entry header: ``@type{ key ,`` — groups the part before the key, the key, and
+# Entry header: ``@type{ key ,`` / ``@type( key ,`` — groups the part before the key, the key, and
 # the trailing comma so the key can be swapped without touching anything else.
 # The key group is ``*`` (not ``+``) so an empty key (``@article{,``) can be
 # filled in by ``keys generate``.
-_HEADER_RE = re.compile(r"(@\w+\s*\{\s*)([^,\s]*)(\s*,)")
+_HEADER_RE = re.compile(r"(@[A-Za-z][A-Za-z0-9_:-]*\s*[{(]\s*)([^,\s]*)(\s*,)")
 
 # The leading ``@type`` token, so the entry type can be swapped without touching
 # the key, braces, or anything else.
-_TYPE_RE = re.compile(r"(@)(\w+)")
+_TYPE_RE = re.compile(r"(@)([A-Za-z][A-Za-z0-9_:-]*)")
 _FIELD_NAME_RE = re.compile(r"([A-Za-z][A-Za-z0-9_:-]*)\s*=")
 
 
@@ -40,7 +40,7 @@ def _scan_value_end(raw: str, pos: int) -> int:
     """Return the index just past the field value starting at ``pos``.
 
     Handles brace-delimited values (with nesting), quoted values, and bare
-    words/numbers (terminated by a comma, closing brace, or line ending).
+    words/numbers (terminated by a comma, closing delimiter, or line ending).
     """
     if pos >= len(raw):
         return pos
@@ -65,7 +65,7 @@ def _scan_value_end(raw: str, pos: int) -> int:
             i += 1
         return len(raw)
     i = pos
-    while i < len(raw) and raw[i] not in ",}\r\n":
+    while i < len(raw) and raw[i] not in ",})\r\n":
         i += 1
     return i
 
@@ -81,11 +81,12 @@ def _find_field(raw: str, field_name: str) -> Optional[tuple[int, int, int]]:
     """
     for m in re.finditer(re.escape(field_name) + r"\s*=\s*", raw, re.IGNORECASE):
         # Reject matches inside a value: the name must be preceded only by
-        # whitespace back to a "{" or "," (i.e. it starts a field assignment).
+        # whitespace back to an opening delimiter or "," (i.e. it starts a
+        # field assignment).
         k = m.start() - 1
         while k >= 0 and raw[k] in " \t\r\n":
             k -= 1
-        if k < 0 or raw[k] in "{,":
+        if k < 0 or raw[k] in "{(,":
             return m.start(), m.end(), _scan_value_end(raw, m.end())
     return None
 
@@ -97,7 +98,7 @@ def _raw_field_name_spans(raw: str) -> list[tuple[int, int]]:
     value. This small scanner stays at the entry body's top level, so it is
     safe to use for cosmetic field-name edits and lint findings.
     """
-    header = re.match(r"@\w+\s*\{\s*[^,]*,", raw, re.IGNORECASE | re.DOTALL)
+    header = re.match(r"@[A-Za-z][A-Za-z0-9_:-]*\s*[{(]\s*[^,]*,", raw, re.IGNORECASE | re.DOTALL)
     if not header:
         return []
 
@@ -120,7 +121,7 @@ def _raw_field_name_spans(raw: str) -> list[tuple[int, int]]:
             depth += 1
             i += 1
             continue
-        if char == "}":
+        if char in "})":
             if depth == 0:
                 break
             depth -= 1
@@ -169,13 +170,21 @@ def set_raw_field(raw: str, field_name: str, new_value: str) -> str:
         return raw[:value_start] + "{" + new_value + "}" + raw[value_end:]
 
     line_ending = "\r\n" if "\r\n" in raw else "\n"
-    close = raw.rfind("}")
-    if close == -1:
+    close = _outer_close_position(raw)
+    if close is None:
         return raw
     body = raw[:close].rstrip()
     if not body.endswith(","):
         body += ","
     return f"{body}{line_ending}  {field_name} = {{{new_value}}}{line_ending}{raw[close:]}"
+
+
+def _outer_close_position(raw: str) -> int | None:
+    """Locate an entry's final ``}`` or ``)`` without inspecting field values."""
+    close = len(raw) - 1
+    while close >= 0 and raw[close].isspace():
+        close -= 1
+    return close if close >= 0 and raw[close] in "})" else None
 
 
 def remove_raw_field(raw: str, field_name: str) -> str:

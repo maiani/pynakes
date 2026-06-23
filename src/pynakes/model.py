@@ -7,7 +7,25 @@ from typing import Optional, Union
 
 # A bare BibTeX string reference: an identifier with no surrounding braces or
 # quotes that may resolve to a @string definition.
-_BARE_IDENTIFIER = re.compile(r"^[A-Za-z_]\w*$")
+_BARE_IDENTIFIER = re.compile(r"^[A-Za-z][A-Za-z0-9_:-]*$")
+
+# BibTeX 0.99d predefines these identifiers. They participate in value
+# interpolation but are not added to ``BibFile.strings`` because they were not
+# declarations in the source file.
+COMMON_STRINGS = {
+    "jan": "January",
+    "feb": "February",
+    "mar": "March",
+    "apr": "April",
+    "may": "May",
+    "jun": "June",
+    "jul": "July",
+    "aug": "August",
+    "sep": "September",
+    "oct": "October",
+    "nov": "November",
+    "dec": "December",
+}
 
 
 def resolve_field_value(value: str, strings: dict[str, str]) -> str:
@@ -22,29 +40,111 @@ def resolve_field_value(value: str, strings: dict[str, str]) -> str:
     - ``#`` concatenation: ``NMI # " Supplement"`` → ``Nature Mach. Intell. Supplement``
     - Everything else: returned unchanged.
     """
-    if not strings:
-        return value
-    if "#" in value:
-        parts = [p.strip() for p in value.split("#")]
-        resolved = []
-        for part in parts:
-            if part in strings:
-                resolved.append(strings[part])
-            elif (part.startswith("{") and part.endswith("}")) or (
-                part.startswith('"') and part.endswith('"')
-            ):
-                resolved.append(part[1:-1])
-            else:
-                resolved.append(part)
-        return "".join(resolved)
-    if _BARE_IDENTIFIER.match(value):
-        return strings.get(value, value)
-    return value
+    lookup = _string_lookup(strings)
+    return _resolve_value(value, lookup, set())
+
+
+def resolve_string_definitions(strings: dict[str, str]) -> dict[str, str]:
+    """Resolve interpolation within a mapping of raw ``@string`` expressions.
+
+    The result retains the source spelling of each definition key, while
+    looking keys up case-insensitively as BibTeX requires. Cyclic references
+    are left as their literal identifiers rather than causing recursion.
+    """
+    lookup = _string_lookup(strings)
+    return {
+        key: _resolve_value(definition, lookup, {key.lower()})
+        for key, definition in strings.items()
+    }
+
+
+def _string_lookup(strings: dict[str, str]) -> dict[str, tuple[str, str]]:
+    """Build BibTeX's case-insensitive string namespace.
+
+    Source declarations intentionally override the standard month macros, the
+    same way they do in BibTeX itself.
+    """
+    lookup = {key: (key, value) for key, value in COMMON_STRINGS.items()}
+    lookup.update({key.lower(): (key, definition) for key, definition in strings.items()})
+    return lookup
+
+
+def _resolve_value(
+    value: str,
+    lookup: dict[str, tuple[str, str]],
+    resolving: set[str],
+) -> str:
+    """Resolve one BibTeX value expression without changing source text."""
+    parts = _split_concatenation(value)
+    if len(parts) > 1:
+        return "".join(_resolve_atom(part, lookup, resolving) for part in parts)
+    return _resolve_atom(value, lookup, resolving)
+
+
+def _resolve_atom(
+    value: str,
+    lookup: dict[str, tuple[str, str]],
+    resolving: set[str],
+) -> str:
+    atom = value.strip()
+    unwrapped = _unwrap_delimited(atom)
+    if unwrapped is not None:
+        return unwrapped
+
+    if not _BARE_IDENTIFIER.fullmatch(atom):
+        return atom
+    definition = lookup.get(atom.lower())
+    if definition is None or atom.lower() in resolving:
+        return atom
+    key, expression = definition
+    return _resolve_value(expression, lookup, {*resolving, key.lower()})
+
+
+def _split_concatenation(value: str) -> list[str]:
+    """Split a BibTeX value on top-level ``#`` operators."""
+    parts: list[str] = []
+    start = 0
+    depth = 0
+    in_quotes = False
+
+    for index, char in enumerate(value):
+        if char == '"' and (index == 0 or value[index - 1] != "\\"):
+            in_quotes = not in_quotes
+        elif not in_quotes:
+            if char == "{":
+                depth += 1
+            elif char == "}" and depth:
+                depth -= 1
+            elif char == "#" and depth == 0:
+                parts.append(value[start:index].strip())
+                start = index + 1
+    parts.append(value[start:].strip())
+    return parts
+
+
+def _unwrap_delimited(value: str) -> str | None:
+    """Return the content of one complete braced or quoted value, if present."""
+    if len(value) < 2:
+        return None
+    if value[0] == '"' and value[-1] == '"':
+        return value[1:-1]
+    if value[0] != "{" or value[-1] != "}":
+        return None
+
+    depth = 0
+    for index, char in enumerate(value):
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return value[1:-1] if index == len(value) - 1 else None
+    return None
 
 
 def is_string_ref(value: str, strings: dict[str, str]) -> bool:
     """Return True if *value* is a bare @string reference (not a literal)."""
-    return bool(_BARE_IDENTIFIER.match(value)) and value in strings
+    return bool(_BARE_IDENTIFIER.fullmatch(value)) and value.lower() in _string_lookup(strings)
 
 
 @dataclass
@@ -240,6 +340,7 @@ class BibFile:
 
     entries: EntryStore = field(default_factory=EntryStore)
     strings: dict[str, str] = field(default_factory=dict)
+    raw_strings: list[str] = field(default_factory=list)
     preamble: list[str] = field(default_factory=list)
     raw_comments: list[str] = field(default_factory=list)
     # ``jabref_metadata``/``jabref_metadata_blocks`` hold the JabRef namespace
@@ -276,11 +377,37 @@ class BibFile:
             key=lambda block: block.comment_index,
         )
 
+    def resolved_fields(self, entry: BibEntry | str) -> dict[str, str]:
+        """Return *entry*'s fields with ``crossref`` inheritance applied.
+
+        Inherited values are a read-only semantic view: they are never copied
+        into ``BibEntry.fields`` and therefore never written into a child
+        record. A child's own field takes precedence. Missing parents and
+        cyclic cross-reference chains are tolerated.
+        """
+        target = self.entries.get(entry) if isinstance(entry, str) else entry
+        if target is None:
+            return {}
+        return self._resolved_fields(target, set())
+
+    def _resolved_fields(self, entry: BibEntry, seen: set[int]) -> dict[str, str]:
+        identity = id(entry)
+        if identity in seen:
+            return {}
+
+        inherited: dict[str, str] = {}
+        parent_key = entry.fields.get("crossref", "").strip()
+        parent = self.entries.get(parent_key) if parent_key else None
+        if parent is not None:
+            inherited = self._resolved_fields(parent, {*seen, identity})
+        return {**inherited, **entry.fields}
+
     def to_dict(self) -> dict:
         """Serialize the bib file to a JSON-friendly dict."""
         return {
             "entries": self.entries.to_dict(),
             "strings": dict(self.strings),
+            "raw_strings": list(self.raw_strings),
             "preamble": list(self.preamble),
             "raw_comments": list(self.raw_comments),
             "jabref_metadata": dict(self.jabref_metadata),

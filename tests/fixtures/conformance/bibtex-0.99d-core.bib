@@ -1,0 +1,31 @@
+% Core syntax cases derived from the BibTeX 0.99d database grammar.
+@comment{pynakes conformance fixture: bibtex-0.99d-core;}
+@comment{A braced comment with {nested} braces.}
+
+@string(ORG = "Open" # "AI")
+@string{JOURNAL = "Journal of " # org}
+@string{ESCAPED = {Escaped \"quote\" and \% percent}}
+@string(MULTILINE = "First " #
+                    "second")
+
+@preamble("\\newcommand{\\fixture}[1]{#1}")
+@preamble{ "\\newcommand{\\fixturetwo}[1]{#1}" }
+
+@article(ParenEntry,
+  author = {Doe, Jane and Roe, Richard},
+  title = "A {quoted} title with a ) delimiter",
+  journal = JOURNAL,
+  month = jan,
+  year = 2025,
+  note = {Nested {braces}, a comma, and (parentheses)},
+  abstract = {A \"quoted\" string with a \# literal hash},
+  howpublished = MULTILINE # " tail"
+)
+
+@book{BracedEntry,
+  author = {Knuth, Donald E.},
+  title = {The {TeX}book},
+  publisher = {Addison-Wesley},
+  year = {1984},
+  edition = 1 # "st"
+}

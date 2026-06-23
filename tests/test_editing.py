@@ -20,6 +20,7 @@ from pynakes.editing import (
 from pynakes.model import BibEntry
 
 RAW = "@article{k,\n  title = {The {DNA} Helix},\n  year = {1953}\n}"
+PAREN_RAW = "@article(k,\n  title = {Original},\n  year = 2024\n)"
 
 
 class TestRawFieldEdits:
@@ -44,6 +45,11 @@ class TestRawFieldEdits:
         out = set_raw_field(raw, "year", "2021")
         assert "year = {2021}" in out
         assert "month = jan" in out
+
+    def test_set_field_preserves_parenthesized_entry_delimiter(self) -> None:
+        out = set_raw_field(PAREN_RAW, "doi", "10.1000/example")
+        assert "doi = {10.1000/example}" in out
+        assert out.rstrip().endswith(")")
 
     def test_set_field_without_close_brace_is_noop(self) -> None:
         assert set_raw_field("@article{k, year = {2020}", "doi", "x").startswith("@article")
@@ -95,6 +101,16 @@ class TestEntryLevelSync:
     def test_set_same_value_is_noop(self) -> None:
         entry = BibEntry(key="k", type="article", fields={"year": "2020"}, raw_content=RAW)
         assert set_entry_field(entry, "year", "2020") is False
+
+    def test_parenthesized_entry_stays_surgical(self) -> None:
+        entry = BibEntry(
+            key="k",
+            type="article",
+            fields={"title": "Original", "year": "2024"},
+            raw_content=PAREN_RAW,
+        )
+        assert set_entry_field(entry, "title", "Updated") is True
+        assert entry.raw_content == "@article(k,\n  title = {Updated},\n  year = 2024\n)"
 
     def test_remove_and_rename_return_false_when_absent(self) -> None:
         entry = BibEntry(key="k", type="article", fields={"year": "2020"}, raw_content=RAW)

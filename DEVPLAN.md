@@ -11,7 +11,8 @@ This document is the **road to 1.0**. Completed work is recorded in
 
 ## Current state (v0.3.0)
 
-The single-file engine is feature-rich and release-ready in all but name:
+The single-file engine is feature-rich, but it is **not release-ready** until
+the parser conformance gate below is complete:
 
 - **Parser/writer** with byte-for-byte round-trip fidelity; atomic,
   re-parse-validated writes with `.bak` backups; surgical minimal-diff editing.
@@ -34,6 +35,46 @@ The single-file engine is feature-rich and release-ready in all but name:
   `BibEntry`, `metadata` — documented in `docs/guides/api-stability.md` with a
   semver policy.
 - **Quality**: ~700 tests, coverage ≥90%, `ruff` clean, docs site builds.
+
+## 0.4 hard gate — BibTeX/BibLaTeX input conformance
+
+Do not describe pynakes as feature-complete or release-ready until every item
+in this gate is checked. Compatibility means that pynakes accepts and safely
+round-trips valid bibliography input; it does not mean it reimplements Biber's
+style engine or a user's custom data-model validation rules.
+
+- [x] Pin the reference inputs: **TeX Live 2025** — **BibTeX 0.99d**,
+      **BibLaTeX 3.20** (2024-03-21), and **Biber 2.20**. This pair is the
+      conformance baseline; fixtures and CI output must record it.
+- [x] Parse every standard top-level construct with every delimiter form the
+      BibTeX 0.99d grammar permits, plus nested values, quoted values, escaped
+      characters, multiline input, macros, and concatenation. The core corpus
+      is validated by BibTeX; `%` comments remain a separately tested permissive
+      extension because they are TeX syntax, not valid top-level BibTeX database
+      syntax.
+- [ ] Preserve arbitrary BibLaTeX entry types and custom data-model fields
+      without a closed schema; cover `@set`, `@xdata`, inheritance references,
+      and Unicode inputs.
+- [ ] Define and implement the BibLaTeX inheritance contract for every consumer
+      of semantic fields: `crossref`, `xref`, `xdata`, and sets must either
+      resolve with documented precedence or remain explicitly opaque. `lint`,
+      `normalize`, key generation, and other field readers must have tests that
+      prove they do not make incorrect assumptions about inherited data.
+- [ ] Preserve the complete top-level source sequence — comments, `@string`,
+      `@preamble`, and entries — so an unmodified whole file writes back
+      byte-for-byte. Preserve that ordering when an individual entry is edited.
+- [ ] Expand the initial versioned core corpus, which now vendors the full
+      upstream `xampl.bib` and `biblatex-examples.bib`, with real-world
+      regression files. Every fixture must parse and parse again after write.
+- [x] Validate the vendored upstream corpora in CI with the pinned TeX Live 2025
+      tools: BibTeX 0.99d for `xampl.bib` and Biber 2.20
+      `--tool --validate-datamodel` for `biblatex-examples.bib`.
+- [ ] Add differential and property-based tests against the pinned reference
+      tools: valid generated inputs accepted by BibTeX/Biber must parse in
+      pynakes, and pynakes output must be accepted by the relevant tool.
+- [ ] Exercise every modifying operation, serializer fallback, and surgical edit
+      path on both `{...}` and `(...)` entries. Validate its output with the
+      relevant pinned tool, including files that retain top-level declarations.
 
 ## Guiding principles (non-negotiable)
 

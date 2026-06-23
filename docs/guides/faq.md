@@ -45,7 +45,9 @@ still planned.
 
 ### Q: How do I handle entry types that pynakes doesn't recognize?
 
-A: pynakes preserves unknown entry types and fields automatically. As long as the syntax is valid BibTeX, it will work.
+A: pynakes preserves unknown entry types and fields automatically. Full
+BibTeX/BibLaTeX input conformance is a hard gate for 0.4; the development plan
+records the pinned grammar and corpus requirements.
 
 ### Q: What if I have a very large bibliography?
 

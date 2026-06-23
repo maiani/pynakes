@@ -123,6 +123,40 @@ class TestBasicParsing:
         assert len(lib.entries) == 1
         assert len(lib.raw_comments) > 0
 
+    def test_parses_parenthesized_blocks_and_quoted_delimiters(self) -> None:
+        """BibTeX permits ``(...)`` blocks and delimiters inside quoted values."""
+        text = (
+            "@article(Paren2024,\n"
+            '  title = "A title with {braces} and a ) parenthesis",\n'
+            "  note = {A braced value with (parentheses)},\n"
+            "  year = 2024\n"
+            ")\n"
+        )
+
+        lib = parse_bib(text)
+
+        entry = lib.entries["Paren2024"]
+        assert entry.fields == {
+            "title": "A title with {braces} and a ) parenthesis",
+            "note": "A braced value with (parentheses)",
+            "year": "2024",
+        }
+        assert entry.raw_content == text.rstrip("\n")
+
+    def test_tex_comments_do_not_change_entry_structure(self) -> None:
+        text = (
+            "@article{Commented,\n"
+            "  title = {A title}, % trailing comment containing } )\n"
+            "  note = {100\\% complete},\n"
+            "  year = {2024}\n"
+            "}\n"
+        )
+
+        lib = parse_bib(text)
+
+        assert lib.entries["Commented"].fields["title"] == "A title"
+        assert lib.entries["Commented"].fields["note"] == r"100\% complete"
+
 
 class TestStringDefinitions:
     """Test parsing @string definitions."""
@@ -137,8 +171,8 @@ class TestStringDefinitions:
         assert lib.strings["IEEE"] == "IEEE Transactions"
         assert lib.strings["LNCS"] == "Lecture Notes in Computer Science"
 
-    def test_use_string_in_entry(self) -> None:
-        """Test that strings are parsed even if not used."""
+    def test_string_reference_is_resolved_for_field_consumers(self) -> None:
+        """A macro remains in raw text but exposes its semantic value."""
         text = """
         @string{IEEE = "IEEE Transactions"}
         @article{Smith2020,
@@ -150,7 +184,43 @@ class TestStringDefinitions:
         """
         lib = parse_bib(text)
         assert "IEEE" in lib.strings
-        assert lib.entries["Smith2020"].fields["journal"] == "IEEE"
+        assert lib.entries["Smith2020"].fields["journal"] == "IEEE Transactions"
+        assert "journal = IEEE," in lib.entries["Smith2020"].raw_content
+
+    def test_resolves_concatenation_and_nested_string_definitions(self) -> None:
+        text = (
+            '@string{PREFIX = "Nature"}\n'
+            '@string{JOURNAL = prefix # " Machine Intelligence"}\n'
+            "@article{Smith2020,\n"
+            '  title = "A " # {multi-line} # " title",\n'
+            "  journal = JOURNAL\n"
+            "}\n"
+        )
+
+        lib = parse_bib(text)
+
+        assert lib.strings["JOURNAL"] == "Nature Machine Intelligence"
+        assert lib.entries["Smith2020"].fields == {
+            "title": "A multi-line title",
+            "journal": "Nature Machine Intelligence",
+        }
+        assert 'title = "A " # {multi-line} # " title"' in lib.entries["Smith2020"].raw_content
+        assert '@string{JOURNAL = prefix # " Machine Intelligence"}' in write_bib(lib)
+
+    def test_parenthesized_string_definition_resolves_hyphenated_identifier(self) -> None:
+        text = '@string(venue-name = "Journal of Tests")\n@article{k, journal = venue-name}\n'
+
+        lib = parse_bib(text)
+
+        assert lib.strings["venue-name"] == "Journal of Tests"
+        assert lib.entries["k"].fields["journal"] == "Journal of Tests"
+        assert '@string(venue-name = "Journal of Tests")' in write_bib(lib)
+
+    def test_resolves_standard_bibtex_month_macros_without_serializing_them(self) -> None:
+        lib = parse_bib("@article{k, month = jan, year = 2024}\n")
+
+        assert lib.entries["k"].fields["month"] == "January"
+        assert "jan" not in lib.strings
 
 
 class TestPreamble:
@@ -169,6 +239,14 @@ class TestPreamble:
         """
         lib = parse_bib(text)
         assert len(lib.preamble) > 0
+
+    def test_parenthesized_preamble_is_preserved(self) -> None:
+        text = '@preamble("\\newcommand{\\noop}[1]{#1}")\n'
+
+        lib = parse_bib(text)
+
+        assert lib.preamble == ['@preamble("\\newcommand{\\noop}[1]{#1}")']
+        assert text.strip() in write_bib(lib)
 
 
 class TestJabRefCitationKeyMetadata:
@@ -201,6 +279,37 @@ class TestJabRefCitationKeyMetadata:
             "}\n"
         )
         assert write_bib(parse_bib(text)) == text
+
+    def test_parenthesized_metadata_comment_is_classified(self) -> None:
+        lib = parse_bib("@comment(jabref-meta: databaseType:biblatex;)\n")
+
+        assert lib.jabref_metadata["databaseType"] == "biblatex;"
+
+
+class TestBibLaTeXSyntax:
+    """Syntax accepted by BibLaTeX/Biber, including extensible data models."""
+
+    def test_preserves_biblatex_entry_types_and_custom_fields(self) -> None:
+        text = (
+            "@online{Dataset,\n"
+            "  author = {Example, Ada},\n"
+            "  title = {A dataset},\n"
+            "  date = {2024-02-29},\n"
+            "  eprinttype = {arxiv},\n"
+            "  custom:field = {extension data}\n"
+            "}\n"
+            "@set{DatasetSet,\n"
+            "  entryset = {Dataset},\n"
+            "  customfield = {kept}\n"
+            "}\n"
+        )
+
+        lib = parse_bib(text)
+
+        assert lib.entries["Dataset"].type == "online"
+        assert lib.entries["Dataset"].fields["custom:field"] == "extension data"
+        assert lib.entries["DatasetSet"].type == "set"
+        assert lib.entries["DatasetSet"].fields["entryset"] == "Dataset"
 
 
 class TestEncodingAndLineEndings:
