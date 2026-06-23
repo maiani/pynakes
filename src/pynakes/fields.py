@@ -128,6 +128,16 @@ def _protect_title_value(value: str, terms: set[str]) -> str:
     return "".join(out)
 
 
+def title_capitalization_is_protected(value: str, terms: list[str] | None = None) -> bool:
+    """Return whether ``value`` already meets pynakes' title-protection policy.
+
+    This is the non-mutating counterpart to :func:`protect_title_capitalization`.
+    Keeping the predicate next to the transformation ensures lint and normalize
+    cannot drift apart over which tokens need brace protection.
+    """
+    return _protect_title_value(value, set(terms or [])) == value
+
+
 def protect_title_capitalization(
     lib: BibFile,
     field: str = "title",

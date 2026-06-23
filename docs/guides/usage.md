@@ -41,13 +41,16 @@ pynakes lint refs.bib chapters/*.bib --strict   # multi-file CI gate
 
 Checks include duplicate citation keys, missing required fields by entry type,
 malformed DOI fields, missing article DOI warnings, malformed group fields, and
-mixed-case entry types or field names. Casing findings are warnings; run
-`normalize` to repair them surgically.
+mixed-case entry types or field names. It also verifies the lintable parts of a
+stored library profile: citation-key patterns, journal style, profile-required
+fields, and title brace protection. Casing and profile findings are warnings;
+run `normalize` to repair formatting issues surgically.
 
 `lint` (along with `keys check`, `files check`, `dedupe check`, and `verify`)
-accepts multiple files and supports `--strict`, which exits `1` when a finding
-is present so it can gate a build. See [Git Workflows](git-workflows.md) for
-pre-commit and CI recipes.
+accepts multiple files and supports `--strict`, which exits `1` for errors or
+profile deviations so it can gate a build. See [Library Profile](library-profile.md)
+for the complete schema and [Git Workflows](git-workflows.md) for pre-commit
+and CI recipes.
 
 ## groups
 

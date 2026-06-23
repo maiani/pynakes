@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from JabRef's `databaseType` metadata.
 
 ### Added
+- **Lintable library profiles.** `lint` now reads the merged `jabref-meta` /
+  `pynakes-meta` profile and warns for citation keys that do not match
+  `keypattern*`, mapped journal titles outside the configured journal style,
+  missing `lint-required-fields`, and title values requiring brace protection.
+  `lint --strict` now fails these stored-profile deviations while leaving other
+  advisory warnings non-blocking. The complete profile schema is documented in
+  `docs/guides/library-profile.md`.
 - **Completed JabRef v5.15 `saveActions` parity.** `normalize` now supports
   `units_to_latex` and reports each configured-but-unsupported formatter as a
   structured `unsupported_save_action_formatter` warning. Formatter pipelines

@@ -131,6 +131,29 @@ class TestInspectAndLint:
         assert data["errors"] >= 1
         assert any(i["type"] == "duplicate_key" for i in data["issues"])
 
+    def test_lint_strict_fails_metadata_profile_deviations(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{jabref-meta: keypatterndefault:[auth][year];}\n\n"
+            "@article{WrongKey,\n"
+            "  author = {Jane Smith},\n"
+            "  title = {A Study},\n"
+            "  journal = {Nature},\n"
+            "  year = {2024},\n"
+            "  doi = {10.1234/example}\n"
+            "}\n"
+        )
+
+        advisory = runner.invoke(app, ["lint", str(bib), "--json"])
+        assert advisory.exit_code == 0, advisory.output
+        assert any(
+            issue["type"] == "citation_key_pattern_mismatch"
+            for issue in json.loads(advisory.output)["issues"]
+        )
+
+        strict = runner.invoke(app, ["lint", str(bib), "--strict", "--json"])
+        assert strict.exit_code == 1, strict.output
+
 
 class TestFilesCommand:
     def test_check_json_reports_linked_files(self, tmp_path: Path) -> None:

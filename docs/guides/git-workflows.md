@@ -12,7 +12,7 @@ build. Pass `--strict` to turn a finding into a non-zero exit code:
 
 | Command | `--strict` fails when… |
 | --- | --- |
-| `pynakes lint --strict` | any **error** (duplicate/empty keys, missing required fields) — warnings stay advisory |
+| `pynakes lint --strict` | any **error** or stored-profile deviation; ordinary warnings stay advisory |
 | `pynakes keys check --strict` | any citation key is duplicated |
 | `pynakes files check --strict` | any linked file is missing or the wrong type |
 | `pynakes dedupe check --strict` | duplicate works (same DOI/arXiv/title) are present |
@@ -20,8 +20,9 @@ build. Pass `--strict` to turn a finding into a non-zero exit code:
 
 `verify --strict` is intentionally broader: its warnings flag integrity
 mismatches against authoritative DOI metadata, which you usually *do* want to
-block on. `lint` warnings (e.g. a missing DOI) are stylistic and never fail a
-build.
+block on. `lint` profile warnings are intentionally gated: they say the library
+no longer matches its declared preferences. Other warnings (e.g. a missing DOI)
+remain advisory. See [Library Profile](library-profile.md).
 
 ## Multiple files
 

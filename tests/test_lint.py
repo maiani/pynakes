@@ -117,3 +117,43 @@ def test_fixtures_lint_without_errors() -> None:
     lib = parse_bib((FIXTURES / "simple.bib").read_text())
     errors = [i for i in lint(lib) if i.severity == "error"]
     assert errors == []
+
+
+def test_lint_checks_the_stored_profile() -> None:
+    lib = parse_bib(
+        "@comment{jabref-meta: keypatterndefault:[auth][year];}\n"
+        "@comment{pynakes-meta: normalize-journal-style:abbreviated;}\n"
+        "@comment{pynakes-meta: lint-required-fields-article:url;}\n"
+        "@comment{pynakes-meta: protected-terms:OpenAI;}\n\n"
+        "@article{WrongKey,\n"
+        "  author = {Jane Smith},\n"
+        "  title = {OpenAI and DNA},\n"
+        "  journal = {Nature Machine Intelligence},\n"
+        "  year = {2024},\n"
+        "  doi = {10.1234/example}\n"
+        "}\n"
+    )
+
+    issues = lint(lib)
+    assert {
+        "citation_key_pattern_mismatch",
+        "journal_style_mismatch",
+        "missing_profile_required_field",
+        "title_capitalization_unprotected",
+    } <= _types(issues)
+    assert all(issue.severity == "warning" for issue in issues)
+
+
+def test_profile_can_disable_title_protection() -> None:
+    lib = parse_bib(
+        "@comment{pynakes-meta: normalize-protect-titles:false;}\n"
+        "@article{A,\n"
+        "  author = {Jane Smith},\n"
+        "  title = {DNA repair},\n"
+        "  journal = {Nature},\n"
+        "  year = {2024},\n"
+        "  doi = {10.1234/example}\n"
+        "}\n"
+    )
+
+    assert "title_capitalization_unprotected" not in _types(lint(lib))

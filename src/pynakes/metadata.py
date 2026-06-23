@@ -38,6 +38,9 @@ KNOWN_EXACT_KEYS = {
     # Linked LaTeX sources that cite this library; consulted by the citation-key
     # commands so .tex edits stay consistent without re-specifying the files.
     "tex-sources": "pynakes",
+    # Lint profile settings. ``lint-required-fields`` applies to every entry;
+    # the entry-type suffix form adds requirements for one type.
+    "lint-required-fields": "pynakes",
 }
 
 KNOWN_PREFIXES = {
@@ -48,6 +51,7 @@ KNOWN_PREFIXES = {
     # ``pynakes-`` spelling (which also covers the ``pynakes-normalize-`` alias).
     "normalize-": "pynakes",
     "pynakes-": "pynakes",
+    "lint-required-fields-": "pynakes",
 }
 
 # The two structurally identical metadata comment namespaces.

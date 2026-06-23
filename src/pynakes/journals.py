@@ -442,6 +442,27 @@ def _target_for_title(
     return None
 
 
+def expected_journal_title(
+    title: str,
+    entry: BibEntry,
+    style: str,
+    sources: JournalSources | None = None,
+) -> str | None:
+    """Return the configured canonical title, or ``None`` when it is unknown.
+
+    Unlike :func:`normalize_journals`, this function never mutates an entry.
+    A missing result is deliberately not a lint violation: without a mapping,
+    pynakes cannot reliably determine whether an unknown value is full or
+    abbreviated.
+    """
+    if style not in JOURNAL_STYLES:
+        raise ValueError(f"Unsupported journal style: {style!r}")
+    if style == "none":
+        return title
+    target = _target_for_title(title, entry, style, sources or builtin_sources())
+    return target[0] if target is not None else None
+
+
 def classify_journal(title: str, entry: BibEntry, sources: JournalSources) -> str:
     """Describe how ``title`` would resolve for abbreviation.
 

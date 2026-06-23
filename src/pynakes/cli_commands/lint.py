@@ -12,6 +12,7 @@ from pynakes.cli_common import (
     _safe,
 )
 from pynakes.io import load_bib
+from pynakes.lint import is_profile_issue
 from pynakes.lint import lint as lint_lib
 
 # --- lint ------------------------------------------------------------------
@@ -39,20 +40,23 @@ def _lint_one(file: str) -> CheckOutcome:
             for issue in issues
         ]
         human.append(f"{len(issues)} issue(s): {errors} error(s), {warnings} warning(s).")
-    # Only errors gate a --strict build; lint warnings (e.g. a missing DOI) are
-    # advisory. (verify --strict is broader because its warnings flag integrity
-    # mismatches against authoritative metadata.)
+    # Structural errors and declared-profile deviations gate a strict build.
+    # Other lint warnings (e.g. a missing DOI) remain advisory.
     return CheckOutcome(
         result=result,
         human=human,
-        failed=errors > 0,
+        failed=errors > 0 or any(is_profile_issue(issue) for issue in issues),
         summary={"issues": len(issues), "errors": errors, "warnings": warnings},
     )
 
 
 def lint(
     files: list[str] = typer.Argument(..., help="One or more .bib files"),
-    strict: bool = typer.Option(False, "--strict", help="Exit 1 if any errors are found"),
+    strict: bool = typer.Option(
+        False,
+        "--strict",
+        help="Exit 1 on errors or metadata-profile deviations",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Validate entries and report issues (accepts multiple files for CI gating)."""

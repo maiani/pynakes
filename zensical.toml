@@ -13,6 +13,7 @@ nav = [
     { "Quick Start" = "guides/quickstart.md" },
     { "Installation" = "guides/installation.md" },
     { "Usage" = "guides/usage.md" },
+    { "Library Profile" = "guides/library-profile.md" },
     { "LLM Integration" = "guides/llm-integration.md" },
     { "Git Workflows" = "guides/git-workflows.md" },
     { "Vision" = "vision.md" },

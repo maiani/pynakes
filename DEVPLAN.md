@@ -159,16 +159,16 @@ as defaults. Close the loop you asked for: make `lint` honor the same profile so
 stored preferences become a checkable contract, pairing with the `lint --strict`
 CI gate.
 
-- [ ] `lint` reads the merged metadata profile and flags deviations: journal not
+- [x] `lint` reads the merged metadata profile and flags deviations: journal not
       in the configured style, citation key not matching `keypattern*`, a field
       the profile marks required is missing, title not brace-protected per
       `protect-titles`.
-- [ ] Deviations are `warning`-severity by default; `lint --strict` makes them
+- [x] Deviations are `warning`-severity by default; `lint --strict` makes them
       fail, so a repo can gate "stays conformant to its own profile."
-- [ ] Document the full profile schema (every `pynakes-meta` key + the JabRef
+- [x] Document the full profile schema (every `pynakes-meta` key + the JabRef
       keys consulted) in one place in `docs/`.
 
-**Done when**: setting a profile and running `lint --strict` fails a
+**Milestone C complete.** Setting a profile and running `lint --strict` fails a
 non-conformant library, with a clear per-entry reason.
 
 ### Milestone D — Pin the public API (the 1.0 promise)
