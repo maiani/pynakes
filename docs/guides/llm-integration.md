@@ -22,11 +22,23 @@ structured JSON contract. It is written for a program (or an agent) that calls
 
 ## Capabilities introspection
 
-Discover the supported operations and exit-code semantics before acting:
+`pynakes capabilities --json` is self-describing: an agent can read it and
+construct valid calls without trial and error. Beyond the operation list and
+exit-code semantics, it includes:
 
 ```bash
 pynakes capabilities --json
 ```
+
+- `command_schemas` — a map keyed by full command path (e.g. `"groups add-entry"`,
+  `"split"`) to that command's `help`, positional `arguments`, and `options`.
+  Each parameter carries a stable `type` (`string`, `boolean`, `path`,
+  `list[string]`, …), its `flags` (for options), `required`, `default`, and
+  `help`. Derived from the live CLI, so it never drifts from the real surface.
+- `error_codes` — every `error` (exit 1) and `conflict` (exit 2) code the JSON
+  envelope can carry, with a one-line meaning, so you can branch on failures.
+- `predicate_grammar` — the operators and special predicates accepted by
+  `fields --where` and `split --to`.
 
 ## Command surface
 

@@ -39,6 +39,52 @@ class TestGetCapabilities:
         assert declared == registered
 
 
+class TestCommandSchemas:
+    def test_schemas_cover_full_command_surface(self) -> None:
+        # Schemas are derived from the live CLI, so the top-level command/group
+        # set they describe must equal the registered CLI surface.
+        schemas = get_capabilities()["command_schemas"]
+        top_level = {name.split(" ", 1)[0] for name in schemas}
+        registered = {cmd.name or cmd.callback.__name__ for cmd in app.registered_commands}
+        registered |= {group.name for group in app.registered_groups}
+        assert top_level == registered
+
+    def test_subcommands_are_expanded(self) -> None:
+        schemas = get_capabilities()["command_schemas"]
+        assert "groups add-entry" in schemas
+        assert "keys rename" in schemas
+        assert "metadata set" in schemas
+
+    def test_schema_shape_for_a_command(self) -> None:
+        split = get_capabilities()["command_schemas"]["split"]
+        assert split["help"]
+        # variadic positional input
+        inputs = next(a for a in split["arguments"] if a["name"] == "inputs")
+        assert inputs["type"] == "list[string]"
+        assert inputs["variadic"] is True
+        # the --to option carries its flag and type
+        to_opt = next(o for o in split["options"] if o["name"] == "to")
+        assert to_opt["flags"] == ["--to"]
+        assert to_opt["type"] == "list[string]"
+        # every option records its flags
+        assert all(o["flags"] for o in split["options"])
+
+
+class TestErrorCatalogAndGrammar:
+    def test_error_codes_grouped_by_status_and_exit(self) -> None:
+        codes = get_capabilities()["error_codes"]
+        assert codes["error"]["exit_code"] == 1
+        assert codes["conflict"]["exit_code"] == 2
+        assert "FileNotFound" in codes["error"]["codes"]
+        assert "DuplicateMergeKey" in codes["conflict"]["codes"]
+
+    def test_predicate_grammar_is_present(self) -> None:
+        grammar = get_capabilities()["predicate_grammar"]
+        assert "contains" in grammar["field_operators"]
+        assert "*" in grammar["split_predicates"]
+        assert grammar["examples"]
+
+
 class TestCapabilitiesCommand:
     def test_json_output_is_valid(self) -> None:
         result = runner.invoke(app, ["capabilities", "--json"])

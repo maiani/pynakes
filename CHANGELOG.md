@@ -45,6 +45,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from JabRef's `databaseType` metadata.
 
 ### Added
+- **Self-describing `capabilities`.** `capabilities --json` now includes
+  `command_schemas` — a per-command map (keyed by full path, e.g.
+  `"groups add-entry"`, `"split"`) of help, positional `arguments`, and
+  `options` with stable type names, flags, defaults, and help, derived live from
+  the CLI so it cannot drift — plus an `error_codes` catalog (every exit-1
+  `error` and exit-2 `conflict` code with its meaning) and a `predicate_grammar`
+  for `fields --where` / `split --to`. Agents can introspect the full tool and
+  build valid calls without trial and error.
 - **`merge` and `split` — whole-file set operations.** `merge` combines several
   `.bib` files into one (`--dedupe` collapses identical same-key entries and
   reports a conflict, exit `2`, when they differ). `split` combines one or more
