@@ -160,6 +160,32 @@ Export a cited-only `.bib` file:
 pynakes used refs.bib paper.tex --out cited-only.bib
 ```
 
+## Example 8b: Combine and Split Across Files
+
+Merge two libraries into one:
+
+```bash
+pynakes merge 1.bib 2.bib --out combined.bib --dedupe --dry-run --diff
+```
+
+Combine `1.bib` and `2.bib` and split the result into two outputs — here cited
+entries go to `3.bib` and the rest to `4.bib`:
+
+```bash
+pynakes split 1.bib 2.bib --tex paper.tex \
+  --to 3.bib='used' \
+  --to 4.bib='*'
+```
+
+Or partition by group instead (first match wins; `*` is the catch-all):
+
+```bash
+pynakes split 1.bib 2.bib \
+  --to ml.bib='group "Machine Learning"' \
+  --to archive.bib='group "Archive"' \
+  --to rest.bib='*'
+```
+
 ## Example 9: Batch Field Editing
 
 ```bash

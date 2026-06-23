@@ -45,6 +45,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from JabRef's `databaseType` metadata.
 
 ### Added
+- **`merge` and `split` — whole-file set operations.** `merge` combines several
+  `.bib` files into one (`--dedupe` collapses identical same-key entries and
+  reports a conflict, exit `2`, when they differ). `split` combines one or more
+  inputs in memory and routes their entries into several outputs, each chosen by
+  a `--to FILE='predicate'` rule — the predicate is a `--where` expression or one
+  of `*`, `used` / `unused` (against `--tex`/`--aux` sources), or `group "Name"`.
+  Routing is first-match by default (a partition); `--copy` sends an entry to
+  every matching output. Inputs are read-only; outputs are created with the usual
+  `--dry-run`/`--diff`/`--json` support. This generalizes `used --out` into the
+  "projections" primitive (`pynakes.setops`).
 - **Lintable library profiles.** `lint` now reads the merged `jabref-meta` /
   `pynakes-meta` profile and warns for citation keys that do not match
   `keypattern*`, mapped journal titles outside the configured journal style,

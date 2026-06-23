@@ -323,6 +323,48 @@ Export only cited entries:
 pynakes used refs.bib paper.tex --out cited-only.bib
 ```
 
+## merge
+
+Combine several `.bib` files into one. Inputs are read-only; the combined file is
+created (atomic write). Duplicate citation keys across inputs are kept and
+reported by default; `--dedupe` collapses entries that share a key when their
+content is identical and reports a **conflict** (exit `2`) when it differs,
+rather than guessing.
+
+```bash
+pynakes merge a.bib b.bib --out combined.bib
+pynakes merge a.bib b.bib --out combined.bib --dedupe --dry-run --diff
+```
+
+## split
+
+Combine one or more inputs (merged in memory) and route their entries into
+several output files, each selected by a predicate. This is `1.bib 2.bib → 3.bib
+4.bib` in one step.
+
+Each `--to FILE='predicate'` rule pairs an output file with a selector. The
+predicate is a [`--where`](#fields) expression, or one of `*` (catch-all),
+`used` / `unused` (against the citations found in `--tex`/`--aux` sources), or
+`group "Name"`.
+
+```bash
+# Partition by group (first match wins; `*` collects the rest)
+pynakes split refs.bib extra.bib \
+  --to ml.bib='group "Machine Learning"' \
+  --to rest.bib='*'
+
+# Partition into cited vs uncited against a manuscript
+pynakes split refs.bib --tex paper.tex \
+  --to used.bib='used' \
+  --to unused.bib='*' --dry-run --diff
+```
+
+Routing is **first match** by default — each entry lands in the first output
+whose predicate matches, so the outputs are a partition. Pass `--copy` to send an
+entry to *every* matching output instead (outputs may then overlap). Entries that
+match no rule are dropped and reported under `unrouted`. `--dedupe` applies to the
+in-memory merge, exactly as for `merge`.
+
 ## convert
 
 Convert between BibTeX and BibLaTeX field/type conventions.

@@ -7,7 +7,7 @@ via the surgical raw-text editing in :mod:`pynakes.editing`.
 """
 
 from pynakes.editing import append_delimited_field, remove_entry_field, set_entry_field
-from pynakes.model import BibFile
+from pynakes.model import BibEntry, BibFile
 
 _DELIM = ";"
 _JOIN = "; "
@@ -15,6 +15,11 @@ _JOIN = "; "
 
 def _parse_groups(value: str) -> list[str]:
     return [g.strip() for g in value.split(_DELIM) if g.strip()]
+
+
+def entry_groups(entry: BibEntry) -> list[str]:
+    """Return the group names a single entry belongs to (first-seen order)."""
+    return _parse_groups(entry.fields.get("groups", ""))
 
 
 def list_groups(lib: BibFile) -> list[str]:

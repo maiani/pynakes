@@ -70,6 +70,8 @@ def get_capabilities() -> dict:
             "normalize_dois",
             "import_doi",
             "detect_used_citations",
+            "merge_libraries",
+            "partition_library",
             "inspect_jabref_metadata",
             "update_jabref_metadata",
             "validate_linked_files",
@@ -91,6 +93,8 @@ def get_capabilities() -> dict:
             "journals": "Abbreviate, expand, and check journal titles",
             "doi": "Import references by DOI",
             "used": "Report/tag/export entries cited in LaTeX sources",
+            "merge": "Combine several .bib files into one (optionally deduping by key)",
+            "split": "Combine inputs and route entries into several outputs by predicate",
             "capabilities": "Show this capability description",
         },
     }

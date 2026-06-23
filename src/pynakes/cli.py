@@ -21,6 +21,7 @@ from pynakes.cli_commands import (
     lint,
     metadata,
     normalize,
+    setops,
     used,
 )
 
@@ -49,6 +50,7 @@ convert.register(app)
 journals.register(journals_app)
 capabilities.register(app)
 used.register(app)
+setops.register(app)
 
 app.add_typer(groups_app, name="groups")
 app.add_typer(keys_app, name="keys")

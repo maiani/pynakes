@@ -20,6 +20,7 @@ removing a name or changing its documented behavior is a breaking change.
 | Data and lifecycle | `pynakes.model`, `pynakes.io`, `pynakes.engine`, `pynakes.bibtex_parser`, `pynakes.bibtex_writer`, `pynakes.diff` |
 | Bibliography operations | `pynakes.authors`, `pynakes.convert`, `pynakes.doi`, `pynakes.fields`, `pynakes.groups`, `pynakes.journals`, `pynakes.keys`, `pynakes.normalize` |
 | Analysis and maintenance | `pynakes.dedupe`, `pynakes.files`, `pynakes.integrity`, `pynakes.lint`, `pynakes.metadata`, `pynakes.usage` |
+| Set operations (projections) | `pynakes.setops` |
 | Introspection | `pynakes.capabilities` and `pynakes.__version__` |
 
 The [API reference](../api/index.md) documents the data model, return objects,
@@ -31,6 +32,11 @@ All operation functions mutate a supplied `BibFile` in place unless their
 documentation explicitly says otherwise. They return a count, a report, or a
 specific result; they do not replace the supplied library. Field/key mutations
 continue to use the surgical editing path, preserving untouched entry text.
+
+The `pynakes.setops` projections are the documented exception: `merge_libraries`
+and `partition_library` read their inputs read-only and return **new**
+`BibFile` objects (a combined library and a label-to-library mapping,
+respectively) rather than mutating in place.
 
 ## Metadata names
 

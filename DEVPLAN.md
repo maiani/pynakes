@@ -229,8 +229,11 @@ application would build on.
   stable-identity machinery).
 - **`Catalogue` (index)** — a derived, rebuildable search index (e.g. SQLite
   FTS) over the Library; strictly derived, never a competing source of truth.
-- **Projections** — formalize subset export (today's `used --out`) as a
-  first-class "view of the Library".
+- **Projections** — stateless file-level projections have landed: `merge`
+  combines files and `split` partitions entries into outputs by predicate
+  (`pynakes.setops`), generalizing `used --out`. What remains for Beyond 1.0 is
+  formalizing them as first-class **views of the `Library`** (kept reconciled
+  with the corpus), once the `Library` exists.
 
 ## Out of scope (permanently, for pynakes)
 

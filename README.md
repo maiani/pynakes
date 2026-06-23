@@ -242,6 +242,7 @@ Additionally:
 - [x] Journal title abbreviation/expansion (`journals abbreviate|expand|check`) with exact, user, and LTWA-style sources
 - [x] Machine-readable capability introspection (`capabilities --json`) matching the agent contract
 - [x] AUX/TeX citation analysis, unused/missing reporting, group/keyword tagging, and subset export
+- [x] Whole-file set operations: `merge` (combine files) and `split` (partition entries into multiple outputs by predicate)
 - [x] Linked-file validation (`files check`) for JabRef `file` fields, with `.bib` directory, `--root`, and `fileDirectory*` resolution
 - [x] `Collection` engine API for staged edits, previews/diffs, atomic commits, reset/reload, and external modification detection
 - [x] Deduplication and conservative merge workflows (`dedupe check|merge`)

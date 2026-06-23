@@ -75,6 +75,19 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 - `pynakes published <file> --apply [--online]` — apply safe published-version metadata
 - `pynakes used <bib-file> <source>... [--out ...] [--group ...] [--keyword ...]`
 
+Projections — read inputs read-only, **create** new files (support `--dry-run`,
+`--diff`, `--json`):
+
+- `pynakes merge <file>... --out <file> [--dedupe]` — combine several `.bib`
+  files into one. `--dedupe` collapses identical same-key entries and reports a
+  conflict (exit `2`) when same-key entries differ.
+- `pynakes split <file>... --to <FILE>='<predicate>'... [--copy] [--tex ...]
+  [--aux ...] [--dedupe]` — combine inputs in memory and route entries into
+  several outputs. Each `--to` pairs an output file with a predicate: a
+  [`--where`](#the-where-filter) expression, or one of `*`, `used` / `unused`
+  (against `--tex`/`--aux`), or `group "Name"`. First match wins by default;
+  `--copy` routes an entry to every matching output.
+
 Planned (not implemented): `entries`.
 
 ## The `--where` filter
@@ -261,6 +274,51 @@ Read-only commands (`inspect`, `lint`, `groups list`, `keys check`,
 `metadata list`, `files check`, `journals check`, `capabilities`) return
 `status`, `action`, `file`, plus command-specific data (e.g. `issues`,
 `duplicate_keys`, `groups`, `metadata`).
+
+### Projection envelopes (`merge`, `split`)
+
+The projection commands read inputs read-only and create new files, so instead
+of the single-`file` / `modified` envelope they report `inputs` and the files
+they produce. `merge`:
+
+```json
+{
+  "status": "success",
+  "action": "merge",
+  "inputs": ["a.bib", "b.bib"],
+  "out": "combined.bib",
+  "dedupe": true,
+  "dry_run": false,
+  "written": true,
+  "entries": 42,
+  "warnings": [{"type": "duplicate_keys", "keys": ["Smith2020"]}],
+  "diff": "..."
+}
+```
+
+`split` reports one entry per output bucket and how many entries matched no rule:
+
+```json
+{
+  "status": "success",
+  "action": "split",
+  "inputs": ["1.bib", "2.bib"],
+  "dry_run": false,
+  "copy": false,
+  "outputs": [
+    {"file": "used.bib", "predicate": "used", "entries": 30, "written": true},
+    {"file": "rest.bib", "predicate": "*", "entries": 12, "written": true}
+  ],
+  "unrouted": 0,
+  "warnings": []
+}
+```
+
+Both still use exit `0`/`1`/`2`; `--dedupe` conflicts return the standard
+`{"status":"conflict","error":"DuplicateMergeKey","options":[...]}` at exit `2`.
+`--diff` adds a `diff` of each created file. `warnings` may carry
+`{"type":"duplicate_keys",...}` and (for `split`) `{"type":"unrouted_entries",
+"count":N}`.
 
 ## Best practices
 
