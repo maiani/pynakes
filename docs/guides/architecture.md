@@ -32,7 +32,7 @@ The model has three nested concepts: **entry** < **collection** < future
 | Entry | BibEntry | One bibliographic record plus the raw entry text needed to preserve its layout. |
 | Entry collection | EntryStore | Ordered, duplicate-key-tolerant container for a file's entries. Dict-like lookup returns the first match; explicit methods expose all duplicates. |
 | File model | BibFile | Semantic content of one parsed .bib file: entries, declarations, comments, structured JabRef metadata, encoding, and line-ending style. |
-| Metadata block | JabRefMetadataBlock | One top-level metadata comment — `@comment{jabref-meta: ...}` or pynakes' superset `@comment{pynakes-meta: ...}` (tagged by `namespace`) — represented both structurally and as raw text. |
+| Metadata block | MetadataBlock | One top-level metadata comment — `@comment{jabref-meta: ...}` or pynakes' superset `@comment{pynakes-meta: ...}` (tagged by `namespace`) — represented both structurally and as raw text. |
 | Collection (working unit) | Collection | A staged, reconciled handle over one `.bib` file — "a slice of references covering one aspect of a topic". Supports operations, preview, diff, commit, reset, reload, and external-change detection. |
 | Library (corpus) | — (planned) | A directory/repository of Collections — the lifelong corpus. Not implemented yet (see [Beyond 1.0](../../DEVPLAN.md) and the [Vision](../vision.md)). |
 | Catalogue (index) | — (planned) | A derived, rebuildable search index over the Library (e.g. SQLite FTS). Never a competing source of truth; the Collections are. Not implemented yet. |
@@ -243,7 +243,7 @@ class's behavior.
 | Dedupe | WorkIdentity, DuplicateCluster, MergeConflict, ClusterMerge, DedupeMergeReport | Evidence that records describe one work, conservative merge outcomes, and unresolved ambiguity. |
 | Integrity | IntegrityIssue, VerifyReport, FieldUpdate, EnrichReport, PublishedCandidate, PublishedReport | Remote-check findings and intentionally applied metadata changes. |
 | File/usage/lint | LinkedFile, FileCheckReport, UsageReport, LintIssue | Read-only analysis findings and summaries. |
-| Metadata/I/O | JabRefMetadataUpdate, SaveResult | A precise raw metadata replacement and a write outcome with backup/error context. |
+| Metadata/I/O | MetadataUpdate, SaveResult | A precise raw metadata replacement and a write outcome with backup/error context. |
 
 ## Errors, conflicts, and CLI contract
 
@@ -255,7 +255,7 @@ exception where callers need structured recovery:
 | Structurally malformed BibTeX | ParseError |
 | DOI import failure, duplicate DOI, explicit key conflict | DOIImportError, DuplicateDOIError, CitationKeyConflictError |
 | Unsupported JabRef key pattern | UnsupportedCitationKeyPatternError |
-| Duplicate/ambiguous JabRef metadata block | DuplicateJabRefMetadataError |
+| Duplicate/ambiguous metadata block | DuplicateMetadataError |
 | Ambiguous duplicate-work merge | DedupeConflictError with MergeConflict values |
 | Failed provider lookup or parse | MetadataFetchError |
 | Concurrent file modification during a collection commit | ExternalModificationError |

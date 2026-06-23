@@ -4,11 +4,8 @@ Python API for programmatic usage of `pynakes`.
 
 The command-line interface is the primary supported surface, but the operation
 modules are also usable directly. Most operations mutate a `BibFile` in place
-and return counts or operation-specific results.
-
-The Python API is the implementation boundary used by the CLI. Its object model
-and behavior are documented here; stable versioned API pinning remains planned,
-so consumers should avoid private names (those beginning with `_`).
+and return counts or operation-specific results. The supported Python API and
+semantic-versioning promise are defined in [Public API & stability](../guides/api-stability.md).
 
 ## Data Models
 
@@ -56,7 +53,7 @@ text, namespace, known/unknown classification, and category.
 | `BibEntry` | One record plus source-preservation state | `fields` accepts standard and custom fields alike; `raw_content` lets an untouched source entry be emitted verbatim. |
 | `EntryStore` | Lossless collection of a file's entries | Maintains source order and duplicate keys. `get()`/`[]` use first-match lookup; `values()`, `get_all()`, and `duplicate_keys()` are duplicate-aware. |
 | `BibFile` | Parsed semantic view of one `.bib` file | Holds entries, top-level declarations/comments, JabRef blocks, encoding, and line ending. |
-| `JabRefMetadataBlock` | One structured top-level `jabref-meta` comment | Keeps the raw comment alongside parsed key/value/category data. |
+| `MetadataBlock` | One structured top-level metadata comment | Keeps the raw comment alongside parsed key/value/category data. |
 | `Collection` | The working unit: a staged handle over one `.bib` file | Provides the lifecycle around a `BibFile`, not a second persistent source of truth. |
 
 ## Result and Analysis Objects
@@ -73,10 +70,10 @@ by the CLI.
 | Dedupe | `WorkIdentity`, `DuplicateCluster`, `MergeConflict`, `ClusterMerge`, `DedupeMergeReport` | Evidence records describe the same work, merge decisions, and ambiguity that blocks guessing. |
 | Integrity | `IntegrityIssue`, `VerifyReport`, `FieldUpdate`, `EnrichReport`, `PublishedCandidate`, `PublishedReport` | Provider-backed findings and the explicitly applied metadata changes. |
 | Files, usage, and lint | `LinkedFile`, `FileCheckReport`, `UsageReport`, `LintIssue` | Read-only analysis items and summaries. |
-| JabRef metadata | `JabRefMetadataUpdate` | The exact raw comment replacement/insertion needed for a minimal-diff update. |
+| Metadata | `MetadataUpdate` | The exact raw comment replacement/insertion needed for a minimal-diff update. |
 
 Domain exceptions communicate recoverable failure categories: `ParseError` for
-invalid BibTeX; DOI import errors; `DuplicateJabRefMetadataError`; a
+invalid BibTeX; DOI import errors; `DuplicateMetadataError`; a
 `DedupeConflictError` containing `MergeConflict` values; `MetadataFetchError`;
 and `ExternalModificationError` for a concurrent collection commit.
 
@@ -390,6 +387,7 @@ except DOIImportError as exc:
 
 ## Next Steps
 
+- [Public API & stability](../guides/api-stability.md)
 - [Usage Guide](../guides/usage.md)
 - [Examples](../examples/index.md)
 - [Architecture](../guides/architecture.md)

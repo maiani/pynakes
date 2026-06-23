@@ -90,7 +90,7 @@ def metadata_set(
     coll = Collection.open(file)
     try:
         update = coll.set_metadata(key, value, namespace=namespace, allow_unknown=allow_unknown)
-    except metadata_ops.DuplicateJabRefMetadataError as exc:
+    except metadata_ops.DuplicateMetadataError as exc:
         _emit_conflict(
             json_output,
             "DuplicateJabRefMetadata",

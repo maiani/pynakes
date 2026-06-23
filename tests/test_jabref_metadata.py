@@ -9,13 +9,15 @@ from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.cli import app
 from pynakes.metadata import (
-    DuplicateJabRefMetadataError,
+    DuplicateMetadataError,
+    MetadataUpdate,
     consolidate_metadata,
     library_save_actions,
     metadata_category,
     parse_save_actions,
     set_metadata,
 )
+from pynakes.model import MetadataBlock
 from pynakes.usage import subset_library
 
 runner = CliRunner()
@@ -157,6 +159,7 @@ def test_parse_both_namespaces_and_merge_precedence() -> None:
     lib = parse_bib(text)
 
     # Blocks are split by namespace.
+    assert isinstance(lib.jabref_metadata_blocks[0], MetadataBlock)
     assert [b.key for b in lib.jabref_metadata_blocks] == ["databaseType", "keypatterndefault"]
     assert [b.key for b in lib.pynakes_metadata_blocks] == [
         "keypatterndefault",
@@ -234,6 +237,7 @@ def test_set_metadata_appends_missing_known_block() -> None:
 
     update = set_metadata(lib, "keypatterndefault", "[auth][year]")
 
+    assert isinstance(update, MetadataUpdate)
     assert update.created is True
     assert lib.raw_comments == ["@comment{jabref-meta: keypatterndefault:[auth][year];}"]
     assert lib.jabref_metadata["keypatterndefault"] == "[auth][year];"
@@ -274,11 +278,11 @@ def test_set_metadata_refuses_duplicate_blocks() -> None:
 
     try:
         set_metadata(lib, "databaseType", "biblatex")
-    except DuplicateJabRefMetadataError as exc:
+    except DuplicateMetadataError as exc:
         assert exc.key == "databaseType"
         assert exc.count == 2
     else:
-        raise AssertionError("expected DuplicateJabRefMetadataError")
+        raise AssertionError("expected DuplicateMetadataError")
 
 
 def test_subset_preserves_structured_metadata_blocks() -> None:

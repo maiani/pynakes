@@ -6,14 +6,14 @@ JabRef stores library-level settings as top-level comments:
 
 The raw comments must be preserved for round-trip fidelity, but callers also
 need structured access for inspection and safe edits. This module keeps both:
-``JabRefMetadataBlock.raw`` is the exact comment text stored in the library,
+``MetadataBlock.raw`` is the exact comment text stored in the library,
 while ``key`` and ``value`` expose the parsed payload.
 """
 
 import re
 from dataclasses import dataclass, field
 
-from pynakes.model import BibFile, JabRefMetadataBlock
+from pynakes.model import BibFile, MetadataBlock
 
 KNOWN_EXACT_KEYS = {
     "databasetype": "library",
@@ -65,7 +65,7 @@ PYNAKES_PREFIX = "pynakes-meta:"
 JABREF_CATEGORIES = {"library", "save", "groups", "citation-key", "files", "selectors"}
 
 
-class DuplicateJabRefMetadataError(Exception):
+class DuplicateMetadataError(Exception):
     """Raised when a metadata update would be ambiguous."""
 
     def __init__(self, key: str, count: int):
@@ -75,7 +75,7 @@ class DuplicateJabRefMetadataError(Exception):
 
 
 @dataclass
-class JabRefMetadataUpdate:
+class MetadataUpdate:
     """One safe replacement or insertion of a top-level JabRef metadata block.
 
     ``old_raw`` and ``new_raw`` are retained so :class:`~pynakes.engine.Collection`
@@ -177,7 +177,7 @@ def parse_jabref_metadata_comment(
     *,
     raw: str | None = None,
     comment_index: int = -1,
-) -> JabRefMetadataBlock | None:
+) -> MetadataBlock | None:
     """Parse a top-level JabRef metadata comment.
 
     ``comment_text`` is the content inside ``@comment{...}``. ``raw`` should be
@@ -207,7 +207,7 @@ def parse_jabref_metadata_comment(
     key = key.strip()
     value = value.strip()
     category = metadata_category(key)
-    return JabRefMetadataBlock(
+    return MetadataBlock(
         key=key,
         value=value,
         raw=raw if raw is not None else f"@comment{{{comment_text}}}",
@@ -218,7 +218,7 @@ def parse_jabref_metadata_comment(
     )
 
 
-def metadata_blocks_to_dict(blocks: list[JabRefMetadataBlock]) -> dict[str, str]:
+def metadata_blocks_to_dict(blocks: list[MetadataBlock]) -> dict[str, str]:
     """Return the backward-compatible flat metadata dict.
 
     Later blocks win, matching the historical parser behavior.
@@ -301,7 +301,7 @@ def set_metadata(
     *,
     namespace: str | None = None,
     allow_unknown: bool = False,
-) -> JabRefMetadataUpdate:
+) -> MetadataUpdate:
     """Set one metadata value, updating raw comments in place.
 
     ``namespace`` selects the target comment: ``"jabref"`` or ``"pynakes"``.
@@ -332,7 +332,7 @@ def set_metadata(
 
     matches = [b for b in blocks if b.key.lower() == key.lower()]
     if len(matches) > 1:
-        raise DuplicateJabRefMetadataError(key, len(matches))
+        raise DuplicateMetadataError(key, len(matches))
 
     new_raw = format_metadata_comment(key, value, namespace)
     new_block = parse_jabref_metadata_comment(
@@ -354,7 +354,7 @@ def set_metadata(
         lib.raw_comments.append(new_raw)
         blocks.append(new_block)
         _refresh()
-        return JabRefMetadataUpdate(
+        return MetadataUpdate(
             key=key,
             value=new_block.value,
             old_raw=None,
@@ -369,7 +369,7 @@ def set_metadata(
         lib.raw_comments[old.comment_index] = new_raw
     blocks[blocks.index(old)] = new_block
     _refresh()
-    return JabRefMetadataUpdate(
+    return MetadataUpdate(
         key=key,
         value=new_block.value,
         old_raw=old.raw,

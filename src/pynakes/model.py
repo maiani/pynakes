@@ -6,7 +6,7 @@ from typing import Optional, Union
 
 
 @dataclass
-class JabRefMetadataBlock:
+class MetadataBlock:
     """Structured representation of one metadata comment block.
 
     pynakes recognizes two structurally identical comment namespaces:
@@ -205,9 +205,9 @@ class BibFile:
     # hold pynakes' superset namespace. Use the ``metadata`` property for the
     # effective merged view that consumers read.
     jabref_metadata: dict[str, str] = field(default_factory=dict)
-    jabref_metadata_blocks: list[JabRefMetadataBlock] = field(default_factory=list)
+    jabref_metadata_blocks: list[MetadataBlock] = field(default_factory=list)
     pynakes_metadata: dict[str, str] = field(default_factory=dict)
-    pynakes_metadata_blocks: list[JabRefMetadataBlock] = field(default_factory=list)
+    pynakes_metadata_blocks: list[MetadataBlock] = field(default_factory=list)
     encoding: str = "utf-8"
     line_ending: str = "\n"
 
@@ -227,7 +227,7 @@ class BibFile:
         return {**self.jabref_metadata, **self.pynakes_metadata}
 
     @property
-    def metadata_blocks(self) -> list[JabRefMetadataBlock]:
+    def metadata_blocks(self) -> list[MetadataBlock]:
         """All metadata blocks, both namespaces, in source order."""
         return sorted(
             [*self.jabref_metadata_blocks, *self.pynakes_metadata_blocks],

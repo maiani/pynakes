@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Public API baseline for 1.0.** The supported Python modules, private-name
+  rule, metadata type names, and post-1.0 semantic-versioning policy are now
+  authoritative in `docs/guides/api-stability.md`. Metadata types were renamed
+  before the API freeze to `MetadataBlock`, `MetadataUpdate`, and
+  `DuplicateMetadataError`; the previous JabRef-prefixed names are not public.
+- **Development version bumped to 0.3.0** for the pre-1.0 API-stabilization
+  baseline.
 - **`convert` now requires an explicit target.** Pass `--to biblatex` or
   `--to bibtex`; the command no longer defaults to BibLaTeX or infers a target
   from JabRef's `databaseType` metadata.
@@ -209,7 +216,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`capabilities.VERSION` now derives from the installed package metadata**
   (`importlib.metadata.version("pynakes")`) instead of a hand-maintained literal,
   so it can never drift from `pyproject`. The `version` field in `capabilities`
-  output is now the full `pyproject` version (e.g. `0.1.0` rather than `0.1`).
+  output is now the full `pyproject` version (e.g. `0.3.0` rather than `0.3`).
 - **`metadata set` appends new blocks at the file end, not the top.** A newly
   created metadata comment now lands at JabRef's canonical bottom position
   (consistent with `normalize --metadata-formatting`), instead of being
@@ -383,7 +390,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-## [0.1.0] - (Planned)
+## [0.3.0] - (Planned)
 
 Initial release with core functionality:
 - BibTeX parser and writer with round-trip preservation

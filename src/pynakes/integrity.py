@@ -396,7 +396,7 @@ def fetch_arxiv_metadata(identifier: str, *, cache_dir: str | Path | None = None
 def fetch_arxiv_atom(identifier: str) -> str:
     """Fetch arXiv Atom XML. Split out for tests to stub without network."""
     url = f"https://export.arxiv.org/api/query?id_list={quote(identifier)}"
-    request = Request(url, headers={"User-Agent": "pynakes/0.1 integrity"})
+    request = Request(url, headers={"User-Agent": "pynakes/0.3.0 integrity"})
     try:
         with urlopen(request, timeout=15.0) as response:
             data = response.read()

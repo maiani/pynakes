@@ -66,7 +66,7 @@ def fetch_bibtex_for_doi(doi: str, timeout: float = 15.0) -> str:
         url,
         headers={
             "Accept": "application/x-bibtex",
-            "User-Agent": "pynakes/0.1 DOI import (mailto:unknown@example.invalid)",
+            "User-Agent": "pynakes/0.3.0 DOI import (mailto:unknown@example.invalid)",
         },
     )
     try:

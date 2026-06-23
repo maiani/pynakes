@@ -540,7 +540,7 @@ class Collection:
         *,
         namespace: str | None = None,
         allow_unknown: bool = False,
-    ) -> metadata_ops.JabRefMetadataUpdate:
+    ) -> metadata_ops.MetadataUpdate:
         """Set one metadata block in memory (jabref-meta or pynakes-meta)."""
         update = metadata_ops.set_metadata(
             self.lib, key, value, namespace=namespace, allow_unknown=allow_unknown

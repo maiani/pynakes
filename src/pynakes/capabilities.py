@@ -12,7 +12,7 @@ try:
     # the installed distribution metadata, so it can never drift from the package.
     VERSION = _package_version("pynakes")
 except PackageNotFoundError:  # running from a source tree without an install
-    VERSION = "0.1.0"
+    VERSION = "0.3.0"
 
 
 def get_capabilities() -> dict:

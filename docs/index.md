@@ -2,7 +2,7 @@
 
 Agent-friendly BibTeX, BibLaTeX, and JabRef-compatible bibliography maintenance.
 
-> **Status — v0.1 in development.** The core command-line workflow is usable:
+> **Status — v0.3 in development.** The core command-line workflow is usable:
 > inspect, lint, groups, citation keys, fields, DOI import, citation-usage
 > analysis, normalization, conversion, capabilities JSON, journal title
 > commands, JabRef metadata inspection/update, and linked-file validation.
@@ -63,6 +63,7 @@ pynakes normalize refs.bib
 - [Installation Guide](guides/installation.md)
 - [Quick Start](guides/quickstart.md)
 - [Usage Guide](guides/usage.md)
+- [Public API & Stability](guides/api-stability.md)
 - [API Reference](api/index.md)
 - [Examples](examples/index.md)
 - [Architecture](guides/architecture.md)

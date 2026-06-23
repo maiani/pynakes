@@ -175,19 +175,20 @@ non-conformant library, with a clear per-entry reason.
 
 1.0 is a stability commitment. Freeze the contract consumers build on.
 
-- [ ] Document and pin the public Python API (`Collection`, the operation
+- [x] Document and pin the public Python API (`Collection`, the operation
       modules, `model.BibFile`/`BibEntry`, `metadata`) as stable in `docs/`,
       alongside the already-stable CLI/JSON contract.
-- [ ] Mark private surface explicitly (leading `_`; document the `_`-rule).
-- [ ] Optional consistency pass: rename `JabRefMetadataBlock`/
-      `JabRefMetadataUpdate`/`DuplicateJabRefMetadataError` → `Metadata*`
-      (they now cover pynakes-meta too) **before** the API freezes, or
-      consciously keep the names. Decide now; renames after 1.0 are breaking.
-- [ ] State the semver policy: post-1.0, breaking the pinned API or the JSON
+- [x] Mark private surface explicitly (leading `_`; document the `_`-rule).
+- [x] Renamed `JabRefMetadataBlock`/`JabRefMetadataUpdate`/
+      `DuplicateJabRefMetadataError` → `MetadataBlock`/`MetadataUpdate`/
+      `DuplicateMetadataError` before the API freeze, because the structures
+      cover both metadata namespaces.
+- [x] State the semver policy: post-1.0, breaking the pinned API or the JSON
       envelope requires a major bump.
 
-**Done when**: `docs/` has an authoritative "public API & stability" page and
-the names are settled.
+**Milestone D complete.** `docs/` has an authoritative "public API & stability"
+page and the generic metadata names are settled. The pre-1.0 API baseline is
+version 0.3.0.
 
 ### Milestone E — 0.9 testing release → 1.0.0 launch
 

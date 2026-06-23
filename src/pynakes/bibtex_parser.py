@@ -5,7 +5,7 @@ import re
 from typing import Optional
 
 from pynakes.metadata import metadata_blocks_to_dict, parse_jabref_metadata_comment
-from pynakes.model import BibEntry, BibFile, EntryStore, JabRefMetadataBlock
+from pynakes.model import BibEntry, BibFile, EntryStore, MetadataBlock
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +56,8 @@ def parse_bib(text: str) -> BibFile:
     strings: dict[str, str] = {}
     preambles: list[str] = []
     raw_comments: list[str] = []
-    jabref_metadata_blocks: list[JabRefMetadataBlock] = []
-    pynakes_metadata_blocks: list[JabRefMetadataBlock] = []
+    jabref_metadata_blocks: list[MetadataBlock] = []
+    pynakes_metadata_blocks: list[MetadataBlock] = []
 
     lines = text.split(line_ending)
 
