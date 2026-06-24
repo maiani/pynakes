@@ -82,6 +82,10 @@ tests pass:
   independent of the CLI.
 - Try to limit file length preferably to ~400 lines, with a maximum limit of 600.
 - Add tests and a `CHANGELOG.md` entry with each behavioral change.
+- Use only generic, invented example data in code, tests, comments, docstrings,
+  and `CHANGELOG.md` — never names, titles, or entries traceable to real people
+  or real publications. When a bug report includes a real `.bib` entry,
+  reproduce/fix with it locally but commit only a generic equivalent.
 
 ## Don't
 

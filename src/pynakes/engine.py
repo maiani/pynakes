@@ -567,6 +567,7 @@ class Collection:
                 report.authors
                 or report.journals
                 or report.dois
+                or report.months
                 or sum(report.title_fields.values())
                 or report.entry_types
                 or report.field_names

@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **BibTeX string-reference linting**: `lint` reports error-level
+  `undefined_string_reference` findings for unquoted/unbraced identifiers that
+  are neither predefined month macros nor declared `@string` names.
+
 - **Targeted citation-key generation**: `pynakes keys generate --key OLD` now
   normalizes one entry to its configured preferred citation-key pattern without
   changing other entries.
@@ -44,6 +48,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for round-trip-safe writes. `BibFile.resolved_fields()` also provides a
   non-mutating, cycle-safe `crossref` inheritance view; `lint` uses it for
   required-field validation.
+
+### Fixed
+- **BibTeX month expressions during normalization**: `normalize` now
+  surgically rewrites invalid values such as `month = june` and canonicalizes
+  standard macro casing such as `month = Jan` → `month = jan`, while
+  preserving literal and declared custom-string values. Common abbreviation
+  variants are now recognized too: `month = Sept` (and `Sept.`) → `month = sep`.
+- **Citation keys from accented author names**: key generation now folds
+  accented Latin characters to ASCII (`Šmith` → `Smith`) instead of dropping
+  them, which previously dropped the accented letter (e.g. `mith…` instead of
+  `Smith…`) and produced spurious `citation_key_pattern_mismatch` lint warnings.
 
 ### Changed
 - **`pynakes add` now inserts imported entries before a canonical trailing

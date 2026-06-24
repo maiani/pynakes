@@ -147,6 +147,28 @@ def is_string_ref(value: str, strings: dict[str, str]) -> bool:
     return bool(_BARE_IDENTIFIER.fullmatch(value)) and value.lower() in _string_lookup(strings)
 
 
+def undefined_string_references(value: str, strings: dict[str, str]) -> list[str]:
+    """Return undefined bare identifiers used by one BibTeX value expression.
+
+    BibTeX treats every unquoted, unbraced identifier as a string reference.
+    This includes each atom in a ``#`` concatenation.  Numeric values and
+    delimited literals are not references.  The source spelling is returned so
+    callers can report a useful diagnostic while lookups remain
+    case-insensitive as required by BibTeX.
+    """
+    lookup = _string_lookup(strings)
+    undefined: list[str] = []
+    for part in _split_concatenation(value):
+        atom = part.strip()
+        if (
+            _unwrap_delimited(atom) is None
+            and _BARE_IDENTIFIER.fullmatch(atom)
+            and atom.lower() not in lookup
+        ):
+            undefined.append(atom)
+    return undefined
+
+
 @dataclass
 class MetadataBlock:
     """Structured representation of one metadata comment block.

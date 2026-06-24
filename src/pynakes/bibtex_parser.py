@@ -182,6 +182,24 @@ def _parse_string_def(body: str) -> tuple[Optional[str], Optional[str]]:
     return key, value.strip()
 
 
+def parse_raw_string_definition(raw: str) -> tuple[str, str] | None:
+    """Return the raw key and value expression from one ``@string`` block.
+
+    This is used by validation code that must distinguish a literal from an
+    unresolved string reference after parsing has produced its semantic view.
+    ``raw`` is expected to be one complete declaration as preserved in
+    :attr:`BibFile.raw_strings`.
+    """
+    header = _TOP_LEVEL_HEADER.match(raw)
+    if header is None or header.group("type").lower() != "string":
+        return None
+    trimmed = raw.rstrip()
+    if len(trimmed) <= header.end() or trimmed[-1] not in "})":
+        return None
+    key, value = _parse_string_def(trimmed[header.end() : -1])
+    return (key, value) if key is not None and value is not None else None
+
+
 def _record_comment(
     raw_comment: str,
     body: str,

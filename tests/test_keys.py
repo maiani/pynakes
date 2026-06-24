@@ -108,6 +108,18 @@ class TestGenerateKey:
         assert generate_key_from_pattern(e, "[camel2]") == "APractical"
         assert generate_key_from_pattern(e, "[entrytype]") == "Article"
 
+    def test_accented_author_names_fold_to_ascii(self) -> None:
+        e = _entry(
+            author="Šexample, Aa and Øfoo-Bär, Bb",
+            year="2020",
+            title="Generic Sample Title",
+        )
+        # The leading accented letter must fold to ASCII (Š → S), not be dropped.
+        assert generate_key_from_pattern(e, "[auth]_[year]_[veryshorttitle]") == (
+            "Sexample_2020_Generic"
+        )
+        assert generate_key_from_pattern(e, "[authors]") == "SexampleOfooBar"
+
     def test_modifier_variants(self) -> None:
         e = _entry(
             author="John Smith", year="2024", title="A Practical Study", journal="test journal"

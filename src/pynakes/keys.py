@@ -8,6 +8,7 @@ instead. Generation is deterministic — the same entry always yields the same k
 
 import re
 
+from pynakes.authors import ascii_fold as _ascii_fold
 from pynakes.authors import last_name as _last_name
 from pynakes.authors import split_name_list as _split_name_list
 from pynakes.editing import rename_entry_key
@@ -168,7 +169,7 @@ def _apply_modifiers(value: str, modifiers: list[str]) -> str:
 
 
 def _sanitize_key(value: str) -> str:
-    return re.sub(r"[^A-Za-z0-9_:+.-]", "", value)
+    return re.sub(r"[^A-Za-z0-9_:+.-]", "", _ascii_fold(value))
 
 
 def generate_key_from_pattern(entry: BibEntry, pattern: str) -> str:

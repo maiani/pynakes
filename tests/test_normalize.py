@@ -72,10 +72,60 @@ def test_normalize_library_runs_standard_pass() -> None:
         "authors": 1,
         "journals": 0,
         "dois": 1,
+        "months": 0,
         "save_action_fields": 0,
         "entry_types": 0,
         "field_names": 0,
     }
+
+
+def test_normalize_repairs_and_canonicalizes_bare_month_names_surgically() -> None:
+    lib = parse_bib(
+        "@article{A,\n  title = {Paper},\n  month = june,\n  note = {Keep this exact}\n}\n"
+        "@article{B, month = Jan}\n"
+    )
+
+    report = normalize_library(
+        lib,
+        NormalizeOptions(protect_titles=False, author_style="none", normalize_dois=False),
+    )
+
+    assert report.months == 2
+    assert lib.entries["A"].fields["month"] == "June"
+    assert lib.entries["A"].raw_content == (
+        "@article{A,\n  title = {Paper},\n  month = jun,\n  note = {Keep this exact}\n}"
+    )
+    assert lib.entries["B"].raw_content == "@article{B, month = jan}"
+
+
+def test_normalize_repairs_abbreviation_variants_like_sept() -> None:
+    lib = parse_bib(
+        "@article{A, month = Sept}\n@article{B, month = Sept.}\n@article{C, month = sept}\n"
+    )
+
+    assert normalize_library(lib).months == 3
+    assert lib.entries["A"].raw_content == "@article{A, month = sep}"
+    assert lib.entries["B"].raw_content == "@article{B, month = sep}"
+    assert lib.entries["C"].raw_content == "@article{C, month = sep}"
+
+
+def test_normalize_leaves_literal_and_declared_month_names_unchanged() -> None:
+    lib = parse_bib(
+        "@string{june = {Custom month}}\n"
+        "@article{Literal, month = {June}}\n"
+        "@article{Declared, month = june}\n"
+    )
+
+    assert normalize_library(lib).months == 0
+    assert "month = {June}" in lib.entries["Literal"].raw_content
+    assert "month = june" in lib.entries["Declared"].raw_content
+
+
+def test_normalize_uses_literal_if_standard_month_macro_is_overridden() -> None:
+    lib = parse_bib("@string{jun = {A custom value}}\n@article{A, month = june}\n")
+
+    assert normalize_library(lib).months == 1
+    assert "month = {June}" in lib.entries["A"].raw_content
 
 
 def test_normalize_lowercases_entry_types_and_field_names_surgically() -> None:

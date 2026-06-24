@@ -113,6 +113,7 @@ def normalize(
         "  "
         f"titles={sum(report.title_fields.values())}, "
         f"authors={report.authors}, journals={report.journals}, dois={report.dois}, "
+        f"months={report.months}, "
         f"entry_types={report.entry_types}, field_names={report.field_names}",
     ]
     if report.warnings:

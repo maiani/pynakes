@@ -141,6 +141,44 @@ def test_no_false_positives_on_clean_entry() -> None:
     assert lint(lib) == []
 
 
+def test_reports_undefined_string_references_in_entries_and_definitions() -> None:
+    lib = parse_bib(
+        "@string{venue = publisher # { Press}}\n"
+        "@article{A,\n"
+        "  author = {Jane Doe},\n"
+        "  title = {A Study},\n"
+        "  journal = venue # { Letters},\n"
+        "  year = {2024},\n"
+        "  month = jun #\n"
+        "    june,\n"
+        "  doi = {10.1234/abc}\n"
+        "}\n"
+    )
+
+    issues = [issue for issue in lint(lib) if issue.type == "undefined_string_reference"]
+
+    assert [(issue.key, issue.field) for issue in issues] == [(None, "venue"), ("A", "month")]
+    assert all(issue.severity == "error" for issue in issues)
+    assert "publisher" in issues[0].message
+    assert "june" in issues[1].message
+
+
+def test_accepts_defined_and_standard_bibtex_string_references() -> None:
+    lib = parse_bib(
+        "@string{venue = {Journal}}\n"
+        "@article{A,\n"
+        "  author = {Jane Doe},\n"
+        "  title = {A Study},\n"
+        "  journal = venue # { Letters},\n"
+        "  year = {2024},\n"
+        "  month = jun,\n"
+        "  doi = {10.1234/abc}\n"
+        "}\n"
+    )
+
+    assert "undefined_string_reference" not in _types(lint(lib))
+
+
 def test_reports_noncanonical_identifier_case_without_inspecting_values() -> None:
     lib = parse_bib(
         "@Article{A,\n  TITLE = {A field-like phrase: FIELD = value},\n  DOI = {10.1234/abc}\n}\n"

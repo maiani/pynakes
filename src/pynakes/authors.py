@@ -6,11 +6,55 @@ into individual people and extracting a person's last name; other modules
 """
 
 import re
+import unicodedata
 
 from pynakes.editing import set_entry_field
 from pynakes.model import BibFile
 
 NAME_FIELDS = ("author", "editor")
+
+# Latin letters that NFKD does not decompose into an ASCII base plus combining
+# marks. JabRef transliterates these (rather than dropping them) when reducing
+# a name to ASCII for citation keys and comparisons.
+_ASCII_FOLD_SPECIALS = {
+    "ø": "o",
+    "Ø": "O",
+    "đ": "d",
+    "Đ": "D",
+    "ð": "d",
+    "Ð": "D",
+    "ł": "l",
+    "Ł": "L",
+    "þ": "th",
+    "Þ": "Th",
+    "ß": "ss",
+    "æ": "ae",
+    "Æ": "Ae",
+    "œ": "oe",
+    "Œ": "Oe",
+    "ı": "i",
+    "İ": "I",
+}
+
+
+def ascii_fold(value: str) -> str:
+    """Transliterate accented Latin characters to ASCII, JabRef-style.
+
+    Citation keys are ASCII, so ``Šmith`` must fold to ``Smith`` rather
+    than have its accented letter dropped. NFKD splits most accented characters
+    into an ASCII base plus combining marks (which are removed); the few Latin
+    letters that do not decompose are mapped explicitly.
+    """
+    folded: list[str] = []
+    for char in value:
+        if char in _ASCII_FOLD_SPECIALS:
+            folded.append(_ASCII_FOLD_SPECIALS[char])
+            continue
+        decomposed = unicodedata.normalize("NFKD", char)
+        folded.append("".join(c for c in decomposed if not unicodedata.combining(c)))
+    return "".join(folded)
+
+
 AUTHOR_STYLES = {"jabref", "conservative", "bibtex", "biblatex", "none"}
 AUTHOR_STYLE_ALIASES = {
     "bibtex": "jabref",
@@ -73,9 +117,11 @@ def last_name(person: str) -> str:
     """Extract a person's last name, stripped to letters only.
 
     Handles ``{Corporate Name}`` (taken whole), ``Last, First`` (part before
-    the comma), and ``First Last`` (final token). Returns ``""`` if empty.
+    the comma), and ``First Last`` (final token). Accented Latin characters are
+    folded to ASCII (``Šmith`` → ``Smith``) rather than dropped. Returns
+    ``""`` if empty.
     """
-    person = person.strip()
+    person = ascii_fold(person.strip())
     if person.startswith("{") and person.endswith("}"):
         return re.sub(r"[^A-Za-z]", "", person[1:-1])
     if "," in person:

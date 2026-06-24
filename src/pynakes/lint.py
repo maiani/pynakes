@@ -2,16 +2,18 @@
 
 Reports issues as a flat list of :class:`LintIssue` objects, each tagged with a
 severity (``error`` or ``warning``), the offending entry key, and a message.
-Checks: duplicate keys, missing required fields (by entry type), malformed or
-missing DOIs, malformed JabRef ``groups`` formatting, noncanonical entry-type
-/ field-name casing, and deviations from the library's stored metadata profile.
+Checks: duplicate keys, missing required fields (by entry type), undefined
+BibTeX string references, malformed or missing DOIs, malformed JabRef
+``groups`` formatting, noncanonical entry-type / field-name casing, and
+deviations from the library's stored metadata profile.
 """
 
 import csv
 from dataclasses import dataclass
 from typing import Optional
 
-from pynakes.editing import raw_field_names
+from pynakes.bibtex_parser import parse_raw_string_definition
+from pynakes.editing import raw_field_names, raw_field_value
 from pynakes.fields import title_capitalization_is_protected
 from pynakes.importer import normalize_doi
 from pynakes.journals import JOURNAL_FIELDS, JournalSources, expected_journal_title, load_sources
@@ -20,7 +22,7 @@ from pynakes.keys import (
     generate_key_from_pattern,
     get_jabref_key_pattern,
 )
-from pynakes.model import BibEntry, BibFile
+from pynakes.model import BibEntry, BibFile, undefined_string_references
 
 # Required fields by entry type. Each requirement is a tuple of acceptable
 # field names (any one satisfies it), to tolerate BibTeX/BibLaTeX variants
@@ -201,10 +203,60 @@ def lint(lib: BibFile) -> list[LintIssue]:
             )
         )
 
+    issues.extend(_lint_undefined_string_definitions(lib))
+
     for entry in lib.entries.values():
+        issues.extend(_lint_undefined_string_references(entry, lib))
         issues.extend(_lint_entry(entry, lib.resolved_fields(entry)))
         issues.extend(_lint_profile_entry(entry, lib, profile, journal_sources))
 
+    return issues
+
+
+def _lint_undefined_string_definitions(lib: BibFile) -> list[LintIssue]:
+    """Report undefined references inside preserved ``@string`` declarations."""
+    issues: list[LintIssue] = []
+    for raw in lib.raw_strings:
+        definition = parse_raw_string_definition(raw)
+        if definition is None:
+            continue
+        name, value = definition
+        for reference in undefined_string_references(value, lib.strings):
+            issues.append(
+                LintIssue(
+                    "undefined_string_reference",
+                    "error",
+                    f"BibTeX @string {name!r} references undefined string name {reference!r}",
+                    field=name,
+                )
+            )
+    return issues
+
+
+def _lint_undefined_string_references(entry: BibEntry, lib: BibFile) -> list[LintIssue]:
+    """Report undefined string names in one entry's original field expressions."""
+    if entry.raw_content is None:
+        # In-memory entries have only semantic field values. The writer will
+        # brace-quote those values, so treating them as source expressions here
+        # would create false positives.
+        return []
+
+    issues: list[LintIssue] = []
+    for field in entry.fields:
+        value = raw_field_value(entry.raw_content, field)
+        if value is None:
+            continue
+        for reference in undefined_string_references(value, lib.strings):
+            issues.append(
+                LintIssue(
+                    "undefined_string_reference",
+                    "error",
+                    f"Entry {entry.key!r} field {field!r} references undefined BibTeX string "
+                    f"name {reference!r}",
+                    key=entry.key,
+                    field=field,
+                )
+            )
     return issues
 
 

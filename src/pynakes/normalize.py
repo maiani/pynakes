@@ -6,10 +6,16 @@ from pynakes import authors as author_ops
 from pynakes import fields as field_ops
 from pynakes import importer as importer_ops
 from pynakes import journals as journal_ops
-from pynakes.editing import normalize_entry_field_names, set_entry_field, set_entry_type
+from pynakes.editing import (
+    normalize_entry_field_names,
+    raw_field_value,
+    set_entry_field,
+    set_entry_field_expression,
+    set_entry_type,
+)
 from pynakes.formatters import FIELD_FORMATTERS
 from pynakes.metadata import library_save_actions
-from pynakes.model import BibFile
+from pynakes.model import COMMON_STRINGS, BibFile
 
 # JabRef saveActions formatter keys mapped to pynakes normalization concerns.
 _NAME_FIELDS = ("author", "editor")
@@ -18,6 +24,15 @@ _DOI_FORMATTERS = ("clean_up_doi", "short_doi")
 # Normalize settings live under the ``normalize-`` key prefix.
 METADATA_PREFIX = "normalize-"
 TITLE_FIELDS = ("title", "booktitle", "maintitle", "subtitle")
+# Recognized month spellings mapped to their canonical BibTeX macro. BibTeX
+# predefines only the three-letter macros ``jan``..``dec``; full names ("June")
+# and common abbreviation variants ("Sept") are noncanonical — and, unbraced,
+# undefined string references — that normalization rewrites to the macro. A
+# trailing period (``Sept.``) is stripped before lookup.
+_MONTH_NAME_MACROS = {macro: macro for macro in COMMON_STRINGS}
+_MONTH_NAME_MACROS.update({name.lower(): macro for macro, name in COMMON_STRINGS.items()})
+# Common abbreviation variants that are neither the macro nor the full name.
+_MONTH_NAME_MACROS["sept"] = "sep"
 
 
 @dataclass
@@ -54,6 +69,7 @@ class NormalizeResult:
     authors: int = 0
     journals: int = 0
     dois: int = 0
+    months: int = 0
     save_action_fields: int = 0
     entry_types: int = 0
     field_names: int = 0
@@ -66,6 +82,7 @@ class NormalizeResult:
             "authors": self.authors,
             "journals": self.journals,
             "dois": self.dois,
+            "months": self.months,
             "save_action_fields": self.save_action_fields,
             "entry_types": self.entry_types,
             "field_names": self.field_names,
@@ -176,6 +193,35 @@ def normalize_dois(lib: BibFile) -> tuple[int, list[dict[str, str]]]:
     return count, warnings
 
 
+def normalize_month_macros(lib: BibFile) -> int:
+    """Normalize bare month names and standard macros to canonical BibTeX.
+
+    BibTeX predefines ``jan`` through ``dec`` only; ``month = june`` is an
+    undefined string reference, while ``month = Jan`` is valid but
+    noncanonical because BibTeX macro names are case-insensitive. A declared
+    custom string named ``june`` or ``jan`` is already valid and is left alone.
+    If a file overrides a target standard macro (for example,
+    ``@string{jun = ...}``), use a braced literal instead of changing meaning.
+    """
+    declared = {name.lower() for name in lib.strings}
+    changed = 0
+    for entry in lib.entries.values():
+        if entry.raw_content is None:
+            continue
+        source_value = raw_field_value(entry.raw_content, "month")
+        if source_value is None:
+            continue
+        source_name = source_value.strip().lower().rstrip(".")
+        macro = _MONTH_NAME_MACROS.get(source_name)
+        if macro is None or source_name in declared:
+            continue
+        month_name = COMMON_STRINGS[macro]
+        expression = macro if macro not in declared else f"{{{month_name}}}"
+        if set_entry_field_expression(entry, "month", expression, month_name):
+            changed += 1
+    return changed
+
+
 def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> NormalizeResult:
     """Apply the standard daily-driver normalization routine in-place."""
     opts = options or NormalizeOptions()
@@ -230,6 +276,10 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
             lib, save_actions
         )
         result.warnings.extend(formatter_warnings)
+
+    # This syntax-specific pass repairs bare full month names and canonicalizes
+    # predefined macro spelling without changing literals or custom strings.
+    result.months = normalize_month_macros(lib)
 
     if _resolve_bool(lib, opts.identifier_case, "identifier-case", True):
         result.entry_types, result.field_names = normalize_identifier_case(lib)

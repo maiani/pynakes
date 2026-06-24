@@ -204,6 +204,32 @@ class TestInspectAndLint:
         assert data["errors"] >= 1
         assert any(i["type"] == "duplicate_key" for i in data["issues"])
 
+    def test_lint_json_reports_undefined_string_references(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{A,\n"
+            "  author = {Jane Doe},\n"
+            "  title = {A Study},\n"
+            "  journal = {Journal},\n"
+            "  year = {2024},\n"
+            "  month = june,\n"
+            "  doi = {10.1234/abc}\n"
+            "}\n"
+        )
+
+        result = runner.invoke(app, ["lint", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["errors"] == 1
+        assert data["issues"][-1] == {
+            "type": "undefined_string_reference",
+            "severity": "error",
+            "message": "Entry 'A' field 'month' references undefined BibTeX string name 'june'",
+            "key": "A",
+            "field": "month",
+        }
+
     def test_lint_strict_fails_metadata_profile_deviations(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text(
@@ -816,6 +842,16 @@ class TestNormalizeCommand:
         data = json.loads(result.output)
         assert data["operations"]["journals"] == 0
         assert "journal = {Nature Machine Intelligence}" in bib.read_text()
+
+    def test_normalize_repairs_bare_month_name(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A, month = june}\n")
+
+        result = runner.invoke(app, ["normalize", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["operations"]["months"] == 1
+        assert bib.read_text() == "@article{A, month = jun}\n"
 
     def test_normalize_identifier_case_can_be_disabled(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"

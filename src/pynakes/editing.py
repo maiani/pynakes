@@ -40,34 +40,30 @@ def _scan_value_end(raw: str, pos: int) -> int:
     """Return the index just past the field value starting at ``pos``.
 
     Handles brace-delimited values (with nesting), quoted values, and bare
-    words/numbers (terminated by a comma, closing delimiter, or line ending).
+    words/numbers (terminated by a comma or closing delimiter).
     """
     if pos >= len(raw):
         return pos
-    ch = raw[pos]
-    if ch == "{":
-        depth = 0
-        i = pos
-        while i < len(raw):
-            if raw[i] == "{":
-                depth += 1
-            elif raw[i] == "}":
-                depth -= 1
-                if depth == 0:
-                    return i + 1
-            i += 1
-        return len(raw)
-    if ch == '"':
-        i = pos + 1
-        while i < len(raw):
-            if raw[i] == '"':
-                return i + 1
-            i += 1
-        return len(raw)
+
+    # A value may concatenate braced, quoted, and bare atoms. Scan the whole
+    # expression rather than stopping after its first atom (for example,
+    # ``prefix # {suffix}``).
+    brace_depth = 0
+    in_quotes = False
     i = pos
-    while i < len(raw) and raw[i] not in ",})\r\n":
+    while i < len(raw):
+        char = raw[i]
+        if char == '"' and (i == 0 or raw[i - 1] != "\\") and brace_depth == 0:
+            in_quotes = not in_quotes
+        elif not in_quotes:
+            if char == "{":
+                brace_depth += 1
+            elif char == "}" and brace_depth:
+                brace_depth -= 1
+            elif brace_depth == 0 and char in ",})":
+                return i
         i += 1
-    return i
+    return len(raw)
 
 
 def _find_field(raw: str, field_name: str) -> Optional[tuple[int, int, int]]:
@@ -142,6 +138,20 @@ def raw_field_names(raw: str) -> list[str]:
     return [raw[start:end] for start, end in _raw_field_name_spans(raw)]
 
 
+def raw_field_value(raw: str, field_name: str) -> str | None:
+    """Return a field's unmodified source value, including ``#`` expressions.
+
+    The parsed ``BibEntry.fields`` mapping contains resolved values, so lint
+    checks that depend on BibTeX expression syntax must inspect ``raw_content``
+    instead.  ``None`` means the assignment could not be located.
+    """
+    found = _find_field(raw, field_name)
+    if found is None:
+        return None
+    _, value_start, value_end = found
+    return raw[value_start:value_end].strip()
+
+
 def normalize_raw_field_names(raw: str) -> tuple[str, int]:
     """Lowercase field names in raw entry text, preserving all other bytes."""
     replacements = [
@@ -177,6 +187,20 @@ def set_raw_field(raw: str, field_name: str, new_value: str) -> str:
     if not body.endswith(","):
         body += ","
     return f"{body}{line_ending}  {field_name} = {{{new_value}}}{line_ending}{raw[close:]}"
+
+
+def set_raw_field_expression(raw: str, field_name: str, expression: str) -> str:
+    """Replace an existing field value with an exact BibTeX expression.
+
+    Unlike :func:`set_raw_field`, this does not add braces around
+    ``expression``. It is for syntax-aware repairs such as replacing the
+    invalid bare month name ``june`` with the predefined ``jun`` macro.
+    """
+    found = _find_field(raw, field_name)
+    if found is None:
+        return raw
+    _, value_start, value_end = found
+    return raw[:value_start] + expression + raw[value_end:]
 
 
 def _outer_close_position(raw: str) -> int | None:
@@ -263,6 +287,30 @@ def set_entry_field(entry: BibEntry, name: str, value: str) -> bool:
     entry.fields[name] = value
     _apply(entry, lambda raw: set_raw_field(raw, name, value))
     return True
+
+
+def set_entry_field_expression(
+    entry: BibEntry,
+    name: str,
+    expression: str,
+    semantic_value: str,
+) -> bool:
+    """Set an existing source field to an exact expression and semantic value.
+
+    Parsed fields retain only semantic values, while some valid repairs need a
+    bare macro rather than a brace-delimited literal. Entries without raw
+    source fall back to a normal brace-quoted field update, which is valid
+    BibTeX and avoids treating an in-memory value as source syntax.
+    """
+    if entry.raw_content:
+        original = raw_field_value(entry.raw_content, name)
+        if original is not None:
+            if original == expression and entry.fields.get(name) == semantic_value:
+                return False
+            entry.fields[name] = semantic_value
+            entry.raw_content = set_raw_field_expression(entry.raw_content, name, expression)
+            return True
+    return set_entry_field(entry, name, semantic_value)
 
 
 def remove_entry_field(entry: BibEntry, name: str) -> bool:

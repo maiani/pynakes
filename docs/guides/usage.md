@@ -46,6 +46,12 @@ stored library profile: citation-key patterns, journal style, profile-required
 fields, and title brace protection. Casing and profile findings are warnings;
 run `normalize` to repair formatting issues surgically.
 
+`pynakes normalize refs.bib` also repairs bare full month names such as
+`month = june`, which BibTeX interprets as an undefined string reference. It
+rewrites them to the standard macro (`month = jun`) and canonicalizes macro
+casing (`month = Jan` → `month = jan`), while preserving literals such as
+`month = {June}` and declared custom strings.
+
 `lint` (along with `keys check`, `files check`, `dedupe check`, and `verify`)
 accepts multiple files and supports `--strict`, which exits `1` for errors or
 profile deviations so it can gate a build. See [Library Profile](library-profile.md)
