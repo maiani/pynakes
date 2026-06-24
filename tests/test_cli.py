@@ -39,6 +39,21 @@ class TestChangePlanEnvelope:
 
 
 class TestUsedCommand:
+    def test_discovers_lone_bib_file_with_source_directory(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{Smith2020,\n  title = {T}\n}\n")
+        sources = tmp_path / "sources"
+        sources.mkdir()
+        (sources / "paper.tex").write_text(r"\cite{Smith2020}" "\n")
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["used", "sources", "--json"])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["report"]["used"] == ["Smith2020"]
+
     def test_report_json(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text((FIXTURES / "simple.bib").read_text())
@@ -139,6 +154,40 @@ def _copy(tmp_path: Path, name: str) -> Path:
 
 
 class TestInspectAndLint:
+    def test_inspect_discovers_lone_bib_file(self, tmp_path: Path, monkeypatch) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text((FIXTURES / "simple.bib").read_text())
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["inspect", "--json"])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["file"] == "refs.bib"
+
+    def test_nested_command_discovers_lone_bib_file(self, tmp_path: Path, monkeypatch) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n")
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(
+            app,
+            ["fields", "append", "keywords", "ml", "--dry-run", "--json"],
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["file"] == "refs.bib"
+        assert data["modified_entries"] == 1
+
+    def test_multiple_bib_files_are_not_auto_selected(self, tmp_path: Path, monkeypatch) -> None:
+        (tmp_path / "first.bib").write_text("@article{A, title = {A}}\n")
+        (tmp_path / "second.bib").write_text("@article{B, title = {B}}\n")
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["inspect"])
+
+        assert result.exit_code == 2
+
     def test_inspect_json(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
         result = runner.invoke(app, ["inspect", str(bib), "--json"])

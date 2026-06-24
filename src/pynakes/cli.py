@@ -26,15 +26,18 @@ from pynakes.cli_commands import (
     setops,
     used,
 )
+from pynakes.cli_discovery import AutoBibGroup
 
-app = typer.Typer(help="Agent-friendly BibTeX library management tool")
-groups_app = typer.Typer(help="Manage entry groups")
-keys_app = typer.Typer(help="Generate and check citation keys")
-fields_app = typer.Typer(help="Edit fields (rename, move, append, clear, protect titles)")
-files_app = typer.Typer(help="Validate JabRef linked files")
-dedupe_app = typer.Typer(help="Detect and merge duplicate works")
-journals_app = typer.Typer(help="Abbreviate, expand, and check journal titles")
-metadata_app = typer.Typer(help="Inspect and update JabRef library metadata")
+app = typer.Typer(help="Agent-friendly BibTeX library management tool", cls=AutoBibGroup)
+groups_app = typer.Typer(help="Manage entry groups", cls=AutoBibGroup)
+keys_app = typer.Typer(help="Generate and check citation keys", cls=AutoBibGroup)
+fields_app = typer.Typer(
+    help="Edit fields (rename, move, append, clear, protect titles)", cls=AutoBibGroup
+)
+files_app = typer.Typer(help="Validate JabRef linked files", cls=AutoBibGroup)
+dedupe_app = typer.Typer(help="Detect and merge duplicate works", cls=AutoBibGroup)
+journals_app = typer.Typer(help="Abbreviate, expand, and check journal titles", cls=AutoBibGroup)
+metadata_app = typer.Typer(help="Inspect and update JabRef library metadata", cls=AutoBibGroup)
 
 
 def _version_callback(value: bool) -> None:

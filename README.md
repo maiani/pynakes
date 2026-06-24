@@ -47,6 +47,11 @@ pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/
 pynakes lint refs.bib chapters/*.bib --strict
 ```
 
+When the current directory contains exactly one `.bib` file, its path may be
+omitted from commands that operate on a single library (for example,
+`pynakes normalize --dry-run`). Commands still require an explicit path when
+there are zero or multiple `.bib` files.
+
 See the [Quick Start guide](docs/guides/quickstart.md) and [Usage guide](docs/guides/usage.md) for the full command surface.
 
 ## Safety model

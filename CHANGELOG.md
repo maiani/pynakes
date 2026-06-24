@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Single-library CLI discovery**: when the current directory contains exactly
+  one `.bib` file, commands that operate on a library accept an omitted library
+  path and use that file. Zero or multiple local `.bib` files remain explicit
+  to avoid guessing.
 - **`pynakes add` — unified reference import by DOI _or_ arXiv.** A single
   command auto-detects the identifier (DOI, DOI URL, bare/legacy arXiv id, or
   arXiv URL), fetches authoritative metadata, and appends a prepared entry.
