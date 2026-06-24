@@ -67,7 +67,8 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 
 - `pynakes groups add-entry <file> <key> <group>`
 - `pynakes groups remove-entry <file> <key> <group>`
-- `pynakes keys generate <file>` — regenerate every key (`AuthorYearTitle`)
+- `pynakes keys generate <file> [--key <old-key>]` — regenerate every key, or
+  only the selected key, using the preferred pattern (`AuthorYearTitle` by default)
 - `pynakes keys repair <file>` — make duplicate keys unique
 - `pynakes keys rename <file> <old> <new> <tex-source>...` — rename one key in
   the `.bib` file and matching TeX citation commands

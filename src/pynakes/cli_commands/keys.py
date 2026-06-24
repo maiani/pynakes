@@ -72,15 +72,30 @@ def _rename_payload(renames: list[tuple[str, str]]) -> dict:
 
 def keys_generate(
     file: str = typer.Argument(..., help="Path to the .bib file"),
+    key: Optional[str] = typer.Option(
+        None,
+        "--key",
+        help="Regenerate only this citation key instead of every key",
+    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Regenerate all citation keys from entry metadata (AuthorYearTitle)."""
+    """Regenerate citation keys from entry metadata (AuthorYearTitle)."""
     coll = Collection.open(file)
-    renames = coll.generate_keys()
-    verb = "Would rename" if dry_run else "Renamed"
-    human = [f"{verb} {len(renames)} {_entries(len(renames))}."]
+    if key is None:
+        renames = coll.generate_keys()
+    else:
+        rename = coll.generate_key(key)
+        renames = [rename] if rename is not None else []
+    if key is None:
+        verb = "Would rename" if dry_run else "Renamed"
+        human = [f"{verb} {len(renames)} {_entries(len(renames))}."]
+    elif renames:
+        verb = "Would normalize" if dry_run else "Normalized"
+        human = [f"{verb} citation key {renames[0][0]!r} to {renames[0][1]!r}."]
+    else:
+        human = [f"Citation key {key!r} already matches the preferred pattern."]
     human += [f"  {old} -> {new}" for old, new in renames]
     _finish_mod(
         file,
@@ -90,6 +105,7 @@ def keys_generate(
         diff,
         json_output,
         human,
+        **({"key": key} if key is not None else {}),
         **_rename_payload(renames),
     )
 

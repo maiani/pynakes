@@ -76,6 +76,7 @@ pynakes keys check refs.bib
 pynakes keys check refs.bib --json
 
 pynakes keys generate refs.bib --dry-run --diff
+pynakes keys generate refs.bib --key OldKey2020 --dry-run --diff
 pynakes keys repair refs.bib --dry-run --diff
 pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/ --dry-run --diff
 ```
@@ -90,6 +91,10 @@ present:
 
 Unsupported JabRef key-pattern markers fail explicitly instead of silently
 generating incorrect keys.
+
+Use `keys generate --key OldKey2020` to apply that preferred pattern to just
+one entry. It changes only the `.bib` key; use `keys rename` when matching TeX
+citations must be rewritten too.
 
 `keys rename` updates the entry key in the `.bib` file and matching keys inside
 recognized TeX citation commands in the supplied `.tex` files/directories. It

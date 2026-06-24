@@ -533,6 +533,22 @@ class TestGroupsCommand:
 
 
 class TestKeysCommand:
+    def test_generate_single_key_uses_preferred_pattern(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{jabref-meta: keypatterndefault:[auth][shortyear];}\n"
+            "@article{Old,\n  author = {John Smith},\n  year = {2024},\n  title = {Data}\n}\n"
+            "@article{Keep,\n  author = {Jane Doe},\n  year = {2023},\n  title = {Other}\n}\n"
+        )
+
+        result = runner.invoke(app, ["keys", "generate", str(bib), "--key", "Old", "--json"])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["renames"] == [{"old": "Old", "new": "Smith24"}]
+        text = bib.read_text()
+        assert "@article{Smith24," in text
+        assert "@article{Keep," in text
+
     def test_check_reports_duplicates(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "duplicate_entries.bib")
         result = runner.invoke(app, ["keys", "check", str(bib), "--json"])

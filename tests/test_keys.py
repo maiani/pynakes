@@ -10,6 +10,7 @@ from pynakes.keys import (
     generate_key,
     generate_key_from_pattern,
     has_duplicate_keys,
+    regenerate_key,
     regenerate_keys,
     rename_key,
     repair_duplicate_keys,
@@ -187,6 +188,26 @@ class TestRename:
 
 
 class TestRegenerate:
+    def test_regenerate_one_uses_pattern_without_changing_other_keys(self) -> None:
+        lib = parse_bib(
+            "@comment{jabref-meta: keypatterndefault:[auth][shortyear];}\n"
+            "@article{old,\n  author = {John Smith},\n  year = {2024},\n  title = {Data}\n}\n"
+            "@article{keep,\n  author = {Jane Doe},\n  year = {2023},\n  title = {Other}\n}\n"
+        )
+
+        assert regenerate_key(lib, "old") == ("old", "Smith24")
+
+        assert "Smith24" in lib.entries
+        assert "keep" in lib.entries
+
+    def test_regenerate_one_disambiguates_against_existing_keys(self) -> None:
+        lib = parse_bib(
+            "@article{old,\n  author = {John Smith},\n  year = {2024},\n  title = {Data}\n}\n"
+            "@article{Smith2024Data,\n  title = {Existing}\n}\n"
+        )
+
+        assert regenerate_key(lib, "old") == ("old", "Smith2024Dataa")
+
     def test_regenerate_applies_generated_keys(self) -> None:
         lib = parse_bib(
             "@article{old1,\n  author = {John Smith},\n  year = {2020},\n  title = {Data}\n}\n"

@@ -480,6 +480,12 @@ class Collection:
         self._mark(bool(renames))
         return renames
 
+    def generate_key(self, key: str) -> tuple[str, str] | None:
+        """Regenerate one citation key from its entry metadata."""
+        rename = key_ops.regenerate_key(self.lib, key)
+        self._mark(rename is not None)
+        return rename
+
     def repair_keys(self) -> list[tuple[str, str]]:
         """Repair duplicate citation keys."""
         renames = key_ops.repair_duplicate_keys(self.lib)

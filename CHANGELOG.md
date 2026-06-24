@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Targeted citation-key generation**: `pynakes keys generate --key OLD` now
+  normalizes one entry to its configured preferred citation-key pattern without
+  changing other entries.
 - **Single-library CLI discovery**: when the current directory contains exactly
   one `.bib` file, commands that operate on a library accept an omitted library
   path and use that file. Zero or multiple local `.bib` files remain explicit

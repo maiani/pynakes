@@ -246,6 +246,28 @@ def regenerate_keys(lib: BibFile) -> list[tuple[str, str]]:
     return renames
 
 
+def regenerate_key(lib: BibFile, key: str) -> tuple[str, str] | None:
+    """Regenerate one unique citation key from its entry metadata.
+
+    The selected entry's current key is excluded from collision detection, so a
+    key that already matches the preferred pattern is a no-op. Other entries
+    retain their keys; a collision with one of them receives the usual letter
+    suffix. Returns the applied ``(old, new)`` rename, or ``None`` for a no-op.
+    """
+    validate_key(key)
+    matches = lib.entries.get_all(key)
+    if not matches:
+        raise ValueError(f"No entry with key {key!r} in the library")
+    if len(matches) > 1:
+        raise ValueError(f"Cannot regenerate duplicated key {key!r}; repair duplicates first")
+
+    entry = matches[0]
+    new_key = unique_key(generate_key(entry, lib), set(lib.entries.keys()) - {key})
+    if not rename_entry_key(entry, new_key):
+        return None
+    return key, new_key
+
+
 def repair_duplicate_keys(lib: BibFile) -> list[tuple[str, str]]:
     """Rename duplicate keys so every key is unique.
 
