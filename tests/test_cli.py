@@ -322,6 +322,24 @@ class TestAddCommand:
         assert "@article{Smith2024Practical," in text
         assert "doi = {10.5555/provider}" in text
 
+    def test_add_places_entry_before_trailing_metadata(self, tmp_path: Path, monkeypatch) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Existing,\n"
+            "  title = {Existing}\n"
+            "}\n"
+            "\n"
+            "@comment{jabref-meta: databaseType:bibtex;}\n"
+        )
+        monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
+
+        result = runner.invoke(app, ["add", str(bib), "10.5555/provider"])
+
+        assert result.exit_code == 0, result.output
+        text = bib.read_text()
+        assert text.index("@article{Existing,") < text.index("@article{Smith2024Practical,")
+        assert text.index("@article{Smith2024Practical,") < text.index("@comment{jabref-meta:")
+
     def test_add_arxiv_writes_misc_entry(self, tmp_path: Path, monkeypatch) -> None:
         bib = _copy(tmp_path, "simple.bib")
         monkeypatch.setattr(importer_ops, "fetch_arxiv_atom", lambda identifier: ARXIV_ATOM)
@@ -357,6 +375,7 @@ class TestAddCommand:
         assert "@online{" in text
         assert "eprinttype = {arxiv}" in text
         assert "date = {2023-01-02}" in text
+        assert text.index("@online{") < text.index("@comment{jabref-meta:")
 
     def test_add_uses_jabref_key_pattern_metadata(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"

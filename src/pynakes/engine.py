@@ -29,7 +29,7 @@ from pynakes.editing import splice_into_text
 from pynakes.io import load_bib, save_text
 from pynakes.lint import LintIssue
 from pynakes.lint import lint as lint_lib
-from pynakes.model import BibEntry, BibFile, EntryStore
+from pynakes.model import BibEntry, BibFile, EntryStore, MetadataBlock
 
 QueryFilter = Callable[[BibEntry], bool] | None
 
@@ -363,7 +363,10 @@ class Collection:
 
         for entry in self._appended_entries:
             text = _append_entry_text(
-                text, importer_ops.render_entry(entry, self.lib.line_ending), self.lib.line_ending
+                text,
+                importer_ops.render_entry(entry, self.lib.line_ending),
+                self.lib.line_ending,
+                self.lib.metadata_blocks,
             )
         return text
 
@@ -715,8 +718,20 @@ def _fingerprint(path: Path) -> FileFingerprint:
     )
 
 
-def _append_entry_text(original_text: str, entry_text: str, line_ending: str) -> str:
-    """Append a BibTeX entry while preserving existing file text."""
+def _append_entry_text(
+    original_text: str,
+    entry_text: str,
+    line_ending: str,
+    metadata_blocks: list[MetadataBlock],
+) -> str:
+    """Append an entry, placing it before a canonical trailing metadata section."""
+    metadata_start = _trailing_metadata_start(original_text, metadata_blocks)
+    if metadata_start is not None:
+        body = original_text[:metadata_start].rstrip("\r\n")
+        metadata = original_text[metadata_start:]
+        if body:
+            return body + line_ending * 2 + entry_text + line_ending * 2 + metadata
+        return entry_text + line_ending * 2 + metadata
     if not original_text:
         return entry_text + line_ending
     if original_text.endswith(line_ending * 2):
@@ -724,6 +739,25 @@ def _append_entry_text(original_text: str, entry_text: str, line_ending: str) ->
     if original_text.endswith(line_ending):
         return original_text + line_ending + entry_text + line_ending
     return original_text + line_ending + line_ending + entry_text + line_ending
+
+
+def _trailing_metadata_start(text: str, blocks: list[MetadataBlock]) -> int | None:
+    """Find the start of a metadata-only section at the end of *text*.
+
+    Metadata comments are canonical only when they form the final non-whitespace
+    content of a library. Earlier metadata remains untouched, so importing into
+    a hand-arranged file does not relocate unrelated comments or entries.
+    """
+    end = len(text.rstrip("\r\n"))
+    start = end
+    found = False
+    for block in reversed(blocks):
+        index = text.rfind(block.raw, 0, start)
+        if index == -1 or text[index + len(block.raw) : start].strip():
+            continue
+        start = index
+        found = True
+    return start if found else None
 
 
 def _insert_metadata_comment(original_text: str, comment: str, line_ending: str) -> str:

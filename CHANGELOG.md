@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   required-field validation.
 
 ### Changed
+- **`pynakes add` now inserts imported entries before a canonical trailing
+  JabRef/pynakes metadata section**, preserving metadata as the final section
+  of the library.
 - **Renamed `pynakes.doi` → `pynakes.importer`** and broadened it to resolve and
   import both DOI and arXiv identifiers. arXiv normalization and Atom parsing
   (previously private in `integrity.py`) now live here as the single identifier
