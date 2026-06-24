@@ -26,7 +26,9 @@ src/pynakes/
   editing.py          surgical raw-text field/key edits + entry-level helpers
   engine.py           Collection lifecycle: open, stage, preview/diff, commit, reload
   groups.py keys.py fields.py files.py lint.py
-  authors.py journals.py doi.py normalize.py format operations
+  authors.py journals.py normalize.py  format operations
+  importer.py         resolve + import references by DOI / arXiv id (metadata only)
+  integrity.py        verify / enrich / published (opt-in --online lookups)
   metadata.py         jabref-meta + pynakes-meta parsing, classification, safe updates
   usage.py            cited-entry detection/tagging and TeX citation-key rewrites
   capabilities.py     machine-readable capability description
@@ -74,19 +76,20 @@ tests pass:
 ## Conventions
 
 - Python ≥ 3.11, type hints throughout. Ruff line length 100 (E501 ignored).
-- CLI: Typer sub-apps (`groups`, `keys`, `fields`, `files`, `doi`, `metadata`,
-  `journals`); one operation module per concern, kept small and unit-testable
+- CLI: Typer sub-apps (`groups`, `keys`, `fields`, `files`, `dedupe`,
+  `metadata`, `journals`) plus top-level commands (`add`, `normalize`,
+  `convert`, …); one operation module per concern, kept small and unit-testable
   independent of the CLI.
-- Keep a single source of truth: name parsing lives in `authors.py`, DOI
-  validation in `doi.py`, key uniquing in `keys.py`. Don't re-derive them.
+- Try to limit file length preferably to ~400 lines, with a maximum limit of 600.
 - Add tests and a `CHANGELOG.md` entry with each behavioral change.
 
 ## Don't
 
 - Don't add `bibtexparser` or another parsing dependency — the custom parser is
   deliberate (round-trip fidelity).
-- Don't introduce nondeterminism (time, randomness, ordering) in core logic;
-  `doi import` is the only sanctioned network call.
+- Don't introduce nondeterminism (time, randomness, ordering) in core logic.
+  Network access is confined to `add` (DOI/arXiv import) and the opt-in
+  `--online` integrity lookups; everything else stays offline and deterministic.
 - Don't let a command emit a traceback — route failures through `_safe`.
 - Don't claim a feature is implemented when it is a stub (keep capabilities,
   README, and DEVPLAN honest).

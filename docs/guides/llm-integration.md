@@ -11,7 +11,7 @@ structured JSON contract. It is written for a program (or an agent) that calls
 ## Why pynakes is automation-friendly
 
 - **Deterministic.** The same input always produces the same output (the one
-  exception is `doi import`, which makes a network call).
+  exception is `add`, which makes a network call).
 - **Preview before writing.** Every modifying command supports `--dry-run`.
 - **Structured output.** `--json` returns a stable envelope (see below).
 - **Conflicts return options, not guesses.** Blocked operations exit `2` with a
@@ -76,7 +76,7 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 - `pynakes fields append <file> <field> <value> [--where ...]`
 - `pynakes fields clear <file> <field> [--where ...]`
 - `pynakes fields protect-title <file> [--field ...] [--term ...] [--where ...]`
-- `pynakes doi import <file> <doi> [--key ...] [--key-source generated|provider] [--allow-duplicate]`
+- `pynakes add <file> <identifier> [--key ...] [--key-source generated|provider] [--allow-duplicate]` — `<identifier>` is a DOI, DOI URL, arXiv id, or arXiv URL
 - `pynakes metadata set <file> <key> <value> [--allow-unknown]`
 - `pynakes normalize <file>`
 - `pynakes convert <file> --to biblatex|bibtex`
@@ -168,11 +168,12 @@ pynakes normalize refs.bib --json
 normalize DOI values, and abbreviate or expand journal titles. It honors project
 metadata overrides via `jabref-meta` comments and CLI options.
 
-### Import a DOI
+### Add a reference (DOI or arXiv)
 
 ```bash
-pynakes doi import refs.bib 10.1145/3377811.3380368 --dry-run --diff --json
-pynakes doi import refs.bib 10.1145/3377811.3380368 --json
+pynakes add refs.bib 10.1145/3377811.3380368 --dry-run --diff --json
+pynakes add refs.bib 10.1145/3377811.3380368 --json
+pynakes add refs.bib arXiv:2301.00001 --json
 ```
 
 Citation-key priority:

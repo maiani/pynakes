@@ -60,7 +60,7 @@ Usage: pynakes [OPTIONS] COMMAND [ARGS]...
 │ groups        Manage entry groups.                                      │
 │ keys          Generate and check citation keys.                         │
 │ fields        Edit fields (rename, move, append, clear, protect titles).│
-│ doi           Import references by DOI.                                 │
+│ add           Add a reference by DOI or arXiv identifier.               │
 │ lint          Validate entries.                                         │
 │ normalize     Run the standard bibliography normalization routine.       │
 │ used          Report cited, unused, and missing entries.                │

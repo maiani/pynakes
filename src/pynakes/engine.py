@@ -13,10 +13,10 @@ from typing import Callable
 
 from pynakes import convert as convert_ops
 from pynakes import dedupe as dedupe_ops
-from pynakes import doi as doi_ops
 from pynakes import fields as field_ops
 from pynakes import files as file_ops
 from pynakes import groups as group_ops
+from pynakes import importer as importer_ops
 from pynakes import integrity as integrity_ops
 from pynakes import journals as journal_ops
 from pynakes import keys as key_ops
@@ -363,7 +363,7 @@ class Collection:
 
         for entry in self._appended_entries:
             text = _append_entry_text(
-                text, doi_ops.render_entry(entry, self.lib.line_ending), self.lib.line_ending
+                text, importer_ops.render_entry(entry, self.lib.line_ending), self.lib.line_ending
             )
         return text
 
@@ -603,7 +603,7 @@ class Collection:
         allow_duplicate_doi: bool = False,
     ) -> BibEntry:
         """Import one DOI entry into memory."""
-        entry = doi_ops.prepare_imported_entry(
+        entry = importer_ops.prepare_imported_entry(
             self.lib,
             doi,
             key=key,
@@ -614,6 +614,34 @@ class Collection:
         self._appended_entries.append(entry)
         self._mark(True)
         return entry
+
+    def import_reference(
+        self,
+        identifier: str,
+        *,
+        key: str | None = None,
+        key_source: str = "generated",
+        allow_duplicate: bool = False,
+    ) -> tuple[str, BibEntry]:
+        """Import one reference (DOI or arXiv) into memory.
+
+        The identifier type is auto-detected. arXiv entries use ``@online`` for
+        BibLaTeX libraries and ``@misc`` for BibTeX ones, per the library's
+        ``databaseType`` metadata (defaulting to BibTeX). Returns
+        ``(kind, entry)``.
+        """
+        kind, entry = importer_ops.prepare_imported_reference(
+            self.lib,
+            identifier,
+            dialect=metadata_ops.library_database_type(self.lib),
+            key=key,
+            key_source=key_source,
+            allow_duplicate=allow_duplicate,
+        )
+        self.lib.entries.add(entry)
+        self._appended_entries.append(entry)
+        self._mark(True)
+        return kind, entry
 
     def set_metadata(
         self,

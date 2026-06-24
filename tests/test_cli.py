@@ -7,7 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from pynakes import __version__
-from pynakes import doi as doi_ops
+from pynakes import importer as importer_ops
 from pynakes.cli import app
 
 runner = CliRunner()
@@ -221,7 +221,21 @@ class TestFilesCommand:
         assert "[missing] A[0]: missing.pdf" in result.output
 
 
-class TestDOICommand:
+ARXIV_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
+  <entry>
+    <id>http://arxiv.org/abs/2301.00001v1</id>
+    <published>2023-01-02T00:00:00Z</published>
+    <title>A Deep Test of arXiv Import</title>
+    <author><name>Ada Lovelace</name></author>
+    <author><name>Alan Turing</name></author>
+    <arxiv:primary_category term="cs.LG"/>
+  </entry>
+</feed>
+"""
+
+
+class TestAddCommand:
     provider_bibtex = """@article{provider-key,
   author = {Jane Smith and John Doe},
   title = {A Practical Test of DOI Import},
@@ -231,41 +245,78 @@ class TestDOICommand:
 }
 """
 
-    def test_import_dry_run_diff_does_not_write(self, tmp_path: Path, monkeypatch) -> None:
+    def test_add_dry_run_diff_does_not_write(self, tmp_path: Path, monkeypatch) -> None:
         bib = _copy(tmp_path, "simple.bib")
         original = bib.read_text()
-        monkeypatch.setattr(doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
+        monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
         result = runner.invoke(
             app,
-            ["doi", "import", str(bib), "10.5555/provider", "--dry-run", "--diff", "--json"],
+            ["add", str(bib), "10.5555/provider", "--dry-run", "--diff", "--json"],
         )
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         assert data["key"] == "Smith2024Practical"
+        assert data["identifier_type"] == "doi"
         assert "@article{Smith2024Practical," in data["diff"]
         assert bib.read_text() == original
 
-    def test_import_writes_entry(self, tmp_path: Path, monkeypatch) -> None:
+    def test_add_writes_entry(self, tmp_path: Path, monkeypatch) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        monkeypatch.setattr(doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
+        monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
-        result = runner.invoke(app, ["doi", "import", str(bib), "10.5555/provider"])
+        result = runner.invoke(app, ["add", str(bib), "10.5555/provider"])
 
         assert result.exit_code == 0, result.output
         text = bib.read_text()
         assert "@article{Smith2024Practical," in text
         assert "doi = {10.5555/provider}" in text
 
-    def test_import_uses_jabref_key_pattern_metadata(self, tmp_path: Path, monkeypatch) -> None:
+    def test_add_arxiv_writes_misc_entry(self, tmp_path: Path, monkeypatch) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        monkeypatch.setattr(importer_ops, "fetch_arxiv_atom", lambda identifier: ARXIV_ATOM)
+
+        result = runner.invoke(app, ["add", str(bib), "arXiv:2301.00001", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["identifier_type"] == "arxiv"
+        assert data["entry_type"] == "misc"
+        assert data["identifier"] == "2301.00001"
+        text = bib.read_text()
+        assert "@misc{" in text
+        assert "eprint = {2301.00001}" in text
+        assert "archivePrefix = {arXiv}" in text
+        assert "year = {2023}" in text
+
+    def test_add_arxiv_url_in_biblatex_writes_online_entry(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@comment{jabref-meta: databaseType:biblatex;}\n")
+        monkeypatch.setattr(importer_ops, "fetch_arxiv_atom", lambda identifier: ARXIV_ATOM)
+
+        result = runner.invoke(
+            app, ["add", str(bib), "https://arxiv.org/abs/2301.00001v1", "--json"]
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["entry_type"] == "online"
+        text = bib.read_text()
+        assert "@online{" in text
+        assert "eprinttype = {arxiv}" in text
+        assert "date = {2023-01-02}" in text
+
+    def test_add_uses_jabref_key_pattern_metadata(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text(
             "@comment{jabref-meta: keypatterndefault:[auth][shortyear][veryshorttitle];}\n"
         )
-        monkeypatch.setattr(doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
+        monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
-        result = runner.invoke(app, ["doi", "import", str(bib), "10.5555/provider", "--json"])
+        result = runner.invoke(app, ["add", str(bib), "10.5555/provider", "--json"])
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -273,13 +324,13 @@ class TestDOICommand:
         assert data["key_source"] == "generated"
         assert "@article{Smith24Practical," in bib.read_text()
 
-    def test_import_can_use_provider_key(self, tmp_path: Path, monkeypatch) -> None:
+    def test_add_can_use_provider_key(self, tmp_path: Path, monkeypatch) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        monkeypatch.setattr(doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
+        monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
         result = runner.invoke(
             app,
-            ["doi", "import", str(bib), "10.5555/provider", "--key-source", "provider", "--json"],
+            ["add", str(bib), "10.5555/provider", "--key-source", "provider", "--json"],
         )
 
         assert result.exit_code == 0, result.output
@@ -287,15 +338,14 @@ class TestDOICommand:
         assert data["key"] == "provider-key"
         assert data["key_source"] == "provider"
 
-    def test_import_explicit_key_wins(self, tmp_path: Path, monkeypatch) -> None:
+    def test_add_explicit_key_wins(self, tmp_path: Path, monkeypatch) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        monkeypatch.setattr(doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
+        monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
         result = runner.invoke(
             app,
             [
-                "doi",
-                "import",
+                "add",
                 str(bib),
                 "10.5555/provider",
                 "--key-source",
@@ -311,44 +361,39 @@ class TestDOICommand:
         assert data["key"] == "Manual2024"
         assert data["key_source"] == "user"
 
-    def test_import_invalid_key_source_errors(self, tmp_path: Path) -> None:
+    def test_add_invalid_key_source_errors(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
 
         result = runner.invoke(
             app,
-            ["doi", "import", str(bib), "10.5555/provider", "--key-source", "garbage", "--json"],
+            ["add", str(bib), "10.5555/provider", "--key-source", "garbage", "--json"],
         )
 
         assert result.exit_code == 1, result.output
         data = json.loads(result.output)
         assert data["error"] == "InvalidKeySource"
 
-    def test_import_duplicate_doi_conflicts(self, tmp_path: Path) -> None:
+    def test_add_duplicate_doi_conflicts(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
 
         result = runner.invoke(
             app,
-            [
-                "doi",
-                "import",
-                str(bib),
-                "https://doi.org/10.1234/nature.ml.2020",
-                "--json",
-            ],
+            ["add", str(bib), "https://doi.org/10.1234/nature.ml.2020", "--json"],
         )
 
         assert result.exit_code == 2, result.output
         data = json.loads(result.output)
         assert data["status"] == "conflict"
+        assert data["error"] == "DuplicateReference"
         assert data["existing_keys"] == ["Smith2020"]
 
-    def test_import_citation_key_conflict(self, tmp_path: Path, monkeypatch) -> None:
+    def test_add_citation_key_conflict(self, tmp_path: Path, monkeypatch) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        monkeypatch.setattr(doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
+        monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
         result = runner.invoke(
             app,
-            ["doi", "import", str(bib), "10.5555/provider", "--key", "Smith2020", "--json"],
+            ["add", str(bib), "10.5555/provider", "--key", "Smith2020", "--json"],
         )
 
         assert result.exit_code == 2, result.output
@@ -357,40 +402,36 @@ class TestDOICommand:
         assert data["error"] == "CitationKeyConflict"
         assert data["key"] == "Smith2020"
 
-    def test_import_citation_key_conflict_human(self, tmp_path: Path, monkeypatch) -> None:
+    def test_add_citation_key_conflict_human(self, tmp_path: Path, monkeypatch) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        monkeypatch.setattr(doi_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
+        monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
-        result = runner.invoke(
-            app, ["doi", "import", str(bib), "10.5555/provider", "--key", "Smith2020"]
-        )
+        result = runner.invoke(app, ["add", str(bib), "10.5555/provider", "--key", "Smith2020"])
         assert result.exit_code == 2, result.output
         assert "CitationKeyConflict" in result.output
 
-    def test_import_malformed_doi_errors(self, tmp_path: Path) -> None:
+    def test_add_unrecognized_identifier_errors(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        result = runner.invoke(app, ["doi", "import", str(bib), "not-a-doi", "--json"])
+        result = runner.invoke(app, ["add", str(bib), "not-an-identifier", "--json"])
         assert result.exit_code == 1, result.output
-        assert json.loads(result.output)["error"] == "InvalidDOI"
+        assert json.loads(result.output)["error"] == "UnsupportedIdentifier"
 
-    def test_import_provider_failure_errors(self, tmp_path: Path, monkeypatch) -> None:
+    def test_add_provider_failure_errors(self, tmp_path: Path, monkeypatch) -> None:
         bib = _copy(tmp_path, "simple.bib")
 
         def _boom(doi: str) -> str:
-            raise doi_ops.DOIImportError("resolver offline")
+            raise importer_ops.DOIImportError("resolver offline")
 
-        monkeypatch.setattr(doi_ops, "fetch_bibtex_for_doi", _boom)
-        result = runner.invoke(app, ["doi", "import", str(bib), "10.5555/provider", "--json"])
+        monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", _boom)
+        result = runner.invoke(app, ["add", str(bib), "10.5555/provider", "--json"])
         assert result.exit_code == 1, result.output
-        assert json.loads(result.output)["error"] == "DOIImportError"
+        assert json.loads(result.output)["error"] == "ReferenceImportError"
 
-    def test_import_duplicate_doi_human_output(self, tmp_path: Path) -> None:
+    def test_add_duplicate_doi_human_output(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        result = runner.invoke(
-            app, ["doi", "import", str(bib), "https://doi.org/10.1234/nature.ml.2020"]
-        )
+        result = runner.invoke(app, ["add", str(bib), "https://doi.org/10.1234/nature.ml.2020"])
         assert result.exit_code == 2, result.output
-        assert "DuplicateDOI" in result.output
+        assert "DuplicateReference" in result.output
         assert "--allow-duplicate" in result.output
 
 

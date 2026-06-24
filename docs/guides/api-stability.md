@@ -18,7 +18,7 @@ removing a name or changing its documented behavior is a breaking change.
 | Area | Stable modules |
 | --- | --- |
 | Data and lifecycle | `pynakes.model`, `pynakes.io`, `pynakes.engine`, `pynakes.bibtex_parser`, `pynakes.bibtex_writer`, `pynakes.diff` |
-| Bibliography operations | `pynakes.authors`, `pynakes.convert`, `pynakes.doi`, `pynakes.fields`, `pynakes.groups`, `pynakes.journals`, `pynakes.keys`, `pynakes.normalize` |
+| Bibliography operations | `pynakes.authors`, `pynakes.convert`, `pynakes.importer`, `pynakes.fields`, `pynakes.groups`, `pynakes.journals`, `pynakes.keys`, `pynakes.normalize` |
 | Analysis and maintenance | `pynakes.dedupe`, `pynakes.files`, `pynakes.integrity`, `pynakes.lint`, `pynakes.metadata`, `pynakes.usage` |
 | Set operations (projections) | `pynakes.setops` |
 | Composition | `pynakes.batch` |

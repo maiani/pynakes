@@ -217,22 +217,29 @@ protect_title_capitalization(lib, terms=["OpenAI"])
 move_field(lib, "school", "institution")
 ```
 
-## DOI Import
+## Reference Import (DOI / arXiv)
 
 ```python
 from pynakes.engine import Collection
 
 coll = Collection.open("refs.bib")
-entry = coll.import_doi(
-    "10.5555/example",
+kind, entry = coll.import_reference(
+    "arXiv:2301.00001",  # or a DOI / DOI URL / arXiv URL
     key_source="generated",
 )
+print(kind)  # "arxiv" or "doi"
 print(coll.diff())
 ```
 
-For lower-level workflows, `pynakes.doi.prepare_imported_entry` and
-`pynakes.doi.render_entry` remain available. `Collection.import_doi()` stages the
-append and lets `diff()`/`commit()` handle preservation and atomic writes.
+`import_reference()` auto-detects the identifier type, fetches metadata only (no
+PDFs), and — for arXiv — emits `@online` for BibLaTeX libraries and `@misc` for
+BibTeX ones per `databaseType`. `Collection.import_doi()` remains as the
+DOI-specific entry point.
+
+For lower-level workflows, `pynakes.importer.prepare_imported_reference`,
+`pynakes.importer.prepare_imported_entry`, and `pynakes.importer.render_entry`
+are available. The staged append lets `diff()`/`commit()` handle preservation
+and atomic writes.
 
 ## Linked Files
 
@@ -370,7 +377,7 @@ save_bib(lib, str(path))
 
 ```python
 from pynakes.bibtex_parser import ParseError
-from pynakes.doi import DuplicateDOIError, DOIImportError
+from pynakes.importer import DuplicateReferenceError, ReferenceImportError
 
 try:
     lib = load_bib("invalid.bib")
@@ -378,10 +385,10 @@ except ParseError as exc:
     print(exc.message)
 
 try:
-    prepare_imported_entry(lib, "10.5555/example")
-except DuplicateDOIError as exc:
+    prepare_imported_reference(lib, "10.5555/example")
+except DuplicateReferenceError as exc:
     print(exc.keys)
-except DOIImportError as exc:
+except ReferenceImportError as exc:
     print(str(exc))
 ```
 

@@ -3,8 +3,8 @@
 from dataclasses import dataclass, field
 
 from pynakes import authors as author_ops
-from pynakes import doi as doi_ops
 from pynakes import fields as field_ops
+from pynakes import importer as importer_ops
 from pynakes import journals as journal_ops
 from pynakes.editing import normalize_entry_field_names, set_entry_field, set_entry_type
 from pynakes.formatters import FIELD_FORMATTERS
@@ -161,7 +161,7 @@ def normalize_dois(lib: BibFile) -> tuple[int, list[dict[str, str]]]:
         if not value:
             continue
         try:
-            normalized = doi_ops.normalize_doi(value)
+            normalized = importer_ops.normalize_doi(value)
         except ValueError as exc:
             warnings.append(
                 {

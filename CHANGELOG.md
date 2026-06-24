@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`pynakes add` — unified reference import by DOI _or_ arXiv.** A single
+  command auto-detects the identifier (DOI, DOI URL, bare/legacy arXiv id, or
+  arXiv URL), fetches authoritative metadata, and appends a prepared entry.
+  arXiv entries are written as `@online` in BibLaTeX libraries and `@misc` in
+  BibTeX ones, following the library's `databaseType` metadata (default
+  BibTeX). Only metadata is fetched — no PDFs or linked files are downloaded.
+  Exposes `Collection.import_reference()` and
+  `metadata.library_database_type()`.
 - **Pinned parser conformance baseline**: TeX Live 2025 — BibTeX 0.99d,
   BibLaTeX 3.20 (2024-03-21), and Biber 2.20. The 0.4 release remains gated on
   a versioned corpus validated against this baseline.
@@ -29,6 +37,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for round-trip-safe writes. `BibFile.resolved_fields()` also provides a
   non-mutating, cycle-safe `crossref` inheritance view; `lint` uses it for
   required-field validation.
+
+### Changed
+- **Renamed `pynakes.doi` → `pynakes.importer`** and broadened it to resolve and
+  import both DOI and arXiv identifiers. arXiv normalization and Atom parsing
+  (previously private in `integrity.py`) now live here as the single identifier
+  authority.
+- **Removed the `pynakes doi import` command in favor of `pynakes add`.** No
+  backward-compatible alias is kept (pre-1.0). The conflict envelope now emits
+  `DuplicateReference` (was `DuplicateDOI`); errors emit `UnsupportedIdentifier`,
+  `InvalidIdentifier`, and `ReferenceImportError`.
 
 ## [0.3.0] - 2026-06-23
 

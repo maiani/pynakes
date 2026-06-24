@@ -20,7 +20,7 @@ the parser conformance gate below is complete:
   with external-change detection; the CLI is a thin consumer.
 - **Operations**: `inspect`, `lint`, `groups`, `keys` (generate/check/repair/
   rename + JabRef key patterns), `fields` (with `--where`), `convert`,
-  `journals`, `files check`, `normalize`, `doi import`, `used`, `dedupe`,
+  `journals`, `files check`, `normalize`, `add` (DOI/arXiv), `used`, `dedupe`,
   `verify`/`published`/`enrich` (opt-in `--online`, cached), `merge`, `split`,
   `batch`.
 - **JabRef v5.15 parity**: full `saveActions` formatter suite, recognized

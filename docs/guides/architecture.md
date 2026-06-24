@@ -224,7 +224,7 @@ the CLI.
 | keys.py | Citation-key generation, validation, duplicate detection/repair, and key renames. |
 | fields.py | Generic field changes, simple predicates, and title capitalization protection. |
 | authors.py | BibTeX name-list splitting, last-name extraction, and conservative/JabRef-style normalization. |
-| doi.py | DOI canonicalization and import preparation; it is the DOI parsing authority. |
+| importer.py | Reference import: identifier resolution (DOI/arXiv), DOI canonicalization, arXiv normalization/Atom parsing, and entry preparation. It is the DOI and arXiv identifier authority. |
 | metadata.py | Structured top-level metadata: parses both jabref-meta and pynakes-meta, classifies, and applies safe namespace-routed updates. |
 | journals.py | Exact title/ISSN mapping plus LTWA-style journal abbreviation/expansion. |
 | normalize.py | Policy orchestration over title, author, journal, and DOI operations. |
@@ -261,7 +261,8 @@ exception where callers need structured recovery:
 | Condition | Exception / outcome |
 | --- | --- |
 | Structurally malformed BibTeX | ParseError |
-| DOI import failure, duplicate DOI, explicit key conflict | DOIImportError, DuplicateDOIError, CitationKeyConflictError |
+| Reference import failure, duplicate DOI/arXiv, explicit key conflict | ReferenceImportError (DOIImportError/ArxivImportError), DuplicateReferenceError (DuplicateDOIError/DuplicateArxivError), CitationKeyConflictError |
+| Unrecognized identifier passed to `add` | UnsupportedIdentifierError |
 | Unsupported JabRef key pattern | UnsupportedCitationKeyPatternError |
 | Duplicate/ambiguous metadata block | DuplicateMetadataError |
 | Ambiguous duplicate-work merge | DedupeConflictError with MergeConflict values |
@@ -279,7 +280,7 @@ interactive choice is possible. Modifying command responses share `status`,
 
 Only DOI import and integrity workflows contact providers. The latter require an
 explicit `online=True`/`--online` opt-in and support deterministic caching.
-Network parsing lives in `doi.py` and `integrity.py`; tests mock or fixture this
+Network parsing lives in `importer.py` and `integrity.py`; tests mock or fixture this
 boundary so the normal suite never relies on external availability.
 
 ## Testing and change discipline

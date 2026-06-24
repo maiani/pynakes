@@ -4,18 +4,23 @@ from __future__ import annotations
 
 import hashlib
 import re
-import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
-from urllib.error import HTTPError, URLError
-from urllib.parse import quote
-from urllib.request import Request, urlopen
 
 from pynakes.authors import last_name, split_name_list
 from pynakes.bibtex_parser import ParseError, parse_bib
-from pynakes.doi import canonical_doi, fetch_bibtex_for_doi, normalize_doi
 from pynakes.editing import set_entry_field, set_entry_type
+from pynakes.importer import (
+    ArxivImportError,
+    canonical_doi,
+    entry_arxiv_id,
+    fetch_arxiv_atom,
+    fetch_bibtex_for_doi,
+    normalize_arxiv,
+    normalize_doi,
+    parse_arxiv_atom,
+)
 from pynakes.model import BibEntry, BibFile
 
 
@@ -166,8 +171,6 @@ class MetadataFetchError(Exception):
 
 _DOI_URL_RE = re.compile(r"(?:https?://(?:dx\.)?doi\.org/|doi:\s*)(10\.\d{4,9}/\S+)", re.I)
 _YEAR_RE = re.compile(r"\d{4}")
-_ARXIV_URL_RE = re.compile(r"arxiv\.org/(?:abs|pdf)/([^?#\s]+)", re.I)
-_ARXIV_VERSION_RE = re.compile(r"v\d+$", re.I)
 _PREPRINT_DOI_PREFIXES = ("10.1101/", "10.21203/", "10.2139/")
 
 
@@ -378,37 +381,27 @@ def fetch_doi_bibtex(doi: str) -> str:
 
 
 def fetch_arxiv_metadata(identifier: str, *, cache_dir: str | Path | None = None) -> dict[str, str]:
-    """Fetch and parse arXiv Atom metadata for one identifier."""
-    normalized = _normalize_arxiv(identifier)
+    """Fetch the published DOI/journal an arXiv preprint links to, if any.
+
+    Delegates the Atom fetch/parse to :mod:`pynakes.importer` and keeps only the
+    deterministic on-disk cache here. Returns ``{"doi": ..., "journal": ...}``.
+    """
+    normalized = normalize_arxiv(identifier)
     if normalized is None:
         raise MetadataFetchError(f"Malformed arXiv identifier: {identifier!r}")
     cache_path = _cache_path(cache_dir, "arxiv", normalized, ".xml")
-    if cache_path is not None and cache_path.exists():
-        text = cache_path.read_text(encoding="utf-8", errors="replace")
-    else:
-        text = fetch_arxiv_atom(normalized)
-        if cache_path is not None:
-            cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_path.write_text(text, encoding="utf-8")
-    return _parse_arxiv_atom(text, normalized)
-
-
-def fetch_arxiv_atom(identifier: str) -> str:
-    """Fetch arXiv Atom XML. Split out for tests to stub without network."""
-    url = f"https://export.arxiv.org/api/query?id_list={quote(identifier)}"
-    request = Request(url, headers={"User-Agent": "pynakes/0.3.0 integrity"})
     try:
-        with urlopen(request, timeout=15.0) as response:
-            data = response.read()
-            encoding = response.headers.get_content_charset() or "utf-8"
-            return data.decode(encoding, errors="replace")
-    except HTTPError as exc:
-        raise MetadataFetchError(f"arXiv returned HTTP {exc.code} for {identifier}") from exc
-    except URLError as exc:
-        reason = getattr(exc, "reason", exc)
-        raise MetadataFetchError(
-            f"Could not fetch arXiv metadata for {identifier}: {reason}"
-        ) from exc
+        if cache_path is not None and cache_path.exists():
+            text = cache_path.read_text(encoding="utf-8", errors="replace")
+        else:
+            text = fetch_arxiv_atom(normalized)
+            if cache_path is not None:
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                cache_path.write_text(text, encoding="utf-8")
+        record = parse_arxiv_atom(text, normalized)
+    except ArxivImportError as exc:
+        raise MetadataFetchError(str(exc)) from exc
+    return {"doi": record.doi, "journal": record.journal}
 
 
 def _compare_entry(local: BibEntry, remote: BibEntry) -> list[IntegrityIssue]:
@@ -540,7 +533,7 @@ def _doi_from_entry_urls(entry: BibEntry) -> str | None:
 
 
 def _preprint_identity(entry: BibEntry) -> tuple[str, str] | None:
-    arxiv = _entry_arxiv_id(entry)
+    arxiv = entry_arxiv_id(entry)
     if arxiv:
         return "arxiv", arxiv
     doi = entry.fields.get("doi", "")
@@ -554,56 +547,6 @@ def _preprint_identity(entry: BibEntry) -> tuple[str, str] | None:
     if "ssrn.com" in url:
         return "ssrn", url
     return None
-
-
-def _entry_arxiv_id(entry: BibEntry) -> str | None:
-    for field_name in ("arxiv", "eprint"):
-        value = entry.fields.get(field_name)
-        if not value:
-            continue
-        archive = entry.fields.get("archiveprefix") or entry.fields.get("eprinttype") or ""
-        if field_name == "arxiv" or archive.lower() == "arxiv":
-            normalized = _normalize_arxiv(value)
-            if normalized:
-                return normalized
-    for field_name in ("url", "howpublished", "note"):
-        match = _ARXIV_URL_RE.search(entry.fields.get(field_name, ""))
-        if match:
-            normalized = _normalize_arxiv(match.group(1))
-            if normalized:
-                return normalized
-    return None
-
-
-def _normalize_arxiv(value: str) -> str | None:
-    cleaned = value.strip().strip("{}<>")
-    cleaned = re.sub(r"^arxiv:\s*", "", cleaned, flags=re.I)
-    match = _ARXIV_URL_RE.search(cleaned)
-    if match:
-        cleaned = match.group(1)
-    cleaned = cleaned.removesuffix(".pdf")
-    cleaned = _ARXIV_VERSION_RE.sub("", cleaned)
-    cleaned = cleaned.strip("/")
-    return cleaned.lower() or None
-
-
-def _parse_arxiv_atom(text: str, identifier: str) -> dict[str, str]:
-    try:
-        root = ET.fromstring(text)
-    except ET.ParseError as exc:
-        raise MetadataFetchError(f"arXiv returned invalid XML for {identifier}") from exc
-    ns = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
-    entry = root.find("atom:entry", ns)
-    if entry is None:
-        raise MetadataFetchError(f"arXiv returned no entry for {identifier}")
-    doi = _xml_text(entry, "arxiv:doi", ns)
-    journal = _xml_text(entry, "arxiv:journal_ref", ns)
-    return {"doi": doi, "journal": journal}
-
-
-def _xml_text(element: ET.Element, path: str, ns: dict[str, str]) -> str:
-    found = element.find(path, ns)
-    return " ".join((found.text or "").split()) if found is not None else ""
 
 
 def _similarity(left: str, right: str) -> float:

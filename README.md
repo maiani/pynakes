@@ -36,9 +36,9 @@ pynakes lint refs.bib --json
 # Preview the standard maintenance pass
 pynakes normalize refs.bib --dry-run --diff
 
-# Import a reference by DOI (preview, then apply)
-pynakes doi import refs.bib 10.5555/example --dry-run --diff
-pynakes doi import refs.bib 10.5555/example
+# Add a reference by DOI or arXiv id (preview, then apply)
+pynakes add refs.bib 10.5555/example --dry-run --diff
+pynakes add refs.bib arXiv:2301.00001
 
 # Rename a citation key across the .bib file and .tex sources
 pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/

@@ -8,8 +8,8 @@ from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 
 from pynakes.authors import last_name, split_name_list
-from pynakes.doi import canonical_doi
 from pynakes.editing import set_entry_field, set_entry_type
+from pynakes.importer import canonical_doi
 from pynakes.model import BibEntry, BibFile
 
 

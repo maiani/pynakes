@@ -11,9 +11,9 @@ import csv
 from dataclasses import dataclass
 from typing import Optional
 
-from pynakes.doi import normalize_doi
 from pynakes.editing import raw_field_names
 from pynakes.fields import title_capitalization_is_protected
+from pynakes.importer import normalize_doi
 from pynakes.journals import JOURNAL_FIELDS, JournalSources, expected_journal_title, load_sources
 from pynakes.keys import (
     UnsupportedCitationKeyPatternError,

@@ -206,7 +206,7 @@ def test_volume_import_doi_adds_entry_in_memory(monkeypatch) -> None:
   doi = {10.5555/example}
 }
 """
-    monkeypatch.setattr("pynakes.doi.fetch_bibtex_for_doi", lambda doi: provider_bibtex)
+    monkeypatch.setattr("pynakes.importer.fetch_bibtex_for_doi", lambda doi: provider_bibtex)
 
     entry = coll.import_doi("10.5555/example")
 

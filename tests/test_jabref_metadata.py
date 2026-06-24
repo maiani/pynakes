@@ -12,6 +12,7 @@ from pynakes.metadata import (
     DuplicateMetadataError,
     MetadataUpdate,
     consolidate_metadata,
+    library_database_type,
     library_save_actions,
     metadata_category,
     parse_save_actions,
@@ -145,6 +146,21 @@ def test_library_save_actions_reads_from_metadata() -> None:
     sa = library_save_actions(lib)
     assert sa is not None
     assert sa.has(("clean_up_doi", "short_doi"), ("doi",)) is True
+
+
+def test_library_database_type_reads_biblatex() -> None:
+    lib = parse_bib("@comment{jabref-meta: databaseType:biblatex;}\n")
+    assert library_database_type(lib) == "biblatex"
+
+
+def test_library_database_type_reads_bibtex() -> None:
+    lib = parse_bib("@comment{jabref-meta: databaseType:bibtex;}\n")
+    assert library_database_type(lib) == "bibtex"
+
+
+def test_library_database_type_defaults_to_bibtex_when_absent() -> None:
+    lib = parse_bib("@article{A, title = {T}}\n")
+    assert library_database_type(lib) == "bibtex"
 
 
 def test_parse_both_namespaces_and_merge_precedence() -> None:

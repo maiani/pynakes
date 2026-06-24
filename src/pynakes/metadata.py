@@ -159,6 +159,21 @@ def library_save_actions(lib: BibFile) -> SaveActions | None:
     return None
 
 
+def library_database_type(lib: BibFile) -> str:
+    """Return the library dialect from ``databaseType`` metadata.
+
+    Reads JabRef's ``databaseType`` key (tolerating its trailing ``;``) and
+    returns ``"biblatex"`` or ``"bibtex"``. Defaults to ``"bibtex"`` when the key
+    is absent or holds an unrecognized value, which is the safer baseline for
+    constructed entries (``@misc`` is valid in both dialects).
+    """
+    for key, value in lib.metadata.items():
+        if key.lower() == "databasetype":
+            normalized = value.strip().rstrip(";").strip().lower()
+            return "biblatex" if normalized == "biblatex" else "bibtex"
+    return "bibtex"
+
+
 def default_namespace(key: str) -> str:
     """Return the namespace a key should be written to by default.
 

@@ -190,25 +190,32 @@ pynakes fields protect-title refs.bib --field booktitle --term Proceedings
 This protects acronyms, uppercase/digit tokens, mixed-case terms such as
 `LaTeX`, and explicit terms.
 
-## doi import
+## add
 
-Import a BibTeX entry from a DOI.
+Add a reference by DOI **or** arXiv identifier. The identifier type is
+auto-detected, so the same command handles all of these:
 
 ```bash
-pynakes doi import refs.bib 10.5555/example --dry-run --diff
-pynakes doi import refs.bib https://doi.org/10.5555/example
+pynakes add refs.bib 10.5555/example --dry-run --diff
+pynakes add refs.bib https://doi.org/10.5555/example
+pynakes add refs.bib arXiv:2301.00001
+pynakes add refs.bib https://arxiv.org/abs/2301.00001
 ```
 
 Options:
 
 ```bash
-pynakes doi import refs.bib 10.5555/example --key ManualKey2026
-pynakes doi import refs.bib 10.5555/example --key-source provider
-pynakes doi import refs.bib 10.5555/example --allow-duplicate
+pynakes add refs.bib 10.5555/example --key ManualKey2026
+pynakes add refs.bib 10.5555/example --key-source provider
+pynakes add refs.bib 10.5555/example --allow-duplicate
 ```
 
-The command fetches BibTeX through DOI resolver content negotiation and checks
-for existing matching DOI fields before importing.
+DOIs are fetched through DOI-resolver content negotiation; arXiv ids are fetched
+from the arXiv Atom API (metadata only — no PDFs or linked files are
+downloaded). Existing matching DOI/arXiv references are detected before
+importing. arXiv entries are written as `@online` in BibLaTeX libraries and
+`@misc` in BibTeX ones, following the library's `databaseType` metadata
+(defaulting to BibTeX when unset).
 
 ## files
 

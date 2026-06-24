@@ -9,7 +9,7 @@ stage-then-commit lifecycle to multi-operation callers.
 Each operation is a dict ``{"op": "<name>", ...params}``. The supported names and
 their parameters are in :data:`OPERATION_SPECS` (also surfaced in
 ``capabilities``). Operations map to the deterministic, in-memory
-``Collection`` methods; network and conflict-prone operations (``doi import``,
+``Collection`` methods; network and conflict-prone operations (``add``,
 ``dedupe merge``) are intentionally excluded.
 """
 
