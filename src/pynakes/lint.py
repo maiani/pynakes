@@ -143,6 +143,7 @@ class LintIssue:
     field: Optional[str] = None
 
     def to_dict(self) -> dict:
+        """Serialize the finding to a JSON-friendly dict for CLI output."""
         return {
             "type": self.type,
             "severity": self.severity,

@@ -77,6 +77,7 @@ class NormalizeResult:
 
     @property
     def operations(self) -> dict[str, object]:
+        """Return the per-domain change counts as a single JSON-friendly dict."""
         return {
             "title_fields": dict(self.title_fields),
             "authors": self.authors,

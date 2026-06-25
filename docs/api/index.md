@@ -7,6 +7,12 @@ modules are also usable directly. Most operations mutate a `BibFile` in place
 and return counts or operation-specific results. The supported Python API and
 semantic-versioning promise are defined in [Public API & stability](../guides/api-stability.md).
 
+!!! tip "Looking for signatures, classes, and return types?"
+    The complete symbol reference — every public class, function, exception,
+    and constant — is generated from the source docstrings on the
+    [Module Reference](reference.md) page, so it never drifts from the code.
+    This page is a task-oriented tour of the same API.
+
 ## Data Models
 
 ### BibEntry
@@ -20,7 +26,7 @@ entry = BibEntry(
     fields={
         "author": "John Smith",
         "title": "A Great Paper",
-        "journal": "Nature",
+        "journal": "Journal of Examples",
         "year": "2020",
     },
 )
@@ -46,31 +52,18 @@ namespace; `BibFile.pynakes_metadata` / `.pynakes_metadata_blocks` hold the
 returns both namespaces in source order. Each block preserves its raw comment
 text, namespace, known/unknown classification, and category.
 
-### Core model concepts
-
-| Class | Concept | Important behavior |
-| --- | --- | --- |
-| `BibEntry` | One record plus source-preservation state | `fields` accepts standard and custom fields alike; `raw_content` lets an untouched source entry be emitted verbatim. |
-| `EntryStore` | Lossless collection of a file's entries | Maintains source order and duplicate keys. `get()`/`[]` use first-match lookup; `values()`, `get_all()`, and `duplicate_keys()` are duplicate-aware. |
-| `BibFile` | Parsed semantic view of one `.bib` file | Holds entries, top-level declarations/comments, JabRef blocks, encoding, and line ending. |
-| `MetadataBlock` | One structured top-level metadata comment | Keeps the raw comment alongside parsed key/value/category data. |
-| `Collection` | The working unit: a staged handle over one `.bib` file | Provides the lifecycle around a `BibFile`, not a second persistent source of truth. |
+The key entry points are `model.BibEntry`, `model.BibFile`, `model.EntryStore`,
+and `engine.Collection`; see their generated entries in the
+[Module Reference](reference.md) for field-by-field detail.
 
 ## Result and Analysis Objects
 
 Operation reports describe what an in-place operation did; they do not contain a
 replacement `BibFile`. Where present, `to_dict()` is the JSON-friendly form used
-by the CLI.
-
-| Domain | Classes | Concept |
-| --- | --- | --- |
-| Engine and I/O | `FileFingerprint`, `CommitResult`, `SaveResult` | External-change state, staged-commit outcome, and backup/write outcome. |
-| Normalization and conversion | `NormalizeOptions`, `NormalizeResult`, `ConvertResult` | Policy overrides, per-domain change counts, and conservative conversion warnings. |
-| Journals | `JournalMapping`, `JournalSources`, `JournalResult` | One exact mapping, the precedence-ordered lookup sources, and normalization outcome. |
-| Dedupe | `WorkIdentity`, `DuplicateCluster`, `MergeConflict`, `ClusterMerge`, `DedupeMergeReport` | Evidence records describe the same work, merge decisions, and ambiguity that blocks guessing. |
-| Integrity | `IntegrityIssue`, `VerifyReport`, `FieldUpdate`, `EnrichReport`, `PublishedCandidate`, `PublishedReport` | Provider-backed findings and the explicitly applied metadata changes. |
-| Files, usage, and lint | `LinkedFile`, `FileCheckReport`, `UsageReport`, `LintIssue` | Read-only analysis items and summaries. |
-| Metadata | `MetadataUpdate` | The exact raw comment replacement/insertion needed for a minimal-diff update. |
+by the CLI. The full set of report objects (per domain) and their fields are in
+the [Module Reference](reference.md) — for example `NormalizeResult`,
+`JournalResult`, `DedupeMergeReport`, `VerifyReport`, `UsageReport`, and
+`LintIssue`.
 
 Domain exceptions communicate recoverable failure categories: `ParseError` for
 invalid BibTeX; DOI import errors; `DuplicateMetadataError`; a
@@ -132,7 +125,7 @@ lib = parse_bib("""
 @article{Smith2020,
   author = {John Smith},
   title = {A Great Paper},
-  journal = {Nature},
+  journal = {Journal of Examples},
   year = {2020}
 }
 """)

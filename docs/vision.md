@@ -48,6 +48,4 @@ CI, and agents — with no dependency on any application above it.
 
 Cross-file corpus work (a `Library` over many collections, a derived search
 index, projections, format interop) is on the post-1.0 roadmap; see
-[DEVPLAN.md](../DEVPLAN.md). Application concerns — capture, reading, a GUI,
-sync, cloud — are explicitly **not** pynakes; they belong to downstream projects
-built on its pinned public API.
+[DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).

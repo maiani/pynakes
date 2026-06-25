@@ -43,8 +43,13 @@ pip install -e ".[dev]"      # or ".[dev,docs]" for the docs site
 pytest                       # full suite (fast; deterministic)
 ruff check src tests         # lint
 ruff format --check src tests
-zensical build               # docs site (needs the docs extra)
+mkdocs build                 # docs site (needs the docs extra)
+mkdocs serve                 # live-preview the docs at localhost:8000
 ```
+
+The API reference is generated from docstrings by `mkdocstrings`
+([docs/api/reference.md](docs/api/reference.md)); keep public-module docstrings
+accurate rather than hand-maintaining a symbol list.
 
 Run `pytest && ruff check src tests` before considering any change done.
 

@@ -21,6 +21,7 @@ class WorkIdentity:
     value: str
 
     def to_dict(self) -> dict[str, str]:
+        """Serialize the identity to a JSON-friendly dict."""
         return {"kind": self.kind, "value": self.value}
 
 
@@ -33,6 +34,7 @@ class DuplicateCluster:
     entries: list[BibEntry]
 
     def to_dict(self) -> dict[str, object]:
+        """Serialize the cluster (identity, reason, and members) to a dict."""
         return {
             "identity": self.identity.to_dict(),
             "reason": self.reason,
@@ -53,6 +55,7 @@ class MergeConflict:
     values: dict[str, str]
 
     def to_dict(self) -> dict[str, object]:
+        """Serialize the conflict (field and per-key values) to a dict."""
         return {
             "cluster": self.cluster.to_dict(),
             "field": self.field,
@@ -71,6 +74,7 @@ class ClusterMerge:
     type_changed: str | None = None
 
     def to_dict(self) -> dict[str, object]:
+        """Serialize the merge (primary, removed keys, and changes) to a dict."""
         return {
             "identity": self.identity.to_dict(),
             "primary_key": self.primary_key,
@@ -91,17 +95,21 @@ class DedupeMergeReport:
 
     @property
     def merged_clusters(self) -> int:
+        """Number of duplicate clusters that were merged."""
         return len(self.merged)
 
     @property
     def removed_entry_count(self) -> int:
+        """Number of entries removed as redundant duplicates."""
         return len(self.removed_entries)
 
     @property
     def modified_entries(self) -> int:
+        """Total entries affected: merged primaries plus removed duplicates."""
         return self.merged_clusters + self.removed_entry_count
 
     def to_dict(self) -> dict[str, object]:
+        """Serialize the merge report to a JSON-friendly dict for CLI output."""
         return {
             "clusters": [cluster.to_dict() for cluster in self.clusters],
             "merged": [item.to_dict() for item in self.merged],

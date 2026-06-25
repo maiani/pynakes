@@ -113,6 +113,7 @@ class ConvertResult:
 
     @property
     def operations(self) -> dict[str, int]:
+        """Return the per-domain conversion counts as a JSON-friendly dict."""
         return {
             "entries": self.entries,
             "fields_renamed": self.fields_renamed,

@@ -61,6 +61,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Smith…`) and produced spurious `citation_key_pattern_mismatch` lint warnings.
 
 ### Changed
+- **Docs site moved from Zensical to MkDocs + Material for MkDocs.** The
+  pre-1.0 `zensical` dependency is replaced by the stable `mkdocs`,
+  `mkdocs-material`, and `mkdocstrings[python]` docs extras (`mkdocs build` /
+  `mkdocs serve`). The Python API reference is now generated from source
+  docstrings via `mkdocstrings` (`docs/api/reference.md`) instead of a
+  hand-maintained symbol list, so it cannot drift from the code.
 - **`pynakes add` now inserts imported entries before a canonical trailing
   JabRef/pynakes metadata section**, preserving metadata as the final section
   of the library.

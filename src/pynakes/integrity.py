@@ -37,6 +37,7 @@ class IntegrityIssue:
     actual: str | None = None
 
     def to_dict(self) -> dict[str, object]:
+        """Serialize the finding to a JSON-friendly dict for CLI output."""
         return {
             "type": self.type,
             "severity": self.severity,
@@ -57,17 +58,21 @@ class VerifyReport:
 
     @property
     def errors(self) -> int:
+        """Number of error-severity findings."""
         return sum(1 for issue in self.issues if issue.severity == "error")
 
     @property
     def warnings(self) -> int:
+        """Number of warning-severity findings."""
         return sum(1 for issue in self.issues if issue.severity == "warning")
 
     @property
     def infos(self) -> int:
+        """Number of info-severity findings."""
         return sum(1 for issue in self.issues if issue.severity == "info")
 
     def to_dict(self) -> dict[str, object]:
+        """Serialize the report (counts and findings) to a JSON-friendly dict."""
         return {
             "checked": self.checked,
             "errors": self.errors,
@@ -86,6 +91,7 @@ class FieldUpdate:
     value: str
 
     def to_dict(self) -> dict[str, str]:
+        """Serialize the field update to a JSON-friendly dict."""
         return {"key": self.key, "field": self.field, "value": self.value}
 
 
@@ -98,13 +104,16 @@ class EnrichReport:
 
     @property
     def changed_entries(self) -> int:
+        """Number of distinct entries that received an enrichment update."""
         return len({update.key for update in self.updates})
 
     @property
     def changed_fields(self) -> int:
+        """Total number of field updates applied across all entries."""
         return len(self.updates)
 
     def to_dict(self) -> dict[str, object]:
+        """Serialize the enrichment report to a JSON-friendly dict."""
         return {
             "changed_entries": self.changed_entries,
             "changed_fields": self.changed_fields,
@@ -125,6 +134,7 @@ class PublishedCandidate:
     message: str = ""
 
     def to_dict(self) -> dict[str, object]:
+        """Serialize the candidate to a JSON-friendly dict."""
         return {
             "key": self.key,
             "source": self.source,
@@ -146,17 +156,21 @@ class PublishedReport:
 
     @property
     def checked(self) -> int:
+        """Number of preprint candidates examined."""
         return len(self.candidates)
 
     @property
     def published(self) -> int:
+        """Number of candidates found to have published metadata available."""
         return sum(1 for c in self.candidates if c.status in {"published", "published_present"})
 
     @property
     def changed_entries(self) -> int:
+        """Number of distinct entries that received a published-metadata update."""
         return len({update.key for update in self.updates})
 
     def to_dict(self) -> dict[str, object]:
+        """Serialize the published-check report to a JSON-friendly dict."""
         return {
             "checked": self.checked,
             "published": self.published,

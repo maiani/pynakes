@@ -90,6 +90,7 @@ class UsageReport:
     include_all: bool = False
 
     def to_dict(self) -> dict:
+        """Serialize the usage report to a JSON-friendly dict for CLI output."""
         return {
             "used": list(self.used),
             "unused": list(self.unused),
