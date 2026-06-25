@@ -169,6 +169,59 @@ class TestModifiedEntryFidelity:
         assert "Title B" in output
 
 
+class TestWholeFileLayoutFidelity:
+    """An unmodified file must write back byte-for-byte, preserving the exact
+    top-level ordering and the whitespace between blocks."""
+
+    def test_blank_lines_between_entries_preserved(self) -> None:
+        src = "@article{a,\n  title = {A},\n}\n\n\n@book{b,\n  title = {B},\n}\n"
+        assert write_bib(parse_bib(src)) == src
+
+    def test_trailing_metadata_not_relocated_to_top(self) -> None:
+        # JabRef writes metadata comments at the end; they must stay there.
+        src = (
+            "@article{a,\n  title = {A},\n  year = {2020},\n}\n\n"
+            "@comment{jabref-meta: databaseType:bibtex;}\n"
+        )
+        assert write_bib(parse_bib(src)) == src
+
+    def test_interleaved_comment_string_entry_order_preserved(self) -> None:
+        src = (
+            "% a leading line comment\n\n"
+            "@string{j = {Jrnl}}\n\n"
+            "@article{a,\n  journal = j,\n  title = {A},\n}\n\n"
+            "@comment{jabref-meta: databaseType:bibtex;}\n"
+        )
+        assert write_bib(parse_bib(src)) == src
+
+    def test_crlf_whole_file_round_trip(self) -> None:
+        src = "@article{a,\r\n  title = {A},\r\n}\r\n\r\n@book{b,\r\n  title = {B},\r\n}\r\n"
+        assert write_bib(parse_bib(src)) == src
+
+    def test_in_place_edit_changes_only_edited_entry(self) -> None:
+        src = "@article{a,\n  title = {A},\n  year = {2020}\n}\n\n@book{b,\n  title = {B}\n}\n"
+        lib = parse_bib(src)
+        lib.entries["b"].fields["title"] = "B revised"
+        lib.entries["b"].modified = True
+
+        output = write_bib(lib)
+        # Entry a and the blank-line spacing are untouched; only b changes.
+        assert "@article{a,\n  title = {A},\n  year = {2020}\n}\n\n@book{b," in output
+        assert "B revised" in output
+
+    def test_added_entry_falls_back_to_canonical_layout(self) -> None:
+        # A structural change invalidates the recorded positions; the writer
+        # must still emit every block (here via the derived canonical layout).
+        src = "@article{a,\n  title = {A},\n}\n"
+        lib = parse_bib(src)
+        lib.entries.add(BibEntry(key="b", type="book", fields={"title": "B"}))
+
+        output = write_bib(lib)
+        assert "@article{a" in output
+        assert "@book{b" in output
+        assert "B" in output
+
+
 class TestLineEndings:
     """Test line ending preservation."""
 

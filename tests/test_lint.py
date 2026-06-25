@@ -93,13 +93,14 @@ def test_crossref_child_fields_override_inherited_values() -> None:
 def test_crossref_cycle_is_tolerated() -> None:
     lib = parse_bib(
         "@inproceedings{First, author = {A. Author}, title = {Paper}, crossref = {Second}}\n"
-        "@proceedings{Second, booktitle = {Proceedings}, crossref = {First}}\n"
+        "@proceedings{Second, title = {Proceedings}, crossref = {First}}\n"
     )
 
     fields = lib.resolved_fields("First")
 
-    assert fields["author"] == "A. Author"
-    assert fields["booktitle"] == "Proceedings"
+    assert fields["author"] == "A. Author"  # inherited from the parent
+    assert fields["title"] == "Paper"  # own title kept despite the cycle
+    assert fields["booktitle"] == "Proceedings"  # parent's title remapped, no infinite loop
 
 
 def test_malformed_doi() -> None:

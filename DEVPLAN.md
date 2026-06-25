@@ -12,7 +12,8 @@ This document is the **road to 1.0**. Completed work is recorded in
 ## Current state (v0.3.0)
 
 The single-file engine is feature-rich, but it is **not release-ready** until
-the parser conformance gate below is complete:
+the two 0.4 hard gates below — input conformance and jabkit parity for bib-file
+operations — are complete:
 
 - **Parser/writer** with byte-for-byte round-trip fidelity; atomic,
   re-parse-validated writes with `.bak` backups; surgical minimal-diff editing.
@@ -55,14 +56,20 @@ style engine or a user's custom data-model validation rules.
 - [ ] Preserve arbitrary BibLaTeX entry types and custom data-model fields
       without a closed schema; cover `@set`, `@xdata`, inheritance references,
       and Unicode inputs.
-- [ ] Define and implement the BibLaTeX inheritance contract for every consumer
+- [x] Define and implement the BibLaTeX inheritance contract for every consumer
       of semantic fields: `crossref`, `xref`, `xdata`, and sets must either
       resolve with documented precedence or remain explicitly opaque. `lint`,
       `normalize`, key generation, and other field readers must have tests that
       prove they do not make incorrect assumptions about inherited data.
-- [ ] Preserve the complete top-level source sequence — comments, `@string`,
+      Implemented in `pynakes.inheritance` (own > xdata > crossref, with biber's
+      type-dependent title remapping; `xref`/sets opaque) and validated against
+      the `biber --tool --output-resolve` oracle.
+- [x] Preserve the complete top-level source sequence — comments, `@string`,
       `@preamble`, and entries — so an unmodified whole file writes back
       byte-for-byte. Preserve that ordering when an individual entry is edited.
+      The parser records a source layout (block order + inter-block whitespace)
+      and the writer renders from it; verified byte-for-byte on every fixture,
+      including the vendored `xampl.bib` and `biblatex-examples.bib`.
 - [ ] Expand the initial versioned core corpus, which now vendors the full
       upstream `xampl.bib` and `biblatex-examples.bib`, with real-world
       regression files. Every fixture must parse and parse again after write.
@@ -75,6 +82,53 @@ style engine or a user's custom data-model validation rules.
 - [ ] Exercise every modifying operation, serializer fallback, and surgical edit
       path on both `{...}` and `(...)` entries. Validate its output with the
       relevant pinned tool, including files that retain top-level declarations.
+
+## 0.4 hard gate — jabkit parity for bib-file operations
+
+To be a credible JabRef alternative, the pynakes CLI must cover every jabkit
+operation **that acts on a `.bib` file**. 0.4 is about being a reliable, complete
+bib editor; the PDF / GUI / capture-app scope question is deliberately deferred
+to 0.5 (below). "Covered" means a pynakes command (or documented combination)
+performs the equivalent operation with the agent-native JSON envelope and
+reviewable-diff workflow.
+
+The jabkit ([docs](https://docs.jabref.org/jabkit)) subcommands that operate on
+bib files:
+
+- [x] **generate-citation-keys** — `pynakes keys generate` (honors JabRef
+      `keypattern*` metadata).
+- [x] **check-integrity** — `pynakes verify` / `enrich` / `published`
+      (opt-in `--online`) plus `lint`.
+- [x] **generate-bib-from-aux** — `pynakes used <bib> <aux> --out cited.bib`
+      produces the cited-only subset.
+- [ ] **check-consistency** — jabkit reports, per entry type, fields present on
+      some entries of that type but missing on others. pynakes `lint` checks
+      required fields but has no cross-entry *consistency* report yet. Add a
+      `consistency` check (or a `lint` finding type).
+- [ ] **search** — query a library and return matches. pynakes has the
+      `--where` field filter and `used`, but no dedicated `search` command with
+      a query syntax over the whole library. Add one.
+- [ ] **convert** — jabkit converts between bibliography *formats*. pynakes
+      `convert` only changes BibTeX↔BibLaTeX dialect; the bibliographic-data
+      interchange formats (RIS, CSL-JSON, MODS, EndNote, …) are reading/writing
+      `.bib` data in another representation, so they belong in this gate. Pulled
+      forward from [Beyond 1.0](#beyond-10).
+
+jabkit subcommands that are **not** bib-file operations are out of 0.4 and feed
+the 0.5 scope decision below: **fetch** (capture entries from web providers —
+pynakes already imports by DOI/arXiv via `add`), **pdf** (read/write PDF XMP
+metadata), and **preferences** (persistent app-level configuration; pynakes
+currently expresses library policy through `jabref-meta`/`pynakes-meta`).
+
+## 0.5 — scope decision: PDF / GUI / capture
+
+Once 0.4 ships a reliable, complete bib editor, decide how far pynakes goes
+toward the remaining jabkit surface and JabRef-app territory. Inputs to the
+decision: jabkit's **fetch** (web/provider capture), **pdf** (PDF metadata), and
+**preferences** (app configuration), weighed against the philosophy's stance
+that capture, a PDF library, and a GUI are downstream concerns. The outcome may
+keep them downstream (a thin companion on the pinned API) or pull specific
+headless, deterministic pieces into the engine. Not decided here.
 
 ## Guiding principles (non-negotiable)
 
@@ -140,7 +194,9 @@ application would build on.
 
 - **Interoperability** — CSL-JSON import/export (Zotero/pandoc/citeproc lingua
   franca), RIS import/export, and first-class stable identifiers (DOI / arXiv /
-  OpenAlex / ORCID) shared by dedup, import, and verify.
+  OpenAlex / ORCID) shared by dedup, import, and verify. *(Note: the formats
+  jabkit's `convert` supports are pulled forward into the 0.4 jabkit-parity
+  gate; what remains here is interop beyond jabkit's surface.)*
 - **`Library` (corpus)** — `Library.open(dir)`; `collections()`,
   `collection(path)`; cross-file `search`/`find_key`/dedup (reusing the existing
   stable-identity machinery).

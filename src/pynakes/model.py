@@ -5,6 +5,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Optional, Union
 
+from pynakes.inheritance import resolve_entry_fields
+
 # A bare BibTeX string reference: an identifier with no surrounding braces or
 # quotes that may resolve to a @string definition.
 _BARE_IDENTIFIER = re.compile(r"^[A-Za-z][A-Za-z0-9_:-]*$")
@@ -375,6 +377,15 @@ class BibFile:
     pynakes_metadata_blocks: list[MetadataBlock] = field(default_factory=list)
     encoding: str = "utf-8"
     line_ending: str = "\n"
+    # Ordered top-level source layout, for byte-faithful whole-file round-trips.
+    # Each segment is ``(gap_before, kind, ref)``: ``kind`` is ``"comment"``,
+    # ``"string"``, or ``"preamble"`` (``ref`` indexes the matching list),
+    # ``"entry"`` (``ref`` is the :class:`BibEntry`), or ``"raw"`` (``ref`` is
+    # verbatim source text). ``source_trailing`` is the text after the last
+    # block. Both are empty for in-memory libraries, in which case the writer
+    # falls back to emitting blocks in canonical category order.
+    source_layout: list = field(default_factory=list)
+    source_trailing: str = ""
 
     def __post_init__(self) -> None:
         # Allow constructing from a dict or list for ergonomics/back-compat.
@@ -400,29 +411,19 @@ class BibFile:
         )
 
     def resolved_fields(self, entry: BibEntry | str) -> dict[str, str]:
-        """Return *entry*'s fields with ``crossref`` inheritance applied.
+        """Return *entry*'s fields with BibLaTeX inheritance applied.
 
-        Inherited values are a read-only semantic view: they are never copied
-        into ``BibEntry.fields`` and therefore never written into a child
-        record. A child's own field takes precedence. Missing parents and
-        cyclic cross-reference chains are tolerated.
+        Applies the ``xdata`` and ``crossref`` inheritance contract defined in
+        :mod:`pynakes.inheritance` (``xref`` and sets are opaque). Inherited
+        values are a read-only semantic view: they are never copied into
+        ``BibEntry.fields`` and therefore never written into a child record. An
+        entry's own fields take precedence. Missing parents and cyclic
+        references are tolerated.
         """
         target = self.entries.get(entry) if isinstance(entry, str) else entry
         if target is None:
             return {}
-        return self._resolved_fields(target, set())
-
-    def _resolved_fields(self, entry: BibEntry, seen: set[int]) -> dict[str, str]:
-        identity = id(entry)
-        if identity in seen:
-            return {}
-
-        inherited: dict[str, str] = {}
-        parent_key = entry.fields.get("crossref", "").strip()
-        parent = self.entries.get(parent_key) if parent_key else None
-        if parent is not None:
-            inherited = self._resolved_fields(parent, {*seen, identity})
-        return {**inherited, **entry.fields}
+        return resolve_entry_fields(target, self.entries.get)
 
     def to_dict(self) -> dict:
         """Serialize the bib file to a JSON-friendly dict."""

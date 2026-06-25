@@ -50,6 +50,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   required-field validation.
 
 ### Fixed
+- **BibLaTeX inheritance contract** (`crossref`, `xdata`, `xref`, sets):
+  `BibFile.resolved_fields` now matches biber's default data-model inheritance
+  instead of copying parent fields verbatim. `xdata` injects fields verbatim
+  (multiple/chained references supported); `crossref` inherits by same name but
+  remaps the title family by parent type (`proceedings.title` → child
+  `booktitle`, `mvbook.title` → `maintitle`, `periodical.title` →
+  `journaltitle`); `xref` and set members inherit nothing. Precedence is
+  own > xdata > crossref. This stops `lint` from, for example, falsely flagging
+  a crossref-inheriting `@inproceedings` as missing `booktitle`. The contract is
+  validated against `biber --tool --output-resolve` as a test oracle.
+- **Whole-file round-trip fidelity**: the writer now preserves the exact
+  top-level source ordering and the whitespace between blocks, so an unmodified
+  file writes back byte-for-byte and an in-place edit changes only the edited
+  entry. Previously blank lines between entries were dropped and trailing JabRef
+  metadata comments were relocated to the top of the file. The parser records a
+  source layout and the writer renders from it, deriving a canonical layout only
+  for in-memory or structurally changed libraries.
 - **BibTeX month expressions during normalization**: `normalize` now
   surgically rewrites invalid values such as `month = june` and canonicalizes
   standard macro casing such as `month = Jan` → `month = jan`, while

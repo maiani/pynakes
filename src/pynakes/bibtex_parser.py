@@ -67,12 +67,21 @@ def parse_bib(text: str) -> BibFile:
     jabref_metadata_blocks: list[MetadataBlock] = []
     pynakes_metadata_blocks: list[MetadataBlock] = []
 
+    # ``layout`` records every top-level construct in source order with the
+    # exact text (gap) that preceded it, so an unmodified file writes back
+    # byte-for-byte and ordering survives in-place edits. ``prev_end`` tracks
+    # the end of the last recognized block; the text up to the next block start
+    # is that block's leading gap.
+    layout: list = []
+    prev_end = 0
     position = 0
     while position < len(text):
         char = text[position]
         if char == "%" and not _is_escaped(text, position):
             line_end = _line_end(text, position)
             raw_comments.append(text[position:line_end])
+            layout.append((text[prev_end:position], "comment", len(raw_comments) - 1))
+            prev_end = line_end
             position = line_end
             continue
         if char != "@":
@@ -96,17 +105,25 @@ def parse_bib(text: str) -> BibFile:
         raw_block = text[position:block_end]
         body = text[header.end() : block_end - 1]
         line_num = _line_number(text, position)
+        gap = text[prev_end:position]
 
         if normalized_type == "string":
             key, value = _parse_string_def(body)
             if key is not None and value is not None:
                 strings[key] = value
                 raw_strings.append(raw_block)
+                layout.append((gap, "string", len(raw_strings) - 1))
+            else:
+                # A malformed ``@string`` is added to no list; keep its source
+                # verbatim so the file still round-trips.
+                layout.append((gap, "raw", raw_block))
         elif normalized_type == "preamble":
             # ``preamble`` deliberately retains its source delimiter and
             # formatting; it has no field/key structure to normalize.
             preambles.append(raw_block)
+            layout.append((gap, "preamble", len(preambles) - 1))
         elif normalized_type == "comment":
+            comment_index = len(raw_comments)
             _record_comment(
                 raw_block,
                 body,
@@ -114,6 +131,7 @@ def parse_bib(text: str) -> BibFile:
                 jabref_metadata_blocks,
                 pynakes_metadata_blocks,
             )
+            layout.append((gap, "comment", comment_index))
         else:
             entry = _parse_entry(entry_type, body, raw_block)
             if entry.key in entries:
@@ -123,7 +141,9 @@ def parse_bib(text: str) -> BibFile:
                     line_num,
                 )
             entries.add(entry)
+            layout.append((gap, "entry", entry))
 
+        prev_end = block_end
         position = block_end
 
     resolved_strings = resolve_string_definitions(strings)
@@ -144,6 +164,8 @@ def parse_bib(text: str) -> BibFile:
         pynakes_metadata=metadata_blocks_to_dict(pynakes_metadata_blocks),
         pynakes_metadata_blocks=pynakes_metadata_blocks,
         line_ending=line_ending,
+        source_layout=layout,
+        source_trailing=text[prev_end:],
     )
 
 
