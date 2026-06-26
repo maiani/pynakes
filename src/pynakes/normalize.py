@@ -258,7 +258,7 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
     # Journal abbreviation/expansion is *off* by default: it is opinionated and
     # not reversible without the right table, so it runs only when a style is
     # configured explicitly (CLI ``--journal-style`` or a ``normalize-journal-style``
-    # metadata key). The standalone ``journals`` commands are unaffected.
+    # metadata key).
     journal_style = _resolve_choice(
         lib, opts.journal_style, "journal-style", journal_ops.JOURNAL_STYLES, "none"
     )

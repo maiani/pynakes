@@ -40,9 +40,7 @@ def used(
     out: Optional[str] = typer.Option(
         None, "--out", help="Write a subset .bib containing only the used entries"
     ),
-    group: Optional[str] = typer.Option(
-        None, "--group", help="Tag used entries into this JabRef group"
-    ),
+    group: Optional[str] = typer.Option(None, "--group", help="Tag used entries into this group"),
     keyword: Optional[str] = typer.Option(
         None, "--keyword", help="Tag used entries with this keyword"
     ),

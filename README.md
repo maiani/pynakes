@@ -1,18 +1,18 @@
 # pynakes
 
-**A headless, round-trip-faithful maintenance toolkit for BibTeX, BibLaTeX, and JabRef-compatible `.bib` libraries.**
+**Version-control your bibliography.** `pynakes` makes small, explicit, reviewable edits to BibTeX/BibLaTeX `.bib` files — minimal diffs, dry-run previews, atomic writes, and structured JSON — deterministic enough to hand to a script, a CI pipeline, or an LLM agent.
 
-`pynakes` makes small, explicit, reviewable changes to bibliography files — without reformatting, reordering, or corrupting the metadata a human or reference manager curated. It is built for researchers, scripts, CI pipelines, and LLM-assisted workflows.
+It never reformats, reorders, or re-quotes the metadata a human or reference manager curated: an entry you don't touch is written back byte-for-byte, so the file stays diff-friendly in git and yours to keep for decades.
 
 Named after the *Pinakes*, Callimachus's catalog of the Library of Alexandria — antiquity's first bibliography.
 
 ## Why pynakes
 
+- **Reviewable by design.** Every modifying command previews as a unified diff (`--dry-run --diff`) before anything is written, then writes atomically with a `.bak` backup. Ambiguous cases — conflicting merges, duplicate DOIs — are reported with exit code `2` rather than guessed.
 - **Round-trip fidelity.** An entry you don't touch is written back byte-for-byte. pynakes never normalizes whitespace, reorders fields, or re-quotes values behind your back — so diffs stay tiny and reviewable.
-- **JabRef-compatible — and a superset.** It reads JabRef's own metadata and `saveActions`, normalizing the way JabRef would; it adds the `pynakes-meta` namespace only where JabRef has no equivalent.
-- **Reviewable by design.** Every modifying command previews as a unified diff (`--dry-run --diff`) before anything is written, then writes atomically with a `.bak` backup.
-- **Conservative.** Conversions, deduplication, and enrichment report conflicts and exit `2` rather than guessing.
 - **Built for agents and CI.** Stable JSON output and exit codes, machine-readable `capabilities`, and `--strict` / pre-commit gates that lint a bibliography like source code.
+- **Deterministic and offline by default.** No hidden time, randomness, or ordering; network access is explicit (`--online`) and confined to the few commands that need it.
+- **Losslessly interoperable.** Reads and writes the BibTeX/BibLaTeX toolchain's files unchanged, and round-trips JabRef's own metadata and `saveActions` — adding the `pynakes-meta` namespace only where no existing equivalent exists.
 
 ## Installation
 
@@ -29,7 +29,7 @@ See [Installation](docs/guides/installation.md) for full setup instructions incl
 ## Quick start
 
 ```bash
-# Inspect a library and check for issues
+# Inspect a library, then check for issues
 pynakes inspect refs.bib
 pynakes lint refs.bib --json
 

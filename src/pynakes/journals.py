@@ -216,8 +216,7 @@ def _looks_like_header(row: list[str]) -> bool:
 def unknown_journal_warnings(titles: list[str]) -> list[dict[str, str]]:
     """Build the standard ``unknown_journal`` warning dicts for unresolved titles.
 
-    Single source of truth for the warning shape shared by ``pynakes journals``
-    and the ``normalize`` routine.
+    Single source of truth for the warning shape used by the ``normalize`` routine.
     """
     return [
         {

@@ -26,7 +26,7 @@ pynakes inspect refs.bib --json
 ```
 
 `inspect` reports entry count, encoding, line endings, entries, duplicate keys,
-JabRef library metadata, and lint issues.
+and JabRef library metadata. Use `lint` for validation findings.
 
 ## 3. Inspect JabRef Metadata
 

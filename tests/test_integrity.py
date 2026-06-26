@@ -115,7 +115,7 @@ def test_enrich_cli_dry_run_diff_json(monkeypatch, tmp_path: Path) -> None:
     assert bib.read_text() == original
 
 
-def test_published_apply_cli_uses_arxiv_metadata(monkeypatch, tmp_path: Path) -> None:
+def test_enrich_published_cli_uses_arxiv_metadata(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(integrity, "fetch_arxiv_atom", lambda identifier: ARXIV_XML)
     bib = tmp_path / "refs.bib"
     original = (
@@ -131,15 +131,15 @@ def test_published_apply_cli_uses_arxiv_metadata(monkeypatch, tmp_path: Path) ->
 
     result = runner.invoke(
         app,
-        ["published", str(bib), "--online", "--apply", "--dry-run", "--diff", "--json"],
+        ["enrich", str(bib), "--published", "--online", "--dry-run", "--diff", "--json"],
     )
     data = json.loads(result.output)
 
     assert result.exit_code == 0, result.output
     assert data["status"] == "success"
-    assert data["action"] == "published_apply"
+    assert data["action"] == "enrich"
     assert data["modified"] is True
-    assert data["published"] == 1
+    assert data["preprints"]["published"] == 1
     assert "+  doi = {10.5555/published}" in data["diff"]
     assert "+  journal = {Journal of Published Tests 12, 34}" in data["diff"]
     assert "-@misc{Preprint," in data["diff"]

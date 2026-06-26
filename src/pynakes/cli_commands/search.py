@@ -1,0 +1,71 @@
+"""CLI command registration for bibliography search."""
+
+import json as _json
+from typing import Optional
+
+import typer
+
+from pynakes import fields as fields_ops
+from pynakes import search as search_ops
+from pynakes.cli_common import _entries, _safe
+from pynakes.io import load_bib
+
+
+def search(
+    file: str = typer.Argument(..., help="Path to the .bib file"),
+    query: str = typer.Argument(
+        ...,
+        help='Search query: words/phrases, optionally scoped as field:term or field:"phrase"',
+    ),
+    field: Optional[list[str]] = typer.Option(
+        None,
+        "--field",
+        help="Restrict stored fields searched and returned; repeat for multiple fields",
+    ),
+    where: Optional[str] = typer.Option(None, "--where", help="Filter expression"),
+    case_sensitive: bool = typer.Option(False, "--case-sensitive", help="Match case sensitively"),
+    limit: Optional[int] = typer.Option(None, "--limit", help="Maximum number of matches"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Search entries by free text, phrases, or field-scoped terms."""
+    lib = load_bib(file)
+    where_filter = fields_ops.parse_query(where) if where is not None else None
+    results = search_ops.search_entries(
+        lib,
+        query,
+        fields=field,
+        where=where_filter,
+        case_sensitive=case_sensitive,
+        limit=limit,
+    )
+
+    if json_output:
+        typer.echo(
+            _json.dumps(
+                {
+                    "status": "success",
+                    "action": "search",
+                    "file": file,
+                    "query": query,
+                    "where": where,
+                    "fields": field or [],
+                    "case_sensitive": case_sensitive,
+                    "limit": limit,
+                    "count": len(results),
+                    "matches": [result.to_dict() for result in results],
+                },
+                indent=2,
+            )
+        )
+        return
+
+    typer.echo(f"{file}: {len(results)} matching {_entries(len(results))}.")
+    for result in results:
+        title = result.fields.get("title")
+        suffix = f" — {title}" if title else ""
+        typer.echo(f"  @{result.type}{{{result.key}}}{suffix} [{', '.join(result.matched_fields)}]")
+
+
+def register(app: typer.Typer) -> None:
+    """Register this command on its Typer application."""
+    app.command()(_safe(search))

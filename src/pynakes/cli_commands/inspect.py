@@ -13,21 +13,37 @@ from pynakes.cli_common import (
     _safe,
 )
 from pynakes.io import load_bib
-from pynakes.lint import lint as lint_lib
 
 # --- inspect ---------------------------------------------------------------
 
 
 def inspect(
     file: str = typer.Argument(..., help="Path to the .bib file"),
+    resolved: bool = typer.Option(
+        False,
+        "--resolved",
+        help="Include each entry's resolved fields (crossref/xdata inheritance applied)",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Inspect a .bib file structure."""
+    """Inspect a .bib file structure.
+
+    The JSON form is the canonical structured read of a library: every entry
+    with its fields, the ``@string``/``@preamble``/comment declarations, both
+    metadata namespaces, encoding, line ending, and duplicate keys. With
+    ``--resolved`` each entry also carries its inherited (crossref/xdata) field
+    view.
+    """
     lib = load_bib(file)
-    issues = lint_lib(lib)
     duplicates = lib.entries.duplicate_keys()
 
     if json_output:
+        entries = []
+        for entry in lib.entries.values():
+            record = {"key": entry.key, "type": entry.type, "fields": dict(entry.fields)}
+            if resolved:
+                record["resolved_fields"] = lib.resolved_fields(entry)
+            entries.append(record)
         result = {
             "status": "success",
             "action": "inspect",
@@ -35,10 +51,10 @@ def inspect(
             "encoding": lib.encoding,
             "line_ending": "crlf" if lib.line_ending == "\r\n" else "lf",
             "entry_count": len(lib.entries),
-            "entries": [
-                {"key": e.key, "type": e.type, "fields": dict(e.fields)}
-                for e in lib.entries.values()
-            ],
+            "entries": entries,
+            "strings": dict(lib.strings),
+            "preamble": list(lib.preamble),
+            "comments": list(lib.raw_comments),
             "jabref_metadata": {
                 "values": dict(lib.jabref_metadata),
                 "blocks": [block.to_dict() for block in lib.jabref_metadata_blocks],
@@ -48,18 +64,27 @@ def inspect(
                 "blocks": [block.to_dict() for block in lib.pynakes_metadata_blocks],
             },
             "duplicate_keys": duplicates,
-            "issues": [i.to_dict() for i in issues],
         }
         typer.echo(_json.dumps(result, indent=2))
         return
 
     le = "CRLF" if lib.line_ending == "\r\n" else "LF"
     typer.echo(f"{file}: {len(lib.entries)} {_entries(len(lib.entries))} ({lib.encoding}, {le})")
+    declarations = []
+    if lib.strings:
+        declarations.append(f"{len(lib.strings)} @string")
+    if lib.preamble:
+        declarations.append(f"{len(lib.preamble)} @preamble")
+    if lib.raw_comments:
+        declarations.append(f"{len(lib.raw_comments)} comment(s)")
+    if declarations:
+        typer.echo(f"  {', '.join(declarations)}")
     for entry in lib.entries.values():
-        typer.echo(f"  @{entry.type}{{{entry.key}}}  ({len(entry.fields)} fields)")
+        count = len(lib.resolved_fields(entry)) if resolved else len(entry.fields)
+        suffix = " resolved" if resolved else ""
+        typer.echo(f"  @{entry.type}{{{entry.key}}}  ({count}{suffix} fields)")
     if duplicates:
         typer.echo(f"Duplicate keys: {', '.join(f'{k} ×{n}' for k, n in duplicates.items())}")
-    typer.echo(f"Issues: {len(issues)}")
 
 
 def register(app: typer.Typer) -> None:

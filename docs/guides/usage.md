@@ -26,8 +26,8 @@ pynakes inspect refs.bib --json
 ```
 
 JSON output includes file encoding, line ending, entries, duplicate keys, and
-lint issues. It also includes structured JabRef library metadata under
-`jabref_metadata`.
+structured JabRef library metadata under `jabref_metadata`. Use `lint` for
+validation findings.
 
 ## lint
 
@@ -266,7 +266,7 @@ Default behavior:
 - normalize author/editor lists in JabRef style
 - normalize DOI values
 - lowercase entry types and field names
-- abbreviate journal titles using exact mappings and LTWA-style generation
+- leave journal titles unchanged unless a journal style is configured
 
 Useful overrides:
 
@@ -282,11 +282,15 @@ pynakes normalize refs.bib --identifier-case off
 Journal source tables:
 
 ```bash
-pynakes normalize refs.bib --journal-table journals.csv --ltwa-table ltwa.csv
+pynakes normalize refs.bib --journal-style abbreviated --journal-table journals.csv --ltwa-table ltwa.csv
 ```
 
 `journals.csv` accepts `title`, `abbreviation`, and optional `issn` columns.
 LTWA tables accept `Word` and `Abbreviation` columns.
+
+To expand abbreviated titles back to full names, use `--journal-style full`.
+To check journal-title conformance without modifying the file, set
+`normalize-journal-style` metadata and run `pynakes lint refs.bib`.
 
 Normalization preferences live in metadata. pynakes-specific settings (no
 JabRef equivalent) go in `pynakes-meta`, under the `normalize-` key prefix.
@@ -341,17 +345,20 @@ Export only cited entries:
 pynakes used refs.bib paper.tex --out cited-only.bib
 ```
 
-## merge
+## combine
 
-Combine several `.bib` files into one. Inputs are read-only; the combined file is
+Union several `.bib` files into one. Inputs are read-only; the combined file is
 created (atomic write). Duplicate citation keys across inputs are kept and
 reported by default; `--dedupe` collapses entries that share a key when their
 content is identical and reports a **conflict** (exit `2`) when it differs,
 rather than guessing.
 
+(`combine` unions whole files; merging two records of the *same* work is a
+different operation — see [`dedupe merge`](#dedupe).)
+
 ```bash
-pynakes merge a.bib b.bib --out combined.bib
-pynakes merge a.bib b.bib --out combined.bib --dedupe --dry-run --diff
+pynakes combine a.bib b.bib --out combined.bib
+pynakes combine a.bib b.bib --out combined.bib --dedupe --dry-run --diff
 ```
 
 ## split
@@ -381,44 +388,30 @@ Routing is **first match** by default — each entry lands in the first output
 whose predicate matches, so the outputs are a partition. Pass `--copy` to send an
 entry to *every* matching output instead (outputs may then overlap). Entries that
 match no rule are dropped and reported under `unrouted`. `--dedupe` applies to the
-in-memory merge, exactly as for `merge`.
+in-memory merge, exactly as for `combine`.
 
 ## convert
 
-Convert between BibTeX and BibLaTeX field/type conventions.
-The target is required: pynakes does not infer it from JabRef's
-`databaseType` metadata.
+Convert between BibTeX and BibLaTeX field/type conventions (in place), or
+export/import the interchange formats CSL-JSON and RIS. The target is required:
+pynakes does not infer it from JabRef's `databaseType` metadata.
 
 ```bash
+# Dialect conversion (edits the .bib in place, with a reviewable diff):
 pynakes convert refs.bib --to biblatex --dry-run --diff
 pynakes convert refs.bib --to bibtex
+
+# Export to an interchange format (stdout, or --out FILE):
+pynakes convert refs.bib --to csl-json --out refs.json
+pynakes convert refs.bib --to ris
+
+# Import an interchange format to BibTeX:
+pynakes convert records.ris --from ris --out refs.bib
+pynakes convert items.json --from csl-json
 ```
 
-## journals
-
-Abbreviate, expand, or check journal titles.
-
-```bash
-pynakes journals abbreviate refs.bib --dry-run --diff
-pynakes journals expand refs.bib
-pynakes journals check refs.bib --json
-```
-
-The journal commands accept the same `--journal-table` and `--ltwa-table`
-options as `normalize`.
-
-To use the same lists as JabRef, download a CSV from
-[abbrv.jabref.org](https://github.com/JabRef/abbrv.jabref.org) (e.g.
-`journals/journal_abbreviations_general.csv`) and pass it directly — pynakes
-reads JabRef's headerless `"Full Name","Abbreviation"` format as-is:
-
-```bash
-pynakes journals abbreviate refs.bib --journal-table journal_abbreviations_general.csv
-pynakes journals expand   refs.bib --journal-table journal_abbreviations_general.csv
-```
-
-The same table drives both directions: `abbreviate` maps full → short, `expand`
-maps short → full.
+Export/import map the common entry types and fields; unmapped fields are
+dropped rather than guessed. (MODS and EndNote are not yet supported.)
 
 ## capabilities
 
@@ -428,6 +421,19 @@ Print the machine-readable command/capability description.
 pynakes capabilities
 pynakes capabilities --json
 ```
+
+## search
+
+Search entries without modifying the library.
+
+```bash
+pynakes search refs.bib learning
+pynakes search refs.bib 'title:"natural language" type:article' --json
+pynakes search refs.bib widgets --field title --where 'year = 2024' --json
+```
+
+Terms are ANDed. Quoted phrases stay together. `field:term` scopes a term to a
+field; plain terms search the key, type, and stored fields.
 
 ## dedupe
 
@@ -441,7 +447,7 @@ pynakes dedupe merge refs.bib --dry-run --diff
 `merge` exits with code `2` when field values disagree and cannot be safely
 resolved.
 
-## verify / enrich / published
+## verify / enrich
 
 Integrity and enrichment commands never use the network unless `--online` is
 passed. Online provider responses are cached beside the `.bib` file by default,
@@ -449,14 +455,16 @@ or in `--cache-dir` when supplied.
 
 ```bash
 pynakes verify refs.bib --online --strict --json
+pynakes verify refs.bib --online --published --json
 pynakes enrich refs.bib --online --dry-run --diff
-pynakes published refs.bib --online --json
-pynakes published refs.bib --online --apply --dry-run --diff
+pynakes enrich refs.bib --online --published --dry-run --diff
 ```
 
 `verify --strict` exits with code `1` when warnings or errors are reported.
-`enrich` only fills missing fields. `published --apply` preserves the preprint
-identifier and only adds missing DOI/journal metadata.
+`enrich` only fills missing fields. The `--published` flag folds in the
+preprint published-version workflow: on `verify` it reports (read-only) preprints
+that now have a published version; on `enrich` it promotes them — preserving the
+preprint identifier and adding the published DOI/journal metadata.
 
 ## Best Practices
 

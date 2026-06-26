@@ -35,7 +35,7 @@ A: `--dry-run` shows what *would* happen without modifying the file. Always use 
 A: Not by default. Writes are atomic (write-to-temp-then-rename) and
 re-parse-validated, so the original is never left half-written. If you also want
 a `<file>.bak` copy of the previous contents, pass `--backup` to the modifying
-command (`normalize`, `convert`, `journals abbreviate`, `journals expand`).
+command (`normalize`, `convert`, `batch`, `combine`, or `split`).
 
 ### Q: Can I use pynakes with BibLaTeX?
 
@@ -138,9 +138,10 @@ A: DOI import is implemented:
 pynakes add refs.bib 10.5555/example --dry-run --diff
 ```
 
-`verify`, `enrich`, and `published` also support opt-in provider lookups with
-`--online`; responses are cached and modifying enrichment commands support
-`--dry-run --diff`. Abstract/PDF metadata extraction is still out of scope.
+`verify` and `enrich` also support opt-in provider lookups with `--online` (and
+a `--published` flag for preprint published-version checks/promotion); responses
+are cached and modifying enrichment commands support `--dry-run --diff`.
+Abstract/PDF metadata extraction is still out of scope.
 
 ## Agent & Automation
 

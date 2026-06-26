@@ -3,9 +3,10 @@
 Reports issues as a flat list of :class:`LintIssue` objects, each tagged with a
 severity (``error`` or ``warning``), the offending entry key, and a message.
 Checks: duplicate keys, missing required fields (by entry type), undefined
-BibTeX string references, malformed or missing DOIs, malformed JabRef
-``groups`` formatting, noncanonical entry-type / field-name casing, and
-deviations from the library's stored metadata profile.
+BibTeX string references, cross-entry field consistency (a field most entries
+of a type define but some omit), malformed or missing DOIs, malformed JabRef
+``groups`` formatting, noncanonical entry-type / field-name casing, unresolved
+journal titles, and deviations from the library's stored metadata profile.
 """
 
 import csv
@@ -41,6 +42,42 @@ _REQUIRED: dict[str, list[tuple[str, ...]]] = {
 # Entry types for which a missing DOI is worth a (low-severity) warning.
 _DOI_EXPECTED = {"article", "inproceedings"}
 
+# Fields excluded from the cross-entry consistency check: structural/reference
+# fields (not bibliographic data) and JabRef-internal management fields that
+# legitimately vary from entry to entry (group membership, file links, dates).
+_CONSISTENCY_SKIP_FIELDS = frozenset(
+    {
+        "crossref",
+        "xref",
+        "xdata",
+        "entryset",
+        "entrysubtype",
+        "ids",
+        "related",
+        "relatedtype",
+        "relatedstring",
+        "relatedoptions",
+        "sortkey",
+        "options",
+        "presort",
+        "groups",
+        "file",
+        "owner",
+        "timestamp",
+        "creationdate",
+        "modificationdate",
+        "comment",
+        "priority",
+        "ranking",
+        "readstatus",
+        "relevance",
+        "printed",
+        "qualityassured",
+        "__markedentry",
+        "marked",
+    }
+)
+
 # Profile findings remain warnings for interactive use, but ``lint --strict``
 # treats them as a failed conformance gate. Ordinary advisory lint warnings
 # (such as a missing DOI) remain advisory even in strict mode.
@@ -52,6 +89,7 @@ PROFILE_ISSUE_TYPES = frozenset(
         "title_capitalization_unprotected",
         "unsupported_citation_key_pattern",
         "invalid_profile_setting",
+        "unknown_journal",
     }
 )
 
@@ -211,6 +249,65 @@ def lint(lib: BibFile) -> list[LintIssue]:
         issues.extend(_lint_entry(entry, lib.resolved_fields(entry)))
         issues.extend(_lint_profile_entry(entry, lib, profile, journal_sources))
 
+    issues.extend(_lint_field_consistency(lib))
+
+    return issues
+
+
+def _lint_field_consistency(lib: BibFile) -> list[LintIssue]:
+    """Report fields a majority of same-type entries define but some omit.
+
+    This is the analogue of JabRef's consistency check, scoped to be useful as
+    an always-on linter: a field is flagged for an entry only when a strict
+    majority of the entries of that entry type carry it (after inheritance) and
+    this entry does not. Required fields (reported separately) and JabRef
+    structural/management fields are excluded. Findings are advisory warnings;
+    they do not fail ``lint --strict``. A field common to *all* same-type
+    entries, or unique to a few, is not an inconsistency.
+    """
+    by_type: dict[str, list[BibEntry]] = {}
+    for entry in lib.entries.values():
+        if entry.key.strip():
+            by_type.setdefault(entry.type.lower(), []).append(entry)
+
+    issues: list[LintIssue] = []
+    for etype, entries in by_type.items():
+        total = len(entries)
+        if total < 3:
+            # A majority among one or two entries is uninformative.
+            continue
+        required = {name for alternatives in _REQUIRED.get(etype, []) for name in alternatives}
+        resolved = [lib.resolved_fields(entry) for entry in entries]
+
+        present_counts: dict[str, int] = {}
+        for fields in resolved:
+            for name, value in fields.items():
+                if value and value.strip():
+                    present_counts[name] = present_counts.get(name, 0) + 1
+
+        majority = {
+            name
+            for name, count in present_counts.items()
+            if count < total  # not common to all -> a real divergence
+            and count * 2 > total  # held by a strict majority
+            and name not in required
+            and name not in _CONSISTENCY_SKIP_FIELDS
+        }
+
+        for entry, fields in zip(entries, resolved):
+            for name in sorted(majority):
+                if not fields.get(name, "").strip():
+                    issues.append(
+                        LintIssue(
+                            "inconsistent_field",
+                            "warning",
+                            f"{etype} entry {entry.key!r} is missing field {name!r}, which "
+                            f"{present_counts[name]} of {total} {etype} entries define",
+                            key=entry.key,
+                            field=name,
+                        )
+                    )
+
     return issues
 
 
@@ -334,7 +431,18 @@ def _lint_profile_entry(
             expected_title = expected_journal_title(
                 title, entry, profile.journal_style, journal_sources
             )
-            if expected_title is not None and expected_title != title:
+            if expected_title is None:
+                issues.append(
+                    LintIssue(
+                        "unknown_journal",
+                        "warning",
+                        f"Entry {entry.key!r} field {field!r} has no known "
+                        f"{profile.journal_style!r} journal mapping for {title!r}",
+                        key=entry.key,
+                        field=field,
+                    )
+                )
+            elif expected_title != title:
                 issues.append(
                     LintIssue(
                         "journal_style_mismatch",

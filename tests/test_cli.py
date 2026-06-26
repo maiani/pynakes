@@ -195,6 +195,34 @@ class TestInspectAndLint:
         data = json.loads(result.output)
         assert data["entry_count"] == 5
         assert {e["key"] for e in data["entries"]} >= {"Smith2020", "Jones2021"}
+        assert "issues" not in data
+
+    def test_inspect_json_includes_declarations_and_resolved_fields(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@string{j = {Jrnl}}\n\n"
+            "@proceedings{p, title = {Proc}, year = {2020}}\n\n"
+            "@inproceedings{c, crossref = {p}, title = {Paper}, author = {A, B}}\n"
+        )
+        result = runner.invoke(app, ["inspect", str(bib), "--resolved", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["strings"] == {"j": "Jrnl"}
+        assert "preamble" in data and "comments" in data
+        child = next(e for e in data["entries"] if e["key"] == "c")
+        # raw fields lack booktitle; resolved view inherits it from the parent.
+        assert "booktitle" not in child["fields"]
+        assert child["resolved_fields"]["booktitle"] == "Proc"
+
+    def test_inspect_human_does_not_run_lint(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n")
+
+        result = runner.invoke(app, ["inspect", str(bib)])
+
+        assert result.exit_code == 0, result.output
+        assert "@article{A}" in result.output
+        assert "Issues:" not in result.output
 
     def test_lint_json_reports_duplicates(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "duplicate_entries.bib")
@@ -252,6 +280,76 @@ class TestInspectAndLint:
 
         strict = runner.invoke(app, ["lint", str(bib), "--strict", "--json"])
         assert strict.exit_code == 1, strict.output
+
+
+class TestSearchCommand:
+    def test_search_json_reports_matches(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Alpha2024,\n"
+            "  author = {Avery Example},\n"
+            "  title = {Neural Widgets for Small Libraries},\n"
+            "  year = {2024}\n"
+            "}\n\n"
+            "@book{Beta2023,\n"
+            "  author = {Blair Example},\n"
+            "  title = {Manual Widgets},\n"
+            "  year = {2023}\n"
+            "}\n"
+        )
+
+        result = runner.invoke(app, ["search", str(bib), "neural widgets", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["status"] == "success"
+        assert data["action"] == "search"
+        assert data["count"] == 1
+        assert data["matches"][0]["key"] == "Alpha2024"
+        assert data["matches"][0]["matched_fields"] == ["title"]
+
+    def test_search_supports_field_terms_and_where_filter(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Alpha2024,\n"
+            "  title = {Graph Widgets},\n"
+            "  year = {2024}\n"
+            "}\n\n"
+            "@book{Beta2024,\n"
+            "  title = {Graph Widgets},\n"
+            "  year = {2024}\n"
+            "}\n"
+        )
+
+        result = runner.invoke(
+            app,
+            ["search", str(bib), "title:graph", "--where", "type = article", "--json"],
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert [match["key"] for match in data["matches"]] == ["Alpha2024"]
+
+    def test_search_human_output_is_clean(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@misc{Alpha,\n  title = {Plain Widget Note}\n}\n")
+
+        result = runner.invoke(app, ["search", str(bib), "widget"])
+
+        assert result.exit_code == 0, result.output
+        assert "1 matching entry" in result.output
+        assert "@misc{Alpha}" in result.output
+
+    def test_search_invalid_query_is_structured(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@misc{Alpha,\n  title = {Plain Widget Note}\n}\n")
+
+        result = runner.invoke(app, ["search", str(bib), '"unterminated', "--json"])
+
+        assert result.exit_code == 1, result.output
+        data = json.loads(result.output)
+        assert data["status"] == "error"
+        assert data["error"] == "InvalidInput"
 
 
 class TestFilesCommand:
@@ -1068,7 +1166,59 @@ class TestConvertCommand:
 
         assert result.exit_code == 1, result.output
         data = json.loads(result.output)
-        assert data["error"] == "InvalidInput"
+        assert data["error"] == "UnknownConvertTarget"
+
+    def test_convert_export_to_csl_json_stdout(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{A, author = {Doe, J}, title = {T}, journal = {J}, year = {2020}}\n"
+        )
+
+        result = runner.invoke(app, ["convert", str(bib), "--to", "csl-json"])
+
+        assert result.exit_code == 0, result.output
+        items = json.loads(result.output)
+        assert items[0]["id"] == "A"
+        assert items[0]["type"] == "article-journal"
+        assert bib.read_text().startswith("@article{A,")  # source untouched
+
+    def test_convert_export_to_ris_file(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{A, author = {Doe, J}, title = {T}, journal = {J}, year = {2020}}\n"
+        )
+        out = tmp_path / "refs.ris"
+
+        result = runner.invoke(
+            app, ["convert", str(bib), "--to", "ris", "--out", str(out), "--json"]
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert (data["to"], data["written"], data["entry_count"]) == ("ris", True, 1)
+        assert "TY  - JOUR" in out.read_text()
+
+    def test_convert_import_from_ris(self, tmp_path: Path) -> None:
+        ris = tmp_path / "in.ris"
+        ris.write_text("TY  - JOUR\nAU  - Doe, Jane\nTI  - A Study\nPY  - 2021\nER  - \n")
+
+        result = runner.invoke(app, ["convert", str(ris), "--from", "ris"])
+
+        assert result.exit_code == 0, result.output
+        assert "@article{" in result.output
+        assert "author = {Doe, Jane}" in result.output
+        assert "title = {A Study}" in result.output
+
+    def test_convert_import_foreign_to_foreign_rejected(self, tmp_path: Path) -> None:
+        src = tmp_path / "in.ris"
+        src.write_text("TY  - JOUR\nER  - \n")
+
+        result = runner.invoke(
+            app, ["convert", str(src), "--from", "ris", "--to", "csl-json", "--json"]
+        )
+
+        assert result.exit_code == 1, result.output
+        assert json.loads(result.output)["error"] == "UnsupportedConversion"
 
 
 class TestErrorHandling:
@@ -1172,58 +1322,6 @@ class TestEnvelopeConsistency:
         assert "input_path" not in data  # standardized to "file"
 
 
-class TestJournalsCommand:
-    def test_abbreviate_writes(self, tmp_path: Path) -> None:
-        bib = _copy(tmp_path, "simple.bib")
-        result = runner.invoke(app, ["journals", "abbreviate", str(bib), "--json"])
-        assert result.exit_code == 0, result.output
-        data = json.loads(result.output)
-        assert data["action"] == "journals_abbreviate"
-        assert data["modified_entries"] == 1
-        assert "journal = {Nat. Mach. Intell.}" in bib.read_text()
-
-    def test_expand_reverses_exact_mapping(self, tmp_path: Path) -> None:
-        bib = tmp_path / "refs.bib"
-        bib.write_text("@article{A,\n  title = {X},\n  journal = {Phys. Rev. Lett.}\n}\n")
-        result = runner.invoke(app, ["journals", "expand", str(bib)])
-        assert result.exit_code == 0, result.output
-        assert "journal = {Physical Review Letters}" in bib.read_text()
-
-    def test_abbreviate_then_expand_round_trips(self, tmp_path: Path) -> None:
-        bib = _copy(tmp_path, "simple.bib")
-        runner.invoke(app, ["journals", "abbreviate", str(bib)])
-        runner.invoke(app, ["journals", "expand", str(bib)])
-        assert "journal = {Nature Machine Intelligence}" in bib.read_text()
-
-    def test_check_reports_status(self, tmp_path: Path) -> None:
-        bib = tmp_path / "refs.bib"
-        bib.write_text(
-            "@article{A,\n  title = {X},\n  journal = {Nature Machine Intelligence}\n}\n"
-            "@article{B,\n  title = {Y},\n  journal = {Some Obscure Local Gazette}\n}\n"
-        )
-        result = runner.invoke(app, ["journals", "check", str(bib), "--json"])
-        assert result.exit_code == 0, result.output
-        data = json.loads(result.output)
-        statuses = {j["journal"]: j["status"] for j in data["journals"]}
-        assert statuses["Nature Machine Intelligence"] == "builtin_exact"
-        assert statuses["Some Obscure Local Gazette"] == "unknown"
-        assert data["unknown"] == ["Some Obscure Local Gazette"]
-
-    def test_check_does_not_modify(self, tmp_path: Path) -> None:
-        bib = _copy(tmp_path, "simple.bib")
-        original = bib.read_text()
-        runner.invoke(app, ["journals", "check", str(bib)])
-        assert bib.read_text() == original
-
-    def test_abbreviate_warns_unknown(self, tmp_path: Path) -> None:
-        bib = tmp_path / "refs.bib"
-        bib.write_text("@article{A,\n  title = {X},\n  journal = {Zzz Qqq Www}\n}\n")
-        result = runner.invoke(app, ["journals", "abbreviate", str(bib), "--json"])
-        data = json.loads(result.output)
-        assert data["unknown"] == ["Zzz Qqq Www"]
-        assert any(w["type"] == "unknown_journal" for w in data["warnings"])
-
-
 # Each case: (command prefix, positional suffix after <file>, fixture). The
 # runner inserts the bib path right after the prefix. Every case is chosen to
 # actually modify its fixture, so --diff must produce a diff.
@@ -1238,7 +1336,6 @@ _MODIFYING_CASES = [
     (["normalize"], [], "simple.bib"),
     (["convert"], ["--to", "biblatex"], "bibtex_classic.bib"),
     (["convert"], ["--to", "bibtex"], "biblatex_sample.bib"),
-    (["journals", "abbreviate"], [], "simple.bib"),
 ]
 
 

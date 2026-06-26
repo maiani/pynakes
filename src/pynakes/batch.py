@@ -71,10 +71,6 @@ OPERATION_SPECS: dict[str, OperationSpec] = {
         "Run the standard normalization routine",
     ),
     "convert": OperationSpec(("to",), (), "Convert between bibtex and biblatex"),
-    "journals.abbreviate": OperationSpec(
-        (), ("journal_table", "ltwa_table"), "Abbreviate journals"
-    ),
-    "journals.expand": OperationSpec((), ("journal_table", "ltwa_table"), "Expand journals"),
     "metadata.set": OperationSpec(("key", "value"), ("namespace",), "Set a metadata key"),
 }
 
@@ -122,12 +118,6 @@ def _apply_one(coll: Collection, op: str, params: dict) -> dict:
     if op == "convert":
         report = coll.convert(params["to"])
         return {"entries": report.entries, "fields_renamed": report.fields_renamed}
-    if op == "journals.abbreviate":
-        report = coll.abbreviate_journals(params.get("journal_table"), params.get("ltwa_table"))
-        return {"changed": report.changed}
-    if op == "journals.expand":
-        report = coll.expand_journals(params.get("journal_table"), params.get("ltwa_table"))
-        return {"changed": report.changed}
     if op == "metadata.set":
         update = coll.set_metadata(
             params["key"], params["value"], namespace=params.get("namespace")

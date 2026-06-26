@@ -64,3 +64,7 @@ with usage examples, see the [API overview](index.md).
 ## Introspection
 
 ::: pynakes.capabilities
+
+## Search
+
+::: pynakes.search

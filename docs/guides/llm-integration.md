@@ -45,15 +45,15 @@ pynakes capabilities --json
 Read-only:
 
 - `pynakes inspect <file> [--json]`
+- `pynakes search <file> <query> [--field ...] [--where ...] [--json]`
 - `pynakes lint <file>... [--strict] [--json]`
 - `pynakes groups list <file> [--json]`
 - `pynakes keys check <file>... [--strict] [--json]`
 - `pynakes metadata list <file> [--json]`
 - `pynakes files check <file>... [--root ...] [--strict] [--json]`
-- `pynakes journals check <file> [--json]`
 - `pynakes dedupe check <file>... [--strict] [--json]`
-- `pynakes verify <file>... [--online] [--strict] [--json]`
-- `pynakes published <file> [--online] [--json]`
+- `pynakes verify <file>... [--online] [--published] [--strict] [--json]` —
+  `--published` also reports preprints that now have a published version
 - `pynakes capabilities [--json]`
 
 The five gate checks (`lint`, `keys check`, `files check`, `dedupe check`,
@@ -79,19 +79,18 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 - `pynakes fields protect-title <file> [--field ...] [--term ...] [--where ...]`
 - `pynakes add <file> <identifier> [--key ...] [--key-source generated|provider] [--allow-duplicate]` — `<identifier>` is a DOI, DOI URL, arXiv id, or arXiv URL
 - `pynakes metadata set <file> <key> <value> [--allow-unknown]`
-- `pynakes normalize <file>`
+- `pynakes normalize <file>` — includes journal abbreviation/expansion when
+  `--journal-style abbreviated|full` or matching metadata is set
 - `pynakes convert <file> --to biblatex|bibtex`
-- `pynakes journals abbreviate <file> [--journal-table ...] [--ltwa-table ...]`
-- `pynakes journals expand <file> [--journal-table ...] [--ltwa-table ...]`
 - `pynakes dedupe merge <file>` — conservatively merge duplicate-work clusters
-- `pynakes enrich <file> [--online]` — conservatively fill missing metadata
-- `pynakes published <file> --apply [--online]` — apply safe published-version metadata
+- `pynakes enrich <file> [--online] [--published]` — conservatively fill missing
+  metadata; `--published` also promotes preprints to their published version
 - `pynakes used <bib-file> <source>... [--out ...] [--group ...] [--keyword ...]`
 
 Projections — read inputs read-only, **create** new files (support `--dry-run`,
 `--diff`, `--json`):
 
-- `pynakes merge <file>... --out <file> [--dedupe]` — combine several `.bib`
+- `pynakes combine <file>... --out <file> [--dedupe]` — union several `.bib`
   files into one. `--dedupe` collapses identical same-key entries and reports a
   conflict (exit `2`) when same-key entries differ.
 - `pynakes split <file>... --to <FILE>='<predicate>'... [--copy] [--tex ...]
@@ -107,7 +106,7 @@ Transactional:
   of operations to one file atomically (one preview, one commit; nothing is
   written if any operation fails). The operation vocabulary (op name → required/
   optional params) is in `capabilities` under `batch_operations`. Example:
-  `--ops '[{"op":"groups.add_entry","key":"Smith2020","group":"ML"},{"op":"journals.abbreviate"}]'`.
+  `--ops '[{"op":"groups.add_entry","key":"Smith2020","group":"ML"},{"op":"normalize","journal_style":"abbreviated"}]'`.
 
 Planned (not implemented): `entries`.
 
@@ -135,6 +134,20 @@ pynakes fields rename refs.bib url doi    --where 'doi exists'
 Targeting `key == "..."` is the way to edit one specific entry — including the
 manual resolution `dedupe merge` suggests for an ambiguous duplicate-work
 cluster.
+
+## Search
+
+`search` is read-only and returns matching entries without touching the file:
+
+```bash
+pynakes search refs.bib learning
+pynakes search refs.bib 'title:"natural language" type:article' --json
+pynakes search refs.bib widgets --field title --where 'year = 2024' --json
+```
+
+Search terms are whitespace-separated and ANDed. Quoted phrases stay together.
+`field:term` scopes a term to one field; `key:` and `type:` target citation keys
+and entry types. Plain terms search the key, type, and stored fields.
 
 ## Recommended workflow
 
@@ -166,8 +179,9 @@ pynakes normalize refs.bib --json
 ```
 
 `normalize` can protect title capitalization, normalize author/editor lists,
-normalize DOI values, and abbreviate or expand journal titles. It honors project
-metadata overrides via `jabref-meta` comments and CLI options.
+normalize DOI values, and abbreviate or expand journal titles when a journal
+style is configured. It honors project metadata overrides via `jabref-meta`
+comments and CLI options.
 
 ### Add a reference (DOI or arXiv)
 
@@ -255,7 +269,7 @@ pynakes used refs.bib paper.tex --group Used --dry-run --diff --json
 ## JSON output
 
 **Every modifying command** (`groups`, `keys`, `fields`, `metadata`,
-`normalize`, `convert`, `journals`, `doi`, `used`) shares one envelope:
+`normalize`, `convert`, `add`, `used`) shares one envelope:
 
 ```json
 {
@@ -318,21 +332,22 @@ exit code 1 (e.g. `FileNotFound`, `ParseError` with `line`, `InvalidInput`).
 **Conflicts** return `{"status":"conflict","error":"...","options":[...]}` with
 exit code 2, where `options` lists the resolutions to choose from.
 
-Read-only commands (`inspect`, `lint`, `groups list`, `keys check`,
-`metadata list`, `files check`, `journals check`, `capabilities`) return
-`status`, `action`, `file`, plus command-specific data (e.g. `issues`,
-`duplicate_keys`, `groups`, `metadata`).
+Read-only commands (`inspect`, `search`, `lint`, `groups list`, `keys check`,
+`metadata list`, `files check`, `capabilities`) return
+`status`, `action`, `file`, plus command-specific data (e.g. `lint` returns
+`issues`; `inspect` returns `duplicate_keys`; group and metadata commands return
+`groups` and `metadata` respectively).
 
-### Projection envelopes (`merge`, `split`)
+### Projection envelopes (`combine`, `split`)
 
 The projection commands read inputs read-only and create new files, so instead
 of the single-`file` / `modified` envelope they report `inputs` and the files
-they produce. `merge`:
+they produce. `combine`:
 
 ```json
 {
   "status": "success",
-  "action": "merge",
+  "action": "combine",
   "inputs": ["a.bib", "b.bib"],
   "out": "combined.bib",
   "dedupe": true,

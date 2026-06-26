@@ -64,7 +64,7 @@ def files_check(
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Validate JabRef linked files (accepts multiple files for CI gating)."""
+    """Validate linked-file references (accepts multiple files for CI gating)."""
     _run_checks(files, "files_check", lambda f: _files_check_one(f, root), json_output, strict)
 
 

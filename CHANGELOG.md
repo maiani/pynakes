@@ -7,7 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Renamed `merge` → `combine`.** The whole-file union command is now
+  `pynakes combine` (alongside `split`), freeing the verb `merge` from colliding
+  with `dedupe merge` (which merges two records of the *same* work). The JSON
+  `action` is now `"combine"` and the capability id is `combine_libraries`.
+- **Folded the `published` command into `verify`/`enrich`.** The preprint
+  published-version workflow is now a `--published` flag: `verify --published`
+  reports (read-only) preprints that now have a published version, and `enrich
+  --published` promotes them (writing the published DOI/journal). The standalone
+  `pynakes published` command and its `published` / `published_apply` JSON
+  actions are removed; the defaults of `verify` and `enrich` are unchanged.
+- **Reframed the project identity** to lead with pynakes as a deterministic,
+  reviewable, agent-safe `.bib` engine. JabRef compatibility is now stated as a
+  lossless-interoperability guarantee rather than the headline, and jabkit
+  coverage is documented as a completeness checklist, not a design driver
+  (input-conformance remains a hard gate). Trimmed unnecessary "JabRef" wording
+  from CLI help where the concept stands on its own (linked files, library
+  metadata, groups).
+- Removed the standalone `pynakes journals` command group. Journal
+  abbreviation/expansion now goes through `pynakes normalize --journal-style
+  abbreviated|full`; read-only journal conformance is reported by `lint` when
+  a `normalize-journal-style` metadata profile is configured.
+- Removed `journals.abbreviate` / `journals.expand` from the transactional
+  `batch` operation vocabulary; use the existing `normalize` batch operation
+  with `journal_style` instead.
+
 ### Added
+- **Interchange formats in `convert`** (jabkit `convert` parity): `convert`
+  now exports a library to CSL-JSON or RIS (`--to csl-json`/`--to ris`) and
+  imports those formats to BibTeX (`--from csl-json`/`--from ris`), in addition
+  to the existing in-place BibTeX↔BibLaTeX dialect conversion. Output goes to
+  `--out` or stdout, with a JSON envelope under `--json`. Bidirectional type,
+  field, author, date, and page mappings live in the new `pynakes.interchange`
+  module. (MODS and EndNote remain to do.)
+- **`inspect` is now a complete structured read**: the JSON form adds
+  `strings`, `preamble`, and `comments`, and a `--resolved` flag includes each
+  entry's inherited (crossref/xdata) field view.
+- **Cross-entry field consistency in `lint`** (jabkit `check-consistency`
+  parity): a new advisory `inconsistent_field` finding flags a field that a
+  strict majority of the entries of a given type define (after crossref/xdata
+  inheritance) but a given entry omits. Required fields and JabRef
+  structural/management fields (`groups`, `file`, timestamps, …) are excluded;
+  the finding is a warning and does not fail `lint --strict`.
+- **`pynakes search`**: read-only library search with free text terms, quoted
+  phrases, field-scoped terms such as `title:widget`, optional `--where`
+  filtering, field restriction, limits, and JSON output.
 - **BibTeX string-reference linting**: `lint` reports error-level
   `undefined_string_reference` findings for unquoted/unbraced identifiers that
   are neither predefined month macros nor declared `@string` names.
@@ -78,6 +123,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Smith…`) and produced spurious `citation_key_pattern_mismatch` lint warnings.
 
 ### Changed
+- **`inspect` is now structural only**: it no longer runs `lint`, includes
+  `issues` in JSON, or prints an issue count. Use `lint` for validation
+  findings.
 - **Docs site moved from Zensical to MkDocs + Material for MkDocs.** The
   pre-1.0 `zensical` dependency is replaced by the stable `mkdocs`,
   `mkdocs-material`, and `mkdocstrings[python]` docs extras (`mkdocs build` /

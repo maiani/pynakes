@@ -54,6 +54,8 @@ class TestCommandSchemas:
         assert "groups add-entry" in schemas
         assert "keys rename" in schemas
         assert "metadata set" in schemas
+        assert "journals" not in get_capabilities()["commands"]
+        assert all(not name.startswith("journals ") for name in schemas)
 
     def test_schema_shape_for_a_command(self) -> None:
         split = get_capabilities()["command_schemas"]["split"]
@@ -82,6 +84,11 @@ class TestErrorCatalogAndGrammar:
         grammar = get_capabilities()["predicate_grammar"]
         assert "contains" in grammar["field_operators"]
         assert "*" in grammar["split_predicates"]
+        assert grammar["examples"]
+
+    def test_search_query_grammar_is_present(self) -> None:
+        grammar = get_capabilities()["search_query_grammar"]
+        assert "field:term" in grammar["field_prefix"]
         assert grammar["examples"]
 
 

@@ -49,3 +49,11 @@ CI, and agents — with no dependency on any application above it.
 Cross-file corpus work (a `Library` over many collections, a derived search
 index, projections, format interop) is on the post-1.0 roadmap; see
 [DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
+
+The name points past the single file. The *Pinakes* was Callimachus's catalog of
+the Library of Alexandria — an index over an entire corpus, not one shelf.
+pynakes begins as a single-file engine and grows toward that catalog: the
+trustworthy, version-controllable layer a larger AI-assisted research system can
+build on. Compatibility with existing tools (JabRef, the BibTeX/BibLaTeX
+toolchain) is a guarantee it keeps along the way — a substrate it interoperates
+with losslessly, not the boundary of what it aims to be.

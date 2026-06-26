@@ -142,6 +142,67 @@ def test_no_false_positives_on_clean_entry() -> None:
     assert lint(lib) == []
 
 
+def _consistency(issues):
+    return [(i.key, i.field) for i in issues if i.type == "inconsistent_field"]
+
+
+def test_field_consistency_flags_majority_field_missing_from_one_entry() -> None:
+    # doi is present on 3 of 4 articles; only the one lacking it is flagged.
+    lib = parse_bib(
+        "@article{a1, author={A}, title={T1}, journal={J}, year={2020}, doi={10.1/a}}\n"
+        "@article{a2, author={B}, title={T2}, journal={J}, year={2021}, doi={10.1/b}}\n"
+        "@article{a3, author={C}, title={T3}, journal={J}, year={2022}}\n"
+        "@article{a4, author={D}, title={T4}, journal={J}, year={2023}, doi={10.1/d}}\n"
+    )
+    issues = [i for i in lint(lib) if i.type == "inconsistent_field"]
+    assert _consistency(issues) == [("a3", "doi")]
+    assert all(i.severity == "warning" for i in issues)
+    assert "3 of 4" in issues[0].message
+
+
+def test_field_consistency_ignores_non_majority_and_universal_fields() -> None:
+    # 'note' on exactly half (not a majority); 'year' on all (universal).
+    lib = parse_bib(
+        "@article{a1, author={A}, title={T1}, journal={J}, year={2020}, note={n}}\n"
+        "@article{a2, author={B}, title={T2}, journal={J}, year={2021}, note={n}}\n"
+        "@article{a3, author={C}, title={T3}, journal={J}, year={2022}}\n"
+        "@article{a4, author={D}, title={T4}, journal={J}, year={2023}}\n"
+    )
+    assert _consistency(lint(lib)) == []
+
+
+def test_field_consistency_needs_at_least_three_entries_of_a_type() -> None:
+    lib = parse_bib(
+        "@article{a1, author={A}, title={T1}, journal={J}, year={2020}, doi={10.1/a}}\n"
+        "@article{a2, author={B}, title={T2}, journal={J}, year={2021}}\n"
+    )
+    assert _consistency(lint(lib)) == []
+
+
+def test_field_consistency_ignores_management_and_structural_fields() -> None:
+    # groups/file/timestamp vary legitimately and must never be flagged.
+    lib = parse_bib(
+        "@article{a1, author={A}, title={T1}, journal={J}, year={2020}, groups={X}, file={a.pdf}}\n"
+        "@article{a2, author={B}, title={T2}, journal={J}, year={2021}, groups={Y}, file={b.pdf}}\n"
+        "@article{a3, author={C}, title={T3}, journal={J}, year={2022}}\n"
+    )
+    assert _consistency(lint(lib)) == []
+
+
+def test_field_consistency_respects_crossref_inheritance() -> None:
+    # booktitle is inherited by every child via crossref, so none is flagged;
+    # only the genuinely-missing majority field (doi) is.
+    lib = parse_bib(
+        "@proceedings{p, title={Proc}}\n"
+        "@inproceedings{c1, author={A}, title={X1}, crossref={p}, doi={1}}\n"
+        "@inproceedings{c2, author={B}, title={X2}, crossref={p}, doi={2}}\n"
+        "@inproceedings{c3, author={C}, title={X3}, crossref={p}}\n"
+    )
+    flagged = _consistency(lint(lib))
+    assert ("c3", "doi") in flagged
+    assert all(field != "booktitle" for _, field in flagged)
+
+
 def test_reports_undefined_string_references_in_entries_and_definitions() -> None:
     lib = parse_bib(
         "@string{venue = publisher # { Press}}\n"
@@ -226,6 +287,24 @@ def test_lint_checks_the_stored_profile() -> None:
         "title_capitalization_unprotected",
     } <= _types(issues)
     assert all(issue.severity == "warning" for issue in issues)
+
+
+def test_lint_reports_unknown_journals_when_style_is_configured() -> None:
+    lib = parse_bib(
+        "@comment{pynakes-meta: normalize-journal-style:abbreviated;}\n"
+        "@article{A,\n"
+        "  author = {Jane Smith},\n"
+        "  title = {Unmapped journal},\n"
+        "  journal = {Some Obscure Local Gazette},\n"
+        "  year = {2024},\n"
+        "  doi = {10.1234/example}\n"
+        "}\n"
+    )
+
+    issues = lint(lib)
+    assert "unknown_journal" in _types(issues)
+    unknown = next(issue for issue in issues if issue.type == "unknown_journal")
+    assert unknown.field == "journal"
 
 
 def test_profile_can_disable_title_protection() -> None:

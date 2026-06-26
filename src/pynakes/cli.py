@@ -18,11 +18,11 @@ from pynakes.cli_commands import (
     groups,
     inspect,
     integrity,
-    journals,
     keys,
     lint,
     metadata,
     normalize,
+    search,
     setops,
     used,
 )
@@ -34,10 +34,9 @@ keys_app = typer.Typer(help="Generate and check citation keys", cls=AutoBibGroup
 fields_app = typer.Typer(
     help="Edit fields (rename, move, append, clear, protect titles)", cls=AutoBibGroup
 )
-files_app = typer.Typer(help="Validate JabRef linked files", cls=AutoBibGroup)
+files_app = typer.Typer(help="Validate linked-file references", cls=AutoBibGroup)
 dedupe_app = typer.Typer(help="Detect and merge duplicate works", cls=AutoBibGroup)
-journals_app = typer.Typer(help="Abbreviate, expand, and check journal titles", cls=AutoBibGroup)
-metadata_app = typer.Typer(help="Inspect and update JabRef library metadata", cls=AutoBibGroup)
+metadata_app = typer.Typer(help="Inspect and update library metadata", cls=AutoBibGroup)
 
 
 def _version_callback(value: bool) -> None:
@@ -73,8 +72,8 @@ keys.register(keys_app)
 fields.register(fields_app)
 normalize.register(app)
 convert.register(app)
-journals.register(journals_app)
 capabilities.register(app)
+search.register(app)
 used.register(app)
 setops.register(app)
 batch.register(app)
@@ -84,7 +83,6 @@ app.add_typer(keys_app, name="keys")
 app.add_typer(fields_app, name="fields")
 app.add_typer(files_app, name="files")
 app.add_typer(dedupe_app, name="dedupe")
-app.add_typer(journals_app, name="journals")
 app.add_typer(metadata_app, name="metadata")
 
 

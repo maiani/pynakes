@@ -9,11 +9,16 @@ Guidance for coding agents (and humans) **developing** this repository.
 
 ## What this project is
 
-`pynakes` is a headless, JabRef-compatible BibTeX/BibLaTeX maintenance toolkit
-with a custom parser built for round-trip fidelity. See
+`pynakes` is a headless, agent-safe BibTeX/BibLaTeX maintenance toolkit with a
+custom parser built for round-trip fidelity. It interoperates losslessly with
+JabRef and the BibTeX/BibLaTeX toolchain — that compatibility is a guarantee it
+keeps, not its identity. See
 [docs/guides/architecture.md](docs/guides/architecture.md) for the design,
 [docs/vision.md](docs/vision.md) for the design philosophy, and
-[DEVPLAN.md](DEVPLAN.md) for the phased plan.
+[DEVPLAN.md](DEVPLAN.md) for the phased plan. For *where this is ultimately
+headed* — pynakes as the kernel under the `bimas` reference-management system —
+see [.long_term_vision.md](.long_term_vision.md), a hidden, agent-facing
+north-star doc kept out of the public docs site.
 
 ## Layout
 

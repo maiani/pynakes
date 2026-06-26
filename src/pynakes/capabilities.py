@@ -53,7 +53,7 @@ _ERROR_CODES = {
         "codes": {
             "ExternalModification": "The file changed on disk since it was read.",
             "DuplicateMetadata": "metadata set: multiple blocks match the key (ambiguous).",
-            "DuplicateMergeKey": "merge/split --dedupe: a shared key has differing content.",
+            "DuplicateMergeKey": "combine/split --dedupe: a shared key has differing content.",
             "DedupeConflict": "dedupe merge: a cluster has irreconcilable field values.",
             "DuplicateReference": "add: the DOI/arXiv reference is already present.",
             "CitationKeyConflict": "add: the chosen citation key already exists.",
@@ -61,16 +61,17 @@ _ERROR_CODES = {
     },
 }
 
-# The predicate grammar shared by `fields --where` and `split --to` rules.
+# The predicate grammar shared by `fields --where`, `search --where`, and
+# `split --to` rules.
 _PREDICATE_GRAMMAR = {
-    "used_by": ["fields (--where)", "split (--to)"],
+    "used_by": ["fields (--where)", "search (--where)", "split (--to)"],
     "field_operators": ["contains", "=", "==", "exists"],
     "special_fields": {"type": "the entry type", "key": "the citation key"},
     "split_predicates": {
         "*": "matches every entry (catch-all / rest bucket)",
         "used": "citation key appears in the --tex/--aux sources",
         "unused": "citation key does not appear in the sources",
-        'group "Name"': "entry belongs to the named JabRef group",
+        'group "Name"': "entry belongs to the named group",
     },
     "examples": [
         'title contains "digital currency"',
@@ -79,6 +80,18 @@ _PREDICATE_GRAMMAR = {
         'group "Machine Learning"',
         "used",
         "*",
+    ],
+}
+
+_SEARCH_QUERY_GRAMMAR = {
+    "terms": "Whitespace-separated terms are ANDed.",
+    "phrases": "Quoted phrases stay together.",
+    "field_prefix": "field:term scopes a term to one field; key: and type: are special fields.",
+    "examples": [
+        "learning",
+        '"natural language"',
+        "title:learning type:article",
+        'author:"Jane Example"',
     ],
 }
 
@@ -163,6 +176,12 @@ def get_capabilities() -> dict:
     return {
         "tool": "pynakes",
         "version": VERSION,
+        "description": (
+            "Small, reviewable, deterministic edits to BibTeX/BibLaTeX .bib files — "
+            "minimal diffs, dry-run previews, atomic writes, and structured JSON — safe "
+            "for scripts, CI, and LLM agents. Losslessly interoperable with JabRef and "
+            "the BibTeX/BibLaTeX toolchain."
+        ),
         "safe_by_default": True,
         "supports_dry_run": True,
         "supports_json_output": True,
@@ -208,12 +227,17 @@ def get_capabilities() -> dict:
             "normalize_library",
             "convert_to_biblatex",
             "convert_to_bibtex",
-            "abbreviate_journals",
+            "export_csl_json",
+            "export_ris",
+            "import_csl_json",
+            "import_ris",
+            "normalize_journals",
             "normalize_authors",
             "normalize_dois",
             "import_reference",
+            "search_library",
             "detect_used_citations",
-            "merge_libraries",
+            "combine_libraries",
             "partition_library",
             "inspect_jabref_metadata",
             "update_jabref_metadata",
@@ -225,18 +249,20 @@ def get_capabilities() -> dict:
             "groups": "Manage entry groups (list, add-entry, remove-entry)",
             "keys": "Generate, check, rename, and repair citation keys",
             "fields": "Edit fields (rename, move, append, clear, protect-title)",
-            "files": "Validate JabRef linked files",
+            "files": "Validate linked-file references",
             "dedupe": "Detect and conservatively merge duplicate works",
-            "verify": "Verify DOI-backed entries against provider metadata",
-            "published": "Report and optionally apply published-version metadata for preprints",
-            "enrich": "Conservatively fill missing metadata",
-            "metadata": "Inspect and update top-level JabRef metadata",
+            "verify": "Verify entries against authoritative metadata "
+            "(--published also reports preprints with a published version)",
+            "enrich": "Conservatively fill missing metadata "
+            "(--published also promotes preprints to their published version)",
+            "metadata": "Inspect and update top-level library metadata",
             "normalize": "Run the standard normalization routine",
-            "convert": "Convert a library between BibTeX and BibLaTeX conventions",
-            "journals": "Abbreviate, expand, and check journal titles",
+            "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "
+            "formats (export/import CSL-JSON and RIS)",
             "add": "Add a reference by DOI or arXiv identifier",
+            "search": "Search entries by free text, phrases, or field-scoped terms",
             "used": "Report/tag/export entries cited in LaTeX sources",
-            "merge": "Combine several .bib files into one (optionally deduping by key)",
+            "combine": "Union several .bib files into one (optionally deduping by key)",
             "split": "Combine inputs and route entries into several outputs by predicate",
             "batch": "Apply a sequence of operations atomically (one preview, one commit)",
             "capabilities": "Show this capability description",
@@ -247,6 +273,7 @@ def get_capabilities() -> dict:
         "command_schemas": command_schemas(),
         "error_codes": _ERROR_CODES,
         "predicate_grammar": _PREDICATE_GRAMMAR,
+        "search_query_grammar": _SEARCH_QUERY_GRAMMAR,
         # The operations accepted by `batch` (op name → required/optional params).
         "batch_operations": _batch_operations(),
     }

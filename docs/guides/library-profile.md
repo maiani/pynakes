@@ -73,14 +73,16 @@ When configured, `lint` reports each of the following as a warning:
 - A citation key that does not reproduce from `keypatterndefault` or its
   matching `keypattern_<entrytype>`.
 - A known journal title that is not in the configured `normalize-journal-style`.
+- An unknown journal title that cannot be resolved by the bundled sources,
+  `journal-table`, or `ltwa-table`.
 - A missing field named by `lint-required-fields`.
 - A title-like field whose case-sensitive terms or acronyms need brace
   protection while `normalize-protect-titles:true` is stored (or
   `protected-terms` is configured).
 
-Unknown journal titles are not reported as style violations because pynakes
-cannot determine their canonical form without a mapping. Add a `journal-table`
-when that distinction matters.
+Unknown journal titles are reported as `unknown_journal` because pynakes cannot
+determine their canonical form without a mapping. Add a `journal-table` or
+`ltwa-table` when that distinction matters.
 
 The warnings are advisory in a normal run. `pynakes lint --strict` exits `1`
 for structural errors and these profile-conformance warnings, allowing a

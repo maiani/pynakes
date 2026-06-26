@@ -1,12 +1,14 @@
 # pynakes
 
-Agent-friendly BibTeX, BibLaTeX, and JabRef-compatible bibliography maintenance.
+Small, reviewable, deterministic edits to your `.bib` library — for researchers,
+scripts, CI, and LLM agents. Reads and writes BibTeX, BibLaTeX, and
+JabRef-compatible files without disturbing what it does not change.
 
 > **Status — v0.3 in development.** The core command-line workflow is usable:
-> inspect, lint, groups, citation keys, fields, DOI import, citation-usage
-> analysis, normalization, conversion, capabilities JSON, journal title
-> commands, JabRef metadata inspection/update, and linked-file validation.
-> Merge workflows and linked-file repair are still planned.
+> inspect, search, lint, groups, citation keys, fields, DOI import, citation-usage
+> analysis, normalization, conversion, capabilities JSON, journal-title
+> normalization, library-metadata inspection/update, linked-file validation, and
+> combine/split. Linked-file repair is still planned.
 
 ## Overview
 
@@ -36,6 +38,7 @@ pynakes normalize refs.bib
 - JabRef group fields and structured `jabref-meta` parsing/preservation/update
 - JabRef citation-key pattern metadata for key generation and DOI imports
 - JabRef metadata list/set commands and `inspect --json` metadata output
+- Read-only library search with free text, phrase, and field-scoped terms
 - Group list/add/remove commands
 - Citation-key check/generate/repair commands
 - Field rename/move/append/clear and title-capitalization protection

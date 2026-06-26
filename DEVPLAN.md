@@ -12,8 +12,10 @@ This document is the **road to 1.0**. Completed work is recorded in
 ## Current state (v0.3.0)
 
 The single-file engine is feature-rich, but it is **not release-ready** until
-the two 0.4 hard gates below — input conformance and jabkit parity for bib-file
-operations — are complete:
+the 0.4 **input-conformance hard gate** below is complete. A second 0.4 track —
+**jabkit coverage** — is a completeness checklist, not a hard gate: it confirms a
+JabRef user can do everything here, without dictating pynakes' own command
+surface.
 
 - **Parser/writer** with byte-for-byte round-trip fidelity; atomic,
   re-parse-validated writes with `.bak` backups; surgical minimal-diff editing.
@@ -21,9 +23,10 @@ operations — are complete:
   with external-change detection; the CLI is a thin consumer.
 - **Operations**: `inspect`, `lint`, `groups`, `keys` (generate/check/repair/
   rename + JabRef key patterns), `fields` (with `--where`), `convert`,
-  `journals`, `files check`, `normalize`, `add` (DOI/arXiv), `used`, `dedupe`,
-  `verify`/`published`/`enrich` (opt-in `--online`, cached), `merge`, `split`,
-  `batch`.
+  `files check`, `normalize` (including journal title abbreviation/expansion),
+  `add` (DOI/arXiv), `used`, `dedupe`, `verify`/`enrich` (opt-in `--online`,
+  cached; `--published` folds in preprint published-version checks/promotion),
+  `combine`, `split`, `batch`.
 - **JabRef v5.15 parity**: full `saveActions` formatter suite, recognized
   metadata vocabulary, and `saveActions`-driven `normalize` defaults. Golden-
   vector test suite anchored to a pinned JabRef release.
@@ -83,52 +86,71 @@ style engine or a user's custom data-model validation rules.
       path on both `{...}` and `(...)` entries. Validate its output with the
       relevant pinned tool, including files that retain top-level declarations.
 
-## 0.4 hard gate — jabkit parity for bib-file operations
+## 0.4 coverage checklist — jabkit operations for bib files
 
-To be a credible JabRef alternative, the pynakes CLI must cover every jabkit
-operation **that acts on a `.bib` file**. 0.4 is about being a reliable, complete
-bib editor; the PDF / GUI / capture-app scope question is deliberately deferred
-to 0.5 (below). "Covered" means a pynakes command (or documented combination)
-performs the equivalent operation with the agent-native JSON envelope and
-reviewable-diff workflow.
+jabkit (JabRef's headless CLI) is a useful **completeness reference**: a JabRef
+user should be able to do everything here. This is a coverage checklist, **not a
+design driver** — pynakes designs its own command surface from first principles
+and consults this list only to catch gaps, never to mirror jabkit
+command-for-command. 0.4 is about being a reliable, complete bib editor; the
+PDF / GUI / capture-app scope question is deliberately deferred to 0.5 (below).
+"Covered" means a pynakes command (or documented combination) performs the
+equivalent operation with the agent-native JSON envelope and reviewable-diff
+workflow.
 
 The jabkit ([docs](https://docs.jabref.org/jabkit)) subcommands that operate on
 bib files:
 
 - [x] **generate-citation-keys** — `pynakes keys generate` (honors JabRef
       `keypattern*` metadata).
-- [x] **check-integrity** — `pynakes verify` / `enrich` / `published`
-      (opt-in `--online`) plus `lint`.
+- [x] **check-integrity** — `pynakes verify` / `enrich` (opt-in `--online`;
+      `--published` folds in preprint published-version checks/promotion) plus
+      `lint`.
 - [x] **generate-bib-from-aux** — `pynakes used <bib> <aux> --out cited.bib`
       produces the cited-only subset.
-- [ ] **check-consistency** — jabkit reports, per entry type, fields present on
-      some entries of that type but missing on others. pynakes `lint` checks
-      required fields but has no cross-entry *consistency* report yet. Add a
-      `consistency` check (or a `lint` finding type).
-- [ ] **search** — query a library and return matches. pynakes has the
+- [x] **check-consistency** — implemented inside `lint` as the advisory
+      `inconsistent_field` finding: a field a strict majority of same-type
+      entries define (after crossref/xdata inheritance) but a given entry omits.
+      Required and JabRef structural/management fields are excluded. It rides the
+      existing `--strict` gate and JSON envelope rather than being a separate
+      command.
+- [x] **search** — query a library and return matches. pynakes has the
       `--where` field filter and `used`, but no dedicated `search` command with
       a query syntax over the whole library. Add one.
-- [ ] **convert** — jabkit converts between bibliography *formats*. pynakes
-      `convert` only changes BibTeX↔BibLaTeX dialect; the bibliographic-data
-      interchange formats (RIS, CSL-JSON, MODS, EndNote, …) are reading/writing
-      `.bib` data in another representation, so they belong in this gate. Pulled
-      forward from [Beyond 1.0](#beyond-10).
+- [x] **convert** — BibTeX↔BibLaTeX dialect conversion plus export/import of
+      **CSL-JSON** and **RIS** (`pynakes.interchange`), the dominant interchange
+      formats. **MODS** and **EndNote** are deferred to 0.5. Pulled forward from
+      [Beyond 1.0](#beyond-10).
+- [x] **preferences** — jabkit manages a global, persistent application
+      preference store. pynakes deliberately has none: configuration lives in
+      the library itself as `jabref-meta`/`pynakes-meta`, managed by
+      `pynakes metadata list`/`set` and read as defaults by `normalize`, `lint`,
+      and key generation. This is the intended design (principle: the file is
+      the single source of truth; no hidden global state), so the parity answer
+      is per-library metadata profiles rather than a separate preference file.
+      *Open, minor:* a way to copy/share a profile between libraries — additive,
+      not blocking.
 
 jabkit subcommands that are **not** bib-file operations are out of 0.4 and feed
 the 0.5 scope decision below: **fetch** (capture entries from web providers —
-pynakes already imports by DOI/arXiv via `add`), **pdf** (read/write PDF XMP
-metadata), and **preferences** (persistent app-level configuration; pynakes
-currently expresses library policy through `jabref-meta`/`pynakes-meta`).
+pynakes already imports by DOI/arXiv via `add`) and **pdf** (read/write PDF XMP
+metadata).
 
 ## 0.5 — scope decision: PDF / GUI / capture
 
 Once 0.4 ships a reliable, complete bib editor, decide how far pynakes goes
 toward the remaining jabkit surface and JabRef-app territory. Inputs to the
-decision: jabkit's **fetch** (web/provider capture), **pdf** (PDF metadata), and
-**preferences** (app configuration), weighed against the philosophy's stance
-that capture, a PDF library, and a GUI are downstream concerns. The outcome may
+decision: jabkit's **fetch** (web/provider capture) and **pdf** (PDF metadata),
+weighed against the philosophy's stance that capture, a PDF library, and a GUI
+are downstream concerns. The outcome may
 keep them downstream (a thin companion on the pinned API) or pull specific
 headless, deterministic pieces into the engine. Not decided here.
+
+Also for 0.5: the remaining interchange formats — **MODS** and **EndNote**
+(and any others jabkit supports) — building on `pynakes.interchange`. Adding a
+dependency is acceptable when it does the heavy lifting better than a
+hand-rolled codec (the no-`bibtexparser` rule is specific to the round-trip
+BibTeX parser, not a blanket ban on dependencies).
 
 ## Guiding principles (non-negotiable)
 
@@ -148,10 +170,11 @@ Invariants from [docs/guides/architecture.md](docs/guides/architecture.md) and
 
 ## What "pynakes 1.0" is
 
-**A polished, JabRef-compatible, single-file maintenance engine, with a pinned
-public API, released on PyPI.** The unit of work is one `Collection` (one
-`.bib`). 1.0 means: it does single-file maintenance excellently, reaches JabRef
-feature parity, promises API stability (semver), and is installable.
+**A polished, deterministic, single-file maintenance engine — agent-safe,
+losslessly JabRef-compatible — with a pinned public API, released on PyPI.** The
+unit of work is one `Collection` (one `.bib`). 1.0 means: it does single-file
+maintenance excellently, covers the JabRef bib-file feature set (the coverage
+checklist above), promises API stability (semver), and is installable.
 
 **Explicitly *not* in 1.0** (deferred to [Beyond 1.0](#beyond-10)):
 the multi-file `Library`/`Catalogue` corpus engine and CSL-JSON/RIS interop.
@@ -195,14 +218,14 @@ application would build on.
 - **Interoperability** — CSL-JSON import/export (Zotero/pandoc/citeproc lingua
   franca), RIS import/export, and first-class stable identifiers (DOI / arXiv /
   OpenAlex / ORCID) shared by dedup, import, and verify. *(Note: the formats
-  jabkit's `convert` supports are pulled forward into the 0.4 jabkit-parity
-  gate; what remains here is interop beyond jabkit's surface.)*
+  jabkit's `convert` supports are pulled forward into the 0.4 jabkit coverage
+  checklist; what remains here is interop beyond jabkit's surface.)*
 - **`Library` (corpus)** — `Library.open(dir)`; `collections()`,
   `collection(path)`; cross-file `search`/`find_key`/dedup (reusing the existing
   stable-identity machinery).
 - **`Catalogue` (index)** — a derived, rebuildable search index (e.g. SQLite
   FTS) over the Library; strictly derived, never a competing source of truth.
-- **Projections** — `merge` and `split` have landed as file-level operations
+- **Projections** — `combine` and `split` have landed as file-level operations
   (`pynakes.setops`). What remains for Beyond 1.0 is formalizing them as
   first-class **views of the `Library`**, once the `Library` exists.
 

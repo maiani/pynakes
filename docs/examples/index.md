@@ -163,10 +163,10 @@ pynakes used refs.bib paper.tex --out cited-only.bib
 
 ## Example 8b: Combine and Split Across Files
 
-Merge two libraries into one:
+Combine two libraries into one:
 
 ```bash
-pynakes merge 1.bib 2.bib --out combined.bib --dedupe --dry-run --diff
+pynakes combine 1.bib 2.bib --out combined.bib --dedupe --dry-run --diff
 ```
 
 Combine `1.bib` and `2.bib` and split the result into two outputs — here cited

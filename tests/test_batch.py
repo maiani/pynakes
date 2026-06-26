@@ -63,7 +63,7 @@ def test_cli_batch_atomic_commit(tmp_path: Path) -> None:
     ops = json.dumps(
         [
             {"op": "groups.add_entry", "key": "A", "group": "ML"},
-            {"op": "journals.abbreviate"},
+            {"op": "normalize", "journal_style": "abbreviated"},
         ]
     )
     result = runner.invoke(app, ["batch", str(bib), "--ops", ops, "--json"])

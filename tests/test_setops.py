@@ -121,35 +121,35 @@ def _write(dir_: Path, name: str, content: str) -> str:
     return str(path)
 
 
-def test_cli_merge_writes_combined_file(tmp_path: Path) -> None:
+def test_cli_combine_writes_combined_file(tmp_path: Path) -> None:
     a = _write(tmp_path, "1.bib", A)
     b = _write(tmp_path, "2.bib", B)
     out = str(tmp_path / "all.bib")
-    result = runner.invoke(app, ["merge", a, b, "--out", out, "--json"])
+    result = runner.invoke(app, ["combine", a, b, "--out", out, "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
-    assert data["action"] == "merge"
+    assert data["action"] == "combine"
     assert data["entries"] == 2
     assert data["written"] is True
     reparsed = parse_bib(Path(out).read_text())
     assert set(reparsed.entries.keys()) == {"Smith2020", "Jones2021"}
 
 
-def test_cli_merge_dry_run_writes_nothing(tmp_path: Path) -> None:
+def test_cli_combine_dry_run_writes_nothing(tmp_path: Path) -> None:
     a = _write(tmp_path, "1.bib", A)
     b = _write(tmp_path, "2.bib", B)
     out = str(tmp_path / "all.bib")
-    result = runner.invoke(app, ["merge", a, b, "--out", out, "--dry-run", "--json"])
+    result = runner.invoke(app, ["combine", a, b, "--out", out, "--dry-run", "--json"])
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["written"] is False
     assert not Path(out).exists()
 
 
-def test_cli_merge_dedupe_conflict_exits_2(tmp_path: Path) -> None:
+def test_cli_combine_dedupe_conflict_exits_2(tmp_path: Path) -> None:
     a = _write(tmp_path, "1.bib", "@article{Smith2020,\n  title = {Alpha}\n}\n")
     b = _write(tmp_path, "2.bib", "@article{Smith2020,\n  title = {Other}\n}\n")
     out = str(tmp_path / "all.bib")
-    result = runner.invoke(app, ["merge", a, b, "--out", out, "--dedupe", "--json"])
+    result = runner.invoke(app, ["combine", a, b, "--out", out, "--dedupe", "--json"])
     assert result.exit_code == 2, result.output
     data = json.loads(result.output)
     assert data["status"] == "conflict"
@@ -209,22 +209,22 @@ def test_cli_split_used_without_sources_errors(tmp_path: Path) -> None:
 # --- CLI: human output and remaining branches ------------------------------
 
 
-def test_cli_merge_human_output_with_diff(tmp_path: Path) -> None:
+def test_cli_combine_human_output_with_diff(tmp_path: Path) -> None:
     a = _write(tmp_path, "1.bib", A)
     b = _write(tmp_path, "2.bib", B)
     out = str(tmp_path / "all.bib")
-    result = runner.invoke(app, ["merge", a, b, "--out", out, "--diff"])
+    result = runner.invoke(app, ["combine", a, b, "--out", out, "--diff"])
     assert result.exit_code == 0, result.output
-    assert "Merged 2 file(s)" in result.output
+    assert "Combined 2 file(s)" in result.output
     assert "Wrote" in result.output
     assert "Smith2020" in result.output  # diff body shown
 
 
-def test_cli_merge_reports_duplicate_keys_human(tmp_path: Path) -> None:
+def test_cli_combine_reports_duplicate_keys_human(tmp_path: Path) -> None:
     a = _write(tmp_path, "1.bib", A)
     b = _write(tmp_path, "2.bib", A)
     out = str(tmp_path / "all.bib")
-    result = runner.invoke(app, ["merge", a, b, "--out", out])
+    result = runner.invoke(app, ["combine", a, b, "--out", out])
     assert result.exit_code == 0, result.output
     assert "duplicate key(s): Smith2020" in result.output
 

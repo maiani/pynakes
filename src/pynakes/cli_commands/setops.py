@@ -1,9 +1,12 @@
-"""CLI commands for whole-file set operations: ``merge`` and ``split``.
+"""CLI commands for whole-file set operations: ``combine`` and ``split``.
 
-``merge`` combines several ``.bib`` files into one; ``split`` routes the entries
+``combine`` unions several ``.bib`` files into one; ``split`` routes the entries
 of one or more inputs into several outputs selected by per-bucket predicates.
 Both read their inputs read-only and create new files, so they use their own
 result envelope rather than the single-file ``_finish_mod`` one.
+
+(``combine`` unions whole files; merging two records of the *same* work is a
+distinct operation living under ``dedupe merge``.)
 """
 
 import json as _json
@@ -33,10 +36,10 @@ def _file_diff(path: str, new_content: str) -> str:
     return generate_diff(original, new_content, path)
 
 
-# --- merge -----------------------------------------------------------------
+# --- combine ---------------------------------------------------------------
 
 
-def merge(
+def combine(
     inputs: list[str] = typer.Argument(..., help="Two or more .bib files to combine"),
     out: str = typer.Option(..., "--out", help="Path to write the combined .bib"),
     dedupe: bool = typer.Option(
@@ -86,7 +89,7 @@ def merge(
     if json_output:
         payload = {
             "status": "success",
-            "action": "merge",
+            "action": "combine",
             "inputs": result.inputs,
             "out": out,
             "dedupe": dedupe,
@@ -101,7 +104,7 @@ def merge(
         return
 
     verb = "Would write" if dry_run else "Wrote"
-    typer.echo(f"Merged {len(result.inputs)} file(s) → {entries} {_entries(entries)}.")
+    typer.echo(f"Combined {len(result.inputs)} file(s) → {entries} {_entries(entries)}.")
     if result.duplicate_keys:
         typer.echo(f"  duplicate key(s): {', '.join(result.duplicate_keys)}")
     typer.echo(f"{verb} {out}.")
@@ -246,6 +249,6 @@ def split(
 
 
 def register(app: typer.Typer) -> None:
-    """Register the ``merge`` and ``split`` commands."""
-    app.command()(_safe(merge))
+    """Register the ``combine`` and ``split`` commands."""
+    app.command()(_safe(combine))
     app.command()(_safe(split))
