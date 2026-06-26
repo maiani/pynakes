@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `keys generate` no longer renames `@xdata` entries. They are structural
+  metadata containers referenced by key from other entries via `xdata = {…}`;
+  renaming them silently broke those references. They are now skipped by
+  `regenerate_keys` (their keys remain in the collision-avoidance pool so
+  generated keys for regular entries do not collide with them).
+
+### Added (conformance)
+- **Regression corpus fixture** (`tests/fixtures/conformance/bibtex-regression.bib`):
+  covers mixed `{…}`/`(…)` delimiters, Unicode author names, JabRef management
+  fields, URL-containing entries, and a range of entry types (`article`, `book`,
+  `inproceedings`, `misc`, `phdthesis`). All conformance fixtures are
+  parametrically tested for semantic round-trip fidelity.
+- **Differential tests** (`test_conformance_corpus.py`): every BibTeX-kind fixture
+  is validated by `bibtex 0.99d` and every BibLaTeX-kind fixture by
+  `biber --tool` after a pynakes parse→write round-trip (skipped if the oracle
+  tool is not installed).
+- **Property tests for `(…)` entries** (`test_property.py`): hypothesis strategy
+  `_paren_libraries` generates parenthesis-delimited BibTeX and verifies that
+  unmodified paren entries write back byte-for-byte and survive re-parse.
+- **Paren operations test suite** (`test_paren_operations.py`): all modifying
+  operations (field set/remove/rename, key rename/regenerate, normalize DOI/month,
+  lint) on `(…)` entries; serializer-fallback path for entries without
+  `raw_content`; bibtex oracle validation of modified-paren output.
+
 ### Changed
 - **Renamed `merge` → `combine`.** The whole-file union command is now
   `pynakes combine` (alongside `split`), freeing the verb `merge` from colliding

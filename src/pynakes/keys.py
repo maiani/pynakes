@@ -39,6 +39,11 @@ _TITLE_STOPWORDS = {
 
 _PATTERN_MARKER_RE = re.compile(r"\[([^\[\]]+)\]")
 
+# Entry types that are structural metadata containers referenced by key from
+# other entries (e.g. via ``xdata = {key}``). Renaming them would silently
+# break those references, so they are skipped by batch key regeneration.
+_STRUCTURAL_ENTRY_TYPES: frozenset[str] = frozenset({"xdata"})
+
 
 class UnsupportedCitationKeyPatternError(ValueError):
     """Raised when a JabRef citation-key pattern uses unsupported syntax."""
@@ -235,10 +240,17 @@ def regenerate_keys(lib: BibFile) -> list[tuple[str, str]]:
     Collisions among generated keys are disambiguated with letter suffixes
     (``Smith2020``, ``Smith2020a``, ...). Returns the list of ``(old, new)``
     renames actually applied. Modifies ``lib`` in place.
+
+    Structural entries whose type is in :data:`_STRUCTURAL_ENTRY_TYPES` (e.g.
+    ``@xdata``) are skipped: they are referenced by key from other entries and
+    renaming them would silently break those references.
     """
     renames: list[tuple[str, str]] = []
     taken: set[str] = set()
     for entry in lib.entries.values():
+        if entry.type.lower() in _STRUCTURAL_ENTRY_TYPES:
+            taken.add(entry.key)
+            continue
         new_key = unique_key(generate_key(entry, lib), taken)
         taken.add(new_key)
         old_key = entry.key

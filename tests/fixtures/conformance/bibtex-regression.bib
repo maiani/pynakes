@@ -1,0 +1,55 @@
+% Regression fixture: real-world field patterns, mixed delimiters, JabRef
+% management fields, Unicode author names, URL with special characters.
+% Every entry must parse and round-trip identically after write.
+@article{Reg2023Article,
+  author = {Smith, Alice and Brown, Bob and Wilson, Carol},
+  title = {A Study of {Graph} Neural Networks for Sequence Analysis},
+  journal = {Bioinformatics},
+  year = {2023},
+  volume = {39},
+  number = {4},
+  pages = {1234--1245},
+  doi = {10.1093/bioinformatics/btad001},
+  keywords = {machine learning, biology, graphs},
+  abstract = {We present a novel approach using graph neural networks.
+    Our method achieves state-of-the-art results on standard benchmarks.},
+  owner = {regtest},
+  timestamp = {2024.01.01}
+}
+
+@book(Reg2019Book,
+  author = {García, José and Müller, Hans-Jürgen},
+  title = {Foundations of {ML}: A Practitioner's {Guide}},
+  publisher = {MIT Press},
+  address = {Cambridge, MA},
+  year = {2019},
+  edition = {3rd},
+  isbn = {978-0-262-04308-5},
+  file = {:path/to/reg2019book.pdf:PDF}
+)
+
+@inproceedings{Reg2022Conf,
+  author = {Zhao, Wei and Liu, Fang},
+  title = {Efficient Architectures with {O(n)} Attention},
+  booktitle = {Advances in Neural Information Processing Systems},
+  year = {2022},
+  pages = {5678--5690},
+  url = {https://example.test/papers?query=efficient-attention},
+  note = {Best paper award}
+}
+
+@misc{Reg2021Dataset,
+  author = {{Example Data Consortium}},
+  title = {Open Benchmark Dataset v2},
+  howpublished = {Online; accessed January 2024},
+  year = {2021},
+  url = {https://example.test/dataset}
+}
+
+@phdthesis{Reg2020Thesis,
+  author = {Johnson, Emily},
+  title = {Causal Inference Methods for Observational Studies},
+  school = {University of Example},
+  year = {2020},
+  type = {PhD thesis}
+}

@@ -23,6 +23,15 @@
       "coverage": ["unicode", "online", "set", "xdata", "custom-fields", "inheritance-references"]
     },
     {
+      "path": "bibtex-regression.bib",
+      "kind": "bibtex",
+      "coverage": [
+        "mixed-delimiters", "unicode-author-names", "jabref-management-fields",
+        "url-special-chars", "multiple-authors", "abstract-field",
+        "parenthesized-entry", "misc", "phdthesis"
+      ]
+    },
+    {
       "path": "upstream/bibtex-0.99d-xampl.bib",
       "kind": "bibtex",
       "source": "https://ctan.org/tex-archive/biblio/bibtex/base/xampl.bib",

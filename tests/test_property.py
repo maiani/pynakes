@@ -49,6 +49,26 @@ def _libraries(draw: st.DrawFn) -> str:
     return "\n\n".join(blocks) + "\n"
 
 
+@st.composite
+def _paren_libraries(draw: st.DrawFn) -> str:
+    """Render entries using the parenthesis delimiter form ``@type(key,...)``.
+
+    BibTeX 0.99d accepts both ``{...}`` and ``(...)`` as entry delimiters.
+    This strategy exercises the parser's paren path and the writer's round-trip
+    guarantee on that form.
+    """
+    n = draw(st.integers(min_value=1, max_value=4))
+    keys = draw(st.lists(_keys, min_size=n, max_size=n, unique_by=str.lower))
+    blocks = []
+    for key in keys:
+        etype = draw(_types)
+        names = draw(st.lists(_field_names, min_size=1, max_size=5, unique=True))
+        rendered = ",\n".join(f"  {name} = {{{draw(_values)}}}" for name in names)
+        # Use parenthesis delimiter — syntactically equivalent to braces.
+        blocks.append(f"@{etype}({key},\n{rendered}\n)")
+    return "\n\n".join(blocks) + "\n"
+
+
 @settings(max_examples=200, suppress_health_check=[HealthCheck.too_slow])
 @given(_libraries())
 def test_parse_write_parse_preserves_content(text: str) -> None:
@@ -79,6 +99,31 @@ def test_unmodified_entries_write_back_verbatim(text: str) -> None:
         assert entry.modified is False
         assert entry.raw_content is not None
         assert entry.raw_content in output
+
+
+@settings(max_examples=200, suppress_health_check=[HealthCheck.too_slow])
+@given(_paren_libraries())
+def test_paren_entries_parse_and_round_trip(text: str) -> None:
+    """Parenthesized entries ``@type(key,...)`` parse and survive write → re-parse.
+
+    Unmodified paren entries must write back byte-for-byte (invariant #1).
+    After re-parse the entry records must match the original.
+    """
+    lib = parse_bib(text)
+    output = write_bib(lib)
+
+    # Unmodified paren entries must reuse raw_content byte-for-byte.
+    for entry in lib.entries.values():
+        assert entry.raw_content is not None
+        assert entry.raw_content in output
+        assert entry.raw_content.startswith("@") and "(" in entry.raw_content
+
+    # Re-parse of written output must preserve keys, types, and fields.
+    lib2 = parse_bib(output)
+    for e1, e2 in zip(lib.entries.values(), lib2.entries.values()):
+        assert e1.key == e2.key
+        assert e1.type == e2.type
+        assert e1.fields == e2.fields
 
 
 @settings(max_examples=300, suppress_health_check=[HealthCheck.too_slow])

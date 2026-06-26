@@ -258,3 +258,23 @@ class TestRegenerate:
         )
         renames = regenerate_keys(lib)
         assert renames == [("old", "Smith24")]
+
+    def test_regenerate_skips_xdata_entries(self) -> None:
+        # @xdata entries are referenced by key from other entries via
+        # ``xdata = {key}``; renaming them would silently break those refs.
+        src = (
+            "@xdata{pub, publisher = {Press}, location = {City}}\n"
+            "@book{old, xdata = {pub}, title = {T}, author = {Doe, J.}, year = {2020}}\n"
+        )
+        lib = parse_bib(src)
+        renames = regenerate_keys(lib)
+        renamed_keys = {old for old, _ in renames}
+        assert "pub" not in renamed_keys, "xdata entry key must not be renamed"
+        assert lib.entries["pub"].type == "xdata"
+        # The @book entry is still renamed normally.
+        assert any(new == "Doe2020T" for _, new in renames)
+        # The xdata reference in the @book entry still points to the original key.
+        from pynakes.bibtex_writer import write_bib
+
+        out = write_bib(lib)
+        assert "xdata = {pub}" in out

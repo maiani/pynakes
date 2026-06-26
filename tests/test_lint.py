@@ -320,3 +320,48 @@ def test_profile_can_disable_title_protection() -> None:
     )
 
     assert "title_capitalization_unprotected" not in _types(lint(lib))
+
+
+def test_xdata_entry_produces_no_false_required_field_errors() -> None:
+    # @xdata entries are structural data containers; they legitimately omit
+    # author, title, year and must not be flagged for missing required fields.
+    lib = parse_bib(
+        "@xdata{pub, publisher = {Example Press}, location = {City}}\n"
+        "@book{Book, xdata = {pub}, title = {T}, author = {Doe, J.}, year = {2020}}\n"
+    )
+    required_issues = [i for i in lint(lib) if i.type == "missing_required_field"]
+    xdata_issues = [i for i in required_issues if i.key == "pub"]
+    assert not xdata_issues, f"false required-field errors on @xdata entry: {xdata_issues}"
+
+
+def test_set_entry_produces_no_false_required_field_errors() -> None:
+    # @set entries hold entryset membership metadata; they do not carry the
+    # author/title/year/publisher fields of their member entries.
+    lib = parse_bib(
+        "@set{DatasetSet, entryset = {art1, art2}, entrysubtype = {research}}\n"
+        "@article{art1, author = {A, B}, title = {T1}, journaltitle = {J}, date = {2024}}\n"
+        "@article{art2, author = {C, D}, title = {T2}, journaltitle = {J}, date = {2024}}\n"
+    )
+    required_issues = [i for i in lint(lib) if i.type == "missing_required_field"]
+    set_issues = [i for i in required_issues if i.key == "DatasetSet"]
+    assert not set_issues, f"false required-field errors on @set entry: {set_issues}"
+
+
+def test_custom_biblatex_entry_type_and_field_names_produce_no_errors() -> None:
+    # Custom entry types (e.g. @online, @dataset) and fields with non-standard
+    # characters (e.g. colons as used by BibLaTeX data-model extensions) must
+    # parse and lint without false errors or tracebacks.
+    lib = parse_bib(
+        "@online{Dataset,\n"
+        "  author = {Ångström, Anders},\n"
+        "  title = {Données, 数据, and data},\n"
+        "  date = {2025},\n"
+        "  url = {https://example.test/dataset},\n"
+        "  custom:field = {A project-defined value}\n"
+        "}\n"
+    )
+    issues = lint(lib)
+    error_issues = [i for i in issues if i.severity == "error"]
+    assert not error_issues, f"unexpected errors on custom entry: {error_issues}"
+    # The custom field must survive a round-trip through lint.
+    assert lib.entries["Dataset"].fields["custom:field"] == "A project-defined value"

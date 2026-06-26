@@ -92,7 +92,7 @@ style engine or a user's custom data-model validation rules.
       is validated by BibTeX; `%` comments remain a separately tested permissive
       extension because they are TeX syntax, not valid top-level BibTeX database
       syntax.
-- [ ] Preserve arbitrary BibLaTeX entry types and custom data-model fields
+- [x] Preserve arbitrary BibLaTeX entry types and custom data-model fields
       without a closed schema; cover `@set`, `@xdata`, inheritance references,
       and Unicode inputs.
 - [x] Define and implement the BibLaTeX inheritance contract for every consumer
@@ -109,16 +109,16 @@ style engine or a user's custom data-model validation rules.
       The parser records a source layout (block order + inter-block whitespace)
       and the writer renders from it; verified byte-for-byte on every fixture,
       including the vendored `xampl.bib` and `biblatex-examples.bib`.
-- [ ] Expand the initial versioned core corpus, which now vendors the full
+- [x] Expand the initial versioned core corpus, which now vendors the full
       upstream `xampl.bib` and `biblatex-examples.bib`, with real-world
       regression files. Every fixture must parse and parse again after write.
 - [x] Validate the vendored upstream corpora in CI with the pinned TeX Live 2025
       tools: BibTeX 0.99d for `xampl.bib` and Biber 2.20
       `--tool --validate-datamodel` for `biblatex-examples.bib`.
-- [ ] Add differential and property-based tests against the pinned reference
+- [x] Add differential and property-based tests against the pinned reference
       tools: valid generated inputs accepted by BibTeX/Biber must parse in
       pynakes, and pynakes output must be accepted by the relevant tool.
-- [ ] Exercise every modifying operation, serializer fallback, and surgical edit
+- [x] Exercise every modifying operation, serializer fallback, and surgical edit
       path on both `{...}` and `(...)` entries. Validate its output with the
       relevant pinned tool, including files that retain top-level declarations.
 
