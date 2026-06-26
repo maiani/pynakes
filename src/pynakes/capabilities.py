@@ -45,7 +45,7 @@ _ERROR_CODES = {
             "InvalidNormalizeOption": "normalize: an option value was not allowed.",
             "KeyNotFound": "A referenced citation key is not in the library.",
             "InvalidIdentifier": "add: an identifier value was malformed.",
-            "UnsupportedIdentifier": "add: the identifier was not a DOI or arXiv id/URL.",
+            "UnsupportedIdentifier": "add: the identifier was not a DOI, arXiv id/URL, or supported journal URL.",
             "ReferenceImportError": "add: a DOI/arXiv reference could not be resolved or imported.",
         },
     },
@@ -262,7 +262,7 @@ def get_capabilities() -> dict:
             "normalize": "Run the standard normalization routine",
             "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "
             "formats (export/import CSL-JSON and RIS)",
-            "add": "Add a reference by DOI or arXiv identifier",
+            "add": "Add a reference by DOI, arXiv identifier, or journal article URL",
             "search": "Search entries by free text, phrases, or field-scoped terms",
             "used": "Report/tag/export entries cited in LaTeX sources",
             "combine": "Union several .bib files into one (optionally deduping by key)",

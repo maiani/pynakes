@@ -29,6 +29,31 @@ _USER_AGENT = "pynakes/0.3.0 reference import (mailto:unknown@example.invalid)"
 _DOI_URL_RE = re.compile(r"^https?://(?:dx\.)?doi\.org/", re.IGNORECASE)
 _DOI_RE = re.compile(r"^10\.\d{4,9}/\S+$", re.IGNORECASE)
 
+# Table of known journal URL patterns that encode the DOI directly.
+# Each entry is (compiled pattern, extractor callable).  The extractor
+# receives the re.Match and returns the bare DOI string.
+# Extend here to support additional publishers without touching the resolver.
+_JOURNAL_URL_RESOLVERS: list[tuple[re.Pattern[str], Callable[[re.Match[str]], str]]] = [
+    (
+        # nature.com article URLs: slug IS the DOI suffix under prefix 10.1038
+        # e.g. https://www.nature.com/articles/s41535-025-00801-3
+        #   → DOI 10.1038/s41535-025-00801-3
+        re.compile(r"^https?://(?:www\.)?nature\.com/articles/([^/?#\s]+)", re.IGNORECASE),
+        lambda m: f"10.1038/{m.group(1)}",
+    ),
+    (
+        # APS (American Physical Society) article and PDF URLs: DOI embedded in path
+        # e.g. https://journals.aps.org/rmp/abstract/10.1103/k13g-z9s8
+        #      https://journals.aps.org/rmp/pdf/10.1103/k13g-z9s8
+        #   → DOI 10.1103/k13g-z9s8
+        re.compile(
+            r"^https?://journals\.aps\.org/\w+/(?:abstract|pdf)/(10\.\d{4,9}/\S+?)(?:[/?#]|$)",
+            re.IGNORECASE,
+        ),
+        lambda m: m.group(1),
+    ),
+]
+
 # arXiv identifiers come in the post-2007 ``YYMM.NNNNN`` form and the legacy
 # ``archive/YYMMNNN`` form (e.g. ``hep-th/9901001``), each optionally suffixed
 # with a version (``v2``). URLs and an ``arXiv:`` prefix are also accepted.
@@ -105,12 +130,32 @@ FetchArxivAtom = Callable[[str], str]
 # --- identifier resolution -------------------------------------------------
 
 
+def extract_doi_from_journal_url(url: str) -> str | None:
+    """Extract a DOI from a recognized journal article URL, or return ``None``.
+
+    Consults :data:`_JOURNAL_URL_RESOLVERS`. Currently supports:
+
+    * ``nature.com/articles/{slug}`` → DOI ``10.1038/{slug}``
+    * ``journals.aps.org/{journal}/abstract/{doi}`` → DOI embedded in path
+    """
+    stripped = url.strip()
+    for pattern, extractor in _JOURNAL_URL_RESOLVERS:
+        m = pattern.match(stripped)
+        if m:
+            doi = extractor(m)
+            if _DOI_RE.match(doi):
+                return doi
+    return None
+
+
 def resolve_identifier(value: str) -> tuple[str, str]:
     """Classify ``value`` and return ``(kind, normalized_identifier)``.
 
     ``kind`` is :data:`DOI` or :data:`ARXIV`. arXiv is detected first because an
     arXiv URL or ``arXiv:`` prefix is unambiguous; a bare ``10.x/...`` string is
-    a DOI. Raises :class:`UnsupportedIdentifierError` for anything else.
+    a DOI. Recognized journal article URLs (e.g. ``nature.com``) have their DOI
+    extracted and also resolve as :data:`DOI`. Raises
+    :class:`UnsupportedIdentifierError` for anything else.
     """
     raw = value.strip()
     if not raw:
@@ -133,8 +178,14 @@ def resolve_identifier(value: str) -> tuple[str, str]:
         if normalized is not None:
             return ARXIV, normalized
 
+    # A recognized journal article URL (DOI extractable from the URL structure).
+    extracted = extract_doi_from_journal_url(raw)
+    if extracted is not None:
+        return DOI, extracted
+
     raise UnsupportedIdentifierError(
-        f"Unrecognized identifier {value!r}; expected a DOI or arXiv id/URL"
+        f"Unrecognized identifier {value!r}; expected a DOI, arXiv id/URL, "
+        f"or a supported journal article URL (nature.com, journals.aps.org)"
     )
 
 

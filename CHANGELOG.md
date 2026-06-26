@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `pynakes add` now accepts Nature and APS journal article URLs in addition to
+  bare DOIs and arXiv identifiers:
+  - `https://www.nature.com/articles/{slug}` → extracted as DOI `10.1038/{slug}`
+  - `https://journals.aps.org/{journal}/abstract/{doi}` → DOI embedded in path
+  - `https://journals.aps.org/{journal}/pdf/{doi}` → same, PDF variant
+  The extracted DOI is then resolved normally via DOI content negotiation.
+  The resolver table (`_JOURNAL_URL_RESOLVERS` in `importer.py`) is designed
+  to be extended for additional publishers.
+
 ### Fixed
 - `keys generate` no longer renames `@xdata` entries. They are structural
   metadata containers referenced by key from other entries via `xdata = {…}`;

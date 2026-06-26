@@ -18,6 +18,7 @@ from pynakes.importer import (
     entry_from_bibtex,
     existing_keys_for_arxiv,
     existing_keys_for_doi,
+    extract_doi_from_journal_url,
     fetch_bibtex_for_doi,
     normalize_arxiv,
     normalize_doi,
@@ -256,6 +257,76 @@ def test_resolve_identifier(value: str, expected: tuple[str, str]) -> None:
 def test_resolve_identifier_rejects_unknown(value: str) -> None:
     with pytest.raises(UnsupportedIdentifierError):
         resolve_identifier(value)
+
+
+# --- journal URL extraction ------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "url,expected_doi",
+    [
+        # nature.com: slug IS the DOI suffix under 10.1038
+        (
+            "https://www.nature.com/articles/s41535-025-00801-3",
+            "10.1038/s41535-025-00801-3",
+        ),
+        (
+            "https://nature.com/articles/s41586-024-07487-w",
+            "10.1038/s41586-024-07487-w",
+        ),
+        # APS: DOI embedded literally in the abstract URL
+        (
+            "https://journals.aps.org/rmp/abstract/10.1103/k13g-z9s8",
+            "10.1103/k13g-z9s8",
+        ),
+        # APS PDF variant
+        (
+            "https://journals.aps.org/rmp/pdf/10.1103/k13g-z9s8",
+            "10.1103/k13g-z9s8",
+        ),
+        # APS Physical Review Letters
+        (
+            "https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.132.010601",
+            "10.1103/PhysRevLett.132.010601",
+        ),
+    ],
+)
+def test_extract_doi_from_journal_url(url: str, expected_doi: str) -> None:
+    assert extract_doi_from_journal_url(url) == expected_doi
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://example.com/articles/something",
+        "https://arxiv.org/abs/2301.00001",
+        "https://doi.org/10.5555/abc",
+        "not a url at all",
+    ],
+)
+def test_extract_doi_from_journal_url_returns_none_for_unknown(url: str) -> None:
+    assert extract_doi_from_journal_url(url) is None
+
+
+@pytest.mark.parametrize(
+    "url,expected",
+    [
+        (
+            "https://www.nature.com/articles/s41535-025-00801-3",
+            (DOI, "10.1038/s41535-025-00801-3"),
+        ),
+        (
+            "https://journals.aps.org/rmp/abstract/10.1103/k13g-z9s8",
+            (DOI, "10.1103/k13g-z9s8"),
+        ),
+        (
+            "https://journals.aps.org/rmp/pdf/10.1103/k13g-z9s8",
+            (DOI, "10.1103/k13g-z9s8"),
+        ),
+    ],
+)
+def test_resolve_identifier_accepts_journal_urls(url: str, expected: tuple[str, str]) -> None:
+    assert resolve_identifier(url) == expected
 
 
 def test_normalize_arxiv_strips_version_and_scheme() -> None:
