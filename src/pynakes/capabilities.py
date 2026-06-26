@@ -36,6 +36,7 @@ _ERROR_CODES = {
         "exit_code": 1,
         "codes": {
             "FileNotFound": "A given file does not exist.",
+            "FileExists": "init: the target .bib already exists (pass --force to overwrite).",
             "ParseError": "A .bib or source file could not be parsed (includes 'line').",
             "InvalidInput": "An argument, option, or predicate was invalid.",
             "IOError": "A read or write failed.",
@@ -210,6 +211,7 @@ def get_capabilities() -> dict:
         ],
         "capabilities": [
             "parse_bibtex",
+            "create_library",
             "inspect_library",
             "lint",
             "manage_groups",
@@ -244,6 +246,7 @@ def get_capabilities() -> dict:
             "validate_linked_files",
         ],
         "commands": {
+            "init": "Create a new .bib library, optionally seeded with a metadata profile",
             "inspect": "Inspect a .bib file structure",
             "lint": "Validate entries and report issues",
             "groups": "Manage entry groups (list, add-entry, remove-entry)",

@@ -16,6 +16,27 @@ Exit codes:
 - `1`: error, such as parse, I/O, or validation failure
 - `2`: conflict, such as duplicate DOI import without `--allow-duplicate`
 
+## init
+
+Create a new `.bib` library, seeded with a metadata profile. With no options it
+writes a sensible default — the BibLaTeX dialect and pynakes' default
+citation-key pattern (`[auth][year][veryshorttitle]`) — so the library works with
+`keys generate` and `normalize` out of the box. It refuses to overwrite an
+existing file unless `--force` (which leaves a `.bak`).
+
+```bash
+pynakes init refs.bib                          # default profile (biblatex)
+pynakes init refs.bib --type bibtex            # choose the dialect
+pynakes init refs.bib --key-pattern '[auth][year]'
+pynakes init refs.bib --from template.bib      # copy another library's profile
+pynakes init refs.bib --dry-run --diff         # preview the seed file
+```
+
+`--from` copies the template's *conventions* — dialect, key patterns,
+`saveActions`, and pynakes normalization/lint settings — but not its own content
+(group tree, linked TeX sources). `--type` / `--key-pattern` override individual
+settings on top of the default (or copied) profile.
+
 ## inspect
 
 Inspect a `.bib` file.

@@ -87,9 +87,13 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
   metadata; `--published` also promotes preprints to their published version
 - `pynakes used <bib-file> <source>... [--out ...] [--group ...] [--keyword ...]`
 
-Projections — read inputs read-only, **create** new files (support `--dry-run`,
-`--diff`, `--json`):
+Creating / projecting — **create** new files (support `--dry-run`, `--diff`,
+`--json`):
 
+- `pynakes init <file> [--type biblatex|bibtex] [--key-pattern ...] [--from <file>] [--force]`
+  — create a new library seeded with a metadata profile (a sensible default, or
+  one copied from `--from`). Refuses to overwrite an existing file without
+  `--force`; emits `FileExists` (exit `1`) otherwise.
 - `pynakes combine <file>... --out <file> [--dedupe]` — union several `.bib`
   files into one. `--dedupe` collapses identical same-key entries and reports a
   conflict (exit `2`) when same-key entries differ.

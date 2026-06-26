@@ -16,6 +16,7 @@ from pynakes.cli_commands import (
     fields,
     files,
     groups,
+    init,
     inspect,
     integrity,
     keys,
@@ -60,6 +61,7 @@ def main(
     """Agent-friendly BibTeX library management tool."""
 
 
+init.register(app)
 inspect.register(app)
 metadata.register(metadata_app)
 lint.register(app)

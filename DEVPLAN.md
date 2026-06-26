@@ -6,8 +6,43 @@ valuable on its own. Any application built on top of pynakes (capture, reading, 
 UI, sync) is a **separate, downstream project** and is explicitly *not* in this
 plan.
 
-This document is the **road to 1.0**. Completed work is recorded in
-[CHANGELOG.md](CHANGELOG.md) and the git log.
+This document is the **road to 1.0** and the cross-file corpus bridge beyond it.
+Completed work is recorded in [CHANGELOG.md](CHANGELOG.md) and the git log.
+
+## Scope ledger — what is built in pynakes, and when
+
+pynakes is the **engine**; a downstream corpus-management application (capture,
+reading, a UI, sync) is out of this plan. To keep that boundary explicit, the
+full set of features that are pynakes' *own* responsibility, by release:
+
+**In pynakes, before 1.0** (detailed in the 0.4 / 0.5 sections and Milestone E):
+
+- **Input conformance** — the 0.4 hard gate: parse + byte-for-byte round-trip of
+  every BibTeX/BibLaTeX construct, inheritance, and `(...)`/`{...}` form,
+  differential-tested against pinned BibTeX/Biber. *(open items below)*
+- **Bib-file operation coverage** — the 0.4 jabkit checklist: `search`,
+  CSL-JSON/RIS `convert`, key generation, integrity, consistency, aux-subset.
+  *(landed)*
+- **Remaining interchange formats** — 0.5: MODS and EndNote, on
+  `pynakes.interchange`.
+- **The 0.5 scope decision** — whether any headless, deterministic slice of
+  jabkit's `fetch`/`pdf` enters the engine or stays downstream.
+- **Release** — lock the pinned public API (semver); ship 0.9 → 1.0 on PyPI.
+
+**In pynakes, after 1.0** — the cross-file corpus bridge, still pure bib-file
+mechanisms, in dependency order (detailed in [Beyond 1.0](#beyond-10)):
+
+1. **First-class shared identity** (DOI/arXiv/OpenAlex/ORCID) — foundational;
+   the rest keys off it.
+2. **`Library`** — a directory of `.bib` files opened as one corpus.
+3. **`Catalogue`** — a derived, rebuildable index over the Library.
+4. **Projections as `Library` views** — `combine`/`split` generalized to
+   reconciled corpus views.
+
+**Never in pynakes** (downstream application territory) — see
+[Out of scope](#out-of-scope-permanently-for-pynakes): capture, a PDF library,
+reading/annotation, a GUI, sync, a database of record, and an MCP server over a
+personal corpus.
 
 ## Current state (v0.3.0)
 
@@ -21,7 +56,8 @@ surface.
   re-parse-validated writes with `.bak` backups; surgical minimal-diff editing.
 - **`engine.Collection`** — the load → stage → preview/diff → commit lifecycle
   with external-change detection; the CLI is a thin consumer.
-- **Operations**: `inspect`, `lint`, `groups`, `keys` (generate/check/repair/
+- **Operations**: `init` (new library with a seeded/copied metadata profile),
+  `inspect`, `lint`, `groups`, `keys` (generate/check/repair/
   rename + JabRef key patterns), `fields` (with `--where`), `convert`,
   `files check`, `normalize` (including journal title abbreviation/expansion),
   `add` (DOI/arXiv), `used`, `dedupe`, `verify`/`enrich` (opt-in `--online`,
@@ -128,8 +164,9 @@ bib files:
       and key generation. This is the intended design (principle: the file is
       the single source of truth; no hidden global state), so the parity answer
       is per-library metadata profiles rather than a separate preference file.
-      *Open, minor:* a way to copy/share a profile between libraries — additive,
-      not blocking.
+      Copying/sharing a profile between libraries is delivered by
+      `pynakes init --from <file>`, which seeds a new library from another's
+      maintenance profile.
 
 jabkit subcommands that are **not** bib-file operations are out of 0.4 and feed
 the 0.5 scope decision below: **fetch** (capture entries from web providers —
@@ -176,9 +213,11 @@ unit of work is one `Collection` (one `.bib`). 1.0 means: it does single-file
 maintenance excellently, covers the JabRef bib-file feature set (the coverage
 checklist above), promises API stability (semver), and is installable.
 
-**Explicitly *not* in 1.0** (deferred to [Beyond 1.0](#beyond-10)):
-the multi-file `Library`/`Catalogue` corpus engine and CSL-JSON/RIS interop.
-These are larger and more corpus-flavored — so 1.0 is not gated on them.
+**Explicitly *not* in 1.0** (deferred to [Beyond 1.0](#beyond-10)): the
+multi-file `Library`/`Catalogue` corpus engine, projections as `Library` views,
+and first-class shared identity. These are larger and more corpus-flavored — so
+1.0 is not gated on them. Basic CSL-JSON/RIS `convert` is *not* deferred — it
+landed in the 0.4 coverage checklist.
 
 ---
 
@@ -211,23 +250,27 @@ These are larger and more corpus-flavored — so 1.0 is not gated on them.
 
 ## Beyond 1.0
 
-Out of 1.0, in roughly this order. The `Library`/`Catalogue` is the bridge from
-the single-file engine to a cross-file corpus, and is what any downstream
-application would build on.
+These stay **in pynakes** — pure bib-file mechanisms, no application scope — but
+together they are the cross-file corpus layer a downstream application builds
+directly on. Out of 1.0, in dependency order:
 
-- **Interoperability** — CSL-JSON import/export (Zotero/pandoc/citeproc lingua
-  franca), RIS import/export, and first-class stable identifiers (DOI / arXiv /
-  OpenAlex / ORCID) shared by dedup, import, and verify. *(Note: the formats
-  jabkit's `convert` supports are pulled forward into the 0.4 jabkit coverage
-  checklist; what remains here is interop beyond jabkit's surface.)*
+- **First-class shared identity** — promote the DOI / arXiv / OpenAlex / ORCID /
+  title machinery (today spread across `dedupe`, `verify`, and `add`) into one
+  explicit, tested primitive. It is the foundation the rest of this list stands
+  on: `Library` dedup, the `Catalogue`, and projection reconciliation all key off
+  a single notion of "the same work". Keeping the `used` / `\cite`-key-matching
+  and `files check` seams general here is also what lets a downstream reading or
+  citation-graph layer build on the engine without changing it.
 - **`Library` (corpus)** — `Library.open(dir)`; `collections()`,
-  `collection(path)`; cross-file `search`/`find_key`/dedup (reusing the existing
-  stable-identity machinery).
+  `collection(path)`; cross-file `search`/`find_key`/dedup, reusing the identity
+  primitive above. *The single biggest thing a corpus application needs.*
 - **`Catalogue` (index)** — a derived, rebuildable search index (e.g. SQLite
   FTS) over the Library; strictly derived, never a competing source of truth.
 - **Projections** — `combine` and `split` have landed as file-level operations
-  (`pynakes.setops`). What remains for Beyond 1.0 is formalizing them as
-  first-class **views of the `Library`**, once the `Library` exists.
+  (`pynakes.setops`). What remains is formalizing them as first-class **views of
+  the `Library`**, with reconciliation, once the `Library` exists.
+- **Interop beyond jabkit** — any import/export formats past what the 0.4 / 0.5
+  checklists cover, building on `pynakes.interchange`.
 
 ## Out of scope (permanently, for pynakes)
 

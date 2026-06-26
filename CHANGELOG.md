@@ -34,6 +34,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with `journal_style` instead.
 
 ### Added
+- **`pynakes init`** — create a new `.bib` library, seeded with a metadata
+  profile. With no options it writes a sensible default (the BibLaTeX dialect and
+  pynakes' default `[auth][year][veryshorttitle]` citation-key pattern) so the
+  library works out of the box; `--type` / `--key-pattern` override individual
+  settings, and `--from <file>` copies another library's maintenance profile (its
+  conventions — dialect, key patterns, `saveActions`, normalization/lint settings
+  — not its group tree or TeX-source list). Refuses to overwrite an existing file
+  unless `--force` (emitting the new `FileExists` error, exit `1`); writes
+  atomically and supports `--dry-run`/`--diff`/`--json`. Profile scaffolding lives
+  in the new `pynakes.initialize` module. This also delivers the cross-library
+  profile sharing the DEVPLAN flagged as an open item.
 - **Interchange formats in `convert`** (jabkit `convert` parity): `convert`
   now exports a library to CSL-JSON or RIS (`--to csl-json`/`--to ris`) and
   imports those formats to BibTeX (`--from csl-json`/`--from ris`), in addition
