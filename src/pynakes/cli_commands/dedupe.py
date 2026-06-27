@@ -14,13 +14,13 @@ from pynakes.cli_common import (
     _run_checks,
     _safe,
 )
-from pynakes.engine import Collection
+from pynakes.engine import Bibliography
 
 # --- dedupe ----------------------------------------------------------------
 
 
 def _dedupe_check_one(file: str) -> CheckOutcome:
-    coll = Collection.open(file)
+    coll = Bibliography.open(file)
     clusters = coll.dedupe_check()
     duplicate_entries = sum(len(cluster.entries) for cluster in clusters)
     result = {
@@ -64,7 +64,7 @@ def dedupe_merge(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Conservatively merge duplicate works into their first entry."""
-    coll = Collection.open(file)
+    coll = Bibliography.open(file)
     try:
         report = coll.dedupe_merge()
     except dedupe_ops.DedupeConflictError as exc:

@@ -19,7 +19,7 @@ from pynakes.cli_common import (
     _finish_mod,
     _safe,
 )
-from pynakes.engine import Collection
+from pynakes.engine import Bibliography
 
 # --- add -------------------------------------------------------------------
 
@@ -50,7 +50,7 @@ def add(
         )
 
     try:
-        coll = Collection.open(file)
+        coll = Bibliography.open(file)
         kind, entry = coll.import_reference(
             identifier,
             key=key,

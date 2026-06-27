@@ -1,6 +1,6 @@
 """In-process engine facade for bibliography operations.
 
-``Collection`` wraps one :class:`~pynakes.model.BibFile`, remembers the pristine
+``Bibliography`` wraps one :class:`~pynakes.model.BibFile`, remembers the pristine
 file text it was opened from, stages edits in memory, and can preview, diff, or
 commit those staged edits. Entry edits use the same surgical splice strategy as
 the CLI so unchanged entries stay byte-stable where possible.
@@ -39,7 +39,7 @@ class FileFingerprint:
     """Observed file state used for optimistic-concurrency checks.
 
     The size, nanosecond modification time, and content digest make a
-    ``Collection`` reject a commit when its on-disk source changed externally.
+    ``Bibliography`` reject a commit when its on-disk source changed externally.
     """
 
     size: int
@@ -49,7 +49,7 @@ class FileFingerprint:
 
 @dataclass
 class CommitResult:
-    """Outcome of one :meth:`Collection.commit` lifecycle transition.
+    """Outcome of one :meth:`Bibliography.commit` lifecycle transition.
 
     ``diff`` compares the pre-commit pristine text with the staged output;
     ``modified`` distinguishes a successful no-op commit from one that wrote.
@@ -61,7 +61,7 @@ class CommitResult:
 
 
 class ExternalModificationError(Exception):
-    """Raised when a bound collection's file changed since it was opened."""
+    """Raised when a bound bibliography's file changed since it was opened."""
 
     def __init__(self, path: Path):
         self.path = path
@@ -69,10 +69,10 @@ class ExternalModificationError(Exception):
 
 
 @dataclass
-class Collection:
-    """One in-memory bibliography collection.
+class Bibliography:
+    """One in-memory bibliography.
 
-    A collection is a *derived editing buffer*, not a second source of truth. It
+    A bibliography is a *derived editing buffer*, not a second source of truth. It
     may be bound to a path via :meth:`open`, or constructed from already-loaded
     text/library data. Operation methods stage changes in the contained
     ``BibFile`` and return the underlying operation reports/counts.
@@ -95,8 +95,8 @@ class Collection:
     _consolidate_metadata: bool = False
 
     @classmethod
-    def open(cls, path: str | Path) -> "Collection":
-        """Load a `.bib` file into a collection."""
+    def open(cls, path: str | Path) -> "Bibliography":
+        """Load a `.bib` file into a bibliography."""
         bound_path = Path(path)
         lib = load_bib(str(bound_path))
         pristine_text = _read_text(bound_path, lib.encoding)
@@ -109,8 +109,8 @@ class Collection:
         )
 
     @classmethod
-    def from_text(cls, text: str, path: str | Path | None = None) -> "Collection":
-        """Create a collection from BibTeX text."""
+    def from_text(cls, text: str, path: str | Path | None = None) -> "Bibliography":
+        """Create a bibliography from BibTeX text."""
         lib = parse_bib(text)
         return cls(
             lib,
@@ -120,7 +120,7 @@ class Collection:
         )
 
     @classmethod
-    def from_bibfile(cls, lib: BibFile, path: str | Path | None = None) -> "Collection":
+    def from_bibfile(cls, lib: BibFile, path: str | Path | None = None) -> "Bibliography":
         """Wrap an existing library without copying it."""
         text = write_bib(lib)
         return cls(
@@ -132,7 +132,7 @@ class Collection:
 
     @property
     def entries(self) -> EntryStore:
-        """Return the duplicate-preserving entry collection."""
+        """Return the duplicate-preserving entry store."""
         return self.lib.entries
 
     @property
@@ -150,7 +150,7 @@ class Collection:
             self._dirty = True
 
     def mark_dirty(self, changed: int | bool = True) -> None:
-        """Mark the collection dirty after a caller mutates ``lib`` directly."""
+        """Mark the bibliography dirty after a caller mutates ``lib`` directly."""
         self._mark(changed)
 
     # --- lifecycle -------------------------------------------------------
@@ -265,7 +265,7 @@ class Collection:
         pass ``backup=True`` to also leave a ``<file>.bak`` copy behind.
         """
         if self.path is None:
-            raise ValueError("commit requires a collection path")
+            raise ValueError("commit requires a bound path")
         if (
             not force
             and self._fingerprint is not None
@@ -299,9 +299,9 @@ class Collection:
     def reload(self, *, force: bool = False) -> None:
         """Reload the bound file from disk, optionally discarding staged edits."""
         if self.path is None:
-            raise ValueError("reload requires a collection path")
+            raise ValueError("reload requires a bound path")
         if self._dirty and not force:
-            raise ValueError("cannot reload a dirty collection without force=True")
+            raise ValueError("cannot reload a dirty bibliography without force=True")
         self.lib = load_bib(str(self.path))
         self._pristine_text = _read_text(self.path, self.lib.encoding)
         self._entry_snapshot = _snapshot_entries(self.lib)
@@ -395,7 +395,7 @@ class Collection:
         return False
 
     def _file_name(self) -> str:
-        return self.path.name if self.path is not None else "collection.bib"
+        return self.path.name if self.path is not None else "bibliography.bib"
 
     # --- read-only views -------------------------------------------------
 
@@ -416,9 +416,9 @@ class Collection:
         return group_ops.list_entries_in_group(self.lib, group)
 
     def files_check(self, roots: list[str | Path] | None = None) -> file_ops.FileCheckReport:
-        """Validate JabRef linked files for this collection."""
+        """Validate JabRef linked files for this bibliography."""
         if self.path is None:
-            raise ValueError("files_check requires a collection path")
+            raise ValueError("files_check requires a bound path")
         return file_ops.check_linked_files(self.lib, self.path, roots)
 
     def journals_check(
@@ -426,7 +426,7 @@ class Collection:
         journal_table: str | None = None,
         ltwa_table: str | None = None,
     ) -> list[dict[str, str]]:
-        """Classify distinct journal titles without modifying the collection."""
+        """Classify distinct journal titles without modifying the bibliography."""
         sources = journal_ops.load_sources(journal_table, ltwa_table)
         seen: dict[str, str] = {}
         for entry in self.lib.entries.values():
@@ -437,7 +437,7 @@ class Collection:
         return [{"journal": title, "status": status} for title, status in seen.items()]
 
     def dedupe_check(self) -> list[dedupe_ops.DuplicateCluster]:
-        """Return duplicate-work clusters without modifying the collection."""
+        """Return duplicate-work clusters without modifying the bibliography."""
         return dedupe_ops.find_duplicate_clusters(self.lib)
 
     def verify(
@@ -577,7 +577,7 @@ class Collection:
         return report
 
     def convert(self, target: str) -> convert_ops.ConvertResult:
-        """Convert the collection in memory to ``target`` conventions."""
+        """Convert the bibliography in memory to ``target`` conventions."""
         report = convert_ops.convert(self.lib, target)
         self._mark(bool(report.entries))
         return report

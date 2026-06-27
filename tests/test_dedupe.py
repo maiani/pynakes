@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 from pynakes.bibtex_parser import parse_bib
 from pynakes.cli import app
 from pynakes.dedupe import DedupeConflictError, find_duplicate_clusters, merge_duplicates
-from pynakes.engine import Collection
+from pynakes.engine import Bibliography
 
 runner = CliRunner()
 
@@ -69,7 +69,7 @@ def test_fuzzy_cluster_can_include_entry_without_stable_id() -> None:
 
 
 def test_merge_duplicates_copies_missing_data_and_removes_duplicate() -> None:
-    coll = Collection.from_text(
+    coll = Bibliography.from_text(
         "@article{A,\n"
         "  author = {John Smith},\n"
         "  title = {A Practical Test},\n"

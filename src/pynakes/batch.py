@@ -1,7 +1,7 @@
-"""Apply a sequence of operations to one :class:`~pynakes.engine.Collection`.
+"""Apply a sequence of operations to one :class:`~pynakes.engine.Bibliography`.
 
 A *batch* lets an agent stage several edits and commit them in one atomic,
-reviewable step: the operations mutate the in-memory collection, the caller
+reviewable step: the operations mutate the in-memory bibliography, the caller
 previews a single combined diff/plan, and one commit writes them together (or
 nothing, if any operation fails). This exposes the engine's existing
 stage-then-commit lifecycle to multi-operation callers.
@@ -9,13 +9,13 @@ stage-then-commit lifecycle to multi-operation callers.
 Each operation is a dict ``{"op": "<name>", ...params}``. The supported names and
 their parameters are in :data:`OPERATION_SPECS` (also surfaced in
 ``capabilities``). Operations map to the deterministic, in-memory
-``Collection`` methods; network and conflict-prone operations (``add``,
+``Bibliography`` methods; network and conflict-prone operations (``add``,
 ``dedupe merge``) are intentionally excluded.
 """
 
 from dataclasses import dataclass
 
-from pynakes.engine import Collection
+from pynakes.engine import Bibliography
 from pynakes.normalize import NormalizeOptions
 
 
@@ -38,7 +38,7 @@ class OperationSpec:
 
 
 # The supported operations, their parameters, and how each maps onto a
-# Collection method. Keep this the single source of truth for the batch surface.
+# Bibliography method. Keep this the single source of truth for the batch surface.
 OPERATION_SPECS: dict[str, OperationSpec] = {
     "fields.rename": OperationSpec(("old", "new"), ("where",), "Rename a field"),
     "fields.move": OperationSpec(
@@ -85,8 +85,8 @@ def _validate(spec: OperationSpec, params: dict, index: int, op: str) -> None:
         raise BatchError(index, op, f"missing parameter(s): {', '.join(missing)}")
 
 
-def _apply_one(coll: Collection, op: str, params: dict) -> dict:
-    """Dispatch one validated operation to the collection; return a result dict."""
+def _apply_one(coll: Bibliography, op: str, params: dict) -> dict:
+    """Dispatch one validated operation to the bibliography; return a result dict."""
     if op == "fields.rename":
         return {"changed": coll.rename_field(params["old"], params["new"], params.get("where"))}
     if op == "fields.move":
@@ -126,7 +126,7 @@ def _apply_one(coll: Collection, op: str, params: dict) -> dict:
     raise AssertionError(f"unhandled op {op!r}")  # pragma: no cover
 
 
-def apply_operations(coll: Collection, operations: list[dict]) -> list[dict]:
+def apply_operations(coll: Bibliography, operations: list[dict]) -> list[dict]:
     """Apply ``operations`` to ``coll`` in order, staging them in memory.
 
     Returns one result dict per operation (``{"op": name, "result": {...}}``).

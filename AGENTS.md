@@ -15,10 +15,7 @@ JabRef and the BibTeX/BibLaTeX toolchain — that compatibility is a guarantee i
 keeps, not its identity. See
 [docs/guides/architecture.md](docs/guides/architecture.md) for the design,
 [docs/vision.md](docs/vision.md) for the design philosophy, and
-[DEVPLAN.md](DEVPLAN.md) for the phased plan. For *where this is ultimately
-headed* — pynakes as the kernel under the `bimas` reference-management system —
-see [.long_term_vision.md](.long_term_vision.md), a hidden, agent-facing
-north-star doc kept out of the public docs site.
+[DEVPLAN.md](DEVPLAN.md) for the phased plan.
 
 ## Layout
 
@@ -29,7 +26,7 @@ src/pynakes/
   bibtex_writer.py    write_bib() — raw_content for unmodified, reconstruct for modified
   io.py               load_bib / save_bib / save_text / save_plain_text (atomic writes)
   editing.py          surgical raw-text field/key edits + entry-level helpers
-  engine.py           Collection lifecycle: open, stage, preview/diff, commit, reload
+  engine.py           Bibliography lifecycle: open, stage, preview/diff, commit, reload
   groups.py keys.py fields.py files.py lint.py
   authors.py journals.py normalize.py  format operations
   importer.py         resolve + import references by DOI / arXiv id (metadata only)

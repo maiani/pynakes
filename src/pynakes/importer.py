@@ -3,7 +3,7 @@
 Resolves a user-supplied identifier (DOI, DOI URL, arXiv id, arXiv URL) to its
 type, fetches authoritative metadata, and prepares a ready-to-append
 :class:`~pynakes.model.BibEntry`. The library is never mutated here; callers
-(see :class:`~pynakes.engine.Collection`) stage the returned entry.
+(see :class:`~pynakes.engine.Bibliography`) stage the returned entry.
 
 DOI metadata comes from DOI content negotiation; arXiv metadata comes from the
 arXiv Atom API. Neither path downloads PDFs or linked files — only metadata.

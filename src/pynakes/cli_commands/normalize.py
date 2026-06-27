@@ -15,7 +15,7 @@ from pynakes.cli_common import (
     _finish_mod,
     _safe,
 )
-from pynakes.engine import Collection
+from pynakes.engine import Bibliography
 
 # --- normalize -------------------------------------------------------------
 
@@ -102,7 +102,7 @@ def normalize(
             identifier_case=_optional_bool(identifier_case),
             format_metadata=_optional_bool(metadata_formatting),
         )
-        coll = Collection.open(file)
+        coll = Bibliography.open(file)
         report = coll.normalize(options)
     except ValueError as exc:
         _emit_error(json_output, "InvalidNormalizeOption", str(exc))

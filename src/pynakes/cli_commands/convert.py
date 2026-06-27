@@ -21,7 +21,7 @@ from pynakes.cli_common import (
     _finish_mod,
     _safe,
 )
-from pynakes.engine import Collection
+from pynakes.engine import Bibliography
 from pynakes.interchange import FORMATS, export_library, import_library
 from pynakes.io import load_bib, save_plain_text
 
@@ -81,7 +81,7 @@ def convert(
 def _convert_dialect(
     file: str, to: str, dry_run: bool, diff: bool, json_output: bool, backup: bool
 ) -> None:
-    coll = Collection.open(file)
+    coll = Bibliography.open(file)
     report = coll.convert(to)  # raises ValueError on an unknown target
 
     verb = "Would convert" if dry_run else "Converted"

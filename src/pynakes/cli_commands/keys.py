@@ -22,7 +22,7 @@ from pynakes.cli_common import (
     _safe,
 )
 from pynakes.diff import generate_diff
-from pynakes.engine import Collection, ExternalModificationError
+from pynakes.engine import Bibliography, ExternalModificationError
 from pynakes.io import load_bib, save_plain_text
 from pynakes.usage import (
     extract_keys_from_tex,
@@ -82,7 +82,7 @@ def keys_generate(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Regenerate citation keys from entry metadata (AuthorYearTitle)."""
-    coll = Collection.open(file)
+    coll = Bibliography.open(file)
     if key is None:
         renames = coll.generate_keys()
     else:
@@ -117,7 +117,7 @@ def keys_repair(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Rename duplicate citation keys so every key is unique."""
-    coll = Collection.open(file)
+    coll = Bibliography.open(file)
     renames = coll.repair_keys()
     verb = "Would repair" if dry_run else "Repaired"
     human = [f"{verb} {len(renames)} duplicate key(s)."]
@@ -186,7 +186,7 @@ def keys_rename(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Rename one citation key in a .bib file and matching TeX citations."""
-    coll = Collection.open(file)
+    coll = Bibliography.open(file)
     keys_ops.validate_key(old)
     keys_ops.validate_key(new)
 

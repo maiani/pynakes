@@ -14,7 +14,7 @@ from pynakes.cli_common import (
     _finish_mod,
     _safe,
 )
-from pynakes.engine import Collection
+from pynakes.engine import Bibliography
 
 # --- fields ----------------------------------------------------------------
 
@@ -28,7 +28,7 @@ def _build_filter(where: Optional[str]):
 
 
 def _run_field_op(file, action, op, dry_run, diff, json_output, details, verb):
-    coll = Collection.open(file)
+    coll = Bibliography.open(file)
     count = op(coll)
     _finish_mod(
         file,

@@ -24,7 +24,7 @@ discarding information a reference manager or a human placed in the file.
 
 ## Domain vocabulary and core concepts
 
-The model has three nested concepts: **entry** < **collection** < future
+The model has three nested concepts: **entry** < **bibliography** < future
 **library**.
 
 | Concept | Implemented class | Meaning |
@@ -33,9 +33,10 @@ The model has three nested concepts: **entry** < **collection** < future
 | Entry collection | EntryStore | Ordered, duplicate-key-tolerant container for a file's entries. Dict-like lookup returns the first match; explicit methods expose all duplicates. |
 | File model | BibFile | Semantic content of one parsed .bib file: entries, declarations, comments, structured JabRef metadata, encoding, and line-ending style. |
 | Metadata block | MetadataBlock | One top-level metadata comment — `@comment{jabref-meta: ...}` or pynakes' superset `@comment{pynakes-meta: ...}` (tagged by `namespace`) — represented both structurally and as raw text. |
-| Collection (working unit) | Collection | A staged, reconciled handle over one `.bib` file — "a slice of references covering one aspect of a topic". Supports operations, preview, diff, commit, reset, reload, and external-change detection. |
-| Library (corpus) | — (planned) | A directory/repository of Collections. Not implemented yet (see [Beyond 1.0](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md)). |
-| Catalogue (index) | — (planned) | A derived, rebuildable search index over the Library (e.g. SQLite FTS). Never a competing source of truth; the Collections are. Not implemented yet. |
+| Bibliography (working unit) | Bibliography | A staged, reconciled handle over one `.bib` file — "a slice of references covering one aspect of a topic". Supports operations, preview, diff, commit, reset, reload, and external-change detection. |
+| Collection | — (planned) | One Bibliography together with its associated directory of linked PDFs and source files — the richer working unit that pairs references with materials. Not implemented yet. |
+| Library (corpus) | — (planned) | A directory of Collections, enabling cross-file search, dedup, and identity resolution across the full research corpus. Not implemented yet (see [Beyond 1.0](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md)). |
+| Catalogue (index) | — (planned) | A derived, rebuildable search index over the Library (e.g. SQLite FTS). Never a competing source of truth; the Bibliographies are. Not implemented yet. |
 
 ### BibEntry: record plus preservation state
 
@@ -71,10 +72,10 @@ safe I/O.
 The BibFile is mutable by design. Operations change it in place and return a
 count or domain report; they do not return a replacement BibFile.
 
-### Collection: lifecycle and optimistic concurrency
+### Bibliography: lifecycle and optimistic concurrency
 
-Collection is the engine facade for one .bib file. It binds the mutable BibFile
-to pristine text, entry snapshots, and a file fingerprint. A collection is a
+Bibliography is the engine facade for one .bib file. It binds the mutable BibFile
+to pristine text, entry snapshots, and a file fingerprint. A bibliography is a
 *derived editing buffer*, not a second source of truth.
 
 ~~~text
@@ -106,10 +107,10 @@ number of changed entries.
 The lifecycle above follows directly from constraints #4 (the file is the source
 of truth) and #5 (determinism):
 
-- **Collection is a thin stateful *handle*** bundling `{path, lib, pristine
+- **Bibliography is a thin stateful *handle*** bundling `{path, lib, pristine
   snapshot, fingerprint, is_dirty}`. Its in-memory state is a derived buffer over
   the file, never an authoritative model.
-- **Rendering and diffing are derived from explicit snapshots.** Collection
+- **Rendering and diffing are derived from explicit snapshots.** Bibliography
   retains pristine text and per-entry snapshots, then derives preview text and a
   diff from its staged library.
 - **Litmus test for any state:** *if I delete it and re-read from disk, do I lose
@@ -147,7 +148,7 @@ extra, never required by core.
 CLI / external callers
           |
           v
-Collection lifecycle facade (engine.py)
+Bibliography lifecycle facade (engine.py)
           |
           v
 Domain operations (groups, keys, fields, dedupe, integrity, ...)
@@ -159,9 +160,9 @@ Editing + model + parser/writer + I/O
                          .bib file
 ~~~
 
-The CLI is intentionally thin: it opens a Collection, invokes an operation,
+The CLI is intentionally thin: it opens a Bibliography, invokes an operation,
 previews or commits it, and emits the stable output envelope. Domain modules
-depend on the model and editing helpers, not on CLI behavior. Collection
+depend on the model and editing helpers, not on CLI behavior. Bibliography
 delegates to those modules rather than duplicating transformation rules — which
 is also the proof the boundary is correct: a downstream consumer can drive the
 same `open → op → diff/commit` flow the CLI does.
@@ -198,7 +199,7 @@ must use these helpers instead of assigning `raw_content` directly or rebuilding
 entries.
 
 `splice_into_text()` applies known raw-entry replacements to the original file
-text. Collection uses it so untouched text between entries remains stable during
+text. Bibliography uses it so untouched text between entries remains stable during
 a normal staged commit.
 
 ### Writing and I/O
@@ -208,7 +209,7 @@ a normal staged commit.
 reconstructed with their insertion field order. This is an **entry-level**
 round-trip guarantee. Direct whole-library serialization can reassemble top-level
 constructs, so callers wanting the smallest possible file diff should use
-Collection.
+Bibliography.
 
 `io.load_bib()` detects UTF-8 or Latin-1 from bytes before parsing. `save_bib()`
 and `save_text()` support backup creation, temporary-file writes, re-parse
@@ -267,7 +268,7 @@ exception where callers need structured recovery:
 | Duplicate/ambiguous metadata block | DuplicateMetadataError |
 | Ambiguous duplicate-work merge | DedupeConflictError with MergeConflict values |
 | Failed provider lookup or parse | MetadataFetchError |
-| Concurrent file modification during a collection commit | ExternalModificationError |
+| Concurrent file modification during a bibliography commit | ExternalModificationError |
 
 The CLI converts expected failures into the documented JSON/error envelope:
 success is exit code 0, errors exit 1, and conflicts exit 2 with options where an
@@ -286,8 +287,8 @@ boundary so the normal suite never relies on external availability.
 ## Testing and change discipline
 
 Tests cover model behavior, parser/writer fidelity, operation modules, the
-Collection lifecycle, CLI JSON/exit contracts, and regression fixtures. The
-critical tests are parse → edit → write → parse paths and staged collection
+Bibliography lifecycle, CLI JSON/exit contracts, and regression fixtures. The
+critical tests are parse → edit → write → parse paths and staged bibliography
 diffs: they guard preservation, not merely semantic field values.
 
 Every behavioral change must add tests and update CHANGELOG.md. Before a change
@@ -306,9 +307,11 @@ arbitrary shell execution, or LLM API calls. An MCP server is similarly a
 downstream transport concern: the CLI already provides a machine-readable, safe
 agent interface.
 
-The next structural extension is a `Library` over multiple Collections, with
-rebuildable cross-file indexes and no competing source of truth. It is planned,
-not part of the current public implementation — see
+The next structural extensions are planned in dependency order: `Collection`
+(one `Bibliography` + its linked file directory), `Library` (a directory of
+Collections with cross-file search and identity resolution), and `Catalogue` (a
+derived, rebuildable index over the Library). None of these are part of the
+current implementation — see
 [DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md) for the roadmap.
 
 - [API reference](../api/index.md)

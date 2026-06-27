@@ -27,7 +27,7 @@ removing a name or changing its documented behavior is a breaking change.
 The [API reference](../api/index.md) documents the data model, return objects,
 exceptions, and typical operation calls. The most important stable entry points
 are `model.BibEntry`, `model.BibFile`, `model.EntryStore`, and
-`engine.Collection`.
+`engine.Bibliography`.
 
 All operation functions mutate a supplied `BibFile` in place unless their
 documentation explicitly says otherwise. They return a count, a report, or a

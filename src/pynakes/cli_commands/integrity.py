@@ -16,7 +16,7 @@ from pynakes.cli_common import (
     _run_checks,
     _safe,
 )
-from pynakes.engine import Collection
+from pynakes.engine import Bibliography
 
 # --- integrity / enrichment -------------------------------------------------
 
@@ -24,7 +24,7 @@ from pynakes.engine import Collection
 def _verify_one(
     file: str, online: bool, cache_dir: Optional[str], strict: bool, published: bool
 ) -> CheckOutcome:
-    coll = Collection.open(file)
+    coll = Bibliography.open(file)
     cache = _metadata_cache_dir(file, cache_dir, online)
     report = coll.verify(online=online, cache_dir=cache)
     result = {
@@ -123,7 +123,7 @@ def enrich(
     promotes preprints to their published version (writing the published
     DOI/journal), folding in the former ``published --apply`` operation.
     """
-    coll = Collection.open(file)
+    coll = Bibliography.open(file)
     cache = _metadata_cache_dir(file, cache_dir, online)
     report = coll.enrich(online=online, cache_dir=cache)
     updates = list(report.updates)

@@ -76,7 +76,7 @@ class DuplicateMetadataError(Exception):
 class MetadataUpdate:
     """One safe replacement or insertion of a top-level JabRef metadata block.
 
-    ``old_raw`` and ``new_raw`` are retained so :class:`~pynakes.engine.Collection`
+    ``old_raw`` and ``new_raw`` are retained so :class:`~pynakes.engine.Bibliography`
     can splice the comment into the original file instead of rewriting it.
     """
 

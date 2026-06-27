@@ -1,18 +1,18 @@
-"""Tests for the Collection engine facade."""
+"""Tests for the Bibliography engine facade."""
 
 from pathlib import Path
 
 import pytest
 
 from pynakes.bibtex_writer import write_bib
-from pynakes.engine import Collection, ExternalModificationError
+from pynakes.engine import Bibliography, ExternalModificationError
 from pynakes.normalize import NormalizeOptions
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def test_change_plan_reports_field_changes() -> None:
-    coll = Collection.from_text("@article{A,\n  title = {t},\n  doi = {10.1/x}\n}\n")
+    coll = Bibliography.from_text("@article{A,\n  title = {t},\n  doi = {10.1/x}\n}\n")
     from pynakes import fields as field_ops
 
     field_ops.append_delimited_field(coll.lib.entries["A"], "keywords", "ml", ",", ", ")
@@ -28,7 +28,7 @@ def test_change_plan_reports_field_changes() -> None:
 
 
 def test_change_plan_detects_rename_not_remove_add() -> None:
-    coll = Collection.from_text("@article{Old,\n  title = {t}\n}\n")
+    coll = Bibliography.from_text("@article{Old,\n  title = {t}\n}\n")
     from pynakes import keys as key_ops
 
     key_ops.rename_key(coll.lib, "Old", "New")
@@ -45,7 +45,7 @@ def test_change_plan_detects_rename_not_remove_add() -> None:
 
 
 def test_change_plan_reports_metadata_changes() -> None:
-    coll = Collection.from_text("@article{A,\n  title = {t}\n}\n")
+    coll = Bibliography.from_text("@article{A,\n  title = {t}\n}\n")
     coll.set_metadata("normalize-dois", "on")
     plan = coll.change_plan()
     assert plan["summary"]["metadata_changed"] == 1
@@ -53,7 +53,7 @@ def test_change_plan_reports_metadata_changes() -> None:
 
 
 def test_change_plan_empty_when_unmodified() -> None:
-    coll = Collection.from_text("@article{A,\n  title = {t}\n}\n")
+    coll = Bibliography.from_text("@article{A,\n  title = {t}\n}\n")
     plan = coll.change_plan()
     assert plan["entries"] == []
     assert plan["summary"]["modified"] == 0
@@ -63,7 +63,7 @@ def test_volume_open_exposes_read_only_views(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text((FIXTURES / "duplicate_entries.bib").read_text())
 
-    coll = Collection.open(bib)
+    coll = Bibliography.open(bib)
 
     assert coll.path == bib
     assert len(coll.entries) == 7
@@ -76,7 +76,7 @@ def test_volume_group_and_field_operations_mutate_in_memory_only(tmp_path: Path)
     bib = tmp_path / "refs.bib"
     original = (FIXTURES / "simple.bib").read_text()
     bib.write_text(original)
-    coll = Collection.open(bib)
+    coll = Bibliography.open(bib)
 
     assert coll.add_to_group("Smith2020", "Read") == 1
     assert coll.rename_field("journal", "journaltitle", where="type = article") == 1
@@ -91,7 +91,7 @@ def test_volume_preview_diff_commit_and_reset(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     original = (FIXTURES / "simple.bib").read_text()
     bib.write_text(original)
-    coll = Collection.open(bib)
+    coll = Bibliography.open(bib)
 
     coll.add_to_group("Smith2020", "Read")
 
@@ -117,7 +117,7 @@ def test_volume_preview_diff_commit_and_reset(tmp_path: Path) -> None:
 def test_volume_reload_discards_disk_changes_when_forced(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text("@article{A,\n  title = {Old}\n}\n")
-    coll = Collection.open(bib)
+    coll = Bibliography.open(bib)
 
     bib.write_text("@article{A,\n  title = {New}\n}\n")
     coll.reload(force=True)
@@ -128,7 +128,7 @@ def test_volume_reload_discards_disk_changes_when_forced(tmp_path: Path) -> None
 def test_volume_commit_detects_external_modification(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text((FIXTURES / "simple.bib").read_text())
-    coll = Collection.open(bib)
+    coll = Bibliography.open(bib)
     coll.add_to_group("Smith2020", "Read")
 
     bib.write_text(bib.read_text() + "\n@comment{external}\n")
@@ -139,7 +139,7 @@ def test_volume_commit_detects_external_modification(tmp_path: Path) -> None:
 
 
 def test_volume_key_repair_and_write_bib_preview() -> None:
-    coll = Collection.from_text((FIXTURES / "duplicate_entries.bib").read_text())
+    coll = Bibliography.from_text((FIXTURES / "duplicate_entries.bib").read_text())
 
     renames = coll.repair_keys()
     text = write_bib(coll.lib)
@@ -150,7 +150,7 @@ def test_volume_key_repair_and_write_bib_preview() -> None:
 
 
 def test_volume_normalize_and_convert() -> None:
-    coll = Collection.from_text(
+    coll = Bibliography.from_text(
         "@article{A,\n"
         "  author = {John Smith},\n"
         "  title = {An AI Paper},\n"
@@ -175,7 +175,7 @@ def test_volume_files_check_uses_bound_path(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text("@article{A,\n  title = {T},\n  file = {paper.pdf}\n}\n")
 
-    coll = Collection.open(bib)
+    coll = Bibliography.open(bib)
     report = coll.files_check()
 
     assert report.checked == 1
@@ -184,7 +184,7 @@ def test_volume_files_check_uses_bound_path(tmp_path: Path) -> None:
 
 
 def test_volume_journal_operations() -> None:
-    coll = Collection.from_text(
+    coll = Bibliography.from_text(
         "@article{A,\n  title = {T},\n  journal = {Physical Review Letters},\n  year = {2020}\n}\n"
     )
 
@@ -197,7 +197,7 @@ def test_volume_journal_operations() -> None:
 
 
 def test_volume_import_doi_adds_entry_in_memory(monkeypatch) -> None:
-    coll = Collection.from_text("")
+    coll = Bibliography.from_text("")
     provider_bibtex = """@article{provider,
   author = {Jane Smith},
   title = {A DOI Paper},

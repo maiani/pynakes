@@ -17,7 +17,7 @@ from pynakes.cli_common import (
     _preview_or_commit,
     _safe,
 )
-from pynakes.engine import Collection
+from pynakes.engine import Bibliography
 from pynakes.metadata import DuplicateMetadataError
 
 
@@ -44,7 +44,7 @@ def batch(
     except _json.JSONDecodeError as exc:
         _emit_error(json_output, "InvalidInput", f"operations are not valid JSON: {exc}")
 
-    coll = Collection.open(file)
+    coll = Bibliography.open(file)
     try:
         op_results = apply_operations(coll, operations)
     except BatchError as exc:

@@ -8,7 +8,7 @@ from typer.testing import CliRunner
 from pynakes.batch import BatchError, apply_operations, operation_catalog
 from pynakes.bibtex_parser import parse_bib
 from pynakes.cli import app
-from pynakes.engine import Collection
+from pynakes.engine import Bibliography
 
 runner = CliRunner()
 
@@ -16,7 +16,7 @@ SRC = "@article{A,\n  title = {t},\n  journal = {Nature Machine Intelligence}\n}
 
 
 def test_apply_operations_runs_in_order() -> None:
-    coll = Collection.from_text(SRC)
+    coll = Bibliography.from_text(SRC)
     results = apply_operations(
         coll,
         [
@@ -30,7 +30,7 @@ def test_apply_operations_runs_in_order() -> None:
 
 
 def test_unknown_op_raises_batch_error_with_index() -> None:
-    coll = Collection.from_text(SRC)
+    coll = Bibliography.from_text(SRC)
     try:
         apply_operations(coll, [{"op": "nope"}])
         raise AssertionError("expected BatchError")
@@ -39,7 +39,7 @@ def test_unknown_op_raises_batch_error_with_index() -> None:
 
 
 def test_bad_params_raise_batch_error() -> None:
-    coll = Collection.from_text(SRC)
+    coll = Bibliography.from_text(SRC)
     for bad in (
         {"op": "fields.rename", "old": "a"},
         {"op": "groups.add_entry", "key": "A", "x": 1},

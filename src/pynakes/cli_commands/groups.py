@@ -15,7 +15,7 @@ from pynakes.cli_common import (
     _finish_mod,
     _safe,
 )
-from pynakes.engine import Collection
+from pynakes.engine import Bibliography
 from pynakes.io import load_bib
 
 # --- groups ----------------------------------------------------------------
@@ -60,7 +60,7 @@ def groups_add_entry(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Add an entry to a group."""
-    coll = Collection.open(file)
+    coll = Bibliography.open(file)
     _require_key(coll.lib, key, json_output)
     count = coll.add_to_group(key, group)
     verb = "Would add" if dry_run else "Added"
@@ -86,7 +86,7 @@ def groups_remove_entry(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Remove an entry from a group."""
-    coll = Collection.open(file)
+    coll = Bibliography.open(file)
     _require_key(coll.lib, key, json_output)
     count = coll.remove_from_group(key, group)
     verb = "Would remove" if dry_run else "Removed"

@@ -53,7 +53,7 @@ returns both namespaces in source order. Each block preserves its raw comment
 text, namespace, known/unknown classification, and category.
 
 The key entry points are `model.BibEntry`, `model.BibFile`, `model.EntryStore`,
-and `engine.Collection`; see their generated entries in the
+and `engine.Bibliography`; see their generated entries in the
 [Module Reference](reference.md) for field-by-field detail.
 
 ## Result and Analysis Objects
@@ -68,7 +68,7 @@ the [Module Reference](reference.md) — for example `NormalizeResult`,
 Domain exceptions communicate recoverable failure categories: `ParseError` for
 invalid BibTeX; DOI import errors; `DuplicateMetadataError`; a
 `DedupeConflictError` containing `MergeConflict` values; `MetadataFetchError`;
-and `ExternalModificationError` for a concurrent collection commit.
+and `ExternalModificationError` for a concurrent bibliography commit.
 
 ## I/O
 
@@ -88,9 +88,9 @@ returned library.
 ## Engine Facade
 
 ```python
-from pynakes.engine import ExternalModificationError, Collection
+from pynakes.engine import ExternalModificationError, Bibliography
 
-coll = Collection.open("refs.bib")
+coll = Bibliography.open("refs.bib")
 issues = coll.lint()
 renames = coll.repair_keys()
 report = coll.normalize()
@@ -99,7 +99,7 @@ print(coll.diff())
 result = coll.commit()
 ```
 
-`Collection` owns the load → stage → preview → commit lifecycle for one `.bib` file.
+`Bibliography` owns the load → stage → preview → commit lifecycle for one `.bib` file.
 It keeps the file as the source of truth: staged operations mutate the in-memory
 library only, `preview()` returns the would-be file text, `diff()` returns a
 unified diff, and `commit()` writes atomically through the same validation path
@@ -213,9 +213,9 @@ move_field(lib, "school", "institution")
 ## Reference Import (DOI / arXiv)
 
 ```python
-from pynakes.engine import Collection
+from pynakes.engine import Bibliography
 
-coll = Collection.open("refs.bib")
+coll = Bibliography.open("refs.bib")
 kind, entry = coll.import_reference(
     "arXiv:2301.00001",  # or a DOI / DOI URL / arXiv URL
     key_source="generated",
@@ -226,7 +226,7 @@ print(coll.diff())
 
 `import_reference()` auto-detects the identifier type, fetches metadata only (no
 PDFs), and — for arXiv — emits `@online` for BibLaTeX libraries and `@misc` for
-BibTeX ones per `databaseType`. `Collection.import_doi()` remains as the
+BibTeX ones per `databaseType`. `Bibliography.import_doi()` remains as the
 DOI-specific entry point.
 
 For lower-level workflows, `pynakes.importer.prepare_imported_reference`,

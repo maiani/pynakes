@@ -16,7 +16,7 @@ from pynakes.cli_common import (
     _preview_or_commit,
     _safe,
 )
-from pynakes.engine import Collection
+from pynakes.engine import Bibliography
 from pynakes.io import save_bib
 from pynakes.usage import (
     analyze_usage,
@@ -49,7 +49,7 @@ def used(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Report which entries are used in LaTeX sources; optionally tag or export them."""
-    coll = Collection.open(bib_file)
+    coll = Bibliography.open(bib_file)
     resolved_sources = (
         list(sources) if sources else tex_sources_from_metadata(coll.lib, Path(bib_file).parent)
     )

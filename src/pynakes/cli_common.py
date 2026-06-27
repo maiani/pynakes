@@ -9,7 +9,7 @@ from typing import Callable, Optional
 import typer
 
 from pynakes.bibtex_parser import ParseError
-from pynakes.engine import Collection, ExternalModificationError
+from pynakes.engine import Bibliography, ExternalModificationError
 
 # --- shared helpers --------------------------------------------------------
 
@@ -105,7 +105,7 @@ def _safe(fn):
 
 
 def _preview_or_commit(
-    coll: Collection, dry_run: bool, backup: bool = False
+    coll: Bibliography, dry_run: bool, backup: bool = False
 ) -> tuple[str, bool, int]:
     """Return ``(diff, modified, changed_entries)`` for a staged collection.
 
@@ -130,7 +130,7 @@ _BACKUP_OPTION = typer.Option(
 def _finish_mod(
     file,
     action,
-    coll: Collection,
+    coll: Bibliography,
     dry_run,
     diff,
     json_output,
@@ -140,7 +140,7 @@ def _finish_mod(
     backup: bool = False,
     **details,
 ) -> None:
-    """Preview/commit a collection and emit the standard modifying-command result.
+    """Preview/commit a bibliography and emit the standard modifying-command result.
 
     Every modifying command shares this envelope:
     ``status, action, file, dry_run, modified, modified_entries, warnings``, a

@@ -16,7 +16,7 @@ from pynakes.cli_common import (
     _finish_mod,
     _safe,
 )
-from pynakes.engine import Collection
+from pynakes.engine import Bibliography
 from pynakes.io import load_bib
 
 # --- metadata --------------------------------------------------------------
@@ -87,7 +87,7 @@ def metadata_set(
             "InvalidNamespace",
             f"Invalid namespace {namespace!r}; expected jabref or pynakes",
         )
-    coll = Collection.open(file)
+    coll = Bibliography.open(file)
     try:
         update = coll.set_metadata(key, value, namespace=namespace, allow_unknown=allow_unknown)
     except metadata_ops.DuplicateMetadataError as exc:
