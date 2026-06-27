@@ -3,8 +3,8 @@
 ``convert`` is the single format-conversion command. With a dialect target
 (``bibtex``/``biblatex``) it edits the ``.bib`` in place, surgically, with the
 usual diff/commit workflow. With an interchange format it reads the library and
-*exports* it (``--to csl-json``/``ris``) or reads a foreign file and *imports*
-it to BibTeX (``--from csl-json``/``ris``).
+*exports* it (``--to csl-json``/``ris``/``mods``/``endnote``) or reads a foreign
+file and *imports* it to BibTeX (``--from csl-json``/``ris``/``mods``/``endnote``).
 """
 
 import json as _json
@@ -35,12 +35,12 @@ def convert(
     to: Optional[str] = typer.Option(
         None,
         "--to",
-        help="Target: biblatex, bibtex (in-place dialect), or csl-json, ris (export)",
+        help="Target: biblatex, bibtex (in-place dialect), or interchange format (export)",
     ),
     from_format: Optional[str] = typer.Option(
         None,
         "--from",
-        help="Import the input from this interchange format (csl-json, ris) to BibTeX",
+        help="Import the input from this interchange format to BibTeX",
     ),
     out: Optional[str] = typer.Option(
         None, "--out", help="Write export/import output here instead of stdout"
@@ -59,7 +59,7 @@ def convert(
         _emit_error(
             json_output,
             "MissingConvertTarget",
-            "--to is required: biblatex/bibtex (dialect), or csl-json/ris (export); "
+            "--to is required: biblatex/bibtex (dialect), or an interchange format (export); "
             "or use --from to import",
         )
 

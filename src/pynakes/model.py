@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Optional, Union
 
-from pynakes.inheritance import resolve_entry_fields
+from pynakes.inheritance import Lookup, resolve_entry_fields
 
 # A bare BibTeX string reference: an identifier with no surrounding braces or
 # quotes that may resolve to a @string definition.
@@ -227,6 +227,15 @@ class BibEntry:
     jabref_metadata: dict[str, str] = field(default_factory=dict)
     modified: bool = False
 
+    def resolve(self, lookup: Lookup) -> dict[str, str]:
+        """Return own fields with BibLaTeX inheritance applied.
+
+        ``lookup`` maps citation keys to entries. The returned dict is a fresh
+        semantic view; inherited values are never copied into ``fields`` or
+        written back to the source entry.
+        """
+        return resolve_entry_fields(self, lookup)
+
     def __repr__(self) -> str:
         """Return a debug representation of the entry."""
         field_preview = ", ".join(
@@ -410,6 +419,10 @@ class BibFile:
             key=lambda block: block.comment_index,
         )
 
+    def resolve(self, entry: BibEntry) -> dict[str, str]:
+        """Return *entry*'s fields with BibLaTeX inheritance applied."""
+        return entry.resolve(self.entries.get)
+
     def resolved_fields(self, entry: BibEntry | str) -> dict[str, str]:
         """Return *entry*'s fields with BibLaTeX inheritance applied.
 
@@ -423,7 +436,7 @@ class BibFile:
         target = self.entries.get(entry) if isinstance(entry, str) else entry
         if target is None:
             return {}
-        return resolve_entry_fields(target, self.entries.get)
+        return self.resolve(target)
 
     def to_dict(self) -> dict:
         """Serialize the bib file to a JSON-friendly dict."""

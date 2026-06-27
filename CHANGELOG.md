@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add `BibEntry.resolve(lookup)` and `BibFile.resolve(entry)` as ergonomic
+  shorthands for the existing read-only BibLaTeX inheritance view.
+
 ### Documentation
 
 - Document the optional Pinax corpus mode while preserving the plain `.bib`
@@ -55,8 +60,9 @@ Biber 2.20).
 - **`normalize`** — `saveActions`-driven formatter pipeline; DOI canonicalization;
   month macro normalization; author normalization; journal abbreviation/expansion
   (`--journal-style abbreviated|full`). Consolidates JabRef metadata to file end.
-- **`convert`** — BibTeX↔BibLaTeX dialect conversion; export to CSL-JSON or RIS
-  (`--to csl-json|ris`); import from CSL-JSON or RIS (`--from csl-json|ris`).
+- **`convert`** — BibTeX↔BibLaTeX dialect conversion; export to CSL-JSON, RIS,
+  MODS, or EndNote tagged text (`--to csl-json|ris|mods|endnote`); import from
+  those interchange formats (`--from csl-json|ris|mods|endnote`).
 - **`add`** — import a reference by DOI, arXiv identifier, or journal article URL
   (nature.com articles, APS journals). Auto-detects identifier type; inserts before
   trailing metadata. Only metadata is fetched — no PDFs downloaded.

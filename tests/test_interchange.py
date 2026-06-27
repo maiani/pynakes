@@ -1,6 +1,7 @@
-"""CSL-JSON and RIS interchange (import/export) tests."""
+"""Interchange-format import/export tests."""
 
 import json
+from xml.etree import ElementTree as ET
 
 from pynakes.bibtex_parser import parse_bib
 from pynakes.interchange import export_library, import_library
@@ -73,6 +74,60 @@ def test_ris_round_trip_preserves_core_fields() -> None:
     assert chapter.fields["editor"] == "Ed, E."
 
 
+def test_mods_export_shape() -> None:
+    mods = export_library(parse_bib(_SRC), "mods")
+    root = ET.fromstring(mods)
+    assert root.tag.endswith("modsCollection")
+    article = next(record for record in root if record.get("ID") == "Smith2020")
+    xml = ET.tostring(article, encoding="unicode")
+    assert "<genre>article</genre>" in xml
+    assert "<title>A Study</title>" in xml
+    assert '<identifier type="doi">10.1/x</identifier>' in xml
+    assert '<detail type="volume">' in xml
+    assert "<start>10</start>" in xml and "<end>20</end>" in xml
+
+
+def test_mods_round_trip_preserves_core_fields() -> None:
+    mods = export_library(parse_bib(_SRC), "mods")
+    lib = import_library(mods, "mods")
+    article = lib.entries["Smith2020"]
+    assert article.type == "article"
+    assert article.fields["journal"] == "Journal of Examples"
+    assert article.fields["author"] == "Smith, John and Doe, Jane"
+    assert article.fields["pages"] == "10--20"
+    assert article.fields["doi"] == "10.1/x"
+    chapter = lib.entries["Roe2019"]
+    assert chapter.type == "incollection"
+    assert chapter.fields["booktitle"] == "Big Book"
+    assert chapter.fields["editor"] == "Ed, E."
+
+
+def test_endnote_export_shape() -> None:
+    text = export_library(parse_bib(_SRC), "endnote")
+    record = text.split("\n\n")[0].splitlines()
+    assert record[0] == "%0 Journal Article"
+    assert "%F Smith2020" in record
+    assert "%A Smith, John" in record
+    assert "%J Journal of Examples" in record
+    assert "%P 10-20" in record
+    assert "%R 10.1/x" in record
+
+
+def test_endnote_round_trip_preserves_core_fields() -> None:
+    text = export_library(parse_bib(_SRC), "endnote")
+    lib = import_library(text, "endnote")
+    article = lib.entries["Smith2020"]
+    assert article.type == "article"
+    assert article.fields["journal"] == "Journal of Examples"
+    assert article.fields["author"] == "Smith, John and Doe, Jane"
+    assert article.fields["pages"] == "10--20"
+    assert article.fields["doi"] == "10.1/x"
+    chapter = lib.entries["Roe2019"]
+    assert chapter.type == "incollection"
+    assert chapter.fields["booktitle"] == "Big Book"
+    assert chapter.fields["editor"] == "Ed, E."
+
+
 def test_import_assigns_unique_keys() -> None:
     ris = "TY  - JOUR\nTI  - X\nPY  - 2020\nER  - \n\nTY  - JOUR\nTI  - X\nPY  - 2020\nER  - \n"
     lib = import_library(ris, "ris")
@@ -84,5 +139,9 @@ def test_import_assigns_unique_keys() -> None:
 def test_empty_input_is_tolerated() -> None:
     assert list(import_library("", "csl-json").entries.values()) == []
     assert list(import_library("", "ris").entries.values()) == []
+    assert list(import_library("", "mods").entries.values()) == []
+    assert list(import_library("", "endnote").entries.values()) == []
     assert export_library(parse_bib(""), "ris") == ""
     assert export_library(parse_bib(""), "csl-json") == "[]"
+    assert export_library(parse_bib(""), "endnote") == ""
+    assert ET.fromstring(export_library(parse_bib(""), "mods")).tag.endswith("modsCollection")

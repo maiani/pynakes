@@ -414,8 +414,9 @@ in-memory merge, exactly as for `combine`.
 ## convert
 
 Convert between BibTeX and BibLaTeX field/type conventions (in place), or
-export/import the interchange formats CSL-JSON and RIS. The target is required:
-pynakes does not infer it from JabRef's `databaseType` metadata.
+export/import the interchange formats CSL-JSON, RIS, MODS, and EndNote tagged
+text. The target is required: pynakes does not infer it from JabRef's
+`databaseType` metadata.
 
 ```bash
 # Dialect conversion (edits the .bib in place, with a reviewable diff):
@@ -425,14 +426,18 @@ pynakes convert refs.bib --to bibtex
 # Export to an interchange format (stdout, or --out FILE):
 pynakes convert refs.bib --to csl-json --out refs.json
 pynakes convert refs.bib --to ris
+pynakes convert refs.bib --to mods --out refs.xml
+pynakes convert refs.bib --to endnote --out refs.enw
 
 # Import an interchange format to BibTeX:
 pynakes convert records.ris --from ris --out refs.bib
 pynakes convert items.json --from csl-json
+pynakes convert records.xml --from mods
+pynakes convert records.enw --from endnote
 ```
 
 Export/import map the common entry types and fields; unmapped fields are
-dropped rather than guessed. (MODS and EndNote are not yet supported.)
+dropped rather than guessed.
 
 ## capabilities
 

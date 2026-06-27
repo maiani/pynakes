@@ -22,7 +22,7 @@ baseline (BibTeX 0.99d, BibLaTeX 3.20, Biber 2.20).
   external-change detection; `reset()`/`reload()`.
 - **Operations**: `init`, `inspect`, `lint`, `groups`, `keys`
   (generate/check/repair/rename + JabRef key patterns), `fields` (with `--where`),
-  `convert` (BibTeX↔BibLaTeX + CSL-JSON/RIS), `files check`, `normalize`
+  `convert` (BibTeX↔BibLaTeX + CSL-JSON/RIS/MODS/EndNote), `files check`, `normalize`
   (authors, DOIs, months, journals, `saveActions` pipeline), `add`
   (DOI/arXiv/journal-URL), `search`, `used`, `dedupe`, `verify`/`enrich`
   (opt-in `--online`; `--published` folds in preprint promotion), `combine`,
@@ -34,16 +34,17 @@ baseline (BibTeX 0.99d, BibLaTeX 3.20, Biber 2.20).
   `capabilities`, multi-file `--strict` gate checks, `.pre-commit-hooks.yaml`.
 - **Parser conformance**: versioned corpus pinned to TeX Live 2025; differential
   tests against BibTeX 0.99d and Biber 2.20; property-based tests (Hypothesis).
-- **Quality**: ~850 tests, coverage ≥90%, `ruff` clean, docs site builds.
+- **Quality**: ~860 tests, coverage ≥90%, `ruff` clean, docs site builds.
 
 ## 0.5 — remaining interchange formats and scope decision
 
-Two items for 0.5:
+Status:
 
-1. **Remaining interchange formats**: MODS and EndNote, building on
-   `pynakes.interchange`. Adding a dependency is acceptable when it does the
-   heavy lifting better than a hand-rolled codec (the no-`bibtexparser` rule is
-   specific to the round-trip BibTeX parser, not a blanket ban on dependencies).
+1. **Remaining interchange formats (done)**: MODS XML and EndNote tagged text
+   are implemented alongside CSL-JSON and RIS. `pynakes.interchange` is now a
+   package with one codec module per format plus a small public dispatcher;
+   import/export still go through `export_library()` / `import_library()` and
+   the `convert --to/--from` CLI surface. No new dependency was needed.
 
 2. **Scope decision — PDF / web capture (decided)**: a headless, deterministic,
    opt-in slice *does* enter the engine — fetching a reference's materials (arXiv
@@ -53,6 +54,8 @@ Two items for 0.5:
    `.bib` maintenance remains unchanged unless a `files-dir` is set. What stays
    out: full-text extraction, content search, reading/annotation — derived
    intelligence over the *contents* of those materials.
+
+Remaining near-term implementation work is the Pinax step plan below.
 
 ## Guiding principles (non-negotiable)
 

@@ -1162,7 +1162,7 @@ class TestConvertCommand:
     def test_convert_unknown_target_errors_json(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "bibtex_classic.bib")
 
-        result = runner.invoke(app, ["convert", str(bib), "--to", "endnote", "--json"])
+        result = runner.invoke(app, ["convert", str(bib), "--to", "bogus-format", "--json"])
 
         assert result.exit_code == 1, result.output
         data = json.loads(result.output)
@@ -1198,11 +1198,38 @@ class TestConvertCommand:
         assert (data["to"], data["written"], data["entry_count"]) == ("ris", True, 1)
         assert "TY  - JOUR" in out.read_text()
 
+    def test_convert_export_to_mods_file(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{A, author = {Doe, J}, title = {T}, journal = {J}, year = {2020}}\n"
+        )
+        out = tmp_path / "refs.xml"
+
+        result = runner.invoke(
+            app, ["convert", str(bib), "--to", "mods", "--out", str(out), "--json"]
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert (data["to"], data["written"], data["entry_count"]) == ("mods", True, 1)
+        assert "<modsCollection" in out.read_text()
+
     def test_convert_import_from_ris(self, tmp_path: Path) -> None:
         ris = tmp_path / "in.ris"
         ris.write_text("TY  - JOUR\nAU  - Doe, Jane\nTI  - A Study\nPY  - 2021\nER  - \n")
 
         result = runner.invoke(app, ["convert", str(ris), "--from", "ris"])
+
+        assert result.exit_code == 0, result.output
+        assert "@article{" in result.output
+        assert "author = {Doe, Jane}" in result.output
+        assert "title = {A Study}" in result.output
+
+    def test_convert_import_from_endnote(self, tmp_path: Path) -> None:
+        tagged = tmp_path / "in.enw"
+        tagged.write_text("%0 Journal Article\n%A Doe, Jane\n%T A Study\n%D 2021\n")
+
+        result = runner.invoke(app, ["convert", str(tagged), "--from", "endnote"])
 
         assert result.exit_code == 0, result.output
         assert "@article{" in result.output

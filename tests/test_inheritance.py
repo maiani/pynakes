@@ -113,6 +113,23 @@ def test_reference_field_is_not_propagated_to_child() -> None:
     assert fields["booktitle"] == "Proc"
 
 
+def test_entry_resolve_applies_inheritance_with_explicit_lookup() -> None:
+    lib = parse_bib("@proceedings{p, title = {Proc}}\n@inproceedings{c, crossref = {p}}\n")
+    entry = lib.entries["c"]
+
+    fields = entry.resolve(lib.entries.get)
+
+    assert fields["booktitle"] == "Proc"
+    assert entry.fields == {"crossref": "p"}  # semantic view only
+
+
+def test_bibfile_resolve_is_entry_shorthand() -> None:
+    lib = parse_bib("@proceedings{p, title = {Proc}}\n@inproceedings{c, crossref = {p}}\n")
+    entry = lib.entries["c"]
+
+    assert lib.resolve(entry) == lib.resolved_fields(entry)
+
+
 # --- differential test against the biber oracle ----------------------------
 
 # Fields whose inherited values we compare against biber. Restricted to the

@@ -29,14 +29,14 @@ from collections.abc import Callable, Mapping
 from typing import Optional, Protocol
 
 
-class _Entry(Protocol):
+class EntryLike(Protocol):
     """Structural type for the entry shape this module reads (duck-typed)."""
 
     type: str
     fields: Mapping[str, str]
 
 
-Lookup = Callable[[str], Optional[_Entry]]
+Lookup = Callable[[str], Optional[EntryLike]]
 
 # Title-family remappings, selected by the *parent* entry type. A source field
 # named here is inherited only under its mapped target name, never its own.
@@ -85,7 +85,7 @@ def _split_refs(value: str) -> list[str]:
     return [part.strip() for part in value.split(",") if part.strip()]
 
 
-def resolve_entry_fields(entry: _Entry, lookup: Lookup) -> dict[str, str]:
+def resolve_entry_fields(entry: EntryLike, lookup: Lookup) -> dict[str, str]:
     """Return *entry*'s fields with xdata and crossref inheritance applied.
 
     ``lookup`` maps a citation key to its entry (or ``None``). The returned dict
@@ -94,7 +94,7 @@ def resolve_entry_fields(entry: _Entry, lookup: Lookup) -> dict[str, str]:
     return _resolve(entry, lookup, frozenset())
 
 
-def _resolve(entry: _Entry, lookup: Lookup, seen: frozenset[int]) -> dict[str, str]:
+def _resolve(entry: EntryLike, lookup: Lookup, seen: frozenset[int]) -> dict[str, str]:
     if id(entry) in seen:
         # A cycle contributes only the entry's own fields, no inheritance.
         return dict(entry.fields)
@@ -117,7 +117,7 @@ def _resolve(entry: _Entry, lookup: Lookup, seen: frozenset[int]) -> dict[str, s
     return result
 
 
-def _xdata_fields(entry: _Entry, lookup: Lookup, seen: frozenset[int]) -> dict[str, str]:
+def _xdata_fields(entry: EntryLike, lookup: Lookup, seen: frozenset[int]) -> dict[str, str]:
     """Fields contributed by an ``@xdata`` entry: verbatim, chains supported."""
     if id(entry) in seen:
         return {}
@@ -137,7 +137,7 @@ def _xdata_fields(entry: _Entry, lookup: Lookup, seen: frozenset[int]) -> dict[s
 
 
 def _crossref_fields(
-    parent: _Entry, child_type: str, lookup: Lookup, seen: frozenset[int]
+    parent: EntryLike, child_type: str, lookup: Lookup, seen: frozenset[int]
 ) -> dict[str, str]:
     """Fields a child inherits from its ``crossref`` parent, with title remap."""
     presolved = _resolve(parent, lookup, seen)
