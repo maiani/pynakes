@@ -38,6 +38,7 @@ nav:
   - Git Workflows: guides/git-workflows.md
   - Philosophy: vision.md
   - Architecture: guides/architecture.md
+  - Pinax (corpus layer): guides/pinax.md
   - API Reference:
       - Overview: api/index.md
       - Module Reference: api/reference.md

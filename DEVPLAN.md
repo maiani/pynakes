@@ -45,11 +45,14 @@ Two items for 0.5:
    heavy lifting better than a hand-rolled codec (the no-`bibtexparser` rule is
    specific to the round-trip BibTeX parser, not a blanket ban on dependencies).
 
-2. **Scope decision — PDF / web capture**: jabkit's **fetch** (web/provider
-   capture) and **pdf** (PDF metadata) are adjacent to pynakes' surface but
-   involve network and filesystem concerns that are nominally downstream. Decide
-   whether any headless, deterministic slice enters the engine or stays in a
-   companion package. Not decided here.
+2. **Scope decision — PDF / web capture (decided)**: a headless, deterministic,
+   opt-in slice *does* enter the engine — fetching a reference's materials (arXiv
+   PDF + source) and attaching them by citation-key convention. This is the
+   **Pinax** mode, specified in [docs/guides/pinax.md](docs/guides/pinax.md) and
+   built via the [Pinax implementation steps](#pinax-implementation-steps). Plain
+   `.bib` maintenance remains unchanged unless a `files-dir` is set. What stays
+   out: full-text extraction, content search, reading/annotation — derived
+   intelligence over the *contents* of those materials.
 
 ## Guiding principles (non-negotiable)
 
@@ -77,7 +80,8 @@ stability (semver), and is installable.
 
 **Explicitly *not* in 1.0** (deferred to [Beyond 1.0](#beyond-10)): the
 multi-file `Library`/`Catalogue` corpus engine, projections as `Library` views,
-and first-class shared identity.
+and first-class shared identity. Pinax may be built earlier because it is an
+optional mode of one `Bibliography`; it must not change plain `.bib` behavior.
 
 ---
 
@@ -117,13 +121,17 @@ directly on. Out of 1.0, in dependency order:
   explicit, tested primitive. It is the foundation the rest of this list stands
   on: `Library` dedup, the `Catalogue`, and projection reconciliation all key off
   a single notion of "the same work".
-- **`Collection`** — one `Bibliography` together with its associated directory of
-  linked PDFs and source files. `Collection.open(dir)` where `dir` holds a `.bib`
-  and its linked file tree. The richer working unit a researcher interacts with
-  directly: references plus the materials.
+- **`Pinax`** (optional corpus mode; formerly "Collection") — a `Bibliography`
+  together with its `files-dir` of materials, addressed by citation key. Not a
+  wrapper class but a *mode* a bibliography enters when `pynakes-meta` declares a
+  `files-dir`. Specified in [docs/guides/pinax.md](docs/guides/pinax.md) and built
+  via the [Pinax implementation steps](#pinax-implementation-steps) below; the
+  top-level `fetch` command is the first slice. **Being pulled forward as active
+  near-term work** because it preserves the single-file engine: no `files-dir`,
+  no Pinax behavior.
 - **`Library` (corpus)** — `Library.open(dir)`; `collections()`,
   `collection(path)`; cross-file `search`/`find_key`/dedup, reusing the identity
-  primitive above. A Library holds many Collections.
+  primitive above. A Library holds many pinakes.
 - **`Catalogue` (index)** — a derived, rebuildable search index (e.g. SQLite
   FTS) over the Library; strictly derived, never a competing source of truth.
 - **Projections** — `combine` and `split` formalized as first-class **views of
@@ -131,10 +139,61 @@ directly on. Out of 1.0, in dependency order:
 - **Interop beyond 0.5** — any import/export formats past the 0.4/0.5 checklists,
   building on `pynakes.interchange`.
 
-## Out of scope (permanently, for pynakes)
+## Pinax implementation steps
 
-A database of record, a cloud service, a PDF library, arbitrary shell
-execution, a GUI, capture (web/DOI/PDF), and reading/annotation.
+The corpus layer (see [docs/guides/pinax.md](docs/guides/pinax.md)) ships as
+small, independently committable steps — each is code + tests + a `CHANGELOG.md`
+entry and ends green on `pytest && ruff check src tests`. Built one at a time,
+reviewed, then the next.
+
+- [ ] **1. `files-dir` + `FileStore` foundation (offline).** Recognize the
+      `files-dir` `pynakes-meta` key; add `filestore.py` (deterministic
+      version-class paths `<citekey>.pdf` / `<citekey>_preprint.pdf` /
+      `<citekey>_preprint/`, directory scan, presence checks); expose
+      `Bibliography.files` (`FileStore | None`). No network.
+- [ ] **2. arXiv download core.** Add `fetch.py` (injectable
+      `fetch_arxiv_pdf`/`fetch_arxiv_source`, URL builders, safe tar extraction)
+      and the `FileStore` atomic writers for the preprint PDF and extracted
+      source. Unit-tested with fixtures; no real network.
+- [ ] **3. The top-level `fetch` command.** `pynakes fetch <bib> [target]
+      [--online] [--dry-run] [--json]`, with what-to-download governed by the
+      `fetch-preprint`/`fetch-source`/`fetch-published` metadata keys;
+      `Bibliography.ensure_files_dir` + `fetch_materials`; zero-config default
+      `files-dir`; JSON envelope; registration in `cli.py` and `capabilities.py`.
+      *First end-to-end slice.*
+- [ ] **4. Agent surface.** `inspect --json` reports per-entry `published_pdf` /
+      `preprint_pdf` / `preprint_source` / `canonical_pdf`; `files check` reports
+      presence/orphans/drift and enforces the unique-key precondition for
+      file-addressing operations.
+- [ ] **5. `preprint_canonical` + provenance manifest (Tier 1).**
+      `.pinax/manifest.json` (`source`/`fetched_date`/`sha256`/`refetchable` per
+      artifact, per-entry `preprint_canonical` boolean, default `false`); `fetch`
+      writes it; `canonical_*` resolves from the boolean.
+- [ ] **6. Pinax-aware `combine`/`split`.** Each output is a pinax; output
+      entries' materials and per-entry state are plainly copied into their
+      files-dir (no hardlinks); non-destructive — inputs untouched, delete the
+      source to reclaim disk after a split.
+- [ ] **7. Coordinated key edits (own design pass).** `keys
+      rename`/`generate`/`repair` move every `<citekey>*` material *in place*
+      (filesystem first, then commit, rollback on failure); `files check --fix`
+      reconciles drift. The only in-place material op, so the riskiest.
+- [ ] **8. (Later) `add --fetch` + open-access published PDFs.** One-step
+      import-and-download; DOI → open-access resolver landing `<citekey>.pdf`;
+      `dedupe` merge reconciles materials onto the surviving key.
+
+## Out of scope (for the deterministic core)
+
+A database of record, a cloud service, arbitrary shell execution, a GUI, a
+reading/annotation experience, and browser/web capture pipelines. Likewise the
+derived-intelligence layers over material **contents** — full-text extraction,
+content search, RAG/embeddings, and rich agent notes/memory — stay *above or
+beside* the core (an opt-in extra such as `pynakes[…]`, or a separate tool),
+never on the deterministic write path.
+
+The line, restated: *attaching and resolving* a reference's materials by
+citation-key convention — the **Pinax** layer — is in scope; *organizing,
+reading, and indexing their contents* is not. See
+[docs/guides/pinax.md](docs/guides/pinax.md).
 
 **MCP server — downstream.** An MCP fits an agent interrogating a personal
 corpus — queries over the `Library`/`Catalogue`. Manuscript-time edits use the

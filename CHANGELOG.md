@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- Document the optional Pinax corpus mode while preserving the plain `.bib`
+  maintenance engine as the base identity.
+
 ## [0.4.0] - 2026-06-26
 Complete single-file BibTeX/BibLaTeX maintenance engine
 with parser conformance verified against TeX Live 2025 (BibTeX 0.99d, BibLaTeX 3.20,

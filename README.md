@@ -82,6 +82,14 @@ pre-commit/CI gating — from the CLI. Parser conformance to the pinned BibTeX a
 BibLaTeX input grammars is a hard requirement before the 0.4 release; progress and
 the remaining compatibility corpus are tracked in [DEVPLAN.md](DEVPLAN.md).
 
+**In progress — optional corpus layer (Pinax).** The single-file `.bib`
+maintenance engine remains the base product. Pinax is an opt-in mode for a `.bib`
+plus the materials it points to (arXiv PDFs and source), addressed by citation
+key and fetched on demand, so humans and agents can read the papers without
+re-downloading them. Plain `.bib` users do not opt into this unless they set a
+`files-dir`. The design and the step-by-step build plan are in
+[docs/guides/pinax.md](docs/guides/pinax.md).
+
 ## Documentation
 
 - [Quick Start](docs/guides/quickstart.md)
@@ -90,6 +98,7 @@ the remaining compatibility corpus are tracked in [DEVPLAN.md](DEVPLAN.md).
 - [LLM Integration](docs/guides/llm-integration.md)
 - [Git Workflows: pre-commit & CI](docs/guides/git-workflows.md)
 - [Architecture](docs/guides/architecture.md)
+- [Pinax — the corpus layer (design + build plan)](docs/guides/pinax.md)
 
 ## License
 

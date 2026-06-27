@@ -25,7 +25,8 @@ discarding information a reference manager or a human placed in the file.
 ## Domain vocabulary and core concepts
 
 The model has three nested concepts: **entry** < **bibliography** < future
-**library**.
+**library**. A Pinax is not a fourth model layer; it is an optional mode of one
+Bibliography when `pynakes-meta` declares a `files-dir`.
 
 | Concept | Implemented class | Meaning |
 | --- | --- | --- |
@@ -34,8 +35,8 @@ The model has three nested concepts: **entry** < **bibliography** < future
 | File model | BibFile | Semantic content of one parsed .bib file: entries, declarations, comments, structured JabRef metadata, encoding, and line-ending style. |
 | Metadata block | MetadataBlock | One top-level metadata comment — `@comment{jabref-meta: ...}` or pynakes' superset `@comment{pynakes-meta: ...}` (tagged by `namespace`) — represented both structurally and as raw text. |
 | Bibliography (working unit) | Bibliography | A staged, reconciled handle over one `.bib` file — "a slice of references covering one aspect of a topic". Supports operations, preview, diff, commit, reset, reload, and external-change detection. |
-| Collection | — (planned) | One Bibliography together with its associated directory of linked PDFs and source files — the richer working unit that pairs references with materials. Not implemented yet. |
-| Library (corpus) | — (planned) | A directory of Collections, enabling cross-file search, dedup, and identity resolution across the full research corpus. Not implemented yet (see [Beyond 1.0](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md)). |
+| Pinax mode | — (planned) | Optional mode of one Bibliography together with its `files-dir` of citation-key-addressed materials. Plain bibliographies have no Pinax behavior. Not implemented yet. |
+| Library (corpus) | — (planned) | A directory of pinakes/bibliographies, enabling cross-file search, dedup, and identity resolution across the full research corpus. Not implemented yet (see [Beyond 1.0](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md)). |
 | Catalogue (index) | — (planned) | A derived, rebuildable search index over the Library (e.g. SQLite FTS). Never a competing source of truth; the Bibliographies are. Not implemented yet. |
 
 ### BibEntry: record plus preservation state
@@ -279,10 +280,13 @@ interactive choice is possible. Modifying command responses share `status`,
 
 ## Network boundary
 
-Only DOI import and integrity workflows contact providers. The latter require an
-explicit `online=True`/`--online` opt-in and support deterministic caching.
-Network parsing lives in `importer.py` and `integrity.py`; tests mock or fixture this
-boundary so the normal suite never relies on external availability.
+Only DOI import and integrity workflows contact providers in the current
+implementation. The latter require an explicit `online=True`/`--online` opt-in
+and support deterministic caching. Planned Pinax fetching follows the same
+boundary: no network unless explicitly requested, and no effect on plain `.bib`
+maintenance. Network parsing lives in `importer.py` and `integrity.py`; tests mock
+or fixture this boundary so the normal suite never relies on external
+availability.
 
 ## Testing and change discipline
 
@@ -307,11 +311,11 @@ arbitrary shell execution, or LLM API calls. An MCP server is similarly a
 downstream transport concern: the CLI already provides a machine-readable, safe
 agent interface.
 
-The next structural extensions are planned in dependency order: `Collection`
-(one `Bibliography` + its linked file directory), `Library` (a directory of
-Collections with cross-file search and identity resolution), and `Catalogue` (a
-derived, rebuildable index over the Library). None of these are part of the
-current implementation — see
+The next structural extensions are planned in dependency order: optional Pinax
+mode (one `Bibliography` + its `files-dir` of materials), `Library` (a directory
+of pinakes/bibliographies with cross-file search and identity resolution), and
+`Catalogue` (a derived, rebuildable index over the Library). None of these are
+part of the current implementation — see
 [DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md) for the roadmap.
 
 - [API reference](../api/index.md)

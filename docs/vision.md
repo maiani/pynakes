@@ -41,14 +41,15 @@ about without you having to trust it blindly:
 
 ## Scope
 
-pynakes is a **standalone single-file maintenance engine**: the unit of work is
+pynakes is a **standalone `.bib` maintenance engine**: the base unit of work is
 one `Bibliography` (one `.bib` file), with a load → stage → preview → commit
 lifecycle. It is complete and valuable on its own — for researchers, scripts,
 CI, and agents — with no dependency on any application above it.
 
-Cross-file corpus work — a `Collection` (one `Bibliography` plus its linked
-files), a `Library` over many Collections, a derived `Catalogue` index —
-is on the post-1.0 roadmap; see
+The optional Pinax mode keeps that base intact while letting a bibliography own a
+`files-dir` of citation-key-addressed materials. No `files-dir` means no Pinax
+behavior. Cross-file corpus work — a `Library` over many pinakes, a derived
+`Catalogue` index — is on the post-1.0 roadmap; see
 [DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
 
 The name points past the single file. The *Pinakes* was Callimachus's catalog of
