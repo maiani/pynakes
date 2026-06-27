@@ -34,7 +34,7 @@ baseline (BibTeX 0.99d, BibLaTeX 3.20, Biber 2.20).
   `capabilities`, multi-file `--strict` gate checks, `.pre-commit-hooks.yaml`.
 - **Parser conformance**: versioned corpus pinned to TeX Live 2025; differential
   tests against BibTeX 0.99d and Biber 2.20; property-based tests (Hypothesis).
-- **Quality**: ~860 tests, coverage ≥90%, `ruff` clean, docs site builds.
+- **Quality**: ~870 tests, coverage ≥90%, `ruff` clean, docs site builds.
 
 ## 0.5 — remaining interchange formats and scope decision
 
@@ -99,6 +99,11 @@ optional mode of one `Bibliography`; it must not change plain `.bib` behavior.
 - [ ] A 30-second demo (asciinema/GIF): "messy `.bib` → clean `.bib` with a
       reviewable diff", and an agent cleaning a bibliography via pynakes.
 - [ ] Lead the README/launch with the agent-tool + reviewable-diff story.
+- [ ] **Shell completion for citation keys** (moderate effort). Register
+      Click shell-completion callbacks on every argument that accepts a citation
+      key (`add`, `keys rename`, `fetch`, etc.). The callback auto-detects the
+      `.bib` (same logic as `_resolve_input_bib`), parses it, and yields matching
+      keys. Usable via `eval "$(pynakes --show-completion bash)"` / `zsh` / `fish`.
 - [ ] Deferred to after traction: Zenodo DOI, then JOSS (JOSS requires
       demonstrated use, so it follows adoption).
 
@@ -149,16 +154,16 @@ small, independently committable steps — each is code + tests + a `CHANGELOG.m
 entry and ends green on `pytest && ruff check src tests`. Built one at a time,
 reviewed, then the next.
 
-- [ ] **1. `files-dir` + `FileStore` foundation (offline).** Recognize the
+- [x] **1. `files-dir` + `FileStore` foundation (offline).** Recognize the
       `files-dir` `pynakes-meta` key; add `filestore.py` (deterministic
       version-class paths `<citekey>.pdf` / `<citekey>_preprint.pdf` /
       `<citekey>_preprint/`, directory scan, presence checks); expose
       `Bibliography.files` (`FileStore | None`). No network.
-- [ ] **2. arXiv download core.** Add `fetch.py` (injectable
+- [x] **2. arXiv download core.** Add `fetch.py` (injectable
       `fetch_arxiv_pdf`/`fetch_arxiv_source`, URL builders, safe tar extraction)
       and the `FileStore` atomic writers for the preprint PDF and extracted
       source. Unit-tested with fixtures; no real network.
-- [ ] **3. The top-level `fetch` command.** `pynakes fetch <bib> [target]
+- [x] **3. The top-level `fetch` command.** `pynakes fetch [target] [file]
       [--online] [--dry-run] [--json]`, with what-to-download governed by the
       `fetch-preprint`/`fetch-source`/`fetch-published` metadata keys;
       `Bibliography.ensure_files_dir` + `fetch_materials`; zero-config default

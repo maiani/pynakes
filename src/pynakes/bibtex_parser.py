@@ -4,7 +4,7 @@ import logging
 import re
 from typing import Optional
 
-from pynakes.metadata import metadata_blocks_to_dict, parse_metadata_comment
+from pynakes.metadata import parse_metadata_comment
 from pynakes.model import (
     BibEntry,
     BibFile,
@@ -159,9 +159,7 @@ def parse_bib(text: str) -> BibFile:
         raw_strings=raw_strings,
         preamble=preambles,
         raw_comments=raw_comments,
-        jabref_metadata=metadata_blocks_to_dict(jabref_metadata_blocks),
         jabref_metadata_blocks=jabref_metadata_blocks,
-        pynakes_metadata=metadata_blocks_to_dict(pynakes_metadata_blocks),
         pynakes_metadata_blocks=pynakes_metadata_blocks,
         line_ending=line_ending,
         source_layout=layout,

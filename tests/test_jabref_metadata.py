@@ -12,9 +12,11 @@ from pynakes.metadata import (
     DuplicateMetadataError,
     MetadataUpdate,
     consolidate_metadata,
+    default_namespace,
     library_database_type,
     library_save_actions,
     metadata_category,
+    metadata_owner,
     parse_save_actions,
     set_metadata,
 )
@@ -44,6 +46,28 @@ def test_metadata_category_covers_pinned_jabref_metadata_constants() -> None:
         "BibDesk Static Groups": "groups",
     }
     assert {key: metadata_category(key) for key in expected_categories} == expected_categories
+
+
+def test_metadata_owner_separates_jabref_and_pynakes_keys() -> None:
+    assert metadata_owner("databaseType") == "jabref"
+    assert metadata_owner("keypattern_article") == "jabref"
+    assert metadata_owner("normalize-journal-style") == "pynakes"
+    assert metadata_owner("files-dir") == "pynakes"
+    assert metadata_owner("unknownThing") == "unknown"
+
+
+def test_pynakes_owned_keys_have_domain_categories() -> None:
+    assert metadata_category("normalize-journal-style") == "normalization"
+    assert metadata_category("protected-terms") == "normalization"
+    assert metadata_category("lint-required-fields-article") == "lint"
+    assert metadata_category("tex-sources") == "usage"
+    assert metadata_category("files-dir") == "pinax"
+
+
+def test_default_namespace_routes_by_owner() -> None:
+    assert default_namespace("databaseType") == "jabref"
+    assert default_namespace("files-dir") == "pynakes"
+    assert default_namespace("unknownThing") == "pynakes"
 
 
 def test_consolidate_metadata_moves_stranded_blocks_to_end_sorted() -> None:
@@ -116,6 +140,10 @@ def test_parse_known_and_unknown_jabref_metadata_blocks() -> None:
     ]
     assert lib.jabref_metadata_blocks[0].known is True
     assert lib.jabref_metadata_blocks[0].category == "library"
+    assert lib.jabref_metadata_blocks[0].value == "biblatex;"
+    assert lib.jabref_metadata_blocks[0].normalized_value == "biblatex"
+    assert lib.jabref_metadata_blocks[0].to_dict()["raw_value"] == "biblatex;"
+    assert lib.jabref_metadata_blocks[0].to_dict()["value"] == "biblatex"
     assert lib.jabref_metadata_blocks[2].category == "selectors"
     assert lib.jabref_metadata_blocks[3].known is False
     assert write_bib(lib) == text

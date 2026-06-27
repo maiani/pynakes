@@ -17,6 +17,7 @@ from pynakes.cli_common import (
     _emit_conflict,
     _emit_error,
     _finish_mod,
+    _resolve_input_bib,
     _safe,
 )
 from pynakes.engine import Bibliography
@@ -25,8 +26,10 @@ from pynakes.engine import Bibliography
 
 
 def add(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
     identifier: str = typer.Argument(..., help="DOI, DOI URL, arXiv id, or arXiv URL to import"),
+    file: Optional[str] = typer.Argument(
+        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
+    ),
     key: Optional[str] = typer.Option(None, "--key", help="Citation key to use"),
     key_source: str = typer.Option(
         "generated",
@@ -41,6 +44,7 @@ def add(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Add a reference by DOI or arXiv identifier."""
+    file = _resolve_input_bib(file, json_output)
     if key_source not in importer_ops.KEY_SOURCES:
         _emit_error(
             json_output,

@@ -245,9 +245,10 @@ def lint(lib: BibFile) -> list[LintIssue]:
     issues.extend(_lint_undefined_string_definitions(lib))
 
     for entry in lib.entries.values():
+        fields = lib.resolved_fields(entry)
         issues.extend(_lint_undefined_string_references(entry, lib))
-        issues.extend(_lint_entry(entry, lib.resolved_fields(entry)))
-        issues.extend(_lint_profile_entry(entry, lib, profile, journal_sources))
+        issues.extend(_lint_entry(entry, fields))
+        issues.extend(_lint_profile_entry(entry, lib, profile, journal_sources, fields))
 
     issues.extend(_lint_field_consistency(lib))
 
@@ -363,9 +364,11 @@ def _lint_profile_entry(
     lib: BibFile,
     profile: LintProfile,
     journal_sources: JournalSources | None,
+    fields: dict[str, str] | None = None,
 ) -> list[LintIssue]:
     """Check one entry against persisted preferences without changing it."""
     issues: list[LintIssue] = []
+    fields = fields or entry.fields
 
     pattern = get_jabref_key_pattern(lib, entry.type)
     if pattern:
@@ -394,7 +397,7 @@ def _lint_profile_entry(
 
     for field in profile_required_fields(lib, entry.type):
         normalized = field.lower()
-        if not entry.fields.get(normalized, "").strip():
+        if not fields.get(normalized, "").strip():
             issues.append(
                 LintIssue(
                     "missing_profile_required_field",
@@ -408,7 +411,7 @@ def _lint_profile_entry(
 
     if profile.protect_titles:
         for field in profile.title_fields:
-            title = entry.fields.get(field)
+            title = fields.get(field)
             if title and not title_capitalization_is_protected(
                 title, list(profile.protected_terms)
             ):
@@ -425,7 +428,7 @@ def _lint_profile_entry(
 
     if profile.journal_style in {"abbreviated", "full"} and journal_sources is not None:
         for field in JOURNAL_FIELDS:
-            title = entry.fields.get(field)
+            title = fields.get(field)
             if not title:
                 continue
             expected_title = expected_journal_title(
@@ -513,7 +516,7 @@ def _lint_entry(
                 )
             )
 
-    doi = entry.fields.get("doi", "").strip()
+    doi = fields.get("doi", "").strip()
     if doi:
         try:
             normalize_doi(doi)

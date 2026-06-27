@@ -76,6 +76,29 @@ def test_crossref_inherits_required_fields_without_mutating_child() -> None:
     assert not [issue for issue in lint(lib) if issue.type == "missing_required_field"]
 
 
+def test_lint_uses_inherited_fields_for_profile_and_doi_checks() -> None:
+    lib = parse_bib(
+        "@comment{pynakes-meta: lint-required-fields-article:url;}\n"
+        "@xdata{shared,\n"
+        "  journal = {Nature},\n"
+        "  year = {2024},\n"
+        "  doi = {10.1234/example},\n"
+        "  url = {https://example.test}\n"
+        "}\n"
+        "@article{Paper,\n"
+        "  author = {A. Author},\n"
+        "  title = {Paper},\n"
+        "  xdata = {shared}\n"
+        "}\n"
+    )
+
+    issue_types = _types(lint(lib))
+
+    assert "missing_required_field" not in issue_types
+    assert "missing_profile_required_field" not in issue_types
+    assert "missing_doi" not in issue_types
+
+
 def test_crossref_child_fields_override_inherited_values() -> None:
     lib = parse_bib(
         "@proceedings{Parent, booktitle = {Parent Book}, year = {2024}}\n"
@@ -345,6 +368,40 @@ def test_set_entry_produces_no_false_required_field_errors() -> None:
     required_issues = [i for i in lint(lib) if i.type == "missing_required_field"]
     set_issues = [i for i in required_issues if i.key == "DatasetSet"]
     assert not set_issues, f"false required-field errors on @set entry: {set_issues}"
+
+
+def test_required_fields_for_techreport() -> None:
+    lib = parse_bib("@techreport{T,\n  author = {X},\n  title = {T},\n  year = {2020}\n}\n")
+    issues = [i for i in lint(lib) if i.type == "missing_required_field"]
+    fields = {i.field for i in issues}
+    assert "institution" in fields, (
+        "techreport should require institution (or school), but this type is not in _REQUIRED yet"
+    )
+
+
+def test_required_fields_for_unpublished() -> None:
+    lib = parse_bib("@unpublished{U,\n  title = {T},\n  year = {2020}\n}\n")
+    issues = [i for i in lint(lib) if i.type == "missing_required_field"]
+    fields = {i.field for i in issues}
+    assert "author" in fields, (
+        "unpublished should require author, but this type is not in _REQUIRED yet"
+    )
+
+
+def test_required_fields_for_incollection() -> None:
+    lib = parse_bib("@incollection{C,\n  author = {X},\n  title = {T},\n  year = {2020}\n}\n")
+    issues = [i for i in lint(lib) if i.type == "missing_required_field"]
+    fields = {i.field for i in issues}
+    assert "booktitle" in fields, (
+        "incollection should require booktitle, but this type is not in _REQUIRED yet"
+    )
+
+
+def test_required_fields_for_manual() -> None:
+    lib = parse_bib("@manual{M,\n  author = {X},\n  year = {2020}\n}\n")
+    issues = [i for i in lint(lib) if i.type == "missing_required_field"]
+    fields = {i.field for i in issues}
+    assert "title" in fields, "manual should require title, but this type is not in _REQUIRED yet"
 
 
 def test_custom_biblatex_entry_type_and_field_names_produce_no_errors() -> None:

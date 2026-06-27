@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from pynakes.bibtex_parser import parse_bib
+from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.model import BibFile
 
@@ -121,7 +121,7 @@ def save_text(
             try:
                 with open(tmp_path, "r", encoding=encoding) as f:
                     parse_bib(f.read())
-            except Exception as e:
+            except ParseError as e:
                 # Restore backup if validation fails
                 if backup_path:
                     Path(backup_path).rename(path)

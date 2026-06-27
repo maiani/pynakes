@@ -5,11 +5,13 @@ retaining the stable CLI contract.
 """
 
 import json as _json
+from typing import Optional
 
 import typer
 
 from pynakes.cli_common import (
     _entries,
+    _resolve_input_bib,
     _safe,
 )
 from pynakes.io import load_bib
@@ -18,7 +20,9 @@ from pynakes.io import load_bib
 
 
 def inspect(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
+    file: Optional[str] = typer.Argument(
+        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
+    ),
     resolved: bool = typer.Option(
         False,
         "--resolved",
@@ -34,6 +38,7 @@ def inspect(
     ``--resolved`` each entry also carries its inherited (crossref/xdata) field
     view.
     """
+    file = _resolve_input_bib(file, json_output)
     lib = load_bib(file)
     duplicates = lib.entries.duplicate_keys()
 

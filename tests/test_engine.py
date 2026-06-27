@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.engine import Bibliography, ExternalModificationError
 from pynakes.normalize import NormalizeOptions
@@ -213,3 +214,11 @@ def test_volume_import_doi_adds_entry_in_memory(monkeypatch) -> None:
     assert entry.key == "Smith2024DOI"
     assert coll.entries["Smith2024DOI"] is entry
     assert coll.is_dirty is True
+
+
+def test_entry_edits_survives_unsnapshotted_entry_with_raw_content() -> None:
+    coll = Bibliography.from_text("@article{A,\n  title = {T},\n  year = {2020}\n}\n")
+    extra = parse_bib("@article{B,\n  title = {Extra},\n  year = {2021}\n}\n").entries["B"]
+    coll.lib.entries.add(extra)
+    coll.rename_field("title", "mytitle")
+    assert "mytitle" in coll.diff()

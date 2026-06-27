@@ -7,60 +7,99 @@ JabRef stores library-level settings as top-level comments:
 The raw comments must be preserved for round-trip fidelity, but callers also
 need structured access for inspection and safe edits. This module keeps both:
 ``MetadataBlock.raw`` is the exact comment text stored in the library,
-while ``key`` and ``value`` expose the parsed payload.
+while ``key`` and ``value`` expose the parsed payload. ``value`` deliberately
+keeps JabRef's trailing semicolon when it was present; use
+``MetadataBlock.normalized_value`` only for display and semantic comparisons.
 """
 
 import re
 from dataclasses import dataclass, field
+from typing import Literal
 
 from pynakes.model import BibFile, MetadataBlock
 
-KNOWN_EXACT_KEYS = {
-    "databasetype": "library",
-    "saveorderconfig": "save",
-    "saveorder": "save",
-    "saveactions": "save",
-    "blgfilepath": "library",
-    "filedirectorylatex": "files",
-    "grouping": "groups",
-    "groupstree": "groups",
-    "groups": "groups",
-    "groupsversion": "groups",
-    "groups-search-syntax-version": "groups",
-    "bibdesk static groups": "groups",
-    "protectedflag": "library",
-    "versiondbstructure": "library",
-    "keypatterndefault": "citation-key",
-    # pynakes normalization settings written with the canonical bare prefix.
-    "protected-terms": "pynakes",
-    "journal-table": "pynakes",
-    "ltwa-table": "pynakes",
-    # Linked LaTeX sources that cite this library; consulted by the citation-key
-    # commands so .tex edits stay consistent without re-specifying the files.
-    "tex-sources": "pynakes",
-    # Lint profile settings. ``lint-required-fields`` applies to every entry;
-    # the entry-type suffix form adds requirements for one type.
-    "lint-required-fields": "pynakes",
+MetadataCategory = Literal[
+    "library",
+    "save",
+    "files",
+    "groups",
+    "selectors",
+    "citation-key",
+    "normalization",
+    "lint",
+    "usage",
+    "pinax",
+    "unknown",
+]
+MetadataOwner = Literal["jabref", "pynakes", "unknown"]
+
+CATEGORY_LIBRARY: MetadataCategory = "library"
+CATEGORY_SAVE: MetadataCategory = "save"
+CATEGORY_FILES: MetadataCategory = "files"
+CATEGORY_GROUPS: MetadataCategory = "groups"
+CATEGORY_SELECTORS: MetadataCategory = "selectors"
+CATEGORY_CITATION_KEY: MetadataCategory = "citation-key"
+CATEGORY_NORMALIZATION: MetadataCategory = "normalization"
+CATEGORY_LINT: MetadataCategory = "lint"
+CATEGORY_USAGE: MetadataCategory = "usage"
+CATEGORY_PINAX: MetadataCategory = "pinax"
+CATEGORY_UNKNOWN: MetadataCategory = "unknown"
+
+# Map values are *categories*: a coarse grouping used for inspection, docs, and
+# validation messages. They are not namespaces (where a block is stored) and not
+# owners (who understands the key). For example, ``databaseType`` is a JabRef key
+# in the library-settings category, so it maps to ``CATEGORY_LIBRARY``.
+
+# JabRef-native metadata keys. These can be written to ``jabref-meta`` by
+# default because JabRef understands them and should keep seeing them.
+JABREF_EXACT_KEYS: dict[str, MetadataCategory] = {
+    "databasetype": CATEGORY_LIBRARY,
+    "saveorderconfig": CATEGORY_SAVE,
+    "saveorder": CATEGORY_SAVE,
+    "saveactions": CATEGORY_SAVE,
+    "blgfilepath": CATEGORY_LIBRARY,
+    "filedirectorylatex": CATEGORY_FILES,
+    "grouping": CATEGORY_GROUPS,
+    "groupstree": CATEGORY_GROUPS,
+    "groups": CATEGORY_GROUPS,
+    "groupsversion": CATEGORY_GROUPS,
+    "groups-search-syntax-version": CATEGORY_GROUPS,
+    "bibdesk static groups": CATEGORY_GROUPS,
+    "protectedflag": CATEGORY_LIBRARY,
+    "versiondbstructure": CATEGORY_LIBRARY,
+    "keypatterndefault": CATEGORY_CITATION_KEY,
 }
 
-KNOWN_PREFIXES = {
-    "filedirectory": "files",
-    "selector_": "selectors",
-    "keypattern_": "citation-key",
-    # pynakes' own settings live under the canonical ``normalize-`` prefix.
-    "normalize-": "pynakes",
-    "lint-required-fields-": "pynakes",
+JABREF_PREFIX_KEYS: dict[str, MetadataCategory] = {
+    "filedirectory": CATEGORY_FILES,
+    "selector_": CATEGORY_SELECTORS,
+    "keypattern_": CATEGORY_CITATION_KEY,
+}
+
+# pynakes-owned metadata keys. These live in ``pynakes-meta`` by default because
+# they have no JabRef equivalent or deliberately extend JabRef behavior.
+PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
+    "protected-terms": CATEGORY_NORMALIZATION,
+    "journal-table": CATEGORY_NORMALIZATION,
+    "ltwa-table": CATEGORY_NORMALIZATION,
+    "files-dir": CATEGORY_PINAX,
+    # Linked LaTeX sources that cite this library; consulted by the citation-key
+    # commands so .tex edits stay consistent without re-specifying the files.
+    "tex-sources": CATEGORY_USAGE,
+    # Lint profile settings. ``lint-required-fields`` applies to every entry;
+    # the entry-type suffix form adds requirements for one type.
+    "lint-required-fields": CATEGORY_LINT,
+}
+
+PYNAKES_PREFIX_KEYS: dict[str, MetadataCategory] = {
+    # pynakes' normalization settings live under the canonical ``normalize-`` prefix.
+    "normalize-": CATEGORY_NORMALIZATION,
+    "lint-required-fields-": CATEGORY_LINT,
 }
 
 # The two structurally identical metadata comment namespaces.
 JABREF_PREFIX = "jabref-meta:"
 PYNAKES_PREFIX = "pynakes-meta:"
-
-# Categories that JabRef itself understands. Keys in these categories are
-# written to ``jabref-meta`` by default (maximum JabRef compatibility); keys
-# JabRef cannot represent (pynakes-specific or unrecognized) go to
-# ``pynakes-meta``.
-JABREF_CATEGORIES = {"library", "save", "groups", "citation-key", "files", "selectors"}
 
 
 class DuplicateMetadataError(Exception):
@@ -88,20 +127,39 @@ class MetadataUpdate:
     namespace: str = "jabref"
 
 
-def metadata_category(key: str) -> str:
+def metadata_category(key: str) -> MetadataCategory:
     """Return the known metadata category for ``key``, or ``unknown``."""
     normalized = key.lower()
-    if normalized in KNOWN_EXACT_KEYS:
-        return KNOWN_EXACT_KEYS[normalized]
-    for prefix, category in KNOWN_PREFIXES.items():
+    if normalized in JABREF_EXACT_KEYS:
+        return JABREF_EXACT_KEYS[normalized]
+    for prefix, category in JABREF_PREFIX_KEYS.items():
         if normalized.startswith(prefix):
             return category
+    if normalized in PYNAKES_EXACT_KEYS:
+        return PYNAKES_EXACT_KEYS[normalized]
+    for prefix, category in PYNAKES_PREFIX_KEYS.items():
+        if normalized.startswith(prefix):
+            return category
+    return CATEGORY_UNKNOWN
+
+
+def metadata_owner(key: str) -> MetadataOwner:
+    """Return ``jabref``, ``pynakes``, or ``unknown`` for a metadata key."""
+    normalized = key.lower()
+    if normalized in JABREF_EXACT_KEYS or any(
+        normalized.startswith(prefix) for prefix in JABREF_PREFIX_KEYS
+    ):
+        return "jabref"
+    if normalized in PYNAKES_EXACT_KEYS or any(
+        normalized.startswith(prefix) for prefix in PYNAKES_PREFIX_KEYS
+    ):
+        return "pynakes"
     return "unknown"
 
 
 def is_known_metadata_key(key: str) -> bool:
     """Return whether ``key`` is a recognized JabRef/pynakes metadata key."""
-    return metadata_category(key) != "unknown"
+    return metadata_owner(key) != "unknown"
 
 
 @dataclass
@@ -182,7 +240,7 @@ def default_namespace(key: str) -> str:
     ``pynakes``. This maximizes JabRef compatibility while letting pynakes own
     the keys JabRef has no place for.
     """
-    return "jabref" if metadata_category(key) in JABREF_CATEGORIES else "pynakes"
+    return "jabref" if metadata_owner(key) == "jabref" else "pynakes"
 
 
 def _make_metadata_block(
@@ -424,7 +482,6 @@ def _set_jabref_metadata(lib: BibFile, key: str, value: str) -> MetadataUpdate:
         new_block.comment_index = len(lib.raw_comments)
         lib.raw_comments.append(new_raw)
         blocks.append(new_block)
-        lib.jabref_metadata = metadata_blocks_to_dict(blocks)
         return MetadataUpdate(key, new_block.value, None, new_raw, True, "jabref")
 
     old = matches[0]
@@ -432,7 +489,6 @@ def _set_jabref_metadata(lib: BibFile, key: str, value: str) -> MetadataUpdate:
     if 0 <= old.comment_index < len(lib.raw_comments):
         lib.raw_comments[old.comment_index] = new_raw
     blocks[blocks.index(old)] = new_block
-    lib.jabref_metadata = metadata_blocks_to_dict(blocks)
     return MetadataUpdate(key, new_block.value, old.raw, new_raw, False, "jabref")
 
 
@@ -490,6 +546,5 @@ def _set_pynakes_metadata(lib: BibFile, key: str, value: str) -> MetadataUpdate:
             b for b in blocks if b.comment_index != comment_index
         ] + new_blocks
 
-    lib.pynakes_metadata = metadata_blocks_to_dict(lib.pynakes_metadata_blocks)
     set_value = next((b.value for b in new_blocks if b.key.lower() == key.lower()), value)
     return MetadataUpdate(key, set_value, old_raw, new_raw, not matches, "pynakes")

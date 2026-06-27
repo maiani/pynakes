@@ -158,9 +158,7 @@ def _apply_modifiers(value: str, modifiers: list[str]) -> str:
             value = value.lower()
         elif modifier == "upper":
             value = value.upper()
-        elif modifier == "capitalize":
-            value = "".join(_capitalize_word(word.lower()) for word in _words(value))
-        elif modifier == "titlecase":
+        elif modifier in ("capitalize", "titlecase"):
             value = "".join(_capitalize_word(word.lower()) for word in _words(value))
         elif modifier == "abbr":
             value = "".join(word[:1] for word in _words(value))

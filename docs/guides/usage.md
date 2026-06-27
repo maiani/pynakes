@@ -160,6 +160,12 @@ pynakes recognizes **two** structurally identical top-level comment namespaces:
 key generation) use the **merged** view, where `pynakes-meta` overrides
 `jabref-meta` on a conflicting key.
 
+In JSON/API output, each metadata block exposes both forms of the value:
+`raw_value` is the parsed payload as stored in the comment, including JabRef's
+trailing `;` when present; `value` is the normalized display/semantic form with
+that terminator stripped. The exact source comment remains available as the
+block's raw text in the Python model.
+
 ```bash
 pynakes metadata list refs.bib
 pynakes metadata list refs.bib --json

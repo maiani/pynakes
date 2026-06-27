@@ -51,6 +51,11 @@ The generic names below are settled before the API freeze because both
 The earlier `JabRefMetadata*` names are not part of the public API. Code should
 use the generic names above.
 
+`MetadataBlock.value` preserves the parsed metadata payload, including JabRef's
+trailing semicolon when the source had one. Use
+`MetadataBlock.normalized_value` for display and semantic comparisons, and
+`MetadataBlock.raw` when exact source text matters.
+
 ## Private implementation surface
 
 A name beginning with `_` is private. Private names, private helpers, and

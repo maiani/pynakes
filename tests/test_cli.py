@@ -186,7 +186,7 @@ class TestInspectAndLint:
 
         result = runner.invoke(app, ["inspect"])
 
-        assert result.exit_code == 2
+        assert result.exit_code == 1
 
     def test_inspect_json(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
@@ -298,7 +298,7 @@ class TestSearchCommand:
             "}\n"
         )
 
-        result = runner.invoke(app, ["search", str(bib), "neural widgets", "--json"])
+        result = runner.invoke(app, ["search", "neural widgets", str(bib), "--json"])
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -323,7 +323,7 @@ class TestSearchCommand:
 
         result = runner.invoke(
             app,
-            ["search", str(bib), "title:graph", "--where", "type = article", "--json"],
+            ["search", "title:graph", str(bib), "--where", "type = article", "--json"],
         )
 
         assert result.exit_code == 0, result.output
@@ -334,7 +334,7 @@ class TestSearchCommand:
         bib = tmp_path / "refs.bib"
         bib.write_text("@misc{Alpha,\n  title = {Plain Widget Note}\n}\n")
 
-        result = runner.invoke(app, ["search", str(bib), "widget"])
+        result = runner.invoke(app, ["search", "widget", str(bib)])
 
         assert result.exit_code == 0, result.output
         assert "1 matching entry" in result.output
@@ -344,7 +344,7 @@ class TestSearchCommand:
         bib = tmp_path / "refs.bib"
         bib.write_text("@misc{Alpha,\n  title = {Plain Widget Note}\n}\n")
 
-        result = runner.invoke(app, ["search", str(bib), '"unterminated', "--json"])
+        result = runner.invoke(app, ["search", '"unterminated', str(bib), "--json"])
 
         assert result.exit_code == 1, result.output
         data = json.loads(result.output)
@@ -425,7 +425,7 @@ class TestAddCommand:
 
         result = runner.invoke(
             app,
-            ["add", str(bib), "10.5555/provider", "--dry-run", "--diff", "--json"],
+            ["add", "10.5555/provider", str(bib), "--dry-run", "--diff", "--json"],
         )
 
         assert result.exit_code == 0, result.output
@@ -439,7 +439,7 @@ class TestAddCommand:
         bib = _copy(tmp_path, "simple.bib")
         monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
-        result = runner.invoke(app, ["add", str(bib), "10.5555/provider"])
+        result = runner.invoke(app, ["add", "10.5555/provider", str(bib)])
 
         assert result.exit_code == 0, result.output
         text = bib.read_text()
@@ -457,7 +457,7 @@ class TestAddCommand:
         )
         monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
-        result = runner.invoke(app, ["add", str(bib), "10.5555/provider"])
+        result = runner.invoke(app, ["add", "10.5555/provider", str(bib)])
 
         assert result.exit_code == 0, result.output
         text = bib.read_text()
@@ -468,7 +468,7 @@ class TestAddCommand:
         bib = _copy(tmp_path, "simple.bib")
         monkeypatch.setattr(importer_ops, "fetch_arxiv_atom", lambda identifier: ARXIV_ATOM)
 
-        result = runner.invoke(app, ["add", str(bib), "arXiv:2301.00001", "--json"])
+        result = runner.invoke(app, ["add", "arXiv:2301.00001", str(bib), "--json"])
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -489,7 +489,7 @@ class TestAddCommand:
         monkeypatch.setattr(importer_ops, "fetch_arxiv_atom", lambda identifier: ARXIV_ATOM)
 
         result = runner.invoke(
-            app, ["add", str(bib), "https://arxiv.org/abs/2301.00001v1", "--json"]
+            app, ["add", "https://arxiv.org/abs/2301.00001v1", str(bib), "--json"]
         )
 
         assert result.exit_code == 0, result.output
@@ -508,7 +508,7 @@ class TestAddCommand:
         )
         monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
-        result = runner.invoke(app, ["add", str(bib), "10.5555/provider", "--json"])
+        result = runner.invoke(app, ["add", "10.5555/provider", str(bib), "--json"])
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -522,7 +522,7 @@ class TestAddCommand:
 
         result = runner.invoke(
             app,
-            ["add", str(bib), "10.5555/provider", "--key-source", "provider", "--json"],
+            ["add", "10.5555/provider", str(bib), "--key-source", "provider", "--json"],
         )
 
         assert result.exit_code == 0, result.output
@@ -538,8 +538,8 @@ class TestAddCommand:
             app,
             [
                 "add",
-                str(bib),
                 "10.5555/provider",
+                str(bib),
                 "--key-source",
                 "provider",
                 "--key",
@@ -558,7 +558,7 @@ class TestAddCommand:
 
         result = runner.invoke(
             app,
-            ["add", str(bib), "10.5555/provider", "--key-source", "garbage", "--json"],
+            ["add", "10.5555/provider", str(bib), "--key-source", "garbage", "--json"],
         )
 
         assert result.exit_code == 1, result.output
@@ -570,7 +570,7 @@ class TestAddCommand:
 
         result = runner.invoke(
             app,
-            ["add", str(bib), "https://doi.org/10.1234/nature.ml.2020", "--json"],
+            ["add", "https://doi.org/10.1234/nature.ml.2020", str(bib), "--json"],
         )
 
         assert result.exit_code == 2, result.output
@@ -585,7 +585,7 @@ class TestAddCommand:
 
         result = runner.invoke(
             app,
-            ["add", str(bib), "10.5555/provider", "--key", "Smith2020", "--json"],
+            ["add", "10.5555/provider", str(bib), "--key", "Smith2020", "--json"],
         )
 
         assert result.exit_code == 2, result.output
@@ -598,13 +598,13 @@ class TestAddCommand:
         bib = _copy(tmp_path, "simple.bib")
         monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
-        result = runner.invoke(app, ["add", str(bib), "10.5555/provider", "--key", "Smith2020"])
+        result = runner.invoke(app, ["add", "10.5555/provider", str(bib), "--key", "Smith2020"])
         assert result.exit_code == 2, result.output
         assert "CitationKeyConflict" in result.output
 
     def test_add_unrecognized_identifier_errors(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        result = runner.invoke(app, ["add", str(bib), "not-an-identifier", "--json"])
+        result = runner.invoke(app, ["add", "not-an-identifier", str(bib), "--json"])
         assert result.exit_code == 1, result.output
         assert json.loads(result.output)["error"] == "UnsupportedIdentifier"
 
@@ -615,13 +615,13 @@ class TestAddCommand:
             raise importer_ops.DOIImportError("resolver offline")
 
         monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", _boom)
-        result = runner.invoke(app, ["add", str(bib), "10.5555/provider", "--json"])
+        result = runner.invoke(app, ["add", "10.5555/provider", str(bib), "--json"])
         assert result.exit_code == 1, result.output
         assert json.loads(result.output)["error"] == "ReferenceImportError"
 
     def test_add_duplicate_doi_human_output(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        result = runner.invoke(app, ["add", str(bib), "https://doi.org/10.1234/nature.ml.2020"])
+        result = runner.invoke(app, ["add", "https://doi.org/10.1234/nature.ml.2020", str(bib)])
         assert result.exit_code == 2, result.output
         assert "DuplicateReference" in result.output
         assert "--allow-duplicate" in result.output

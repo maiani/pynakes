@@ -4,16 +4,7 @@ Kept in sync with the actually-implemented CLI commands so agents can introspect
 the tool rather than guessing. Update this when commands are added or removed.
 """
 
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as _package_version
-
-try:
-    # Single source of truth: the version declared in pyproject and recorded in
-    # the installed distribution metadata, so it can never drift from the package.
-    VERSION = _package_version("pynakes")
-except PackageNotFoundError:  # running from a source tree without an install
-    VERSION = "0.3.0"
-
+from pynakes import __version__ as VERSION
 
 # Stable type vocabulary for command-schema introspection. The on-disk click
 # type names are mapped to this small, version-independent set so the pinned
@@ -248,9 +239,12 @@ def get_capabilities() -> dict:
             "inspect_jabref_metadata",
             "update_jabref_metadata",
             "validate_linked_files",
+            "pinax_filestore",
+            "pinax_arxiv_download_core",
+            "pinax_fetch",
         ],
         "commands": {
-            "init": "Create a new .bib library, optionally seeded with a metadata profile",
+            "init": "Create a new .bib library, optionally seeded with a metadata profile (--pinax for pinax mode)",
             "inspect": "Inspect a .bib file structure",
             "lint": "Validate entries and report issues",
             "groups": "Manage entry groups (list, add-entry, remove-entry)",
@@ -267,6 +261,7 @@ def get_capabilities() -> dict:
             "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "
             "formats (export/import CSL-JSON, RIS, MODS, and EndNote)",
             "add": "Add a reference by DOI, arXiv identifier, or journal article URL",
+            "fetch": "Download arXiv materials (PDF and source) into the Pinax files-dir",
             "search": "Search entries by free text, phrases, or field-scoped terms",
             "used": "Report/tag/export entries cited in LaTeX sources",
             "combine": "Union several .bib files into one (optionally deduping by key)",

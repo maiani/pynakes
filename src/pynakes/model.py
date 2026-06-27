@@ -179,7 +179,9 @@ class MetadataBlock:
     ``@comment{jabref-meta: key:value;}`` (JabRef's own) and
     ``@comment{pynakes-meta: key:value;}`` (pynakes' superset, for settings
     JabRef cannot represent). ``namespace`` records which one this block came
-    from; everything else is identical between the two.
+    from; ``raw`` preserves the exact source comment, ``value`` is the parsed
+    payload with JabRef's terminator preserved when present, and
+    ``normalized_value`` is the stripped display/semantic view.
     """
 
     key: str
@@ -192,7 +194,12 @@ class MetadataBlock:
 
     @property
     def normalized_value(self) -> str:
-        """Return the metadata value without JabRef's trailing semicolon."""
+        """Return the display/semantic value without JabRef's trailing semicolon.
+
+        ``value`` preserves the parsed payload as stored in the metadata comment;
+        this convenience view strips the terminator JabRef appends to
+        ``jabref-meta`` values.
+        """
         return self.value.strip().rstrip(";").strip()
 
     def to_dict(self) -> dict[str, object]:
@@ -212,11 +219,14 @@ class BibEntry:
     """One bibliographic record and its preservation state.
 
     ``fields`` is deliberately open-ended: it holds standard BibTeX/BibLaTeX
-    fields and user-defined fields alike. ``raw_content`` is the original
-    entry text used to retain formatting for untouched entries; mutation
-    helpers in :mod:`pynakes.editing` keep it synchronized with ``fields``.
-    ``modified`` selects writer reconstruction only when no surgical raw edit
-    is available.
+    fields and user-defined fields alike. For parsed files, values are the
+    semantic field view after BibTeX ``@string`` interpolation; the original
+    field expressions remain in ``raw_content`` for round-trip writing,
+    undefined-string linting, and surgical edits. ``raw_content`` is the
+    original entry text used to retain formatting for untouched entries;
+    mutation helpers in :mod:`pynakes.editing` keep it synchronized with
+    ``fields``. ``modified`` selects writer reconstruction only when no surgical
+    raw edit is available.
     """
 
     key: str
@@ -224,7 +234,6 @@ class BibEntry:
     fields: dict[str, str]
     raw_content: Optional[str] = None
     raw_comments: list[str] = field(default_factory=list)
-    jabref_metadata: dict[str, str] = field(default_factory=dict)
     modified: bool = False
 
     def resolve(self, lookup: Lookup) -> dict[str, str]:
@@ -359,16 +368,44 @@ class EntryStore:
         return f"EntryStore({len(self._entries)} entries{suffix})"
 
 
-@dataclass
+def _metadata_blocks_to_dict(blocks: list[MetadataBlock]) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for block in blocks:
+        result[block.key] = block.value
+    return result
+
+
+def _init_metadata_blocks(
+    blocks: list[MetadataBlock] | None,
+    metadata: dict[str, str] | None,
+    namespace: str,
+) -> list[MetadataBlock]:
+    if blocks is not None:
+        return list(blocks)
+    if not metadata:
+        return []
+    return [
+        MetadataBlock(
+            key=key,
+            value=value,
+            raw="",
+            comment_index=-1,
+            namespace=namespace,
+        )
+        for key, value in metadata.items()
+    ]
+
+
+@dataclass(init=False)
 class BibFile:
     """The complete in-memory representation of one ``.bib`` file.
 
     A ``BibFile`` is a semantic view plus the preservation data needed to write
     it back safely. ``entries`` is an :class:`EntryStore`, so duplicate keys
     remain representable; top-level declarations and comments are retained in
-    their own lists. JabRef metadata is available both as ordered raw blocks and
-    as a compatibility mapping. Encoding and line-ending metadata let I/O
-    reproduce the source file's representation.
+    their own lists. Metadata block lists are the source of truth; flat metadata
+    mappings are derived compatibility views. Encoding and line-ending metadata
+    let I/O reproduce the source file's representation.
     """
 
     entries: EntryStore = field(default_factory=EntryStore)
@@ -376,13 +413,11 @@ class BibFile:
     raw_strings: list[str] = field(default_factory=list)
     preamble: list[str] = field(default_factory=list)
     raw_comments: list[str] = field(default_factory=list)
-    # ``jabref_metadata``/``jabref_metadata_blocks`` hold the JabRef namespace
-    # only (back-compatible). ``pynakes_metadata``/``pynakes_metadata_blocks``
-    # hold pynakes' superset namespace. Use the ``metadata`` property for the
-    # effective merged view that consumers read.
-    jabref_metadata: dict[str, str] = field(default_factory=dict)
+    # ``jabref_metadata_blocks`` holds the JabRef namespace only
+    # (back-compatible). ``pynakes_metadata_blocks`` holds pynakes' superset
+    # namespace. Use the derived ``metadata`` property for the effective merged
+    # view that consumers read.
     jabref_metadata_blocks: list[MetadataBlock] = field(default_factory=list)
-    pynakes_metadata: dict[str, str] = field(default_factory=dict)
     pynakes_metadata_blocks: list[MetadataBlock] = field(default_factory=list)
     encoding: str = "utf-8"
     line_ending: str = "\n"
@@ -396,10 +431,51 @@ class BibFile:
     source_layout: list = field(default_factory=list)
     source_trailing: str = ""
 
-    def __post_init__(self) -> None:
+    def __init__(
+        self,
+        entries: Union[EntryStore, dict[str, BibEntry], list[BibEntry], None] = None,
+        strings: dict[str, str] | None = None,
+        raw_strings: list[str] | None = None,
+        preamble: list[str] | None = None,
+        raw_comments: list[str] | None = None,
+        jabref_metadata: dict[str, str] | None = None,
+        jabref_metadata_blocks: list[MetadataBlock] | None = None,
+        pynakes_metadata: dict[str, str] | None = None,
+        pynakes_metadata_blocks: list[MetadataBlock] | None = None,
+        encoding: str = "utf-8",
+        line_ending: str = "\n",
+        source_layout: list | None = None,
+        source_trailing: str = "",
+    ) -> None:
         # Allow constructing from a dict or list for ergonomics/back-compat.
-        if not isinstance(self.entries, EntryStore):
-            self.entries = EntryStore(self.entries)
+        if not isinstance(entries, EntryStore):
+            self.entries = EntryStore(entries)
+        else:
+            self.entries = entries
+        self.strings = dict(strings or {})
+        self.raw_strings = list(raw_strings or [])
+        self.preamble = list(preamble or [])
+        self.raw_comments = list(raw_comments or [])
+        self.jabref_metadata_blocks = _init_metadata_blocks(
+            jabref_metadata_blocks, jabref_metadata, "jabref"
+        )
+        self.pynakes_metadata_blocks = _init_metadata_blocks(
+            pynakes_metadata_blocks, pynakes_metadata, "pynakes"
+        )
+        self.encoding = encoding
+        self.line_ending = line_ending
+        self.source_layout = list(source_layout or [])
+        self.source_trailing = source_trailing
+
+    @property
+    def jabref_metadata(self) -> dict[str, str]:
+        """Flat JabRef metadata view derived from ``jabref_metadata_blocks``."""
+        return _metadata_blocks_to_dict(self.jabref_metadata_blocks)
+
+    @property
+    def pynakes_metadata(self) -> dict[str, str]:
+        """Flat pynakes metadata view derived from ``pynakes_metadata_blocks``."""
+        return _metadata_blocks_to_dict(self.pynakes_metadata_blocks)
 
     @property
     def metadata(self) -> dict[str, str]:
@@ -407,7 +483,9 @@ class BibFile:
 
         This is the view operations (``lint``, ``normalize``, key generation)
         should read: pynakes settings take precedence as the authoritative
-        namespace, while JabRef-native keys remain visible.
+        namespace, while JabRef-native keys remain visible. The returned mapping
+        is derived and should not be mutated; use :func:`pynakes.metadata.set_metadata`
+        for updates.
         """
         return {**self.jabref_metadata, **self.pynakes_metadata}
 

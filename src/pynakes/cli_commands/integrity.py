@@ -13,6 +13,7 @@ from pynakes.cli_common import (
     _entries,
     _finish_mod,
     _metadata_cache_dir,
+    _resolve_input_bib,
     _run_checks,
     _safe,
 )
@@ -98,7 +99,9 @@ def verify(
 
 
 def enrich(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
+    file: Optional[str] = typer.Argument(
+        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
+    ),
     online: bool = typer.Option(
         False,
         "--online",
@@ -123,6 +126,7 @@ def enrich(
     promotes preprints to their published version (writing the published
     DOI/journal), folding in the former ``published --apply`` operation.
     """
+    file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
     cache = _metadata_cache_dir(file, cache_dir, online)
     report = coll.enrich(online=online, cache_dir=cache)

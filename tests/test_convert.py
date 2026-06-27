@@ -187,13 +187,13 @@ class TestToBibtex:
         assert entry.fields["month"] == "jul"
         assert "date" not in entry.fields
 
-    def test_date_with_day_warns_and_drops_day(self) -> None:
+    def test_date_with_day_preserves_day(self) -> None:
         lib = _load_biblatex()
-        result = convert_to_bibtex(lib)
+        convert_to_bibtex(lib)
         entry = lib.entries["WebSource2024"]
         assert entry.fields["year"] == "2024"
         assert entry.fields["month"] == "jan"
-        assert any(w["type"] == "date_day_dropped" for w in result.warnings)
+        assert entry.fields["day"] == "15"
 
     def test_existing_year_is_preserved(self) -> None:
         # FormattedArticle2020 has year=2020 and no date → year stays untouched.

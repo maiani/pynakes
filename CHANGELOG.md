@@ -11,11 +11,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add `BibEntry.resolve(lookup)` and `BibFile.resolve(entry)` as ergonomic
   shorthands for the existing read-only BibLaTeX inheritance view.
+- Add the offline Pinax `FileStore` foundation: recognized `files-dir` metadata,
+  deterministic material paths, presence scans, orphan detection, and
+  `Bibliography.files`.
+- Add the Pinax arXiv download core with injectable PDF/source fetchers, safe
+  source archive extraction, and atomic preprint material writes.
+
+### Changed
+
+- Remove the unused per-entry `BibEntry.jabref_metadata` field; JabRef and
+  pynakes metadata remain library-level state on `BibFile`.
+- Derive `BibFile.jabref_metadata`, `BibFile.pynakes_metadata`, and
+  `BibFile.metadata` from metadata blocks instead of storing separate mutable
+  dicts.
+- Make lint profile and DOI checks read inherited field views consistently, and
+  align source-tree fallback version reporting.
 
 ### Documentation
 
 - Document the optional Pinax corpus mode while preserving the plain `.bib`
   maintenance engine as the base identity.
+- Clarify that `MetadataBlock.normalized_value` is a display/semantic view,
+  while `MetadataBlock.value` and `raw` preserve the parsed/source forms.
+- Document that parsed `BibEntry.fields` are semantic values after BibTeX string
+  interpolation, with original expressions preserved in `raw_content`.
 
 ## [0.4.0] - 2026-06-26
 Complete single-file BibTeX/BibLaTeX maintenance engine

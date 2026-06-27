@@ -36,6 +36,9 @@ def init(
     from_: Optional[str] = typer.Option(
         None, "--from", help="Copy the metadata profile from an existing .bib library"
     ),
+    pinax: bool = typer.Option(
+        False, "--pinax", help="Seed pinax mode (files-dir, fetch-preprint, fetch-source)"
+    ),
     force: bool = typer.Option(
         False, "--force", help="Overwrite the target file if it already exists (writes a .bak)"
     ),
@@ -51,7 +54,8 @@ def init(
     and pynakes' default citation-key pattern). ``--type`` / ``--key-pattern``
     override individual settings; ``--from`` replaces the defaults with another
     library's maintenance profile (its conventions, not its group tree or
-    TeX-source list).
+    TeX-source list). ``--pinax`` also seeds pinax mode (files-dir,
+    fetch-preprint, fetch-source).
     """
     if type_ is not None and type_ not in {"biblatex", "bibtex"}:
         _emit_error(
@@ -72,6 +76,11 @@ def init(
         overrides.append(("databaseType", type_, "jabref"))
     if key_pattern is not None:
         overrides.append(("keypatterndefault", key_pattern, "jabref"))
+    if pinax:
+        stem = Path(file).stem
+        overrides.append(("files-dir", f"{stem}.files", "pynakes"))
+        overrides.append(("fetch-preprint", "true", "pynakes"))
+        overrides.append(("fetch-source", "true", "pynakes"))
     entries = apply_overrides(entries, overrides)
 
     content = render_library(entries)

@@ -35,7 +35,7 @@ Bibliography when `pynakes-meta` declares a `files-dir`.
 | File model | BibFile | Semantic content of one parsed .bib file: entries, declarations, comments, structured JabRef metadata, encoding, and line-ending style. |
 | Metadata block | MetadataBlock | One top-level metadata comment — `@comment{jabref-meta: ...}` or pynakes' superset `@comment{pynakes-meta: ...}` (tagged by `namespace`) — represented both structurally and as raw text. |
 | Bibliography (working unit) | Bibliography | A staged, reconciled handle over one `.bib` file — "a slice of references covering one aspect of a topic". Supports operations, preview, diff, commit, reset, reload, and external-change detection. |
-| Pinax mode | — (planned) | Optional mode of one Bibliography together with its `files-dir` of citation-key-addressed materials. Plain bibliographies have no Pinax behavior. Not implemented yet. |
+| Pinax mode | FileStore + fetch primitives | Optional mode of one Bibliography together with its `files-dir` of citation-key-addressed materials. Plain bibliographies have no Pinax behavior. The storage foundation and arXiv material download core are implemented; the CLI workflow is planned. |
 | Library (corpus) | — (planned) | A directory of pinakes/bibliographies, enabling cross-file search, dedup, and identity resolution across the full research corpus. Not implemented yet (see [Beyond 1.0](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md)). |
 | Catalogue (index) | — (planned) | A derived, rebuildable search index over the Library (e.g. SQLite FTS). Never a competing source of truth; the Bibliographies are. Not implemented yet. |
 
@@ -64,11 +64,23 @@ entry, while key repair and linting must see every occurrence.
 
 BibFile owns the set of entries and top-level BibTeX constructs: `@string`
 definitions, `@preamble` blocks, comments, and metadata. Metadata lives in two
-namespaces — `jabref_metadata(_blocks)` for `jabref-meta` and
-`pynakes_metadata(_blocks)` for the `pynakes-meta` superset — with the `metadata`
-property exposing the merged effective view operations read (pynakes overrides
-jabref). Its `encoding` and `line_ending` record the source representation for
-safe I/O.
+namespace block lists — `jabref_metadata_blocks` for `jabref-meta` and
+`pynakes_metadata_blocks` for the `pynakes-meta` superset. The flat
+`jabref_metadata`, `pynakes_metadata`, and merged `metadata` mappings are fresh
+derived views; update metadata through `metadata.set_metadata`, not by mutating
+those dicts. Its `encoding` and `line_ending` record the source representation
+for safe I/O.
+
+Metadata has two independent axes. The parsed **namespace** records where a
+block came from (`jabref-meta` or `pynakes-meta`), preserving source structure.
+The key **owner** records who understands the setting: JabRef-native keys route
+to `jabref-meta` by default for compatibility; pynakes-owned and unknown keys
+route to `pynakes-meta`, where pynakes can extend JabRef without polluting
+JabRef's namespace. The key **category** is only a domain label for inspection
+and validation messages (`library`, `save`, `normalization`, `pinax`, …).
+For values, `MetadataBlock.raw` is the exact source comment, `value` is the
+parsed payload with JabRef's trailing semicolon preserved when present, and
+`normalized_value` is the stripped display/semantic view used in reports.
 
 The BibFile is mutable by design. Operations change it in place and return a
 count or domain report; they do not return a replacement BibFile.
@@ -227,7 +239,9 @@ the CLI.
 | fields.py | Generic field changes, simple predicates, and title capitalization protection. |
 | authors.py | BibTeX name-list splitting, last-name extraction, and conservative/JabRef-style normalization. |
 | importer.py | Reference import: identifier resolution (DOI/arXiv), DOI canonicalization, arXiv normalization/Atom parsing, and entry preparation. It is the DOI and arXiv identifier authority. |
-| metadata.py | Structured top-level metadata: parses both jabref-meta and pynakes-meta, classifies, and applies safe namespace-routed updates. |
+| filestore.py | Pinax material paths, presence scanning, orphan detection, and atomic writes inside a configured `files-dir`. |
+| fetch.py | arXiv material URL construction, injectable PDF/source byte fetchers, safe source archive extraction, and FileStore installation. |
+| metadata.py | Structured top-level metadata: parses both jabref-meta and pynakes-meta, separates JabRef-native and pynakes-owned key tables, classifies, and applies safe namespace-routed updates. |
 | journals.py | Exact title/ISSN mapping plus LTWA-style journal abbreviation/expansion. |
 | normalize.py | Policy orchestration over title, author, journal, and DOI operations. |
 | convert.py | Conservative BibTeX/BibLaTeX convention conversion. |
@@ -280,13 +294,13 @@ interactive choice is possible. Modifying command responses share `status`,
 
 ## Network boundary
 
-Only DOI import and integrity workflows contact providers in the current
-implementation. The latter require an explicit `online=True`/`--online` opt-in
-and support deterministic caching. Planned Pinax fetching follows the same
-boundary: no network unless explicitly requested, and no effect on plain `.bib`
-maintenance. Network parsing lives in `importer.py` and `integrity.py`; tests mock
-or fixture this boundary so the normal suite never relies on external
-availability.
+Only DOI import, integrity workflows, and the Pinax arXiv download primitives
+contact providers in the current implementation. Integrity workflows require an
+explicit `online=True`/`--online` opt-in and support deterministic caching; the
+planned Pinax CLI follows the same boundary. Plain `.bib` maintenance never
+fetches materials. Network parsing lives in `importer.py`, `integrity.py`, and
+`fetch.py`; tests mock or fixture this boundary so the normal suite never relies
+on external availability.
 
 ## Testing and change discipline
 

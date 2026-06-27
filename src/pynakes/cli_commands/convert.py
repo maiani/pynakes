@@ -19,6 +19,7 @@ from pynakes.cli_common import (
     _emit_error,
     _entries,
     _finish_mod,
+    _resolve_input_bib,
     _safe,
 )
 from pynakes.engine import Bibliography
@@ -31,7 +32,9 @@ _DIALECTS = ("biblatex", "bibtex")
 
 
 def convert(
-    file: str = typer.Argument(..., help="Path to the input file"),
+    file: Optional[str] = typer.Argument(
+        None, help="Path to the input file (default: auto-detect single .bib in cwd)"
+    ),
     to: Optional[str] = typer.Option(
         None,
         "--to",
@@ -51,6 +54,7 @@ def convert(
     backup: bool = _BACKUP_OPTION,
 ) -> None:
     """Convert a library between BibTeX/BibLaTeX dialects and interchange formats."""
+    file = _resolve_input_bib(file, json_output)
     if from_format is not None:
         _convert_import(file, from_format, to, out, dry_run, json_output, backup)
         return

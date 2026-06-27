@@ -26,6 +26,8 @@ from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.diff import generate_diff
 from pynakes.editing import splice_into_text
+from pynakes.fetch import ArxivFetchError, download_arxiv_materials
+from pynakes.filestore import FILES_DIR_KEY, FileStore, resolve_files_dir
 from pynakes.io import load_bib, save_text
 from pynakes.lint import LintIssue
 from pynakes.lint import lint as lint_lib
@@ -100,35 +102,43 @@ class Bibliography:
         bound_path = Path(path)
         lib = load_bib(str(bound_path))
         pristine_text = _read_text(bound_path, lib.encoding)
-        return cls(
+        coll = cls(
             lib,
             bound_path,
             _pristine_text=pristine_text,
             _entry_snapshot=_snapshot_entries(lib),
             _fingerprint=_fingerprint(bound_path),
         )
+        _validate_files_dir(coll.lib, bound_path)
+        return coll
 
     @classmethod
     def from_text(cls, text: str, path: str | Path | None = None) -> "Bibliography":
         """Create a bibliography from BibTeX text."""
         lib = parse_bib(text)
-        return cls(
+        coll = cls(
             lib,
             Path(path) if path is not None else None,
             _pristine_text=text,
             _entry_snapshot=_snapshot_entries(lib),
         )
+        if coll.path is not None:
+            _validate_files_dir(coll.lib, coll.path)
+        return coll
 
     @classmethod
     def from_bibfile(cls, lib: BibFile, path: str | Path | None = None) -> "Bibliography":
         """Wrap an existing library without copying it."""
         text = write_bib(lib)
-        return cls(
+        coll = cls(
             lib,
             Path(path) if path is not None else None,
             _pristine_text=text,
             _entry_snapshot=_snapshot_entries(lib),
         )
+        if coll.path is not None:
+            _validate_files_dir(coll.lib, coll.path)
+        return coll
 
     @property
     def entries(self) -> EntryStore:
@@ -144,6 +154,13 @@ class Bibliography:
     def is_modified(self) -> bool:
         """Return whether staged output differs from the pristine text."""
         return self.preview() != self._pristine_text
+
+    @property
+    def files(self) -> FileStore | None:
+        """Return the Pinax file store when ``files-dir`` metadata is configured."""
+        if self.path is None:
+            return None
+        return FileStore.from_metadata(self.lib, self.path)
 
     def _mark(self, changed: int | bool) -> None:
         if changed:
@@ -302,7 +319,9 @@ class Bibliography:
             raise ValueError("reload requires a bound path")
         if self._dirty and not force:
             raise ValueError("cannot reload a dirty bibliography without force=True")
-        self.lib = load_bib(str(self.path))
+        lib = load_bib(str(self.path))
+        _validate_files_dir(lib, self.path)
+        self.lib = lib
         self._pristine_text = _read_text(self.path, self.lib.encoding)
         self._entry_snapshot = _snapshot_entries(self.lib)
         self._fingerprint = _fingerprint(self.path)
@@ -333,7 +352,7 @@ class Bibliography:
                 continue
             before = self._entry_snapshot.get(id(entry))
             if before is None:
-                if entry.raw_content is not None and entry.raw_content != before:
+                if entry.raw_content is not None:
                     return []
                 continue
             if entry.raw_content is None:
@@ -579,6 +598,11 @@ class Bibliography:
     def convert(self, target: str) -> convert_ops.ConvertResult:
         """Convert the bibliography in memory to ``target`` conventions."""
         report = convert_ops.convert(self.lib, target)
+        if report.entries:
+            if target == "bibtex":
+                self.set_metadata("databaseType", "bibtex")
+            elif target == "biblatex":
+                self.set_metadata("databaseType", "biblatex")
         self._mark(bool(report.entries))
         return report
 
@@ -662,6 +686,8 @@ class Bibliography:
         allow_unknown: bool = False,
     ) -> metadata_ops.MetadataUpdate:
         """Set one metadata block in memory (jabref-meta or pynakes-meta)."""
+        if self.path is not None and key.strip().lower() == FILES_DIR_KEY:
+            resolve_files_dir(value, self.path)
         update = metadata_ops.set_metadata(
             self.lib, key, value, namespace=namespace, allow_unknown=allow_unknown
         )
@@ -706,9 +732,136 @@ class Bibliography:
         self._mark(bool(report.updates))
         return report
 
+    # --- Pinax fetch/ensure operations -----------------------------------
+
+    def ensure_files_dir(self) -> bool:
+        """Bootstrap ``files-dir`` metadata if not already configured.
+
+        Returns True if metadata was set (bibliography marked dirty), False if
+        ``files-dir`` was already present.
+        """
+        for name in self.lib.metadata:
+            if name.strip().lower() == FILES_DIR_KEY:
+                return False
+        if self.path is None:
+            raise ValueError("ensure_files_dir requires a bound path")
+        default = f"{self.path.stem}.files"
+        self.set_metadata(FILES_DIR_KEY, default)
+        return True
+
+    def fetch_materials(
+        self,
+        target: str | None = None,
+        *,
+        dry_run: bool = False,
+        pdf_fetcher: Callable[[str], bytes] | None = None,
+        source_fetcher: Callable[[str], bytes] | None = None,
+    ) -> dict:
+        """Download arXiv materials for entries into the Pinax files-dir.
+
+        Args:
+            target: Optional single citation key to fetch. If None, fetch all.
+            dry_run: If True, report what would be fetched without downloading.
+            pdf_fetcher: Injectable PDF fetcher for testing.
+            source_fetcher: Injectable source fetcher for testing.
+
+        Returns:
+            A dict with ``fetched``, ``skipped``, ``failed`` lists, plus
+            ``fetch_preprint`` and ``fetch_source`` settings from metadata.
+        """
+        store = self.files
+        if store is None:
+            self.ensure_files_dir()
+            store = self.files
+            if store is None:
+                raise ValueError("could not resolve files-dir after bootstrapping")
+
+        store.ensure_root()
+
+        fetch_preprint = _metadata_bool(self.lib, "fetch-preprint", True)
+        fetch_source = _metadata_bool(self.lib, "fetch-source", True)
+
+        if target is not None:
+            entries = list(self.lib.entries.get_all(target))
+            if not entries:
+                raise ValueError(f"No entry with key {target!r} in the library")
+            if len(entries) > 1:
+                raise ValueError(f"Cannot fetch for duplicate key {target!r}")
+            entry_queue = [entries[0]]
+        else:
+            entry_queue = list(self.lib.entries.values())
+
+        fetched: list[dict] = []
+        skipped: list[dict] = []
+        failed: list[dict] = []
+
+        for entry in entry_queue:
+            if not entry.key.strip():
+                skipped.append({"key": entry.key, "reason": "empty key"})
+                continue
+
+            arxiv_id = importer_ops.entry_arxiv_id(entry)
+            if arxiv_id is None:
+                skipped.append({"key": entry.key, "reason": "no arXiv id"})
+                continue
+
+            presence = store.presence_for(entry.key)
+            all_present = True
+            if fetch_preprint and not presence.preprint_pdf:
+                all_present = False
+            if fetch_source and not presence.preprint_source:
+                all_present = False
+            if all_present:
+                skipped.append({"key": entry.key, "reason": "materials already present"})
+                continue
+
+            if dry_run:
+                skipped.append(
+                    {"key": entry.key, "reason": "would fetch (use --dry-run to preview)"}
+                )
+                continue
+
+            try:
+                result = download_arxiv_materials(
+                    store,
+                    entry.key,
+                    arxiv_id,
+                    pdf=fetch_preprint,
+                    source=fetch_source,
+                    pdf_fetcher=pdf_fetcher,
+                    source_fetcher=source_fetcher,
+                )
+                fetched.append(result.to_dict())
+            except ArxivFetchError as exc:
+                failed.append({"key": entry.key, "error": str(exc)})
+
+        return {
+            "fetch_preprint": fetch_preprint,
+            "fetch_source": fetch_source,
+            "fetched": fetched,
+            "skipped": skipped,
+            "failed": failed,
+        }
+
 
 def _snapshot_entries(lib: BibFile) -> dict[int, str | None]:
     return {id(entry): entry.raw_content for entry in lib.entries.values()}
+
+
+def _validate_files_dir(lib: BibFile, path: Path) -> None:
+    FileStore.from_metadata(lib, path)
+
+
+def _metadata_bool(lib: BibFile, name: str, default: bool) -> bool:
+    for key, value in lib.metadata.items():
+        if key.strip().lower() == name.strip().lower():
+            stripped = value.rstrip(";").strip().lower()
+            if stripped in {"1", "true", "yes", "on", "enabled"}:
+                return True
+            if stripped in {"0", "false", "no", "off", "disabled"}:
+                return False
+            return default
+    return default
 
 
 def _read_text(path: Path, encoding: str) -> str:

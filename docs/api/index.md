@@ -45,12 +45,15 @@ print(len(lib.entries))
 duplicate citation keys while exposing dict-like access to the first matching
 entry.
 
-`BibFile.jabref_metadata` / `.jabref_metadata_blocks` hold the `jabref-meta`
-namespace; `BibFile.pynakes_metadata` / `.pynakes_metadata_blocks` hold the
-`pynakes-meta` superset. `BibFile.metadata` is the effective merged view
-(pynakes overrides jabref) that operations read, and `BibFile.metadata_blocks`
-returns both namespaces in source order. Each block preserves its raw comment
-text, namespace, known/unknown classification, and category.
+`BibFile.jabref_metadata_blocks` holds the `jabref-meta` namespace;
+`BibFile.pynakes_metadata_blocks` holds the `pynakes-meta` superset.
+`BibFile.jabref_metadata`, `BibFile.pynakes_metadata`, and `BibFile.metadata`
+are fresh derived mappings for read access; update metadata through
+`pynakes.metadata.set_metadata`, not by mutating those dicts. `BibFile.metadata`
+is the effective merged view (pynakes overrides jabref), and
+`BibFile.metadata_blocks` returns both namespaces in source order. Each block
+preserves its raw comment text, namespace, known/unknown classification, and
+category.
 
 The key entry points are `model.BibEntry`, `model.BibFile`, `model.EntryStore`,
 and `engine.Bibliography`; see their generated entries in the
@@ -189,7 +192,9 @@ Known metadata keys include JabRef database/save/group/file/selector/key-pattern
 blocks such as `databaseType`, `saveOrderConfig`, `saveActions`, `groupstree`,
 `fileDirectory*`, `selector_*`, `VersionDBStructure`, `keypatterndefault`, and
 `keypattern_<entrytype>`. Unknown blocks are parsed and preserved; setting an
-unknown key requires `allow_unknown=True`.
+unknown key requires `allow_unknown=True`. `MetadataBlock.value` is the parsed
+payload as stored in the comment, while `normalized_value` strips JabRef's
+trailing semicolon for display and semantic comparisons.
 
 ## Fields
 

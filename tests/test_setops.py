@@ -267,3 +267,15 @@ def test_cli_split_duplicate_to_target_errors(tmp_path: Path) -> None:
     result = runner.invoke(app, ["split", a, "--to", f"{dup}=*", "--to", f"{dup}=used", "--json"])
     assert result.exit_code == 1, result.output
     assert json.loads(result.output)["status"] == "error"
+
+
+def test_merge_dedupe_detects_conflict_on_equivalent_but_not_identical_entries() -> None:
+    a = parse_bib("@article{Smith2020,\n  title = {Alpha}\n}\n")
+    b = parse_bib("@article{Smith2020,\n  title = {Alpha}\n}\n")
+    c = parse_bib("@article{Smith2020,\n  title = Alpha\n}\n")
+    result = merge_libraries([("a.bib", a), ("b.bib", b), ("c.bib", c)], dedupe=True)
+    assert len(result.lib.entries) == 1
+    assert len(result.conflicts) == 1, (
+        "entries with same key, same fields, but different raw formatting "
+        "should raise a formatting conflict rather than silently dropping one"
+    )

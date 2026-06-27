@@ -13,6 +13,7 @@ from pynakes.cli_common import (
     _BACKUP_OPTION,
     _emit_error,
     _finish_mod,
+    _resolve_input_bib,
     _safe,
 )
 from pynakes.engine import Bibliography
@@ -32,7 +33,9 @@ def _optional_bool(value: str) -> bool | None:
 
 
 def normalize(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
+    file: Optional[str] = typer.Argument(
+        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
+    ),
     title_protection: str = typer.Option(
         "metadata",
         "--title-protection",
@@ -89,6 +92,7 @@ def normalize(
     backup: bool = _BACKUP_OPTION,
 ) -> None:
     """Run the standard bibliography normalization routine."""
+    file = _resolve_input_bib(file, json_output)
     try:
         options = normalize_ops.NormalizeOptions(
             protect_titles=_optional_bool(title_protection),

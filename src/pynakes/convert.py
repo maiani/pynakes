@@ -255,13 +255,12 @@ def _revert_thesis(entry: BibEntry, result: ConvertResult) -> bool:
 
 
 def _split_date(entry: BibEntry, result: ConvertResult) -> bool:
-    """Split a BibLaTeX ``date`` into ``year``/``month``, consuming the ``date`` field.
+    """Split a BibLaTeX ``date`` into ``year``/``month``/``day``, consuming the ``date`` field.
 
-    Fills in ``year`` and ``month`` only where they are absent (never clobbering
-    existing values), then drops the now-redundant ``date`` (BibTeX has no
-    ``date`` field). A ``date`` that is not a plain ISO year/month/day (e.g. a
-    range or literal) is left untouched with a warning; a day component is
-    dropped (BibTeX has no day field).
+    Fills in ``year`` and ``month``/``day`` only where they are absent (never
+    clobbering existing values), then drops the now-redundant ``date`` (BibTeX
+    has no ``date`` field). A ``date`` that is not a plain ISO year/month/day
+    (e.g. a range or literal) is left untouched with a warning.
     """
     if "date" not in entry.fields:
         return False
@@ -287,14 +286,8 @@ def _split_date(entry: BibEntry, result: ConvertResult) -> bool:
         remove_entry_field(entry, "date")
     if mm and "month" not in entry.fields:
         set_entry_field(entry, "month", _MONTH_ABBR.get(mm, str(int(mm))))
-    if day:
-        result.warnings.append(
-            {
-                "type": "date_day_dropped",
-                "entry_key": entry.key,
-                "message": f"Dropped day from date (BibTeX has no day field): {year}-{mm}-{day}",
-            }
-        )
+    if day and "day" not in entry.fields:
+        set_entry_field(entry, "day", str(int(day)))
     result.dates_changed += 1
     return True
 

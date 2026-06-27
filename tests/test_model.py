@@ -3,7 +3,7 @@
 import json
 from dataclasses import asdict
 
-from pynakes.model import BibEntry, BibFile, EntryStore
+from pynakes.model import BibEntry, BibFile, EntryStore, MetadataBlock
 
 
 class TestBibEntry:
@@ -17,7 +17,6 @@ class TestBibEntry:
         assert entry.fields == {}
         assert entry.raw_content is None
         assert entry.raw_comments == []
-        assert entry.jabref_metadata == {}
         assert entry.modified is False
 
     def test_entry_with_fields(self) -> None:
@@ -41,12 +40,10 @@ class TestBibEntry:
             fields={"author": "John Smith"},
             raw_content="@article{Smith2020, author={John Smith}}",
             raw_comments=["% This is a comment"],
-            jabref_metadata={"keywords": "AI, ML"},
             modified=True,
         )
         assert entry.raw_content == "@article{Smith2020, author={John Smith}}"
         assert entry.raw_comments == ["% This is a comment"]
-        assert entry.jabref_metadata == {"keywords": "AI, ML"}
         assert entry.modified is True
 
     def test_entry_modification(self) -> None:
@@ -238,6 +235,40 @@ class TestBibLibrary:
         assert len(lib.preamble) == 1
         assert len(lib.raw_comments) == 1
         assert lib.encoding == "utf-8"
+
+    def test_library_metadata_maps_are_derived_from_blocks(self) -> None:
+        """Test flat metadata maps are fresh views over metadata blocks."""
+        block = MetadataBlock(
+            key="databaseType",
+            value="biblatex;",
+            raw="@comment{jabref-meta: databaseType:biblatex;}",
+            comment_index=0,
+            namespace="jabref",
+        )
+        lib = BibFile(entries={}, jabref_metadata_blocks=[block])
+
+        assert lib.jabref_metadata == {"databaseType": "biblatex;"}
+        block.value = "bibtex;"
+        assert lib.jabref_metadata == {"databaseType": "bibtex;"}
+
+        view = lib.jabref_metadata
+        view["databaseType"] = "changed;"
+        assert lib.jabref_metadata == {"databaseType": "bibtex;"}
+
+    def test_library_metadata_constructor_dict_is_compatibility_input(self) -> None:
+        """Test legacy flat metadata constructor input is converted to blocks."""
+        lib = BibFile(
+            entries={},
+            jabref_metadata={"databaseType": "biblatex;"},
+            pynakes_metadata={"files-dir": "refs.files"},
+        )
+
+        assert lib.jabref_metadata == {"databaseType": "biblatex;"}
+        assert lib.pynakes_metadata == {"files-dir": "refs.files"}
+        assert [(block.key, block.namespace) for block in lib.metadata_blocks] == [
+            ("databaseType", "jabref"),
+            ("files-dir", "pynakes"),
+        ]
 
 
 class TestEntryCollection:

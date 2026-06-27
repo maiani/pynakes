@@ -860,9 +860,22 @@ def _protected_characters(word: str) -> list[bool]:
     return protected
 
 
-def _title_first(word: str) -> str:
-    chars = list(word)
+def _title_word_core(word: str, force: bool = False) -> str:
+    """Core title-case logic shared by _title_first and _title_word.
+
+    If ``force`` is True (like _title_first), always apply title-case rules.
+    If ``force`` is False (like _title_word), first check if the word is a
+    small word and lowercase it entirely if so.
+    """
     protected = _protected_characters(word)
+    chars = list(word)
+
+    if not force and word.replace(":", "").lower() in _TITLE_SMALL_WORDS:
+        for index, char in enumerate(chars):
+            if not protected[index]:
+                chars[index] = char.lower()
+        return "".join(chars)
+
     for index, char in enumerate(chars):
         if protected[index]:
             continue
@@ -879,31 +892,16 @@ def _title_first(word: str) -> str:
             else char.lower()
         )
     return "".join(chars)
+
+
+def _title_first(word: str) -> str:
+    """Capitalize the first letter of the first non-brace-protected word."""
+    return _title_word_core(word, force=True)
 
 
 def _title_word(word: str) -> str:
-    protected = _protected_characters(word)
-    small = word.replace(":", "").lower() in _TITLE_SMALL_WORDS
-    chars = list(word)
-    for index, char in enumerate(chars):
-        if protected[index]:
-            continue
-        if small:
-            chars[index] = char.lower()
-            continue
-        next_dash = next(
-            (i for i in range(index, len(chars)) if chars[i] in _TITLE_DASHES), len(chars)
-        )
-        suffix_is_not_conjunction = (
-            "".join(chars[index:next_dash]).lower() not in _TITLE_CONJUNCTIONS
-        )
-        chars[index] = (
-            char.upper()
-            if index == 0
-            or (index > 0 and chars[index - 1] in _TITLE_DASHES and suffix_is_not_conjunction)
-            else char.lower()
-        )
-    return "".join(chars)
+    """Apply title-case rules with small-word handling."""
+    return _title_word_core(word, force=False)
 
 
 def title_case(value: str) -> str:

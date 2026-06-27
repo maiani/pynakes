@@ -1,10 +1,11 @@
 # Pinax — a bibliography and its materials
 
-> **Status: design specification.** This is the document we work and polish
-> before writing code. It specifies the optional *Pinax* layer (a bibliography
-> plus its materials) without replacing the plain `.bib` maintenance engine, and
-> scopes what is deliberately deferred. The first slice being built from it is
-> [fetch](#fetch-the-first-slice). For the engine it builds on, see
+> **Status: design specification with the offline FileStore foundation
+> implemented.** This document specifies the optional *Pinax* layer (a
+> bibliography plus its materials) without replacing the plain `.bib`
+> maintenance engine, and scopes what is deliberately deferred. The first
+> networked slice being built from it is [fetch](#fetch-the-first-slice). For the
+> engine it builds on, see
 > [Architecture](architecture.md); for philosophy, [vision](../vision.md); for
 > sequencing, [DEVPLAN](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
 
@@ -484,7 +485,7 @@ checklist.
 2. **arXiv download core.** Add `fetch.py`: injectable `fetch_arxiv_pdf` /
    `fetch_arxiv_source`, the URL builders, and safe tar extraction; add the
    `FileStore` atomic writers for the preprint PDF and the extracted source.
-   Unit-tested with fixtures, no real network.
+   Unit-tested with fixtures, no real network. *(Implemented.)*
 3. **The top-level `fetch` command.** `pynakes fetch <bib> [target] [--online]
    [--dry-run] [--json]`, with what-to-download governed by the `fetch-preprint` /
    `fetch-source` / `fetch-published` metadata keys; `Bibliography.ensure_files_dir`

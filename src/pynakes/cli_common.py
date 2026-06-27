@@ -14,6 +14,32 @@ from pynakes.engine import Bibliography, ExternalModificationError
 # --- shared helpers --------------------------------------------------------
 
 
+def _resolve_input_bib(file: str | None, json_output: bool, *, label: str = ".bib") -> str:
+    """Return the input ``file`` path, auto-detecting when ``None``.
+
+    When ``file`` is ``None``, scans the current directory for files matching
+    ``*{label}``. If exactly one is found, returns it. If none or multiple
+    are found, emits an error (never returns).
+    """
+    if file is not None:
+        return file
+    candidates = sorted(Path(".").glob(f"*{label}"))
+    if not candidates:
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            f"No *{label} file found in current directory; specify one as an argument",
+        )
+    if len(candidates) > 1:
+        names = "  ".join(c.name for c in candidates)
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            f"Multiple *{label} files found; specify one as an argument:\n{names}",
+        )
+    return str(candidates[0])
+
+
 def _emit(
     json_output: bool,
     result: dict,

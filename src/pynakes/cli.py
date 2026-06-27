@@ -13,6 +13,7 @@ from pynakes.cli_commands import (
     capabilities,
     convert,
     dedupe,
+    fetch,
     fields,
     files,
     groups,
@@ -63,6 +64,7 @@ def main(
 
 init.register(app)
 inspect.register(app)
+fetch.register(app)
 metadata.register(metadata_app)
 lint.register(app)
 files.register(files_app)

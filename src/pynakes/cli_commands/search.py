@@ -7,15 +7,17 @@ import typer
 
 from pynakes import fields as fields_ops
 from pynakes import search as search_ops
-from pynakes.cli_common import _entries, _safe
+from pynakes.cli_common import _entries, _resolve_input_bib, _safe
 from pynakes.io import load_bib
 
 
 def search(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
     query: str = typer.Argument(
         ...,
         help='Search query: words/phrases, optionally scoped as field:term or field:"phrase"',
+    ),
+    file: Optional[str] = typer.Argument(
+        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
     ),
     field: Optional[list[str]] = typer.Option(
         None,
@@ -28,6 +30,7 @@ def search(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Search entries by free text, phrases, or field-scoped terms."""
+    file = _resolve_input_bib(file, json_output)
     lib = load_bib(file)
     where_filter = fields_ops.parse_query(where) if where is not None else None
     results = search_ops.search_entries(
