@@ -1,0 +1,430 @@
+"""Operation-method mixin for :class:`~pynakes.engine.Bibliography`.
+
+All methods here delegate to the relevant operation modules and call
+``self._mark()`` / ``self._stage_pinax_renames()`` to record staging state.
+They are split out to keep ``engine.py`` under the 600-line project limit.
+Do not import this module directly; use ``pynakes.engine``.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from pynakes import convert as convert_ops
+from pynakes import dedupe as dedupe_ops
+from pynakes import fields as field_ops
+from pynakes import files as file_ops
+from pynakes import groups as group_ops
+from pynakes import importer as importer_ops
+from pynakes import integrity as integrity_ops
+from pynakes import journals as journal_ops
+from pynakes import keys as key_ops
+from pynakes import metadata as metadata_ops
+from pynakes import normalize as normalize_ops
+from pynakes._engine_helpers import build_fetch_queue, metadata_bool, run_fetch_loop
+from pynakes.filestore import FILES_DIR_KEY, resolve_files_dir
+from pynakes.lint import LintIssue
+from pynakes.lint import lint as lint_lib
+from pynakes.model import BibEntry
+
+if TYPE_CHECKING:
+    from pynakes.engine import QueryFilter
+
+
+class BibliographyOperations:
+    """Mixin providing all operation methods for :class:`~pynakes.engine.Bibliography`.
+
+    Consumers must not instantiate this class directly.
+    """
+
+    # --- read-only views -------------------------------------------------
+
+    def lint(self) -> list[LintIssue]:
+        """Run linting against the current in-memory library."""
+        return lint_lib(self.lib)
+
+    def duplicate_keys(self) -> dict[str, int]:
+        """Return duplicate citation-key counts."""
+        return self.lib.entries.duplicate_keys()
+
+    def list_groups(self) -> list[str]:
+        """Return all group names in first-seen order."""
+        return group_ops.list_groups(self.lib)
+
+    def list_entries_in_group(self, group: str) -> list[str]:
+        """Return entry keys that belong to ``group``."""
+        return group_ops.list_entries_in_group(self.lib, group)
+
+    def files_check(self, roots: list[str | Path] | None = None) -> file_ops.FileCheckReport:
+        """Validate JabRef linked files for this bibliography."""
+        if self.path is None:
+            raise ValueError("files_check requires a bound path")
+        return file_ops.check_linked_files(self.lib, self.path, roots)
+
+    def journals_check(
+        self,
+        journal_table: str | None = None,
+        ltwa_table: str | None = None,
+    ) -> list[dict[str, str]]:
+        """Classify distinct journal titles without modifying the bibliography."""
+        sources = journal_ops.load_sources(journal_table, ltwa_table)
+        seen: dict[str, str] = {}
+        for entry in self.lib.entries.values():
+            for journal_field in journal_ops.JOURNAL_FIELDS:
+                title = entry.fields.get(journal_field)
+                if title and title not in seen:
+                    seen[title] = journal_ops.classify_journal(title, entry, sources)
+        return [{"journal": title, "status": status} for title, status in seen.items()]
+
+    def dedupe_check(self) -> list[dedupe_ops.DuplicateCluster]:
+        """Return duplicate-work clusters without modifying the bibliography."""
+        return dedupe_ops.find_duplicate_clusters(self.lib)
+
+    def verify(
+        self,
+        *,
+        online: bool = False,
+        cache_dir: str | Path | None = None,
+    ) -> integrity_ops.VerifyReport:
+        """Verify entries against authoritative metadata without modifying."""
+        return integrity_ops.verify_library(self.lib, online=online, cache_dir=cache_dir)
+
+    def published_check(
+        self,
+        *,
+        online: bool = False,
+        cache_dir: str | Path | None = None,
+    ) -> integrity_ops.PublishedReport:
+        """Check preprint entries for published metadata without modifying."""
+        return integrity_ops.check_published(self.lib, online=online, cache_dir=cache_dir)
+
+    # --- group operations -----------------------------------------------
+
+    def add_to_group(self, key: str, group: str) -> int:
+        """Add every entry with ``key`` to ``group``."""
+        count = group_ops.add_to_group(self.lib, key, group)
+        self._mark(count)
+        return count
+
+    def remove_from_group(self, key: str, group: str) -> int:
+        """Remove every entry with ``key`` from ``group``."""
+        count = group_ops.remove_from_group(self.lib, key, group)
+        self._mark(count)
+        return count
+
+    # --- key operations --------------------------------------------------
+
+    def generate_keys(self) -> list[tuple[str, str]]:
+        """Regenerate all citation keys from entry metadata."""
+        renames = key_ops.regenerate_keys(self.lib)
+        self._stage_pinax_renames(renames)
+        self._mark(bool(renames))
+        return renames
+
+    def generate_key(self, key: str) -> tuple[str, str] | None:
+        """Regenerate one citation key from its entry metadata."""
+        rename = key_ops.regenerate_key(self.lib, key)
+        self._stage_pinax_renames([rename] if rename is not None else [])
+        self._mark(rename is not None)
+        return rename
+
+    def repair_keys(self) -> list[tuple[str, str]]:
+        """Repair duplicate citation keys."""
+        renames = key_ops.repair_duplicate_keys(self.lib)
+        self._stage_pinax_renames(renames)
+        self._mark(bool(renames))
+        return renames
+
+    def rename_key(self, old: str, new: str) -> int:
+        """Rename one unique citation key."""
+        count = key_ops.rename_key(self.lib, old, new)
+        self._stage_pinax_renames([(old, new)] if count else [])
+        self._mark(count)
+        return count
+
+    # --- field operations ------------------------------------------------
+
+    def _where(self, where: str | QueryFilter) -> QueryFilter:
+        if isinstance(where, str):
+            return field_ops.parse_query(where)
+        return where
+
+    def rename_field(self, old: str, new: str, where: str | QueryFilter = None) -> int:
+        """Rename a field on matching entries."""
+        count = field_ops.rename_field(self.lib, old, new, self._where(where))
+        self._mark(count)
+        return count
+
+    def move_field(self, old: str, new: str, where: str | QueryFilter = None) -> int:
+        """Move a field on matching entries."""
+        count = field_ops.move_field(self.lib, old, new, self._where(where))
+        self._mark(count)
+        return count
+
+    def append_field(
+        self,
+        field: str,
+        value: str,
+        where: str | QueryFilter = None,
+    ) -> int:
+        """Append a delimited field value on matching entries."""
+        count = field_ops.append_field(self.lib, field, value, self._where(where))
+        self._mark(count)
+        return count
+
+    def clear_field(self, field: str, where: str | QueryFilter = None) -> int:
+        """Remove a field from matching entries."""
+        count = field_ops.clear_field(self.lib, field, self._where(where))
+        self._mark(count)
+        return count
+
+    def protect_title(
+        self,
+        field: str = "title",
+        where: str | QueryFilter = None,
+        terms: list[str] | None = None,
+    ) -> int:
+        """Brace-protect capitalization-sensitive title tokens."""
+        count = field_ops.protect_title_capitalization(
+            self.lib,
+            field=field,
+            where=self._where(where),
+            terms=terms,
+        )
+        self._mark(count)
+        return count
+
+    # --- format/metadata operations -------------------------------------
+
+    def normalize(
+        self,
+        options: normalize_ops.NormalizeOptions | None = None,
+    ) -> normalize_ops.NormalizeResult:
+        """Run the standard normalization routine in memory."""
+        opts = options or normalize_ops.NormalizeOptions()
+        report = normalize_ops.normalize_library(self.lib, opts)
+        self._consolidate_metadata = normalize_ops.resolve_format_metadata(
+            self.lib, opts.format_metadata
+        )
+        self._mark(
+            bool(
+                report.authors
+                or report.journals
+                or report.dois
+                or report.months
+                or sum(report.title_fields.values())
+                or report.entry_types
+                or report.field_names
+                or self._consolidate_metadata
+            )
+        )
+        return report
+
+    def convert(self, target: str) -> convert_ops.ConvertResult:
+        """Convert the bibliography in memory to ``target`` conventions."""
+        report = convert_ops.convert(self.lib, target)
+        if report.entries:
+            if target == "bibtex":
+                self.set_metadata("databaseType", "bibtex")
+            elif target == "biblatex":
+                self.set_metadata("databaseType", "biblatex")
+        self._mark(bool(report.entries))
+        return report
+
+    def abbreviate_journals(
+        self,
+        journal_table: str | None = None,
+        ltwa_table: str | None = None,
+    ) -> journal_ops.JournalResult:
+        """Abbreviate journal titles in memory."""
+        sources = journal_ops.load_sources(journal_table, ltwa_table)
+        report = journal_ops.normalize_journals(self.lib, "abbreviated", sources)
+        self._mark(report.changed)
+        return report
+
+    def expand_journals(
+        self,
+        journal_table: str | None = None,
+        ltwa_table: str | None = None,
+    ) -> journal_ops.JournalResult:
+        """Expand journal titles in memory."""
+        sources = journal_ops.load_sources(journal_table, ltwa_table)
+        report = journal_ops.normalize_journals(self.lib, "full", sources)
+        self._mark(report.changed)
+        return report
+
+    def import_doi(
+        self,
+        doi: str,
+        *,
+        key: str | None = None,
+        key_source: str = "generated",
+        allow_duplicate_doi: bool = False,
+    ) -> BibEntry:
+        """Import one DOI entry into memory."""
+        entry = importer_ops.prepare_imported_entry(
+            self.lib,
+            doi,
+            key=key,
+            key_source=key_source,
+            allow_duplicate_doi=allow_duplicate_doi,
+        )
+        self.lib.entries.add(entry)
+        self._appended_entries.append(entry)
+        self._mark(True)
+        return entry
+
+    def import_reference(
+        self,
+        identifier: str,
+        *,
+        key: str | None = None,
+        key_source: str = "generated",
+        allow_duplicate: bool = False,
+    ) -> tuple[str, BibEntry]:
+        """Import one reference (DOI or arXiv) into memory.
+
+        The identifier type is auto-detected. arXiv entries use ``@online`` for
+        BibLaTeX libraries and ``@misc`` for BibTeX ones, per the library's
+        ``databaseType`` metadata (defaulting to BibTeX). Returns
+        ``(kind, entry)``.
+        """
+        kind, entry = importer_ops.prepare_imported_reference(
+            self.lib,
+            identifier,
+            dialect=metadata_ops.library_database_type(self.lib),
+            key=key,
+            key_source=key_source,
+            allow_duplicate=allow_duplicate,
+        )
+        self.lib.entries.add(entry)
+        self._appended_entries.append(entry)
+        self._mark(True)
+        return kind, entry
+
+    def set_metadata(
+        self,
+        key: str,
+        value: str,
+        *,
+        namespace: str | None = None,
+        allow_unknown: bool = False,
+    ) -> metadata_ops.MetadataUpdate:
+        """Set one metadata block in memory (jabref-meta or pynakes-meta)."""
+        if self.path is not None and key.strip().lower() == FILES_DIR_KEY:
+            resolve_files_dir(value, self.path)
+        update = metadata_ops.set_metadata(
+            self.lib, key, value, namespace=namespace, allow_unknown=allow_unknown
+        )
+        self._text_replacements.append((update.old_raw, update.new_raw))
+        self._mark(True)
+        return update
+
+    def dedupe_merge(self) -> dedupe_ops.DedupeMergeReport:
+        """Merge duplicate-work clusters in memory."""
+        report = dedupe_ops.merge_duplicates(self.lib)
+        for entry in report.removed_entries:
+            if entry.raw_content:
+                self._text_replacements.append((entry.raw_content, ""))
+        self._removed_entries.extend(report.removed_entries)
+        self._mark(report.removed_entry_count or report.field_changes)
+        return report
+
+    def enrich(
+        self,
+        *,
+        online: bool = False,
+        cache_dir: str | Path | None = None,
+    ) -> integrity_ops.EnrichReport:
+        """Conservatively fill missing metadata in memory."""
+        report = integrity_ops.enrich_library(self.lib, online=online, cache_dir=cache_dir)
+        self._mark(report.changed_fields)
+        return report
+
+    def apply_published(
+        self,
+        *,
+        online: bool = False,
+        cache_dir: str | Path | None = None,
+    ) -> integrity_ops.PublishedReport:
+        """Apply conservative published-version metadata updates in memory."""
+        report = integrity_ops.check_published(
+            self.lib,
+            online=online,
+            apply=True,
+            cache_dir=cache_dir,
+        )
+        self._mark(bool(report.updates))
+        return report
+
+    # --- Pinax fetch/ensure operations -----------------------------------
+
+    def ensure_files_dir(self) -> bool:
+        """Bootstrap ``files-dir`` metadata if not already configured.
+
+        Returns True if metadata was set (bibliography marked dirty), False if
+        ``files-dir`` was already present.
+        """
+        for name in self.lib.metadata:
+            if name.strip().lower() == FILES_DIR_KEY:
+                return False
+        if self.path is None:
+            raise ValueError("ensure_files_dir requires a bound path")
+        default = f"{self.path.stem}.files"
+        self.set_metadata(FILES_DIR_KEY, default)
+        return True
+
+    def fetch_materials(
+        self,
+        target: str | None = None,
+        *,
+        dry_run: bool = False,
+        pdf_fetcher: Callable[[str], bytes] | None = None,
+        source_fetcher: Callable[[str], bytes] | None = None,
+    ) -> dict:
+        """Download arXiv materials for entries into the Pinax files-dir.
+
+        Args:
+            target: Optional single citation key to fetch. If None, fetch all.
+            dry_run: If True, report what would be fetched without downloading.
+            pdf_fetcher: Injectable PDF fetcher for testing.
+            source_fetcher: Injectable source fetcher for testing.
+
+        Returns:
+            A dict with ``fetched``, ``skipped``, ``failed`` lists, plus
+            ``fetch_preprint`` and ``fetch_source`` settings from metadata.
+        """
+        store = self.files
+        if store is None:
+            self.ensure_files_dir()
+            store = self.files
+            if store is None:
+                raise ValueError("could not resolve files-dir after bootstrapping")
+
+        store.ensure_root()
+
+        fetch_preprint = metadata_bool(self.lib, "fetch-preprint", True)
+        fetch_source = metadata_bool(self.lib, "fetch-source", True)
+        fetch_published = metadata_bool(self.lib, "fetch-published", False)
+
+        entry_queue = build_fetch_queue(self.lib, target)
+        fetched, skipped, failed = run_fetch_loop(
+            entry_queue,
+            store,
+            fetch_preprint,
+            fetch_source,
+            dry_run,
+            pdf_fetcher,
+            source_fetcher,
+        )
+
+        return {
+            "fetch_preprint": fetch_preprint,
+            "fetch_source": fetch_source,
+            "fetch_published": fetch_published,
+            "fetched": fetched,
+            "skipped": skipped,
+            "failed": failed,
+        }

@@ -34,7 +34,15 @@ baseline (BibTeX 0.99d, BibLaTeX 3.20, Biber 2.20).
   `capabilities`, multi-file `--strict` gate checks, `.pre-commit-hooks.yaml`.
 - **Parser conformance**: versioned corpus pinned to TeX Live 2025; differential
   tests against BibTeX 0.99d and Biber 2.20; property-based tests (Hypothesis).
-- **Quality**: ~870 tests, coverage ≥90%, `ruff` clean, docs site builds.
+- **Quality**: ~951 tests, coverage ≥90%, `ruff` clean, docs site builds.
+- **Refactoring (post-v0.4 quality pass)**: ``engine.py`` split into ``_engine_helpers.py`` /
+  ``_engine_ops.py`` + mixin (~400 lines, within the 500-line convention); ``formatters.py`` split
+  into a ``formatters/`` package; ``_text_utils.py`` consolidates the 7+ brace/quote scanner copies
+  into one; interchange codec deduplication via ``assign_key`` / ``build_bibfile`` in
+  ``_shared.py``; CLI verb-string boilerplate consolidated via ``_verb`` helper; ``BibFile.derive()``
+  replaces the duplicated ``_with_entries`` / ``subset_library`` pattern; ``_metadata_value`` /
+  ``_metadata_list`` / ``_metadata_bool`` moved from ``lint.py`` / ``normalize.py`` into
+  ``metadata.py``; many ``ISSUES.md`` bugs, type-safety issues, and invariant violations addressed.
 
 ## 0.5 — remaining interchange formats and scope decision
 

@@ -49,7 +49,7 @@ def test_fetch_arxiv_pdf_reads_bytes_with_user_agent(monkeypatch: pytest.MonkeyP
         assert timeout == 30.0
         return Response()
 
-    monkeypatch.setattr("pynakes.fetch.urlopen", fake_urlopen)
+    monkeypatch.setattr("pynakes.importer.urlopen", fake_urlopen)
 
     data = fetch_arxiv_pdf("2101.00001v2")
 
@@ -62,9 +62,9 @@ def test_fetch_arxiv_pdf_wraps_url_errors(monkeypatch: pytest.MonkeyPatch) -> No
     def fake_urlopen(request: Request, timeout: float) -> None:
         raise URLError("offline")
 
-    monkeypatch.setattr("pynakes.fetch.urlopen", fake_urlopen)
+    monkeypatch.setattr("pynakes.importer.urlopen", fake_urlopen)
 
-    with pytest.raises(ArxivFetchError, match="Could not fetch arXiv PDF"):
+    with pytest.raises(ArxivFetchError, match="2101.00001"):
         fetch_arxiv_pdf("2101.00001")
 
 

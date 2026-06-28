@@ -9,8 +9,8 @@ from difflib import SequenceMatcher
 
 from pynakes.authors import last_name, split_name_list
 from pynakes.editing import set_entry_field, set_entry_type
-from pynakes.importer import canonical_doi
-from pynakes.model import BibEntry, BibFile
+from pynakes.importer import canonical_doi, entry_arxiv_id, entry_year, normalize_arxiv
+from pynakes.model import BibEntry, BibFile, _normalize_text
 
 
 @dataclass(frozen=True)
@@ -129,9 +129,6 @@ class DedupeConflictError(Exception):
 
 
 _ID_PRIORITY = {"doi": 0, "arxiv": 1, "pmid": 2, "pmcid": 3, "isbn": 4}
-_ARXIV_URL_RE = re.compile(r"arxiv\.org/(?:abs|pdf)/([^?#\s]+)", re.IGNORECASE)
-_ARXIV_VERSION_RE = re.compile(r"v\d+$", re.IGNORECASE)
-_YEAR_RE = re.compile(r"\d{4}")
 _DELIMITED_FIELDS = {"groups", "keywords", "keyword", "tags"}
 
 
@@ -323,7 +320,7 @@ def _resolve_field_value(field: str, left: str, right: str) -> str | None:
         return _resolve_arxiv(left, right)
     if field in {"pmid", "pmcid", "isbn"}:
         return left if _normalize_identifier(left) == _normalize_identifier(right) else None
-    if _normalized_value(left) == _normalized_value(right):
+    if _normalize_text(left) == _normalize_text(right):
         return left
     if field in _DELIMITED_FIELDS:
         return _merge_delimited(left, right, ",")
@@ -340,18 +337,18 @@ def _resolve_doi(left: str, right: str) -> str | None:
         left_canonical = canonical_doi(left)
         right_canonical = canonical_doi(right)
     except ValueError:
-        return left if _normalized_value(left) == _normalized_value(right) else None
+        return left if _normalize_text(left) == _normalize_text(right) else None
     if left_canonical != right_canonical:
         return None
     return left
 
 
 def _resolve_arxiv(left: str, right: str) -> str | None:
-    left_id = _normalize_arxiv(left)
-    right_id = _normalize_arxiv(right)
+    left_id = normalize_arxiv(left)
+    right_id = normalize_arxiv(right)
     if left_id and right_id and left_id == right_id:
         return left
-    return left if _normalized_value(left) == _normalized_value(right) else None
+    return left if _normalize_text(left) == _normalize_text(right) else None
 
 
 def _merge_delimited(left: str, right: str, sep: str) -> str:
@@ -360,7 +357,7 @@ def _merge_delimited(left: str, right: str, sep: str) -> str:
     for raw in (left, right):
         for item in raw.split(sep):
             clean = item.strip()
-            key = _normalized_value(clean)
+            key = _normalize_text(clean)
             if clean and key not in seen:
                 items.append(clean)
                 seen.add(key)
@@ -368,8 +365,8 @@ def _merge_delimited(left: str, right: str, sep: str) -> str:
 
 
 def _richer_containing_value(left: str, right: str) -> str | None:
-    left_norm = _normalized_value(left)
-    right_norm = _normalized_value(right)
+    left_norm = _normalize_text(left)
+    right_norm = _normalize_text(right)
     if not left_norm or not right_norm:
         return left or right
     if left_norm in right_norm:
@@ -388,7 +385,7 @@ def _stable_identities(entry: BibEntry) -> list[WorkIdentity]:
         except ValueError:
             pass
 
-    arxiv = _entry_arxiv_id(entry)
+    arxiv = entry_arxiv_id(entry)
     if arxiv:
         identities.append(WorkIdentity("arxiv", arxiv))
 
@@ -398,38 +395,6 @@ def _stable_identities(entry: BibEntry) -> list[WorkIdentity]:
             identities.append(WorkIdentity(field_name, _normalize_identifier(value)))
 
     return sorted(identities, key=lambda identity: _ID_PRIORITY[identity.kind])
-
-
-def _entry_arxiv_id(entry: BibEntry) -> str | None:
-    for field_name in ("arxiv", "eprint"):
-        value = entry.fields.get(field_name)
-        if not value:
-            continue
-        archive = entry.fields.get("archiveprefix") or entry.fields.get("eprinttype") or ""
-        if field_name == "arxiv" or archive.lower() == "arxiv":
-            normalized = _normalize_arxiv(value)
-            if normalized:
-                return normalized
-    for field_name in ("url", "howpublished", "note"):
-        value = entry.fields.get(field_name, "")
-        match = _ARXIV_URL_RE.search(value)
-        if match:
-            normalized = _normalize_arxiv(match.group(1))
-            if normalized:
-                return normalized
-    return None
-
-
-def _normalize_arxiv(value: str) -> str | None:
-    cleaned = value.strip().strip("{}<>")
-    cleaned = re.sub(r"^arxiv:\s*", "", cleaned, flags=re.IGNORECASE)
-    match = _ARXIV_URL_RE.search(cleaned)
-    if match:
-        cleaned = match.group(1)
-    cleaned = cleaned.removesuffix(".pdf")
-    cleaned = _ARXIV_VERSION_RE.sub("", cleaned)
-    cleaned = cleaned.strip("/")
-    return cleaned.lower() or None
 
 
 def _normalize_identifier(value: str) -> str:
@@ -448,7 +413,7 @@ def _stable_ids_compatible(left: list[WorkIdentity], right: list[WorkIdentity]) 
 
 
 def _fuzzy_same_work(left: BibEntry, right: BibEntry) -> bool:
-    if _year(left) != _year(right):
+    if entry_year(left) != entry_year(right):
         return False
     left_title = _normalized_title(left)
     right_title = _normalized_title(right)
@@ -467,13 +432,7 @@ def _cluster_identity(entries: list[BibEntry]) -> WorkIdentity:
         return sorted(stable, key=lambda identity: _ID_PRIORITY[identity.kind])[0]
     first = entries[0]
     author = _author_names(first)[0] if _author_names(first) else "anon"
-    return WorkIdentity("fuzzy", f"{author}:{_year(first)}:{_normalized_title(first)}")
-
-
-def _year(entry: BibEntry) -> str:
-    raw = entry.fields.get("year") or entry.fields.get("date") or ""
-    match = _YEAR_RE.search(raw)
-    return match.group(0) if match else ""
+    return WorkIdentity("fuzzy", f"{author}:{entry_year(first)}:{_normalized_title(first)}")
 
 
 def _author_names(entry: BibEntry) -> list[str]:
@@ -483,10 +442,4 @@ def _author_names(entry: BibEntry) -> list[str]:
 
 
 def _normalized_title(entry: BibEntry) -> str:
-    return _normalized_value(entry.fields.get("title", ""))
-
-
-def _normalized_value(value: str) -> str:
-    value = value.replace("{", "").replace("}", "")
-    words = re.findall(r"[a-z0-9]+", value.lower())
-    return " ".join(words)
+    return _normalize_text(entry.fields.get("title", ""))

@@ -12,12 +12,11 @@ distinct operation living under ``dedupe merge``.)
 import json as _json
 import os
 from pathlib import Path
-from typing import Optional
 
 import typer
 
 from pynakes.bibtex_writer import write_bib
-from pynakes.cli_common import _BACKUP_OPTION, _emit_conflict, _entries, _safe
+from pynakes.cli_common import _BACKUP_OPTION, _emit_conflict, _entries, _safe, _verb
 from pynakes.diff import generate_diff
 from pynakes.filestore import FILES_DIR_KEY, FileStore
 from pynakes.io import load_bib, save_bib
@@ -159,13 +158,12 @@ def combine(
         typer.echo(_json.dumps(payload, indent=2))
         return
 
-    verb = "Would write" if dry_run else "Wrote"
     typer.echo(f"Combined {len(result.inputs)} file(s) → {entries} {_entries(entries)}.")
     if pinax_sources:
         typer.echo(f"  pinax materials copied: {len(pinax_materials)}")
     if result.duplicate_keys:
         typer.echo(f"  duplicate key(s): {', '.join(result.duplicate_keys)}")
-    typer.echo(f"{verb} {out}.")
+    typer.echo(f"{_verb('write', dry_run, 'Wrote')} {out}.")
     if diff and diff_text:
         typer.echo("")
         typer.echo(diff_text)
@@ -203,10 +201,10 @@ def split(
         "--copy",
         help="Send an entry to every matching bucket (default: first match only)",
     ),
-    tex: Optional[list[str]] = typer.Option(
+    tex: list[str] | None = typer.Option(
         None, "--tex", help="TeX file(s)/dir(s) feeding the used/unused predicates"
     ),
-    aux: Optional[list[str]] = typer.Option(
+    aux: list[str] | None = typer.Option(
         None, "--aux", help="AUX file(s)/dir(s) feeding the used/unused predicates"
     ),
     dedupe: bool = typer.Option(
@@ -301,11 +299,12 @@ def split(
         typer.echo(_json.dumps(payload, indent=2))
         return
 
-    verb = "Would write" if dry_run else "Wrote"
     typer.echo(f"Split {len(merged.inputs)} input(s) into {len(rules)} output(s):")
     for entry in outputs:
         count = entry["entries"]
-        typer.echo(f"  {verb} {count} {_entries(count)} → {entry['file']}  [{entry['predicate']}]")
+        typer.echo(
+            f"  {_verb('write', dry_run, 'Wrote')} {count} {_entries(count)} → {entry['file']}  [{entry['predicate']}]"
+        )
     if result.unrouted:
         typer.echo(f"  {result.unrouted} {_entries(result.unrouted)} matched no output.")
     if merged.duplicate_keys:

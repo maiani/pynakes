@@ -18,10 +18,9 @@ import re
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from pathlib import Path
-from typing import Optional
 
 from pynakes.editing import set_entry_field
-from pynakes.model import BibEntry, BibFile
+from pynakes.model import BibEntry, BibFile, _normalize_text
 
 JOURNAL_FIELDS = ("journal", "journaltitle")
 ISSN_FIELDS = ("issn", "eissn", "e-issn")
@@ -119,7 +118,7 @@ class JournalMapping:
 
     title: str
     abbreviated: str
-    issn: Optional[str] = None
+    issn: str | None = None
     source: str = "user"
 
 
@@ -150,9 +149,7 @@ class JournalResult:
 
 
 def _journal_key(value: str) -> str:
-    lowered = value.lower().replace("&", "and")
-    stripped = "".join(ch for ch in lowered if ch.isalnum() or ch.isspace())
-    return " ".join(stripped.split())
+    return _normalize_text(value)
 
 
 def _issn_key(value: str) -> str:

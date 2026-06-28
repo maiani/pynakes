@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 
 from pynakes.bibtex_parser import parse_bib
-from pynakes.lint import lint
+from pynakes.lint import LintProfile, _lint_entry, _lint_profile_entry, lint
+from pynakes.model import BibEntry
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -49,6 +50,34 @@ def test_missing_required_field() -> None:
     # article needs author and journal too.
     assert "author" in fields
     assert "journal" in fields
+
+
+def test_lint_entry_respects_explicit_empty_field_view() -> None:
+    entry = BibEntry(
+        "A",
+        "article",
+        {"author": "A. Author", "title": "T", "journal": "J", "year": "2024"},
+    )
+
+    issues = _lint_entry(entry, {}, dialect="bibtex")
+
+    assert {issue.field for issue in issues if issue.type == "missing_required_field"} == {
+        "author",
+        "title",
+        "journal",
+        "year",
+    }
+
+
+def test_lint_profile_respects_explicit_empty_field_view() -> None:
+    lib = parse_bib("@comment{pynakes-meta: lint-required-fields-article:url;}\n")
+    entry = BibEntry("A", "article", {"url": "https://example.test"})
+
+    issues = _lint_profile_entry(entry, lib, LintProfile(), None, {})
+
+    assert [(issue.type, issue.field) for issue in issues] == [
+        ("missing_profile_required_field", "url")
+    ]
 
 
 def test_biblatex_variants_satisfy_requirements() -> None:

@@ -1,10 +1,10 @@
 """Data models representing one parsed BibTeX file."""
 
 import re
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
-from typing import Optional, Union
 
+from pynakes._text_utils import iter_toplevel_splits
 from pynakes.inheritance import Lookup, resolve_entry_fields
 
 # A bare BibTeX string reference: an identifier with no surrounding braces or
@@ -104,24 +104,7 @@ def _resolve_atom(
 
 def _split_concatenation(value: str) -> list[str]:
     """Split a BibTeX value on top-level ``#`` operators."""
-    parts: list[str] = []
-    start = 0
-    depth = 0
-    in_quotes = False
-
-    for index, char in enumerate(value):
-        if char == '"' and (index == 0 or value[index - 1] != "\\"):
-            in_quotes = not in_quotes
-        elif not in_quotes:
-            if char == "{":
-                depth += 1
-            elif char == "}" and depth:
-                depth -= 1
-            elif char == "#" and depth == 0:
-                parts.append(value[start:index].strip())
-                start = index + 1
-    parts.append(value[start:].strip())
-    return parts
+    return iter_toplevel_splits(value, separators="#")
 
 
 def _unwrap_delimited(value: str) -> str | None:
@@ -232,7 +215,7 @@ class BibEntry:
     key: str
     type: str
     fields: dict[str, str]
-    raw_content: Optional[str] = None
+    raw_content: str | None = None
     raw_comments: list[str] = field(default_factory=list)
     modified: bool = False
 
@@ -253,7 +236,7 @@ class BibEntry:
         )
         return (
             f"BibEntry(key={self.key!r}, type={self.type!r}, "
-            f"fields={{{field_preview}{'...' if len(self.fields) > 3 else ''}}}, "
+            f"fields={{{field_preview}{'...' if len(self.fields) >= 3 else ''}}}, "
             f"modified={self.modified})"
         )
 
@@ -272,7 +255,7 @@ class EntryStore:
 
     def __init__(
         self,
-        entries: Union["EntryStore", dict[str, BibEntry], list[BibEntry], None] = None,
+        entries: "EntryStore | dict[str, BibEntry] | list[BibEntry] | None" = None,
     ) -> None:
         self._entries: list[BibEntry] = []
         if entries is None:
@@ -324,7 +307,7 @@ class EntryStore:
                 return
         self._entries.append(entry)
 
-    def get(self, key: str, default: Optional[BibEntry] = None) -> Optional[BibEntry]:
+    def get(self, key: str, default: BibEntry | None = None) -> BibEntry | None:
         """Return the first entry with ``key``, or ``default``."""
         for entry in self._entries:
             if entry.key == key:
@@ -366,6 +349,17 @@ class EntryStore:
         dupes = self.duplicate_keys()
         suffix = f", duplicates={dupes}" if dupes else ""
         return f"EntryStore({len(self._entries)} entries{suffix})"
+
+
+def _normalize_text(value: str) -> str:
+    """Lowercase, replace ``&`` with ``and``, strip non-alphanumeric, collapse whitespace.
+
+    Used as a normalisation key for fuzzy comparisons across dedupe, integrity,
+    and journal-title matching. Brace characters are removed first so LaTeX
+    protection does not affect equality.
+    """
+    lowered = value.replace("{", "").replace("}", "").replace("&", "and").lower()
+    return " ".join("".join(ch for ch in lowered if ch.isalnum() or ch.isspace()).split())
 
 
 def _metadata_blocks_to_dict(blocks: list[MetadataBlock]) -> dict[str, str]:
@@ -428,12 +422,12 @@ class BibFile:
     # verbatim source text). ``source_trailing`` is the text after the last
     # block. Both are empty for in-memory libraries, in which case the writer
     # falls back to emitting blocks in canonical category order.
-    source_layout: list = field(default_factory=list)
+    source_layout: list[tuple[str, str, object]] = field(default_factory=list)
     source_trailing: str = ""
 
     def __init__(
         self,
-        entries: Union[EntryStore, dict[str, BibEntry], list[BibEntry], None] = None,
+        entries: EntryStore | dict[str, BibEntry] | list[BibEntry] | None = None,
         strings: dict[str, str] | None = None,
         raw_strings: list[str] | None = None,
         preamble: list[str] | None = None,
@@ -515,6 +509,25 @@ class BibFile:
         if target is None:
             return {}
         return self.resolve(target)
+
+    def derive(self, entries: Iterable[BibEntry]) -> "BibFile":
+        """Return a new library with this library's top-level data and ``entries``.
+
+        Subsets and partitions keep string definitions, preamble, comments,
+        metadata, encoding, and line-ending preferences, but intentionally drop
+        the original source layout because the entry set has changed.
+        """
+        return BibFile(
+            entries=EntryStore(list(entries)),
+            strings=dict(self.strings),
+            raw_strings=list(self.raw_strings),
+            preamble=list(self.preamble),
+            raw_comments=list(self.raw_comments),
+            jabref_metadata_blocks=list(self.jabref_metadata_blocks),
+            pynakes_metadata_blocks=list(self.pynakes_metadata_blocks),
+            encoding=self.encoding,
+            line_ending=self.line_ending,
+        )
 
     def to_dict(self) -> dict:
         """Serialize the bib file to a JSON-friendly dict."""

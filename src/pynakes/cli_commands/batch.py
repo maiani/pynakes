@@ -16,6 +16,7 @@ from pynakes.cli_common import (
     _emit_error,
     _preview_or_commit,
     _safe,
+    _verb,
 )
 from pynakes.engine import Bibliography
 from pynakes.metadata import DuplicateMetadataError
@@ -33,8 +34,12 @@ def batch(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Apply a sequence of operations atomically (one preview, one commit)."""
-    if (ops is None) == (ops_file is None):
-        _emit_error(json_output, "InvalidInput", "Provide exactly one of --ops or --ops-file")
+    if ops is None and ops_file is None:
+        _emit_error(json_output, "InvalidInput", "Provide --ops or --ops-file")
+    if ops is not None and ops_file is not None:
+        _emit_error(
+            json_output, "InvalidInput", "Provide only one of --ops or --ops-file, not both"
+        )
     raw = ops
     if ops_file is not None:
         with open(ops_file, encoding="utf-8") as handle:
@@ -74,7 +79,7 @@ def batch(
             "plan": plan,
         },
         [
-            f"{'Would apply' if dry_run else 'Applied'} {len(op_results)} operation(s); "
+            f"{_verb('apply', dry_run, 'Applied')} {len(op_results)} operation(s); "
             f"{changed} entry change(s)."
         ],
         diff_text,

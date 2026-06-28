@@ -3,14 +3,15 @@
 from pynakes.authors import split_name_list
 from pynakes.interchange._shared import (
     assign_container,
+    assign_key,
+    build_bibfile,
     person_to_bibtex,
     split_keywords,
     split_pages,
     split_person,
     year_of,
 )
-from pynakes.keys import generate_key, unique_key
-from pynakes.model import BibEntry, BibFile, EntryStore
+from pynakes.model import BibEntry, BibFile
 
 _BIB_TO_ENDNOTE_TYPE = {
     "article": "Journal Article",
@@ -67,19 +68,14 @@ _BIB_TO_ENDNOTE_FIELD = {
     "note": "%Z",
     "language": "%G",
 }
-_ENDNOTE_TO_BIB_FIELD = {
-    "T": "title",
-    "I": "publisher",
+# Auto-generated from _BIB_TO_ENDNOTE_FIELD (stripping the leading '%' from tag names);
+# overrides fix collisions and hand-curated extras not present in the forward dict.
+# "address"/"location" → "%C" → prefer "address" on import.
+# "number"/"issue" → "%N" → prefer "number" on import.
+# "%@" is used for isbn/issn on export but "@" maps to isbn on import (extra entry).
+_ENDNOTE_TO_BIB_FIELD = {v.lstrip("%"): k for k, v in _BIB_TO_ENDNOTE_FIELD.items()} | {
     "C": "address",
-    "V": "volume",
     "N": "number",
-    "R": "doi",
-    "U": "url",
-    "X": "abstract",
-    "7": "edition",
-    "S": "series",
-    "Z": "note",
-    "G": "language",
     "@": "isbn",
 }
 
@@ -87,7 +83,7 @@ _ENDNOTE_TO_BIB_FIELD = {
 def _entry_to_endnote(entry: BibEntry) -> list[str]:
     fields = entry.fields
     lines = [f"%0 {_BIB_TO_ENDNOTE_TYPE.get(entry.type.lower(), 'Generic')}"]
-    if entry.key:
+    if entry.key.strip():
         lines.append(f"%F {entry.key}")
     for person in split_name_list(fields.get("author", "")):
         lines.append(f"%A {person_to_bibtex(split_person(person))}")
@@ -179,31 +175,34 @@ def _record_to_entry(record: list[tuple[str, str]], taken: set[str]) -> BibEntry
         fields["keywords"] = ", ".join(keywords)
 
     entry = BibEntry(key="", type=bib_type, fields=fields)
-    key = raw_key if raw_key and raw_key.isidentifier() else generate_key(entry)
-    entry.key = unique_key(key, taken)
-    taken.add(entry.key)
+    assign_key(entry, taken, raw_key)
     return entry
 
 
-def import_endnote(text: str) -> BibFile:
-    """Parse EndNote tagged text into a new :class:`BibFile`."""
-    store = EntryStore()
-    taken: set[str] = set()
+def _parse_endnote_records(text: str) -> list[list[tuple[str, str]]]:
+    """Split raw EndNote tagged text into a list of tag-value records."""
+    records: list[list[tuple[str, str]]] = []
     record: list[tuple[str, str]] = []
     for raw in text.splitlines():
         line = raw.rstrip("\r")
         if not line.strip():
             if record:
-                store.add(_record_to_entry(record, taken))
+                records.append(record)
                 record = []
             continue
         if len(line) < 3 or not line.startswith("%"):
             continue
-        tag, value = line[1], line[3:].strip() if len(line) > 3 else ""
+        tag = line[1]
+        value = line[3:].strip() if len(line) > 2 else ""
         if tag == "0" and record:
-            store.add(_record_to_entry(record, taken))
+            records.append(record)
             record = []
         record.append((tag, value))
     if record:
-        store.add(_record_to_entry(record, taken))
-    return BibFile(entries=store)
+        records.append(record)
+    return records
+
+
+def import_endnote(text: str) -> BibFile:
+    """Parse EndNote tagged text into a new :class:`BibFile`."""
+    return build_bibfile(_parse_endnote_records(text), _record_to_entry)

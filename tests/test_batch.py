@@ -3,9 +3,11 @@
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
-from pynakes.batch import BatchError, apply_operations, operation_catalog
+from pynakes import batch as batch_ops
+from pynakes.batch import BatchError, OperationSpec, apply_operations, operation_catalog
 from pynakes.bibtex_parser import parse_bib
 from pynakes.cli import app
 from pynakes.engine import Bibliography
@@ -55,6 +57,48 @@ def test_operation_catalog_lists_specs() -> None:
     cat = operation_catalog()
     assert "fields.rename" in cat
     assert cat["fields.rename"]["required"] == ["old", "new"]
+
+
+def test_every_declared_operation_has_a_dispatch_branch() -> None:
+    operations = {
+        "fields.rename": {"old": "journal", "new": "journaltitle"},
+        "fields.move": {"old": "journal", "new": "journaltitle"},
+        "fields.append": {"field": "keywords", "value": "ml"},
+        "fields.clear": {"field": "journal"},
+        "fields.protect_title": {},
+        "groups.add_entry": {"key": "A", "group": "ML"},
+        "groups.remove_entry": {"key": "A", "group": "ML"},
+        "keys.generate": {},
+        "keys.repair": {},
+        "keys.rename": {"old": "A", "new": "Renamed"},
+        "normalize": {},
+        "convert": {"to": "biblatex"},
+        "metadata.set": {"key": "lint-required-fields", "value": "url"},
+    }
+
+    assert set(operations) == set(batch_ops.OPERATION_SPECS)
+    for op, params in operations.items():
+        coll = Bibliography.from_text(SRC)
+        apply_operations(coll, [{"op": op, **params}])
+
+
+def test_declared_but_undispatched_operation_raises_not_implemented(monkeypatch) -> None:
+    monkeypatch.setitem(batch_ops.OPERATION_SPECS, "debug.unhandled", OperationSpec())
+    coll = Bibliography.from_text(SRC)
+
+    with pytest.raises(NotImplementedError, match="debug.unhandled"):
+        apply_operations(coll, [{"op": "debug.unhandled"}])
+
+
+def test_protect_title_warns_when_matching_entries_lack_field() -> None:
+    coll = Bibliography.from_text("@article{A,\n  year = {2024}\n}\n")
+
+    result = apply_operations(coll, [{"op": "fields.protect_title"}])
+
+    assert result[0]["result"] == {
+        "changed": 0,
+        "warnings": ["No matching entries had field 'title'"],
+    }
 
 
 def test_cli_batch_atomic_commit(tmp_path: Path) -> None:

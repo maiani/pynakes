@@ -1,7 +1,10 @@
 """Shared helpers for bibliography interchange codecs."""
 
+from collections.abc import Callable, Iterable
+
 from pynakes.authors import split_name_list
-from pynakes.model import BibEntry
+from pynakes.keys import generate_key, unique_key
+from pynakes.model import BibEntry, BibFile, EntryStore
 
 # Bib entry types whose container is a book/proceedings, so an incoming
 # "container-title" (CSL) or T2 (RIS) maps to ``booktitle`` rather than ``journal``.
@@ -31,7 +34,7 @@ def _name_parts(family: str, given: str) -> dict[str, str]:
     return parts
 
 
-def person_to_bibtex(name: dict) -> str:
+def person_to_bibtex(name: dict[str, str]) -> str:
     if name.get("literal"):
         return str(name["literal"])
     family = (name.get("family") or "").strip()
@@ -39,7 +42,7 @@ def person_to_bibtex(name: dict) -> str:
     return f"{family}, {given}" if given else family
 
 
-def names_to_bibtex(names: list) -> str:
+def names_to_bibtex(names: list[dict[str, str]]) -> str:
     return " and ".join(person_to_bibtex(n) for n in names if isinstance(n, dict))
 
 
@@ -91,3 +94,25 @@ def split_keywords(value: str) -> list[str]:
 
 def entry_people(entry: BibEntry, field: str) -> list[dict[str, str]]:
     return [split_person(person) for person in split_name_list(entry.fields.get(field, ""))]
+
+
+def assign_key(entry: BibEntry, taken: set[str], raw_id: str | None = None) -> None:
+    """Assign a unique citation key to *entry*, updating *taken* in place."""
+    key = raw_id if raw_id and raw_id.isidentifier() else generate_key(entry)
+    entry.key = unique_key(key, taken)
+    taken.add(entry.key)
+
+
+def build_bibfile(records: Iterable[object], converter: Callable[..., BibEntry | None]) -> BibFile:
+    """Build a :class:`BibFile` by applying *converter* to each record.
+
+    *converter* must accept ``(record, taken: set[str])`` and return a
+    :class:`BibEntry` or ``None`` (skipped entries).
+    """
+    store = EntryStore()
+    taken: set[str] = set()
+    for record in records:
+        entry = converter(record, taken)
+        if entry is not None:
+            store.add(entry)
+    return BibFile(entries=store)

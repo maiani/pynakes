@@ -18,6 +18,48 @@ from typing import Literal
 
 from pynakes.model import BibFile, MetadataBlock
 
+
+def metadata_value(lib: BibFile, name: str) -> str | None:
+    """Return the effective metadata value for ``name`` (case-insensitive), without trailing ``;``.
+
+    Searches the library's merged metadata (pynakes-meta overrides jabref-meta).
+    Returns ``None`` when the key is absent.
+    """
+    lowered = {key.lower(): value for key, value in lib.metadata.items()}
+    value = lowered.get(name.lower())
+    if value is not None:
+        return value.strip().rstrip(";").strip()
+    return None
+
+
+def metadata_list(value: str | None) -> tuple[str, ...]:
+    """Split a metadata list value on ``;`` and ``,``.
+
+    Returns an empty tuple when ``value`` is ``None`` or blank; each non-empty
+    token (after stripping whitespace) becomes one element.
+    """
+    if not value:
+        return ()
+    return tuple(part.strip() for part in value.replace(";", ",").split(",") if part.strip())
+
+
+def metadata_bool(value: str | None, default: bool) -> bool:
+    """Coerce a metadata string to ``bool``.
+
+    Truthy spellings: ``1``, ``true``, ``yes``, ``on``, ``enabled``.
+    Falsy spellings: ``0``, ``false``, ``no``, ``off``, ``disabled``.
+    Anything else returns ``default``.
+    """
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on", "enabled"}:
+        return True
+    if normalized in {"0", "false", "no", "off", "disabled"}:
+        return False
+    return default
+
+
 MetadataCategory = Literal[
     "library",
     "save",

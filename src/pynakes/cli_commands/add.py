@@ -8,7 +8,6 @@ also downloads configured Pinax materials for imported arXiv entries.
 """
 
 import json as _json
-from typing import Optional
 
 import typer
 
@@ -19,6 +18,7 @@ from pynakes.cli_common import (
     _finish_mod,
     _resolve_input_bib,
     _safe,
+    _verb,
 )
 from pynakes.engine import Bibliography
 
@@ -27,10 +27,10 @@ from pynakes.engine import Bibliography
 
 def add(
     identifier: str = typer.Argument(..., help="DOI, DOI URL, arXiv id, or arXiv URL to import"),
-    file: Optional[str] = typer.Argument(
+    file: str | None = typer.Argument(
         None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
     ),
-    key: Optional[str] = typer.Option(None, "--key", help="Citation key to use"),
+    key: str | None = typer.Option(None, "--key", help="Citation key to use"),
     key_source: str = typer.Option(
         "generated",
         "--key-source",
@@ -58,6 +58,7 @@ def add(
             f"{', '.join(sorted(importer_ops.KEY_SOURCES))}",
         )
 
+    entry = None
     try:
         coll = Bibliography.open(file)
         kind, entry = coll.import_reference(
@@ -111,6 +112,8 @@ def add(
         )
     except importer_ops.ReferenceImportError as exc:
         _emit_error(json_output, "ReferenceImportError", str(exc))
+    if entry is None:
+        return
 
     fetch_report = None
     if fetch:
@@ -119,9 +122,8 @@ def add(
         except ValueError as exc:
             _emit_error(json_output, "InvalidInput", str(exc))
 
-    verb = "Would add" if dry_run else "Added"
     label = entry.fields.get("doi") or entry.fields.get("eprint") or entry.key
-    human = [f"{verb} {kind} {label} as {entry.key}."]
+    human = [f"{_verb('add', dry_run)} {kind} {label} as {entry.key}."]
     if fetch_report is not None:
         human.extend(_fetch_human_lines(fetch_report))
 

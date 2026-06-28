@@ -62,8 +62,7 @@ def _source_layout_matches(lib: BibFile) -> bool:
     current = list(lib.entries.values())
     if len(entries) != len(current):
         return False
-    current_ids = {id(entry) for entry in current}
-    return all(id(entry) in current_ids for entry in entries)
+    return [id(entry) for entry in entries] == [id(entry) for entry in current]
 
 
 def _canonical_layout(lib: BibFile) -> list:
@@ -74,7 +73,7 @@ def _canonical_layout(lib: BibFile) -> list:
     the conventional JabRef arrangement.
     """
     le = lib.line_ending
-    segments: list = []
+    segments: list[tuple[str, str, object]] = []
 
     def add(kind: str, ref: object) -> None:
         gap = "" if not segments else le * 2
@@ -101,7 +100,7 @@ def _canonical_layout(lib: BibFile) -> list:
     return segments
 
 
-def _render_layout(lib: BibFile, layout: list, trailing: str) -> str:
+def _render_layout(lib: BibFile, layout: list[tuple[str, str, object]], trailing: str) -> str:
     """Render an ordered layout to text by concatenating gaps and block content.
 
     Unmodified entries emit their preserved ``raw_content``; modified ones are

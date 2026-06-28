@@ -14,14 +14,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path, PurePosixPath
-from urllib.error import HTTPError, URLError
 from urllib.parse import quote
-from urllib.request import Request, urlopen
 
 from pynakes.filestore import FileStore
-from pynakes.importer import normalize_arxiv
-
-_USER_AGENT = "pynakes/0.3.0 arxiv material fetch (mailto:unknown@example.invalid)"
+from pynakes.importer import _fetch_url, normalize_arxiv
 
 FetchArxivBytes = Callable[[str], bytes]
 
@@ -147,15 +143,12 @@ def extract_arxiv_source(data: bytes, target_dir: str | Path) -> Path:
 
 
 def _fetch_bytes(url: str, identifier: str, kind: str, timeout: float) -> bytes:
-    request = Request(url, headers={"User-Agent": _USER_AGENT})
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            return response.read()
-    except HTTPError as exc:
-        raise ArxivFetchError(f"arXiv returned HTTP {exc.code} for {identifier} {kind}") from exc
-    except URLError as exc:
-        reason = getattr(exc, "reason", exc)
-        raise ArxivFetchError(f"Could not fetch arXiv {kind} for {identifier}: {reason}") from exc
+    return _fetch_url(
+        url,
+        timeout=timeout,
+        error_class=ArxivFetchError,
+        label=f"{identifier} {kind}",
+    )
 
 
 def _normalize_or_raise(identifier: str) -> str:

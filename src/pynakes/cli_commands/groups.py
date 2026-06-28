@@ -14,6 +14,7 @@ from pynakes.cli_common import (
     _entries,
     _finish_mod,
     _safe,
+    _verb,
 )
 from pynakes.engine import Bibliography
 from pynakes.io import load_bib
@@ -51,6 +52,29 @@ def _require_key(lib, key: str, json_output: bool) -> None:
         _emit_error(json_output, "KeyNotFound", f"No entry with key {key!r} in the library")
 
 
+def _group_mod_entry(
+    file: str,
+    key: str,
+    group: str,
+    dry_run: bool,
+    diff: bool,
+    json_output: bool,
+    add: bool,
+) -> None:
+    """Shared implementation for add-entry and remove-entry."""
+    coll = Bibliography.open(file)
+    _require_key(coll.lib, key, json_output)
+    if add:
+        action, count = "groups_add_entry", coll.add_to_group(key, group)
+        msg = (
+            f"{_verb('add', dry_run)} {key} to group {group!r} ({count} {_entries(count)} changed)."
+        )
+    else:
+        action, count = "groups_remove_entry", coll.remove_from_group(key, group)
+        msg = f"{_verb('remove', dry_run)} {key} from group {group!r} ({count} {_entries(count)} changed)."
+    _finish_mod(file, action, coll, dry_run, diff, json_output, [msg], key=key, group=group)
+
+
 def groups_add_entry(
     file: str = typer.Argument(..., help="Path to the .bib file"),
     key: str = typer.Argument(..., help="Citation key to add"),
@@ -60,21 +84,7 @@ def groups_add_entry(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Add an entry to a group."""
-    coll = Bibliography.open(file)
-    _require_key(coll.lib, key, json_output)
-    count = coll.add_to_group(key, group)
-    verb = "Would add" if dry_run else "Added"
-    _finish_mod(
-        file,
-        "groups_add_entry",
-        coll,
-        dry_run,
-        diff,
-        json_output,
-        [f"{verb} {key} to group {group!r} ({count} {_entries(count)} changed)."],
-        key=key,
-        group=group,
-    )
+    _group_mod_entry(file, key, group, dry_run, diff, json_output, add=True)
 
 
 def groups_remove_entry(
@@ -86,21 +96,7 @@ def groups_remove_entry(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Remove an entry from a group."""
-    coll = Bibliography.open(file)
-    _require_key(coll.lib, key, json_output)
-    count = coll.remove_from_group(key, group)
-    verb = "Would remove" if dry_run else "Removed"
-    _finish_mod(
-        file,
-        "groups_remove_entry",
-        coll,
-        dry_run,
-        diff,
-        json_output,
-        [f"{verb} {key} from group {group!r} ({count} {_entries(count)} changed)."],
-        key=key,
-        group=group,
-    )
+    _group_mod_entry(file, key, group, dry_run, diff, json_output, add=False)
 
 
 def register(app: typer.Typer) -> None:

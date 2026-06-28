@@ -19,14 +19,14 @@ def _parse_groups(value: str) -> list[str]:
 
 def entry_groups(entry: BibEntry) -> list[str]:
     """Return the group names a single entry belongs to (first-seen order)."""
-    return _parse_groups(entry.fields.get("groups", ""))
+    return _parse_groups(entry.fields.get("groups") or "")
 
 
 def list_groups(lib: BibFile) -> list[str]:
     """Return all distinct group names across the library, in first-seen order."""
     seen: dict[str, None] = {}
     for entry in lib.entries.values():
-        for group in _parse_groups(entry.fields.get("groups", "")):
+        for group in _parse_groups(entry.fields.get("groups") or ""):
             seen.setdefault(group, None)
     return list(seen)
 

@@ -12,39 +12,14 @@ predicate language is :func:`pynakes.fields.parse_query` extended with ``*``
 (any), ``used`` / ``unused`` (against a cited-key set), and ``group "Name"``.
 """
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from pynakes import groups as group_ops
 from pynakes.fields import parse_query
-from pynakes.model import BibEntry, BibFile, EntryStore
+from pynakes.model import BibEntry, BibFile
 
 Predicate = Callable[[BibEntry], bool]
-
-
-# --- shared library construction -------------------------------------------
-
-
-def _with_entries(context: BibFile, entries: Iterable[BibEntry]) -> BibFile:
-    """Build a new library from ``context``'s library-level data and ``entries``.
-
-    Library-level data (strings, preamble, comments, metadata, encoding, line
-    ending) is copied from ``context`` so every output stays a valid,
-    profile-carrying ``.bib`` file — mirroring :func:`pynakes.usage.subset_library`.
-    """
-    store = EntryStore()
-    for entry in entries:
-        store.add(entry)
-    return BibFile(
-        entries=store,
-        strings=dict(context.strings),
-        preamble=list(context.preamble),
-        raw_comments=list(context.raw_comments),
-        jabref_metadata_blocks=list(context.jabref_metadata_blocks),
-        pynakes_metadata_blocks=list(context.pynakes_metadata_blocks),
-        encoding=context.encoding,
-        line_ending=context.line_ending,
-    )
 
 
 # --- merge -----------------------------------------------------------------
@@ -106,7 +81,7 @@ def merge_libraries(named_libs: list[tuple[str, BibFile]], *, dedupe: bool = Fal
 
     duplicate_keys = sorted(k for k, n in seen_count.items() if n > 1)
     return MergeResult(
-        lib=_with_entries(context, kept),
+        lib=context.derive(kept),
         inputs=[name for name, _ in named_libs],
         duplicate_keys=duplicate_keys,
         conflicts=conflicts,
@@ -213,6 +188,6 @@ def partition_library(
         if not matched:
             unrouted += 1
 
-    buckets = {label: _with_entries(lib, entries) for label, entries in collected.items()}
+    buckets = {label: lib.derive(entries) for label, entries in collected.items()}
     counts = {label: len(entries) for label, entries in collected.items()}
     return PartitionResult(buckets=buckets, counts=counts, unrouted=unrouted)

@@ -49,10 +49,11 @@ class TestIOErrors:
         path.write_text(good)
 
         # Content that the re-parse validation rejects (unbalanced braces).
-        result = save_text("@article{broken, title = {oops}\n", str(path))
+        result = save_text("@article{broken, title = {oops}\n", str(path), validate=True)
         assert result.success is False
         assert "Validation failed" in (result.error or "")
-        # Original content was restored from the backup.
+        # With validate=True the original file is left intact (no backup rename
+        # happens before validation, so there is nothing to restore).
         assert path.read_text() == good
 
     def test_successful_save_writes_backup(self, tmp_path) -> None:

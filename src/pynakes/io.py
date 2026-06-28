@@ -3,11 +3,12 @@
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.model import BibFile
+
+_WRITE_ERRORS = (OSError, UnicodeError)
 
 
 @dataclass
@@ -20,8 +21,8 @@ class SaveResult:
 
     success: bool
     file_path: str
-    backup_path: Optional[str] = None
-    error: Optional[str] = None
+    backup_path: str | None = None
+    error: str | None = None
 
 
 def _decode_bytes(data: bytes) -> tuple[str, str]:
@@ -79,7 +80,14 @@ def save_bib(lib: BibFile, file_path: str, backup: bool = True, atomic: bool = T
     Returns:
         SaveResult with status and paths
     """
-    return save_text(write_bib(lib), file_path, encoding=lib.encoding, backup=backup, atomic=atomic)
+    return save_text(
+        write_bib(lib),
+        file_path,
+        encoding=lib.encoding,
+        backup=backup,
+        atomic=atomic,
+        validate=True,
+    )
 
 
 def save_text(
@@ -88,25 +96,28 @@ def save_text(
     encoding: str = "utf-8",
     backup: bool = True,
     atomic: bool = True,
+    *,
+    validate: bool = False,
 ) -> SaveResult:
-    """Save already-serialized BibTeX text to a file.
+    """Save text to a file with optional backup, atomic write, and BibTeX validation.
 
-    Used when content is produced outside the writer (e.g. surgical in-place
-    edits that splice changed entries into the original text for a minimal
-    diff). Shares the same atomic-write, backup, and re-parse-validation
-    guarantees as :func:`save_bib`.
+    Used both for BibTeX files (``validate=True``, which re-parses the temp file
+    before committing) and for arbitrary text such as ``.tex`` sources
+    (``validate=False``, the default). Shares the same atomic-write and backup
+    mechanics in both cases.
+
+    The backup rename happens **after** the new file is safely in place so a
+    crash between the temp-write and the final rename never loses data: the
+    original is still at its original path until the atomic swap succeeds.
     """
     path = Path(file_path)
     backup_path = None
+    original_exists = path.exists()
 
     try:
-        # Create backup if file exists and backup=True
-        if backup and path.exists():
-            backup_path = str(path) + ".bak"
-            path.rename(backup_path)
-
-        # Atomic write: write to temp file, then rename
         if atomic:
+            # Write content to a temporary file in the same directory so the
+            # final rename is guaranteed to be on the same filesystem.
             with tempfile.NamedTemporaryFile(
                 mode="w",
                 dir=path.parent,
@@ -117,35 +128,45 @@ def save_text(
                 tmp.write(content)
                 tmp_path = tmp.name
 
-            # Validate temp file before committing
-            try:
-                with open(tmp_path, "r", encoding=encoding) as f:
-                    parse_bib(f.read())
-            except ParseError as e:
-                # Restore backup if validation fails
-                if backup_path:
-                    Path(backup_path).rename(path)
-                Path(tmp_path).unlink()
-                return SaveResult(
-                    success=False,
-                    file_path=file_path,
-                    backup_path=backup_path,
-                    error=f"Validation failed: {str(e)}",
-                )
+            if validate:
+                try:
+                    with open(tmp_path, "r", encoding=encoding) as f:
+                        parse_bib(f.read())
+                except ParseError as e:
+                    Path(tmp_path).unlink(missing_ok=True)
+                    return SaveResult(
+                        success=False,
+                        file_path=file_path,
+                        backup_path=None,
+                        error=f"Validation failed: {e}",
+                    )
 
-            # Atomic rename
+            # Rename original to .bak only after the temp file is ready and
+            # validated.  A crash between the backup rename and the final
+            # replace would leave the original at backup_path; the except
+            # block restores it.
+            if backup and original_exists:
+                backup_path = str(path) + ".bak"
+                path.rename(backup_path)
+
+            # Atomic swap: on POSIX this is a single syscall.
             Path(tmp_path).replace(path)
         else:
-            # Non-atomic write
+            # Non-atomic write — backup first if requested.
+            if backup and original_exists:
+                backup_path = str(path) + ".bak"
+                path.rename(backup_path)
             with open(path, "w", encoding=encoding, newline="") as f:
                 f.write(content)
 
         return SaveResult(success=True, file_path=file_path, backup_path=backup_path, error=None)
 
-    except Exception as e:
-        # Restore backup on error
+    except _WRITE_ERRORS as e:
+        # Best-effort restore: if the original was moved to .bak but the new
+        # file is not yet at path, put the original back.
         if backup_path and not path.exists():
             Path(backup_path).rename(path)
+            backup_path = None
 
         return SaveResult(
             success=False,
@@ -162,38 +183,9 @@ def save_plain_text(
     backup: bool = True,
     atomic: bool = True,
 ) -> SaveResult:
-    """Save arbitrary text with the same backup/atomic mechanics as BibTeX I/O."""
-    path = Path(file_path)
-    backup_path = None
+    """Save arbitrary text — thin alias for ``save_text(..., validate=False)``.
 
-    try:
-        if backup and path.exists():
-            backup_path = str(path) + ".bak"
-            path.rename(backup_path)
-
-        if atomic:
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                dir=path.parent,
-                delete=False,
-                encoding=encoding,
-                newline="",
-            ) as tmp:
-                tmp.write(content)
-                tmp_path = tmp.name
-            Path(tmp_path).replace(path)
-        else:
-            with open(path, "w", encoding=encoding, newline="") as f:
-                f.write(content)
-
-        return SaveResult(success=True, file_path=file_path, backup_path=backup_path, error=None)
-
-    except Exception as e:
-        if backup_path and not path.exists():
-            Path(backup_path).rename(path)
-        return SaveResult(
-            success=False,
-            file_path=file_path,
-            backup_path=backup_path,
-            error=str(e),
-        )
+    .. deprecated::
+        Call :func:`save_text` directly with ``validate=False`` (the default).
+    """
+    return save_text(content, file_path, encoding, backup, atomic, validate=False)

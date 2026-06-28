@@ -5,7 +5,6 @@ retaining the stable CLI contract.
 """
 
 import json as _json
-from typing import Optional
 
 import typer
 
@@ -22,7 +21,7 @@ from pynakes.io import load_bib
 
 
 def inspect(
-    file: Optional[str] = typer.Argument(
+    file: str | None = typer.Argument(
         None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
     ),
     resolved: bool = typer.Option(

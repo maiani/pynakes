@@ -2,7 +2,6 @@
 
 import logging
 import re
-from typing import Optional
 
 from pynakes.metadata import parse_metadata_comment
 from pynakes.model import (
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 class ParseError(Exception):
     """Exception raised when parsing BibTeX fails."""
 
-    def __init__(self, message: str, line: Optional[int] = None, file: Optional[str] = None):
+    def __init__(self, message: str, line: int | None = None, file: str | None = None):
         self.message = message
         self.line = line
         self.file = file
@@ -72,7 +71,7 @@ def parse_bib(text: str) -> BibFile:
     # byte-for-byte and ordering survives in-place edits. ``prev_end`` tracks
     # the end of the last recognized block; the text up to the next block start
     # is that block's leading gap.
-    layout: list = []
+    layout: list[tuple[str, str, object]] = []
     prev_end = 0
     position = 0
     while position < len(text):
@@ -191,7 +190,7 @@ def _parse_fields(content: str) -> dict[str, str]:
     return fields
 
 
-def _parse_string_def(body: str) -> tuple[Optional[str], Optional[str]]:
+def _parse_string_def(body: str) -> tuple[str | None, str | None]:
     """Parse the body of a ``@string`` declaration."""
     key, value = _split_once_top_level(_strip_tex_comments(body), "=")
     key = key.strip()

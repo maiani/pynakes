@@ -26,7 +26,7 @@ parents and cyclic references contribute no inheritance.
 """
 
 from collections.abc import Callable, Mapping
-from typing import Optional, Protocol
+from typing import Protocol
 
 
 class EntryLike(Protocol):
@@ -36,7 +36,7 @@ class EntryLike(Protocol):
     fields: Mapping[str, str]
 
 
-Lookup = Callable[[str], Optional[EntryLike]]
+Lookup = Callable[[str], EntryLike | None]
 
 # Title-family remappings, selected by the *parent* entry type. A source field
 # named here is inherited only under its mapped target name, never its own.

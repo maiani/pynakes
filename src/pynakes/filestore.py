@@ -23,6 +23,7 @@ MANIFEST_DIR = ".pinax"
 MANIFEST_FILE = "manifest.json"
 MANIFEST_VERSION = 1
 ARTIFACT_KINDS = ("published_pdf", "preprint_pdf", "preprint_source")
+_FILESYSTEM_ERRORS = (OSError, shutil.Error)
 
 
 @dataclass(frozen=True)
@@ -314,7 +315,8 @@ class FileStore:
         known = set(key_list)
         manifest = self.read_manifest()
         files = manifest["files"]
-        assert isinstance(files, dict)
+        if not isinstance(files, dict):
+            raise TypeError("Pinax manifest 'files' must be a dict")
         fixed: list[dict[str, str]] = []
 
         for key in list(files):
@@ -400,7 +402,7 @@ class FileStore:
                 src.replace(dst)
                 transaction.moved.append((src, dst))
             self._rename_manifest_row(old, new)
-        except Exception:
+        except _FILESYSTEM_ERRORS:
             transaction.rollback()
             raise
         return transaction
@@ -446,7 +448,8 @@ class FileStore:
             return []
         manifest = self.read_manifest()
         files = manifest["files"]
-        assert isinstance(files, dict)
+        if not isinstance(files, dict):
+            raise TypeError("Pinax manifest 'files' must be a dict")
         drift: list[dict[str, str]] = []
         for key, row in sorted(files.items()):
             if key not in known:
@@ -463,8 +466,6 @@ class FileStore:
                 exists = material.is_dir() if kind == "preprint_source" else material.is_file()
                 if not exists:
                     drift.append({"key": key, "kind": kind, "reason": "manifest without file"})
-        for presence in self.scan(known).entries if False else []:
-            pass
         for key in sorted(known):
             presence = self.presence_for(key)
             row = files.get(key, {})
@@ -481,7 +482,8 @@ class FileStore:
             return
         manifest = self.read_manifest()
         files = manifest["files"]
-        assert isinstance(files, dict)
+        if not isinstance(files, dict):
+            raise TypeError("Pinax manifest 'files' must be a dict")
         if old not in files:
             return
         if new in files:
@@ -569,7 +571,8 @@ def _copy_manifest_row(source: FileStore, target: FileStore, key: str) -> None:
         return
     target_manifest = target.read_manifest()
     files = target_manifest["files"]
-    assert isinstance(files, dict)
+    if not isinstance(files, dict):
+        raise TypeError("Pinax manifest 'files' must be a dict")
     files[_validate_key(key)] = dict(source_row)
     target.write_manifest(target_manifest)
 
@@ -612,19 +615,15 @@ def _validate_key(key: str) -> str:
 
 
 def _unique_keys(keys: Iterable[str]) -> list[str]:
+    """Return a deduplicated list of validated keys; silently drops duplicates."""
     seen: set[str] = set()
     result: list[str] = []
-    duplicates: set[str] = set()
     for key in keys:
         normalized = _validate_key(key)
         if normalized in seen:
-            duplicates.add(normalized)
             continue
         seen.add(normalized)
         result.append(normalized)
-    if duplicates:
-        joined = ", ".join(sorted(duplicates))
-        raise ValueError(f"Pinax material addressing requires unique citation keys: {joined}")
     return result
 
 
@@ -653,7 +652,7 @@ def _atomic_write_bytes(path: Path, data: bytes, root: Path) -> None:
             tmp.write(data)
             tmp.flush()
         tmp_path.replace(path)
-    except Exception:
+    except _FILESYSTEM_ERRORS:
         tmp_path.unlink(missing_ok=True)
         raise
 
@@ -665,7 +664,7 @@ def _atomic_replace_dir(source: Path, target: Path, root: Path) -> None:
         target.replace(backup)
     try:
         source.replace(target)
-    except Exception:
+    except _FILESYSTEM_ERRORS:
         if had_target and backup.exists() and not target.exists():
             backup.replace(target)
         raise

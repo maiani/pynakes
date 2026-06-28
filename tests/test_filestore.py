@@ -181,11 +181,12 @@ def test_rename_materials_moves_paths_and_manifest_with_rollback(tmp_path: Path)
     assert "Old" in manifest["files"]
 
 
-def test_scan_rejects_duplicate_keys(tmp_path: Path) -> None:
+def test_scan_deduplicates_keys(tmp_path: Path) -> None:
+    # Duplicate keys must be tolerated (invariant #5): scan silently deduplicates.
     store = FileStore(root=tmp_path / "refs.files", bib_path=tmp_path / "refs.bib")
-
-    with pytest.raises(ValueError, match="requires unique citation keys: A"):
-        store.scan(["A", "A"])
+    result = store.scan(["A", "A"])
+    assert len(result.entries) == 1
+    assert result.entries[0].key == "A"
 
 
 def test_bibliography_open_exposes_filestore_when_files_dir_is_set(tmp_path: Path) -> None:

@@ -5,14 +5,15 @@ from xml.etree import ElementTree as ET
 from pynakes.authors import split_name_list
 from pynakes.interchange._shared import (
     assign_container,
+    assign_key,
+    build_bibfile,
     person_to_bibtex,
     split_keywords,
     split_pages,
     split_person,
     year_of,
 )
-from pynakes.keys import generate_key, unique_key
-from pynakes.model import BibEntry, BibFile, EntryStore
+from pynakes.model import BibEntry, BibFile
 
 MODS_NS = "http://www.loc.gov/mods/v3"
 NS = {"mods": MODS_NS}
@@ -82,7 +83,7 @@ def _children(parent: ET.Element, local: str) -> list[ET.Element]:
 def _entry_to_mods(entry: BibEntry) -> ET.Element:
     fields = entry.fields
     mods = ET.Element(_q("mods"), {"version": "3.7"})
-    if entry.key:
+    if entry.key.strip():
         mods.set("ID", entry.key)
     _sub(mods, "genre", _BIB_TO_MODS_GENRE.get(entry.type.lower(), "miscellaneous"))
     if fields.get("title"):
@@ -219,9 +220,7 @@ def _mods_to_entry(mods: ET.Element, taken: set[str]) -> BibEntry:
 
     entry = BibEntry(key="", type=bib_type, fields=fields)
     raw_id = (mods.get("ID") or mods.get("id") or "").strip()
-    key = raw_id if raw_id and raw_id.isidentifier() else generate_key(entry)
-    entry.key = unique_key(key, taken)
-    taken.add(entry.key)
+    assign_key(entry, taken, raw_id)
     return entry
 
 
@@ -325,10 +324,5 @@ def _read_identifiers(mods: ET.Element, fields: dict[str, str]) -> None:
 def import_mods(text: str) -> BibFile:
     """Parse MODS XML into a new :class:`BibFile`."""
     root = _parse_xml(text)
-    store = EntryStore()
-    taken: set[str] = set()
-    if root is None:
-        return BibFile(entries=store)
-    for mods in _mods_records(root):
-        store.add(_mods_to_entry(mods, taken))
-    return BibFile(entries=store)
+    records = _mods_records(root) if root is not None else []
+    return build_bibfile(records, _mods_to_entry)

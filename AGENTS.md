@@ -97,7 +97,7 @@ tests pass:
   `metadata`, `journals`) plus top-level commands (`add`, `normalize`,
   `convert`, …); one operation module per concern, kept small and unit-testable
   independent of the CLI.
-- Try to limit file length preferably to ~400 lines, with a maximum limit of 600.
+- Try to limit file length preferably to ~500 lines, with a maximum limit of 800.
 - Add tests and a `CHANGELOG.md` entry with each behavioral change.
 - Use generic, invented example references or alternatively old, famous, historical references to famous papers in various fields in  code, tests, comments, docstrings, and
   `CHANGELOG.md`. Never commit examples

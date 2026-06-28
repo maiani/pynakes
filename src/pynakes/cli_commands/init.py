@@ -8,11 +8,10 @@ single-file modify envelope.
 """
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 
-from pynakes.cli_common import _emit, _emit_error, _safe
+from pynakes.cli_common import _emit, _emit_error, _safe, _verb
 from pynakes.diff import generate_diff
 from pynakes.initialize import (
     apply_overrides,
@@ -27,13 +26,13 @@ from pynakes.io import load_bib, save_text
 
 def init(
     file: str = typer.Argument(..., help="Path to the new .bib library to create"),
-    type_: Optional[str] = typer.Option(
+    type_: str | None = typer.Option(
         None, "--type", help="Library dialect: biblatex or bibtex (sets databaseType)"
     ),
-    key_pattern: Optional[str] = typer.Option(
+    key_pattern: str | None = typer.Option(
         None, "--key-pattern", help="Default citation-key pattern (sets keypatterndefault)"
     ),
-    from_: Optional[str] = typer.Option(
+    from_: str | None = typer.Option(
         None, "--from", help="Copy the metadata profile from an existing .bib library"
     ),
     pinax: bool = typer.Option(
@@ -100,9 +99,8 @@ def init(
     effective = next((e.value for e in entries if e.key.lower() == "databasetype"), None)
     effective_type = effective.strip().rstrip(";").strip().lower() if effective else None
 
-    verb = "Would create" if dry_run else "Created"
     detail = f" [{effective_type}]" if effective_type else ""
-    human = [f"{verb} {file}{detail} with {len(keys)} metadata key(s)."]
+    human = [f"{_verb('create', dry_run)} {file}{detail} with {len(keys)} metadata key(s)."]
     payload = {
         "status": "success",
         "action": "init",

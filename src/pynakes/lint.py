@@ -15,7 +15,7 @@ https://mirrors.ctan.org/macros/latex/contrib/biblatex/doc/biblatex.pdf
 
 import csv
 from dataclasses import dataclass
-from typing import Optional
+from typing import Literal
 
 from pynakes.bibtex_parser import parse_raw_string_definition
 from pynakes.editing import raw_field_names, raw_field_value
@@ -27,7 +27,7 @@ from pynakes.keys import (
     generate_key_from_pattern,
     get_jabref_key_pattern,
 )
-from pynakes.metadata import library_database_type
+from pynakes.metadata import library_database_type, metadata_bool, metadata_list, metadata_value
 from pynakes.model import BibEntry, BibFile, undefined_string_references
 
 RequiredRules = dict[str, list[tuple[str, ...]]]
@@ -52,8 +52,7 @@ _BIBTEX_REQUIRED: RequiredRules = {
 
 _BIBLATEX_REQUIRED: RequiredRules = {
     # BibLaTeX default data model, section 2.1.1 "Entry Types".
-    # Source of truth when editing this table: the official BibLaTeX manual
-    # from CTAN, section 2.1 entry types and aliases:
+    # Source of truth: the official BibLaTeX manual from CTAN, section 2.1:
     # https://mirrors.ctan.org/macros/latex/contrib/biblatex/doc/biblatex.pdf
     "article": [("author",), ("title",), ("journaltitle", "journal"), ("year", "date")],
     "book": [("author",), ("title",), ("year", "date")],
@@ -92,10 +91,6 @@ _BIBLATEX_REQUIREMENT_ALIASES: dict[str, str] = {
     "conference": "inproceedings",
     "electronic": "online",
     "www": "online",
-    # BibLaTeX treats these as thesis/report aliases with a default type.
-    "mastersthesis": "mastersthesis",
-    "phdthesis": "phdthesis",
-    "techreport": "techreport",
 }
 
 _BIBLATEX_ALIAS_REQUIRED: RequiredRules = {
@@ -111,8 +106,7 @@ _DOI_EXPECTED = {"article", "inproceedings"}
 def _required_for_entry_type(entry_type: str, dialect: str) -> list[tuple[str, ...]]:
     """Return built-in required fields for ``entry_type`` in ``dialect``.
 
-    For BibLaTeX, this is derived from the official BibLaTeX manual on CTAN,
-    section 2.1 "Entry Types" and entry-type aliases:
+    For BibLaTeX, derived from the official BibLaTeX manual on CTAN, section 2.1:
     https://mirrors.ctan.org/macros/latex/contrib/biblatex/doc/biblatex.pdf
     """
     etype = entry_type.lower()
@@ -120,13 +114,11 @@ def _required_for_entry_type(entry_type: str, dialect: str) -> list[tuple[str, .
         return _BIBTEX_REQUIRED.get(etype, [])
     if etype in _BIBLATEX_ALIAS_REQUIRED:
         return _BIBLATEX_ALIAS_REQUIRED[etype]
-    target = _BIBLATEX_REQUIREMENT_ALIASES.get(etype, etype)
-    return _BIBLATEX_REQUIRED.get(target, [])
+    return _BIBLATEX_REQUIRED.get(_BIBLATEX_REQUIREMENT_ALIASES.get(etype, etype), [])
 
 
 # Fields excluded from the cross-entry consistency check: structural/reference
-# fields (not bibliographic data) and JabRef-internal management fields that
-# legitimately vary from entry to entry (group membership, file links, dates).
+# fields and JabRef-internal management fields that legitimately vary per entry.
 _CONSISTENCY_SKIP_FIELDS = frozenset(
     {
         "crossref",
@@ -161,8 +153,7 @@ _CONSISTENCY_SKIP_FIELDS = frozenset(
 )
 
 # Profile findings remain warnings for interactive use, but ``lint --strict``
-# treats them as a failed conformance gate. Ordinary advisory lint warnings
-# (such as a missing DOI) remain advisory even in strict mode.
+# treats them as a failed conformance gate.
 PROFILE_ISSUE_TYPES = frozenset(
     {
         "citation_key_pattern_mismatch",
@@ -188,46 +179,21 @@ class LintProfile:
     protected_terms: tuple[str, ...] = ()
 
 
-def _metadata_value(lib: BibFile, name: str) -> str | None:
-    """Return the effective metadata value for ``name``, without ``;``."""
-    metadata = {key.lower(): value for key, value in lib.metadata.items()}
-    value = metadata.get(name.lower())
-    if value is not None:
-        return value.rstrip(";").strip()
-    return None
-
-
-def _metadata_list(value: str | None) -> tuple[str, ...]:
-    if not value:
-        return ()
-    return tuple(part.strip() for part in value.replace(";", ",").split(",") if part.strip())
-
-
-def _metadata_bool(value: str | None, default: bool) -> bool:
-    if value is None:
-        return default
-    if value.lower() in {"1", "true", "yes", "on", "enabled"}:
-        return True
-    if value.lower() in {"0", "false", "no", "off", "disabled"}:
-        return False
-    return default
-
-
 def resolve_lint_profile(lib: BibFile) -> LintProfile:
     """Resolve the same persisted normalization settings that lint can verify."""
-    journal_style = (_metadata_value(lib, "normalize-journal-style") or "none").lower()
+    journal_style = (metadata_value(lib, "normalize-journal-style") or "none").lower()
     title_fields = (
-        _metadata_list(_metadata_value(lib, "normalize-title-fields")) or LintProfile.title_fields
+        metadata_list(metadata_value(lib, "normalize-title-fields")) or LintProfile.title_fields
     )
-    protected_terms = _metadata_list(_metadata_value(lib, "protected-terms"))
-    protect_titles = _metadata_bool(
-        _metadata_value(lib, "normalize-protect-titles"),
+    protected_terms = metadata_list(metadata_value(lib, "protected-terms"))
+    protect_titles = metadata_bool(
+        metadata_value(lib, "normalize-protect-titles"),
         bool(protected_terms),
     )
     return LintProfile(
         journal_style=journal_style,
-        journal_table=_metadata_value(lib, "journal-table"),
-        ltwa_table=_metadata_value(lib, "ltwa-table"),
+        journal_table=metadata_value(lib, "journal-table"),
+        ltwa_table=metadata_value(lib, "ltwa-table"),
         # Normalization protects titles by default, but lint enforces only a
         # stored title preference. This keeps unprofiled libraries advisory.
         protect_titles=protect_titles,
@@ -242,8 +208,8 @@ def profile_required_fields(lib: BibFile, entry_type: str) -> tuple[str, ...]:
     ``lint-required-fields`` applies to every entry and
     ``lint-required-fields-<entrytype>`` adds type-specific requirements.
     """
-    global_fields = _metadata_list(_metadata_value(lib, "lint-required-fields"))
-    type_fields = _metadata_list(_metadata_value(lib, f"lint-required-fields-{entry_type.lower()}"))
+    global_fields = metadata_list(metadata_value(lib, "lint-required-fields"))
+    type_fields = metadata_list(metadata_value(lib, f"lint-required-fields-{entry_type.lower()}"))
     return global_fields + type_fields
 
 
@@ -257,10 +223,10 @@ class LintIssue:
     """A single validation finding."""
 
     type: str
-    severity: str  # "error" | "warning"
+    severity: Literal["error", "warning"]
     message: str
-    key: Optional[str] = None
-    field: Optional[str] = None
+    key: str | None = None
+    field: str | None = None
 
     def to_dict(self) -> dict:
         """Serialize the finding to a JSON-friendly dict for CLI output."""
@@ -334,20 +300,15 @@ def lint(lib: BibFile) -> list[LintIssue]:
         issues.extend(_lint_profile_entry(entry, lib, profile, journal_sources, fields))
 
     issues.extend(_lint_field_consistency(lib, dialect=dialect))
-
     return issues
 
 
 def _lint_field_consistency(lib: BibFile, *, dialect: str = "bibtex") -> list[LintIssue]:
     """Report fields a majority of same-type entries define but some omit.
 
-    This is the analogue of JabRef's consistency check, scoped to be useful as
-    an always-on linter: a field is flagged for an entry only when a strict
-    majority of the entries of that entry type carry it (after inheritance) and
-    this entry does not. Required fields (reported separately) and JabRef
-    structural/management fields are excluded. Findings are advisory warnings;
-    they do not fail ``lint --strict``. A field common to *all* same-type
-    entries, or unique to a few, is not an inconsistency.
+    A field is flagged for an entry only when a strict majority of same-type
+    entries carry it and this entry does not. Required fields and JabRef
+    structural/management fields are excluded. Findings are advisory warnings.
     """
     by_type: dict[str, list[BibEntry]] = {}
     for entry in lib.entries.values():
@@ -358,7 +319,6 @@ def _lint_field_consistency(lib: BibFile, *, dialect: str = "bibtex") -> list[Li
     for etype, entries in by_type.items():
         total = len(entries)
         if total < 3:
-            # A majority among one or two entries is uninformative.
             continue
         required = {
             name
@@ -376,8 +336,8 @@ def _lint_field_consistency(lib: BibFile, *, dialect: str = "bibtex") -> list[Li
         majority = {
             name
             for name, count in present_counts.items()
-            if count < total  # not common to all -> a real divergence
-            and count * 2 > total  # held by a strict majority
+            if count < total
+            and count * 2 > total
             and name not in required
             and name not in _CONSISTENCY_SKIP_FIELDS
         }
@@ -422,11 +382,9 @@ def _lint_undefined_string_definitions(lib: BibFile) -> list[LintIssue]:
 def _lint_undefined_string_references(entry: BibEntry, lib: BibFile) -> list[LintIssue]:
     """Report undefined string names in one entry's original field expressions."""
     if entry.raw_content is None:
-        # In-memory entries have only semantic field values. The writer will
-        # brace-quote those values, so treating them as source expressions here
-        # would create false positives.
+        # In-memory entries have only semantic field values; treating them as
+        # source expressions would create false positives.
         return []
-
     issues: list[LintIssue] = []
     for field in entry.fields:
         value = raw_field_value(entry.raw_content, field)
@@ -446,105 +404,87 @@ def _lint_undefined_string_references(entry: BibEntry, lib: BibFile) -> list[Lin
     return issues
 
 
-def _lint_profile_entry(
-    entry: BibEntry,
-    lib: BibFile,
-    profile: LintProfile,
-    journal_sources: JournalSources | None,
-    fields: dict[str, str] | None = None,
-) -> list[LintIssue]:
-    """Check one entry against persisted preferences without changing it."""
-    issues: list[LintIssue] = []
-    fields = fields or entry.fields
+# ---------------------------------------------------------------------------
+# _lint_entry helpers
+# ---------------------------------------------------------------------------
 
-    pattern = get_jabref_key_pattern(lib, entry.type)
-    if pattern:
+
+def _lint_empty_key(entry: BibEntry) -> list[LintIssue]:
+    """Report an empty citation key."""
+    if entry.key.strip():
+        return []
+    title = entry.fields.get("title", "").strip() or "?"
+    return [
+        LintIssue(
+            "empty_key",
+            "error",
+            f"{entry.type.lower()} entry has an empty citation key (title: {title!r})",
+            key=entry.key,
+        )
+    ]
+
+
+def _lint_doi(entry: BibEntry, fields: dict[str, str]) -> list[LintIssue]:
+    """Check the DOI field for validity; warn when expected but absent."""
+    etype = entry.type.lower()
+    doi = fields.get("doi", "").strip()
+    if doi:
         try:
-            expected_key = generate_key_from_pattern(entry, pattern)
-        except UnsupportedCitationKeyPatternError as exc:
-            issues.append(
+            normalize_doi(doi)
+            return []
+        except ValueError:
+            return [
                 LintIssue(
-                    "unsupported_citation_key_pattern",
+                    "malformed_doi",
                     "warning",
-                    f"Entry {entry.key!r} cannot be checked against key pattern {pattern!r}: {exc}",
+                    f"Entry {entry.key!r} has a malformed DOI: {doi!r}",
                     key=entry.key,
+                    field="doi",
                 )
+            ]
+    if etype in _DOI_EXPECTED:
+        return [
+            LintIssue(
+                "missing_doi",
+                "warning",
+                f"Entry {entry.key!r} ({etype}) has no DOI",
+                key=entry.key,
+                field="doi",
             )
-        else:
-            if entry.key != expected_key:
-                issues.append(
-                    LintIssue(
-                        "citation_key_pattern_mismatch",
-                        "warning",
-                        f"Entry {entry.key!r} does not match configured citation-key pattern "
-                        f"{pattern!r}; expected {expected_key!r}",
-                        key=entry.key,
-                    )
-                )
+        ]
+    return []
 
-    for field in profile_required_fields(lib, entry.type):
-        normalized = field.lower()
-        if not fields.get(normalized, "").strip():
-            issues.append(
-                LintIssue(
-                    "missing_profile_required_field",
-                    "warning",
-                    f"{entry.type.lower()} entry {entry.key!r} is missing profile-required field "
-                    f"{normalized!r}",
-                    key=entry.key,
-                    field=normalized,
-                )
+
+def _lint_groups(entry: BibEntry) -> list[LintIssue]:
+    """Check the groups field for malformed semicolon-separated values."""
+    groups = entry.fields.get("groups")
+    if groups and groups.strip() and any(not s.strip() for s in groups.split(";")):
+        return [
+            LintIssue(
+                "malformed_groups",
+                "warning",
+                f"Entry {entry.key!r} has a malformed groups field: {groups!r}",
+                key=entry.key,
+                field="groups",
             )
+        ]
+    return []
 
-    if profile.protect_titles:
-        for field in profile.title_fields:
-            title = fields.get(field)
-            if title and not title_capitalization_is_protected(
-                title, list(profile.protected_terms)
-            ):
-                issues.append(
-                    LintIssue(
-                        "title_capitalization_unprotected",
-                        "warning",
-                        f"Entry {entry.key!r} field {field!r} is not brace-protected as required "
-                        "by normalize-protect-titles",
-                        key=entry.key,
-                        field=field,
-                    )
-                )
 
-    if profile.journal_style in {"abbreviated", "full"} and journal_sources is not None:
-        for field in JOURNAL_FIELDS:
-            title = fields.get(field)
-            if not title:
-                continue
-            expected_title = expected_journal_title(
-                title, entry, profile.journal_style, journal_sources
-            )
-            if expected_title is None:
-                issues.append(
-                    LintIssue(
-                        "unknown_journal",
-                        "warning",
-                        f"Entry {entry.key!r} field {field!r} has no known "
-                        f"{profile.journal_style!r} journal mapping for {title!r}",
-                        key=entry.key,
-                        field=field,
-                    )
-                )
-            elif expected_title != title:
-                issues.append(
-                    LintIssue(
-                        "journal_style_mismatch",
-                        "warning",
-                        f"Entry {entry.key!r} field {field!r} is not in configured "
-                        f"{profile.journal_style!r} journal style; expected {expected_title!r}",
-                        key=entry.key,
-                        field=field,
-                    )
-                )
-
-    return issues
+def _lint_required_fields(entry: BibEntry, fields: dict[str, str], dialect: str) -> list[LintIssue]:
+    """Report missing required fields for the entry type."""
+    etype = entry.type.lower()
+    return [
+        LintIssue(
+            "missing_required_field",
+            "error",
+            f"{etype} entry {entry.key!r} is missing required field {' or '.join(alternatives)}",
+            key=entry.key,
+            field=alternatives[0],
+        )
+        for alternatives in _required_for_entry_type(etype, dialect)
+        if not any(fields.get(name, "").strip() for name in alternatives)
+    ]
 
 
 def _lint_entry(
@@ -553,10 +493,12 @@ def _lint_entry(
     *,
     dialect: str = "bibtex",
 ) -> list[LintIssue]:
-    issues: list[LintIssue] = []
-    fields = fields or entry.fields
+    """Run structural checks on a single entry; return all findings."""
+    if fields is None:
+        fields = entry.fields
     etype = entry.type.lower()
 
+    issues: list[LintIssue] = []
     if entry.type != etype:
         issues.append(
             LintIssue(
@@ -581,65 +523,138 @@ def _lint_entry(
                 )
             )
 
-    if not entry.key.strip():
-        issues.append(
-            LintIssue(
-                "empty_key",
-                "error",
-                f"{etype} entry has an empty citation key "
-                f"(title: {entry.fields.get('title', '').strip() or '?'!r})",
-                key=entry.key,
-            )
-        )
-
-    for alternatives in _required_for_entry_type(etype, dialect):
-        if not any(fields.get(name, "").strip() for name in alternatives):
-            issues.append(
-                LintIssue(
-                    "missing_required_field",
-                    "error",
-                    f"{etype} entry {entry.key!r} is missing required field "
-                    f"{' or '.join(alternatives)}",
-                    key=entry.key,
-                    field=alternatives[0],
-                )
-            )
-
-    doi = fields.get("doi", "").strip()
-    if doi:
-        try:
-            normalize_doi(doi)
-        except ValueError:
-            issues.append(
-                LintIssue(
-                    "malformed_doi",
-                    "warning",
-                    f"Entry {entry.key!r} has a malformed DOI: {doi!r}",
-                    key=entry.key,
-                    field="doi",
-                )
-            )
-    elif etype in _DOI_EXPECTED:
-        issues.append(
-            LintIssue(
-                "missing_doi",
-                "warning",
-                f"Entry {entry.key!r} ({etype}) has no DOI",
-                key=entry.key,
-                field="doi",
-            )
-        )
-
-    groups = entry.fields.get("groups")
-    if groups and groups.strip() and any(not s.strip() for s in groups.split(";")):
-        issues.append(
-            LintIssue(
-                "malformed_groups",
-                "warning",
-                f"Entry {entry.key!r} has a malformed groups field: {groups!r}",
-                key=entry.key,
-                field="groups",
-            )
-        )
-
+    issues += _lint_empty_key(entry)
+    issues += _lint_required_fields(entry, fields, dialect)
+    issues += _lint_doi(entry, fields)
+    issues += _lint_groups(entry)
     return issues
+
+
+# ---------------------------------------------------------------------------
+# _lint_profile_entry helpers
+# ---------------------------------------------------------------------------
+
+
+def _lint_key_pattern(entry: BibEntry, lib: BibFile) -> list[LintIssue]:
+    """Check the entry's citation key against the configured JabRef key pattern."""
+    pattern = get_jabref_key_pattern(lib, entry.type)
+    if not pattern:
+        return []
+    try:
+        expected_key = generate_key_from_pattern(entry, pattern)
+    except UnsupportedCitationKeyPatternError as exc:
+        return [
+            LintIssue(
+                "unsupported_citation_key_pattern",
+                "warning",
+                f"Entry {entry.key!r} cannot be checked against key pattern {pattern!r}: {exc}",
+                key=entry.key,
+            )
+        ]
+    if entry.key != expected_key:
+        return [
+            LintIssue(
+                "citation_key_pattern_mismatch",
+                "warning",
+                f"Entry {entry.key!r} does not match configured citation-key pattern "
+                f"{pattern!r}; expected {expected_key!r}",
+                key=entry.key,
+            )
+        ]
+    return []
+
+
+def _lint_journal_style(
+    entry: BibEntry,
+    fields: dict[str, str],
+    profile: LintProfile,
+    journal_sources: JournalSources | None,
+) -> list[LintIssue]:
+    """Check entry journal fields against the configured journal style."""
+    if profile.journal_style not in {"abbreviated", "full"} or journal_sources is None:
+        return []
+    issues: list[LintIssue] = []
+    for field in JOURNAL_FIELDS:
+        title = fields.get(field)
+        if not title:
+            continue
+        expected_title = expected_journal_title(
+            title, entry, profile.journal_style, journal_sources
+        )
+        if expected_title is None:
+            issues.append(
+                LintIssue(
+                    "unknown_journal",
+                    "warning",
+                    f"Entry {entry.key!r} field {field!r} has no known "
+                    f"{profile.journal_style!r} journal mapping for {title!r}",
+                    key=entry.key,
+                    field=field,
+                )
+            )
+        elif expected_title != title:
+            issues.append(
+                LintIssue(
+                    "journal_style_mismatch",
+                    "warning",
+                    f"Entry {entry.key!r} field {field!r} is not in configured "
+                    f"{profile.journal_style!r} journal style; expected {expected_title!r}",
+                    key=entry.key,
+                    field=field,
+                )
+            )
+    return issues
+
+
+def _lint_consistency(
+    entry: BibEntry, lib: BibFile, profile: LintProfile, fields: dict[str, str]
+) -> list[LintIssue]:
+    """Check profile-required fields and title-capitalisation protection."""
+    issues: list[LintIssue] = []
+    for field in profile_required_fields(lib, entry.type):
+        normalized = field.lower()
+        if not fields.get(normalized, "").strip():
+            issues.append(
+                LintIssue(
+                    "missing_profile_required_field",
+                    "warning",
+                    f"{entry.type.lower()} entry {entry.key!r} is missing profile-required field "
+                    f"{normalized!r}",
+                    key=entry.key,
+                    field=normalized,
+                )
+            )
+    if profile.protect_titles:
+        for field in profile.title_fields:
+            title = fields.get(field)
+            if title and not title_capitalization_is_protected(
+                title, list(profile.protected_terms)
+            ):
+                issues.append(
+                    LintIssue(
+                        "title_capitalization_unprotected",
+                        "warning",
+                        f"Entry {entry.key!r} field {field!r} is not brace-protected as required "
+                        "by normalize-protect-titles",
+                        key=entry.key,
+                        field=field,
+                    )
+                )
+    return issues
+
+
+def _lint_profile_entry(
+    entry: BibEntry,
+    lib: BibFile,
+    profile: LintProfile,
+    journal_sources: JournalSources | None,
+    fields: dict[str, str] | None = None,
+) -> list[LintIssue]:
+    """Check one entry against persisted preferences without changing it."""
+    if fields is None:
+        fields = entry.fields
+    return (
+        _lint_key_pattern(entry, lib)
+        + _lint_consistency(entry, lib, profile, fields)
+        + _lint_journal_style(entry, fields, profile, journal_sources)
+    )

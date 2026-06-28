@@ -96,13 +96,14 @@ def _apply_one(coll: Bibliography, op: str, params: dict) -> dict:
     if op == "fields.clear":
         return {"changed": coll.clear_field(params["field"], params.get("where"))}
     if op == "fields.protect_title":
-        return {
-            "changed": coll.protect_title(
-                field=params.get("field", "title"),
-                where=params.get("where"),
-                terms=params.get("terms"),
-            )
-        }
+        field = params.get("field", "title")
+        where = coll._where(params.get("where"))
+        selected = [entry for entry in coll.lib.entries.values() if where is None or where(entry)]
+        changed = coll.protect_title(field=field, where=where, terms=params.get("terms"))
+        result: dict[str, object] = {"changed": changed}
+        if selected and not any(field in entry.fields for entry in selected):
+            result["warnings"] = [f"No matching entries had field {field!r}"]
+        return result
     if op == "groups.add_entry":
         return {"changed": coll.add_to_group(params["key"], params["group"])}
     if op == "groups.remove_entry":
@@ -123,7 +124,7 @@ def _apply_one(coll: Bibliography, op: str, params: dict) -> dict:
             params["key"], params["value"], namespace=params.get("namespace")
         )
         return {"key": update.key, "namespace": update.namespace, "created": update.created}
-    raise AssertionError(f"unhandled op {op!r}")  # pragma: no cover
+    raise NotImplementedError(f"unhandled batch operation {op!r}")
 
 
 def apply_operations(coll: Bibliography, operations: list[dict]) -> list[dict]:

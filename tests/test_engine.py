@@ -222,3 +222,12 @@ def test_entry_edits_survives_unsnapshotted_entry_with_raw_content() -> None:
     coll.lib.entries.add(extra)
     coll.rename_field("title", "mytitle")
     assert "mytitle" in coll.diff()
+
+
+def test_unsnapshotted_raw_entry_counts_as_changed_for_full_rewrite() -> None:
+    coll = Bibliography.from_text("@article{A,\n  title = {T}\n}\n")
+    extra = parse_bib("@article{B,\n  title = {Extra}\n}\n").entries["B"]
+    coll.lib.entries.add(extra)
+
+    assert coll.changed_entries_count() == 1
+    assert "@article{B," in coll.preview()

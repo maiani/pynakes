@@ -3,14 +3,15 @@
 from pynakes.authors import split_name_list
 from pynakes.interchange._shared import (
     assign_container,
+    assign_key,
+    build_bibfile,
     person_to_bibtex,
     split_keywords,
     split_pages,
     split_person,
     year_of,
 )
-from pynakes.keys import generate_key, unique_key
-from pynakes.model import BibEntry, BibFile, EntryStore
+from pynakes.model import BibEntry, BibFile
 
 _BIB_TO_RIS_TYPE = {
     "article": "JOUR",
@@ -63,19 +64,14 @@ _BIB_TO_RIS_FIELD = {
     "series": "T3",
     "note": "N1",
 }
-_RIS_TO_BIB_FIELD = {
-    "TI": "title",
-    "T1": "title",
-    "PB": "publisher",
+# Auto-generated from _BIB_TO_RIS_FIELD; overrides fix collisions and expand import vocab.
+# "address"/"location" → "CY" → prefer "address" on import.
+# "number"/"issue" → "IS" → prefer "number" on import.
+# T1, JO, JF, SN are import-only aliases not present in the forward dict.
+_RIS_TO_BIB_FIELD = {v: k for k, v in _BIB_TO_RIS_FIELD.items()} | {
     "CY": "address",
-    "VL": "volume",
     "IS": "number",
-    "DO": "doi",
-    "UR": "url",
-    "AB": "abstract",
-    "ET": "edition",
-    "T3": "series",
-    "N1": "note",
+    "T1": "title",
     "JO": "journal",
     "JF": "journal",
     "SN": "isbn",
@@ -158,8 +154,7 @@ def _ris_record_to_entry(record: list[tuple[str, str]], taken: set[str]) -> BibE
         fields["keywords"] = ", ".join(keywords)
 
     entry = BibEntry(key="", type=bib_type, fields=fields)
-    entry.key = unique_key(generate_key(entry), taken)
-    taken.add(entry.key)
+    assign_key(entry, taken)
     return entry
 
 
@@ -170,9 +165,9 @@ def export_ris(lib: BibFile) -> str:
     return "\n\n".join(records) + ("\n" if records else "")
 
 
-def import_ris(text: str) -> BibFile:
-    store = EntryStore()
-    taken: set[str] = set()
+def _parse_ris_records(text: str) -> list[list[tuple[str, str]]]:
+    """Split raw RIS text into a list of tag-value records."""
+    records: list[list[tuple[str, str]]] = []
     record: list[tuple[str, str]] = []
     for raw in text.splitlines():
         line = raw.rstrip("\r")
@@ -182,10 +177,14 @@ def import_ris(text: str) -> BibFile:
                 record = [(tag, value)]
             elif tag == "ER":
                 if record:
-                    store.add(_ris_record_to_entry(record, taken))
+                    records.append(record)
                 record = []
             elif record:
                 record.append((tag, value))
     if record:
-        store.add(_ris_record_to_entry(record, taken))
-    return BibFile(entries=store)
+        records.append(record)
+    return records
+
+
+def import_ris(text: str) -> BibFile:
+    return build_bibfile(_parse_ris_records(text), _ris_record_to_entry)

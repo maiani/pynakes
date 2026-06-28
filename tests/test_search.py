@@ -3,7 +3,7 @@
 import pytest
 
 from pynakes.bibtex_parser import parse_bib
-from pynakes.search import parse_search_query, search_entries
+from pynakes.search import _candidate_values, parse_search_query, search_entries
 
 _LIB = (
     "@article{Alpha2024,\n"
@@ -48,6 +48,13 @@ def test_field_limit_restricts_stored_field_search_and_output() -> None:
         {"title": "Neural Widgets for Small Libraries"},
         {"title": "Manual Widgets"},
     ]
+
+
+def test_candidate_values_normalizes_scoped_field_against_filter() -> None:
+    entry = parse_bib("@article{A, title={Manual Widgets}}\n").entries["A"]
+
+    assert _candidate_values(entry, "TITLE", {"title"}) == [("title", "Manual Widgets")]
+    assert _candidate_values(entry, "TITLE", {"author"}) == []
 
 
 def test_case_sensitive_search() -> None:

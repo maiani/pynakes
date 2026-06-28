@@ -5,7 +5,6 @@ retaining the stable CLI contract.
 """
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -20,10 +19,11 @@ from pynakes.cli_common import (
     _preview_or_commit,
     _run_checks,
     _safe,
+    _verb,
 )
 from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography, ExternalModificationError
-from pynakes.io import load_bib, save_plain_text
+from pynakes.io import save_plain_text
 from pynakes.usage import (
     extract_keys_from_tex,
     iter_tex_files,
@@ -35,8 +35,8 @@ from pynakes.usage import (
 
 
 def _keys_check_one(file: str) -> CheckOutcome:
-    lib = load_bib(file)
-    duplicates = keys_ops.duplicate_key_counts(lib)
+    coll = Bibliography.open(file)
+    duplicates = keys_ops.duplicate_key_counts(coll.lib)
     result = {
         "status": "success",
         "action": "keys_check",
@@ -72,7 +72,7 @@ def _rename_payload(renames: list[tuple[str, str]]) -> dict:
 
 def keys_generate(
     file: str = typer.Argument(..., help="Path to the .bib file"),
-    key: Optional[str] = typer.Option(
+    key: str | None = typer.Option(
         None,
         "--key",
         help="Regenerate only this citation key instead of every key",
@@ -89,11 +89,11 @@ def keys_generate(
         rename = coll.generate_key(key)
         renames = [rename] if rename is not None else []
     if key is None:
-        verb = "Would rename" if dry_run else "Renamed"
-        human = [f"{verb} {len(renames)} {_entries(len(renames))}."]
+        human = [f"{_verb('rename', dry_run)} {len(renames)} {_entries(len(renames))}."]
     elif renames:
-        verb = "Would normalize" if dry_run else "Normalized"
-        human = [f"{verb} citation key {renames[0][0]!r} to {renames[0][1]!r}."]
+        human = [
+            f"{_verb('normalize', dry_run)} citation key {renames[0][0]!r} to {renames[0][1]!r}."
+        ]
     else:
         human = [f"Citation key {key!r} already matches the preferred pattern."]
     human += [f"  {old} -> {new}" for old, new in renames]
@@ -119,8 +119,7 @@ def keys_repair(
     """Rename duplicate citation keys so every key is unique."""
     coll = Bibliography.open(file)
     renames = coll.repair_keys()
-    verb = "Would repair" if dry_run else "Repaired"
-    human = [f"{verb} {len(renames)} duplicate key(s)."]
+    human = [f"{_verb('repair', dry_run)} {len(renames)} duplicate key(s)."]
     human += [f"  {old} -> {new}" for old, new in renames]
 
     # A repaired key still exists on the first (kept) entry, so a TeX
@@ -176,7 +175,7 @@ def keys_rename(
     file: str = typer.Argument(..., help="Path to the .bib file"),
     old: str = typer.Argument(..., help="Existing citation key"),
     new: str = typer.Argument(..., help="New citation key"),
-    sources: Optional[list[str]] = typer.Argument(
+    sources: list[str] | None = typer.Argument(
         None,
         help="One or more .tex files or directories whose citations should be updated "
         "(defaults to the library's 'tex-sources' metadata)",
@@ -267,9 +266,8 @@ def keys_rename(
     source_modified = any(change["modified"] for change in source_changes)
     modified = bib_modified or source_modified
 
-    verb = "Would rename" if dry_run else "Renamed"
     human = [
-        f"{verb} citation key {old!r} to {new!r}.",
+        f"{_verb('rename', dry_run)} citation key {old!r} to {new!r}.",
         f"  bib entries changed={bib_changed}, TeX citations changed={total_source_occurrences}",
     ]
     _emit(

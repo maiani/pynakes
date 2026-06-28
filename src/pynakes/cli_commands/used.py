@@ -6,7 +6,6 @@ retaining the stable CLI contract.
 
 import json as _json
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -15,6 +14,7 @@ from pynakes.cli_common import (
     _entries,
     _preview_or_commit,
     _safe,
+    _verb,
 )
 from pynakes.engine import Bibliography
 from pynakes.io import save_bib
@@ -32,16 +32,16 @@ from pynakes.usage import (
 
 def used(
     bib_file: str = typer.Argument(..., help="Path to the .bib library"),
-    sources: Optional[list[str]] = typer.Argument(
+    sources: list[str] | None = typer.Argument(
         None,
         help="One or more .tex/.aux files or directories to scan "
         "(defaults to the library's 'tex-sources' metadata)",
     ),
-    out: Optional[str] = typer.Option(
+    out: str | None = typer.Option(
         None, "--out", help="Write a subset .bib containing only the used entries"
     ),
-    group: Optional[str] = typer.Option(None, "--group", help="Tag used entries into this group"),
-    keyword: Optional[str] = typer.Option(
+    group: str | None = typer.Option(None, "--group", help="Tag used entries into this group"),
+    keyword: str | None = typer.Option(
         None, "--keyword", help="Tag used entries with this keyword"
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would change without writing"),
@@ -119,11 +119,14 @@ def used(
             typer.echo(f"  - {key}  (cited but not in library)")
 
     if tag_field:
-        verb = "Would tag" if dry_run else "Tagged"
-        typer.echo(f'{verb} {tagged} {_entries(tagged)} with {tag_field} = "{group or keyword}".')
+        typer.echo(
+            f"{_verb('tag', dry_run, 'Tagged')} {tagged} {_entries(tagged)}"
+            f' with {tag_field} = "{group or keyword}".'
+        )
     if out:
-        verb = "Would write" if dry_run else "Wrote"
-        typer.echo(f"{verb} {len(report.used)} {_entries(len(report.used))} to {out}.")
+        typer.echo(
+            f"{_verb('write', dry_run, 'Wrote')} {len(report.used)} {_entries(len(report.used))} to {out}."
+        )
     if diff and bib_diff:
         typer.echo("")
         typer.echo(bib_diff)

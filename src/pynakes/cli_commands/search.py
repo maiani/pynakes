@@ -1,7 +1,6 @@
 """CLI command registration for bibliography search."""
 
 import json as _json
-from typing import Optional
 
 import typer
 
@@ -16,17 +15,17 @@ def search(
         ...,
         help='Search query: words/phrases, optionally scoped as field:term or field:"phrase"',
     ),
-    file: Optional[str] = typer.Argument(
+    file: str | None = typer.Argument(
         None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
     ),
-    field: Optional[list[str]] = typer.Option(
+    field: list[str] | None = typer.Option(
         None,
         "--field",
         help="Restrict stored fields searched and returned; repeat for multiple fields",
     ),
-    where: Optional[str] = typer.Option(None, "--where", help="Filter expression"),
+    where: str | None = typer.Option(None, "--where", help="Filter expression"),
     case_sensitive: bool = typer.Option(False, "--case-sensitive", help="Match case sensitively"),
-    limit: Optional[int] = typer.Option(None, "--limit", help="Maximum number of matches"),
+    limit: int | None = typer.Option(None, "--limit", help="Maximum number of matches"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Search entries by free text, phrases, or field-scoped terms."""

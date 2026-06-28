@@ -217,6 +217,10 @@ def test_html_to_latex_parity(expected: str, value: str) -> None:
     assert html_to_latex(value) == expected
 
 
+def test_html_to_latex_preserves_literal_dollar_pairs() -> None:
+    assert html_to_latex("Cost: $$50") == "Cost: $$50"
+
+
 # --- html_to_unicode -------------------------------------------------------
 
 HTML_TO_UNICODE_VECTORS = [

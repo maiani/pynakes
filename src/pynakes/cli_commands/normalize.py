@@ -4,8 +4,6 @@ This module keeps command callbacks separate from application assembly while
 retaining the stable CLI contract.
 """
 
-from typing import Optional
-
 import typer
 
 from pynakes import normalize as normalize_ops
@@ -15,6 +13,7 @@ from pynakes.cli_common import (
     _finish_mod,
     _resolve_input_bib,
     _safe,
+    _verb,
 )
 from pynakes.engine import Bibliography
 
@@ -33,7 +32,7 @@ def _optional_bool(value: str) -> bool | None:
 
 
 def normalize(
-    file: Optional[str] = typer.Argument(
+    file: str | None = typer.Argument(
         None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
     ),
     title_protection: str = typer.Option(
@@ -41,12 +40,12 @@ def normalize(
         "--title-protection",
         help="metadata, on, or off",
     ),
-    title_field: Optional[list[str]] = typer.Option(
+    title_field: list[str] | None = typer.Option(
         None,
         "--title-field",
         help="Title-like field to brace-protect; can be repeated",
     ),
-    term: Optional[list[str]] = typer.Option(
+    term: list[str] | None = typer.Option(
         None,
         "--term",
         help="Additional exact title term to brace-protect; can be repeated",
@@ -61,12 +60,12 @@ def normalize(
         "--journal-style",
         help="metadata, abbreviated, full, or none (default: no change unless metadata sets it)",
     ),
-    journal_table: Optional[str] = typer.Option(
+    journal_table: str | None = typer.Option(
         None,
         "--journal-table",
         help="CSV/TSV with title, abbreviation, and optional ISSN mappings",
     ),
-    ltwa_table: Optional[str] = typer.Option(
+    ltwa_table: str | None = typer.Option(
         None,
         "--ltwa-table",
         help="CSV/TSV LTWA word abbreviation table",
@@ -111,9 +110,8 @@ def normalize(
     except ValueError as exc:
         _emit_error(json_output, "InvalidNormalizeOption", str(exc))
 
-    verb = "Would normalize" if dry_run else "Normalized"
     human = [
-        f"{verb} entries.",
+        f"{_verb('normalize', dry_run)} entries.",
         "  "
         f"titles={sum(report.title_fields.values())}, "
         f"authors={report.authors}, journals={report.journals}, dois={report.dois}, "

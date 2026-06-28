@@ -158,10 +158,11 @@ def _candidate_values(
     if field == "type":
         return [("type", entry.type)]
     if field is not None:
-        if field_filter is not None and field not in field_filter:
+        normalized = field.lower()
+        if field_filter is not None and normalized not in field_filter:
             return []
-        value = entry.fields.get(field)
-        return [(field, value)] if value is not None else []
+        value = next((v for k, v in entry.fields.items() if k.lower() == normalized), None)
+        return [(normalized, value)] if value is not None else []
 
     values = [("key", entry.key), ("type", entry.type)]
     values.extend(

@@ -17,7 +17,6 @@ The two layers:
 
 import re
 from collections.abc import Callable, Iterable
-from typing import Optional, Union
 
 from pynakes.model import BibEntry
 
@@ -31,6 +30,16 @@ _HEADER_RE = re.compile(r"(@[A-Za-z][A-Za-z0-9_:-]*\s*[{(]\s*)([^,\s]*)(\s*,)")
 # the key, braces, or anything else.
 _TYPE_RE = re.compile(r"(@)([A-Za-z][A-Za-z0-9_:-]*)")
 _FIELD_NAME_RE = re.compile(r"([A-Za-z][A-Za-z0-9_:-]*)\s*=")
+
+
+def _is_escaped(text: str, index: int) -> bool:
+    """Return True if the character at *index* is preceded by an odd number of backslashes."""
+    backslashes = 0
+    index -= 1
+    while index >= 0 and text[index] == "\\":
+        backslashes += 1
+        index -= 1
+    return bool(backslashes % 2)
 
 
 # --- locating a field within raw entry text --------------------------------
@@ -53,7 +62,7 @@ def _scan_value_end(raw: str, pos: int) -> int:
     i = pos
     while i < len(raw):
         char = raw[i]
-        if char == '"' and (i == 0 or raw[i - 1] != "\\") and brace_depth == 0:
+        if char == '"' and not _is_escaped(raw, i) and brace_depth == 0:
             in_quotes = not in_quotes
         elif not in_quotes:
             if char == "{":
@@ -66,7 +75,7 @@ def _scan_value_end(raw: str, pos: int) -> int:
     return len(raw)
 
 
-def _find_field(raw: str, field_name: str) -> Optional[tuple[int, int, int]]:
+def _find_field(raw: str, field_name: str) -> tuple[int, int, int] | None:
     """Locate a field assignment in raw entry text.
 
     Returns ``(name_start, value_start, value_end)`` for the first real
@@ -179,7 +188,7 @@ def set_raw_field(raw: str, field_name: str, new_value: str) -> str:
         _, value_start, value_end = found
         return raw[:value_start] + "{" + new_value + "}" + raw[value_end:]
 
-    line_ending = "\r\n" if "\r\n" in raw else "\n"
+    line_ending = "\r\n" if "\r\n" in raw else ("\r" if "\r" in raw else "\n")
     close = _outer_close_position(raw)
     if close is None:
         return raw
@@ -252,7 +261,7 @@ def set_raw_type(raw: str, new_type: str) -> str:
     return _TYPE_RE.sub(lambda m: f"{m.group(1)}{new_type}", raw, count=1)
 
 
-def splice_into_text(original_text: str, edits: Iterable[tuple[str, str]]) -> Union[str, None]:
+def splice_into_text(original_text: str, edits: Iterable[tuple[str, str]]) -> str | None:
     """Splice surgically-edited entry blocks back into the original file text.
 
     Each edit is ``(old_raw, new_raw)``. Replacing each entry's exact original

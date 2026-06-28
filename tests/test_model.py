@@ -135,6 +135,31 @@ class TestBibLibrary:
         assert lib.strings["IEEE"] == "IEEE Transactions"
         assert lib.strings["ACM"] == "ACM Computing Surveys"
 
+    def test_derive_preserves_library_level_data_without_source_layout(self) -> None:
+        """Test deriving a subset library from existing top-level data."""
+        entry = BibEntry(key="A", type="article", fields={})
+        lib = BibFile(
+            entries=[entry],
+            strings={"venue": "{Journal}"},
+            raw_strings=["@string{venue = {Journal}}"],
+            raw_comments=["@comment{pynakes-meta: files-dir:refs.files;}"],
+            encoding="latin-1",
+            line_ending="\r\n",
+            source_layout=[("", "entry", entry)],
+            source_trailing="% tail",
+        )
+
+        derived = lib.derive([entry])
+
+        assert list(derived.entries.values()) == [entry]
+        assert derived.strings == lib.strings
+        assert derived.raw_strings == lib.raw_strings
+        assert derived.raw_comments == lib.raw_comments
+        assert derived.encoding == "latin-1"
+        assert derived.line_ending == "\r\n"
+        assert derived.source_layout == []
+        assert derived.source_trailing == ""
+
     def test_library_with_preamble(self) -> None:
         """Test library with preamble."""
         lib = BibFile(

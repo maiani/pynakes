@@ -4,8 +4,6 @@ This module keeps command callbacks separate from application assembly while
 retaining the stable CLI contract.
 """
 
-from typing import Optional
-
 import typer
 
 from pynakes import files as files_ops
@@ -20,7 +18,7 @@ from pynakes.io import load_bib
 # --- files -----------------------------------------------------------------
 
 
-def _files_check_one(file: str, root: Optional[list[str]], fix: bool = False) -> CheckOutcome:
+def _files_check_one(file: str, root: list[str] | None, fix: bool = False) -> CheckOutcome:
     lib = load_bib(file)
     report = files_ops.check_linked_files(lib, file, root)
     store = FileStore.from_metadata(lib, file)
@@ -80,7 +78,7 @@ def _files_check_one(file: str, root: Optional[list[str]], fix: bool = False) ->
 
 def files_check(
     files: list[str] = typer.Argument(..., help="One or more .bib files"),
-    root: Optional[list[str]] = typer.Option(
+    root: list[str] | None = typer.Option(
         None,
         "--root",
         help="Additional directory to resolve relative linked-file paths; can be repeated",

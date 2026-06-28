@@ -127,9 +127,15 @@ class TestAnalysis:
 
 class TestSubsetExport:
     def test_subset_keeps_only_requested(self) -> None:
-        lib = parse_bib("@article{A,year={1}}\n@article{B,year={2}}\n@article{C,year={3}}\n")
+        lib = parse_bib(
+            "@string{venue = {Journal}}\n"
+            "@article{A,year={1}, journal=venue}\n"
+            "@article{B,year={2}}\n"
+            "@article{C,year={3}}\n"
+        )
         sub = subset_library(lib, ["A", "C"])
         assert sorted(sub.entries.keys()) == ["A", "C"]
+        assert sub.raw_strings == ["@string{venue = {Journal}}"]
         # The subset is a valid, parseable library.
         reparsed = parse_bib(write_bib(sub))
         assert sorted(reparsed.entries.keys()) == ["A", "C"]

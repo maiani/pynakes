@@ -4,8 +4,6 @@ This module keeps command callbacks separate from application assembly while
 retaining the stable CLI contract.
 """
 
-from typing import Optional
-
 import typer
 
 from pynakes.cli_common import (
@@ -16,6 +14,7 @@ from pynakes.cli_common import (
     _resolve_input_bib,
     _run_checks,
     _safe,
+    _verb,
 )
 from pynakes.engine import Bibliography
 
@@ -23,7 +22,7 @@ from pynakes.engine import Bibliography
 
 
 def _verify_one(
-    file: str, online: bool, cache_dir: Optional[str], strict: bool, published: bool
+    file: str, online: bool, cache_dir: str | None, strict: bool, published: bool
 ) -> CheckOutcome:
     coll = Bibliography.open(file)
     cache = _metadata_cache_dir(file, cache_dir, online)
@@ -78,7 +77,7 @@ def verify(
         help="Also report preprints that now have a published version available "
         "(read-only; informational, does not affect --strict)",
     ),
-    cache_dir: Optional[str] = typer.Option(
+    cache_dir: str | None = typer.Option(
         None, "--cache-dir", help="Directory for deterministic provider-response cache"
     ),
     strict: bool = typer.Option(False, "--strict", help="Exit 1 if warnings or errors are found"),
@@ -99,7 +98,7 @@ def verify(
 
 
 def enrich(
-    file: Optional[str] = typer.Argument(
+    file: str | None = typer.Argument(
         None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
     ),
     online: bool = typer.Option(
@@ -113,7 +112,7 @@ def enrich(
         help="Also promote preprints to their published version, writing the "
         "published DOI/journal when one is available (use with --online)",
     ),
-    cache_dir: Optional[str] = typer.Option(
+    cache_dir: str | None = typer.Option(
         None, "--cache-dir", help="Directory for deterministic provider-response cache"
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
@@ -133,9 +132,8 @@ def enrich(
     updates = list(report.updates)
     warnings = list(report.warnings)
     extra: dict[str, object] = {}
-    verb = "Would enrich" if dry_run else "Enriched"
     human = [
-        f"{verb} {report.changed_entries} {_entries(report.changed_entries)}.",
+        f"{_verb('enrich', dry_run, 'Enriched')} {report.changed_entries} {_entries(report.changed_entries)}.",
         f"  field_updates={report.changed_fields}",
     ]
     if published:

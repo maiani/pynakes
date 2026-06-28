@@ -4,6 +4,8 @@ import json
 
 from pynakes.interchange._shared import (
     assign_container,
+    assign_key,
+    build_bibfile,
     date_part,
     entry_people,
     month_number,
@@ -11,8 +13,7 @@ from pynakes.interchange._shared import (
     split_pages,
     year_of,
 )
-from pynakes.keys import generate_key, unique_key
-from pynakes.model import BibEntry, BibFile, EntryStore
+from pynakes.model import BibEntry, BibFile
 
 _BIB_TO_CSL_TYPE = {
     "article": "article-journal",
@@ -74,22 +75,12 @@ _BIB_TO_CSL_FIELD = {
     "language": "language",
     "chapter": "chapter-number",
 }
-_CSL_TO_BIB_FIELD = {
-    "title": "title",
-    "publisher": "publisher",
+# Auto-generated from _BIB_TO_CSL_FIELD; overrides fix collisions and preferred mappings.
+# "address"/"location" → "publisher-place" → prefer "address" on import.
+# "number"/"issue" → "issue" → prefer "number" on import.
+_CSL_TO_BIB_FIELD = {v: k for k, v in _BIB_TO_CSL_FIELD.items()} | {
     "publisher-place": "address",
-    "volume": "volume",
     "issue": "number",
-    "DOI": "doi",
-    "URL": "url",
-    "ISBN": "isbn",
-    "ISSN": "issn",
-    "note": "note",
-    "abstract": "abstract",
-    "edition": "edition",
-    "collection-title": "series",
-    "language": "language",
-    "chapter-number": "chapter",
 }
 
 
@@ -157,9 +148,7 @@ def _csl_to_entry(item: dict, taken: set[str]) -> BibEntry:
 
     entry = BibEntry(key="", type=bib_type, fields=fields)
     raw_id = str(item.get("id", "")).strip()
-    key = raw_id if raw_id and raw_id.isidentifier() else generate_key(entry)
-    entry.key = unique_key(key, taken)
-    taken.add(entry.key)
+    assign_key(entry, taken, raw_id)
     return entry
 
 
@@ -168,13 +157,14 @@ def export_csl_json(lib: BibFile) -> str:
     return json.dumps(items, indent=2, ensure_ascii=False)
 
 
+def _csl_item_to_entry(item: object, taken: set[str]) -> BibEntry | None:
+    if not isinstance(item, dict):
+        return None
+    return _csl_to_entry(item, taken)
+
+
 def import_csl_json(text: str) -> BibFile:
     data = json.loads(text) if text.strip() else []
     if isinstance(data, dict):
         data = [data]
-    store = EntryStore()
-    taken: set[str] = set()
-    for item in data:
-        if isinstance(item, dict):
-            store.add(_csl_to_entry(item, taken))
-    return BibFile(entries=store)
+    return build_bibfile(data, _csl_item_to_entry)

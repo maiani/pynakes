@@ -2,14 +2,17 @@
 
 import functools
 import json as _json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
+from typing import TypeVar
 
 import typer
 
 from pynakes.bibtex_parser import ParseError
 from pynakes.engine import Bibliography, ExternalModificationError
+
+_F = TypeVar("_F", bound=Callable)
 
 # --- shared helpers --------------------------------------------------------
 
@@ -63,6 +66,18 @@ def _entries(count: int) -> str:
     return "entry" if count == 1 else "entries"
 
 
+def _verb(action: str, dry_run: bool, past: str | None = None) -> str:
+    """Return ``"Would <action>"`` in dry-run mode, or the past-tense form otherwise.
+
+    For regular verbs the past tense is derived automatically (e.g. ``"rename"``
+    → ``"Renamed"``). Pass ``past`` explicitly for irregular or special forms
+    (e.g. ``past="Wrote"`` for ``"write"``).
+    """
+    if dry_run:
+        return f"Would {action}"
+    return past if past is not None else f"{action.capitalize()}d"
+
+
 def _emit_error(json_output: bool, error: str, message: str, code: int = 1, **extra) -> None:
     if json_output:
         typer.echo(
@@ -85,7 +100,7 @@ def _emit_conflict(json_output: bool, error: str, message: str, **extra) -> None
     raise typer.Exit(code=2)
 
 
-def _safe(fn):
+def _safe(fn: _F) -> _F:
     """Turn expected failures into structured exit-1 errors instead of tracebacks.
 
     Honors the agent contract: a missing/unreadable file, malformed BibTeX, or
@@ -123,6 +138,9 @@ def _safe(fn):
                 ],
             )
         except ValueError as exc:
+            # By convention, operation modules raise ValueError to signal
+            # invalid user-supplied data (bad field name, malformed key, etc.).
+            # Programming errors should use a different exception type.
             _emit_error(json_output, "InvalidInput", str(exc))
         except OSError as exc:
             _emit_error(json_output, "IOError", str(exc))
@@ -192,7 +210,7 @@ def _finish_mod(
     _emit(json_output, result, human, diff_text, diff)
 
 
-def _metadata_cache_dir(file: str, cache_dir: Optional[str], online: bool) -> str | None:
+def _metadata_cache_dir(file: str, cache_dir: str | None, online: bool) -> str | None:
     if cache_dir is not None:
         return cache_dir
     if not online:

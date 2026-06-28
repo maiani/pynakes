@@ -9,7 +9,6 @@ file and *imports* it to BibTeX (``--from csl-json``/``ris``/``mods``/``endnote`
 
 import json as _json
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -21,6 +20,7 @@ from pynakes.cli_common import (
     _finish_mod,
     _resolve_input_bib,
     _safe,
+    _verb,
 )
 from pynakes.engine import Bibliography
 from pynakes.interchange import FORMATS, export_library, import_library
@@ -32,20 +32,20 @@ _DIALECTS = ("biblatex", "bibtex")
 
 
 def convert(
-    file: Optional[str] = typer.Argument(
+    file: str | None = typer.Argument(
         None, help="Path to the input file (default: auto-detect single .bib in cwd)"
     ),
-    to: Optional[str] = typer.Option(
+    to: str | None = typer.Option(
         None,
         "--to",
         help="Target: biblatex, bibtex (in-place dialect), or interchange format (export)",
     ),
-    from_format: Optional[str] = typer.Option(
+    from_format: str | None = typer.Option(
         None,
         "--from",
         help="Import the input from this interchange format to BibTeX",
     ),
-    out: Optional[str] = typer.Option(
+    out: str | None = typer.Option(
         None, "--out", help="Write export/import output here instead of stdout"
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
@@ -88,9 +88,8 @@ def _convert_dialect(
     coll = Bibliography.open(file)
     report = coll.convert(to)  # raises ValueError on an unknown target
 
-    verb = "Would convert" if dry_run else "Converted"
     human = [
-        f"{verb} {report.entries} {_entries(report.entries)} to {report.target}.",
+        f"{_verb('convert', dry_run)} {report.entries} {_entries(report.entries)} to {report.target}.",
         "  "
         f"fields_renamed={report.fields_renamed}, "
         f"types_changed={report.types_changed}, dates_changed={report.dates_changed}",
@@ -113,7 +112,7 @@ def _convert_dialect(
 
 
 def _convert_export(
-    file: str, to: str, out: Optional[str], dry_run: bool, json_output: bool, backup: bool
+    file: str, to: str, out: str | None, dry_run: bool, json_output: bool, backup: bool
 ) -> None:
     lib = load_bib(file)
     content = export_library(lib, to)
@@ -125,8 +124,8 @@ def _convert_export(
 def _convert_import(
     file: str,
     from_format: str,
-    to: Optional[str],
-    out: Optional[str],
+    to: str | None,
+    out: str | None,
     dry_run: bool,
     json_output: bool,
     backup: bool,
@@ -158,7 +157,7 @@ def _emit_conversion(
     to_format: str,
     content: str,
     entry_count: int,
-    out: Optional[str],
+    out: str | None,
     dry_run: bool,
     json_output: bool,
     backup: bool,
@@ -186,9 +185,8 @@ def _emit_conversion(
         return
 
     if out:
-        verb = "Would write" if dry_run else "Wrote"
         typer.echo(
-            f"{verb} {entry_count} {_entries(entry_count)} as {to_format} to {out} "
+            f"{_verb('write', dry_run, 'Wrote')} {entry_count} {_entries(entry_count)} as {to_format} to {out} "
             f"(from {from_format})."
         )
     else:

@@ -4,8 +4,6 @@ This module keeps command callbacks separate from application assembly while
 retaining the stable CLI contract.
 """
 
-from typing import Optional
-
 import typer
 
 from pynakes import fields as fields_ops
@@ -13,13 +11,14 @@ from pynakes.cli_common import (
     _entries,
     _finish_mod,
     _safe,
+    _verb,
 )
 from pynakes.engine import Bibliography
 
 # --- fields ----------------------------------------------------------------
 
 
-def _build_filter(where: Optional[str]):
+def _build_filter(where: str | None) -> fields_ops.QueryFilter:
     # A bad expression raises ValueError, which @_safe renders as a structured
     # exit-1 error (honoring --json), so no local handling is needed here.
     if where is None:
@@ -27,7 +26,16 @@ def _build_filter(where: Optional[str]):
     return fields_ops.parse_query(where)
 
 
-def _run_field_op(file, action, op, dry_run, diff, json_output, details, verb):
+def _run_field_op(
+    file: str,
+    action: str,
+    op: object,
+    dry_run: bool,
+    diff: bool,
+    json_output: bool,
+    details: dict,
+    verb: str,
+) -> None:
     coll = Bibliography.open(file)
     count = op(coll)
     _finish_mod(
@@ -46,7 +54,7 @@ def fields_rename(
     file: str = typer.Argument(...),
     old: str = typer.Argument(..., help="Existing field name"),
     new: str = typer.Argument(..., help="New field name"),
-    where: Optional[str] = typer.Option(None, "--where", help="Filter expression"),
+    where: str | None = typer.Option(None, "--where", help="Filter expression"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
     json_output: bool = typer.Option(False, "--json"),
@@ -61,7 +69,7 @@ def fields_rename(
         diff,
         json_output,
         {"old": old, "new": new, "where": where},
-        f"{'Would rename' if dry_run else 'Renamed'} field {old!r} to {new!r}",
+        f"{_verb('rename', dry_run)} field {old!r} to {new!r}",
     )
 
 
@@ -69,7 +77,7 @@ def fields_move(
     file: str = typer.Argument(...),
     old: str = typer.Argument(..., help="Existing field name"),
     new: str = typer.Argument(..., help="Target field name"),
-    where: Optional[str] = typer.Option(None, "--where", help="Filter expression"),
+    where: str | None = typer.Option(None, "--where", help="Filter expression"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
     json_output: bool = typer.Option(False, "--json"),
@@ -84,7 +92,7 @@ def fields_move(
         diff,
         json_output,
         {"old": old, "new": new, "where": where},
-        f"{'Would move' if dry_run else 'Moved'} field {old!r} to {new!r}",
+        f"{_verb('move', dry_run)} field {old!r} to {new!r}",
     )
 
 
@@ -92,7 +100,7 @@ def fields_append(
     file: str = typer.Argument(...),
     field: str = typer.Argument(..., help="Field name"),
     value: str = typer.Argument(..., help="Value to append"),
-    where: Optional[str] = typer.Option(None, "--where", help="Filter expression"),
+    where: str | None = typer.Option(None, "--where", help="Filter expression"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
     json_output: bool = typer.Option(False, "--json"),
@@ -107,14 +115,14 @@ def fields_append(
         diff,
         json_output,
         {"field": field, "value": value, "where": where},
-        f"{'Would append' if dry_run else 'Appended'} {value!r} to field {field!r}",
+        f"{_verb('append', dry_run, 'Appended')} {value!r} to field {field!r}",
     )
 
 
 def fields_clear(
     file: str = typer.Argument(...),
     field: str = typer.Argument(..., help="Field name to remove"),
-    where: Optional[str] = typer.Option(None, "--where", help="Filter expression"),
+    where: str | None = typer.Option(None, "--where", help="Filter expression"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
     json_output: bool = typer.Option(False, "--json"),
@@ -129,17 +137,17 @@ def fields_clear(
         diff,
         json_output,
         {"field": field, "where": where},
-        f"{'Would clear' if dry_run else 'Cleared'} field {field!r}",
+        f"{_verb('clear', dry_run, 'Cleared')} field {field!r}",
     )
 
 
 def fields_protect_title(
     file: str = typer.Argument(...),
     field: str = typer.Option("title", "--field", help="Title-like field to protect"),
-    term: Optional[list[str]] = typer.Option(
+    term: list[str] | None = typer.Option(
         None, "--term", help="Additional exact term to brace-protect"
     ),
-    where: Optional[str] = typer.Option(None, "--where", help="Filter expression"),
+    where: str | None = typer.Option(None, "--where", help="Filter expression"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
     json_output: bool = typer.Option(False, "--json"),
@@ -155,7 +163,7 @@ def fields_protect_title(
         diff,
         json_output,
         {"field": field, "terms": terms, "where": where},
-        f"{'Would protect' if dry_run else 'Protected'} capitalization in field {field!r}",
+        f"{_verb('protect', dry_run, 'Protected')} capitalization in field {field!r}",
     )
 
 

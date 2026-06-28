@@ -228,7 +228,7 @@ def test_fetch_bibtex_for_doi_wraps_url_error(monkeypatch: pytest.MonkeyPatch) -
         raise URLError("offline")
 
     monkeypatch.setattr("pynakes.importer.urlopen", _raise)
-    with pytest.raises(DOIImportError, match="Could not resolve"):
+    with pytest.raises(DOIImportError, match="10.5555/missing"):
         fetch_bibtex_for_doi("10.5555/missing")
 
 

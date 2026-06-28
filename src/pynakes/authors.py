@@ -8,6 +8,7 @@ into individual people and extracting a person's last name; other modules
 import re
 import unicodedata
 
+from pynakes._text_utils import iter_toplevel_splits
 from pynakes.editing import set_entry_field
 from pynakes.model import BibFile
 
@@ -131,27 +132,7 @@ def last_name(person: str) -> str:
 
 
 def _split_top_level(value: str, sep: str) -> list[str]:
-    parts: list[str] = []
-    current: list[str] = []
-    depth = 0
-
-    for ch in value:
-        if ch == "{":
-            depth += 1
-            current.append(ch)
-            continue
-        if ch == "}":
-            depth = max(0, depth - 1)
-            current.append(ch)
-            continue
-        if ch == sep and depth == 0:
-            parts.append("".join(current).strip())
-            current = []
-            continue
-        current.append(ch)
-
-    parts.append("".join(current).strip())
-    return parts
+    return iter_toplevel_splits(value, separators=sep)
 
 
 def _is_fully_braced(value: str) -> bool:
@@ -185,11 +166,6 @@ def _normalize_conservative_name(name: str) -> str:
     return _normalize_name(name)
 
 
-def _is_von_token(token: str) -> bool:
-    stripped = token.strip("{}")
-    return bool(stripped) and stripped[0].islower()
-
-
 def _normalize_jabref_name(name: str) -> str:
     collapsed = _normalize_name(name)
     if collapsed == "others" or _is_fully_braced(collapsed):
@@ -209,7 +185,10 @@ def _normalize_jabref_name(name: str) -> str:
         return f"{tokens[0]}, {_normalize_initials(tokens[-1])}"
 
     last_start = len(tokens) - 1
-    while last_start > 0 and _is_von_token(tokens[last_start - 1]):
+    while last_start > 0:
+        stripped = tokens[last_start - 1].strip("{}")
+        if not (stripped and stripped[0].islower()):
+            break
         last_start -= 1
 
     first_names = " ".join(_normalize_initials(token) for token in tokens[:last_start])

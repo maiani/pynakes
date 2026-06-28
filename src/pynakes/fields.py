@@ -8,7 +8,6 @@ the touched field changes in a diff). A ``where`` filter — a predicate over a
 
 import re
 from collections.abc import Callable, Iterator
-from typing import Optional
 
 from pynakes.editing import (
     append_delimited_field,
@@ -18,7 +17,7 @@ from pynakes.editing import (
 )
 from pynakes.model import BibEntry, BibFile
 
-QueryFilter = Optional[Callable[[BibEntry], bool]]
+QueryFilter = Callable[[BibEntry], bool] | None
 
 
 def _selected(lib: BibFile, where: QueryFilter) -> Iterator[BibEntry]:
@@ -89,9 +88,10 @@ def _protect_token(token: str, terms: set[str]) -> bool:
     if any(ch.isdigit() for ch in token) and any(ch.isupper() for ch in token):
         return True
 
-    for i, ch in enumerate(token):
-        if i > 0 and ch.isupper():
-            return True
+    for part in [t for t in re.split(r"[-+]", token) if t]:
+        for i, ch in enumerate(part):
+            if i > 0 and ch.isupper():
+                return True
     return False
 
 

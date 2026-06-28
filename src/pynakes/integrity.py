@@ -13,15 +13,17 @@ from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.editing import set_entry_field, set_entry_type
 from pynakes.importer import (
     ArxivImportError,
+    DOIImportError,
     canonical_doi,
     entry_arxiv_id,
+    entry_year,
     fetch_arxiv_atom,
     fetch_bibtex_for_doi,
     normalize_arxiv,
     normalize_doi,
     parse_arxiv_atom,
 )
-from pynakes.model import BibEntry, BibFile
+from pynakes.model import BibEntry, BibFile, _normalize_text
 
 
 @dataclass
@@ -184,7 +186,6 @@ class MetadataFetchError(Exception):
 
 
 _DOI_URL_RE = re.compile(r"(?:https?://(?:dx\.)?doi\.org/|doi:\s*)(10\.\d{4,9}/\S+)", re.I)
-_YEAR_RE = re.compile(r"\d{4}")
 _PREPRINT_DOI_PREFIXES = ("10.1101/", "10.21203/", "10.2139/")
 
 
@@ -372,7 +373,7 @@ def fetch_doi_entry(doi: str, *, cache_dir: str | Path | None = None) -> BibEntr
     else:
         try:
             text = fetch_doi_bibtex(normalized)
-        except Exception as exc:
+        except DOIImportError as exc:
             raise MetadataFetchError(f"Could not fetch DOI {normalized!r}: {exc}") from exc
         if cache_path is not None:
             cache_path.parent.mkdir(parents=True, exist_ok=True)
@@ -434,8 +435,8 @@ def _compare_entry(local: BibEntry, remote: BibEntry) -> list[IntegrityIssue]:
                 actual=local_title,
             )
         )
-    local_year = _year(local)
-    remote_year = _year(remote)
+    local_year = entry_year(local)
+    remote_year = entry_year(remote)
     if local_year and remote_year and local_year != remote_year:
         issues.append(
             IntegrityIssue(
@@ -564,18 +565,7 @@ def _preprint_identity(entry: BibEntry) -> tuple[str, str] | None:
 
 
 def _similarity(left: str, right: str) -> float:
-    return SequenceMatcher(None, _text_key(left), _text_key(right)).ratio()
-
-
-def _text_key(value: str) -> str:
-    value = value.replace("{", "").replace("}", "")
-    return " ".join(re.findall(r"[a-z0-9]+", value.lower()))
-
-
-def _year(entry: BibEntry) -> str:
-    raw = entry.fields.get("year") or entry.fields.get("date") or ""
-    match = _YEAR_RE.search(raw)
-    return match.group(0) if match else ""
+    return SequenceMatcher(None, _normalize_text(left), _normalize_text(right)).ratio()
 
 
 def _first_author(entry: BibEntry) -> str:

@@ -14,7 +14,7 @@ from pynakes.editing import (
     set_entry_type,
 )
 from pynakes.formatters import FIELD_FORMATTERS
-from pynakes.metadata import library_save_actions
+from pynakes.metadata import library_save_actions, metadata_bool, metadata_list, metadata_value
 from pynakes.model import COMMON_STRINGS, BibFile
 
 # JabRef saveActions formatter keys mapped to pynakes normalization concerns.
@@ -90,42 +90,15 @@ class NormalizeResult:
         }
 
 
-def _metadata_value(lib: BibFile, name: str) -> str | None:
-    """Return the metadata value for ``name`` (case-insensitive), or ``None``."""
-    lowered = {key.lower(): value for key, value in lib.metadata.items()}
-    value = lowered.get(name.lower())
-    if value is not None:
-        return value.rstrip(";").strip()
-    return None
-
-
 def _normalize_setting(lib: BibFile, name: str) -> str | None:
     """Look up a normalize setting by its canonical ``normalize-`` key."""
-    return _metadata_value(lib, f"{METADATA_PREFIX}{name}")
-
-
-def _split_metadata_list(value: str | None) -> list[str]:
-    if not value:
-        return []
-    normalized = value.replace(";", ",")
-    return [part.strip() for part in normalized.split(",") if part.strip()]
-
-
-def _metadata_bool(value: str | None, default: bool) -> bool:
-    if value is None:
-        return default
-    normalized = value.strip().lower()
-    if normalized in {"1", "true", "yes", "on", "enabled"}:
-        return True
-    if normalized in {"0", "false", "no", "off", "disabled"}:
-        return False
-    return default
+    return metadata_value(lib, f"{METADATA_PREFIX}{name}")
 
 
 def _resolve_bool(lib: BibFile, option: bool | None, name: str, default: bool) -> bool:
     if option is not None:
         return option
-    return _metadata_bool(_normalize_setting(lib, name), default)
+    return metadata_bool(_normalize_setting(lib, name), default)
 
 
 def _resolve_choice(
@@ -151,13 +124,13 @@ def _resolve_choice(
 def _resolve_title_fields(lib: BibFile, option: list[str] | None) -> list[str]:
     if option:
         return option
-    metadata = _normalize_setting(lib, "title-fields")
-    return _split_metadata_list(metadata) or list(TITLE_FIELDS)
+    meta = _normalize_setting(lib, "title-fields")
+    return list(metadata_list(meta)) or list(TITLE_FIELDS)
 
 
 def _resolve_terms(lib: BibFile, option: list[str] | None) -> list[str]:
     terms = list(option or [])
-    terms.extend(_split_metadata_list(_metadata_value(lib, "protected-terms")))
+    terms.extend(metadata_list(metadata_value(lib, "protected-terms")))
     return terms
 
 
@@ -262,8 +235,8 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
     journal_style = _resolve_choice(
         lib, opts.journal_style, "journal-style", journal_ops.JOURNAL_STYLES, "none"
     )
-    journal_table = opts.journal_table or _metadata_value(lib, "journal-table")
-    ltwa_table = opts.ltwa_table or _metadata_value(lib, "ltwa-table")
+    journal_table = opts.journal_table or metadata_value(lib, "journal-table")
+    ltwa_table = opts.ltwa_table or metadata_value(lib, "ltwa-table")
     journal_sources = journal_ops.load_sources(journal_table, ltwa_table)
     journal_result = journal_ops.normalize_journals(lib, journal_style, journal_sources)
     result.journals = journal_result.changed

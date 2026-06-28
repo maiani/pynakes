@@ -64,6 +64,19 @@ _ARXIV_OLD_RE = re.compile(r"^[a-z][a-z-]+(\.[a-z]{2})?/\d{7}(v\d+)?$", re.IGNOR
 
 KEY_SOURCES = {"generated", "provider"}
 
+_YEAR_RE = re.compile(r"\d{4}")
+
+
+def entry_year(entry: "BibEntry") -> str:
+    """Return the four-digit year an entry carries, or an empty string.
+
+    Checks ``year`` then ``date``; the first four consecutive digits win.
+    """
+    raw = entry.fields.get("year") or entry.fields.get("date") or ""
+    match = _YEAR_RE.search(raw)
+    return match.group(0) if match else ""
+
+
 # Identifier types ``resolve_identifier`` can return. ``journal_url`` is reserved
 # for a future resolver and currently raises ``UnsupportedIdentifierError``.
 DOI = "doi"
@@ -208,27 +221,49 @@ def canonical_doi(value: str) -> str:
     return normalize_doi(value).lower()
 
 
+def _fetch_url(
+    url: str,
+    *,
+    accept: str | None = None,
+    timeout: float = 15.0,
+    error_class: type[Exception] = ReferenceImportError,
+    label: str | None = None,
+) -> bytes:
+    """Fetch ``url`` and return raw response bytes.
+
+    Shared low-level helper used by DOI and arXiv fetchers. ``accept`` sets the
+    ``Accept`` header when provided. ``label`` replaces the URL in error messages
+    (useful for human-readable identifiers like DOIs). Raises ``error_class`` for
+    HTTP and network errors so callers get domain-specific exceptions without
+    duplicating the try/except pattern.
+    """
+    headers: dict[str, str] = {"User-Agent": _USER_AGENT}
+    if accept is not None:
+        headers["Accept"] = accept
+    request = Request(url, headers=headers)
+    display = label or url
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            return response.read()
+    except HTTPError as exc:
+        raise error_class(f"Server returned HTTP {exc.code} for {display}") from exc
+    except URLError as exc:
+        reason = getattr(exc, "reason", exc)
+        raise error_class(f"Network error fetching {display}: {reason}") from exc
+
+
 def fetch_bibtex_for_doi(doi: str, timeout: float = 15.0) -> str:
     """Fetch BibTeX metadata for ``doi`` using DOI content negotiation."""
     normalized = normalize_doi(doi)
     url = f"https://doi.org/{quote(normalized, safe='/')}"
-    request = Request(
+    data = _fetch_url(
         url,
-        headers={
-            "Accept": "application/x-bibtex",
-            "User-Agent": _USER_AGENT,
-        },
+        accept="application/x-bibtex",
+        timeout=timeout,
+        error_class=DOIImportError,
+        label=normalized,
     )
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            data = response.read()
-            encoding = response.headers.get_content_charset() or "utf-8"
-            return data.decode(encoding, errors="replace")
-    except HTTPError as exc:
-        raise DOIImportError(f"DOI resolver returned HTTP {exc.code} for {normalized}") from exc
-    except URLError as exc:
-        reason = getattr(exc, "reason", exc)
-        raise DOIImportError(f"Could not resolve DOI {normalized!r}: {reason}") from exc
+    return data.decode("utf-8", errors="replace")
 
 
 def entry_from_bibtex(text: str) -> BibEntry:
@@ -322,19 +357,8 @@ def existing_keys_for_arxiv(lib: BibFile, identifier: str) -> list[str]:
 def fetch_arxiv_atom(identifier: str, timeout: float = 15.0) -> str:
     """Fetch arXiv Atom XML for ``identifier``. Split out so tests can stub it."""
     url = f"https://export.arxiv.org/api/query?id_list={quote(identifier)}"
-    request = Request(url, headers={"User-Agent": _USER_AGENT})
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            data = response.read()
-            encoding = response.headers.get_content_charset() or "utf-8"
-            return data.decode(encoding, errors="replace")
-    except HTTPError as exc:
-        raise ArxivImportError(f"arXiv returned HTTP {exc.code} for {identifier}") from exc
-    except URLError as exc:
-        reason = getattr(exc, "reason", exc)
-        raise ArxivImportError(
-            f"Could not fetch arXiv metadata for {identifier}: {reason}"
-        ) from exc
+    data = _fetch_url(url, timeout=timeout, error_class=ArxivImportError, label=identifier)
+    return data.decode("utf-8", errors="replace")
 
 
 _ATOM_NS = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}

@@ -94,6 +94,12 @@ class TestTitleCapitalizationProtection:
         out = write_bib(lib)
         assert "title = {{DNA} repair with {GPT-4}, {LaTeX}, {eBay} and Machine Learning}" in out
 
+    def test_hyphenated_title_case_words_are_not_false_positive_mixed_case(self) -> None:
+        lib = parse_bib("@article{A,\n  title = {Post-Processing Methods}\n}\n")
+
+        assert protect_title_capitalization(lib) == 0
+        assert lib.entries["A"].fields["title"] == "Post-Processing Methods"
+
     def test_preserves_existing_braces_and_is_idempotent(self) -> None:
         lib = parse_bib(
             "@article{A,\n  title = {The {NASA} study of mRNA and DNA},\n  year = {2024}\n}\n"

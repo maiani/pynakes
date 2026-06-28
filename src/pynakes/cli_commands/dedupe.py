@@ -13,6 +13,7 @@ from pynakes.cli_common import (
     _finish_mod,
     _run_checks,
     _safe,
+    _verb,
 )
 from pynakes.engine import Bibliography
 
@@ -86,9 +87,8 @@ def dedupe_merge(
             ],
         )
 
-    verb = "Would merge" if dry_run else "Merged"
     human = [
-        f"{verb} {report.merged_clusters} duplicate work cluster(s).",
+        f"{_verb('merge', dry_run)} {report.merged_clusters} duplicate work cluster(s).",
         f"  removed_entries={report.removed_entry_count}, field_changes={report.field_changes}",
     ]
     _finish_mod(

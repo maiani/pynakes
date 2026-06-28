@@ -5,7 +5,6 @@ retaining the stable CLI contract.
 """
 
 import json as _json
-from typing import Optional
 
 import typer
 
@@ -15,6 +14,7 @@ from pynakes.cli_common import (
     _emit_error,
     _finish_mod,
     _safe,
+    _verb,
 )
 from pynakes.engine import Bibliography
 from pynakes.io import load_bib
@@ -67,7 +67,7 @@ def metadata_set(
     file: str = typer.Argument(..., help="Path to the .bib file"),
     key: str = typer.Argument(..., help="Metadata key"),
     value: str = typer.Argument(..., help="Metadata value"),
-    namespace: Optional[str] = typer.Option(
+    namespace: str | None = typer.Option(
         None,
         "--namespace",
         help="Target comment: jabref or pynakes. Default: auto (JabRef-native keys "
@@ -105,7 +105,6 @@ def metadata_set(
             ],
         )
 
-    verb = "Would set" if dry_run else "Set"
     _finish_mod(
         file,
         "metadata_set",
@@ -113,7 +112,7 @@ def metadata_set(
         dry_run,
         diff,
         json_output,
-        [f"{verb} {update.namespace}-meta {update.key!r}."],
+        [f"{_verb('set', dry_run, 'Set')} {update.namespace}-meta {update.key!r}."],
         modified_entries=0,
         key=update.key,
         value=update.value.rstrip(";").strip(),

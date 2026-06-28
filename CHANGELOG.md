@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Treat differing raw BibTeX spelling as a `combine --dedupe` conflict even
   when parsed fields match, preserving round-trip intent.
+- Derive subset, split, and merge output libraries through `BibFile.derive()`,
+  preserving library-level raw string declarations consistently.
 - Make required-field linting dialect-aware: BibTeX keeps the traditional rule
   set, while BibLaTeX libraries use the default BibLaTeX data-model entry types
   and aliases.
@@ -39,6 +41,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dicts.
 - Make lint profile and DOI checks read inherited field views consistently, and
   align source-tree fallback version reporting.
+
+### Fixed
+
+- Tighten broad exception handling in DOI metadata fetching, file writes, and
+  Pinax filesystem rollback paths.
+- Fix small reviewer-flagged edge cases in lint field-view handling, search
+  field filters, title-protection heuristics, `html_to_latex`, and batch
+  operation dispatch.
+
+### Internal
+
+- Consolidate duplicated utilities: `_metadata_value`, `_metadata_list`, and
+  `_metadata_bool` moved from `lint.py` and `normalize.py` into `metadata.py`
+  as public helpers; callers import from there.
+- Fix `save_text` backup-rename ordering: the original file is now only renamed
+  to `.bak` after the temp file has been written and validated, so a crash or
+  validation failure can never lose the original.
+- Merge `save_plain_text` into `save_text` as a `validate=False` default;
+  `save_plain_text` is kept as a thin alias pending removal.
 
 ### Documentation
 

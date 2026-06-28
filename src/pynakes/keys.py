@@ -78,7 +78,7 @@ def _year(entry: BibEntry) -> str:
 
 def _first_title_word(entry: BibEntry) -> str:
     raw = entry.fields.get("title", "").replace("{", "").replace("}", "")
-    for word in re.findall(r"[A-Za-z][A-Za-z0-9]*", raw):
+    for word in re.findall(r"[A-Za-z0-9]+", raw):
         if word.lower() not in _TITLE_STOPWORDS:
             return word[0].upper() + word[1:]
     return ""
@@ -100,27 +100,19 @@ def _significant_title_words(entry: BibEntry) -> list[str]:
     ]
 
 
-def _field_value(entry: BibEntry, field: str) -> str:
-    return entry.fields.get(field.lower(), "")
-
-
-def _all_author_last_names(entry: BibEntry) -> list[str]:
-    return _author_last_names(entry)
-
-
 def _resolve_marker(entry: BibEntry, marker: str) -> str:
     base, *_modifiers = marker.split(":")
     base = base.strip()
     lower_base = base.lower()
 
     if base != lower_base and lower_base in entry.fields:
-        value = _field_value(entry, base)
+        value = entry.fields.get(lower_base, "")
     elif lower_base == "auth":
         value = _first_author_last_name(entry)
     elif lower_base.startswith("auth") and lower_base[4:].isdigit():
         value = _first_author_last_name(entry)[: int(lower_base[4:])]
     elif lower_base == "authors":
-        value = "".join(_all_author_last_names(entry))
+        value = "".join(_author_last_names(entry))
     elif lower_base == "year":
         value = _year(entry)
     elif lower_base == "shortyear":
@@ -142,7 +134,7 @@ def _resolve_marker(entry: BibEntry, marker: str) -> str:
     elif lower_base == "entrytype":
         value = _capitalize_word(entry.type)
     else:
-        value = _field_value(entry, base)
+        value = entry.fields.get(base.lower(), "")
         if not value and base not in entry.fields and lower_base not in entry.fields:
             raise UnsupportedCitationKeyPatternError(
                 f"Unsupported JabRef citation-key marker [{base}]"
@@ -159,6 +151,7 @@ def _apply_modifiers(value: str, modifiers: list[str]) -> str:
         elif modifier == "upper":
             value = value.upper()
         elif modifier in ("capitalize", "titlecase"):
+            # JabRef treats these citation-key modifiers identically.
             value = "".join(_capitalize_word(word.lower()) for word in _words(value))
         elif modifier == "abbr":
             value = "".join(word[:1] for word in _words(value))

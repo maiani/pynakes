@@ -3,8 +3,6 @@
 Downloads arXiv materials (PDF and source) for entries into the Pinax files-dir.
 """
 
-from typing import Optional
-
 import typer
 
 from pynakes.cli_common import _emit_error, _finish_mod, _resolve_input_bib, _safe
@@ -12,10 +10,10 @@ from pynakes.engine import Bibliography
 
 
 def fetch(
-    target: Optional[str] = typer.Argument(
+    target: str | None = typer.Argument(
         None, help="Citation key to fetch (default: all entries with arXiv ids)"
     ),
-    file: Optional[str] = typer.Argument(
+    file: str | None = typer.Argument(
         None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
     ),
     dry_run: bool = typer.Option(

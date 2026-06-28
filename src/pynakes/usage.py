@@ -11,10 +11,9 @@ import re
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union
 
 from pynakes.editing import append_delimited_field, splice_into_text
-from pynakes.model import BibFile, EntryStore
+from pynakes.model import BibFile
 
 __all__ = [
     "UsageReport",
@@ -278,7 +277,7 @@ def analyze_usage(
     lib: BibFile,
     cited_keys: set[str],
     include_all: bool = False,
-    sources: Union[list[str], None] = None,
+    sources: list[str] | None = None,
 ) -> UsageReport:
     """Compare a library's entries against the set of cited keys."""
     bib_keys = list(dict.fromkeys(lib.entries.keys()))  # unique, order-preserving
@@ -313,21 +312,7 @@ def subset_library(lib: BibFile, keys: Iterable[str]) -> BibFile:
     preserved so the subset stays a valid, JabRef-compatible file.
     """
     keyset = set(keys)
-    subset = EntryStore()
-    for entry in lib.entries.values():
-        if entry.key in keyset:
-            subset.add(entry)
-
-    return BibFile(
-        entries=subset,
-        strings=dict(lib.strings),
-        preamble=list(lib.preamble),
-        raw_comments=list(lib.raw_comments),
-        jabref_metadata_blocks=list(lib.jabref_metadata_blocks),
-        pynakes_metadata_blocks=list(lib.pynakes_metadata_blocks),
-        encoding=lib.encoding,
-        line_ending=lib.line_ending,
-    )
+    return lib.derive(entry for entry in lib.entries.values() if entry.key in keyset)
 
 
 # --- tagging ---------------------------------------------------------------

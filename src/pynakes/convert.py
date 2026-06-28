@@ -7,7 +7,6 @@ a target field that is already present (it reports a warning instead) and never
 discards information it cannot safely translate.
 """
 
-import re
 from dataclasses import dataclass, field
 
 from pynakes.editing import (
@@ -16,6 +15,7 @@ from pynakes.editing import (
     set_entry_field,
     set_entry_type,
 )
+from pynakes.formatters import _ISO_DATE_RE, _MONTH_NUM_TO_ABBR, month_number_str
 from pynakes.model import BibEntry, BibFile
 
 TO_BIBLATEX = "biblatex"
@@ -50,51 +50,6 @@ _FROM_THESIS: dict[str, str] = {
     "mastersthesis": "mastersthesis",
 }
 
-# Month names/abbreviations → two-digit number for ISO ``date`` assembly.
-_MONTH_NUM: dict[str, str] = {
-    "jan": "01",
-    "january": "01",
-    "feb": "02",
-    "february": "02",
-    "mar": "03",
-    "march": "03",
-    "apr": "04",
-    "april": "04",
-    "may": "05",
-    "jun": "06",
-    "june": "06",
-    "jul": "07",
-    "july": "07",
-    "aug": "08",
-    "august": "08",
-    "sep": "09",
-    "sept": "09",
-    "september": "09",
-    "oct": "10",
-    "october": "10",
-    "nov": "11",
-    "november": "11",
-    "dec": "12",
-    "december": "12",
-}
-# Two-digit number → BibTeX-idiomatic month abbreviation.
-_MONTH_ABBR: dict[str, str] = {
-    "01": "jan",
-    "02": "feb",
-    "03": "mar",
-    "04": "apr",
-    "05": "may",
-    "06": "jun",
-    "07": "jul",
-    "08": "aug",
-    "09": "sep",
-    "10": "oct",
-    "11": "nov",
-    "12": "dec",
-}
-# An ISO-ish date: year, optional month, optional day.
-_DATE_RE = re.compile(r"^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?$")
-
 
 @dataclass
 class ConvertResult:
@@ -120,16 +75,6 @@ class ConvertResult:
             "types_changed": self.types_changed,
             "dates_changed": self.dates_changed,
         }
-
-
-def _month_number(value: str) -> str | None:
-    """Return ``MM`` for a recognized month name/number, else ``None``."""
-    token = value.strip().strip("{}").strip().lower()
-    if token in _MONTH_NUM:
-        return _MONTH_NUM[token]
-    if token.isdigit() and 1 <= int(token) <= 12:
-        return f"{int(token):02d}"
-    return None
 
 
 def _rename_fields(entry: BibEntry, field_map: dict[str, str], result: ConvertResult) -> bool:
@@ -180,7 +125,7 @@ def _combine_date(entry: BibEntry, result: ConvertResult) -> bool:
     month = entry.fields.get("month")
     mm = None
     if month is not None:
-        mm = _month_number(month)
+        mm = month_number_str(month)
         if mm is None:
             result.warnings.append(
                 {
@@ -266,7 +211,7 @@ def _split_date(entry: BibEntry, result: ConvertResult) -> bool:
         return False
 
     raw_date = entry.fields["date"]
-    match = _DATE_RE.match(raw_date.strip())
+    match = _ISO_DATE_RE.match(raw_date.strip())
     if not match:
         result.warnings.append(
             {
@@ -285,7 +230,7 @@ def _split_date(entry: BibEntry, result: ConvertResult) -> bool:
     else:
         remove_entry_field(entry, "date")
     if mm and "month" not in entry.fields:
-        set_entry_field(entry, "month", _MONTH_ABBR.get(mm, str(int(mm))))
+        set_entry_field(entry, "month", _MONTH_NUM_TO_ABBR.get(mm, str(int(mm))))
     if day and "day" not in entry.fields:
         set_entry_field(entry, "day", str(int(day)))
     result.dates_changed += 1
