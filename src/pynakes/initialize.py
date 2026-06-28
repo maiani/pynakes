@@ -10,6 +10,9 @@ existing library for ``init --from``.
 It is deterministic (sorted output, no timestamps) and produces no entries; the
 CLI command writes the rendered text through the same atomic, re-parse-validated
 path as every other write.
+
+The module also renders the optional ``AGENTS.md`` guide (``init --agent-guide``)
+that tells LLM agents how to work with a Pinax bibliography.
 """
 
 from dataclasses import dataclass
@@ -106,6 +109,77 @@ def apply_overrides(
 def _normalize_line_endings(text: str, line_ending: str) -> str:
     normalized = text.replace("\r\n", "\n").replace("\r", "\n")
     return normalized if line_ending == "\n" else normalized.replace("\n", line_ending)
+
+
+AGENTS_GUIDE = """\
+# Bibliography management (Pinax)
+
+This directory manages a BibTeX library with an associated **Pinax** — a
+sidecar directory (`{bibname}.files/`) that stores downloaded materials
+(PDFs and LaTeX sources).
+
+## Pinax structure
+
+```
+{bibname}.bib               # BibTeX library (pynakes-managed)
+{bibname}.files/            # Pinax files-dir (auto-generated)
+  .pinax/manifest.json    # Integrity manifest (SHA-256, fetch dates, sources)
+  {{Key}}_preprint.pdf      # Preprint PDF for entry {{Key}}
+  {{Key}}_preprint/         # Preprint source bundle (LaTeX + figures)
+  {{Key}}.pdf               # Published PDF (when available)
+```
+
+The `files-dir` path is set in the `pynakes-meta` block inside the `.bib`
+file (key: `files-dir`). Fetch behaviour is configured by:
+- `fetch-preprint`: download preprint PDF when available (default: `true`)
+- `fetch-published`: download published version when available (default: `false`)
+- `fetch-source`: download preprint LaTeX source when available (default: `true`)
+
+## Agent rules
+
+1. **Prefer source over PDF** — when an entry has a Pinax source directory
+   (`{{Key}}_preprint/`), read the `.tex` files there rather than the `.pdf`.
+   The source contains semantically meaningful content (equations, citations,
+   structured sections) that PDF reading tools cannot reliably extract.
+
+2. **Use `pynakes fetch` to download** — never manually download materials.
+   `pynakes fetch` handles the download and updates the manifest.
+   Run it from this directory (it auto-detects the `.bib` file).
+
+3. **Validate before editing** — run `pynakes lint --strict {bibname}.bib`
+   and `pynakes files check {bibname}.bib --root .` before and after changes.
+
+4. **Add new references with `pynakes add`** — use
+   `pynakes add {bibname}.bib <identifier>` rather than writing entries by
+   hand. Identifiers are auto-detected: DOI (`10.1103/PhysRevLett.116.061102`),
+   arXiv ID (`2301.00001`), or a journal article URL. This ensures consistent
+   formatting, citation-key generation, and group propagation.
+
+5. **Remove entries with `pynakes remove`** — use
+   `pynakes remove {bibname}.bib <citekey>` to delete an entry and its Pinax
+   materials.
+
+6. **Inspect before deciding** — `pynakes inspect --json {bibname}.bib` gives a
+   machine-readable view of every entry and its local file presence, so you can
+   decide what to read or fetch without re-scanning the directory.
+
+7. **Review diffs before committing changes** — all modifying commands support
+   `--dry-run --diff`; use them to preview before applying.
+
+8. **Check pinax integrity** — after any fetch or modify operation, verify with
+   `pynakes files check --strict {bibname}.bib --root .`. The manifest tracks
+   SHA-256 hashes and fetch dates; report any drift (mismatched checksums) to
+   the user rather than silently fixing.
+"""
+
+
+def render_agents_md(bibname: str) -> str:
+    """Return the ``AGENTS.md`` guide for a Pinax bibliography.
+
+    ``bibname`` is the stem of the ``.bib`` file (e.g. ``"library"`` for
+    ``library.bib``).
+    """
+    return AGENTS_GUIDE.format(bibname=bibname)
 
 
 def render_library(entries: list[ProfileEntry], line_ending: str = "\n") -> str:
