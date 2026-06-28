@@ -279,6 +279,15 @@ reviewed, then the next.
       open-access copy exists.
 - [ ] **10. Dedupe material merge.** (deferred) `dedupe` merge reconciles Pinax
       materials onto the surviving key.
+- [ ] **11. DOI → arXiv backfill.** (deferred) Extend `enrich --published
+      --online` to reconcile identity both ways: when an entry has a publisher
+      DOI but no resolvable arXiv id, resolve the work via OpenAlex (injectable
+      fetcher, deterministic cache) and backfill `eprint` (+ `eprinttype`/
+      `archiveprefix` per dialect) so a published-first entry becomes a
+      `fetch-source` target — the source is only reachable through the arXiv id.
+      Lands in `integrity.py`; useful to any library, pinax or not. Spec:
+      [pinax.md](docs/guides/pinax.md) → "Recovering the arXiv source for
+      published papers".
 
 ## Out of scope (for the deterministic core)
 

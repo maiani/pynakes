@@ -22,9 +22,11 @@ def capabilities(
         typer.echo(_json.dumps(caps, indent=2))
         return
     typer.echo(f"{caps['tool']} v{caps['version']}")
-    typer.echo("Commands:")
-    for name, desc in caps["commands"].items():
-        typer.echo(f"  {name:14} {desc}")
+    descriptions = caps["commands"]
+    for panel, names in caps["command_groups"].items():
+        typer.echo(f"\n{panel}:")
+        for name in names:
+            typer.echo(f"  {name:14} {descriptions[name]}")
 
 
 def register(app: typer.Typer) -> None:

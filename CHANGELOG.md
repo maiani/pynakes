@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`--help` and `capabilities` group commands by nature.** The top-level
+  `pynakes --help` now organizes commands into panels — *Inspect & validate*,
+  *Edit references*, *Materials (pinax)*, *Corpus (multiple files)*, *Create* —
+  instead of one flat list. `capabilities` gains a `command_groups` field
+  mirroring the same grouping. The taxonomy lives in one place
+  (`capabilities.COMMAND_GROUPS`), shared by both surfaces.
+
 - **`metadata adopt-jabref` — opt-in JabRef metadata tracking.** pynakes-native
   libraries now keep their settings in `pynakes-meta` by default; `jabref-meta`
   is no longer injected into a file that never had it. Run `adopt-jabref` to

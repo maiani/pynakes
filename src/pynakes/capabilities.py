@@ -88,6 +88,32 @@ _SEARCH_QUERY_GRAMMAR = {
 }
 
 
+# Single source of truth for how commands are grouped by nature, shared by the
+# CLI ``--help`` panels (``cli.py`` reads this for ``rich_help_panel``) and the
+# ``command_groups`` field of the capability description. Ordered: panels render
+# in this order, and the commands within each panel in this order. Every
+# top-level command/group must appear in exactly one panel — guarded by tests.
+COMMAND_GROUPS: dict[str, list[str]] = {
+    "Inspect & validate": ["inspect", "search", "lint", "verify", "capabilities"],
+    "Edit references": [
+        "add",
+        "remove",
+        "normalize",
+        "convert",
+        "enrich",
+        "dedupe",
+        "fields",
+        "keys",
+        "groups",
+        "metadata",
+        "used",
+    ],
+    "Materials (pinax)": ["fetch", "files"],
+    "Corpus (multiple files)": ["combine", "split", "batch"],
+    "Create": ["init"],
+}
+
+
 def _stable_type(param) -> str:
     """Map a click parameter's type to the stable vocabulary, marking lists."""
     if getattr(param, "is_flag", False):
@@ -251,6 +277,9 @@ def get_capabilities() -> dict:
             "pinax_setops",
             "pinax_key_edits",
         ],
+        # Commands grouped by nature (single source of truth shared with the CLI
+        # ``--help`` panels). Mirrors the flat ``commands`` map below.
+        "command_groups": {panel: list(names) for panel, names in COMMAND_GROUPS.items()},
         "commands": {
             "init": "Create a new .bib library, optionally seeded with a metadata profile (--pinax for pinax mode)",
             "inspect": "Inspect a .bib file structure",

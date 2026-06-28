@@ -8,6 +8,7 @@ import typer
 import typer.main
 
 from pynakes import __version__
+from pynakes.capabilities import COMMAND_GROUPS
 from pynakes.cli_commands import (
     add,
     batch,
@@ -93,6 +94,41 @@ app.add_typer(fields_app, name="fields")
 app.add_typer(files_app, name="files")
 app.add_typer(dedupe_app, name="dedupe")
 app.add_typer(metadata_app, name="metadata")
+
+# --- Group top-level --help by nature ---------------------------------------
+# The taxonomy lives once in capabilities.COMMAND_GROUPS (shared with the
+# machine-readable description). Apply it as Typer rich-help panels, and order
+# both the commands and the panels to follow that taxonomy.
+_PANEL_BY_COMMAND = {name: panel for panel, names in COMMAND_GROUPS.items() for name in names}
+_PANEL_ORDER = {panel: index for index, panel in enumerate(COMMAND_GROUPS)}
+_COMMAND_ORDER = {
+    name: index
+    for index, name in enumerate(name for names in COMMAND_GROUPS.values() for name in names)
+}
+
+
+def _command_name(info) -> str:
+    """Resolve a registered command's CLI name (Typer leaves ``name`` None often)."""
+    return info.name or info.callback.__name__
+
+
+def _panel_sort_key(name: str) -> tuple[int, int]:
+    panel = _PANEL_BY_COMMAND.get(name)
+    return (
+        _PANEL_ORDER.get(panel, len(_PANEL_ORDER)),
+        _COMMAND_ORDER.get(name, len(_COMMAND_ORDER)),
+    )
+
+
+for _info in app.registered_commands:
+    _info.rich_help_panel = _PANEL_BY_COMMAND.get(_command_name(_info))
+for _info in app.registered_groups:
+    _info.rich_help_panel = _PANEL_BY_COMMAND.get(_info.name)
+
+# Order so panels (and commands within them) render in taxonomy order. Leaf
+# commands sort before sub-groups within a shared panel, which reads naturally.
+app.registered_commands.sort(key=lambda info: _panel_sort_key(_command_name(info)))
+app.registered_groups.sort(key=lambda info: _panel_sort_key(info.name))
 
 # --- Shell completion wiring ------------------------------------------------
 # Typer does not forward ``shell_complete`` from arguments. Since

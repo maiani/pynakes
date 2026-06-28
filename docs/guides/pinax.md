@@ -349,6 +349,59 @@ If a work is split across two *entries* (a separate `@misc` arXiv and an
 pinax must reconcile their materials onto the surviving key, the same
 coordinated-edit machinery as rename.
 
+### Recovering the arXiv source for published papers (DOI to arXiv backfill)
+
+The source bundle is only ever reachable through the **arXiv id**: a published
+PDF carries no LaTeX. So the rule that a published entry keeps *both* its `doi`
+and its arXiv `eprint` is what makes the source fetchable at all. Two directions
+have to hold it:
+
+- **Preprint → published** is already additive. `enrich --published` adds `doi`
+  / `journal` and promotes `@misc`/`@online` → `@article` **without ever
+  removing `eprint`** (`integrity._apply_published_candidate`), so a promoted
+  entry stays a valid `fetch-source` target.
+- **Published → arXiv is the gap.** A paper entered by its publisher DOI
+  (`add 10.1103/…`) never had an arXiv id — Crossref metadata does not carry one
+  — so its source is unreachable. This is the real "we lose the arXiv".
+
+The fix is a **DOI → arXiv back-resolution** folded into the online published
+pass, so `enrich --published --online` reconciles identity *both* ways: for an
+entry that has a publisher DOI but no resolvable arXiv id
+(`importer.entry_arxiv_id` returns `None`), it looks the work up by DOI and, when
+a preprint exists, backfills the arXiv id.
+
+- **Source: OpenAlex** (`https://api.openalex.org/works/doi:<doi>`). Chosen
+  because it needs no API key, its data is CC0, and it is already the identity
+  backbone named for [v0.7](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
+  OpenAlex represents arXiv as a *location*, not an id field, so the resolver
+  scans the work's `locations[]` for an `arxiv.org/abs/<id>` URL and parses it
+  with the existing `_ARXIV_URL_RE` / `normalize_arxiv`. (Semantic Scholar's
+  `externalIds.ArXiv` is a clean fallback for later; v1 stays single-source.)
+- **Network boundary.** Behind `--online`, fetcher injectable exactly like
+  `importer.fetch_arxiv_atom`, with the same deterministic on-disk cache
+  (`integrity._cache_path`). The default test suite never touches the network.
+- **Fields written**, dialect-aware (via `library_database_type`), through the
+  surgical `editing.set_entry_field` and never overwriting an existing value:
+  - biblatex → `eprint = {<id>}`, `eprinttype = {arxiv}`
+  - bibtex → `eprint = {<id>}`, `archiveprefix = {arXiv}`
+
+  Both pairs are read back by `entry_arxiv_id`, so either makes `fetch-source`
+  work; the dialect choice is only about idiomatic output.
+- **Graceful gaps.** No OpenAlex record, or a record with no arXiv location, is a
+  skip with a reason — never an error. The backfill only *adds* an identifier; it
+  never changes the citation identity (`doi` / `journal` / type stay put).
+- **Envelope.** It reuses `enrich`'s existing `updates` (a `FieldUpdate` per
+  `eprint`/`eprinttype` written) and `changed_entries` / `changed_fields`; no new
+  top-level keys. No provenance manifest entry — the recovered id lives on the
+  entry, which *is* its provenance.
+
+Once `eprint` is present, the existing `fetch-source` machinery downloads the
+`<citekey>_preprint/` tree unchanged; `preprint_canonical: true` then lets you
+read the arXiv source while still citing the version of record. This is distinct
+from [step 9](#implementation-steps) (open-access *published PDF* bytes): this
+step recovers the *identifier linkage*, and is useful to any library, pinax or
+not.
+
 ## Coordinated edits and atomicity
 
 Renaming a key in a pinax must move its materials — the one genuinely hard
@@ -515,6 +568,12 @@ checklist.
    exists.
 10. **Dedupe material merge.** `dedupe` merge reconciles Pinax materials onto the
     surviving key.
+11. **DOI → arXiv backfill.** `enrich --published --online` reconciles identity
+    both ways: when an entry has a publisher DOI but no arXiv id, resolve the
+    work via OpenAlex and backfill `eprint` (+ `eprinttype`/`archiveprefix` per
+    dialect), so a published-first entry becomes a `fetch-source` target. See
+    [Recovering the arXiv source for published papers](#recovering-the-arxiv-source-for-published-papers-doi-to-arxiv-backfill).
+    Lands in `integrity.py`; useful to any library, pinax or not.
 
 ## Decisions and open questions
 

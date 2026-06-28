@@ -38,6 +38,29 @@ class TestGetCapabilities:
         registered |= {group.name for group in app.registered_groups}
         assert declared == registered
 
+    def test_command_groups_partition_every_command(self) -> None:
+        # The by-nature grouping (shared with the --help panels) must cover every
+        # command exactly once — no command unassigned, none in two panels, none
+        # naming a command that does not exist.
+        from pynakes.capabilities import COMMAND_GROUPS
+
+        grouped = [name for names in COMMAND_GROUPS.values() for name in names]
+        assert len(grouped) == len(set(grouped)), "a command appears in two panels"
+        assert set(grouped) == set(get_capabilities()["commands"])
+
+    def test_help_panels_follow_command_groups(self) -> None:
+        # Every top-level command/group is assigned to its taxonomy panel.
+        from pynakes.capabilities import COMMAND_GROUPS
+
+        panel_by_command = {
+            name: panel for panel, names in COMMAND_GROUPS.items() for name in names
+        }
+        for cmd in app.registered_commands:
+            name = cmd.name or cmd.callback.__name__
+            assert cmd.rich_help_panel == panel_by_command[name]
+        for group in app.registered_groups:
+            assert group.rich_help_panel == panel_by_command[group.name]
+
 
 class TestCommandSchemas:
     def test_schemas_cover_full_command_surface(self) -> None:
