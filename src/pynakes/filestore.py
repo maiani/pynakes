@@ -407,6 +407,33 @@ class FileStore:
             raise
         return transaction
 
+    def remove_materials(self, key: str) -> list[str]:
+        """Remove all disk materials and manifest row for ``key``.
+
+        Returns a list of relative paths that were removed (empty when nothing
+        existed). Does nothing when the store root does not exist.
+        """
+        key = _validate_key(key)
+        if not self.root.is_dir():
+            return []
+        paths = self.paths_for(key)
+        removed: list[str] = []
+        for path in [paths.published_pdf, paths.preprint_pdf]:
+            if path.exists():
+                path.unlink()
+                removed.append(str(path.relative_to(self.root)))
+        if paths.preprint_source.is_dir():
+            shutil.rmtree(paths.preprint_source)
+            removed.append(str(paths.preprint_source.relative_to(self.root)))
+        if self.manifest_path.exists():
+            manifest = self.read_manifest()
+            files: dict = manifest.get("files", {})
+            if key in files:
+                del files[key]
+                manifest["files"] = files
+                self.write_manifest(manifest)
+        return removed
+
     def scan(self, keys: Iterable[str]) -> FileStoreScan:
         """Scan this store for known-key presence and material-shaped orphans.
 

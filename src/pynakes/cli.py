@@ -24,6 +24,7 @@ from pynakes.cli_commands import (
     lint,
     metadata,
     normalize,
+    remove,
     search,
     setops,
     used,
@@ -80,6 +81,7 @@ capabilities.register(app)
 search.register(app)
 used.register(app)
 setops.register(app)
+remove.register(app)
 batch.register(app)
 
 app.add_typer(groups_app, name="groups")

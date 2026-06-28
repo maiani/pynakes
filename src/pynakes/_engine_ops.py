@@ -332,6 +332,20 @@ class BibliographyOperations:
         self._mark(report.removed_entry_count or report.field_changes)
         return report
 
+    def remove_entry(self, key: str) -> int:
+        """Remove every entry with the given citation key from memory.
+
+        Returns the number of entries removed.
+        """
+        entries = self.lib.entries.get_all(key)
+        for entry in entries:
+            if entry.raw_content:
+                self._text_replacements.append((entry.raw_content, ""))
+            self.lib.entries.remove(entry)
+            self._removed_entries.append(entry)
+        self._mark(len(entries))
+        return len(entries)
+
     def enrich(
         self,
         *,
