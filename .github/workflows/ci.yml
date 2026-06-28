@@ -40,7 +40,7 @@ jobs:
   texlive-conformance:
     name: TeX Live 2026 conformance
     runs-on: ubuntu-latest
-    container: ghcr.io/xu-cheng/texlive-full:2026
+    container: ghcr.io/xu-cheng/texlive-full:20260401
 
     steps:
       - name: Check out repository
@@ -51,7 +51,7 @@ jobs:
         run: |
           test "$(bibtex --version | awk 'NR == 1 { print $2 }')" = "0.99d"
           test "$(biber --version | awk 'NR == 1 { print $3 }')" = "2.21"
-          grep -F '\\def\abx@version{3.21}' "$(kpsewhich biblatex.sty)"
+          grep -F '\def\abx@version{3.21}' "$(kpsewhich biblatex.sty)"
 
       - name: Validate BibTeX 0.99d corpus
         shell: bash

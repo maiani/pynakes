@@ -81,32 +81,32 @@ See the [Installation guide](docs/guides/installation.md) for shell completion a
 ## Quick start
 
 ```bash
-# Inspect a library, then check for issues
-pynakes inspect refs.bib
-pynakes lint refs.bib --json
+# Create a new library, then inspect and check for issues
+pynakes init mylib.bib
+pynakes inspect mylib.bib
+pynakes lint mylib.bib --json
 
-# Preview the standard maintenance pass
-pynakes normalize refs.bib --dry-run --diff
+# Add a reference by DOI or arXiv id
+pynakes add 10.5555/example mylib.bib
+pynakes add arXiv:2301.00001 mylib.bib
 
-# Add a reference by DOI or arXiv id (preview, then apply)
-pynakes add 10.5555/example refs.bib --dry-run --diff
-pynakes add arXiv:2301.00001 refs.bib
+# Preview the standard maintenance pass before committing
+pynakes normalize mylib.bib --dry-run --diff
 
 # Remove entries by citation key (with pinax material cleanup)
-pynakes remove refs.bib DeprecatedKey2020 --dry-run --diff
+pynakes remove mylib.bib DeprecatedKey2020
 
 # Rename a citation key across the .bib file and .tex sources
-pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/
+pynakes keys rename mylib.bib OldKey2020 NewKey2020 paper.tex chapters/
 
 # Fetch arXiv materials for an entry (Pinax mode)
-pynakes fetch refs.bib arXivKey2024 --dry-run
-pynakes fetch refs.bib --all
+pynakes fetch mylib.bib arXivKey2024
 
 # Search entries
-pynakes search refs.bib "neural network" --json
+pynakes search mylib.bib "neural network" --json
 
 # Gate a build: fail if any .bib has errors
-pynakes lint refs.bib chapters/*.bib --strict
+pynakes lint mylib.bib chapters/*.bib --strict
 
 # Shell completion for cite keys (bash/zsh/fish)
 eval "$(pynakes --show-completion bash)"

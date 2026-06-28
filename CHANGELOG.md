@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Declare Click as a direct runtime dependency for CLI discovery and shell
+  completion support, fixing clean CI installs with newer Typer releases.
+
 ## [0.5.0] - 2026-06-28
 
 ### Added
