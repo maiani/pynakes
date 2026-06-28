@@ -27,6 +27,9 @@ baseline (BibTeX 0.99d, BibLaTeX 3.20, Biber 2.20).
   (DOI/arXiv/journal-URL), `search`, `used`, `dedupe`, `verify`/`enrich`
   (opt-in `--online`; `--published` folds in preprint promotion), `combine`,
   `split`, `batch`.
+- **Pinax corpus mode (steps 1-8)**: `FileStore`, arXiv download, `fetch` command,
+  agent surface, provenance manifest, pinax-aware `combine`/`split`, coordinated
+  key edits, `add --fetch`. See [Pinax implementation steps](#pinax-implementation-steps).
 - **JabRef v5.15 parity**: full `saveActions` formatter suite, complete metadata
   vocabulary, JabRef key patterns, group management.
 - **Agent-native surface**: stable JSON envelope + exit codes (0/1/2),
@@ -44,26 +47,41 @@ baseline (BibTeX 0.99d, BibLaTeX 3.20, Biber 2.20).
   ``_metadata_list`` / ``_metadata_bool`` moved from ``lint.py`` / ``normalize.py`` into
   ``metadata.py``; many ``ISSUES.md`` bugs, type-safety issues, and invariant violations addressed.
 
-## 0.5 — remaining interchange formats and scope decision
+## v0.5 — Pinax completion + agent polish
 
-Status:
+Complete the Pinax corpus layer and polish the agent surface. The interchange
+formats and scope decision from the 0.4→0.5 window are already resolved; this
+release finishes the remaining Pinax steps and pulls the citekey shell-completion
+forward from the original 0.9 plan.
 
-1. **Remaining interchange formats (done)**: MODS XML and EndNote tagged text
-   are implemented alongside CSL-JSON and RIS. `pynakes.interchange` is now a
-   package with one codec module per format plus a small public dispatcher;
-   import/export still go through `export_library()` / `import_library()` and
-   the `convert --to/--from` CLI surface. No new dependency was needed.
+### v0.5 checklist
 
-2. **Scope decision — PDF / web capture (decided)**: a headless, deterministic,
-   opt-in slice *does* enter the engine — fetching a reference's materials (arXiv
-   PDF + source) and attaching them by citation-key convention. This is the
-   **Pinax** mode, specified in [docs/guides/pinax.md](docs/guides/pinax.md) and
-   built via the [Pinax implementation steps](#pinax-implementation-steps). Plain
-   `.bib` maintenance remains unchanged unless a `files-dir` is set. What stays
-   out: full-text extraction, content search, reading/annotation — derived
-   intelligence over the *contents* of those materials.
+- [ ] **Open-access published PDFs (Pinax step 9).** DOI → open-access resolver
+      landing the published version at `<citekey>.pdf`, when a resolvable
+      open-access copy exists. Follows the same injectable-fetcher, atomic-write,
+      metadata-gated pattern as arXiv downloads. See
+      [docs/guides/pinax.md](docs/guides/pinax.md).
+- [ ] **Citekey shell completion.** Register Click shell-completion callbacks on
+      every argument that accepts a citation key (`add`, `keys rename`, `fetch`,
+      etc.). The callback auto-detects the `.bib` (same logic as
+      `_resolve_input_bib`), parses it, and yields matching keys. Usable via
+      `eval "$(pynakes --show-completion bash)"` / `zsh` / `fish`.
+- [ ] **Dedupe material merge (Pinax step 10).** `dedupe` merge reconciles Pinax
+      materials onto the surviving key — the last remaining Pinax gap after
+      step 9.
+- [ ] **`--backup` flag on all write commands.** Add the `_BACKUP_OPTION` Typer
+      parameter to `add`, `dedupe_merge`, `fetch`, `fields`, `groups`, `keys`,
+      `metadata/set`, `used`, `integrity/enrich` so every command that modifies a
+      `.bib` can back up the pre-edit file (see ISSUES.md inconsistency).
+- [ ] **Output emission consolidation.** Unify the three current output strategies
+      (`_finish_mod`, `_emit`, manual dict construction) behind a shared helper so
+      file-creation commands (setops, used) and mutation commands emit the same
+      JSON envelope without contract drift (see ISSUES.md consolidation
+      opportunity).
 
-Remaining near-term implementation work is the Pinax step plan below.
+**Done when**: all five checklist items are implemented, tested, and documented;
+`pytest && ruff check src tests` passes; CHANGELOG updated; version bumped to
+0.5.0.
 
 ## Guiding principles (non-negotiable)
 
@@ -91,8 +109,8 @@ stability (semver), and is installable.
 
 **Explicitly *not* in 1.0** (deferred to [Beyond 1.0](#beyond-10)): the
 multi-file `Library`/`Catalogue` corpus engine, projections as `Library` views,
-and first-class shared identity. Pinax may be built earlier because it is an
-optional mode of one `Bibliography`; it must not change plain `.bib` behavior.
+and first-class shared identity. Pinax was built in v0.5 because it is an
+optional mode of one `Bibliography`; it does not change plain `.bib` behavior.
 
 ---
 
@@ -107,11 +125,6 @@ optional mode of one `Bibliography`; it must not change plain `.bib` behavior.
 - [ ] A 30-second demo (asciinema/GIF): "messy `.bib` → clean `.bib` with a
       reviewable diff", and an agent cleaning a bibliography via pynakes.
 - [ ] Lead the README/launch with the agent-tool + reviewable-diff story.
-- [ ] **Shell completion for citation keys** (moderate effort). Register
-      Click shell-completion callbacks on every argument that accepts a citation
-      key (`add`, `keys rename`, `fetch`, etc.). The callback auto-detects the
-      `.bib` (same logic as `_resolve_input_bib`), parses it, and yields matching
-      keys. Usable via `eval "$(pynakes --show-completion bash)"` / `zsh` / `fish`.
 - [ ] Deferred to after traction: Zenodo DOI, then JOSS (JOSS requires
       demonstrated use, so it follows adoption).
 
@@ -137,14 +150,10 @@ directly on. Out of 1.0, in dependency order:
   explicit, tested primitive. It is the foundation the rest of this list stands
   on: `Library` dedup, the `Catalogue`, and projection reconciliation all key off
   a single notion of "the same work".
-- **`Pinax`** (optional corpus mode; formerly "Collection") — a `Bibliography`
-  together with its `files-dir` of materials, addressed by citation key. Not a
-  wrapper class but a *mode* a bibliography enters when `pynakes-meta` declares a
-  `files-dir`. Specified in [docs/guides/pinax.md](docs/guides/pinax.md) and built
-  via the [Pinax implementation steps](#pinax-implementation-steps) below; the
-  top-level `fetch` command is the first slice. **Being pulled forward as active
-  near-term work** because it preserves the single-file engine: no `files-dir`,
-  no Pinax behavior.
+- **`Pinax` implementation complete** (v0.5). All ten Pinax implementation steps
+  are done by v0.5; the deferred content-intelligence layers (full-text
+  extraction, content search, RAG/embeddings) remain beyond 1.0 as specified in
+  [docs/guides/pinax.md](docs/guides/pinax.md).
 - **`Library` (corpus)** — `Library.open(dir)`; `collections()`,
   `collection(path)`; cross-file `search`/`find_key`/dedup, reusing the identity
   primitive above. A Library holds many pinakes.
@@ -152,8 +161,8 @@ directly on. Out of 1.0, in dependency order:
   FTS) over the Library; strictly derived, never a competing source of truth.
 - **Projections** — `combine` and `split` formalized as first-class **views of
   the `Library`**, with reconciliation, once the `Library` exists.
-- **Interop beyond 0.5** — any import/export formats past the 0.4/0.5 checklists,
-  building on `pynakes.interchange`.
+- **Additional interchange formats** — any import/export formats beyond the
+  existing CSL-JSON/RIS/MODS/EndNote quartet, building on `pynakes.interchange`.
 
 ## Pinax implementation steps
 
@@ -196,11 +205,11 @@ reviewed, then the next.
 - [x] **8. `add --fetch` for arXiv Pinax materials.** One-step
       import-and-download for arXiv references, using the existing Pinax fetch
       policy for preprint PDF/source materials.
-- [ ] **9. Open-access published PDFs.** DOI → open-access resolver landing the
-      published version at `<citekey>.pdf`, when a resolvable open-access copy
+- [ ] **9. Open-access published PDFs.** (v0.5) DOI → open-access resolver landing
+      the published version at `<citekey>.pdf`, when a resolvable open-access copy
       exists.
-- [ ] **10. Dedupe material merge.** `dedupe` merge reconciles Pinax materials
-      onto the surviving key.
+- [ ] **10. Dedupe material merge.** (v0.5) `dedupe` merge reconciles Pinax
+      materials onto the surviving key.
 
 ## Out of scope (for the deterministic core)
 
