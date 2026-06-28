@@ -47,12 +47,14 @@ baseline (BibTeX 0.99d, BibLaTeX 3.20, Biber 2.20).
   ``_metadata_list`` / ``_metadata_bool`` moved from ``lint.py`` / ``normalize.py`` into
   ``metadata.py``; many ``ISSUES.md`` bugs, type-safety issues, and invariant violations addressed.
 
-## v0.5 — Pinax completion + agent polish
+## v0.5 — Pinax completion + agent polish + cross-discipline import
 
-Complete the Pinax corpus layer and polish the agent surface. The interchange
-formats and scope decision from the 0.4→0.5 window are already resolved; this
-release finishes the remaining Pinax steps and pulls the citekey shell-completion
-forward from the original 0.9 plan.
+Complete the Pinax corpus layer, polish the agent surface, and broaden the
+import pipeline beyond physics. The interchange formats and scope decision from
+the 0.4→0.5 window are already resolved; this release finishes the remaining
+Pinax steps, pulls the citekey shell-completion forward from the original 0.9
+plan, and adds identifier support for biomedicine (PubMed), social sciences
+(SSRN, NBER), and books (ISBN).
 
 ### v0.5 checklist
 
@@ -86,7 +88,26 @@ forward from the original 0.9 plan.
       JSON envelope without contract drift (see ISSUES.md consolidation
       opportunity).
 
-**Done when**: all five checklist items are implemented, tested, and documented;
+- [ ] **Multi-discipline identifier support.** Broaden `add` beyond DOI and arXiv
+      with dedicated import paths for:
+  - **PubMed PMID / PMCID** — via NCBI E-utilities (`eutils.ncbi.nlm.nih.gov`).
+        Covers biomedicine and life sciences (~35M citations).
+  - **ISBN** — for books, via Open Library or Google Books API. Covers humanities
+        and social sciences where books dominate.
+  - **SSRN ID** — Social Science Research Network papers; the existing
+        `_preprint_identity` already recognizes `ssrn.com` URLs but there is no
+        import path.
+  - **NBER ID** — National Bureau of Economic Research working papers
+        (economics).
+  - **Generalize journal URL resolver table** — the current
+        `_JOURNAL_URL_RESOLVERS` dict has only two entries (nature.com and
+        journals.aps.org). Add common publisher patterns (Elsevier, Springer,
+        Wiley, PLOS, PubMed Central URLs).
+  - Many preprint servers (bioRxiv, medRxiv, ChemRxiv, PsyArXiv, etc.) use
+        dedicated DOI prefixes and already work through the DOI path — document
+        this and add test fixtures.
+
+**Done when**: all checklist items are implemented, tested, and documented;
 `pytest && ruff check src tests` passes; CHANGELOG updated; version bumped to
 0.5.0.
 
