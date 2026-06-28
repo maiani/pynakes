@@ -69,6 +69,13 @@ forward from the original 0.9 plan.
 - [ ] **Dedupe material merge (Pinax step 10).** `dedupe` merge reconciles Pinax
       materials onto the surviving key — the last remaining Pinax gap after
       step 9.
+- [ ] **`remove` command.** `pynakes remove <bib> <citekey>... [--keep-files]
+      [--dry-run] [--diff] [--json] [--backup]`. Removes entries by citation key
+      through the standard lifecycle. In a pinax, removes the entry's materials
+      from `files-dir` by default (filesystem first, then commit; `--keep-files`
+      opts out). The `--keep-files` flag handles the case where materials should
+      survive (e.g. shared materials, or the user wants to re-add under a
+      different key).
 - [ ] **`--backup` flag on all write commands.** Add the `_BACKUP_OPTION` Typer
       parameter to `add`, `dedupe_merge`, `fetch`, `fields`, `groups`, `keys`,
       `metadata/set`, `used`, `integrity/enrich` so every command that modifies a
