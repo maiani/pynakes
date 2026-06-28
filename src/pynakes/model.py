@@ -1,10 +1,10 @@
 """Data models representing one parsed BibTeX file."""
 
 import re
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 
-from pynakes._text_utils import iter_toplevel_splits
+from pynakes._text_utils import iter_toplevel_splits, strip_jabref_terminator
 from pynakes.inheritance import Lookup, resolve_entry_fields
 
 # A bare BibTeX string reference: an identifier with no surrounding braces or
@@ -183,7 +183,7 @@ class MetadataBlock:
         this convenience view strips the terminator JabRef appends to
         ``jabref-meta`` values.
         """
-        return self.value.strip().rstrip(";").strip()
+        return strip_jabref_terminator(self.value)
 
     def to_dict(self) -> dict[str, object]:
         """Serialize the block to a JSON-friendly dict."""
@@ -323,6 +323,15 @@ class EntryStore:
     def remove(self, entry: BibEntry) -> None:
         """Remove one entry object from the store."""
         self._entries.remove(entry)
+
+    def reorder(self, key: Callable[[BibEntry], object], *, reverse: bool = False) -> None:
+        """Stably reorder entries in place by ``key`` (duplicates preserved).
+
+        A thin wrapper over ``list.sort`` so callers reorder the store without
+        reaching into its backing list. Stable, so successive calls compose into
+        a multi-criterion sort from least- to most-significant key.
+        """
+        self._entries.sort(key=key, reverse=reverse)
 
     def get_all(self, key: str) -> list[BibEntry]:
         """Return every entry with the given citation key, in order."""

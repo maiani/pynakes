@@ -9,6 +9,7 @@ instead. Generation is deterministic — the same entry always yields the same k
 import re
 from collections.abc import Callable
 
+from pynakes._text_utils import strip_jabref_terminator
 from pynakes.authors import ascii_fold as _ascii_fold
 from pynakes.authors import last_name as _last_name
 from pynakes.authors import split_name_list as _split_name_list
@@ -181,20 +182,16 @@ def generate_key_from_pattern(entry: BibEntry, pattern: str) -> str:
     return _sanitize_key("".join(output)) or generate_fallback_key(entry)
 
 
-def _strip_jabref_value(value: str) -> str:
-    return value.strip().rstrip(";").strip()
-
-
 def get_jabref_key_pattern(lib: BibFile, entry_type: str) -> str | None:
     """Return the JabRef citation-key pattern for ``entry_type`` if stored."""
     type_key = f"keypattern_{entry_type.lower()}"
     for key, value in lib.metadata.items():
         normalized = key.lower()
         if normalized == type_key:
-            return _strip_jabref_value(value)
+            return strip_jabref_terminator(value)
     for key, value in lib.metadata.items():
         if key.lower() == "keypatterndefault":
-            return _strip_jabref_value(value)
+            return strip_jabref_terminator(value)
     return None
 
 

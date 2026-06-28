@@ -14,10 +14,14 @@ from pynakes.metadata import (
     consolidate_metadata,
     default_namespace,
     library_database_type,
+    library_is_jabref_tracked,
     library_save_actions,
+    library_save_order,
     metadata_category,
     metadata_owner,
     parse_save_actions,
+    parse_save_order,
+    remove_metadata,
     set_metadata,
 )
 from pynakes.model import MetadataBlock
@@ -65,9 +69,30 @@ def test_pynakes_owned_keys_have_domain_categories() -> None:
 
 
 def test_default_namespace_routes_by_owner() -> None:
+    # Without file context the answer is by owner (the static "belongs to" view).
     assert default_namespace("databaseType") == "jabref"
     assert default_namespace("files-dir") == "pynakes"
     assert default_namespace("unknownThing") == "pynakes"
+
+
+def test_library_is_jabref_tracked_follows_presence() -> None:
+    untracked = parse_bib("@article{A,\n  title = {T}\n}\n")
+    assert library_is_jabref_tracked(untracked) is False
+
+    tracked = parse_bib("@comment{jabref-meta: databaseType:bibtex;}\n")
+    assert library_is_jabref_tracked(tracked) is True
+
+
+def test_default_namespace_is_file_context_aware() -> None:
+    untracked = parse_bib("@article{A,\n  title = {T}\n}\n")
+    # A JabRef-native key stays in pynakes-meta on an untracked file...
+    assert default_namespace("databaseType", untracked) == "pynakes"
+    # ...but pynakes-owned keys are always pynakes-meta regardless.
+    assert default_namespace("files-dir", untracked) == "pynakes"
+
+    tracked = parse_bib("@comment{jabref-meta: protectedflag:true;}\n")
+    assert default_namespace("databaseType", tracked) == "jabref"
+    assert default_namespace("files-dir", tracked) == "pynakes"
 
 
 def test_consolidate_metadata_moves_stranded_blocks_to_end_sorted() -> None:
@@ -174,6 +199,48 @@ def test_library_save_actions_reads_from_metadata() -> None:
     sa = library_save_actions(lib)
     assert sa is not None
     assert sa.has(("clean_up_doi", "short_doi"), ("doi",)) is True
+
+
+def test_parse_save_order_reads_jabref_criteria() -> None:
+    # JabRef's serialized form: type, then field;descending pairs, trailing ';'.
+    order = parse_save_order("specified;author;false;year;true;")
+    assert order is not None
+    assert order.order_type == "specified"
+    assert order.criteria == [("author", False), ("year", True)]
+
+
+def test_parse_save_order_original_and_absent() -> None:
+    assert parse_save_order(None) is None
+    assert parse_save_order("") is None
+    keep = parse_save_order("original;")
+    assert keep is not None and keep.order_type == "original" and keep.criteria == []
+
+
+def test_parse_save_order_is_case_insensitive_on_type() -> None:
+    order = parse_save_order("SPECIFIED;citationkey;TRUE;")
+    assert order is not None
+    assert order.order_type == "specified"
+    assert order.criteria == [("citationkey", True)]
+
+
+def test_parse_save_order_unknown_even_token_list_keeps_original() -> None:
+    # An unrecognized leading token with an even token count cannot form whole
+    # criteria pairs, so (like JabRef) the order degrades to "original".
+    order = parse_save_order("citationkey;false;")
+    assert order is not None
+    assert order.order_type == "original"
+    assert order.criteria == []
+
+
+def test_library_save_order_reads_from_metadata() -> None:
+    lib = parse_bib(
+        "@comment{jabref-meta: saveOrderConfig:specified;citationkey;false;}\n"
+        "@article{A,\n  title = {T},\n  year = {2020}\n}\n"
+    )
+    order = library_save_order(lib)
+    assert order is not None
+    assert order.order_type == "specified"
+    assert order.criteria == [("citationkey", False)]
 
 
 def test_library_database_type_reads_biblatex() -> None:
@@ -358,14 +425,28 @@ def test_set_metadata_updates_known_block_without_touching_unknown() -> None:
     assert lib.jabref_metadata["unknownThing"] == "keep;"
 
 
-def test_set_metadata_appends_missing_known_block() -> None:
+def test_set_metadata_untracked_file_keeps_native_key_in_pynakes() -> None:
+    # On a pynakes-native file (no jabref-meta blocks), even a JabRef-native key
+    # stays in pynakes-meta: pynakes does not inject jabref-meta until adoption.
     lib = parse_bib("@article{A,\n  title = {T}\n}\n")
 
     update = set_metadata(lib, "keypatterndefault", "[auth][year]")
 
     assert isinstance(update, MetadataUpdate)
     assert update.created is True
-    assert lib.raw_comments == ["@comment{jabref-meta: keypatterndefault:[auth][year];}"]
+    assert update.namespace == "pynakes"
+    assert lib.pynakes_metadata["keypatterndefault"] == "[auth][year]"
+
+
+def test_set_metadata_tracked_file_appends_known_jabref_block() -> None:
+    # A JabRef-tracked file (already carries jabref-meta) keeps native keys there.
+    lib = parse_bib("@comment{jabref-meta: protectedflag:true;}\n\n@article{A,\n  title = {T}\n}\n")
+
+    update = set_metadata(lib, "keypatterndefault", "[auth][year]")
+
+    assert update.created is True
+    assert update.namespace == "jabref"
+    assert "@comment{jabref-meta: keypatterndefault:[auth][year];}" in lib.raw_comments
     assert lib.jabref_metadata["keypatterndefault"] == "[auth][year];"
 
 
@@ -389,11 +470,17 @@ def test_set_metadata_routes_unknown_to_pynakes_by_default() -> None:
         raise AssertionError("expected ValueError when forcing unknown key into jabref-meta")
 
 
-def test_set_metadata_routes_native_key_to_jabref() -> None:
-    lib = parse_bib("")
-    update = set_metadata(lib, "databaseType", "biblatex")
-    assert update.namespace == "jabref"
-    assert update.new_raw == "@comment{jabref-meta: databaseType:biblatex;}"
+def test_set_metadata_routes_native_key_by_file_context() -> None:
+    # Untracked (no jabref-meta): a JabRef-native key stays in pynakes-meta.
+    untracked = parse_bib("")
+    u = set_metadata(untracked, "databaseType", "biblatex")
+    assert u.namespace == "pynakes"
+
+    # Tracked (already carries jabref-meta): the native key routes to jabref-meta.
+    tracked = parse_bib("@comment{jabref-meta: protectedflag:true;}\n")
+    t = set_metadata(tracked, "databaseType", "biblatex")
+    assert t.namespace == "jabref"
+    assert t.new_raw == "@comment{jabref-meta: databaseType:biblatex;}"
 
 
 def test_set_metadata_refuses_duplicate_blocks() -> None:
@@ -409,6 +496,46 @@ def test_set_metadata_refuses_duplicate_blocks() -> None:
         assert exc.count == 2
     else:
         raise AssertionError("expected DuplicateMetadataError")
+
+
+def test_remove_metadata_pynakes_key_rewrites_block_in_place() -> None:
+    lib = parse_bib("@comment{pynakes-meta:\ndatabaseType: biblatex;\nfiles-dir: refs.files;\n}\n")
+
+    update = remove_metadata(lib, "databaseType", namespace="pynakes")
+
+    assert update is not None
+    assert update.namespace == "pynakes"
+    assert "databaseType" not in lib.pynakes_metadata
+    assert lib.pynakes_metadata["files-dir"] == "refs.files"
+
+
+def test_remove_metadata_drops_emptied_pynakes_comment() -> None:
+    lib = parse_bib("@comment{pynakes-meta:\ndatabaseType: biblatex;\n}\n")
+
+    update = remove_metadata(lib, "databaseType", namespace="pynakes")
+
+    assert update is not None
+    assert update.new_raw == ""
+    assert "databaseType" not in lib.pynakes_metadata
+
+
+def test_remove_metadata_jabref_drops_whole_comment() -> None:
+    lib = parse_bib(
+        "@comment{jabref-meta: databaseType:biblatex;}\n"
+        "@comment{jabref-meta: protectedflag:true;}\n"
+    )
+
+    update = remove_metadata(lib, "databaseType", namespace="jabref")
+
+    assert update is not None
+    assert update.new_raw == ""
+    assert "databaseType" not in lib.jabref_metadata
+    assert lib.jabref_metadata["protectedflag"] == "true;"
+
+
+def test_remove_metadata_absent_key_returns_none() -> None:
+    lib = parse_bib("@article{A,\n  title = {T}\n}\n")
+    assert remove_metadata(lib, "databaseType") is None
 
 
 def test_subset_preserves_structured_metadata_blocks() -> None:
@@ -480,7 +607,8 @@ def test_metadata_set_writes_existing_block(tmp_path: Path) -> None:
 
 def test_metadata_set_appends_missing_block(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
-    bib.write_text("@article{A,\n  title = {T}\n}\n")
+    # A JabRef-tracked file (carries jabref-meta) keeps native keys in jabref-meta.
+    bib.write_text("@comment{jabref-meta: protectedflag:true;}\n\n@article{A,\n  title = {T}\n}\n")
 
     result = runner.invoke(
         app, ["metadata", "set", str(bib), "keypatterndefault", "[auth][year]", "--json"]
@@ -489,9 +617,10 @@ def test_metadata_set_appends_missing_block(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["created"] is True
+    assert data["namespace"] == "jabref"
     text = bib.read_text()
     # New metadata is appended at the canonical bottom position, after the entry.
-    assert text.index("@article{A,") < text.index("@comment{jabref-meta:")
+    assert text.index("@article{A,") < text.index("@comment{jabref-meta: keypatterndefault")
     assert text.rstrip().endswith("@comment{jabref-meta: keypatterndefault:[auth][year];}")
 
 
@@ -535,3 +664,84 @@ def test_metadata_set_duplicate_key_conflicts(tmp_path: Path) -> None:
     data = json.loads(result.output)
     assert data["error"] == "DuplicateMetadata"
     assert data["count"] == 2
+
+
+def test_metadata_adopt_jabref_anchors_databasetype(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@article{Curie1898,\n  title = {T}\n}\n\n@comment{pynakes-meta:\nfiles-dir: refs.files;\n}\n"
+    )
+
+    result = runner.invoke(app, ["metadata", "adopt-jabref", str(bib), "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["database_type_added"] is True
+    assert data["was_tracked"] is False
+    assert data["moved_keys"] == []
+    text = bib.read_text()
+    assert "@comment{jabref-meta: databaseType:bibtex;}" in text
+    # The entry is left byte-for-byte untouched.
+    assert "@article{Curie1898,\n  title = {T}\n}" in text
+
+
+def test_metadata_adopt_jabref_rehomes_native_key(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@article{A,\n  title = {T}\n}\n\n"
+        "@comment{pynakes-meta:\ndatabaseType: biblatex;\nfiles-dir: refs.files;\n}\n"
+    )
+
+    result = runner.invoke(app, ["metadata", "adopt-jabref", str(bib), "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["moved_keys"] == ["databaseType"]
+    text = bib.read_text()
+    assert "@comment{jabref-meta: databaseType:biblatex;}" in text
+    # databaseType is gone from the pynakes-meta comment, but its companions remain.
+    pynakes_block = text.split("pynakes-meta:")[1].split("}")[0]
+    assert "databaseType" not in pynakes_block
+    assert "files-dir" in pynakes_block
+
+
+def test_metadata_adopt_jabref_idempotent(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@comment{jabref-meta: databaseType:bibtex;}\n\n@article{A,\n  title = {T}\n}\n")
+
+    result = runner.invoke(app, ["metadata", "adopt-jabref", str(bib), "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["modified"] is False
+    assert data["was_tracked"] is True
+    assert data["moved_keys"] == []
+    assert data["database_type_added"] is False
+
+
+def test_metadata_adopt_then_native_set_routes_to_jabref(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@article{A,\n  title = {T}\n}\n\n@comment{pynakes-meta:\nfiles-dir: refs.files;\n}\n"
+    )
+
+    runner.invoke(app, ["metadata", "adopt-jabref", str(bib)])
+    result = runner.invoke(app, ["metadata", "set", str(bib), "protectedflag", "true", "--json"])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["namespace"] == "jabref"
+
+
+def test_metadata_adopt_jabref_dry_run_does_not_write(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    original = (
+        "@article{A,\n  title = {T}\n}\n\n@comment{pynakes-meta:\nfiles-dir: refs.files;\n}\n"
+    )
+    bib.write_text(original)
+
+    result = runner.invoke(app, ["metadata", "adopt-jabref", str(bib), "--dry-run", "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["dry_run"] is True
+    assert bib.read_text() == original

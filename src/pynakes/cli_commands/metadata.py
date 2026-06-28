@@ -129,7 +129,53 @@ def metadata_set(
     )
 
 
+def metadata_adopt_jabref(
+    file: str | None = typer.Argument(
+        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
+    ),
+    backup: bool = _BACKUP_OPTION,
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Start maintaining a JabRef metadata projection for this library.
+
+    pynakes-native libraries keep their settings in ``pynakes-meta``. This writes
+    the equivalent ``jabref-meta`` blocks (relocating any JabRef-native keys and
+    anchoring a ``databaseType``) so that, from now on, pynakes also keeps
+    ``jabref-meta`` in sync — the file works in JabRef without losing its pynakes
+    settings. Running it again once tracked is a no-op.
+    """
+    file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    coll = Bibliography.open(file)
+    report = coll.adopt_jabref()
+
+    if not report.changed:
+        summary = "Already JabRef-tracked; nothing to adopt."
+    else:
+        parts = []
+        if report.moved_keys:
+            parts.append(f"relocated {len(report.moved_keys)} key(s) to jabref-meta")
+        if report.database_type_added:
+            parts.append("anchored databaseType")
+        summary = f"{_verb('adopt', params, 'Adopted')} JabRef metadata: {', '.join(parts)}."
+
+    _finish_mod(
+        file,
+        "metadata_adopt_jabref",
+        coll,
+        params,
+        [summary],
+        modified_entries=0,
+        moved_keys=report.moved_keys,
+        database_type_added=report.database_type_added,
+        was_tracked=report.was_tracked,
+    )
+
+
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
     app.command("list")(_safe(metadata_list))
     app.command("set")(_safe(metadata_set))
+    app.command("adopt-jabref")(_safe(metadata_adopt_jabref))

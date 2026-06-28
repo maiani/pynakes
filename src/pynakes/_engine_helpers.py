@@ -10,6 +10,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from pynakes.metadata import metadata_bool as _coerce_metadata_bool
+from pynakes.metadata import metadata_value
 from pynakes.model import BibEntry, BibFile, MetadataBlock
 
 
@@ -53,16 +55,12 @@ def snapshot_entries(lib: BibFile) -> dict[int, str | None]:
 
 
 def metadata_bool(lib: BibFile, name: str, default: bool) -> bool:
-    """Return a boolean metadata value, falling back to ``default``."""
-    for key, value in lib.metadata.items():
-        if key.strip().lower() == name.strip().lower():
-            stripped = value.rstrip(";").strip().lower()
-            if stripped in {"1", "true", "yes", "on", "enabled"}:
-                return True
-            if stripped in {"0", "false", "no", "off", "disabled"}:
-                return False
-            return default
-    return default
+    """Return a boolean metadata value for ``name``, falling back to ``default``.
+
+    A thin ``lib``-aware wrapper over the canonical lookup/coercion pair in
+    :mod:`pynakes.metadata`, so the truthy/falsy spellings stay defined once.
+    """
+    return _coerce_metadata_bool(metadata_value(lib, name), default)
 
 
 def read_text(path: Path, encoding: str) -> str:

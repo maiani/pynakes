@@ -182,7 +182,10 @@ def get_capabilities() -> dict:
         "supports_multiple_files": True,
         # Two structurally identical metadata comment namespaces are read and
         # merged (pynakes-meta overrides jabref-meta). `metadata set` routes a
-        # key to jabref-meta when JabRef understands it, else pynakes-meta.
+        # JabRef-native key to jabref-meta only when the file is already
+        # JabRef-tracked (carries jabref-meta); otherwise it, like every
+        # pynakes-owned key, stays in pynakes-meta. `metadata adopt-jabref`
+        # establishes tracking so JabRef-native keys are mirrored from then on.
         "metadata_namespaces": ["jabref-meta", "pynakes-meta"],
         "exit_codes": {
             "0": "success",

@@ -14,7 +14,14 @@ from pynakes.editing import (
     set_entry_type,
 )
 from pynakes.formatters import FIELD_FORMATTERS
-from pynakes.metadata import library_save_actions, metadata_bool, metadata_list, metadata_value
+from pynakes.metadata import (
+    SAVE_ORDER_KEY_FIELDS,
+    library_save_actions,
+    library_save_order,
+    metadata_bool,
+    metadata_list,
+    metadata_value,
+)
 from pynakes.model import COMMON_STRINGS, BibFile
 
 # JabRef saveActions formatter keys mapped to pynakes normalization concerns.
@@ -55,6 +62,10 @@ class NormalizeOptions:
     normalize_dois: bool | None = None
     identifier_case: bool | None = None
     format_metadata: bool | None = None
+    # One-off sort override using JabRef field names; each token is
+    # ``field`` or ``field:asc`` / ``field:desc``. ``["original"]`` (or
+    # ``["none"]``) forces "keep current order", overriding ``saveOrderConfig``.
+    sort_by: list[str] | None = None
 
 
 @dataclass
@@ -75,6 +86,9 @@ class NormalizeResult:
     field_names: int = 0
     warnings: list[dict[str, str]] = field(default_factory=list)
 
+    sort_entries_count: int = 0
+    sort_criteria: list[tuple[str, bool]] = field(default_factory=list)
+
     @property
     def operations(self) -> dict[str, object]:
         """Return the per-domain change counts as a single JSON-friendly dict."""
@@ -87,6 +101,7 @@ class NormalizeResult:
             "save_action_fields": self.save_action_fields,
             "entry_types": self.entry_types,
             "field_names": self.field_names,
+            "sorted_entries": self.sort_entries_count,
         }
 
 
@@ -258,7 +273,80 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
     if _resolve_bool(lib, opts.identifier_case, "identifier-case", True):
         result.entry_types, result.field_names = normalize_identifier_case(lib)
 
+    criteria = _resolve_sort_criteria(lib, opts.sort_by)
+    if criteria:
+        sort_entries(lib, criteria)
+        result.sort_criteria = criteria
+        result.sort_entries_count = len(lib.entries)
+
     return result
+
+
+def _resolve_sort_criteria(lib: BibFile, sort_by: list[str] | None) -> list[tuple[str, bool]]:
+    """Resolve the entry sort order, JabRef-compatibly.
+
+    An explicit CLI ``sort_by`` wins: each token is ``field`` or
+    ``field:asc``/``field:desc`` (the JabRef field name; ``key`` is accepted for
+    the citation key). A lone ``original`` or ``none`` token means "keep current
+    order". With no CLI override, JabRef's ``saveOrderConfig`` metadata drives
+    the order — but only when its type is ``specified``, matching JabRef, which
+    leaves entries untouched for ``original``/``table``.
+    """
+    if sort_by:
+        tokens = [token.strip() for token in sort_by if token.strip()]
+        if not tokens or (len(tokens) == 1 and tokens[0].lower() in {"original", "none"}):
+            return []
+        criteria: list[tuple[str, bool]] = []
+        for token in tokens:
+            name, _, direction = token.partition(":")
+            descending = direction.strip().lower() in {"desc", "descending", "true", "down"}
+            criteria.append((name.strip(), descending))
+        return criteria
+
+    save_order = library_save_order(lib)
+    if save_order is not None and save_order.order_type == "specified":
+        return list(save_order.criteria)
+    return []
+
+
+def sort_entries(lib: BibFile, criteria: list[tuple[str, bool]]) -> int:
+    """Reorder ``lib`` entries in-place by the given criteria.
+
+    ``criteria`` is an ordered ``(field, descending)`` list; the first is the
+    primary sort. Implemented as successive stable sorts from the least- to the
+    most-significant criterion, so per-criterion ascending/descending is honored
+    independently. Returns the number of entries.
+    """
+    for field_name, descending in reversed(criteria):
+        lib.entries.reorder(
+            lambda entry, f=field_name: _entry_sort_key(entry, f),
+            reverse=descending,
+        )
+    return len(lib.entries)
+
+
+def _entry_sort_key(entry, field_name: str) -> tuple:
+    """Compute a stable sort key for *entry* on *field_name* (JabRef field name).
+
+    JabRef's ``citationkey`` (and the ``bibtexkey``/``key`` aliases) sorts by the
+    citation key; ``entrytype``/``type`` by the entry type; any other name is a
+    bibliographic field. Entries missing the field sort last (ascending). ``year``
+    is compared numerically so ``2010`` precedes ``2020``.
+    """
+    name = field_name.lower()
+    if name in SAVE_ORDER_KEY_FIELDS:
+        return (0, entry.key.lower(), "")
+    if name in {"entrytype", "type"}:
+        return (0, entry.type.lower(), "")
+    raw = entry.fields.get(name, "")
+    if not raw:
+        return (1, "", "")  # missing → last
+    if name == "year":
+        try:
+            return (0, int(raw), "")
+        except ValueError:
+            return (0, 0, raw.lower())
+    return (0, raw.lower(), "")
 
 
 def normalize_identifier_case(lib: BibFile) -> tuple[int, int]:

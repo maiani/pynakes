@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`metadata adopt-jabref` — opt-in JabRef metadata tracking.** pynakes-native
+  libraries now keep their settings in `pynakes-meta` by default; `jabref-meta`
+  is no longer injected into a file that never had it. Run `adopt-jabref` to
+  establish a JabRef projection: it relocates any JabRef-native keys stranded in
+  `pynakes-meta` into `jabref-meta` and anchors a `databaseType` block, so the
+  file works in JabRef without losing its pynakes settings. From then on the
+  library is *JabRef-tracked* and JabRef-native keys are written to `jabref-meta`
+  automatically. Running it again once tracked is a no-op. The JSON envelope
+  reports `moved_keys`, `database_type_added`, and `was_tracked`.
+
+- **Entry sorting in `normalize`, compatible with JabRef's `saveOrderConfig`.**
+  When a library carries JabRef's `@Comment{jabref-meta: saveOrderConfig:...}`
+  with order type `specified`, `normalize` now reorders entries to match it —
+  the same multi-criterion `field;descending` model JabRef writes from its
+  "Save sort order" settings (order types `original`/`table` keep the current
+  order). A new repeatable `--sort-by` option overrides it for one run:
+  `--sort-by author --sort-by year:desc` sorts by author ascending then year
+  descending; `citationkey` (or `key`) sorts by citation key; `year` sorts
+  numerically; `--sort-by original` keeps the current order. Reported in the
+  JSON envelope as `operations.sorted_entries`.
+
+### Changed
+
+- **Metadata namespace routing is now file-context-aware (interop, not parity).**
+  `set_metadata` previously routed every JabRef-native key (e.g. `databaseType`)
+  into `jabref-meta` by owner, regardless of the file. It now routes a
+  JabRef-native key to `jabref-meta` only when the file is already JabRef-tracked
+  (carries `jabref-meta` blocks); otherwise it — like every pynakes-owned key —
+  stays in `pynakes-meta`. An existing JabRef library keeps its convention
+  unchanged; a pynakes-native file stays free of `jabref-meta` until you run
+  `metadata adopt-jabref`. New `library_is_jabref_tracked()` and `remove_metadata()`
+  helpers support this.
+
 ### Fixed
 
 - Declare Click as a direct runtime dependency for CLI discovery and shell

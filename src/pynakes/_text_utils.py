@@ -82,3 +82,14 @@ def iter_toplevel_splits(
     if tail or not parts:
         parts.append(tail)
     return parts
+
+
+def strip_jabref_terminator(value: str) -> str:
+    """Return *value* without surrounding whitespace or JabRef's trailing ``;``.
+
+    JabRef terminates each ``jabref-meta`` value with a semicolon; this strips
+    that terminator (and surrounding whitespace) so callers compare and store
+    the bare payload. Centralizes an idiom shared by the metadata, key-pattern,
+    model, and filestore layers.
+    """
+    return value.strip().rstrip(";").strip()

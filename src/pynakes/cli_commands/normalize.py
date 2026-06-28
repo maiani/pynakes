@@ -86,6 +86,14 @@ def normalize(
         "--metadata-formatting",
         help="Consolidate jabref-meta to the file end, sorted (metadata, on, or off)",
     ),
+    sort_by: list[str] | None = typer.Option(
+        None,
+        "--sort-by",
+        help="Sort entries by a JabRef field name; repeat for secondary keys "
+        '(e.g. --sort-by author --sort-by year:desc). Use "citationkey" (or "key") '
+        'for the citation key and append ":desc" for descending. "original" keeps '
+        "the current order. Omit to follow the file's JabRef saveOrderConfig.",
+    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
@@ -106,19 +114,28 @@ def normalize(
             normalize_dois=_optional_bool(doi_normalization),
             identifier_case=_optional_bool(identifier_case),
             format_metadata=_optional_bool(metadata_formatting),
+            sort_by=sort_by,
         )
         coll = Bibliography.open(file)
         report = coll.normalize(options)
     except ValueError as exc:
         _emit_error(json_output, "InvalidNormalizeOption", str(exc))
 
+    if report.sort_criteria:
+        order = ", ".join(
+            f"{field}{':desc' if descending else ''}" for field, descending in report.sort_criteria
+        )
+        sort_detail = f", sorted_by=[{order}]"
+    else:
+        sort_detail = ""
     human = [
         f"{_verb('normalize', params)} entries.",
         "  "
         f"titles={sum(report.title_fields.values())}, "
         f"authors={report.authors}, journals={report.journals}, dois={report.dois}, "
         f"months={report.months}, "
-        f"entry_types={report.entry_types}, field_names={report.field_names}",
+        f"entry_types={report.entry_types}, field_names={report.field_names}"
+        f"{sort_detail}",
     ]
     if report.warnings:
         human.append(f"  {len(report.warnings)} warning(s).")

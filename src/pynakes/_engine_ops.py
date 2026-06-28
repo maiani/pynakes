@@ -208,6 +208,11 @@ class BibliographyOperations:
         self._consolidate_metadata = normalize_ops.resolve_format_metadata(
             self.lib, opts.format_metadata
         )
+        if report.sort_entries_count:
+            # Sorting reorders _entries in-place. Clearing the snapshot makes
+            # every entry appear "missing" to _entry_edits(), which falls back
+            # to write_bib() and preserves the new order.
+            self._entry_snapshot = {}
         self._mark(
             bool(
                 report.authors
@@ -217,6 +222,7 @@ class BibliographyOperations:
                 or sum(report.title_fields.values())
                 or report.entry_types
                 or report.field_names
+                or report.sort_entries_count
                 or self._consolidate_metadata
             )
         )
@@ -321,6 +327,51 @@ class BibliographyOperations:
         self._text_replacements.append((update.old_raw, update.new_raw))
         self._mark(True)
         return update
+
+    def remove_metadata(
+        self, key: str, *, namespace: str | None = None
+    ) -> metadata_ops.MetadataUpdate | None:
+        """Remove one metadata block in memory, or ``None`` if the key is absent."""
+        update = metadata_ops.remove_metadata(self.lib, key, namespace=namespace)
+        if update is None:
+            return None
+        self._text_replacements.append((update.old_raw, update.new_raw))
+        self._mark(True)
+        return update
+
+    def adopt_jabref(self) -> metadata_ops.JabRefAdoptReport:
+        """Establish a ``jabref-meta`` projection so JabRef tracks this library.
+
+        Relocates any JabRef-native keys stranded in ``pynakes-meta`` into
+        ``jabref-meta`` and ensures a ``databaseType`` block exists to anchor
+        tracking. From then on the library is JabRef-tracked, so future writes of
+        JabRef-native keys are routed to ``jabref-meta`` automatically. A library
+        that is already tracked with nothing to relocate is a no-op.
+        """
+        was_tracked = metadata_ops.library_is_jabref_tracked(self.lib)
+        rehome = [
+            (block.key, block.value)
+            for block in self.lib.pynakes_metadata_blocks
+            if metadata_ops.metadata_owner(block.key) == "jabref"
+        ]
+        moved: list[str] = []
+        for key, value in rehome:
+            self.remove_metadata(key, namespace="pynakes")
+            self.set_metadata(key, value, namespace="jabref")
+            moved.append(key)
+
+        database_type_added = False
+        if not any(b.key.lower() == "databasetype" for b in self.lib.jabref_metadata_blocks):
+            self.set_metadata(
+                "databaseType", metadata_ops.library_database_type(self.lib), namespace="jabref"
+            )
+            database_type_added = True
+
+        return metadata_ops.JabRefAdoptReport(
+            moved_keys=moved,
+            database_type_added=database_type_added,
+            was_tracked=was_tracked,
+        )
 
     def dedupe_merge(self) -> dedupe_ops.DedupeMergeReport:
         """Merge duplicate-work clusters in memory."""

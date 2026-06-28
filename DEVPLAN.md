@@ -25,7 +25,8 @@ syntax, or JSON envelopes.
 - **Operations**: `init`, `inspect`, `lint`, `groups`, `keys`
   (generate/check/repair/rename + JabRef key patterns), `fields` (with `--where`),
   `convert` (BibTeX↔BibLaTeX + CSL-JSON/RIS/MODS/EndNote), `files check`, `normalize`
-  (authors, DOIs, months, journals, `saveActions` pipeline), `add`
+  (authors, DOIs, months, journals, `saveActions` pipeline, `saveOrderConfig`
+  entry sorting), `add`
   (DOI/arXiv/journal-URL), `search`, `used`, `dedupe`, `verify`/`enrich`
   (opt-in `--online`; `--published` folds in preprint promotion), `combine`,
   `split`, `batch`.
@@ -302,6 +303,14 @@ core.
 - **`saveActions` format drift** → JabRef is reworking the format toward embedded
   JSON. Parse tolerantly (regex over `field[formatter]`), keep the pinned JabRef
   v5.15 baseline, and audit v6 only once a stable v6 release ships.
+- **`saveOrderConfig` sort parity (partial)** → `normalize` honors JabRef's
+  order type and `field;descending` criteria, but does **not** yet replicate
+  JabRef's rule of hoisting `crossref`-referencing entries ahead of their
+  parents (a BibTeX 0.99 processing requirement). A library JabRef would save
+  with parents reordered can therefore differ in entry order. Deferred until a
+  crossref-aware pass lands; track here rather than claiming full parity. The
+  `saveActions` formatter suite and metadata vocabulary remain at full v5.15
+  parity.
 - **Scope creep** → no application concerns enter the pynakes core. GUIs,
   content-intelligence, and MCP servers ship as optional companions or separate
   releases (v0.8, v2.0).

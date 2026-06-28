@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+from pynakes._text_utils import strip_jabref_terminator
+from pynakes.metadata import metadata_value
 from pynakes.model import BibEntry, BibFile
 
 FILES_DIR_KEY = "files-dir"
@@ -138,7 +140,7 @@ class FileStore:
     @classmethod
     def from_metadata(cls, lib: BibFile, bib_path: str | Path) -> "FileStore | None":
         """Return the configured file store, or ``None`` when no ``files-dir`` is set."""
-        value = _metadata_value(lib, FILES_DIR_KEY)
+        value = metadata_value(lib, FILES_DIR_KEY)
         if value is None:
             return None
         path = resolve_files_dir(value, bib_path)
@@ -540,7 +542,7 @@ def resolve_files_dir(value: str, bib_path: str | Path) -> Path:
     """
     bib = _absolute_bib_path(bib_path)
     base = bib.parent
-    raw = value.strip().rstrip(";").strip()
+    raw = strip_jabref_terminator(value)
     if not raw:
         return base / f"{bib.stem}.files"
     path = Path(raw).expanduser()
@@ -555,13 +557,6 @@ def resolve_files_dir(value: str, bib_path: str | Path) -> Path:
 def _absolute_bib_path(path: str | Path) -> Path:
     bib = Path(path).expanduser()
     return bib if bib.is_absolute() else bib.resolve(strict=False)
-
-
-def _metadata_value(lib: BibFile, key: str) -> str | None:
-    for name, value in lib.metadata.items():
-        if name.lower() == key:
-            return value
-    return None
 
 
 def _normalized_manifest(manifest: dict[str, object]) -> dict[str, object]:

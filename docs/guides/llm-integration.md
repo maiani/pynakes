@@ -79,6 +79,9 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 - `pynakes fields protect-title <file> [--field ...] [--term ...] [--where ...]`
 - `pynakes add <identifier> [file] [--key ...] [--key-source generated|provider] [--allow-duplicate] [--fetch]` — `<identifier>` is a DOI, DOI URL, arXiv id, or arXiv URL
 - `pynakes metadata set <file> <key> <value> [--allow-unknown]`
+- `pynakes metadata adopt-jabref <file>` — start maintaining a JabRef metadata
+  projection for a pynakes-native library (mirrors JabRef-native settings into
+  `jabref-meta` and keeps them in sync from then on)
 - `pynakes normalize <file>` — includes journal abbreviation/expansion when
   `--journal-style abbreviated|full` or matching metadata is set
 - `pynakes convert <file> --to biblatex|bibtex`
@@ -234,6 +237,14 @@ pynakes metadata set refs.bib databaseType biblatex --json
 `metadata set` rejects unknown keys unless `--allow-unknown` is passed. If
 duplicate matching metadata blocks are present, it exits `2` with a conflict
 instead of choosing one.
+
+Routing is file-context-aware: a JabRef-native key (e.g. `databaseType`) is
+written to `jabref-meta` only when the file is already *JabRef-tracked* (carries
+`jabref-meta` blocks); otherwise it, like every pynakes-owned key, stays in
+`pynakes-meta`. To make a pynakes-native library track JabRef from then on, run
+`pynakes metadata adopt-jabref <file>` — it relocates any JabRef-native keys into
+`jabref-meta` and anchors a `databaseType`. Its envelope adds `moved_keys`,
+`database_type_added`, and `was_tracked`; re-running once tracked is a no-op.
 
 ### Add entries to a group
 

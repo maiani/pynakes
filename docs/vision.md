@@ -39,6 +39,21 @@ about without you having to trust it blindly:
 - **Deterministic by default.** No time, randomness, or hidden ordering in core
   logic. Network access is explicit (`add`, `fetch`, or `--online`) and isolated.
 
+## In JabRef's lineage
+
+pynakes is strongly influenced by JabRef. JabRef is the program that treated a `.bib` file as something worth curating with care, and pynakes carries that conviction forward —
+rebuilt headless, git-native, and safe for machines to drive. It is a descendant,
+not a rival: it speaks JabRef's metadata vocabulary fluently and reads JabRef's
+configuration as guidance, honoring `saveOrderConfig`, `saveActions`, and key
+patterns whenever a library carries them.
+
+The kinship is interop, not imitation. pynakes keeps its own settings in a
+`pynakes-meta` namespace and treats `jabref-meta` as a projection it maintains on
+JabRef's behalf — already present in libraries that use it, and added to a
+pynakes-native file only when you opt in with `metadata adopt-jabref`. It follows
+JabRef's intent rather than its byte-for-byte output, so the two can evolve on
+their own schedules and either can still open the file and find it whole.
+
 ## Scope
 
 pynakes is a **standalone `.bib` maintenance engine**: the base unit of work is
@@ -56,6 +71,6 @@ The name points past the single file. The *Pinakes* was Callimachus's catalog of
 the Library of Alexandria — an index over an entire corpus, not one shelf.
 pynakes begins as a single-file engine and grows toward that catalog: the
 trustworthy, version-controllable layer a larger AI-assisted research system can
-build on. Compatibility with existing tools (JabRef, the BibTeX/BibLaTeX
-toolchain) is a guarantee it keeps along the way — a substrate it interoperates
-with losslessly, not the boundary of what it aims to be.
+build on. Compatibility with the tools it grew from — JabRef, and the
+BibTeX/BibLaTeX it speaks natively — is a guarantee it keeps along the way, not
+the boundary of what it aims to be.

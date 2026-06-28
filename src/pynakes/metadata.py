@@ -16,6 +16,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Literal
 
+from pynakes._text_utils import strip_jabref_terminator
 from pynakes.model import BibFile, MetadataBlock
 
 
@@ -28,7 +29,7 @@ def metadata_value(lib: BibFile, name: str) -> str | None:
     lowered = {key.lower(): value for key, value in lib.metadata.items()}
     value = lowered.get(name.lower())
     if value is not None:
-        return value.strip().rstrip(";").strip()
+        return strip_jabref_terminator(value)
     return None
 
 
@@ -262,6 +263,76 @@ def library_save_actions(lib: BibFile) -> SaveActions | None:
     return None
 
 
+# JabRef's citation-key field name; ``bibtexkey`` is its accepted legacy spelling.
+SAVE_ORDER_KEY_FIELDS = {"citationkey", "bibtexkey", "key"}
+SAVE_ORDER_TYPES = {"specified", "original", "table"}
+
+
+@dataclass
+class SaveOrder:
+    """JabRef's ``saveOrderConfig`` entry-ordering configuration.
+
+    JabRef stores the on-save sort order as
+    ``@comment{jabref-meta: saveOrderConfig:<type>;<field>;<descending>;...;}``,
+    where ``type`` is ``specified``, ``original``, or ``table`` and each
+    following ``field;descending`` pair is one sort criterion (``descending`` is
+    the string ``true`` or ``false``). pynakes reads this so a library JabRef
+    would save in a given order is sorted the same way by ``normalize``.
+    """
+
+    order_type: str
+    criteria: list[tuple[str, bool]] = field(default_factory=list)
+
+
+def parse_save_order(value: str | None) -> SaveOrder | None:
+    """Parse a ``saveOrderConfig`` metadata value, or ``None`` if absent.
+
+    Mirrors JabRef's own parser: the first ``;``-separated token is the order
+    type and each subsequent ``field;descending`` pair is a criterion. An
+    unrecognized leading token with an odd token count is tolerated as
+    ``specified`` (JabRef's fallback); anything else degrades to ``original``
+    (keep existing order). The serializer's trailing ``;`` is ignored.
+    """
+    if not value or not value.strip():
+        return None
+    tokens = [token.strip() for token in strip_jabref_terminator(value).split(";")]
+    while tokens and tokens[-1] == "":
+        tokens.pop()
+    if not tokens:
+        return None
+
+    head = tokens[0].lower()
+    if head in SAVE_ORDER_TYPES:
+        order_type = head
+    elif len(tokens) > 1 and len(tokens) % 2 == 1:
+        order_type = "specified"  # JabRef's lenient fallback for a missing type
+    else:
+        return SaveOrder("original", [])
+
+    criteria: list[tuple[str, bool]] = []
+    # Pairs start after the leading type token; ignore a dangling half-pair.
+    for index in range(1, len(tokens) - 1, 2):
+        field_name = tokens[index]
+        if not field_name:
+            continue
+        descending = tokens[index + 1].strip().lower() == "true"
+        criteria.append((field_name, descending))
+    return SaveOrder(order_type, criteria)
+
+
+def library_save_order(lib: BibFile) -> SaveOrder | None:
+    """Return the parsed ``saveOrderConfig`` from merged metadata, if any.
+
+    Reads JabRef's current ``saveOrderConfig`` key, falling back to the
+    reserved ``saveOrder`` alias.
+    """
+    for name in ("saveOrderConfig", "saveOrder"):
+        value = metadata_value(lib, name)
+        if value is not None:
+            return parse_save_order(value)
+    return None
+
+
 def library_database_type(lib: BibFile) -> str:
     """Return the library dialect from ``databaseType`` metadata.
 
@@ -272,20 +343,40 @@ def library_database_type(lib: BibFile) -> str:
     """
     for key, value in lib.metadata.items():
         if key.lower() == "databasetype":
-            normalized = value.strip().rstrip(";").strip().lower()
+            normalized = strip_jabref_terminator(value).lower()
             return "biblatex" if normalized == "biblatex" else "bibtex"
     return "bibtex"
 
 
-def default_namespace(key: str) -> str:
+def library_is_jabref_tracked(lib: BibFile) -> bool:
+    """Whether the library maintains a ``jabref-meta`` projection.
+
+    Presence-based: a file that already carries any ``jabref-meta`` block follows
+    JabRef's convention, so pynakes keeps writing JabRef-native keys there. A
+    greenfield pynakes-native file carries none — its settings live in
+    ``pynakes-meta`` — until :func:`pynakes.engine.Bibliography.adopt_jabref`
+    establishes the projection. This is interop on demand, not parity by default.
+    """
+    return bool(lib.jabref_metadata_blocks)
+
+
+def default_namespace(key: str, lib: BibFile | None = None) -> str:
     """Return the namespace a key should be written to by default.
 
-    JabRef-native keys go to ``jabref`` (so JabRef keeps seeing them); settings
-    JabRef cannot represent (pynakes-specific or unrecognized) go to
-    ``pynakes``. This maximizes JabRef compatibility while letting pynakes own
-    the keys JabRef has no place for.
+    pynakes-owned keys (and anything JabRef cannot represent) always go to
+    ``pynakes-meta``. A JabRef-native key goes to ``jabref-meta`` only when the
+    file is *JabRef-tracked* — i.e. it already carries ``jabref-meta`` blocks (see
+    :func:`library_is_jabref_tracked`). Without file context (``lib is None``) the
+    answer is by owner, the static "where does this key belong" view.
+
+    The effect: a pynakes-native file stays free of ``jabref-meta`` until the user
+    opts in via ``adopt-jabref``; an existing JabRef library keeps its convention.
     """
-    return "jabref" if metadata_owner(key) == "jabref" else "pynakes"
+    if metadata_owner(key) != "jabref":
+        return "pynakes"
+    if lib is not None and not library_is_jabref_tracked(lib):
+        return "pynakes"
+    return "jabref"
 
 
 def _make_metadata_block(
@@ -397,7 +488,7 @@ def format_pynakes_meta_block(items: list[tuple[str, str]], line_ending: str = "
     """
     lines = [f"@comment{{{PYNAKES_PREFIX}"]
     for key, value in items:
-        value = value.strip().rstrip(";").strip()
+        value = strip_jabref_terminator(value)
         lines.append(f"{key.strip()}: {value}")
     lines.append("}")
     return line_ending.join(lines)
@@ -481,9 +572,10 @@ def set_metadata(
     """Set one metadata value, updating raw comments in place.
 
     ``namespace`` selects the target comment: ``"jabref"`` or ``"pynakes"``.
-    When ``None`` (the default), the key is routed automatically — JabRef-native
-    keys to ``jabref-meta`` (maximum compatibility), everything else to
-    ``pynakes-meta`` (pynakes' superset). Writes into ``jabref-meta`` still
+    When ``None`` (the default), the key is routed by :func:`default_namespace`
+    using the file's context — a JabRef-native key lands in ``jabref-meta`` only
+    when the file is already JabRef-tracked, otherwise it (and every pynakes key)
+    goes to ``pynakes-meta``. Writes into ``jabref-meta`` still
     reject keys JabRef will not understand unless ``allow_unknown`` is set;
     ``pynakes-meta`` accepts any key, since it is pynakes' own namespace. If
     multiple existing blocks in the target namespace match the key, the update
@@ -494,7 +586,7 @@ def set_metadata(
         raise ValueError("metadata key must not be empty")
 
     if namespace is None:
-        namespace = default_namespace(key)
+        namespace = default_namespace(key, lib)
     if namespace not in {"jabref", "pynakes"}:
         raise ValueError(f"Unknown metadata namespace {namespace!r}; expected jabref or pynakes")
 
@@ -593,3 +685,121 @@ def _set_pynakes_metadata(lib: BibFile, key: str, value: str) -> MetadataUpdate:
 
     set_value = next((b.value for b in new_blocks if b.key.lower() == key.lower()), value)
     return MetadataUpdate(key, set_value, old_raw, new_raw, not matches, "pynakes")
+
+
+def remove_metadata(
+    lib: BibFile, key: str, *, namespace: str | None = None
+) -> MetadataUpdate | None:
+    """Remove one metadata key, updating raw comments in place.
+
+    ``namespace`` selects which namespace to remove from; when ``None`` the key is
+    located automatically (a match in both namespaces is refused as ambiguous).
+    Returns the :class:`MetadataUpdate` describing the text change (``new_raw`` is
+    ``""`` when the comment is dropped entirely), or ``None`` when the key is
+    absent. Each ``jabref-meta`` key is its own comment, so it is dropped whole; a
+    ``pynakes-meta`` key is removed from its consolidated comment, which is
+    rewritten in place (or dropped when no keys remain).
+    """
+    key = key.strip()
+    if not key:
+        raise ValueError("metadata key must not be empty")
+
+    if namespace is None:
+        in_jabref = any(b.key.lower() == key.lower() for b in lib.jabref_metadata_blocks)
+        in_pynakes = any(b.key.lower() == key.lower() for b in lib.pynakes_metadata_blocks)
+        if in_jabref and in_pynakes:
+            raise DuplicateMetadataError(key, 2)
+        if in_jabref:
+            namespace = "jabref"
+        elif in_pynakes:
+            namespace = "pynakes"
+        else:
+            return None
+    if namespace not in {"jabref", "pynakes"}:
+        raise ValueError(f"Unknown metadata namespace {namespace!r}; expected jabref or pynakes")
+
+    if namespace == "jabref":
+        return _remove_jabref_metadata(lib, key)
+    return _remove_pynakes_metadata(lib, key)
+
+
+def _comment_raw(lib: BibFile, block: MetadataBlock) -> str:
+    """Return the live raw comment text for *block* (its stored raw as fallback)."""
+    if 0 <= block.comment_index < len(lib.raw_comments):
+        return lib.raw_comments[block.comment_index]
+    return block.raw
+
+
+def _remove_jabref_metadata(lib: BibFile, key: str) -> MetadataUpdate | None:
+    """Drop the ``jabref-meta`` comment for ``key`` (one comment per key)."""
+    blocks = lib.jabref_metadata_blocks
+    matches = [b for b in blocks if b.key.lower() == key.lower()]
+    if not matches:
+        return None
+    if len(matches) > 1:
+        raise DuplicateMetadataError(key, len(matches))
+    old = matches[0]
+    old_raw = _comment_raw(lib, old)
+    # Keep the comment slot (as a blank placeholder) so existing comment_index /
+    # source-layout references stay valid; the surgical text edit removes it from
+    # the rendered file.
+    if 0 <= old.comment_index < len(lib.raw_comments):
+        lib.raw_comments[old.comment_index] = ""
+    lib.jabref_metadata_blocks = [b for b in blocks if b is not old]
+    return MetadataUpdate(key, "", old_raw, "", False, "jabref")
+
+
+def _remove_pynakes_metadata(lib: BibFile, key: str) -> MetadataUpdate | None:
+    """Remove ``key`` from its consolidated ``pynakes-meta`` comment."""
+    blocks = lib.pynakes_metadata_blocks
+    matches = [b for b in blocks if b.key.lower() == key.lower()]
+    if not matches:
+        return None
+    if len(matches) > 1:
+        raise DuplicateMetadataError(key, len(matches))
+    comment_index = matches[0].comment_index
+    old_raw = _comment_raw(lib, matches[0])
+
+    remaining = [
+        (b.key, b.value)
+        for b in blocks
+        if b.comment_index == comment_index and b.key.lower() != key.lower()
+    ]
+    others = [b for b in blocks if b.comment_index != comment_index]
+
+    if not remaining:
+        # Last key in the comment: drop the whole comment (blank placeholder keeps
+        # indices stable; the surgical edit removes it from the file).
+        if 0 <= comment_index < len(lib.raw_comments):
+            lib.raw_comments[comment_index] = ""
+        lib.pynakes_metadata_blocks = others
+        return MetadataUpdate(key, "", old_raw, "", False, "pynakes")
+
+    new_raw = format_pynakes_meta_block(remaining, lib.line_ending)
+    new_blocks = parse_metadata_comment(
+        new_raw[new_raw.find("{") + 1 : -1], raw=new_raw, comment_index=comment_index
+    )
+    if 0 <= comment_index < len(lib.raw_comments):
+        lib.raw_comments[comment_index] = new_raw
+    lib.pynakes_metadata_blocks = others + new_blocks
+    return MetadataUpdate(key, "", old_raw, new_raw, False, "pynakes")
+
+
+@dataclass
+class JabRefAdoptReport:
+    """Outcome of :meth:`pynakes.engine.Bibliography.adopt_jabref`.
+
+    ``moved_keys`` are JabRef-native keys relocated from ``pynakes-meta`` into
+    ``jabref-meta``; ``database_type_added`` is set when a ``databaseType`` block
+    was written to anchor tracking; ``was_tracked`` reflects whether the file
+    already carried ``jabref-meta`` before the call.
+    """
+
+    moved_keys: list[str] = field(default_factory=list)
+    database_type_added: bool = False
+    was_tracked: bool = False
+
+    @property
+    def changed(self) -> bool:
+        """Whether the call modified the file."""
+        return bool(self.moved_keys) or self.database_type_added

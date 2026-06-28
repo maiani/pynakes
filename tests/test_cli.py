@@ -1314,6 +1314,246 @@ class TestNormalizeCommand:
         assert result.exit_code == 0, result.output
         assert bib.read_text() == original
 
+    def test_normalize_sort_by_key(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Zebra1980,\n  author = {Zebra, Z.},\n  title = {Z}\n}\n"
+            "\n"
+            "@article{Alpha2020,\n  author = {Alpha, A.},\n  title = {A}\n}\n"
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "normalize",
+                str(bib),
+                "--sort-by",
+                "key",
+                "--author-style",
+                "none",
+                "--title-protection",
+                "off",
+                "--doi-normalization",
+                "off",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        text = bib.read_text()
+        assert text.index("Alpha2020") < text.index("Zebra1980")
+
+    def test_normalize_sort_by_year(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Later2020,\n  year = {2020},\n  author = {B, B.},\n  title = {B}\n}\n"
+            "\n"
+            "@article{Earlier1990,\n  year = {1990},\n  author = {A, A.},\n  title = {A}\n}\n"
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "normalize",
+                str(bib),
+                "--sort-by",
+                "year",
+                "--author-style",
+                "none",
+                "--title-protection",
+                "off",
+                "--doi-normalization",
+                "off",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        text = bib.read_text()
+        assert text.index("Earlier1990") < text.index("Later2020")
+
+    def test_normalize_sort_dry_run_does_not_write(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        original = (
+            "@article{Zebra1980,\n  title = {Z}\n}\n\n@article{Alpha2020,\n  title = {A}\n}\n"
+        )
+        bib.write_text(original)
+
+        result = runner.invoke(
+            app,
+            [
+                "normalize",
+                str(bib),
+                "--sort-by",
+                "key",
+                "--dry-run",
+                "--json",
+                "--author-style",
+                "none",
+                "--title-protection",
+                "off",
+                "--doi-normalization",
+                "off",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["dry_run"] is True
+        assert bib.read_text() == original
+
+    def test_normalize_sort_reported_in_operations(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Zebra1980,\n  title = {Z}\n}\n@article{Alpha2020,\n  title = {A}\n}\n"
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "normalize",
+                str(bib),
+                "--sort-by",
+                "key",
+                "--json",
+                "--author-style",
+                "none",
+                "--title-protection",
+                "off",
+                "--doi-normalization",
+                "off",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["operations"]["sorted_entries"] == 2
+
+    def test_normalize_honors_jabref_save_order_config(self, tmp_path: Path) -> None:
+        # With no --sort-by, normalize follows JabRef's own saveOrderConfig.
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{jabref-meta: saveOrderConfig:specified;citationkey;false;}\n"
+            "\n"
+            "@article{Zebra1980,\n  title = {Z}\n}\n"
+            "\n"
+            "@article{Alpha2020,\n  title = {A}\n}\n"
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "normalize",
+                str(bib),
+                "--author-style",
+                "none",
+                "--title-protection",
+                "off",
+                "--doi-normalization",
+                "off",
+                "--metadata-formatting",
+                "off",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        text = bib.read_text()
+        assert text.index("Alpha2020") < text.index("Zebra1980")
+
+    def test_normalize_save_order_original_is_not_sorted(self, tmp_path: Path) -> None:
+        # saveOrderConfig type "original" means keep current order — no reorder.
+        bib = tmp_path / "refs.bib"
+        original = (
+            "@comment{jabref-meta: saveOrderConfig:original;}\n"
+            "\n"
+            "@article{Zebra1980,\n  title = {Z}\n}\n"
+            "\n"
+            "@article{Alpha2020,\n  title = {A}\n}\n"
+        )
+        bib.write_text(original)
+
+        result = runner.invoke(
+            app,
+            [
+                "normalize",
+                str(bib),
+                "--author-style",
+                "none",
+                "--title-protection",
+                "off",
+                "--doi-normalization",
+                "off",
+                "--metadata-formatting",
+                "off",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert bib.read_text() == original
+
+    def test_normalize_sort_by_overrides_save_order_config(self, tmp_path: Path) -> None:
+        # An explicit --sort-by original overrides a "specified" saveOrderConfig.
+        bib = tmp_path / "refs.bib"
+        original = (
+            "@comment{jabref-meta: saveOrderConfig:specified;citationkey;false;}\n"
+            "\n"
+            "@article{Zebra1980,\n  title = {Z}\n}\n"
+            "\n"
+            "@article{Alpha2020,\n  title = {A}\n}\n"
+        )
+        bib.write_text(original)
+
+        result = runner.invoke(
+            app,
+            [
+                "normalize",
+                str(bib),
+                "--sort-by",
+                "original",
+                "--author-style",
+                "none",
+                "--title-protection",
+                "off",
+                "--doi-normalization",
+                "off",
+                "--metadata-formatting",
+                "off",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert bib.read_text() == original
+
+    def test_normalize_multi_criterion_sort_with_descending(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{C,\n  author = {Smith, A.},\n  year = {1990}\n}\n"
+            "@article{A,\n  author = {Jones, B.},\n  year = {2020}\n}\n"
+            "@article{B,\n  author = {Jones, B.},\n  year = {1995}\n}\n"
+        )
+
+        # Primary author ascending, secondary year descending.
+        result = runner.invoke(
+            app,
+            [
+                "normalize",
+                str(bib),
+                "--sort-by",
+                "author",
+                "--sort-by",
+                "year:desc",
+                "--author-style",
+                "none",
+                "--title-protection",
+                "off",
+                "--doi-normalization",
+                "off",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        text = bib.read_text()
+        # Jones entries come first (author asc); within Jones, 2020 before 1995.
+        assert text.index("{A,") < text.index("{B,") < text.index("{C,")
+
 
 class TestConvertCommand:
     def test_convert_dry_run_diff_json(self, tmp_path: Path) -> None:
