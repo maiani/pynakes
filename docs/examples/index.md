@@ -59,16 +59,17 @@ pynakes normalize refs.bib --ltwa-table ltwa.csv --dry-run --diff
 ## Example 3: Add a Reference by DOI or arXiv id
 
 ```bash
-pynakes add refs.bib 10.5555/example --dry-run --diff
-pynakes add refs.bib 10.5555/example
-pynakes add refs.bib arXiv:2301.00001
+pynakes add 10.5555/example refs.bib --dry-run --diff
+pynakes add 10.5555/example refs.bib
+pynakes add arXiv:2301.00001 refs.bib
+pynakes add arXiv:2301.00001 refs.bib --fetch
 ```
 
 Use the provider key or an explicit key:
 
 ```bash
-pynakes add refs.bib 10.5555/example --key-source provider
-pynakes add refs.bib 10.5555/example --key Smith2026Example
+pynakes add 10.5555/example refs.bib --key-source provider
+pynakes add 10.5555/example refs.bib --key Smith2026Example
 ```
 
 If the DOI already exists, the command exits with a conflict unless you pass

@@ -66,9 +66,9 @@ class MergeResult:
     conflicts: list[dict[str, object]] = field(default_factory=list)
 
 
-def _entry_identity(entry: BibEntry) -> tuple[str, tuple[tuple[str, str], ...]]:
-    """A content fingerprint for dedupe: entry type plus sorted fields."""
-    return (entry.type.lower(), tuple(sorted(entry.fields.items())))
+def _entry_identity(entry: BibEntry) -> tuple[str, tuple[tuple[str, str], ...], str | None]:
+    """A content fingerprint for dedupe: semantics plus preserved raw spelling."""
+    return (entry.type.lower(), tuple(sorted(entry.fields.items())), entry.raw_content)
 
 
 def merge_libraries(named_libs: list[tuple[str, BibFile]], *, dedupe: bool = False) -> MergeResult:

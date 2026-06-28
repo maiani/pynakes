@@ -1,6 +1,8 @@
 """CLI smoke tests."""
 
 import json
+import tarfile
+from io import BytesIO
 from pathlib import Path
 
 import pytest
@@ -214,6 +216,31 @@ class TestInspectAndLint:
         assert "booktitle" not in child["fields"]
         assert child["resolved_fields"]["booktitle"] == "Proc"
 
+    def test_inspect_json_annotates_pinax_materials(self, tmp_path: Path) -> None:
+        files = tmp_path / "refs.files"
+        files.mkdir()
+        (files / "A_preprint.pdf").write_bytes(b"pdf")
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{A,\n"
+            "  title = {T},\n"
+            "  eprinttype = {arxiv},\n"
+            "  eprint = {2101.00001}\n"
+            "}\n"
+            "@comment{pynakes-meta:\n"
+            "files-dir:\n"
+            "}\n"
+        )
+
+        result = runner.invoke(app, ["inspect", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        entry = data["entries"][0]
+        assert entry["preprint_pdf"] == str(files / "A_preprint.pdf")
+        assert entry["canonical_pdf"] == str(files / "A_preprint.pdf")
+        assert entry["refetchable"] is True
+
     def test_inspect_human_does_not_run_lint(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text("@article{A,\n  title = {T}\n}\n")
@@ -393,6 +420,82 @@ class TestFilesCommand:
         assert "checked 1 linked file" in result.output
         assert "[missing] A[0]: missing.pdf" in result.output
 
+    def test_check_json_reports_pinax_orphans_and_drift(self, tmp_path: Path) -> None:
+        files = tmp_path / "refs.files"
+        files.mkdir()
+        (files / "Ghost.pdf").write_bytes(b"pdf")
+        (files / ".pinax").mkdir()
+        (files / ".pinax" / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "files": {
+                        "A": {
+                            "preprint_pdf": {
+                                "source": "manual",
+                                "added_date": "2026-06-27",
+                                "sha256": "0" * 64,
+                                "refetchable": False,
+                            }
+                        }
+                    },
+                }
+            )
+        )
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n@comment{pynakes-meta:\nfiles-dir:\n}\n")
+
+        result = runner.invoke(app, ["files", "check", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        pinax = json.loads(result.output)["pinax"]
+        assert pinax["orphans"][0]["key"] == "Ghost"
+        assert pinax["drift"][0] == {
+            "key": "A",
+            "kind": "preprint_pdf",
+            "reason": "manifest without file",
+        }
+
+    def test_check_fix_reconciles_pinax_manifest_drift(self, tmp_path: Path) -> None:
+        files = tmp_path / "refs.files"
+        files.mkdir()
+        (files / "A_preprint.pdf").write_bytes(b"pdf")
+        (files / ".pinax").mkdir()
+        (files / ".pinax" / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "files": {
+                        "A": {
+                            "published_pdf": {
+                                "source": "manual",
+                                "added_date": "2026-06-27",
+                                "sha256": "0" * 64,
+                                "refetchable": False,
+                            }
+                        },
+                        "Ghost": {},
+                    },
+                }
+            )
+        )
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n@comment{pynakes-meta:\nfiles-dir:\n}\n")
+
+        result = runner.invoke(app, ["files", "check", str(bib), "--fix", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert {item["action"] for item in data["fixed"]} == {
+            "removed_missing_file",
+            "removed_orphan_row",
+            "added_manual_record",
+        }
+        assert data["pinax"]["drift"] == []
+        manifest = json.loads((files / ".pinax" / "manifest.json").read_text())
+        assert "Ghost" not in manifest["files"]
+        assert manifest["files"]["A"]["preprint_pdf"]["source"] == "manual"
+
 
 ARXIV_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
@@ -500,6 +603,52 @@ class TestAddCommand:
         assert "eprinttype = {arxiv}" in text
         assert "date = {2023-01-02}" in text
         assert text.index("@online{") < text.index("@comment{jabref-meta:")
+
+    def test_add_fetch_downloads_arxiv_materials(self, tmp_path: Path, monkeypatch) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@comment{jabref-meta: databaseType:biblatex;}\n")
+        monkeypatch.setattr(importer_ops, "fetch_arxiv_atom", lambda identifier: ARXIV_ATOM)
+        monkeypatch.setattr("pynakes.fetch.fetch_arxiv_pdf", lambda arxiv_id: b"%PDF fixture")
+        monkeypatch.setattr(
+            "pynakes.fetch.fetch_arxiv_source",
+            lambda arxiv_id: _tar_bytes({"paper.tex": b"\\title{A Deep Test}\n"}),
+        )
+
+        result = runner.invoke(app, ["add", "arXiv:2301.00001", str(bib), "--fetch", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        key = data["key"]
+        assert data["fetch"]["fetched"][0]["key"] == key
+        assert data["fetch"]["fetch_preprint"] is True
+        assert data["fetch"]["fetch_source"] is True
+        assert (tmp_path / "refs.files" / f"{key}_preprint.pdf").read_bytes() == b"%PDF fixture"
+        assert (tmp_path / "refs.files" / f"{key}_preprint" / "paper.tex").read_text() == (
+            "\\title{A Deep Test}\n"
+        )
+        assert "files-dir: refs.files" in bib.read_text()
+
+    def test_add_fetch_honors_fetch_source_metadata(self, tmp_path: Path, monkeypatch) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@comment{pynakes-meta:\nfetch-source: false\n}\n")
+        monkeypatch.setattr(importer_ops, "fetch_arxiv_atom", lambda identifier: ARXIV_ATOM)
+        monkeypatch.setattr("pynakes.fetch.fetch_arxiv_pdf", lambda arxiv_id: b"%PDF fixture")
+
+        def fail_source(arxiv_id: str) -> bytes:
+            raise AssertionError("source fetcher should not run")
+
+        monkeypatch.setattr("pynakes.fetch.fetch_arxiv_source", fail_source)
+
+        result = runner.invoke(app, ["add", "arXiv:2301.00001", str(bib), "--fetch", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        key = data["key"]
+        fetched = data["fetch"]["fetched"][0]
+        assert data["fetch"]["fetch_source"] is False
+        assert fetched["pdf_path"] == str(tmp_path / "refs.files" / f"{key}_preprint.pdf")
+        assert fetched["source_path"] is None
+        assert not (tmp_path / "refs.files" / f"{key}_preprint").exists()
 
     def test_add_uses_jabref_key_pattern_metadata(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
@@ -627,6 +776,16 @@ class TestAddCommand:
         assert "--allow-duplicate" in result.output
 
 
+def _tar_bytes(files: dict[str, bytes]) -> bytes:
+    buffer = BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
+        for name, data in files.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            archive.addfile(info, BytesIO(data))
+    return buffer.getvalue()
+
+
 class TestGroupsCommand:
     def test_list_groups(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "jabref_groups.bib")
@@ -743,6 +902,43 @@ class TestKeysCommand:
         assert "@article{Smith2020ML," in bib.read_text()
         assert r"\cite{Smith2020ML}" in tex.read_text()
         assert r"% \cite{Smith2020}" in tex.read_text()
+
+    def test_rename_moves_pinax_materials_on_commit(self, tmp_path: Path) -> None:
+        files = tmp_path / "refs.files"
+        files.mkdir()
+        (files / "Smith2020_preprint.pdf").write_bytes(b"pdf")
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Smith2020,\n  title = {T}\n}\n@comment{pynakes-meta:\nfiles-dir:\n}\n"
+        )
+        tex = tmp_path / "paper.tex"
+        tex.write_text(r"\cite{Smith2020}" "\n")
+
+        result = runner.invoke(
+            app, ["keys", "rename", str(bib), "Smith2020", "Smith2020ML", str(tex)]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert not (files / "Smith2020_preprint.pdf").exists()
+        assert (files / "Smith2020ML_preprint.pdf").read_bytes() == b"pdf"
+
+    def test_generate_pinax_material_move_respects_dry_run(self, tmp_path: Path) -> None:
+        files = tmp_path / "refs.files"
+        files.mkdir()
+        (files / "Old_preprint.pdf").write_bytes(b"pdf")
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Old,\n  author = {Jane Smith},\n  title = {A Test},\n  year = {2020}\n}\n"
+            "@comment{pynakes-meta:\nfiles-dir:\n}\n"
+        )
+
+        result = runner.invoke(
+            app, ["keys", "generate", str(bib), "--key", "Old", "--dry-run", "--json"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert (files / "Old_preprint.pdf").read_bytes() == b"pdf"
+        assert not (files / "Smith2020Test_preprint.pdf").exists()
 
     def test_rename_falls_back_to_tex_sources_metadata(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"

@@ -81,6 +81,7 @@ def init(
         overrides.append(("files-dir", f"{stem}.files", "pynakes"))
         overrides.append(("fetch-preprint", "true", "pynakes"))
         overrides.append(("fetch-source", "true", "pynakes"))
+        overrides.append(("fetch-published", "false", "pynakes"))
     entries = apply_overrides(entries, overrides)
 
     content = render_library(entries)

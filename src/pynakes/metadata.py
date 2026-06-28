@@ -83,6 +83,9 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     "journal-table": CATEGORY_NORMALIZATION,
     "ltwa-table": CATEGORY_NORMALIZATION,
     "files-dir": CATEGORY_PINAX,
+    "fetch-preprint": CATEGORY_PINAX,
+    "fetch-source": CATEGORY_PINAX,
+    "fetch-published": CATEGORY_PINAX,
     # Linked LaTeX sources that cite this library; consulted by the citation-key
     # commands so .tex edits stay consistent without re-specifying the files.
     "tex-sources": CATEGORY_USAGE,

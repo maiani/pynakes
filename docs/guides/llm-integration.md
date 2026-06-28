@@ -77,7 +77,7 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 - `pynakes fields append <file> <field> <value> [--where ...]`
 - `pynakes fields clear <file> <field> [--where ...]`
 - `pynakes fields protect-title <file> [--field ...] [--term ...] [--where ...]`
-- `pynakes add <file> <identifier> [--key ...] [--key-source generated|provider] [--allow-duplicate]` — `<identifier>` is a DOI, DOI URL, arXiv id, or arXiv URL
+- `pynakes add <identifier> [file] [--key ...] [--key-source generated|provider] [--allow-duplicate] [--fetch]` — `<identifier>` is a DOI, DOI URL, arXiv id, or arXiv URL
 - `pynakes metadata set <file> <key> <value> [--allow-unknown]`
 - `pynakes normalize <file>` — includes journal abbreviation/expansion when
   `--journal-style abbreviated|full` or matching metadata is set
@@ -190,9 +190,10 @@ comments and CLI options.
 ### Add a reference (DOI or arXiv)
 
 ```bash
-pynakes add refs.bib 10.1145/3377811.3380368 --dry-run --diff --json
-pynakes add refs.bib 10.1145/3377811.3380368 --json
-pynakes add refs.bib arXiv:2301.00001 --json
+pynakes add 10.1145/3377811.3380368 refs.bib --dry-run --diff --json
+pynakes add 10.1145/3377811.3380368 refs.bib --json
+pynakes add arXiv:2301.00001 refs.bib --json
+pynakes add arXiv:2301.00001 refs.bib --fetch --json
 ```
 
 Citation-key priority:
@@ -201,6 +202,8 @@ Citation-key priority:
 - `--key-source provider` keeps the provider's key when one is available.
 - `--key-source generated` (default) generates a key locally, using JabRef
   citation-key metadata when present.
+- `--fetch` downloads configured Pinax arXiv materials for the new key after the
+  import succeeds.
 
 ### Repair duplicate keys
 

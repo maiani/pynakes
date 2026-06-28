@@ -14,20 +14,29 @@ from pynakes.cli_common import (
     _run_checks,
     _safe,
 )
+from pynakes.filestore import FileStore
 from pynakes.io import load_bib
 
 # --- files -----------------------------------------------------------------
 
 
-def _files_check_one(file: str, root: Optional[list[str]]) -> CheckOutcome:
+def _files_check_one(file: str, root: Optional[list[str]], fix: bool = False) -> CheckOutcome:
     lib = load_bib(file)
     report = files_ops.check_linked_files(lib, file, root)
+    store = FileStore.from_metadata(lib, file)
+    fixed: list[dict[str, str]] = []
+    if store is not None and fix:
+        fixed = store.fix_drift(entry.key for entry in lib.entries.values() if entry.key.strip())
+    pinax = store.scan_entries(lib.entries.values()) if store is not None else None
     result = {
         "status": "success",
         "action": "files_check",
         "file": file,
         **report.to_dict(),
     }
+    if pinax is not None:
+        result["pinax"] = pinax.to_dict()
+        result["fixed"] = fixed
     human = [
         f"{file}: checked {report.checked} linked file(s); "
         f"ok={report.ok}, missing={report.missing}, "
@@ -37,7 +46,22 @@ def _files_check_one(file: str, root: Optional[list[str]]) -> CheckOutcome:
         f"  [{issue.status}] {issue.entry_key}[{issue.index}]: {issue.path}"
         for issue in report.issues
     ]
-    bad = report.missing + report.wrong_type + report.unresolved
+    pinax_bad = 0
+    if pinax is not None:
+        pinax_bad = len(pinax.orphans) + len(pinax.drift)
+        human.append(
+            f"  pinax: entries={len(pinax.entries)}, "
+            f"orphans={len(pinax.orphans)}, drift={len(pinax.drift)}."
+        )
+        if fixed:
+            human.append(f"    fixed {len(fixed)} pinax manifest item(s).")
+        human += [
+            f"    [orphan] {orphan.key}:{orphan.kind}: {orphan.path}" for orphan in pinax.orphans
+        ]
+        human += [
+            f"    [drift] {item['key']}:{item['kind']}: {item['reason']}" for item in pinax.drift
+        ]
+    bad = report.missing + report.wrong_type + report.unresolved + pinax_bad
     return CheckOutcome(
         result=result,
         human=human,
@@ -48,6 +72,8 @@ def _files_check_one(file: str, root: Optional[list[str]]) -> CheckOutcome:
             "missing": report.missing,
             "wrong_type": report.wrong_type,
             "unresolved": report.unresolved,
+            "pinax_orphans": len(pinax.orphans) if pinax is not None else 0,
+            "pinax_drift": len(pinax.drift) if pinax is not None else 0,
         },
     )
 
@@ -62,10 +88,17 @@ def files_check(
     strict: bool = typer.Option(
         False, "--strict", help="Exit 1 if any linked file is missing or wrong-type"
     ),
+    fix: bool = typer.Option(False, "--fix", help="Reconcile Pinax manifest drift"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Validate linked-file references (accepts multiple files for CI gating)."""
-    _run_checks(files, "files_check", lambda f: _files_check_one(f, root), json_output, strict)
+    _run_checks(
+        files,
+        "files_check",
+        lambda f: _files_check_one(f, root, fix),
+        json_output,
+        strict,
+    )
 
 
 def register(app: typer.Typer) -> None:

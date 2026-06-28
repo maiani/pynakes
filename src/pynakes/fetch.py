@@ -82,6 +82,7 @@ def download_arxiv_materials(
     source: bool = True,
     pdf_fetcher: FetchArxivBytes | None = None,
     source_fetcher: FetchArxivBytes | None = None,
+    fetched_date: str | None = None,
 ) -> ArxivDownloadResult:
     """Download selected arXiv materials and install them in ``store``.
 
@@ -96,6 +97,13 @@ def download_arxiv_materials(
     if pdf:
         pdf_bytes = (pdf_fetcher or fetch_arxiv_pdf)(arxiv_id)
         pdf_path = store.write_preprint_pdf(key, pdf_bytes)
+        store.record_artifact(
+            key,
+            "preprint_pdf",
+            source=arxiv_pdf_url(arxiv_id),
+            fetched_date=fetched_date,
+            refetchable=True,
+        )
 
     if source:
         source_bytes = (source_fetcher or fetch_arxiv_source)(arxiv_id)
@@ -105,6 +113,13 @@ def download_arxiv_materials(
             extracted.mkdir()
             extract_arxiv_source(source_bytes, extracted)
             source_path = store.write_preprint_source(key, extracted)
+        store.record_artifact(
+            key,
+            "preprint_source",
+            source=arxiv_source_url(arxiv_id),
+            fetched_date=fetched_date,
+            refetchable=True,
+        )
 
     return ArxivDownloadResult(
         key=key,

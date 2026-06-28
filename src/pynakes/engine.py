@@ -27,7 +27,7 @@ from pynakes.bibtex_writer import write_bib
 from pynakes.diff import generate_diff
 from pynakes.editing import splice_into_text
 from pynakes.fetch import ArxivFetchError, download_arxiv_materials
-from pynakes.filestore import FILES_DIR_KEY, FileStore, resolve_files_dir
+from pynakes.filestore import FILES_DIR_KEY, FileStore, PinaxRenameTransaction, resolve_files_dir
 from pynakes.io import load_bib, save_text
 from pynakes.lint import LintIssue
 from pynakes.lint import lint as lint_lib
@@ -95,6 +95,7 @@ class Bibliography:
     _removed_entries: list[BibEntry] = field(default_factory=list)
     _text_replacements: list[tuple[str | None, str]] = field(default_factory=list)
     _consolidate_metadata: bool = False
+    _pinax_renames: list[tuple[str, str]] = field(default_factory=list)
 
     @classmethod
     def open(cls, path: str | Path) -> "Bibliography":
@@ -294,10 +295,19 @@ class Bibliography:
         diff_text = self.diff()
         new_text = self.preview()
         modified = new_text != self._pristine_text
-        if modified:
-            result = save_text(new_text, str(self.path), encoding=self.lib.encoding, backup=backup)
-            if not result.success:
-                raise OSError(result.error or f"Could not write {self.path}")
+        transactions: list[PinaxRenameTransaction] = []
+        try:
+            transactions = self._apply_pinax_renames()
+            if modified:
+                result = save_text(
+                    new_text, str(self.path), encoding=self.lib.encoding, backup=backup
+                )
+                if not result.success:
+                    raise OSError(result.error or f"Could not write {self.path}")
+        except Exception:
+            for transaction in reversed(transactions):
+                transaction.rollback()
+            raise
         self._refresh_from_text(new_text, fingerprint=_fingerprint(self.path))
         return CommitResult(changed_entries, diff_text, modified)
 
@@ -310,6 +320,7 @@ class Bibliography:
         self._appended_entries.clear()
         self._removed_entries.clear()
         self._text_replacements.clear()
+        self._pinax_renames.clear()
         self._consolidate_metadata = False
         self._dirty = False
 
@@ -328,6 +339,7 @@ class Bibliography:
         self._appended_entries.clear()
         self._removed_entries.clear()
         self._text_replacements.clear()
+        self._pinax_renames.clear()
         self._consolidate_metadata = False
         self._dirty = False
 
@@ -341,6 +353,7 @@ class Bibliography:
         self._appended_entries.clear()
         self._removed_entries.clear()
         self._text_replacements.clear()
+        self._pinax_renames.clear()
         self._consolidate_metadata = False
         self._dirty = False
 
@@ -406,12 +419,32 @@ class Bibliography:
                 continue
             before = self._entry_snapshot.get(id(entry))
             if before is None and entry.raw_content is not None:
-                continue
+                return True
             if before is not None and entry.raw_content is not None:
                 continue
             if entry.raw_content != before:
                 return True
         return False
+
+    def _stage_pinax_renames(self, renames: list[tuple[str, str]]) -> None:
+        if not renames or self.files is None:
+            return
+        current_keys = set(self.lib.entries.keys())
+        for old, new in renames:
+            if old == new or old in current_keys:
+                continue
+            self._pinax_renames.append((old, new))
+
+    def _apply_pinax_renames(self) -> list[PinaxRenameTransaction]:
+        if not self._pinax_renames:
+            return []
+        store = self.files
+        if store is None:
+            return []
+        transactions: list[PinaxRenameTransaction] = []
+        for old, new in self._pinax_renames:
+            transactions.append(store.rename_materials(old, new))
+        return transactions
 
     def _file_name(self) -> str:
         return self.path.name if self.path is not None else "bibliography.bib"
@@ -496,24 +529,28 @@ class Bibliography:
     def generate_keys(self) -> list[tuple[str, str]]:
         """Regenerate all citation keys from entry metadata."""
         renames = key_ops.regenerate_keys(self.lib)
+        self._stage_pinax_renames(renames)
         self._mark(bool(renames))
         return renames
 
     def generate_key(self, key: str) -> tuple[str, str] | None:
         """Regenerate one citation key from its entry metadata."""
         rename = key_ops.regenerate_key(self.lib, key)
+        self._stage_pinax_renames([rename] if rename is not None else [])
         self._mark(rename is not None)
         return rename
 
     def repair_keys(self) -> list[tuple[str, str]]:
         """Repair duplicate citation keys."""
         renames = key_ops.repair_duplicate_keys(self.lib)
+        self._stage_pinax_renames(renames)
         self._mark(bool(renames))
         return renames
 
     def rename_key(self, old: str, new: str) -> int:
         """Rename one unique citation key."""
         count = key_ops.rename_key(self.lib, old, new)
+        self._stage_pinax_renames([(old, new)] if count else [])
         self._mark(count)
         return count
 
@@ -780,6 +817,7 @@ class Bibliography:
 
         fetch_preprint = _metadata_bool(self.lib, "fetch-preprint", True)
         fetch_source = _metadata_bool(self.lib, "fetch-source", True)
+        fetch_published = _metadata_bool(self.lib, "fetch-published", False)
 
         if target is not None:
             entries = list(self.lib.entries.get_all(target))
@@ -789,6 +827,10 @@ class Bibliography:
                 raise ValueError(f"Cannot fetch for duplicate key {target!r}")
             entry_queue = [entries[0]]
         else:
+            duplicates = self.lib.entries.duplicate_keys()
+            if duplicates:
+                keys = ", ".join(sorted(duplicates))
+                raise ValueError(f"Pinax material addressing requires unique citation keys: {keys}")
             entry_queue = list(self.lib.entries.values())
 
         fetched: list[dict] = []
@@ -838,6 +880,7 @@ class Bibliography:
         return {
             "fetch_preprint": fetch_preprint,
             "fetch_source": fetch_source,
+            "fetch_published": fetch_published,
             "fetched": fetched,
             "skipped": skipped,
             "failed": failed,

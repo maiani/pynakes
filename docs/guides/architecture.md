@@ -35,7 +35,7 @@ Bibliography when `pynakes-meta` declares a `files-dir`.
 | File model | BibFile | Semantic content of one parsed .bib file: entries, declarations, comments, structured JabRef metadata, encoding, and line-ending style. |
 | Metadata block | MetadataBlock | One top-level metadata comment — `@comment{jabref-meta: ...}` or pynakes' superset `@comment{pynakes-meta: ...}` (tagged by `namespace`) — represented both structurally and as raw text. |
 | Bibliography (working unit) | Bibliography | A staged, reconciled handle over one `.bib` file — "a slice of references covering one aspect of a topic". Supports operations, preview, diff, commit, reset, reload, and external-change detection. |
-| Pinax mode | FileStore + fetch primitives | Optional mode of one Bibliography together with its `files-dir` of citation-key-addressed materials. Plain bibliographies have no Pinax behavior. The storage foundation and arXiv material download core are implemented; the CLI workflow is planned. |
+| Pinax mode | FileStore + fetch primitives | Optional mode of one Bibliography together with its `files-dir` of citation-key-addressed materials. Plain bibliographies have no Pinax behavior. Includes agent inspection, file checks/fixes, arXiv material fetch, provenance manifests, set-operation copying, and coordinated key-edit material moves. |
 | Library (corpus) | — (planned) | A directory of pinakes/bibliographies, enabling cross-file search, dedup, and identity resolution across the full research corpus. Not implemented yet (see [Beyond 1.0](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md)). |
 | Catalogue (index) | — (planned) | A derived, rebuildable search index over the Library (e.g. SQLite FTS). Never a competing source of truth; the Bibliographies are. Not implemented yet. |
 
@@ -239,7 +239,7 @@ the CLI.
 | fields.py | Generic field changes, simple predicates, and title capitalization protection. |
 | authors.py | BibTeX name-list splitting, last-name extraction, and conservative/JabRef-style normalization. |
 | importer.py | Reference import: identifier resolution (DOI/arXiv), DOI canonicalization, arXiv normalization/Atom parsing, and entry preparation. It is the DOI and arXiv identifier authority. |
-| filestore.py | Pinax material paths, presence scanning, orphan detection, and atomic writes inside a configured `files-dir`. |
+| filestore.py | Pinax material paths, presence scanning, orphan/drift detection and repair, provenance manifests, material copying, and atomic writes inside a configured `files-dir`. |
 | fetch.py | arXiv material URL construction, injectable PDF/source byte fetchers, safe source archive extraction, and FileStore installation. |
 | metadata.py | Structured top-level metadata: parses both jabref-meta and pynakes-meta, separates JabRef-native and pynakes-owned key tables, classifies, and applies safe namespace-routed updates. |
 | journals.py | Exact title/ISSN mapping plus LTWA-style journal abbreviation/expansion. |
@@ -247,7 +247,7 @@ the CLI.
 | convert.py | Conservative BibTeX/BibLaTeX convention conversion. |
 | files.py | Parsing and resolution/validation of JabRef linked-file descriptors. |
 | usage.py | LaTeX/AUX citation extraction, library-usage analysis, tagging, and subset projection. |
-| lint.py | Local structural/semantic findings such as missing required fields, malformed DOI, groups, and duplicate keys. |
+| lint.py | Local structural/semantic findings such as missing required fields, malformed DOI, groups, and duplicate keys. BibLaTeX required-field rules cite the official CTAN BibLaTeX manual, section 2.1 entry types and aliases, as their source of truth. |
 | dedupe.py | Duplicate-work clustering and conflict-first merge planning. |
 | integrity.py | Opt-in provider-backed verification, conservative enrichment, and preprint publication checks. |
 | diff.py | Unified diff generation. |

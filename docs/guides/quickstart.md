@@ -82,20 +82,22 @@ columns. LTWA tables should contain `Word` and `Abbreviation` columns.
 ## 7. Add by DOI or arXiv id
 
 ```bash
-pynakes add refs.bib 10.5555/example --dry-run --diff
-pynakes add refs.bib 10.5555/example
-pynakes add refs.bib arXiv:2301.00001
+pynakes add 10.5555/example refs.bib --dry-run --diff
+pynakes add 10.5555/example refs.bib
+pynakes add arXiv:2301.00001 refs.bib
+pynakes add arXiv:2301.00001 refs.bib --fetch
 ```
 
 Citation-key choices:
 
 ```bash
-pynakes add refs.bib 10.5555/example --key-source provider
-pynakes add refs.bib 10.5555/example --key ManualKey2026
+pynakes add 10.5555/example refs.bib --key-source provider
+pynakes add 10.5555/example refs.bib --key ManualKey2026
 ```
 
 By default, imported entries use generated keys. If the library has JabRef
 `keypatterndefault` or `keypattern_<entrytype>` metadata, that pattern is used.
+`--fetch` also downloads configured Pinax materials for the new arXiv entry.
 
 ## 8. Organize with Groups
 

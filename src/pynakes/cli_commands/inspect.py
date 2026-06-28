@@ -9,11 +9,13 @@ from typing import Optional
 
 import typer
 
+from pynakes import importer as importer_ops
 from pynakes.cli_common import (
     _entries,
     _resolve_input_bib,
     _safe,
 )
+from pynakes.filestore import FileStore
 from pynakes.io import load_bib
 
 # --- inspect ---------------------------------------------------------------
@@ -41,6 +43,7 @@ def inspect(
     file = _resolve_input_bib(file, json_output)
     lib = load_bib(file)
     duplicates = lib.entries.duplicate_keys()
+    store = FileStore.from_metadata(lib, file)
 
     if json_output:
         entries = []
@@ -48,6 +51,13 @@ def inspect(
             record = {"key": entry.key, "type": entry.type, "fields": dict(entry.fields)}
             if resolved:
                 record["resolved_fields"] = lib.resolved_fields(entry)
+            if store is not None:
+                record.update(
+                    store.annotation_for(
+                        entry.key,
+                        refetchable=importer_ops.entry_arxiv_id(entry) is not None,
+                    )
+                )
             entries.append(record)
         result = {
             "status": "success",
@@ -70,6 +80,11 @@ def inspect(
             },
             "duplicate_keys": duplicates,
         }
+        if store is not None:
+            result["pinax"] = {
+                "files_dir": str(store.root),
+                "manifest": str(store.manifest_path),
+            }
         typer.echo(_json.dumps(result, indent=2))
         return
 

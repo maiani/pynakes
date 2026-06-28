@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from pynakes.bibtex_parser import parse_bib
 from pynakes.lint import lint
 
@@ -375,7 +377,7 @@ def test_required_fields_for_techreport() -> None:
     issues = [i for i in lint(lib) if i.type == "missing_required_field"]
     fields = {i.field for i in issues}
     assert "institution" in fields, (
-        "techreport should require institution (or school), but this type is not in _REQUIRED yet"
+        "techreport should require institution (or school) in the built-in rules"
     )
 
 
@@ -383,25 +385,85 @@ def test_required_fields_for_unpublished() -> None:
     lib = parse_bib("@unpublished{U,\n  title = {T},\n  year = {2020}\n}\n")
     issues = [i for i in lint(lib) if i.type == "missing_required_field"]
     fields = {i.field for i in issues}
-    assert "author" in fields, (
-        "unpublished should require author, but this type is not in _REQUIRED yet"
-    )
+    assert "author" in fields, "unpublished should require author in the built-in rules"
 
 
 def test_required_fields_for_incollection() -> None:
     lib = parse_bib("@incollection{C,\n  author = {X},\n  title = {T},\n  year = {2020}\n}\n")
     issues = [i for i in lint(lib) if i.type == "missing_required_field"]
     fields = {i.field for i in issues}
-    assert "booktitle" in fields, (
-        "incollection should require booktitle, but this type is not in _REQUIRED yet"
-    )
+    assert "booktitle" in fields, "incollection should require booktitle in the built-in rules"
 
 
 def test_required_fields_for_manual() -> None:
     lib = parse_bib("@manual{M,\n  author = {X},\n  year = {2020}\n}\n")
     issues = [i for i in lint(lib) if i.type == "missing_required_field"]
     fields = {i.field for i in issues}
-    assert "title" in fields, "manual should require title, but this type is not in _REQUIRED yet"
+    assert "title" in fields, "manual should require title in the built-in rules"
+
+
+@pytest.mark.parametrize(
+    ("entry_type", "fields"),
+    [
+        # BibLaTeX required fields and aliases are taken from the official
+        # BibLaTeX manual on CTAN, section 2.1 "Entry Types":
+        # https://mirrors.ctan.org/macros/latex/contrib/biblatex/doc/biblatex.pdf
+        ("article", {"author", "title", "journaltitle", "year"}),
+        ("book", {"author", "title", "year"}),
+        ("mvbook", {"author", "title", "year"}),
+        ("inbook", {"author", "title", "booktitle", "year"}),
+        ("bookinbook", {"author", "title", "booktitle", "year"}),
+        ("suppbook", {"author", "title", "booktitle", "year"}),
+        ("booklet", {"author", "title", "year"}),
+        ("collection", {"editor", "title", "year"}),
+        ("mvcollection", {"editor", "title", "year"}),
+        ("incollection", {"author", "title", "editor", "booktitle", "year"}),
+        ("suppcollection", {"author", "title", "editor", "booktitle", "year"}),
+        ("dataset", {"author", "title", "year"}),
+        ("manual", {"author", "title", "year"}),
+        ("misc", {"author", "title", "year"}),
+        ("online", {"author", "title", "year", "doi"}),
+        ("patent", {"author", "title", "number", "year"}),
+        ("periodical", {"editor", "title", "year"}),
+        ("suppperiodical", {"author", "title", "journaltitle", "year"}),
+        ("proceedings", {"title", "year"}),
+        ("mvproceedings", {"title", "year"}),
+        ("inproceedings", {"author", "title", "booktitle", "year"}),
+        ("reference", {"editor", "title", "year"}),
+        ("mvreference", {"editor", "title", "year"}),
+        ("inreference", {"author", "title", "editor", "booktitle", "year"}),
+        ("report", {"author", "title", "type", "institution", "year"}),
+        ("thesis", {"author", "title", "type", "institution", "year"}),
+        ("unpublished", {"author", "title", "year"}),
+        ("review", {"author", "title", "journaltitle", "year"}),
+        ("software", {"author", "title", "year"}),
+        ("conference", {"author", "title", "booktitle", "year"}),
+        ("electronic", {"author", "title", "year", "doi"}),
+        ("www", {"author", "title", "year", "doi"}),
+        ("mastersthesis", {"author", "title", "institution", "year"}),
+        ("phdthesis", {"author", "title", "institution", "year"}),
+        ("techreport", {"author", "title", "institution", "year"}),
+    ],
+)
+def test_biblatex_required_fields_cover_default_data_model(
+    entry_type: str, fields: set[str]
+) -> None:
+    lib = parse_bib(f"@comment{{jabref-meta: databaseType:biblatex;}}\n@{entry_type}{{Key,\n}}\n")
+
+    issues = [i for i in lint(lib) if i.type == "missing_required_field"]
+
+    assert {issue.field for issue in issues} == fields
+
+
+def test_biblatex_required_fields_differ_from_bibtex_book_publisher() -> None:
+    entry = "@book{B,\n  author = {A. Author},\n  title = {T},\n  date = {2020}\n}\n"
+    biblatex = parse_bib("@comment{jabref-meta: databaseType:biblatex;}\n" + entry)
+    bibtex = parse_bib("@comment{jabref-meta: databaseType:bibtex;}\n" + entry)
+
+    assert "publisher" not in {
+        i.field for i in lint(biblatex) if i.type == "missing_required_field"
+    }
+    assert "publisher" in {i.field for i in lint(bibtex) if i.type == "missing_required_field"}
 
 
 def test_custom_biblatex_entry_type_and_field_names_produce_no_errors() -> None:

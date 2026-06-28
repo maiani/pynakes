@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import tarfile
 from io import BytesIO
 from pathlib import Path
@@ -85,6 +86,7 @@ def test_download_arxiv_materials_writes_pdf_and_source(tmp_path: Path) -> None:
         "https://arxiv.org/abs/2101.00001v2",
         pdf_fetcher=pdf_fetcher,
         source_fetcher=source_fetcher,
+        fetched_date="2026-06-27",
     )
 
     assert calls == [("pdf", "2101.00001"), ("source", "2101.00001")]
@@ -101,6 +103,14 @@ def test_download_arxiv_materials_writes_pdf_and_source(tmp_path: Path) -> None:
     assert (
         tmp_path / "refs.files" / "Noether1918_preprint" / "src" / "notes.txt"
     ).read_bytes() == (b"notes\n")
+    manifest = json.loads((tmp_path / "refs.files" / ".pinax" / "manifest.json").read_text())
+    row = manifest["files"]["Noether1918"]
+    assert row["preprint_canonical"] is False
+    assert row["preprint_pdf"]["source"] == "https://arxiv.org/pdf/2101.00001"
+    assert row["preprint_pdf"]["fetched_date"] == "2026-06-27"
+    assert row["preprint_pdf"]["refetchable"] is True
+    assert len(row["preprint_pdf"]["sha256"]) == 64
+    assert row["preprint_source"]["source"] == "https://arxiv.org/e-print/2101.00001"
 
 
 def test_source_extraction_rejects_path_traversal(tmp_path: Path) -> None:

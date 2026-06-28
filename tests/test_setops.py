@@ -135,6 +135,49 @@ def test_cli_combine_writes_combined_file(tmp_path: Path) -> None:
     assert set(reparsed.entries.keys()) == {"Smith2020", "Jones2021"}
 
 
+def test_cli_combine_copies_pinax_materials_and_manifest(tmp_path: Path) -> None:
+    source = tmp_path / "source.bib"
+    source.write_text(
+        "@article{Smith2020,\n  title = {Alpha}\n}\n"
+        "@comment{pynakes-meta:\nfiles-dir: source.files\n}\n"
+    )
+    source_files = tmp_path / "source.files"
+    source_files.mkdir()
+    (source_files / "Smith2020_preprint.pdf").write_bytes(b"pdf")
+    (source_files / ".pinax").mkdir()
+    (source_files / ".pinax" / "manifest.json").write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "files": {
+                    "Smith2020": {
+                        "preprint_canonical": True,
+                        "preprint_pdf": {
+                            "source": "https://arxiv.org/pdf/2101.00001",
+                            "fetched_date": "2026-06-27",
+                            "sha256": "0" * 64,
+                            "refetchable": True,
+                        },
+                    }
+                },
+            }
+        )
+    )
+    b = _write(tmp_path, "2.bib", B)
+    out = str(tmp_path / "all.bib")
+
+    result = runner.invoke(app, ["combine", str(source), b, "--out", out, "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["pinax_materials"][0]["kind"] == "preprint_pdf"
+    assert (tmp_path / "all.files" / "Smith2020_preprint.pdf").read_bytes() == b"pdf"
+    combined = parse_bib(Path(out).read_text())
+    assert combined.pynakes_metadata["files-dir"] == "all.files"
+    manifest = json.loads((tmp_path / "all.files" / ".pinax" / "manifest.json").read_text())
+    assert manifest["files"]["Smith2020"]["preprint_canonical"] is True
+
+
 def test_cli_combine_dry_run_writes_nothing(tmp_path: Path) -> None:
     a = _write(tmp_path, "1.bib", A)
     b = _write(tmp_path, "2.bib", B)
@@ -174,6 +217,32 @@ def test_cli_split_by_group(tmp_path: Path) -> None:
     assert {o["file"]: o["entries"] for o in data["outputs"]} == {ml: 1, rest: 1}
     assert list(parse_bib(Path(ml).read_text()).entries.keys()) == ["Smith2020"]
     assert list(parse_bib(Path(rest).read_text()).entries.keys()) == ["Jones2021"]
+
+
+def test_cli_split_copies_pinax_materials_to_matching_output(tmp_path: Path) -> None:
+    source = tmp_path / "source.bib"
+    source.write_text(
+        "@article{Smith2020,\n  title = {Alpha},\n  groups = {ML}\n}\n"
+        "@article{Jones2021,\n  title = {Beta},\n  groups = {Bio}\n}\n"
+        "@comment{pynakes-meta:\nfiles-dir: source.files\n}\n"
+    )
+    source_files = tmp_path / "source.files"
+    source_files.mkdir()
+    (source_files / "Smith2020_preprint.pdf").write_bytes(b"pdf")
+    ml = str(tmp_path / "ml.bib")
+    rest = str(tmp_path / "rest.bib")
+
+    result = runner.invoke(
+        app,
+        ["split", str(source), "--to", f'{ml}=group "ML"', "--to", f"{rest}=*", "--json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    outputs = {item["file"]: item for item in json.loads(result.output)["outputs"]}
+    assert outputs[ml]["pinax_materials"][0]["kind"] == "preprint_pdf"
+    assert (tmp_path / "ml.files" / "Smith2020_preprint.pdf").read_bytes() == b"pdf"
+    assert not (tmp_path / "rest.files" / "Smith2020_preprint.pdf").exists()
+    assert parse_bib(Path(ml).read_text()).pynakes_metadata["files-dir"] == "ml.files"
 
 
 def test_cli_split_used_unused_with_tex(tmp_path: Path) -> None:

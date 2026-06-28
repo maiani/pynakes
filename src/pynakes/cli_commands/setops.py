@@ -11,6 +11,7 @@ distinct operation living under ``dedupe merge``.)
 
 import json as _json
 import os
+from pathlib import Path
 from typing import Optional
 
 import typer
@@ -18,12 +19,15 @@ import typer
 from pynakes.bibtex_writer import write_bib
 from pynakes.cli_common import _BACKUP_OPTION, _emit_conflict, _entries, _safe
 from pynakes.diff import generate_diff
+from pynakes.filestore import FILES_DIR_KEY, FileStore
 from pynakes.io import load_bib, save_bib
+from pynakes.metadata import set_metadata
+from pynakes.model import BibFile
 from pynakes.setops import PartitionRule, merge_libraries, partition_library
 from pynakes.usage import collect_cited_keys
 
 
-def _load_inputs(paths: list[str]) -> list[tuple[str, object]]:
+def _load_inputs(paths: list[str]) -> list[tuple[str, BibFile]]:
     return [(path, load_bib(path)) for path in paths]
 
 
@@ -34,6 +38,49 @@ def _file_diff(path: str, new_content: str) -> str:
         with open(path, encoding="utf-8") as handle:
             original = handle.read()
     return generate_diff(original, new_content, path)
+
+
+def _entry_sources(named_libs: list[tuple[str, BibFile]]) -> dict[int, FileStore]:
+    sources: dict[int, FileStore] = {}
+    for path, lib in named_libs:
+        store = FileStore.from_metadata(lib, path)
+        if store is None:
+            continue
+        for entry in lib.entries.values():
+            sources[id(entry)] = store
+    return sources
+
+
+def _ensure_pinax_output(lib: BibFile, out: str) -> FileStore:
+    set_metadata(lib, FILES_DIR_KEY, f"{Path(out).stem}.files")
+    store = FileStore.from_metadata(lib, out)
+    if store is None:
+        raise ValueError("could not resolve output files-dir")
+    return store
+
+
+def _copy_pinax_materials(
+    lib: BibFile,
+    out: str,
+    sources: dict[int, FileStore],
+    *,
+    dry_run: bool,
+) -> list[dict[str, str]]:
+    if not sources:
+        return []
+    duplicates = lib.entries.duplicate_keys()
+    if duplicates:
+        keys = ", ".join(sorted(duplicates))
+        raise ValueError(f"Pinax output requires unique citation keys: {keys}")
+    target = _ensure_pinax_output(lib, out)
+    copied: list[dict[str, str]] = []
+    if dry_run:
+        return copied
+    for entry in lib.entries.values():
+        source = sources.get(id(entry))
+        if source is not None:
+            copied.extend(target.copy_materials_from(source, entry.key))
+    return copied
 
 
 # --- combine ---------------------------------------------------------------
@@ -54,7 +101,9 @@ def combine(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Combine several .bib files into one (optionally deduping by citation key)."""
-    result = merge_libraries(_load_inputs(inputs), dedupe=dedupe)
+    named_inputs = _load_inputs(inputs)
+    pinax_sources = _entry_sources(named_inputs)
+    result = merge_libraries(named_inputs, dedupe=dedupe)
     if result.conflicts:
         _emit_conflict(
             json_output,
@@ -73,6 +122,12 @@ def combine(
             ],
         )
 
+    pinax_materials = _copy_pinax_materials(
+        result.lib,
+        out,
+        pinax_sources,
+        dry_run=dry_run,
+    )
     content = write_bib(result.lib)
     entries = len(result.lib.entries)
     # Diff against the pre-existing file (or empty) before we overwrite it.
@@ -97,6 +152,7 @@ def combine(
             "written": written,
             "entries": entries,
             "warnings": warnings,
+            "pinax_materials": pinax_materials,
         }
         if diff and diff_text:
             payload["diff"] = diff_text
@@ -105,6 +161,8 @@ def combine(
 
     verb = "Would write" if dry_run else "Wrote"
     typer.echo(f"Combined {len(result.inputs)} file(s) → {entries} {_entries(entries)}.")
+    if pinax_sources:
+        typer.echo(f"  pinax materials copied: {len(pinax_materials)}")
     if result.duplicate_keys:
         typer.echo(f"  duplicate key(s): {', '.join(result.duplicate_keys)}")
     typer.echo(f"{verb} {out}.")
@@ -162,7 +220,9 @@ def split(
     """Combine inputs, then route entries into several outputs by predicate."""
     rules = _parse_rules(to)
 
-    merged = merge_libraries(_load_inputs(inputs), dedupe=dedupe)
+    named_inputs = _load_inputs(inputs)
+    pinax_sources = _entry_sources(named_inputs)
+    merged = merge_libraries(named_inputs, dedupe=dedupe)
     if merged.conflicts:
         _emit_conflict(
             json_output,
@@ -193,6 +253,12 @@ def split(
     diff_chunks: list[str] = []
     for rule in rules:
         bucket = result.buckets[rule.label]
+        pinax_materials = _copy_pinax_materials(
+            bucket,
+            rule.label,
+            pinax_sources,
+            dry_run=dry_run,
+        )
         content = write_bib(bucket)
         # Diff against the pre-existing file (or empty) before we overwrite it.
         if diff:
@@ -207,6 +273,7 @@ def split(
                 "predicate": rule.predicate,
                 "entries": result.counts[rule.label],
                 "written": written,
+                "pinax_materials": pinax_materials,
             }
         )
 

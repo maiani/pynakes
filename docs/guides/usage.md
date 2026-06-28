@@ -60,12 +60,16 @@ pynakes lint refs.bib --json
 pynakes lint refs.bib chapters/*.bib --strict   # multi-file CI gate
 ```
 
-Checks include duplicate citation keys, missing required fields by entry type,
-malformed DOI fields, missing article DOI warnings, malformed group fields, and
-mixed-case entry types or field names. It also verifies the lintable parts of a
-stored library profile: citation-key patterns, journal style, profile-required
-fields, and title brace protection. Casing and profile findings are warnings;
-run `normalize` to repair formatting issues surgically.
+Checks include duplicate citation keys, dialect-aware missing required fields by
+entry type, malformed DOI fields, missing article DOI warnings, malformed group
+fields, and mixed-case entry types or field names. BibLaTeX required-field
+validation follows the official BibLaTeX manual from CTAN, section 2.1 entry
+types and aliases:
+<https://mirrors.ctan.org/macros/latex/contrib/biblatex/doc/biblatex.pdf>. It
+also verifies the lintable parts of a stored library profile: citation-key
+patterns, journal style, profile-required fields, and title brace protection.
+Casing and profile findings are warnings; run `normalize` to repair formatting
+issues surgically.
 
 `pynakes normalize refs.bib` also repairs bare full month names such as
 `month = june`, which BibTeX interprets as an undefined string reference. It
@@ -234,26 +238,28 @@ Add a reference by DOI **or** arXiv identifier. The identifier type is
 auto-detected, so the same command handles all of these:
 
 ```bash
-pynakes add refs.bib 10.5555/example --dry-run --diff
-pynakes add refs.bib https://doi.org/10.5555/example
-pynakes add refs.bib arXiv:2301.00001
-pynakes add refs.bib https://arxiv.org/abs/2301.00001
+pynakes add 10.5555/example refs.bib --dry-run --diff
+pynakes add https://doi.org/10.5555/example refs.bib
+pynakes add arXiv:2301.00001 refs.bib
+pynakes add https://arxiv.org/abs/2301.00001 refs.bib
 ```
 
 Options:
 
 ```bash
-pynakes add refs.bib 10.5555/example --key ManualKey2026
-pynakes add refs.bib 10.5555/example --key-source provider
-pynakes add refs.bib 10.5555/example --allow-duplicate
+pynakes add 10.5555/example refs.bib --key ManualKey2026
+pynakes add 10.5555/example refs.bib --key-source provider
+pynakes add 10.5555/example refs.bib --allow-duplicate
+pynakes add arXiv:2301.00001 refs.bib --fetch
 ```
 
 DOIs are fetched through DOI-resolver content negotiation; arXiv ids are fetched
-from the arXiv Atom API (metadata only — no PDFs or linked files are
-downloaded). Existing matching DOI/arXiv references are detected before
-importing. arXiv entries are written as `@online` in BibLaTeX libraries and
-`@misc` in BibTeX ones, following the library's `databaseType` metadata
-(defaulting to BibTeX when unset).
+from the arXiv Atom API. By default `add` imports metadata only; `--fetch` also
+downloads configured Pinax materials for the new arXiv entry according to the
+library's `fetch-preprint` and `fetch-source` metadata. Existing matching
+DOI/arXiv references are detected before importing. arXiv entries are written as
+`@online` in BibLaTeX libraries and `@misc` in BibTeX ones, following the
+library's `databaseType` metadata (defaulting to BibTeX when unset).
 
 ## files
 

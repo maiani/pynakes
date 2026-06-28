@@ -1,11 +1,9 @@
 # Pinax — a bibliography and its materials
 
-> **Status: design specification with the offline FileStore foundation
-> implemented.** This document specifies the optional *Pinax* layer (a
-> bibliography plus its materials) without replacing the plain `.bib`
-> maintenance engine, and scopes what is deliberately deferred. The first
-> networked slice being built from it is [fetch](#fetch-the-first-slice). For the
-> engine it builds on, see
+> **Status: core Pinax layer implemented; open-access published PDF import is
+> deferred.** This document specifies the optional *Pinax* layer (a bibliography
+> plus its materials) without replacing the plain `.bib` maintenance engine, and
+> scopes what is deliberately deferred. For the engine it builds on, see
 > [Architecture](architecture.md); for philosophy, [vision](../vision.md); for
 > sequencing, [DEVPLAN](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
 
@@ -496,24 +494,27 @@ checklist.
 4. **Agent surface.** `inspect --json` reports per-entry `published_pdf` /
    `preprint_pdf` / `preprint_source` / `canonical_pdf`; `files check` reports
    presence, orphans, and drift, and enforces the unique-key precondition for
-   file-addressing operations.
+   file-addressing operations. *(Implemented.)*
 5. **`preprint_canonical` + provenance manifest (Tier 1).** `.pinax/manifest.json`
    with `source` / `fetched_date` / `sha256` / `refetchable` per artifact and the
    per-entry `preprint_canonical` boolean (default `false`); `fetch` writes it and
-   may initialize the boolean; `canonical_*` resolves from it.
+   may initialize the boolean; `canonical_*` resolves from it. *(Implemented.)*
 6. **Pinax-aware `combine` / `split`.** Each output is a pinax; an output entry's
    materials and per-entry state are copied into its files-dir. Non-destructive —
    inputs untouched. (Lower-risk than rename: outputs are fresh, so a failure just
-   discards a half-written output.)
+   discards a half-written output.) *(Implemented.)*
 7. **Coordinated key edits (own design pass).** `keys rename` / `generate` /
    `repair` move every `<citekey>*` material *in place* (filesystem first, then
    commit, rollback on failure); `files check --fix` reconciles drift. The only
-   in-place material operation, so the riskiest — design it on its own before
-   building.
-8. **(Later) `add --fetch` and open-access published PDFs.** A one-step
-   import-and-download flag on `add`, and a DOI → open-access resolver that lands
-   the published `<citekey>.pdf`; `dedupe` merge reconciles materials onto the
-   surviving key.
+   in-place material operation, so the riskiest. *(Implemented.)*
+8. **`add --fetch` for arXiv Pinax materials.** One-step import-and-download for
+   arXiv references, using the existing Pinax fetch policy for preprint
+   PDF/source materials. *(Implemented.)*
+9. **Open-access published PDFs.** DOI → open-access resolver landing the
+   published version at `<citekey>.pdf`, when a resolvable open-access copy
+   exists.
+10. **Dedupe material merge.** `dedupe` merge reconciles Pinax materials onto the
+    surviving key.
 
 ## Decisions and open questions
 
@@ -523,6 +524,8 @@ Settled in discussion:
   namespace.
 - **What to fetch is metadata-driven** — the `fetch-preprint` / `fetch-source` /
   `fetch-published` keys, not a per-invocation flag.
+- **`add --fetch` is a convenience trigger** — it imports the reference, then
+  runs the same metadata-driven fetch policy for the new key.
 - **Canonical is a per-entry `preprint_canonical` boolean**, default `false`.
 - **PDF-only e-prints** are handled gracefully (the source step is skipped).
 - **Operations preserve the pinax** — `combine` / `split` produce pinakes,

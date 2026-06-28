@@ -58,6 +58,7 @@ def fetch(
         warnings,
         fetch_preprint=report["fetch_preprint"],
         fetch_source=report["fetch_source"],
+        fetch_published=report["fetch_published"],
         fetched=report["fetched"],
         skipped=report["skipped"],
         failed=report["failed"],

@@ -7,6 +7,10 @@ BibTeX string references, cross-entry field consistency (a field most entries
 of a type define but some omit), malformed or missing DOIs, malformed JabRef
 ``groups`` formatting, noncanonical entry-type / field-name casing, unresolved
 journal titles, and deviations from the library's stored metadata profile.
+
+BibLaTeX required-field validation follows the official BibLaTeX manual on
+CTAN, section 2.1 "Entry Types" and entry-type aliases:
+https://mirrors.ctan.org/macros/latex/contrib/biblatex/doc/biblatex.pdf
 """
 
 import csv
@@ -23,24 +27,102 @@ from pynakes.keys import (
     generate_key_from_pattern,
     get_jabref_key_pattern,
 )
+from pynakes.metadata import library_database_type
 from pynakes.model import BibEntry, BibFile, undefined_string_references
 
-# Required fields by entry type. Each requirement is a tuple of acceptable
-# field names (any one satisfies it), to tolerate BibTeX/BibLaTeX variants
-# (e.g. journal/journaltitle, year/date).
-_REQUIRED: dict[str, list[tuple[str, ...]]] = {
+RequiredRules = dict[str, list[tuple[str, ...]]]
+
+# Required fields by entry type. Each requirement is a tuple of acceptable field
+# names (any one satisfies it), to tolerate compatibility aliases such as
+# journal/journaltitle, year/date, and school/institution.
+_BIBTEX_REQUIRED: RequiredRules = {
     "article": [("author",), ("title",), ("journal", "journaltitle"), ("year", "date")],
     "book": [("author", "editor"), ("title",), ("publisher",), ("year", "date")],
     "inbook": [("author", "editor"), ("title",), ("publisher",), ("year", "date")],
+    "incollection": [("author",), ("title",), ("booktitle",), ("year", "date")],
     "inproceedings": [("author",), ("title",), ("booktitle",), ("year", "date")],
     "conference": [("author",), ("title",), ("booktitle",), ("year", "date")],
+    "manual": [("title",)],
     "phdthesis": [("author",), ("title",), ("school", "institution"), ("year", "date")],
     "mastersthesis": [("author",), ("title",), ("school", "institution"), ("year", "date")],
     "thesis": [("author",), ("title",), ("institution", "school"), ("year", "date")],
+    "techreport": [("author",), ("title",), ("institution", "school"), ("year", "date")],
+    "unpublished": [("author",), ("title",), ("note",)],
+}
+
+_BIBLATEX_REQUIRED: RequiredRules = {
+    # BibLaTeX default data model, section 2.1.1 "Entry Types".
+    # Source of truth when editing this table: the official BibLaTeX manual
+    # from CTAN, section 2.1 entry types and aliases:
+    # https://mirrors.ctan.org/macros/latex/contrib/biblatex/doc/biblatex.pdf
+    "article": [("author",), ("title",), ("journaltitle", "journal"), ("year", "date")],
+    "book": [("author",), ("title",), ("year", "date")],
+    "mvbook": [("author",), ("title",), ("year", "date")],
+    "inbook": [("author",), ("title",), ("booktitle",), ("year", "date")],
+    "booklet": [("author", "editor"), ("title",), ("year", "date")],
+    "collection": [("editor",), ("title",), ("year", "date")],
+    "mvcollection": [("editor",), ("title",), ("year", "date")],
+    "incollection": [("author",), ("title",), ("editor",), ("booktitle",), ("year", "date")],
+    "dataset": [("author", "editor"), ("title",), ("year", "date")],
+    "manual": [("author", "editor"), ("title",), ("year", "date")],
+    "misc": [("author", "editor"), ("title",), ("year", "date")],
+    "online": [("author", "editor"), ("title",), ("year", "date"), ("doi", "eprint", "url")],
+    "patent": [("author",), ("title",), ("number",), ("year", "date")],
+    "periodical": [("editor",), ("title",), ("year", "date")],
+    "proceedings": [("title",), ("year", "date")],
+    "mvproceedings": [("title",), ("year", "date")],
+    "inproceedings": [("author",), ("title",), ("booktitle",), ("year", "date")],
+    "report": [("author",), ("title",), ("type",), ("institution", "school"), ("year", "date")],
+    "thesis": [("author",), ("title",), ("type",), ("institution", "school"), ("year", "date")],
+    "unpublished": [("author",), ("title",), ("year", "date")],
+}
+
+_BIBLATEX_REQUIREMENT_ALIASES: dict[str, str] = {
+    # Soft aliases from the BibLaTeX manual, section 2.1.1.
+    "bookinbook": "inbook",
+    "suppbook": "inbook",
+    "suppcollection": "incollection",
+    "suppperiodical": "article",
+    "reference": "collection",
+    "mvreference": "mvcollection",
+    "inreference": "incollection",
+    "review": "article",
+    "software": "misc",
+    # Hard aliases from the BibLaTeX manual, section 2.1.2. These are resolved by biber.
+    "conference": "inproceedings",
+    "electronic": "online",
+    "www": "online",
+    # BibLaTeX treats these as thesis/report aliases with a default type.
+    "mastersthesis": "mastersthesis",
+    "phdthesis": "phdthesis",
+    "techreport": "techreport",
+}
+
+_BIBLATEX_ALIAS_REQUIRED: RequiredRules = {
+    "mastersthesis": [("author",), ("title",), ("institution", "school"), ("year", "date")],
+    "phdthesis": [("author",), ("title",), ("institution", "school"), ("year", "date")],
+    "techreport": [("author",), ("title",), ("institution", "school"), ("year", "date")],
 }
 
 # Entry types for which a missing DOI is worth a (low-severity) warning.
 _DOI_EXPECTED = {"article", "inproceedings"}
+
+
+def _required_for_entry_type(entry_type: str, dialect: str) -> list[tuple[str, ...]]:
+    """Return built-in required fields for ``entry_type`` in ``dialect``.
+
+    For BibLaTeX, this is derived from the official BibLaTeX manual on CTAN,
+    section 2.1 "Entry Types" and entry-type aliases:
+    https://mirrors.ctan.org/macros/latex/contrib/biblatex/doc/biblatex.pdf
+    """
+    etype = entry_type.lower()
+    if dialect != "biblatex":
+        return _BIBTEX_REQUIRED.get(etype, [])
+    if etype in _BIBLATEX_ALIAS_REQUIRED:
+        return _BIBLATEX_ALIAS_REQUIRED[etype]
+    target = _BIBLATEX_REQUIREMENT_ALIASES.get(etype, etype)
+    return _BIBLATEX_REQUIRED.get(target, [])
+
 
 # Fields excluded from the cross-entry consistency check: structural/reference
 # fields (not bibliographic data) and JabRef-internal management fields that
@@ -196,6 +278,7 @@ def lint(lib: BibFile) -> list[LintIssue]:
     issues: list[LintIssue] = []
     profile = resolve_lint_profile(lib)
     journal_sources = None
+    dialect = library_database_type(lib)
 
     if profile.journal_style not in {"none", "abbreviated", "full"}:
         issues.append(
@@ -247,15 +330,15 @@ def lint(lib: BibFile) -> list[LintIssue]:
     for entry in lib.entries.values():
         fields = lib.resolved_fields(entry)
         issues.extend(_lint_undefined_string_references(entry, lib))
-        issues.extend(_lint_entry(entry, fields))
+        issues.extend(_lint_entry(entry, fields, dialect=dialect))
         issues.extend(_lint_profile_entry(entry, lib, profile, journal_sources, fields))
 
-    issues.extend(_lint_field_consistency(lib))
+    issues.extend(_lint_field_consistency(lib, dialect=dialect))
 
     return issues
 
 
-def _lint_field_consistency(lib: BibFile) -> list[LintIssue]:
+def _lint_field_consistency(lib: BibFile, *, dialect: str = "bibtex") -> list[LintIssue]:
     """Report fields a majority of same-type entries define but some omit.
 
     This is the analogue of JabRef's consistency check, scoped to be useful as
@@ -277,7 +360,11 @@ def _lint_field_consistency(lib: BibFile) -> list[LintIssue]:
         if total < 3:
             # A majority among one or two entries is uninformative.
             continue
-        required = {name for alternatives in _REQUIRED.get(etype, []) for name in alternatives}
+        required = {
+            name
+            for alternatives in _required_for_entry_type(etype, dialect)
+            for name in alternatives
+        }
         resolved = [lib.resolved_fields(entry) for entry in entries]
 
         present_counts: dict[str, int] = {}
@@ -463,6 +550,8 @@ def _lint_profile_entry(
 def _lint_entry(
     entry: BibEntry,
     fields: dict[str, str] | None = None,
+    *,
+    dialect: str = "bibtex",
 ) -> list[LintIssue]:
     issues: list[LintIssue] = []
     fields = fields or entry.fields
@@ -503,7 +592,7 @@ def _lint_entry(
             )
         )
 
-    for alternatives in _REQUIRED.get(etype, []):
+    for alternatives in _required_for_entry_type(etype, dialect):
         if not any(fields.get(name, "").strip() for name in alternatives):
             issues.append(
                 LintIssue(

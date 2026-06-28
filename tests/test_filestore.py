@@ -1,5 +1,6 @@
 """Pinax FileStore foundation tests."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -98,6 +99,86 @@ def test_scan_reports_entries_and_material_shaped_orphans(tmp_path: Path) -> Non
         ("Ghost", "preprint_source"),
         ("Ghost", "preprint_pdf"),
     ]
+
+
+def test_manifest_records_canonical_annotation_and_drift(tmp_path: Path) -> None:
+    root = tmp_path / "refs.files"
+    root.mkdir()
+    (root / "A_preprint.pdf").write_bytes(b"preprint")
+    store = FileStore(root=root, bib_path=tmp_path / "refs.bib")
+
+    store.record_artifact(
+        "A",
+        "preprint_pdf",
+        source="https://arxiv.org/pdf/2101.00001",
+        fetched_date="2026-06-27",
+        refetchable=True,
+    )
+    store.set_preprint_canonical("A", True)
+
+    annotation = store.annotation_for("A")
+    assert annotation["canonical_pdf"] == str(root / "A_preprint.pdf")
+    assert annotation["preprint_canonical"] is True
+    assert annotation["refetchable"] is True
+
+    (root / "A_preprint.pdf").unlink()
+    scan = store.scan(["A"])
+    assert scan.drift == [{"key": "A", "kind": "preprint_pdf", "reason": "manifest without file"}]
+
+
+def test_copy_materials_copies_files_and_manifest_row(tmp_path: Path) -> None:
+    source_root = tmp_path / "source.files"
+    source_root.mkdir()
+    (source_root / "A_preprint.pdf").write_bytes(b"preprint")
+    (source_root / "A_preprint").mkdir()
+    (source_root / "A_preprint" / "paper.tex").write_text("\\title{A}\n")
+    source = FileStore(root=source_root, bib_path=tmp_path / "source.bib")
+    source.record_artifact(
+        "A",
+        "preprint_pdf",
+        source="https://arxiv.org/pdf/2101.00001",
+        fetched_date="2026-06-27",
+        refetchable=True,
+    )
+    source.set_preprint_canonical("A", True)
+    target = FileStore(root=tmp_path / "target.files", bib_path=tmp_path / "target.bib")
+
+    copied = target.copy_materials_from(source, "A")
+
+    assert {item["kind"] for item in copied} == {"preprint_pdf", "preprint_source"}
+    assert (tmp_path / "target.files" / "A_preprint.pdf").read_bytes() == b"preprint"
+    assert (tmp_path / "target.files" / "A_preprint" / "paper.tex").read_text() == "\\title{A}\n"
+    manifest = json.loads((tmp_path / "target.files" / ".pinax" / "manifest.json").read_text())
+    assert manifest["files"]["A"]["preprint_canonical"] is True
+
+
+def test_rename_materials_moves_paths_and_manifest_with_rollback(tmp_path: Path) -> None:
+    root = tmp_path / "refs.files"
+    root.mkdir()
+    (root / "Old_preprint.pdf").write_bytes(b"pdf")
+    store = FileStore(root=root, bib_path=tmp_path / "refs.bib")
+    store.record_artifact(
+        "Old",
+        "preprint_pdf",
+        source="https://arxiv.org/pdf/2101.00001",
+        fetched_date="2026-06-27",
+        refetchable=True,
+    )
+
+    transaction = store.rename_materials("Old", "New")
+
+    assert not (root / "Old_preprint.pdf").exists()
+    assert (root / "New_preprint.pdf").read_bytes() == b"pdf"
+    manifest = json.loads((root / ".pinax" / "manifest.json").read_text())
+    assert "New" in manifest["files"]
+    assert "Old" not in manifest["files"]
+
+    transaction.rollback()
+
+    assert (root / "Old_preprint.pdf").read_bytes() == b"pdf"
+    assert not (root / "New_preprint.pdf").exists()
+    manifest = json.loads((root / ".pinax" / "manifest.json").read_text())
+    assert "Old" in manifest["files"]
 
 
 def test_scan_rejects_duplicate_keys(tmp_path: Path) -> None:

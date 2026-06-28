@@ -3,8 +3,8 @@
 A single comprehensive importer: it auto-detects whether the identifier is a DOI
 or an arXiv id/URL, fetches authoritative metadata, and appends a prepared
 entry. arXiv entries are written as ``@online`` in BibLaTeX libraries and
-``@misc`` in BibTeX ones (per ``databaseType``; default BibTeX). No PDFs or
-linked files are downloaded.
+``@misc`` in BibTeX ones (per ``databaseType``; default BibTeX). ``--fetch``
+also downloads configured Pinax materials for imported arXiv entries.
 """
 
 import json as _json
@@ -38,6 +38,11 @@ def add(
     ),
     allow_duplicate: bool = typer.Option(
         False, "--allow-duplicate", help="Import even if the reference already exists"
+    ),
+    fetch: bool = typer.Option(
+        False,
+        "--fetch",
+        help="After importing, fetch configured Pinax materials for the new entry",
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
@@ -107,8 +112,30 @@ def add(
     except importer_ops.ReferenceImportError as exc:
         _emit_error(json_output, "ReferenceImportError", str(exc))
 
+    fetch_report = None
+    if fetch:
+        try:
+            fetch_report = coll.fetch_materials(target=entry.key, dry_run=dry_run)
+        except ValueError as exc:
+            _emit_error(json_output, "InvalidInput", str(exc))
+
     verb = "Would add" if dry_run else "Added"
     label = entry.fields.get("doi") or entry.fields.get("eprint") or entry.key
+    human = [f"{verb} {kind} {label} as {entry.key}."]
+    if fetch_report is not None:
+        human.extend(_fetch_human_lines(fetch_report))
+
+    details = {
+        "identifier_type": kind,
+        "identifier": label,
+        "doi": entry.fields.get("doi"),
+        "key": entry.key,
+        "key_source": "user" if key else key_source,
+        "entry_type": entry.type,
+    }
+    if fetch_report is not None:
+        details["fetch"] = fetch_report
+
     _finish_mod(
         file,
         "add",
@@ -116,14 +143,26 @@ def add(
         dry_run,
         diff,
         json_output,
-        [f"{verb} {kind} {label} as {entry.key}."],
-        identifier_type=kind,
-        identifier=label,
-        doi=entry.fields.get("doi"),
-        key=entry.key,
-        key_source="user" if key else key_source,
-        entry_type=entry.type,
+        human,
+        **details,
     )
+
+
+def _fetch_human_lines(report: dict) -> list[str]:
+    lines: list[str] = []
+    for item in report["fetched"]:
+        parts = []
+        if item["pdf_path"]:
+            parts.append("PDF")
+        if item["source_path"]:
+            parts.append("source")
+        label = "+".join(parts) if parts else "materials"
+        lines.append(f"Fetched {label} for {item['key']} (arXiv:{item['arxiv_id']}).")
+    for item in report["skipped"]:
+        lines.append(f"Skipped fetch for {item['key']} ({item['reason']}).")
+    for item in report["failed"]:
+        lines.append(f"Failed fetch for {item['key']} ({item['error']}).")
+    return lines
 
 
 def register(app: typer.Typer) -> None:

@@ -16,9 +16,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Bibliography.files`.
 - Add the Pinax arXiv download core with injectable PDF/source fetchers, safe
   source archive extraction, and atomic preprint material writes.
+- Complete the core Pinax layer: `inspect --json` material annotations,
+  `files check` Pinax presence/orphan/drift reporting plus `--fix`, provenance
+  manifests with canonical preprint selection, Pinax-aware `combine`/`split`,
+  and coordinated material moves for key edits.
+- Add `pynakes add --fetch`, which imports a reference and then downloads the
+  new entry's configured Pinax arXiv materials.
 
 ### Changed
 
+- Treat differing raw BibTeX spelling as a `combine --dedupe` conflict even
+  when parsed fields match, preserving round-trip intent.
+- Make required-field linting dialect-aware: BibTeX keeps the traditional rule
+  set, while BibLaTeX libraries use the default BibLaTeX data-model entry types
+  and aliases.
+- Fall back to a full rewrite when an engine operation edits an unsnapshotted
+  raw entry, avoiding an empty staged diff.
 - Remove the unused per-entry `BibEntry.jabref_metadata` field; JabRef and
   pynakes metadata remain library-level state on `BibFile`.
 - Derive `BibFile.jabref_metadata`, `BibFile.pynakes_metadata`, and

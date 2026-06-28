@@ -169,25 +169,30 @@ reviewed, then the next.
       `Bibliography.ensure_files_dir` + `fetch_materials`; zero-config default
       `files-dir`; JSON envelope; registration in `cli.py` and `capabilities.py`.
       *First end-to-end slice.*
-- [ ] **4. Agent surface.** `inspect --json` reports per-entry `published_pdf` /
+- [x] **4. Agent surface.** `inspect --json` reports per-entry `published_pdf` /
       `preprint_pdf` / `preprint_source` / `canonical_pdf`; `files check` reports
       presence/orphans/drift and enforces the unique-key precondition for
       file-addressing operations.
-- [ ] **5. `preprint_canonical` + provenance manifest (Tier 1).**
+- [x] **5. `preprint_canonical` + provenance manifest (Tier 1).**
       `.pinax/manifest.json` (`source`/`fetched_date`/`sha256`/`refetchable` per
       artifact, per-entry `preprint_canonical` boolean, default `false`); `fetch`
       writes it; `canonical_*` resolves from the boolean.
-- [ ] **6. Pinax-aware `combine`/`split`.** Each output is a pinax; output
+- [x] **6. Pinax-aware `combine`/`split`.** Each output is a pinax; output
       entries' materials and per-entry state are plainly copied into their
       files-dir (no hardlinks); non-destructive — inputs untouched, delete the
       source to reclaim disk after a split.
-- [ ] **7. Coordinated key edits (own design pass).** `keys
+- [x] **7. Coordinated key edits (own design pass).** `keys
       rename`/`generate`/`repair` move every `<citekey>*` material *in place*
       (filesystem first, then commit, rollback on failure); `files check --fix`
       reconciles drift. The only in-place material op, so the riskiest.
-- [ ] **8. (Later) `add --fetch` + open-access published PDFs.** One-step
-      import-and-download; DOI → open-access resolver landing `<citekey>.pdf`;
-      `dedupe` merge reconciles materials onto the surviving key.
+- [x] **8. `add --fetch` for arXiv Pinax materials.** One-step
+      import-and-download for arXiv references, using the existing Pinax fetch
+      policy for preprint PDF/source materials.
+- [ ] **9. Open-access published PDFs.** DOI → open-access resolver landing the
+      published version at `<citekey>.pdf`, when a resolvable open-access copy
+      exists.
+- [ ] **10. Dedupe material merge.** `dedupe` merge reconciles Pinax materials
+      onto the surviving key.
 
 ## Out of scope (for the deterministic core)
 

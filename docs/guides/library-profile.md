@@ -43,9 +43,13 @@ The older one-comment-per-key and `key:value;` layouts are still read;
 | `lint-required-fields-<entrytype>` | Extra fields required on one entry type | `lint` |
 | `tex-sources` | List of TeX files or directories, relative to the `.bib` file | `keys`, `used` |
 
-`lint-required-fields` values are additive to pynakes' built-in BibTeX/BibLaTeX
-requirements. For example, this makes `url` mandatory for every entry and
-`pages` mandatory for articles:
+`lint-required-fields` values are additive to pynakes' built-in requirements,
+which follow the library's `databaseType` (`bibtex` or `biblatex`). The
+BibLaTeX built-ins are sourced from the official BibLaTeX manual from CTAN,
+section 2.1 entry types and aliases:
+<https://mirrors.ctan.org/macros/latex/contrib/biblatex/doc/biblatex.pdf>. For
+example, this makes `url` mandatory for every entry and `pages` mandatory for
+articles:
 
 ```bibtex
 @comment{pynakes-meta:
