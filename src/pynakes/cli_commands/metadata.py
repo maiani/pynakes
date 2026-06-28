@@ -17,7 +17,6 @@ from pynakes.cli_common import (
     _verb,
 )
 from pynakes.engine import Bibliography
-from pynakes.io import load_bib
 
 # --- metadata --------------------------------------------------------------
 
@@ -27,7 +26,7 @@ def metadata_list(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """List top-level metadata blocks (both jabref-meta and pynakes-meta)."""
-    lib = load_bib(file)
+    lib = Bibliography.open(file).lib
     all_blocks = lib.metadata_blocks
 
     if json_output:

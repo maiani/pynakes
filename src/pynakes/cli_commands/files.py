@@ -12,14 +12,14 @@ from pynakes.cli_common import (
     _run_checks,
     _safe,
 )
+from pynakes.engine import Bibliography
 from pynakes.filestore import FileStore
-from pynakes.io import load_bib
 
 # --- files -----------------------------------------------------------------
 
 
 def _files_check_one(file: str, root: list[str] | None, fix: bool = False) -> CheckOutcome:
-    lib = load_bib(file)
+    lib = Bibliography.open(file).lib
     report = files_ops.check_linked_files(lib, file, root)
     store = FileStore.from_metadata(lib, file)
     fixed: list[dict[str, str]] = []

@@ -192,6 +192,7 @@ def keys_rename(
     matches = coll.lib.entries.get_all(old)
     if not matches:
         _emit_error(json_output, "KeyNotFound", f"No entry with key {old!r} in the library")
+        return
     if len(matches) > 1:
         _emit_conflict(
             json_output,
@@ -206,6 +207,7 @@ def keys_rename(
                 }
             ],
         )
+        return
     if old != new and new in coll.lib.entries:
         _emit_conflict(
             json_output,
@@ -220,6 +222,7 @@ def keys_rename(
                 },
             ],
         )
+        return
 
     bib_changed = coll.rename_key(old, new)
     resolved_sources = (
@@ -232,6 +235,7 @@ def keys_rename(
             "NoTeXSources",
             "No .tex files found in the provided sources or the library's 'tex-sources' metadata",
         )
+        return
     if not dry_run and coll.externally_changed():
         if coll.path is None:
             raise ValueError("rename requires a bound .bib file")

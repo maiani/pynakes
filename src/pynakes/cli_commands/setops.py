@@ -82,6 +82,54 @@ def _copy_pinax_materials(
     return copied
 
 
+def _merge_and_check(
+    named_inputs: list[tuple[str, BibFile]],
+    dedupe: bool,
+    json_output: bool,
+    *,
+    extra_conflict_note: str = "",
+) -> BibFile:
+    """Merge inputs and emit conflict if --dedupe reveals differing same-key entries."""
+    result = merge_libraries(named_inputs, dedupe=dedupe)
+    if result.conflicts:
+        _emit_conflict(
+            json_output,
+            "DuplicateMergeKey",
+            f"{len(result.conflicts)} citation key(s) differ across inputs under --dedupe",
+            conflicts=result.conflicts,
+            options=[
+                {
+                    "id": "keep_all",
+                    "description": f"Re-run without --dedupe to keep every entry{extra_conflict_note}",
+                },
+                {
+                    "id": "manual_resolve",
+                    "description": "Reconcile the differing entries in the inputs, then retry",
+                },
+            ],
+        )
+        return
+    return result.lib
+
+
+def _write_bib_file(
+    lib: BibFile,
+    path: str,
+    content: str,
+    backup: bool,
+    dry_run: bool,
+    *,
+    diff: bool = False,
+) -> tuple[bool, str]:
+    """Write *content* to *path* (unless dry-run), returning (written, diff_text)."""
+    diff_text = _file_diff(path, content) if diff else ""
+    written = False
+    if not dry_run:
+        save_bib(lib, path, backup=backup)
+        written = True
+    return written, diff_text
+
+
 # --- combine ---------------------------------------------------------------
 
 
@@ -102,13 +150,13 @@ def combine(
     """Combine several .bib files into one (optionally deduping by citation key)."""
     named_inputs = _load_inputs(inputs)
     pinax_sources = _entry_sources(named_inputs)
-    result = merge_libraries(named_inputs, dedupe=dedupe)
-    if result.conflicts:
+    merged = merge_libraries(named_inputs, dedupe=dedupe)
+    if merged.conflicts:
         _emit_conflict(
             json_output,
             "DuplicateMergeKey",
-            f"{len(result.conflicts)} citation key(s) differ across inputs under --dedupe",
-            conflicts=result.conflicts,
+            f"{len(merged.conflicts)} citation key(s) differ across inputs under --dedupe",
+            conflicts=merged.conflicts,
             options=[
                 {
                     "id": "keep_all",
@@ -120,31 +168,22 @@ def combine(
                 },
             ],
         )
+        return
 
-    pinax_materials = _copy_pinax_materials(
-        result.lib,
-        out,
-        pinax_sources,
-        dry_run=dry_run,
-    )
-    content = write_bib(result.lib)
-    entries = len(result.lib.entries)
-    # Diff against the pre-existing file (or empty) before we overwrite it.
-    diff_text = _file_diff(out, content) if diff else ""
-    written = False
-    if not dry_run:
-        save_bib(result.lib, out, backup=backup)
-        written = True
+    pinax_materials = _copy_pinax_materials(merged.lib, out, pinax_sources, dry_run=dry_run)
+    content = write_bib(merged.lib)
+    entries = len(merged.lib.entries)
+    written, diff_text = _write_bib_file(merged.lib, out, content, backup, dry_run, diff=diff)
 
     warnings: list[dict[str, object]] = []
-    if result.duplicate_keys:
-        warnings.append({"type": "duplicate_keys", "keys": result.duplicate_keys})
+    if merged.duplicate_keys:
+        warnings.append({"type": "duplicate_keys", "keys": merged.duplicate_keys})
 
     if json_output:
         payload = {
             "status": "success",
             "action": "combine",
-            "inputs": result.inputs,
+            "inputs": merged.inputs,
             "out": out,
             "dedupe": dedupe,
             "dry_run": dry_run,
@@ -158,11 +197,11 @@ def combine(
         typer.echo(_json.dumps(payload, indent=2))
         return
 
-    typer.echo(f"Combined {len(result.inputs)} file(s) → {entries} {_entries(entries)}.")
+    typer.echo(f"Combined {len(merged.inputs)} file(s) → {entries} {_entries(entries)}.")
     if pinax_sources:
         typer.echo(f"  pinax materials copied: {len(pinax_materials)}")
-    if result.duplicate_keys:
-        typer.echo(f"  duplicate key(s): {', '.join(result.duplicate_keys)}")
+    if merged.duplicate_keys:
+        typer.echo(f"  duplicate key(s): {', '.join(merged.duplicate_keys)}")
     typer.echo(f"{_verb('write', dry_run, 'Wrote')} {out}.")
     if diff and diff_text:
         typer.echo("")
@@ -238,6 +277,7 @@ def split(
                 },
             ],
         )
+        return
 
     sources = [*(tex or []), *(aux or [])]
     cited_keys: set[str] | None = None
@@ -251,20 +291,13 @@ def split(
     diff_chunks: list[str] = []
     for rule in rules:
         bucket = result.buckets[rule.label]
-        pinax_materials = _copy_pinax_materials(
-            bucket,
-            rule.label,
-            pinax_sources,
-            dry_run=dry_run,
-        )
+        pinax_materials = _copy_pinax_materials(bucket, rule.label, pinax_sources, dry_run=dry_run)
         content = write_bib(bucket)
-        # Diff against the pre-existing file (or empty) before we overwrite it.
-        if diff:
-            diff_chunks.append(_file_diff(rule.label, content))
-        written = False
-        if not dry_run:
-            save_bib(bucket, rule.label, backup=backup)
-            written = True
+        written, chunk_diff = _write_bib_file(
+            bucket, rule.label, content, backup, dry_run, diff=diff
+        )
+        if chunk_diff:
+            diff_chunks.append(chunk_diff)
         outputs.append(
             {
                 "file": rule.label,

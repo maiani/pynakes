@@ -1,15 +1,12 @@
 """EndNote tagged-text import/export."""
 
-from pynakes.authors import split_name_list
 from pynakes.interchange._shared import (
-    assign_container,
-    assign_key,
+    _common_entry_to_format,
+    _common_record_to_entry,
+    _EntryFormatSpec,
+    _export_records,
+    _ImportFormatSpec,
     build_bibfile,
-    person_to_bibtex,
-    split_keywords,
-    split_pages,
-    split_person,
-    year_of,
 )
 from pynakes.model import BibEntry, BibFile
 
@@ -79,48 +76,24 @@ _ENDNOTE_TO_BIB_FIELD = {v.lstrip("%"): k for k, v in _BIB_TO_ENDNOTE_FIELD.item
     "@": "isbn",
 }
 
-
-def _entry_to_endnote(entry: BibEntry) -> list[str]:
-    fields = entry.fields
-    lines = [f"%0 {_BIB_TO_ENDNOTE_TYPE.get(entry.type.lower(), 'Generic')}"]
-    if entry.key.strip():
-        lines.append(f"%F {entry.key}")
-    for person in split_name_list(fields.get("author", "")):
-        lines.append(f"%A {person_to_bibtex(split_person(person))}")
-    for person in split_name_list(fields.get("editor", "")):
-        lines.append(f"%E {person_to_bibtex(split_person(person))}")
-    for name, value in fields.items():
-        if not value or not value.strip():
-            continue
-        tag = _BIB_TO_ENDNOTE_FIELD.get(name)
-        if tag:
-            lines.append(f"{tag} {value}")
-    container = fields.get("journal") or fields.get("journaltitle")
-    if container:
-        lines.append(f"%J {container}")
-    if fields.get("booktitle"):
-        lines.append(f"%B {fields['booktitle']}")
-    if fields.get("isbn"):
-        lines.append(f"%@ {fields['isbn']}")
-    elif fields.get("issn"):
-        lines.append(f"%@ {fields['issn']}")
-    if fields.get("pages"):
-        start, end = split_pages(fields["pages"])
-        lines.append(f"%P {start}-{end}" if end else f"%P {start}")
-    year = year_of(fields)
-    if year:
-        lines.append(f"%D {year}")
-    for keyword in split_keywords(fields.get("keywords", "")):
-        lines.append(f"%K {keyword}")
-    return lines
-
-
-def export_endnote(lib: BibFile) -> str:
-    """Serialize *lib* as EndNote tagged text."""
-    records = [
-        "\n".join(_entry_to_endnote(entry)) for entry in lib.entries.values() if entry.key.strip()
-    ]
-    return "\n\n".join(records) + ("\n" if records else "")
+_ENDNOTE_ENTRY_SPEC = _EntryFormatSpec(
+    type_map=_BIB_TO_ENDNOTE_TYPE,
+    default_type="Generic",
+    type_fmt="%%0 %s",
+    export_key=True,
+    key_fmt="%%F %s",
+    author_fmt="%%A %s",
+    editor_fmt="%%E %s",
+    field_map=_BIB_TO_ENDNOTE_FIELD,
+    field_line_fmt="%s %s",
+    journal_fmt="%%J %s",
+    booktitle_fmt="%%B %s",
+    isbn_fmt="%%@ %s",
+    pages_fn=lambda start, end: [f"%P {start}-{end}" if end else f"%P {start}"],
+    year_fmt="%%D %s",
+    keyword_fmt="%%K %s",
+    terminator=None,
+)
 
 
 def _bib_pages(value: str) -> str:
@@ -134,49 +107,39 @@ def _bib_pages(value: str) -> str:
     return text
 
 
-def _record_to_entry(record: list[tuple[str, str]], taken: set[str]) -> BibEntry:
-    bib_type = "misc"
-    fields: dict[str, str] = {}
-    authors: list[str] = []
-    editors: list[str] = []
-    keywords: list[str] = []
-    raw_key = ""
-    container = ""
-    for tag, value in record:
-        if tag == "0":
-            bib_type = _ENDNOTE_TO_BIB_TYPE.get(value.lower(), "misc")
-        elif tag == "F":
-            raw_key = value.strip()
-        elif tag == "A":
-            authors.append(value)
-        elif tag == "E":
-            editors.append(value)
-        elif tag == "B":
-            container = value
-        elif tag == "J":
-            fields.setdefault("journal", value)
-        elif tag == "P":
-            fields["pages"] = _bib_pages(value)
-        elif tag == "D":
-            year = value.strip()[:4]
-            if year.isdigit():
-                fields["year"] = year
-        elif tag == "K":
-            keywords.append(value)
-        elif tag in _ENDNOTE_TO_BIB_FIELD:
-            fields.setdefault(_ENDNOTE_TO_BIB_FIELD[tag], value)
-    if authors:
-        fields["author"] = " and ".join(authors)
-    if editors:
-        fields["editor"] = " and ".join(editors)
-    if container:
-        assign_container(fields, bib_type, container)
-    if keywords:
-        fields["keywords"] = ", ".join(keywords)
+_ENDNOTE_IMPORT_SPEC = _ImportFormatSpec(
+    type_map=_ENDNOTE_TO_BIB_TYPE,
+    default_type="misc",
+    type_tag="0",
+    type_value_transform=str.lower,
+    author_tags=frozenset({"A"}),
+    editor_tags=frozenset({"E"}),
+    container_tags=frozenset({"B"}),
+    journal_tag="J",
+    pages_start_tag=None,
+    pages_end_tag=None,
+    pages_tag="P",
+    pages_fn=_bib_pages,
+    pages_join=None,
+    year_tags=frozenset({"D"}),
+    keyword_tag="K",
+    field_map=_ENDNOTE_TO_BIB_FIELD,
+    preserve_key=True,
+    key_tag="F",
+)
 
-    entry = BibEntry(key="", type=bib_type, fields=fields)
-    assign_key(entry, taken, raw_key)
-    return entry
+
+def _entry_to_endnote(entry: BibEntry) -> list[str]:
+    return _common_entry_to_format(entry, _ENDNOTE_ENTRY_SPEC)
+
+
+def export_endnote(lib: BibFile) -> str:
+    """Serialize *lib* as EndNote tagged text."""
+    return _export_records(lib, _entry_to_endnote)
+
+
+def _record_to_entry(record: list[tuple[str, str]], taken: set[str]) -> BibEntry:
+    return _common_record_to_entry(record, taken, _ENDNOTE_IMPORT_SPEC)
 
 
 def _parse_endnote_records(text: str) -> list[list[tuple[str, str]]]:

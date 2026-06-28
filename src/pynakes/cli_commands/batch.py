@@ -34,12 +34,14 @@ def batch(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Apply a sequence of operations atomically (one preview, one commit)."""
-    if ops is None and ops_file is None:
-        _emit_error(json_output, "InvalidInput", "Provide --ops or --ops-file")
     if ops is not None and ops_file is not None:
         _emit_error(
             json_output, "InvalidInput", "Provide only one of --ops or --ops-file, not both"
         )
+        return
+    if ops is None and ops_file is None:
+        _emit_error(json_output, "InvalidInput", "Provide either --ops or --ops-file")
+        return
     raw = ops
     if ops_file is not None:
         with open(ops_file, encoding="utf-8") as handle:
@@ -48,12 +50,14 @@ def batch(
         operations = _json.loads(raw)
     except _json.JSONDecodeError as exc:
         _emit_error(json_output, "InvalidInput", f"operations are not valid JSON: {exc}")
+        return
 
     coll = Bibliography.open(file)
     try:
         op_results = apply_operations(coll, operations)
     except BatchError as exc:
         _emit_error(json_output, "InvalidInput", str(exc), index=exc.index)
+        return
     except DuplicateMetadataError as exc:
         _emit_conflict(
             json_output,
@@ -62,6 +66,7 @@ def batch(
             key=exc.key,
             options=[{"id": "manual_edit", "description": "Resolve duplicate blocks, then retry"}],
         )
+        return
 
     plan = coll.change_plan()  # combined, before commit
     diff_text, modified, changed = _preview_or_commit(coll, dry_run, backup)

@@ -7,7 +7,7 @@ import typer
 from pynakes import fields as fields_ops
 from pynakes import search as search_ops
 from pynakes.cli_common import _entries, _resolve_input_bib, _safe
-from pynakes.io import load_bib
+from pynakes.engine import Bibliography
 
 
 def search(
@@ -30,7 +30,7 @@ def search(
 ) -> None:
     """Search entries by free text, phrases, or field-scoped terms."""
     file = _resolve_input_bib(file, json_output)
-    lib = load_bib(file)
+    lib = Bibliography.open(file).lib
     where_filter = fields_ops.parse_query(where) if where is not None else None
     results = search_ops.search_entries(
         lib,

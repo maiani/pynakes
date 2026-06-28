@@ -59,6 +59,7 @@ def used(
             "NoSources",
             "No sources given and no 'tex-sources' metadata to fall back to",
         )
+        return
     cited, include_all, scanned = collect_cited_keys(resolved_sources)
     report = analyze_usage(coll.lib, cited, include_all=include_all, sources=scanned)
 
@@ -70,12 +71,13 @@ def used(
     elif keyword:
         tagged = tag_with_keyword(coll.lib, report.used, keyword)
         tag_field = "keywords"
-    coll.mark_dirty(tagged)
 
     bib_diff = ""
     tagged_entries = 0
     file_modified = False
     if tag_field:
+        if not dry_run:
+            coll.mark_dirty(tagged)
         bib_diff, file_modified, tagged_entries = _preview_or_commit(coll, dry_run)
 
     out_written = False

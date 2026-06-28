@@ -13,13 +13,14 @@ import typer
 
 from pynakes.cli_common import _emit, _emit_error, _safe, _verb
 from pynakes.diff import generate_diff
+from pynakes.engine import Bibliography
 from pynakes.initialize import (
     apply_overrides,
     collect_profile,
     default_profile,
     render_library,
 )
-from pynakes.io import load_bib, save_text
+from pynakes.io import save_text
 
 # --- init ------------------------------------------------------------------
 
@@ -69,7 +70,9 @@ def init(
 
     # Base profile: a copied template (authoritative, no defaults injected) or
     # the sensible default profile for a fresh library.
-    entries = collect_profile(load_bib(from_)) if from_ is not None else default_profile()
+    entries = (
+        collect_profile(Bibliography.open(from_).lib) if from_ is not None else default_profile()
+    )
     overrides: list[tuple[str, str, str]] = []
     if type_ is not None:
         overrides.append(("databaseType", type_, "jabref"))

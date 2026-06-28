@@ -57,10 +57,11 @@ def add(
             f"Invalid key source {key_source!r}; expected one of: "
             f"{', '.join(sorted(importer_ops.KEY_SOURCES))}",
         )
+        return
 
+    coll = Bibliography.open(file)
     entry = None
     try:
-        coll = Bibliography.open(file)
         kind, entry = coll.import_reference(
             identifier,
             key=key,
@@ -69,8 +70,10 @@ def add(
         )
     except importer_ops.UnsupportedIdentifierError as exc:
         _emit_error(json_output, "UnsupportedIdentifier", str(exc))
+        return
     except ValueError as exc:
         _emit_error(json_output, "InvalidIdentifier", str(exc))
+        return
     except importer_ops.DuplicateReferenceError as exc:
         if json_output:
             typer.echo(
@@ -110,8 +113,10 @@ def add(
                 {"id": "auto_key", "description": "Retry without --key"},
             ],
         )
+        return
     except importer_ops.ReferenceImportError as exc:
         _emit_error(json_output, "ReferenceImportError", str(exc))
+        return
     if entry is None:
         return
 
@@ -121,6 +126,7 @@ def add(
             fetch_report = coll.fetch_materials(target=entry.key, dry_run=dry_run)
         except ValueError as exc:
             _emit_error(json_output, "InvalidInput", str(exc))
+            return
 
     label = entry.fields.get("doi") or entry.fields.get("eprint") or entry.key
     human = [f"{_verb('add', dry_run)} {kind} {label} as {entry.key}."]

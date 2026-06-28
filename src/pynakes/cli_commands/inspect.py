@@ -14,8 +14,8 @@ from pynakes.cli_common import (
     _resolve_input_bib,
     _safe,
 )
+from pynakes.engine import Bibliography
 from pynakes.filestore import FileStore
-from pynakes.io import load_bib
 
 # --- inspect ---------------------------------------------------------------
 
@@ -40,7 +40,7 @@ def inspect(
     view.
     """
     file = _resolve_input_bib(file, json_output)
-    lib = load_bib(file)
+    lib = Bibliography.open(file).lib
     duplicates = lib.entries.duplicate_keys()
     store = FileStore.from_metadata(lib, file)
 

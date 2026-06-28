@@ -237,34 +237,32 @@ class CheckOutcome:
     summary: dict = field(default_factory=dict)
 
 
-def _run_checks(
+def _run_single_check(
+    file: str,
+    action: str,
+    check_one: Callable[[str], CheckOutcome],
+    json_output: bool,
+    strict: bool,
+) -> None:
+    """Run a read-only check over a single file."""
+    outcome = check_one(file)
+    if json_output:
+        typer.echo(_json.dumps(outcome.result, indent=2))
+    else:
+        for line in outcome.human:
+            typer.echo(line)
+    if strict and outcome.failed:
+        raise typer.Exit(code=1)
+
+
+def _run_multi_checks(
     files: list[str],
     action: str,
     check_one: Callable[[str], CheckOutcome],
     json_output: bool,
     strict: bool,
 ) -> None:
-    """Run a read-only check over one or more files and emit the result.
-
-    A single file preserves the exact historical per-file envelope and human
-    output (the documented, byte-stable contract). Multiple files emit an
-    aggregate ``{status, action, strict, files: [...], summary}`` envelope, with
-    each element the same per-file envelope (or a per-file error object).
-
-    Exit code: ``1`` if any file could not be read/parsed, or — when
-    ``--strict`` — if any file tripped its gate; otherwise ``0``.
-    """
-    if len(files) == 1:
-        outcome = check_one(files[0])
-        if json_output:
-            typer.echo(_json.dumps(outcome.result, indent=2))
-        else:
-            for line in outcome.human:
-                typer.echo(line)
-        if strict and outcome.failed:
-            raise typer.Exit(code=1)
-        return
-
+    """Run a read-only check over multiple files and emit an aggregate result."""
     results: list[dict] = []
     totals: dict = {}
     error_files = 0
@@ -313,3 +311,26 @@ def _run_checks(
         )
     if error_files or (strict and findings_failed):
         raise typer.Exit(code=1)
+
+
+def _run_checks(
+    files: list[str],
+    action: str,
+    check_one: Callable[[str], CheckOutcome],
+    json_output: bool,
+    strict: bool,
+) -> None:
+    """Run a read-only check over one or more files and emit the result.
+
+    A single file preserves the exact historical per-file envelope and human
+    output (the documented, byte-stable contract). Multiple files emit an
+    aggregate ``{status, action, strict, files: [...], summary}`` envelope, with
+    each element the same per-file envelope (or a per-file error object).
+
+    Exit code: ``1`` if any file could not be read/parsed, or — when
+    ``--strict`` — if any file tripped its gate; otherwise ``0``.
+    """
+    if len(files) == 1:
+        _run_single_check(files[0], action, check_one, json_output, strict)
+    else:
+        _run_multi_checks(files, action, check_one, json_output, strict)

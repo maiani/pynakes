@@ -7,6 +7,7 @@ instead. Generation is deterministic — the same entry always yields the same k
 """
 
 import re
+from collections.abc import Callable
 
 from pynakes.authors import ascii_fold as _ascii_fold
 from pynakes.authors import last_name as _last_name
@@ -77,10 +78,8 @@ def _year(entry: BibEntry) -> str:
 
 
 def _first_title_word(entry: BibEntry) -> str:
-    raw = entry.fields.get("title", "").replace("{", "").replace("}", "")
-    for word in re.findall(r"[A-Za-z0-9]+", raw):
-        if word.lower() not in _TITLE_STOPWORDS:
-            return word[0].upper() + word[1:]
+    for word in _significant_title_words(entry):
+        return _capitalize_word(word)
     return ""
 
 
@@ -100,45 +99,47 @@ def _significant_title_words(entry: BibEntry) -> list[str]:
     ]
 
 
+_MARKER_HANDLERS: dict[str, Callable[[BibEntry], str]] = {
+    "auth": _first_author_last_name,
+    "authors": lambda e: "".join(_author_last_names(e)),
+    "year": _year,
+    "shortyear": lambda e: _year(e)[-2:],
+    "veryshorttitle": lambda e: (
+        _capitalize_word(_significant_title_words(e)[0]) if _significant_title_words(e) else ""
+    ),
+    "shorttitle": lambda e: "".join(_capitalize_word(w) for w in _significant_title_words(e)[:3]),
+    "title": lambda e: "".join(_capitalize_word(w) for w in _significant_title_words(e)),
+    "camel": lambda e: "".join(_capitalize_word(w) for w in _words(e.fields.get("title", ""))),
+    "entrytype": lambda e: _capitalize_word(e.type),
+}
+
+
 def _resolve_marker(entry: BibEntry, marker: str) -> str:
     base, *_modifiers = marker.split(":")
     base = base.strip()
     lower_base = base.lower()
 
     if base != lower_base and lower_base in entry.fields:
-        value = entry.fields.get(lower_base, "")
-    elif lower_base == "auth":
-        value = _first_author_last_name(entry)
-    elif lower_base.startswith("auth") and lower_base[4:].isdigit():
-        value = _first_author_last_name(entry)[: int(lower_base[4:])]
-    elif lower_base == "authors":
-        value = "".join(_author_last_names(entry))
-    elif lower_base == "year":
-        value = _year(entry)
-    elif lower_base == "shortyear":
-        value = _year(entry)[-2:]
-    elif lower_base == "veryshorttitle":
-        words = _significant_title_words(entry)
-        value = _capitalize_word(words[0]) if words else ""
-    elif lower_base == "shorttitle":
-        value = "".join(_capitalize_word(word) for word in _significant_title_words(entry)[:3])
-    elif lower_base == "title":
-        value = "".join(_capitalize_word(word) for word in _significant_title_words(entry))
-    elif lower_base == "camel":
-        value = "".join(_capitalize_word(word) for word in _words(entry.fields.get("title", "")))
-    elif lower_base.startswith("camel") and lower_base[5:].isdigit():
-        value = "".join(
-            _capitalize_word(word)
-            for word in _words(entry.fields.get("title", ""))[: int(lower_base[5:])]
-        )
-    elif lower_base == "entrytype":
-        value = _capitalize_word(entry.type)
+        value = entry.fields[lower_base]
     else:
-        value = entry.fields.get(base.lower(), "")
-        if not value and base not in entry.fields and lower_base not in entry.fields:
-            raise UnsupportedCitationKeyPatternError(
-                f"Unsupported JabRef citation-key marker [{base}]"
+        handler = _MARKER_HANDLERS.get(lower_base)
+        if handler is not None:
+            value = handler(entry)
+        elif lower_base.startswith("auth") and lower_base[4:].isdigit():
+            value = _first_author_last_name(entry)[: int(lower_base[4:])]
+        elif lower_base.startswith("camel") and lower_base[5:].isdigit():
+            count = int(lower_base[5:])
+            value = "".join(
+                _capitalize_word(word) for word in _words(entry.fields.get("title", ""))[:count]
             )
+        elif lower_base in entry.fields:
+            value = entry.fields[lower_base]
+        else:
+            value = entry.fields.get(base.lower(), "")
+            if not value and base not in entry.fields and lower_base not in entry.fields:
+                raise UnsupportedCitationKeyPatternError(
+                    f"Unsupported JabRef citation-key marker [{base}]"
+                )
 
     return _apply_modifiers(value, _modifiers)
 

@@ -24,7 +24,7 @@ from pynakes.cli_common import (
 )
 from pynakes.engine import Bibliography
 from pynakes.interchange import FORMATS, export_library, import_library
-from pynakes.io import load_bib, save_plain_text
+from pynakes.io import save_plain_text
 
 _DIALECTS = ("biblatex", "bibtex")
 
@@ -114,7 +114,7 @@ def _convert_dialect(
 def _convert_export(
     file: str, to: str, out: str | None, dry_run: bool, json_output: bool, backup: bool
 ) -> None:
-    lib = load_bib(file)
+    lib = Bibliography.open(file).lib
     content = export_library(lib, to)
     _emit_conversion(
         file, "bibtex", to, content, len(lib.entries), out, dry_run, json_output, backup

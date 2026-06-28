@@ -11,7 +11,7 @@ from pynakes.cli_common import (
     _run_checks,
     _safe,
 )
-from pynakes.io import load_bib
+from pynakes.engine import Bibliography
 from pynakes.lint import is_profile_issue
 from pynakes.lint import lint as lint_lib
 
@@ -19,7 +19,7 @@ from pynakes.lint import lint as lint_lib
 
 
 def _lint_one(file: str) -> CheckOutcome:
-    lib = load_bib(file)
+    lib = Bibliography.open(file).lib
     issues = lint_lib(lib)
     errors = sum(1 for i in issues if i.severity == "error")
     warnings = sum(1 for i in issues if i.severity == "warning")

@@ -86,6 +86,7 @@ def dedupe_merge(
                 },
             ],
         )
+        return
 
     human = [
         f"{_verb('merge', dry_run)} {report.merged_clusters} duplicate work cluster(s).",
