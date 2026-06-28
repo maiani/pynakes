@@ -10,9 +10,11 @@ import typer
 
 from pynakes import groups as groups_ops
 from pynakes.cli_common import (
+    _BACKUP_OPTION,
     _emit_error,
     _entries,
     _finish_mod,
+    _resolve_input_bib,
     _safe,
     _verb,
 )
@@ -23,10 +25,13 @@ from pynakes.io import load_bib
 
 
 def groups_list(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
+    file: str | None = typer.Argument(
+        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """List all groups and their members."""
+    file = _resolve_input_bib(file, json_output)
     lib = load_bib(file)
     names = groups_ops.list_groups(lib)
     members = {g: groups_ops.list_entries_in_group(lib, g) for g in names}
@@ -59,6 +64,7 @@ def _group_mod_entry(
     dry_run: bool,
     diff: bool,
     json_output: bool,
+    backup: bool,
     add: bool,
 ) -> None:
     """Shared implementation for add-entry and remove-entry."""
@@ -72,31 +78,41 @@ def _group_mod_entry(
     else:
         action, count = "groups_remove_entry", coll.remove_from_group(key, group)
         msg = f"{_verb('remove', dry_run)} {key} from group {group!r} ({count} {_entries(count)} changed)."
-    _finish_mod(file, action, coll, dry_run, diff, json_output, [msg], key=key, group=group)
+    _finish_mod(
+        file, action, coll, dry_run, diff, json_output, [msg], backup=backup, key=key, group=group
+    )
 
 
 def groups_add_entry(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
+    file: str | None = typer.Argument(
+        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
+    ),
     key: str = typer.Argument(..., help="Citation key to add"),
     group: str = typer.Argument(..., help="Group name"),
+    backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Add an entry to a group."""
-    _group_mod_entry(file, key, group, dry_run, diff, json_output, add=True)
+    file = _resolve_input_bib(file, json_output)
+    _group_mod_entry(file, key, group, dry_run, diff, json_output, backup, add=True)
 
 
 def groups_remove_entry(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
+    file: str | None = typer.Argument(
+        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
+    ),
     key: str = typer.Argument(..., help="Citation key to remove"),
     group: str = typer.Argument(..., help="Group name"),
+    backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Remove an entry from a group."""
-    _group_mod_entry(file, key, group, dry_run, diff, json_output, add=False)
+    file = _resolve_input_bib(file, json_output)
+    _group_mod_entry(file, key, group, dry_run, diff, json_output, backup, add=False)
 
 
 def register(app: typer.Typer) -> None:

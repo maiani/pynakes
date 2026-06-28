@@ -10,6 +10,7 @@ import typer
 
 from pynakes import keys as keys_ops
 from pynakes.cli_common import (
+    _BACKUP_OPTION,
     CheckOutcome,
     _emit,
     _emit_conflict,
@@ -17,6 +18,7 @@ from pynakes.cli_common import (
     _entries,
     _finish_mod,
     _preview_or_commit,
+    _resolve_input_bib,
     _run_checks,
     _safe,
     _verb,
@@ -71,17 +73,21 @@ def _rename_payload(renames: list[tuple[str, str]]) -> dict:
 
 
 def keys_generate(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
+    file: str | None = typer.Argument(
+        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
+    ),
     key: str | None = typer.Option(
         None,
         "--key",
         help="Regenerate only this citation key instead of every key",
     ),
+    backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Regenerate citation keys from entry metadata (AuthorYearTitle)."""
+    file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
     if key is None:
         renames = coll.generate_keys()
@@ -105,6 +111,7 @@ def keys_generate(
         diff,
         json_output,
         human,
+        backup=backup,
         **({"key": key} if key is not None else {}),
         **_rename_payload(renames),
     )
@@ -112,6 +119,7 @@ def keys_generate(
 
 def keys_repair(
     file: str = typer.Argument(..., help="Path to the .bib file"),
+    backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
@@ -137,6 +145,7 @@ def keys_repair(
         diff,
         json_output,
         human,
+        backup=backup,
         warnings=warnings,
         **_rename_payload(renames),
     )
@@ -172,7 +181,9 @@ def _repaired_citation_warnings(lib, file: str, renames: list[tuple[str, str]]) 
 
 
 def keys_rename(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
+    file: str | None = typer.Argument(
+        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
+    ),
     old: str = typer.Argument(..., help="Existing citation key"),
     new: str = typer.Argument(..., help="New citation key"),
     sources: list[str] | None = typer.Argument(
@@ -180,11 +191,13 @@ def keys_rename(
         help="One or more .tex files or directories whose citations should be updated "
         "(defaults to the library's 'tex-sources' metadata)",
     ),
+    backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Rename one citation key in a .bib file and matching TeX citations."""
+    file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
     keys_ops.validate_key(old)
     keys_ops.validate_key(new)
@@ -264,7 +277,7 @@ def keys_rename(
         )
 
     plan = coll.change_plan()  # before commit, which refreshes the baseline
-    bib_diff, bib_modified, changed_entries = _preview_or_commit(coll, dry_run)
+    bib_diff, bib_modified, changed_entries = _preview_or_commit(coll, dry_run, backup=backup)
 
     diff_text = "\n".join(part for part in [bib_diff, *source_diff_parts] if part)
     source_modified = any(change["modified"] for change in source_changes)

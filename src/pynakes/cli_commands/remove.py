@@ -49,7 +49,10 @@ def remove(
     material_removals: dict[str, list[str]] = {}
     if not keep_files and coll.files is not None:
         for key in removed_keys:
-            removed = coll.files.remove_materials(key)
+            if dry_run:
+                removed = coll.files._materials_paths_for(key)
+            else:
+                removed = coll.files.remove_materials(key)
             if removed:
                 material_removals[key] = removed
 
@@ -68,7 +71,9 @@ def remove(
     if material_removals:
         details["material_removals"] = material_removals
 
-    _finish_mod(file, "remove", coll, dry_run, diff, json_output, human, warnings, **details)
+    _finish_mod(
+        file, "remove", coll, dry_run, diff, json_output, human, warnings, backup=backup, **details
+    )
 
 
 def register(app: typer.Typer) -> None:

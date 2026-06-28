@@ -8,9 +8,11 @@ import typer
 
 from pynakes import dedupe as dedupe_ops
 from pynakes.cli_common import (
+    _BACKUP_OPTION,
     CheckOutcome,
     _emit_conflict,
     _finish_mod,
+    _resolve_input_bib,
     _run_checks,
     _safe,
     _verb,
@@ -59,12 +61,16 @@ def dedupe_check(
 
 
 def dedupe_merge(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
+    file: str | None = typer.Argument(
+        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
+    ),
+    backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Conservatively merge duplicate works into their first entry."""
+    file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
     try:
         report = coll.dedupe_merge()
@@ -100,6 +106,7 @@ def dedupe_merge(
         diff,
         json_output,
         human,
+        backup=backup,
         modified_entries=report.modified_entries,
         **report.to_dict(),
     )

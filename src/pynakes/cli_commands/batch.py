@@ -15,6 +15,7 @@ from pynakes.cli_common import (
     _emit_conflict,
     _emit_error,
     _preview_or_commit,
+    _resolve_input_bib,
     _safe,
     _verb,
 )
@@ -23,7 +24,9 @@ from pynakes.metadata import DuplicateMetadataError
 
 
 def batch(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
+    file: str | None = typer.Argument(
+        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
+    ),
     ops: str = typer.Option(None, "--ops", help="JSON array of operations (or use --ops-file)"),
     ops_file: str = typer.Option(
         None, "--ops-file", help="Path to a JSON file with the operations array"
@@ -52,6 +55,7 @@ def batch(
         _emit_error(json_output, "InvalidInput", f"operations are not valid JSON: {exc}")
         return
 
+    file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
     try:
         op_results = apply_operations(coll, operations)

@@ -20,13 +20,13 @@ def _entry_records(text: str) -> list[tuple[str, str, dict[str, str]]]:
     return [(entry.key, entry.type, entry.fields) for entry in lib.entries.values()]
 
 
-def test_corpus_is_pinned_to_texlive_2025() -> None:
+def test_corpus_is_pinned_to_texlive_2026() -> None:
     assert MANIFEST["baseline"] == {
-        "texlive": "2025",
+        "texlive": "2026",
         "bibtex": "0.99d",
-        "biblatex": "3.20",
-        "biblatex_date": "2024-03-21",
-        "biber": "2.20",
+        "biblatex": "3.21",
+        "biblatex_date": "2025-05-01",
+        "biber": "2.21",
     }
 
 
@@ -73,7 +73,7 @@ def test_bibtex_core_fixture_exercises_standard_macros_and_concatenation() -> No
 
 
 def test_biblatex_core_fixture_preserves_extensible_data_model_input() -> None:
-    lib = parse_bib((CORPUS_ROOT / "biblatex-3.20-core.bib").read_text(encoding="utf-8"))
+    lib = parse_bib((CORPUS_ROOT / "biblatex-3.21-core.bib").read_text(encoding="utf-8"))
 
     # Arbitrary entry types (online, set) and custom data-model fields.
     assert lib.entries["UnicodeDataset"].type == "online"

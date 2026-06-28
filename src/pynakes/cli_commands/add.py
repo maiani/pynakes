@@ -13,6 +13,7 @@ import typer
 
 from pynakes import importer as importer_ops
 from pynakes.cli_common import (
+    _BACKUP_OPTION,
     _emit_conflict,
     _emit_error,
     _finish_mod,
@@ -44,6 +45,7 @@ def add(
         "--fetch",
         help="After importing, fetch configured Pinax materials for the new entry",
     ),
+    backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
@@ -152,6 +154,7 @@ def add(
         diff,
         json_output,
         human,
+        backup=backup,
         **details,
     )
 

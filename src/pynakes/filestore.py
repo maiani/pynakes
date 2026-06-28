@@ -407,6 +407,19 @@ class FileStore:
             raise
         return transaction
 
+    def _materials_paths_for(self, key: str) -> list[str]:
+        """Return relative paths that *would* be removed for *key* (no-op)."""
+        if not self.root.is_dir():
+            return []
+        paths = self.paths_for(key)
+        removed: list[str] = []
+        for path in [paths.published_pdf, paths.preprint_pdf]:
+            if path.exists():
+                removed.append(str(path.relative_to(self.root)))
+        if paths.preprint_source.is_dir():
+            removed.append(str(paths.preprint_source.relative_to(self.root)))
+        return removed
+
     def remove_materials(self, key: str) -> list[str]:
         """Remove all disk materials and manifest row for ``key``.
 

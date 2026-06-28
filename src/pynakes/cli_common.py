@@ -171,6 +171,76 @@ _BACKUP_OPTION = typer.Option(
 )
 
 
+def _citekey_completer(ctx, incomplete):
+    """Shell-completion callback yielding matching citation keys.
+
+    Intended for use as ``param.shell_complete`` on citekey arguments.
+    Auto-detects the ``.bib`` file from ``ctx.params`` or the current directory.
+
+    Click/ShellComplete calls this with ``(ctx, incomplete)`` — see
+    ``ShellComplete.get_completions``.
+    """
+    from click.shell_completion import CompletionItem
+
+    from pynakes.cli_discovery import _single_bib_file as _find_bib
+
+    file = ctx.params.get("file") or ctx.params.get("bib_file")
+    if file is None:
+        candidate = _find_bib(Path.cwd())
+        if candidate is None:
+            return []
+        file = str(candidate)
+    try:
+        from pynakes.bibtex_parser import parse_bib
+
+        lib = parse_bib(Path(file).read_text(encoding="utf-8"))
+        return [
+            CompletionItem(key)
+            for key in sorted(set(lib.entries.keys()))
+            if incomplete.lower() in key.lower()
+        ]
+    except Exception:
+        return []
+
+
+def _bibfile_completer(ctx, incomplete):
+    """Shell-completion callback for the ``.bib`` file positional argument.
+
+    When a single ``.bib`` file can be auto-detected, this returns citekeys
+    from that library (so the user can Tab complete citekeys without first
+    filling in the file argument).  Otherwise it falls back to suggesting
+    ``.bib`` filenames.
+    """
+    from click.shell_completion import CompletionItem
+
+    from pynakes.cli_discovery import _single_bib_file as _find_bib
+
+    candidate = _find_bib(Path.cwd())
+    if candidate is not None:
+        name = candidate.name
+        items: list[CompletionItem] = []
+        if incomplete.lower() in name.lower():
+            items.append(CompletionItem(name))
+        try:
+            from pynakes.bibtex_parser import parse_bib
+
+            lib = parse_bib(candidate.read_text(encoding="utf-8"))
+        except Exception:
+            return items
+        for key in sorted(set(lib.entries.keys())):
+            if incomplete.lower() in key.lower():
+                items.append(CompletionItem(key))
+        return items
+    try:
+        return [
+            CompletionItem(p.name)
+            for p in sorted(Path(".").iterdir(), key=lambda x: x.name.casefold())
+            if p.is_file() and p.suffix.lower() == ".bib" and incomplete.lower() in p.name.lower()
+        ]
+    except Exception:
+        return []
+
+
 def _finish_mod(
     file,
     action,

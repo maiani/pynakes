@@ -4,15 +4,17 @@ This module keeps command callbacks separate from application assembly while
 retaining the stable CLI contract.
 """
 
-import json as _json
 from pathlib import Path
 
 import typer
 
 from pynakes.cli_common import (
+    _BACKUP_OPTION,
+    _emit,
     _emit_error,
     _entries,
     _preview_or_commit,
+    _resolve_input_bib,
     _safe,
     _verb,
 )
@@ -31,7 +33,9 @@ from pynakes.usage import (
 
 
 def used(
-    bib_file: str = typer.Argument(..., help="Path to the .bib library"),
+    bib_file: str | None = typer.Argument(
+        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
+    ),
     sources: list[str] | None = typer.Argument(
         None,
         help="One or more .tex/.aux files or directories to scan "
@@ -44,11 +48,13 @@ def used(
     keyword: str | None = typer.Option(
         None, "--keyword", help="Tag used entries with this keyword"
     ),
+    backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would change without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff of changes"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Report which entries are used in LaTeX sources; optionally tag or export them."""
+    bib_file = _resolve_input_bib(bib_file, json_output)
     coll = Bibliography.open(bib_file)
     resolved_sources = (
         list(sources) if sources else tex_sources_from_metadata(coll.lib, Path(bib_file).parent)
@@ -78,7 +84,7 @@ def used(
     if tag_field:
         if not dry_run:
             coll.mark_dirty(tagged)
-        bib_diff, file_modified, tagged_entries = _preview_or_commit(coll, dry_run)
+        bib_diff, file_modified, tagged_entries = _preview_or_commit(coll, dry_run, backup=backup)
 
     out_written = False
     if out:
@@ -87,51 +93,43 @@ def used(
             save_bib(sub, out, backup=False)
             out_written = True
 
-    if json_output:
-        result = {
-            "status": "success",
-            "action": "used",
-            "file": bib_file,
-            "dry_run": dry_run,
-            "modified": file_modified,
-            "modified_entries": tagged_entries,
-            "warnings": [],
-            "report": report.to_dict(),
-            "tagged": {"field": tag_field, "value": group or keyword, "count": tagged}
-            if tag_field
-            else None,
-            "exported": {"path": out, "written": out_written, "count": len(report.used)}
-            if out
-            else None,
-        }
-        if diff and bib_diff:
-            result["diff"] = bib_diff
-        typer.echo(_json.dumps(result, indent=2))
-        return
-
-    # Human-readable output
-    typer.echo(f"Scanned {len(scanned)} source file(s); {report.cited_count} cited key(s).")
+    result = {
+        "status": "success",
+        "action": "used",
+        "file": bib_file,
+        "dry_run": dry_run,
+        "modified": file_modified,
+        "modified_entries": tagged_entries,
+        "warnings": [],
+        "report": report.to_dict(),
+        "tagged": {"field": tag_field, "value": group or keyword, "count": tagged}
+        if tag_field
+        else None,
+        "exported": {"path": out, "written": out_written, "count": len(report.used)}
+        if out
+        else None,
+    }
+    human = [
+        f"Scanned {len(scanned)} source file(s); {report.cited_count} cited key(s).",
+    ]
     if report.include_all:
-        typer.echo(r"\nocite{*} found — all entries counted as used.")
-    typer.echo(f"Used:    {len(report.used)}")
-    typer.echo(f"Unused:  {len(report.unused)}")
-    typer.echo(f"Missing: {len(report.missing)}")
+        human.append(r"\nocite{*} found — all entries counted as used.")
+    human.append(f"Used:    {len(report.used)}")
+    human.append(f"Unused:  {len(report.unused)}")
+    human.append(f"Missing: {len(report.missing)}")
     if report.missing:
         for key in report.missing:
-            typer.echo(f"  - {key}  (cited but not in library)")
-
+            human.append(f"  - {key}  (cited but not in library)")
     if tag_field:
-        typer.echo(
+        human.append(
             f"{_verb('tag', dry_run, 'Tagged')} {tagged} {_entries(tagged)}"
             f' with {tag_field} = "{group or keyword}".'
         )
     if out:
-        typer.echo(
+        human.append(
             f"{_verb('write', dry_run, 'Wrote')} {len(report.used)} {_entries(len(report.used))} to {out}."
         )
-    if diff and bib_diff:
-        typer.echo("")
-        typer.echo(bib_diff)
+    _emit(json_output, result, human, bib_diff, diff)
 
 
 def register(app: typer.Typer) -> None:

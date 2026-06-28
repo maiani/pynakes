@@ -5,6 +5,7 @@ in pynakes.cli_commands, grouped by command family.
 """
 
 import typer
+import typer.main
 
 from pynakes import __version__
 from pynakes.cli_commands import (
@@ -29,6 +30,8 @@ from pynakes.cli_commands import (
     setops,
     used,
 )
+from pynakes.cli_common import _bibfile_completer
+from pynakes.cli_common import _citekey_completer as _complete_fn
 from pynakes.cli_discovery import AutoBibGroup
 
 app = typer.Typer(help="Agent-friendly BibTeX library management tool", cls=AutoBibGroup)
@@ -90,6 +93,46 @@ app.add_typer(fields_app, name="fields")
 app.add_typer(files_app, name="files")
 app.add_typer(dedupe_app, name="dedupe")
 app.add_typer(metadata_app, name="metadata")
+
+# --- Shell completion wiring ------------------------------------------------
+# Typer does not forward ``shell_complete`` from arguments. Since
+# ``typer.main.get_command()`` builds a fresh Click tree on every call, we
+# monkey-patch it so our completion wiring is always applied.
+
+# Maps (command_path, parameter_name) → shell_complete callback.
+_CITEKEY_ARGS: dict[tuple[str, ...], str] = {
+    ("remove",): "citekeys",
+    ("fetch",): "target",
+    ("keys", "rename"): "old",
+    ("groups", "add-entry"): "key",
+    ("groups", "remove-entry"): "key",
+}
+
+
+def _wire_completion(command, path=()) -> None:
+    for name, sub in command.commands.items():
+        full = (*path, name)
+        if not hasattr(sub, "commands"):
+            target = _CITEKEY_ARGS.get(full)
+            for param in sub.params:
+                if param.name == target:
+                    param.shell_complete = _complete_fn
+                if param.name in ("file", "bib_file"):
+                    param.shell_complete = _bibfile_completer
+        else:
+            _wire_completion(sub, full)
+
+
+_get_command_orig = typer.main.get_command
+
+
+def _get_command_patched(typer_instance):
+    cmd = _get_command_orig(typer_instance)
+    _wire_completion(cmd)
+    return cmd
+
+
+typer.main.get_command = _get_command_patched
 
 
 if __name__ == "__main__":

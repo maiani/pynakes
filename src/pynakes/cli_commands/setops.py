@@ -9,14 +9,13 @@ result envelope rather than the single-file ``_finish_mod`` one.
 distinct operation living under ``dedupe merge``.)
 """
 
-import json as _json
 import os
 from pathlib import Path
 
 import typer
 
 from pynakes.bibtex_writer import write_bib
-from pynakes.cli_common import _BACKUP_OPTION, _emit_conflict, _entries, _safe, _verb
+from pynakes.cli_common import _BACKUP_OPTION, _emit, _emit_conflict, _entries, _safe, _verb
 from pynakes.diff import generate_diff
 from pynakes.filestore import FILES_DIR_KEY, FileStore
 from pynakes.io import load_bib, save_bib
@@ -179,33 +178,25 @@ def combine(
     if merged.duplicate_keys:
         warnings.append({"type": "duplicate_keys", "keys": merged.duplicate_keys})
 
-    if json_output:
-        payload = {
-            "status": "success",
-            "action": "combine",
-            "inputs": merged.inputs,
-            "out": out,
-            "dedupe": dedupe,
-            "dry_run": dry_run,
-            "written": written,
-            "entries": entries,
-            "warnings": warnings,
-            "pinax_materials": pinax_materials,
-        }
-        if diff and diff_text:
-            payload["diff"] = diff_text
-        typer.echo(_json.dumps(payload, indent=2))
-        return
-
-    typer.echo(f"Combined {len(merged.inputs)} file(s) → {entries} {_entries(entries)}.")
+    payload = {
+        "status": "success",
+        "action": "combine",
+        "inputs": merged.inputs,
+        "out": out,
+        "dedupe": dedupe,
+        "dry_run": dry_run,
+        "written": written,
+        "entries": entries,
+        "warnings": warnings,
+        "pinax_materials": pinax_materials,
+    }
+    human = [f"Combined {len(merged.inputs)} file(s) → {entries} {_entries(entries)}."]
     if pinax_sources:
-        typer.echo(f"  pinax materials copied: {len(pinax_materials)}")
+        human.append(f"  pinax materials copied: {len(pinax_materials)}")
     if merged.duplicate_keys:
-        typer.echo(f"  duplicate key(s): {', '.join(merged.duplicate_keys)}")
-    typer.echo(f"{_verb('write', dry_run, 'Wrote')} {out}.")
-    if diff and diff_text:
-        typer.echo("")
-        typer.echo(diff_text)
+        human.append(f"  duplicate key(s): {', '.join(merged.duplicate_keys)}")
+    human.append(f"{_verb('write', dry_run, 'Wrote')} {out}.")
+    _emit(json_output, payload, human, diff_text, diff)
 
 
 # --- split -----------------------------------------------------------------
@@ -316,35 +307,27 @@ def split(
 
     diff_text = "\n".join(chunk for chunk in diff_chunks if chunk)
 
-    if json_output:
-        payload = {
-            "status": "success",
-            "action": "split",
-            "inputs": merged.inputs,
-            "dry_run": dry_run,
-            "copy": copy,
-            "outputs": outputs,
-            "unrouted": result.unrouted,
-            "warnings": warnings,
-        }
-        if diff and diff_text:
-            payload["diff"] = diff_text
-        typer.echo(_json.dumps(payload, indent=2))
-        return
-
-    typer.echo(f"Split {len(merged.inputs)} input(s) into {len(rules)} output(s):")
+    payload = {
+        "status": "success",
+        "action": "split",
+        "inputs": merged.inputs,
+        "dry_run": dry_run,
+        "copy": copy,
+        "outputs": outputs,
+        "unrouted": result.unrouted,
+        "warnings": warnings,
+    }
+    human = [f"Split {len(merged.inputs)} input(s) into {len(rules)} output(s):"]
     for entry in outputs:
         count = entry["entries"]
-        typer.echo(
+        human.append(
             f"  {_verb('write', dry_run, 'Wrote')} {count} {_entries(count)} → {entry['file']}  [{entry['predicate']}]"
         )
     if result.unrouted:
-        typer.echo(f"  {result.unrouted} {_entries(result.unrouted)} matched no output.")
+        human.append(f"  {result.unrouted} {_entries(result.unrouted)} matched no output.")
     if merged.duplicate_keys:
-        typer.echo(f"  duplicate key(s): {', '.join(merged.duplicate_keys)}")
-    if diff and diff_text:
-        typer.echo("")
-        typer.echo(diff_text)
+        human.append(f"  duplicate key(s): {', '.join(merged.duplicate_keys)}")
+    _emit(json_output, payload, human, diff_text, diff)
 
 
 def register(app: typer.Typer) -> None:

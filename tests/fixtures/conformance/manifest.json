@@ -1,15 +1,15 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "baseline": {
-    "texlive": "2025",
+    "texlive": "2026",
     "bibtex": "0.99d",
-    "biblatex": "3.20",
-    "biblatex_date": "2024-03-21",
-    "biber": "2.20"
+    "biblatex": "3.21",
+    "biblatex_date": "2025-05-01",
+    "biber": "2.21"
   },
   "sources": {
     "bibtex": "https://ctan.org/tex-archive/biblio/bibtex/base",
-    "biblatex": "https://github.com/plk/biblatex/tree/v3.20"
+    "biblatex": "https://github.com/plk/biblatex/tree/v3.21"
   },
   "fixtures": [
     {
@@ -18,7 +18,7 @@
       "coverage": ["comment", "string", "preamble", "braces", "parentheses", "concat", "comments"]
     },
     {
-      "path": "biblatex-3.20-core.bib",
+      "path": "biblatex-3.21-core.bib",
       "kind": "biblatex",
       "coverage": ["unicode", "online", "set", "xdata", "custom-fields", "inheritance-references"]
     },
@@ -39,9 +39,9 @@
       "coverage": ["official-example-corpus", "standard-entry-types", "crossref", "strings", "preamble"]
     },
     {
-      "path": "upstream/biblatex-3.20-examples.bib",
+      "path": "upstream/biblatex-3.21-examples.bib",
       "kind": "biblatex",
-      "source": "https://sourceforge.net/projects/biblatex/files/biblatex-3.20/biblatex-3.20.tgz/download",
+      "source": "https://github.com/plk/biblatex/archive/refs/tags/v3.21.tar.gz",
       "sha256": "54d27fe2ca94786128c9b2e742c87c6bbab11fa1f1469b7a9646878aa9a6273f",
       "coverage": ["official-example-corpus", "default-data-model", "unicode", "sets", "xdata", "xref", "related"]
     }

@@ -5,7 +5,7 @@ and valuable on its own. Any application built on top of it (capture, reading,
 a UI, sync) is a **separate, downstream project** and is explicitly not in this
 plan.
 
-This document is the **road to 1.0** and the cross-file corpus bridge beyond it.
+This document is the **road to 1.0** and the major releases beyond it.
 Completed work is recorded in [CHANGELOG.md](CHANGELOG.md) and the git log.
 
 ## Current state (v0.4.0)
@@ -27,9 +27,10 @@ baseline (BibTeX 0.99d, BibLaTeX 3.20, Biber 2.20).
   (DOI/arXiv/journal-URL), `search`, `used`, `dedupe`, `verify`/`enrich`
   (opt-in `--online`; `--published` folds in preprint promotion), `combine`,
   `split`, `batch`.
-- **Pinax corpus mode (steps 1-8)**: `FileStore`, arXiv download, `fetch` command,
+- **Pinax corpus mode (steps 1–8)**: `FileStore`, arXiv download, `fetch` command,
   agent surface, provenance manifest, pinax-aware `combine`/`split`, coordinated
-  key edits, `add --fetch`. See [Pinax implementation steps](#pinax-implementation-steps).
+  key edits, `add --fetch`. Steps 9–10 (OA PDFs, dedupe material merge) ship in
+  v0.5. See [Pinax implementation steps](#pinax-implementation-steps).
 - **JabRef v5.15 parity**: full `saveActions` formatter suite, complete metadata
   vocabulary, JabRef key patterns, group management.
 - **Agent-native surface**: stable JSON envelope + exit codes (0/1/2),
@@ -47,69 +48,134 @@ baseline (BibTeX 0.99d, BibLaTeX 3.20, Biber 2.20).
   ``_metadata_list`` / ``_metadata_bool`` moved from ``lint.py`` / ``normalize.py`` into
   ``metadata.py``; many ``ISSUES.md`` bugs, type-safety issues, and invariant violations addressed.
 
-## v0.5 — Pinax completion + agent polish + cross-discipline import
+---
 
-Complete the Pinax corpus layer, polish the agent surface, and broaden the
-import pipeline beyond physics. The interchange formats and scope decision from
-the 0.4→0.5 window are already resolved; this release finishes the remaining
-Pinax steps, pulls the citekey shell-completion forward from the original 0.9
-plan, and adds identifier support for biomedicine (PubMed), social sciences
-(SSRN, NBER), and books (ISBN).
+## Road to 1.0
 
-### v0.5 checklist
+### v0.5 — Pinax completion
 
-- [ ] **Open-access published PDFs (Pinax step 9).** DOI → open-access resolver
-      landing the published version at `<citekey>.pdf`, when a resolvable
-      open-access copy exists. Follows the same injectable-fetcher, atomic-write,
-      metadata-gated pattern as arXiv downloads. See
-      [docs/guides/pinax.md](docs/guides/pinax.md).
-- [ ] **Citekey shell completion.** Register Click shell-completion callbacks on
-      every argument that accepts a citation key (`add`, `keys rename`, `fetch`,
-      etc.). The callback auto-detects the `.bib` (same logic as
-      `_resolve_input_bib`), parses it, and yields matching keys. Usable via
+All ten Pinax implementation steps, plus the remaining v0.4-to-v0.5 agent polish
+items. The pinned conformance baseline moves from TeX Live 2025 → TeX Live 2026.
+
+**Pinax steps**
+- [ ] **9. Open-access published PDFs.** DOI → open-access resolver landing the
+      published version at `<citekey>.pdf`, when a resolvable open-access copy
+      exists. Follows the same injectable-fetcher, atomic-write, metadata-gated
+      pattern as arXiv downloads.
+- [ ] **10. Dedupe material merge.** `dedupe` merge reconciles Pinax materials
+      onto the surviving key.
+
+**Agent polish**
+- [x] **Citekey shell completion.** Register Click shell-completion callbacks on
+      `remove`, `fetch`, `keys rename`, `groups add-entry`, `groups remove-entry`.
+      The `.bib`-file completer also shows citekeys alongside the filename when a
+      single `.bib` is auto-detectable. Usable via
       `eval "$(pynakes --show-completion bash)"` / `zsh` / `fish`.
-- [ ] **Dedupe material merge (Pinax step 10).** `dedupe` merge reconciles Pinax
-      materials onto the surviving key — the last remaining Pinax gap after
-      step 9.
-- [ ] **`remove` command.** `pynakes remove <bib> <citekey>... [--keep-files]
+- [x] **`remove` command.** `pynakes remove <bib> <citekey>... [--keep-files]
       [--dry-run] [--diff] [--json] [--backup]`. Removes entries by citation key
       through the standard lifecycle. In a pinax, removes the entry's materials
-      from `files-dir` by default (filesystem first, then commit; `--keep-files`
-      opts out). The `--keep-files` flag handles the case where materials should
-      survive (e.g. shared materials, or the user wants to re-add under a
-      different key).
-- [ ] **`--backup` flag on all write commands.** Add the `_BACKUP_OPTION` Typer
-      parameter to `add`, `dedupe_merge`, `fetch`, `fields`, `groups`, `keys`,
-      `metadata/set`, `used`, `integrity/enrich` so every command that modifies a
-      `.bib` can back up the pre-edit file (see ISSUES.md inconsistency).
-- [ ] **Output emission consolidation.** Unify the three current output strategies
-      (`_finish_mod`, `_emit`, manual dict construction) behind a shared helper so
-      file-creation commands (setops, used) and mutation commands emit the same
-      JSON envelope without contract drift (see ISSUES.md consolidation
-      opportunity).
+      from `files-dir` by default (`--keep-files` opts out). Dry-run correctly
+      skips all filesystem side effects.
+- [x] **`--backup` flag on all write commands.** Added to `add`, `dedupe_merge`,
+      `fetch`, `fields`, `groups`, `keys`, `metadata/set`, `used`,
+      `integrity/enrich`. Also fixed `remove` which declared the param but didn't
+      wire it through.
+- [x] **Output emission consolidation.** Migrated `used`, `combine`, and `split`
+      from manual `typer.echo(_json.dumps(...))` to the canonical `_emit()` helper.
+- [x] **Optional `file` argument on all single-file commands.** Every command that
+      takes a `.bib` file argument now auto-detects a single `.bib` in the current
+      directory when omitted.
 
-- [ ] **Multi-discipline identifier support.** Broaden `add` beyond DOI and arXiv
-      with dedicated import paths for:
-  - **PubMed PMID / PMCID** — via NCBI E-utilities (`eutils.ncbi.nlm.nih.gov`).
-        Covers biomedicine and life sciences (~35M citations).
-  - **ISBN** — for books, via Open Library or Google Books API. Covers humanities
-        and social sciences where books dominate.
-  - **SSRN ID** — Social Science Research Network papers; the existing
-        `_preprint_identity` already recognizes `ssrn.com` URLs but there is no
-        import path.
-  - **NBER ID** — National Bureau of Economic Research working papers
-        (economics).
-  - **Generalize journal URL resolver table** — the current
-        `_JOURNAL_URL_RESOLVERS` dict has only two entries (nature.com and
-        journals.aps.org). Add common publisher patterns (Elsevier, Springer,
-        Wiley, PLOS, PubMed Central URLs).
-  - Many preprint servers (bioRxiv, medRxiv, ChemRxiv, PsyArXiv, etc.) use
-        dedicated DOI prefixes and already work through the DOI path — document
-        this and add test fixtures.
+**Conformance baseline**
+- [ ] **Bump pinned TeX Live baseline to 2026.** Update the versioned conformance
+      corpus, differential test expectations, and CI configuration to match
+      TeX Live 2026 (BibTeX 0.99d, BibLaTeX 3.21, Biber 2.21).
 
-**Done when**: all checklist items are implemented, tested, and documented;
+**Done when**: all checklist items implemented, tested, and documented;
 `pytest && ruff check src tests` passes; CHANGELOG updated; version bumped to
 0.5.0.
+
+---
+
+### v0.6 — Cross-discipline import
+
+Broaden `add` beyond DOI and arXiv with dedicated import paths for:
+
+- **PubMed PMID / PMCID** — via NCBI E-utilities (`eutils.ncbi.nlm.nih.gov`).
+  Covers biomedicine and life sciences (~35M citations).
+- **ISBN** — for books, via Open Library or Google Books API. Covers humanities
+  and social sciences where books dominate.
+- **SSRN ID** — Social Science Research Network papers; the existing
+  `_preprint_identity` already recognizes `ssrn.com` URLs but there is no
+  import path.
+- **NBER ID** — National Bureau of Economic Research working papers (economics).
+- **Generalize journal URL resolver table** — the current
+  `_JOURNAL_URL_RESOLVERS` dict has only two entries (nature.com and
+  journals.aps.org). Add common publisher patterns (Elsevier, Springer, Wiley,
+  PLOS, PubMed Central URLs).
+- Many preprint servers (bioRxiv, medRxiv, ChemRxiv, PsyArXiv, etc.) use
+  dedicated DOI prefixes and already work through the DOI path — document this
+  and add test fixtures.
+
+**Done when**: all import paths implemented, tested, and documented; `pytest &&
+ruff` green; CHANGELOG updated; version bumped to 0.6.0.
+
+---
+
+### v0.7 — Shared identity
+
+Promote the DOI / arXiv / OpenAlex / ORCID / title machinery (today spread
+across `dedupe`, `verify`, and `add`) into one explicit, tested primitive. It
+is the foundation everything else stands on: `Library` dedup, the `Catalogue`,
+and projection reconciliation all key off a single notion of "the same work".
+
+**Done when**: identity primitive shipped with tests and docs; consumers in
+`dedupe`, `verify`, and `add` refactored to use it; `pytest && ruff` green;
+CHANGELOG updated; version bumped to 0.7.0.
+
+---
+
+### v0.8 — MCP server + Library + Catalogue
+
+- **MCP server.** A thin [Model Context Protocol](https://modelcontextprotocol.io)
+  companion on the pinned pynakes API, allowing agents to interrogate a personal
+  corpus. Manuscript-time edits still use the pynakes CLI directly; the MCP
+  server is a query-only layer over the `Library`/`Catalogue`.
+- **`Library` (corpus).** `Library.open(dir)`; `collections()`,
+  `collection(path)`; cross-file `search`/`find_key`/dedup, reusing the identity
+  primitive from v0.7. A Library holds many pinakes.
+- **`Catalogue` (index).** A derived, rebuildable search index (e.g. SQLite FTS)
+  over the Library; strictly derived, never a competing source of truth.
+
+**Done when**: MCP server published as a companion package (or optional extra),
+`Library` and `Catalogue` shipped with tests and docs; `pytest && ruff` green;
+CHANGELOG updated; version bumped to 0.8.0.
+
+---
+
+### v0.9 — Testing release
+
+- **First stable pre-release**: bump to **0.9.0**, sync `capabilities.VERSION`,
+  `twine upload`, tag `v0.9.0`, point the pre-commit hook `rev:` in docs at it.
+  Gather feedback before committing to the 1.0 API.
+- A 30-second demo (asciinema/GIF): "messy `.bib` → clean `.bib` with a
+  reviewable diff", and an agent cleaning a bibliography via pynakes.
+- Lead the README/launch with the agent-tool + reviewable-diff story.
+- Zenodo DOI and JOSS submission deferred to after traction.
+
+**Done when**: 0.9.0 is on PyPI with a demo and the launch posts are out.
+
+---
+
+### v1.0 — Launch
+
+- Stable API, semver promise.
+- All eight guiding principles intact; coverage ≥90%; `ruff` clean.
+- Launch posts, Zenodo DOI, JOSS submission after adoption.
+
+**Done when**: 1.0.0 is on PyPI.
+
+---
 
 ## Guiding principles (non-negotiable)
 
@@ -135,62 +201,33 @@ unit of work is one `Bibliography` (one `.bib`). 1.0 means: it does single-file
 maintenance excellently, covers the JabRef bib-file feature set, promises API
 stability (semver), and is installable.
 
-**Explicitly *not* in 1.0** (deferred to [Beyond 1.0](#beyond-10)): the
-multi-file `Library`/`Catalogue` corpus engine, projections as `Library` views,
-and first-class shared identity. Pinax was built in v0.5 because it is an
-optional mode of one `Bibliography`; it does not change plain `.bib` behavior.
+**Explicitly *not* in 1.0** (deferred to [v2.0](#v20--beyond-10)): the
+multi-file `Library`/`Catalogue` corpus engine, the MCP server, projections as
+`Library` views, and first-class shared identity. Pinax was built in v0.5
+because it is an optional mode of one `Bibliography`; it does not change plain
+`.bib` behavior.
 
 ---
 
-## Road to 1.0
+## v2.0 — Beyond 1.0
 
-### Milestone E — 0.9 testing release → 1.0.0 launch
+These stay **in pynakes** — pure bib-file mechanisms, no application scope —
+but together they are the cross-file corpus layer a downstream application
+builds directly on.
 
-- [ ] **First stable release**: bump to **0.9.0** (a pre-1.0 testing release —
-      sync `capabilities.VERSION`), `twine upload`, tag `v0.9.0`, and point the
-      pre-commit hook `rev:` in docs at it. Gather feedback before committing to
-      the 1.0 API.
-- [ ] A 30-second demo (asciinema/GIF): "messy `.bib` → clean `.bib` with a
-      reviewable diff", and an agent cleaning a bibliography via pynakes.
-- [ ] Lead the README/launch with the agent-tool + reviewable-diff story.
-- [ ] Deferred to after traction: Zenodo DOI, then JOSS (JOSS requires
-      demonstrated use, so it follows adoption).
-
-**Done when**: 1.0.0 is on PyPI with a demo and the launch posts are out.
-
-### Quality gate (cross-cutting, every PR)
-
-- [ ] `pytest && ruff check src tests && ruff format --check src tests` green.
-- [ ] Coverage stays ≥90%; new behavior has tests and a `CHANGELOG.md` entry.
-- [ ] All eight guiding principles intact; `capabilities`, README, and this plan
-      stay honest (no stub described as shipped).
-
----
-
-## Beyond 1.0
-
-These stay **in pynakes** — pure bib-file mechanisms, no application scope — but
-together they are the cross-file corpus layer a downstream application builds
-directly on. Out of 1.0, in dependency order:
-
-- **First-class shared identity** — promote the DOI / arXiv / OpenAlex / ORCID /
-  title machinery (today spread across `dedupe`, `verify`, and `add`) into one
-  explicit, tested primitive. It is the foundation the rest of this list stands
-  on: `Library` dedup, the `Catalogue`, and projection reconciliation all key off
-  a single notion of "the same work".
-- **`Pinax` implementation complete** (v0.5). All ten Pinax implementation steps
-  are done by v0.5; the deferred content-intelligence layers (full-text
-  extraction, content search, RAG/embeddings) remain beyond 1.0 as specified in
-  [docs/guides/pinax.md](docs/guides/pinax.md).
-- **`Library` (corpus)** — `Library.open(dir)`; `collections()`,
-  `collection(path)`; cross-file `search`/`find_key`/dedup, reusing the identity
-  primitive above. A Library holds many pinakes.
-- **`Catalogue` (index)** — a derived, rebuildable search index (e.g. SQLite
-  FTS) over the Library; strictly derived, never a competing source of truth.
 - **Projections** — `combine` and `split` formalized as first-class **views of
-  the `Library`**, with reconciliation, once the `Library` exists.
+  the `Library`**, with reconciliation.
 - **Additional interchange formats** — any import/export formats beyond the
   existing CSL-JSON/RIS/MODS/EndNote quartet, building on `pynakes.interchange`.
+- **Content-intelligence layers** — full-text extraction, content search,
+  RAG/embeddings, and rich agent notes/memory, as an opt-in extra never on the
+  deterministic write path.
+- **Thin `pynakes` Bimas GUI** — a lightweight desktop GUI built on the pinned
+  API, reading/writing `.bib` files through the library, not the CLI.
+
+**Done when**: 2.0.0 is on PyPI with all of the above shipped and documented.
+
+---
 
 ## Pinax implementation steps
 
@@ -233,15 +270,16 @@ reviewed, then the next.
 - [x] **8. `add --fetch` for arXiv Pinax materials.** One-step
       import-and-download for arXiv references, using the existing Pinax fetch
       policy for preprint PDF/source materials.
-- [ ] **9. Open-access published PDFs.** (v0.5) DOI → open-access resolver landing
-      the published version at `<citekey>.pdf`, when a resolvable open-access copy
-      exists.
+- [ ] **9. Open-access published PDFs.** (v0.5) DOI → open-access resolver
+      landing the published version at `<citekey>.pdf`, when a resolvable
+      open-access copy exists.
 - [ ] **10. Dedupe material merge.** (v0.5) `dedupe` merge reconciles Pinax
       materials onto the surviving key.
 
 ## Out of scope (for the deterministic core)
 
-A database of record, a cloud service, arbitrary shell execution, a GUI, a
+A database of record, a cloud service, arbitrary shell execution, a GUI (the
+Bimas GUI ships in v2.0 as a separate application, not in the core), a
 reading/annotation experience, and browser/web capture pipelines. Likewise the
 derived-intelligence layers over material **contents** — full-text extraction,
 content search, RAG/embeddings, and rich agent notes/memory — stay *above or
@@ -253,18 +291,24 @@ citation-key convention — the **Pinax** layer — is in scope; *organizing,
 reading, and indexing their contents* is not. See
 [docs/guides/pinax.md](docs/guides/pinax.md).
 
-**MCP server — downstream.** An MCP fits an agent interrogating a personal
-corpus — queries over the `Library`/`Catalogue`. Manuscript-time edits use the
-pynakes CLI directly. The MCP belongs in a thin companion on the pinned API, not
-in the lean, deterministic core.
+The MCP server is part of v0.8: a thin companion on the pinned API, not in the
+core.
 
 ## Risks & mitigations
 
 - **`saveActions` format drift** → JabRef is reworking the format toward embedded
   JSON. Parse tolerantly (regex over `field[formatter]`), keep the pinned JabRef
   v5.15 baseline, and audit v6 only once a stable v6 release ships.
-- **Scope creep** → Library/Catalogue and interop stay Beyond 1.0 unless
-  consciously pulled forward; no application concerns enter pynakes.
+- **Scope creep** → no application concerns enter the pynakes core. GUIs,
+  content-intelligence, and MCP servers ship as optional companions or separate
+  releases (v0.8, v2.0).
+
+## Quality gate (cross-cutting, every PR)
+
+- [ ] `pytest && ruff check src tests && ruff format --check src tests` green.
+- [ ] Coverage stays ≥90%; new behavior has tests and a `CHANGELOG.md` entry.
+- [ ] All eight guiding principles intact; `capabilities`, README, and this plan
+      stay honest (no stub described as shipped).
 
 ## Definition of done — 1.0
 

@@ -22,6 +22,7 @@ Not yet published to PyPI. Install from source:
 git clone https://github.com/maiani/pynakes.git
 cd pynakes
 pip install -e ".[dev]"
+pynakes --install-completion
 ```
 
 See [Installation](docs/guides/installation.md) for full setup instructions including shell completion.
@@ -40,11 +41,17 @@ pynakes normalize refs.bib --dry-run --diff
 pynakes add 10.5555/example refs.bib --dry-run --diff
 pynakes add arXiv:2301.00001 refs.bib
 
+# Remove entries by citation key (with pinax material cleanup)
+pynakes remove refs.bib DeprecatedKey2020 --dry-run --diff
+
 # Rename a citation key across the .bib file and .tex sources
 pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/
 
 # Gate a build: fail if any .bib has errors
 pynakes lint refs.bib chapters/*.bib --strict
+
+# Shell completion for cite keys (bash/zsh/fish)
+eval "$(pynakes --show-completion bash)"
 ```
 
 When the current directory contains exactly one `.bib` file, its path may be
@@ -77,15 +84,16 @@ See the [LLM Integration guide](docs/guides/llm-integration.md) for the full JSO
 ## Status
 
 pynakes provides the full single-file maintenance workflow — deduplication/merge,
-integrity/enrichment, the JabRef metadata superset with `saveActions` parity, and
-pre-commit/CI gating — from the CLI. Parser conformance to the pinned BibTeX and
-BibLaTeX input grammars is a hard requirement before the 0.4 release; progress and
-the remaining compatibility corpus are tracked in [DEVPLAN.md](DEVPLAN.md).
+integrity/enrichment, the JabRef metadata superset with `saveActions` parity,
+pre-commit/CI gating, citekey shell completion, and the `remove` command — from
+the CLI. Parser conformance to the pinned BibTeX and BibLaTeX input grammars is
+a hard requirement before the 0.4 release; progress and the remaining
+compatibility corpus are tracked in [DEVPLAN.md](DEVPLAN.md).
 
-**In progress — optional corpus layer (Pinax).** The single-file `.bib`
-maintenance engine remains the base product. Pinax is an opt-in mode for a `.bib`
-plus the materials it points to (arXiv PDFs and source), addressed by citation
-key and fetched on demand, so humans and agents can read the papers without
+**Optional corpus layer (Pinax).** The single-file `.bib` maintenance engine
+remains the base product. Pinax is an opt-in mode for a `.bib` plus the
+materials it points to (arXiv PDFs and source), addressed by citation key and
+fetched on demand, so humans and agents can read the papers without
 re-downloading them. Plain `.bib` users do not opt into this unless they set a
 `files-dir`. The design and the step-by-step build plan are in
 [docs/guides/pinax.md](docs/guides/pinax.md).

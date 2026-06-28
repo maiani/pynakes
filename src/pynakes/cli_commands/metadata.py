@@ -10,9 +10,11 @@ import typer
 
 from pynakes import metadata as metadata_ops
 from pynakes.cli_common import (
+    _BACKUP_OPTION,
     _emit_conflict,
     _emit_error,
     _finish_mod,
+    _resolve_input_bib,
     _safe,
     _verb,
 )
@@ -22,10 +24,13 @@ from pynakes.engine import Bibliography
 
 
 def metadata_list(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
+    file: str | None = typer.Argument(
+        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """List top-level metadata blocks (both jabref-meta and pynakes-meta)."""
+    file = _resolve_input_bib(file, json_output)
     lib = Bibliography.open(file).lib
     all_blocks = lib.metadata_blocks
 
@@ -63,7 +68,9 @@ def metadata_list(
 
 
 def metadata_set(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
+    file: str | None = typer.Argument(
+        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
+    ),
     key: str = typer.Argument(..., help="Metadata key"),
     value: str = typer.Argument(..., help="Metadata value"),
     namespace: str | None = typer.Option(
@@ -75,11 +82,13 @@ def metadata_set(
     allow_unknown: bool = typer.Option(
         False, "--allow-unknown", help="Allow writing an unrecognized key into jabref-meta"
     ),
+    backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Set one top-level metadata block (jabref-meta or pynakes-meta)."""
+    file = _resolve_input_bib(file, json_output)
     if namespace is not None and namespace not in {"jabref", "pynakes"}:
         _emit_error(
             json_output,
@@ -112,6 +121,7 @@ def metadata_set(
         diff,
         json_output,
         [f"{_verb('set', dry_run, 'Set')} {update.namespace}-meta {update.key!r}."],
+        backup=backup,
         modified_entries=0,
         key=update.key,
         value=update.value.rstrip(";").strip(),

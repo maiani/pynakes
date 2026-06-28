@@ -5,7 +5,7 @@ Downloads arXiv materials (PDF and source) for entries into the Pinax files-dir.
 
 import typer
 
-from pynakes.cli_common import _emit_error, _finish_mod, _resolve_input_bib, _safe
+from pynakes.cli_common import _BACKUP_OPTION, _emit_error, _finish_mod, _resolve_input_bib, _safe
 from pynakes.engine import Bibliography
 
 
@@ -16,6 +16,7 @@ def fetch(
     file: str | None = typer.Argument(
         None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
     ),
+    backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show what would be fetched without downloading"
     ),
@@ -54,6 +55,7 @@ def fetch(
         diff,
         json_output,
         warnings,
+        backup=backup,
         fetch_preprint=report["fetch_preprint"],
         fetch_source=report["fetch_source"],
         fetch_published=report["fetch_published"],

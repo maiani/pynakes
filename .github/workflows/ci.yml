@@ -38,9 +38,9 @@ jobs:
         run: pytest
 
   texlive-conformance:
-    name: TeX Live 2025 conformance
+    name: TeX Live 2026 conformance
     runs-on: ubuntu-latest
-    container: ghcr.io/xu-cheng/texlive-full:2025
+    container: ghcr.io/xu-cheng/texlive-full:2026
 
     steps:
       - name: Check out repository
@@ -50,8 +50,8 @@ jobs:
         shell: bash
         run: |
           test "$(bibtex --version | awk 'NR == 1 { print $2 }')" = "0.99d"
-          test "$(biber --version | awk 'NR == 1 { print $3 }')" = "2.20"
-          grep -F '\\def\abx@version{3.20}' "$(kpsewhich biblatex.sty)"
+          test "$(biber --version | awk 'NR == 1 { print $3 }')" = "2.21"
+          grep -F '\\def\abx@version{3.21}' "$(kpsewhich biblatex.sty)"
 
       - name: Validate BibTeX 0.99d corpus
         shell: bash
@@ -65,10 +65,10 @@ jobs:
           bibtex refs
           bibtex core
 
-      - name: Validate BibLaTeX 3.20 corpus with Biber
+      - name: Validate BibLaTeX 3.21 corpus with Biber
         shell: bash
         run: |
           mkdir -p /tmp/pynakes-biber
-          cp tests/fixtures/conformance/upstream/biblatex-3.20-examples.bib /tmp/pynakes-biber/refs.bib
+          cp tests/fixtures/conformance/upstream/biblatex-3.21-examples.bib /tmp/pynakes-biber/refs.bib
           cd /tmp/pynakes-biber
           biber --tool --validate-datamodel refs.bib

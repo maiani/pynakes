@@ -72,7 +72,16 @@ def _should_insert_bib(command: click.Command, tokens: list[str]) -> bool:
     # ``used`` and ``keys rename`` accept optional source paths after the
     # library. If their leading token is not an explicit file, it belongs to
     # that optional source list rather than the omitted library argument.
-    return any(param.nargs == -1 for param in arguments[1:])
+    if any(param.nargs == -1 for param in arguments[1:]):
+        return True
+
+    # When the leading bib argument is optional and the first token does not
+    # look like a bib file, auto-insert the discovered library so that commands
+    # like ``fields append keywords ml`` work without an explicit file.
+    if not arguments[0].required:
+        return True
+
+    return False
 
 
 class AutoBibGroup(TyperGroup):

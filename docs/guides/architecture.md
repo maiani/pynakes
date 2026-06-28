@@ -197,7 +197,7 @@ strings, unknown entry fields survive, and malformed structural input raises
 
 ### Parser conformance baseline
 
-The 0.4 parser-conformance target is **TeX Live 2025**: BibTeX **0.99d**,
+The 0.4 parser-conformance target was **TeX Live 2025** (BibTeX **0.99d**,
 BibLaTeX **3.20** (2024-03-21), and Biber **2.20** as the BibLaTeX
 input-validation oracle. The versioned corpus and CI validation remain a
 release gate; until they are complete, pynakes must not claim full standards

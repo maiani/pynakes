@@ -7,6 +7,7 @@ retaining the stable CLI contract.
 import typer
 
 from pynakes.cli_common import (
+    _BACKUP_OPTION,
     CheckOutcome,
     _entries,
     _finish_mod,
@@ -115,6 +116,7 @@ def enrich(
     cache_dir: str | None = typer.Option(
         None, "--cache-dir", help="Directory for deterministic provider-response cache"
     ),
+    backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
@@ -154,6 +156,7 @@ def enrich(
         diff,
         json_output,
         human,
+        backup=backup,
         warnings=warnings,
         changed_entries=len({update.key for update in updates}),
         changed_fields=len(updates),

@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`remove` command** (`pynakes remove <bib> <citekey>...`). Removes entries
+  by citation key through the standard lifecycle. In a pinax, removes the
+  entry's materials from `files-dir` by default (`--keep-files` opts out).
+  Dry-run correctly skips all filesystem side effects.
+- **Citekey shell completion.** Register Click shell-completion callbacks on
+  `remove`, `fetch`, `keys rename`, `groups add-entry`, and `groups
+  remove-entry`. The `.bib`-file completer also shows citekeys alongside the
+  filename when a single `.bib` is auto-detectable. Usable via
+  `eval "$(pynakes --show-completion bash)"` / `zsh` / `fish`.
+- **`--backup` flag on all write commands.** Added to `add`, `dedupe_merge`,
+  `fetch`, all `fields` subcommands, `groups`, `keys`, `metadata set`, `used`,
+  and `integrity enrich`. The `remove` command had its declared `--backup`
+  param wired through (was silently ignored).
+- **Optional `file` argument on all single-file commands.** Every command that
+  takes a `.bib` file argument now auto-detects a single `.bib` in the current
+  directory when omitted — matching the behavior previously available only on
+  `add`, `convert`, `fetch`, `inspect`, `enrich`, `normalize`, `remove`, and
+  `search`.
+- **Output emission consolidation.** Migrated `used`, `combine`, and `split`
+  from manual `typer.echo(_json.dumps(...))` to the canonical `_emit()` helper.
+
 - Add `BibEntry.resolve(lookup)` and `BibFile.resolve(entry)` as ergonomic
   shorthands for the existing read-only BibLaTeX inheritance view.
 - Add the offline Pinax `FileStore` foundation: recognized `files-dir` metadata,
@@ -44,6 +65,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `remove --dry-run` no longer removes Pinax materials from disk; it only
+  previews what would be removed (regression introduced in the initial `remove`
+  implementation).
 - Tighten broad exception handling in DOI metadata fetching, file writes, and
   Pinax filesystem rollback paths.
 - Fix small reviewer-flagged edge cases in lint field-view handling, search
@@ -72,7 +96,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - 2026-06-26
 Complete single-file BibTeX/BibLaTeX maintenance engine
-with parser conformance verified against TeX Live 2025 (BibTeX 0.99d, BibLaTeX 3.20,
+with parser conformance pinned to TeX Live 2026 (BibTeX 0.99d, BibLaTeX 3.21,
 Biber 2.20).
 
 ### Parser and round-trip fidelity
