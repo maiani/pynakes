@@ -12,6 +12,7 @@ from pynakes import keys as keys_ops
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     CheckOutcome,
+    RunParams,
     _emit,
     _emit_conflict,
     _emit_error,
@@ -88,6 +89,7 @@ def keys_generate(
 ) -> None:
     """Regenerate citation keys from entry metadata (AuthorYearTitle)."""
     file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     coll = Bibliography.open(file)
     if key is None:
         renames = coll.generate_keys()
@@ -95,10 +97,10 @@ def keys_generate(
         rename = coll.generate_key(key)
         renames = [rename] if rename is not None else []
     if key is None:
-        human = [f"{_verb('rename', dry_run)} {len(renames)} {_entries(len(renames))}."]
+        human = [f"{_verb('rename', params)} {len(renames)} {_entries(len(renames))}."]
     elif renames:
         human = [
-            f"{_verb('normalize', dry_run)} citation key {renames[0][0]!r} to {renames[0][1]!r}."
+            f"{_verb('normalize', params)} citation key {renames[0][0]!r} to {renames[0][1]!r}."
         ]
     else:
         human = [f"Citation key {key!r} already matches the preferred pattern."]
@@ -107,11 +109,8 @@ def keys_generate(
         file,
         "keys_generate",
         coll,
-        dry_run,
-        diff,
-        json_output,
+        params,
         human,
-        backup=backup,
         **({"key": key} if key is not None else {}),
         **_rename_payload(renames),
     )
@@ -125,9 +124,10 @@ def keys_repair(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Rename duplicate citation keys so every key is unique."""
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     coll = Bibliography.open(file)
     renames = coll.repair_keys()
-    human = [f"{_verb('repair', dry_run)} {len(renames)} duplicate key(s)."]
+    human = [f"{_verb('repair', params)} {len(renames)} duplicate key(s)."]
     human += [f"  {old} -> {new}" for old, new in renames]
 
     # A repaired key still exists on the first (kept) entry, so a TeX
@@ -141,11 +141,8 @@ def keys_repair(
         file,
         "keys_repair",
         coll,
-        dry_run,
-        diff,
-        json_output,
+        params,
         human,
-        backup=backup,
         warnings=warnings,
         **_rename_payload(renames),
     )
@@ -198,6 +195,7 @@ def keys_rename(
 ) -> None:
     """Rename one citation key in a .bib file and matching TeX citations."""
     file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     coll = Bibliography.open(file)
     keys_ops.validate_key(old)
     keys_ops.validate_key(new)
@@ -249,7 +247,7 @@ def keys_rename(
             "No .tex files found in the provided sources or the library's 'tex-sources' metadata",
         )
         return
-    if not dry_run and coll.externally_changed():
+    if not params.dry_run and coll.externally_changed():
         if coll.path is None:
             raise ValueError("rename requires a bound .bib file")
         raise ExternalModificationError(coll.path)
@@ -264,7 +262,7 @@ def keys_rename(
         total_source_occurrences += occurrences
         if modified:
             source_diff_parts.append(generate_diff(before, after, path.name))
-            if not dry_run:
+            if not params.dry_run:
                 saved = save_plain_text(after, str(path), encoding="utf-8")
                 if not saved.success:
                     raise OSError(saved.error or f"Could not write {path}")
@@ -277,23 +275,23 @@ def keys_rename(
         )
 
     plan = coll.change_plan()  # before commit, which refreshes the baseline
-    bib_diff, bib_modified, changed_entries = _preview_or_commit(coll, dry_run, backup=backup)
+    bib_diff, bib_modified, changed_entries = _preview_or_commit(coll, params)
 
     diff_text = "\n".join(part for part in [bib_diff, *source_diff_parts] if part)
     source_modified = any(change["modified"] for change in source_changes)
     modified = bib_modified or source_modified
 
     human = [
-        f"{_verb('rename', dry_run)} citation key {old!r} to {new!r}.",
+        f"{_verb('rename', params)} citation key {old!r} to {new!r}.",
         f"  bib entries changed={bib_changed}, TeX citations changed={total_source_occurrences}",
     ]
     _emit(
-        json_output,
+        params.json_output,
         {
             "status": "success",
             "action": "keys_rename",
             "file": file,
-            "dry_run": dry_run,
+            "dry_run": params.dry_run,
             "modified": modified,
             "modified_entries": changed_entries,
             "warnings": [],
@@ -305,7 +303,7 @@ def keys_rename(
         },
         human,
         diff_text,
-        diff,
+        params.diff,
     )
 
 

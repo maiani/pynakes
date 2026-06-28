@@ -198,9 +198,9 @@ These extend — never weaken — the guiding principles in
    only boundary for `.bib` text, all material moves/downloads go through the
    `filestore`/`fetch` mechanism. When references and materials drift apart,
    pynakes **reports** it and offers a reconcile; it never silently resolves it.
-6. **Determinism and the offline default hold.** Fetching is network I/O, gated
-   by the same explicit `--online` opt-in and deterministic cache the integrity
-   workflows use. Nothing about a pinax introduces hidden time, randomness, or
+6. **Determinism and the offline default hold.** Fetching is network I/O, but it
+   only happens when the user runs the explicit `fetch` command or passes
+   `add --fetch`. Nothing about a pinax introduces hidden time, randomness, or
    network into core logic.
 7. **Operations preserve the pinax.** Any operation that produces a `.bib` from a
    pinax produces a *pinax* — carrying the materials and per-entry state for the
@@ -429,7 +429,7 @@ local path and read the paper without re-downloading it** — it reads
 `canonical_pdf` (here the arXiv version, because `preprint_canonical` is set,
 which also brings `canonical_source`) — and knows, for what is missing, whether a
 `fetch` could retrieve it. It is a derived view over the
-filesystem scan, emitted through the same stable JSON envelope as every other
+filesystem scan, emitted through the same documented JSON envelope as every other
 command.
 
 ## Breaking with JabRef's `file` field
@@ -484,7 +484,7 @@ checklist.
    `fetch_arxiv_source`, the URL builders, and safe tar extraction; add the
    `FileStore` atomic writers for the preprint PDF and the extracted source.
    Unit-tested with fixtures, no real network. *(Implemented.)*
-3. **The top-level `fetch` command.** `pynakes fetch <bib> [target] [--online]
+3. **The top-level `fetch` command.** `pynakes fetch [target] [file]
    [--dry-run] [--json]`, with what-to-download governed by the `fetch-preprint` /
    `fetch-source` / `fetch-published` metadata keys; `Bibliography.ensure_files_dir`
    + `fetch_materials`; the zero-config default `files-dir`; the JSON envelope;

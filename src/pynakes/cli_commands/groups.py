@@ -11,6 +11,7 @@ import typer
 from pynakes import groups as groups_ops
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    RunParams,
     _emit_error,
     _entries,
     _finish_mod,
@@ -61,26 +62,21 @@ def _group_mod_entry(
     file: str,
     key: str,
     group: str,
-    dry_run: bool,
-    diff: bool,
-    json_output: bool,
-    backup: bool,
+    params: RunParams,
     add: bool,
 ) -> None:
     """Shared implementation for add-entry and remove-entry."""
     coll = Bibliography.open(file)
-    _require_key(coll.lib, key, json_output)
+    _require_key(coll.lib, key, params.json_output)
     if add:
         action, count = "groups_add_entry", coll.add_to_group(key, group)
         msg = (
-            f"{_verb('add', dry_run)} {key} to group {group!r} ({count} {_entries(count)} changed)."
+            f"{_verb('add', params)} {key} to group {group!r} ({count} {_entries(count)} changed)."
         )
     else:
         action, count = "groups_remove_entry", coll.remove_from_group(key, group)
-        msg = f"{_verb('remove', dry_run)} {key} from group {group!r} ({count} {_entries(count)} changed)."
-    _finish_mod(
-        file, action, coll, dry_run, diff, json_output, [msg], backup=backup, key=key, group=group
-    )
+        msg = f"{_verb('remove', params)} {key} from group {group!r} ({count} {_entries(count)} changed)."
+    _finish_mod(file, action, coll, params, [msg], key=key, group=group)
 
 
 def groups_add_entry(
@@ -96,7 +92,8 @@ def groups_add_entry(
 ) -> None:
     """Add an entry to a group."""
     file = _resolve_input_bib(file, json_output)
-    _group_mod_entry(file, key, group, dry_run, diff, json_output, backup, add=True)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    _group_mod_entry(file, key, group, params, add=True)
 
 
 def groups_remove_entry(
@@ -112,7 +109,8 @@ def groups_remove_entry(
 ) -> None:
     """Remove an entry from a group."""
     file = _resolve_input_bib(file, json_output)
-    _group_mod_entry(file, key, group, dry_run, diff, json_output, backup, add=False)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    _group_mod_entry(file, key, group, params, add=False)
 
 
 def register(app: typer.Typer) -> None:

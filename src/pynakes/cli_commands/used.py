@@ -8,8 +8,10 @@ from pathlib import Path
 
 import typer
 
+from pynakes.bibtex_writer import write_bib
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    RunParams,
     _emit,
     _emit_error,
     _entries,
@@ -19,7 +21,7 @@ from pynakes.cli_common import (
     _verb,
 )
 from pynakes.engine import Bibliography
-from pynakes.io import save_bib
+from pynakes.io import save_text
 from pynakes.usage import (
     analyze_usage,
     collect_cited_keys,
@@ -54,6 +56,7 @@ def used(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Report which entries are used in LaTeX sources; optionally tag or export them."""
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     bib_file = _resolve_input_bib(bib_file, json_output)
     coll = Bibliography.open(bib_file)
     resolved_sources = (
@@ -79,36 +82,21 @@ def used(
         tag_field = "keywords"
 
     bib_diff = ""
-    tagged_entries = 0
     file_modified = False
+    tagged_entries = 0
     if tag_field:
-        if not dry_run:
+        if not params.dry_run:
             coll.mark_dirty(tagged)
-        bib_diff, file_modified, tagged_entries = _preview_or_commit(coll, dry_run, backup=backup)
+        bib_diff, file_modified, tagged_entries = _preview_or_commit(coll, params)
 
     out_written = False
     if out:
         sub = subset_library(coll.lib, report.used)
-        if not dry_run:
-            save_bib(sub, out, backup=False)
-            out_written = True
+        content = write_bib(sub)
+        if not params.dry_run:
+            save_result = save_text(content, out, backup=False)
+            out_written = save_result.success
 
-    result = {
-        "status": "success",
-        "action": "used",
-        "file": bib_file,
-        "dry_run": dry_run,
-        "modified": file_modified,
-        "modified_entries": tagged_entries,
-        "warnings": [],
-        "report": report.to_dict(),
-        "tagged": {"field": tag_field, "value": group or keyword, "count": tagged}
-        if tag_field
-        else None,
-        "exported": {"path": out, "written": out_written, "count": len(report.used)}
-        if out
-        else None,
-    }
     human = [
         f"Scanned {len(scanned)} source file(s); {report.cited_count} cited key(s).",
     ]
@@ -122,14 +110,32 @@ def used(
             human.append(f"  - {key}  (cited but not in library)")
     if tag_field:
         human.append(
-            f"{_verb('tag', dry_run, 'Tagged')} {tagged} {_entries(tagged)}"
+            f"{_verb('tag', params, 'Tagged')} {tagged} {_entries(tagged)}"
             f' with {tag_field} = "{group or keyword}".'
         )
     if out:
         human.append(
-            f"{_verb('write', dry_run, 'Wrote')} {len(report.used)} {_entries(len(report.used))} to {out}."
+            f"{_verb('write', params, 'Wrote')} {len(report.used)}"
+            f" {_entries(len(report.used))} to {out}."
         )
-    _emit(json_output, result, human, bib_diff, diff)
+
+    result = {
+        "status": "success",
+        "action": "used",
+        "file": bib_file,
+        "dry_run": params.dry_run,
+        "modified": file_modified,
+        "modified_entries": tagged_entries,
+        "warnings": [],
+        "report": report.to_dict(),
+        "tagged": {"field": tag_field, "value": group or keyword, "count": tagged}
+        if tag_field
+        else None,
+        "exported": {"path": out, "written": out_written, "count": len(report.used)}
+        if out
+        else None,
+    }
+    _emit(params.json_output, result, human, bib_diff, params.diff)
 
 
 def register(app: typer.Typer) -> None:

@@ -4,11 +4,11 @@ Small, reviewable, deterministic edits to your `.bib` library — for researcher
 scripts, CI, and LLM agents. Reads and writes BibTeX, BibLaTeX, and
 JabRef-compatible files without disturbing what it does not change.
 
-> **Status — v0.3 in development.** The core command-line workflow is usable:
-> inspect, search, lint, groups, citation keys, fields, DOI import, citation-usage
-> analysis, normalization, conversion, capabilities JSON, journal-title
-> normalization, library-metadata inspection/update, linked-file validation, and
-> combine/split. Linked-file repair is still planned.
+> **Status — v0.5 public alpha.** The single-file bibliography engine is
+> feature-complete for this release, with Pinax material handling implemented
+> through arXiv PDF/source download. Until v1.0, pynakes does **not** guarantee
+> backward compatibility for the Python API, CLI syntax, or JSON envelopes; pin
+> exact `0.x` versions for reproducible automation.
 
 ## Overview
 
@@ -54,12 +54,6 @@ pynakes normalize refs.bib
   - exact journal mappings and LTWA-style journal abbreviation
 - Local pre-commit hooks and GitHub Actions CI
 - Capability introspection JSON
-
-## Still Planned
-
-- Linked-file repair
-- Advanced query DSL
-
 
 ## Documentation
 

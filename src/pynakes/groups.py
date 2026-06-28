@@ -36,7 +36,7 @@ def list_entries_in_group(lib: BibFile, group: str) -> list[str]:
     return [
         entry.key
         for entry in lib.entries.values()
-        if group in _parse_groups(entry.fields.get("groups", ""))
+        if group in _parse_groups(entry.fields.get("groups") or "")
     ]
 
 
@@ -61,7 +61,7 @@ def remove_from_group(lib: BibFile, key: str, group: str) -> int:
     """
     count = 0
     for entry in lib.entries.get_all(key):
-        groups = _parse_groups(entry.fields.get("groups", ""))
+        groups = _parse_groups(entry.fields.get("groups") or "")
         if group not in groups:
             continue
         groups.remove(group)

@@ -66,14 +66,29 @@ def _entries(count: int) -> str:
     return "entry" if count == 1 else "entries"
 
 
-def _verb(action: str, dry_run: bool, past: str | None = None) -> str:
+@dataclass
+class RunParams:
+    """Consolidated CLI run parameters.
+
+    Every modifying and file-creation command accepts the same four boolean
+    flags (``--dry-run``, ``--diff``, ``--json``, ``--backup``).  This
+    dataclass eliminates threading them individually through helper functions.
+    """
+
+    dry_run: bool = False
+    diff: bool = False
+    json_output: bool = False
+    backup: bool = False
+
+
+def _verb(action: str, params: RunParams, past: str | None = None) -> str:
     """Return ``"Would <action>"`` in dry-run mode, or the past-tense form otherwise.
 
     For regular verbs the past tense is derived automatically (e.g. ``"rename"``
     → ``"Renamed"``). Pass ``past`` explicitly for irregular or special forms
     (e.g. ``past="Wrote"`` for ``"write"``).
     """
-    if dry_run:
+    if params.dry_run:
         return f"Would {action}"
     return past if past is not None else f"{action.capitalize()}d"
 
@@ -98,6 +113,16 @@ def _emit_conflict(json_output: bool, error: str, message: str, **extra) -> None
     else:
         typer.echo(f"{error}: {message}")
     raise typer.Exit(code=2)
+
+
+class InvalidInputError(ValueError):
+    """Raised by operation modules to signal invalid user-supplied input.
+
+    Distinguished from plain ``ValueError`` so that programming bugs (which
+    also raise ``ValueError``) are not silently misreported as user-input
+    errors by :func:`_safe`.  Operation modules should prefer this type for
+    validation errors exposed through the CLI.
+    """
 
 
 def _safe(fn: _F) -> _F:
@@ -137,10 +162,12 @@ def _safe(fn: _F) -> _F:
                     },
                 ],
             )
+        except InvalidInputError as exc:
+            _emit_error(json_output, "InvalidInput", str(exc))
         except ValueError as exc:
             # By convention, operation modules raise ValueError to signal
             # invalid user-supplied data (bad field name, malformed key, etc.).
-            # Programming errors should use a different exception type.
+            # Programming errors should use InvalidInputError.
             _emit_error(json_output, "InvalidInput", str(exc))
         except OSError as exc:
             _emit_error(json_output, "IOError", str(exc))
@@ -148,18 +175,16 @@ def _safe(fn: _F) -> _F:
     return wrapper
 
 
-def _preview_or_commit(
-    coll: Bibliography, dry_run: bool, backup: bool = False
-) -> tuple[str, bool, int]:
+def _preview_or_commit(coll: Bibliography, params: RunParams) -> tuple[str, bool, int]:
     """Return ``(diff, modified, changed_entries)`` for a staged collection.
 
     In ``--dry-run`` mode this previews without writing; otherwise it commits
     (atomic write + re-parse validation) and reports the committed outcome.
-    Pass ``backup=True`` to also leave a ``<file>.bak`` copy behind.
+    Use ``params.backup`` to also leave a ``<file>.bak`` copy behind.
     """
-    if dry_run:
+    if params.dry_run:
         return coll.diff(), coll.is_modified, coll.changed_entries_count()
-    result = coll.commit(backup=backup)
+    result = coll.commit(backup=params.backup)
     return result.diff, result.modified, result.changed_entries
 
 
@@ -245,13 +270,10 @@ def _finish_mod(
     file,
     action,
     coll: Bibliography,
-    dry_run,
-    diff,
-    json_output,
+    params: RunParams,
     human,
     warnings=None,
     modified_entries: int | None = None,
-    backup: bool = False,
     **details,
 ) -> None:
     """Preview/commit a bibliography and emit the standard modifying-command result.
@@ -263,21 +285,61 @@ def _finish_mod(
     """
     # The plan must be read before commit, which refreshes the pristine baseline.
     plan = coll.change_plan()
-    diff_text, modified, changed = _preview_or_commit(coll, dry_run, backup)
+    diff_text, modified, changed = _preview_or_commit(coll, params)
     if modified_entries is not None:
         changed = modified_entries
     result = {
         "status": "success",
         "action": action,
         "file": file,
-        "dry_run": dry_run,
+        "dry_run": params.dry_run,
         "modified": modified,
         "modified_entries": changed,
         "warnings": warnings or [],
         "plan": plan,
         **details,
     }
-    _emit(json_output, result, human, diff_text, diff)
+    _emit(params.json_output, result, human, diff_text, params.diff)
+
+
+def _finish_create(
+    params: RunParams,
+    path: str,
+    action: str,
+    content: str,
+    human: list[str],
+    previous_content: str = "",
+    backup: bool = False,
+    warnings: list | None = None,
+    **details,
+) -> None:
+    """Write a new file and emit the standard creation-command result.
+
+    File-creation commands (``combine``, ``split``, ``used``, ``init``) share
+    this envelope: ``status, action, file, dry_run, written, warnings``, plus
+    command-specific keys, and an optional ``diff`` when ``--diff`` is set.
+    """
+    from pynakes.diff import generate_diff
+    from pynakes.io import save_text
+
+    diff_text = generate_diff(previous_content, content, path) if params.diff else ""
+    written = False
+    if not params.dry_run:
+        result = save_text(content, path, backup=backup)
+        if not result.success:
+            _emit_error(params.json_output, "IOError", result.error or f"Failed to write {path}")
+        written = True
+
+    payload = {
+        "status": "success",
+        "action": action,
+        "file": path,
+        "dry_run": params.dry_run,
+        "written": written,
+        "warnings": warnings or [],
+        **details,
+    }
+    _emit(params.json_output, payload, human, diff_text, params.diff)
 
 
 def _metadata_cache_dir(file: str, cache_dir: str | None, online: bool) -> str | None:

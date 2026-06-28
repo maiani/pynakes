@@ -5,7 +5,14 @@ Downloads arXiv materials (PDF and source) for entries into the Pinax files-dir.
 
 import typer
 
-from pynakes.cli_common import _BACKUP_OPTION, _emit_error, _finish_mod, _resolve_input_bib, _safe
+from pynakes.cli_common import (
+    _BACKUP_OPTION,
+    RunParams,
+    _emit_error,
+    _finish_mod,
+    _resolve_input_bib,
+    _safe,
+)
 from pynakes.engine import Bibliography
 
 
@@ -24,6 +31,7 @@ def fetch(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Download arXiv materials (PDF and source) for entries into the Pinax files-dir."""
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     file = _resolve_input_bib(file, json_output)
 
     try:
@@ -31,7 +39,7 @@ def fetch(
     except ValueError as exc:
         _emit_error(json_output, "InvalidInput", str(exc))
 
-    report = coll.fetch_materials(target=target, dry_run=dry_run)
+    report = coll.fetch_materials(target=target, dry_run=params.dry_run)
 
     warnings: list[str] = []
     for f in report["fetched"]:
@@ -51,11 +59,8 @@ def fetch(
         file,
         "fetch",
         coll,
-        dry_run,
-        diff,
-        json_output,
+        params,
         warnings,
-        backup=backup,
         fetch_preprint=report["fetch_preprint"],
         fetch_source=report["fetch_source"],
         fetch_published=report["fetch_published"],

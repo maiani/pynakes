@@ -15,6 +15,7 @@ import typer
 from pynakes.bibtex_writer import write_bib
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    RunParams,
     _emit_error,
     _entries,
     _finish_mod,
@@ -55,8 +56,9 @@ def convert(
 ) -> None:
     """Convert a library between BibTeX/BibLaTeX dialects and interchange formats."""
     file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     if from_format is not None:
-        _convert_import(file, from_format, to, out, dry_run, json_output, backup)
+        _convert_import(file, from_format, to, out, params)
         return
 
     if to is None:
@@ -68,11 +70,11 @@ def convert(
         )
 
     if to in _DIALECTS:
-        _convert_dialect(file, to, dry_run, diff, json_output, backup)
+        _convert_dialect(file, to, params)
         return
 
     if to in FORMATS:
-        _convert_export(file, to, out, dry_run, json_output, backup)
+        _convert_export(file, to, out, params)
         return
 
     _emit_error(
@@ -82,14 +84,12 @@ def convert(
     )
 
 
-def _convert_dialect(
-    file: str, to: str, dry_run: bool, diff: bool, json_output: bool, backup: bool
-) -> None:
+def _convert_dialect(file: str, to: str, params: RunParams) -> None:
     coll = Bibliography.open(file)
     report = coll.convert(to)  # raises ValueError on an unknown target
 
     human = [
-        f"{_verb('convert', dry_run)} {report.entries} {_entries(report.entries)} to {report.target}.",
+        f"{_verb('convert', params)} {report.entries} {_entries(report.entries)} to {report.target}.",
         "  "
         f"fields_renamed={report.fields_renamed}, "
         f"types_changed={report.types_changed}, dates_changed={report.dates_changed}",
@@ -101,24 +101,17 @@ def _convert_dialect(
         file,
         "convert",
         coll,
-        dry_run,
-        diff,
-        json_output,
+        params,
         human,
         warnings=report.warnings,
         operations=report.operations,
-        backup=backup,
     )
 
 
-def _convert_export(
-    file: str, to: str, out: str | None, dry_run: bool, json_output: bool, backup: bool
-) -> None:
+def _convert_export(file: str, to: str, out: str | None, params: RunParams) -> None:
     lib = Bibliography.open(file).lib
     content = export_library(lib, to)
-    _emit_conversion(
-        file, "bibtex", to, content, len(lib.entries), out, dry_run, json_output, backup
-    )
+    _emit_conversion(file, "bibtex", to, content, len(lib.entries), out, params)
 
 
 def _convert_import(
@@ -126,19 +119,17 @@ def _convert_import(
     from_format: str,
     to: str | None,
     out: str | None,
-    dry_run: bool,
-    json_output: bool,
-    backup: bool,
+    params: RunParams,
 ) -> None:
     if from_format not in FORMATS:
         _emit_error(
-            json_output,
+            params.json_output,
             "UnknownConvertSource",
             f"Unknown --from format {from_format!r}; choose {' or '.join(FORMATS)}",
         )
     if to is not None and to not in _DIALECTS:
         _emit_error(
-            json_output,
+            params.json_output,
             "UnsupportedConversion",
             f"Importing from {from_format!r} produces BibTeX; foreign --to {to!r} is unsupported",
         )
@@ -146,9 +137,7 @@ def _convert_import(
     text = Path(file).read_text(encoding="utf-8")
     lib = import_library(text, from_format)
     content = write_bib(lib)
-    _emit_conversion(
-        file, from_format, "bibtex", content, len(lib.entries), out, dry_run, json_output, backup
-    )
+    _emit_conversion(file, from_format, "bibtex", content, len(lib.entries), out, params)
 
 
 def _emit_conversion(
@@ -158,17 +147,15 @@ def _emit_conversion(
     content: str,
     entry_count: int,
     out: str | None,
-    dry_run: bool,
-    json_output: bool,
-    backup: bool,
+    params: RunParams,
 ) -> None:
     """Emit the result of an export/import: write to ``out`` or stream to stdout."""
     written = False
-    if out and not dry_run:
-        save_plain_text(content, out, backup=backup)
+    if out and not params.dry_run:
+        save_plain_text(content, out, backup=params.backup)
         written = True
 
-    if json_output:
+    if params.json_output:
         result = {
             "status": "success",
             "action": "convert",
@@ -176,7 +163,7 @@ def _emit_conversion(
             "from": from_format,
             "to": to_format,
             "entry_count": entry_count,
-            "dry_run": dry_run,
+            "dry_run": params.dry_run,
             "out": out,
             "written": written,
             "content": None if out else content,
@@ -186,7 +173,7 @@ def _emit_conversion(
 
     if out:
         typer.echo(
-            f"{_verb('write', dry_run, 'Wrote')} {entry_count} {_entries(entry_count)} as {to_format} to {out} "
+            f"{_verb('write', params, 'Wrote')} {entry_count} {_entries(entry_count)} as {to_format} to {out} "
             f"(from {from_format})."
         )
     else:

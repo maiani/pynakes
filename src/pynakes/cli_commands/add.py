@@ -14,6 +14,7 @@ import typer
 from pynakes import importer as importer_ops
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    RunParams,
     _emit_conflict,
     _emit_error,
     _finish_mod,
@@ -51,6 +52,7 @@ def add(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Add a reference by DOI or arXiv identifier."""
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     file = _resolve_input_bib(file, json_output)
     if key_source not in importer_ops.KEY_SOURCES:
         _emit_error(
@@ -125,13 +127,13 @@ def add(
     fetch_report = None
     if fetch:
         try:
-            fetch_report = coll.fetch_materials(target=entry.key, dry_run=dry_run)
+            fetch_report = coll.fetch_materials(target=entry.key, dry_run=params.dry_run)
         except ValueError as exc:
             _emit_error(json_output, "InvalidInput", str(exc))
             return
 
     label = entry.fields.get("doi") or entry.fields.get("eprint") or entry.key
-    human = [f"{_verb('add', dry_run)} {kind} {label} as {entry.key}."]
+    human = [f"{_verb('add', params)} {kind} {label} as {entry.key}."]
     if fetch_report is not None:
         human.extend(_fetch_human_lines(fetch_report))
 
@@ -150,11 +152,8 @@ def add(
         file,
         "add",
         coll,
-        dry_run,
-        diff,
-        json_output,
+        params,
         human,
-        backup=backup,
         **details,
     )
 

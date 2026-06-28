@@ -174,7 +174,7 @@ Editing + model + parser/writer + I/O
 ~~~
 
 The CLI is intentionally thin: it opens a Bibliography, invokes an operation,
-previews or commits it, and emits the stable output envelope. Domain modules
+previews or commits it, and emits the structured output envelope. Domain modules
 depend on the model and editing helpers, not on CLI behavior. Bibliography
 delegates to those modules rather than duplicating transformation rules — which
 is also the proof the boundary is correct: a downstream consumer can drive the
@@ -197,11 +197,10 @@ strings, unknown entry fields survive, and malformed structural input raises
 
 ### Parser conformance baseline
 
-The 0.4 parser-conformance target was **TeX Live 2025** (BibTeX **0.99d**,
-BibLaTeX **3.20** (2024-03-21), and Biber **2.20** as the BibLaTeX
-input-validation oracle. The versioned corpus and CI validation remain a
-release gate; until they are complete, pynakes must not claim full standards
-compatibility.
+The parser-conformance target is pinned to **TeX Live 2026** (BibTeX **0.99d**,
+BibLaTeX **3.21**, and Biber **2.21** as the BibLaTeX input-validation oracle).
+The versioned corpus and CI validation remain a release gate; pynakes should not
+claim broader standards compatibility than this pinned baseline exercises.
 
 ### Surgical edits
 
@@ -294,13 +293,13 @@ interactive choice is possible. Modifying command responses share `status`,
 
 ## Network boundary
 
-Only DOI import, integrity workflows, and the Pinax arXiv download primitives
-contact providers in the current implementation. Integrity workflows require an
-explicit `online=True`/`--online` opt-in and support deterministic caching; the
-planned Pinax CLI follows the same boundary. Plain `.bib` maintenance never
-fetches materials. Network parsing lives in `importer.py`, `integrity.py`, and
-`fetch.py`; tests mock or fixture this boundary so the normal suite never relies
-on external availability.
+Only DOI/arXiv import, integrity workflows, and the Pinax arXiv download
+primitives contact providers in the current implementation. Integrity workflows
+require an explicit `online=True`/`--online` opt-in and support deterministic
+caching; Pinax downloads require the explicit `fetch` command or `add --fetch`.
+Plain `.bib` maintenance never fetches materials. Network parsing lives in
+`importer.py`, `integrity.py`, and `fetch.py`; tests mock or fixture this
+boundary so the normal suite never relies on external availability.
 
 ## Testing and change discipline
 

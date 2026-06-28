@@ -13,7 +13,7 @@ structured JSON contract. It is written for a program (or an agent) that calls
 - **Deterministic.** The same input always produces the same output (the one
   exception is `add`, which makes a network call).
 - **Preview before writing.** Every modifying command supports `--dry-run`.
-- **Structured output.** `--json` returns a stable envelope (see below).
+- **Structured output.** `--json` returns a documented envelope (see below).
 - **Conflicts return options, not guesses.** Blocked operations exit `2` with a
   list of resolutions.
 - **Safe writes.** Modifications are atomic (temp file → re-parse validation →

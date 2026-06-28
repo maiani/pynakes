@@ -8,9 +8,9 @@
 
 ## Installation Methods
 
-### From PyPI (Recommended)
+### From PyPI (Public Alpha)
 
-Once published, install with pip:
+Install with pip:
 
 ```bash
 pip install pynakes

@@ -62,7 +62,7 @@ Add it to your repository's `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/maiani/pynakes
-    rev: v0.3.0
+    rev: v0.5.0
     hooks:
       - id: pynakes-lint
       - id: pynakes-keys-check

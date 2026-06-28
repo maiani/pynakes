@@ -19,12 +19,13 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
+from pynakes import __version__
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.keys import UnsupportedCitationKeyPatternError, generate_key, unique_key
 from pynakes.model import BibEntry, BibFile
 
-_USER_AGENT = "pynakes/0.3.0 reference import (mailto:unknown@example.invalid)"
+_USER_AGENT = f"pynakes/{__version__} reference import (mailto:unknown@example.invalid)"
 
 _DOI_URL_RE = re.compile(r"^https?://(?:dx\.)?doi\.org/", re.IGNORECASE)
 _DOI_RE = re.compile(r"^10\.\d{4,9}/\S+$", re.IGNORECASE)

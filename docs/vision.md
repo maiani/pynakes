@@ -37,7 +37,7 @@ about without you having to trust it blindly:
   own. Structure (required fields, identifiers) is *advisory* — enforced by
   `lint` / `normalize` only when asked.
 - **Deterministic by default.** No time, randomness, or hidden ordering in core
-  logic. Network access is explicit (`--online` where supported) and isolated.
+  logic. Network access is explicit (`add`, `fetch`, or `--online`) and isolated.
 
 ## Scope
 

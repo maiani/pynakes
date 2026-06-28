@@ -1,0 +1,209 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 256 256"
+  role="img"
+  aria-labelledby="title desc"
+>
+  <title id="title">pynakes icon</title>
+  <desc id="desc">A parchment scroll showing a small BibTeX-style diff, backed by a visible Python snake.</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="28" y1="20" x2="228" y2="236" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#172033"/>
+      <stop offset="1" stop-color="#020617"/>
+    </linearGradient>
+
+    <linearGradient id="snakeGrad" x1="28" y1="40" x2="230" y2="220" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#38BDF8"/>
+      <stop offset="0.42" stop-color="#22C55E"/>
+      <stop offset="1" stop-color="#15803D"/>
+    </linearGradient>
+
+    <linearGradient id="scrollGrad" x1="68" y1="54" x2="188" y2="202" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF7D6"/>
+      <stop offset="1" stop-color="#E4C879"/>
+    </linearGradient>
+
+    <linearGradient id="cylinderGrad" x1="68" y1="42" x2="188" y2="214" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#D8B76C"/>
+      <stop offset="0.5" stop-color="#B8893E"/>
+      <stop offset="1" stop-color="#7A4E20"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-24%" y="-24%" width="148%" height="156%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000000" flood-opacity="0.30"/>
+    </filter>
+
+    <clipPath id="scrollClip">
+      <path
+        d="M76 58
+           H180
+           C190 58 196 66 194 78
+           C191 94 191 162 194 178
+           C196 190 190 198 180 198
+           H76
+           C66 198 60 190 62 178
+           C65 162 65 94 62 78
+           C60 66 66 58 76 58Z"
+      />
+    </clipPath>
+  </defs>
+
+  <rect width="256" height="256" rx="48" fill="url(#bg)"/>
+
+  <g>
+    <path
+      d="M216 67
+         C174 36 103 44 65 91
+         C30 134 42 190 91 216
+         C137 241 203 217 225 164"
+      fill="none"
+      stroke="#052E16"
+      stroke-width="42"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      opacity="0.9"
+    />
+
+    <path
+      d="M216 67
+         C174 36 103 44 65 91
+         C30 134 42 190 91 216
+         C137 241 203 217 225 164"
+      fill="none"
+      stroke="url(#snakeGrad)"
+      stroke-width="31"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+
+    <path
+      d="M213 53
+         C231 49 245 60 245 77
+         C245 94 228 105 212 98
+         C195 91 193 59 213 53Z"
+      fill="#15803D"
+      stroke="#052E16"
+      stroke-width="5"
+      stroke-linejoin="round"
+    />
+
+    <circle cx="227" cy="71" r="3.7" fill="#F8FAFC"/>
+
+    <path
+      d="M242 82L252 86M252 86L256 83M252 86L256 91"
+      fill="none"
+      stroke="#EF4444"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect
+      x="67"
+      y="43"
+      width="122"
+      height="24"
+      rx="12"
+      fill="url(#cylinderGrad)"
+    />
+    <path
+      d="M80 50H176"
+      stroke="#E6C978"
+      stroke-width="4"
+      stroke-linecap="round"
+      opacity="0.7"
+    />
+
+    <rect
+      x="67"
+      y="189"
+      width="122"
+      height="24"
+      rx="12"
+      fill="url(#cylinderGrad)"
+    />
+    <path
+      d="M80 196H176"
+      stroke="#E6C978"
+      stroke-width="4"
+      stroke-linecap="round"
+      opacity="0.45"
+    />
+
+    <path
+      d="M76 58
+         H180
+         C190 58 196 66 194 78
+         C191 94 191 162 194 178
+         C196 190 190 198 180 198
+         H76
+         C66 198 60 190 62 178
+         C65 162 65 94 62 78
+         C60 66 66 58 76 58Z"
+      fill="url(#scrollGrad)"
+    />
+
+    <path
+      d="M76 58
+         H180
+         C190 58 196 66 194 78
+         C191 94 191 162 194 178
+         C196 190 190 198 180 198
+         H76
+         C66 198 60 190 62 178
+         C65 162 65 94 62 78
+         C60 66 66 58 76 58Z"
+      fill="none"
+      stroke="#7C5525"
+      stroke-width="3"
+      opacity="0.78"
+    />
+  </g>
+
+  <g clip-path="url(#scrollClip)">
+    <path
+      d="M98 82V178"
+      stroke="#8A5F2B"
+      stroke-width="3"
+      stroke-linecap="round"
+      opacity="0.35"
+    />
+
+    <text
+      x="82"
+      y="100"
+      font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+      font-size="24"
+      font-weight="800"
+      fill="#4A341F"
+    >@</text>
+
+    <path d="M111 93H143" stroke="#5B3A1D" stroke-width="7" stroke-linecap="round"/>
+
+    <path
+      d="M151 85
+         C144 85 142 90 145 94
+         C148 97 148 100 143 102
+         C148 104 148 107 145 110
+         C142 114 144 119 151 119"
+      fill="none"
+      stroke="#5B3A1D"
+      stroke-width="4.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      opacity="0.85"
+    />
+
+    <path d="M83 120H93M88 115V125" stroke="#16A34A" stroke-width="5" stroke-linecap="round"/>
+    <path d="M111 120H166" stroke="#16A34A" stroke-width="7" stroke-linecap="round"/>
+
+    <path d="M83 144H93" stroke="#DC2626" stroke-width="5" stroke-linecap="round"/>
+    <path d="M111 144H154" stroke="#DC2626" stroke-width="7" stroke-linecap="round"/>
+
+    <path d="M111 167H162" stroke="#6F4A25" stroke-width="6" stroke-linecap="round"/>
+    <path d="M111 184H145" stroke="#7A552B" stroke-width="5.5" stroke-linecap="round" opacity="0.75"/>
+  </g>
+</svg>

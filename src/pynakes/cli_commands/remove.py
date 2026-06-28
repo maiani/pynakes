@@ -7,7 +7,15 @@ opts out).
 
 import typer
 
-from pynakes.cli_common import _emit_error, _finish_mod, _resolve_input_bib, _safe, _verb
+from pynakes.cli_common import (
+    RunParams,
+    _emit_error,
+    _entries,
+    _finish_mod,
+    _resolve_input_bib,
+    _safe,
+    _verb,
+)
 from pynakes.engine import Bibliography
 
 
@@ -28,6 +36,7 @@ def remove(
 ) -> None:
     """Remove entries by citation key."""
     file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
 
     coll = Bibliography.open(file)
 
@@ -49,7 +58,7 @@ def remove(
     material_removals: dict[str, list[str]] = {}
     if not keep_files and coll.files is not None:
         for key in removed_keys:
-            if dry_run:
+            if params.dry_run:
                 removed = coll.files._materials_paths_for(key)
             else:
                 removed = coll.files.remove_materials(key)
@@ -57,7 +66,7 @@ def remove(
                 material_removals[key] = removed
 
     label = ", ".join(removed_keys)
-    human = [f"{_verb('remove', dry_run)} {total} entry/entries: {label}."]
+    human = [f"{_verb('remove', params)} {total} {_entries(total)}: {label}."]
     if not keep_files and material_removals:
         human.append("Removed Pinax materials.")
     elif keep_files:
@@ -71,9 +80,7 @@ def remove(
     if material_removals:
         details["material_removals"] = material_removals
 
-    _finish_mod(
-        file, "remove", coll, dry_run, diff, json_output, human, warnings, backup=backup, **details
-    )
+    _finish_mod(file, "remove", coll, params, human, warnings, **details)
 
 
 def register(app: typer.Typer) -> None:

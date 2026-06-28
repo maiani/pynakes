@@ -9,6 +9,7 @@ import typer
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     CheckOutcome,
+    RunParams,
     _entries,
     _finish_mod,
     _metadata_cache_dir,
@@ -128,6 +129,7 @@ def enrich(
     DOI/journal), folding in the former ``published --apply`` operation.
     """
     file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     coll = Bibliography.open(file)
     cache = _metadata_cache_dir(file, cache_dir, online)
     report = coll.enrich(online=online, cache_dir=cache)
@@ -135,7 +137,7 @@ def enrich(
     warnings = list(report.warnings)
     extra: dict[str, object] = {}
     human = [
-        f"{_verb('enrich', dry_run, 'Enriched')} {report.changed_entries} {_entries(report.changed_entries)}.",
+        f"{_verb('enrich', params, 'Enriched')} {report.changed_entries} {_entries(report.changed_entries)}.",
         f"  field_updates={report.changed_fields}",
     ]
     if published:
@@ -152,11 +154,8 @@ def enrich(
         file,
         "enrich",
         coll,
-        dry_run,
-        diff,
-        json_output,
+        params,
         human,
-        backup=backup,
         warnings=warnings,
         changed_entries=len({update.key for update in updates}),
         changed_fields=len(updates),

@@ -106,8 +106,7 @@ tests pass:
 
 ## Don't
 
-- Don't add `bibtexparser` or another parsing dependency — the custom parser is
-  deliberate (round-trip fidelity).
+- The parser is deliberate to maintain round-trip fidelity.
 - Don't introduce nondeterminism (time, randomness, ordering) in core logic.
   Network access is confined to `add` (DOI/arXiv import) and the opt-in
   `--online` integrity lookups; everything else stays offline and deterministic.

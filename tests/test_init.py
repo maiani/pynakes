@@ -157,6 +157,17 @@ def test_init_rejects_bad_type(tmp_path: Path) -> None:
     assert not out.exists()
 
 
+def test_init_pinax_creates_files_dir_beside_target(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    out = project / "refs.bib"
+    result = runner.invoke(app, ["init", str(out), "--pinax", "--json"])
+    assert result.exit_code == 0, result.output
+    assert (project / "refs.files").is_dir()
+    assert not (tmp_path / "refs.files").exists()
+    assert load_bib(str(out)).metadata["files-dir"].strip() == "refs.files"
+
+
 # --- helpers ---------------------------------------------------------------
 
 

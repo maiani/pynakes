@@ -35,13 +35,13 @@ A: `--dry-run` shows what *would* happen without modifying the file. Always use 
 A: Not by default. Writes are atomic (write-to-temp-then-rename) and
 re-parse-validated, so the original is never left half-written. If you also want
 a `<file>.bak` copy of the previous contents, pass `--backup` to the modifying
-command (`normalize`, `convert`, `batch`, `combine`, or `split`).
+command.
 
 ### Q: Can I use pynakes with BibLaTeX?
 
 A: Yes, `pynakes` can parse and preserve BibLaTeX-style fields such as
-`journaltitle` and `date`. A dedicated BibTeX → BibLaTeX conversion command is
-still planned.
+`journaltitle` and `date`. Use `pynakes convert refs.bib --to biblatex` to
+convert BibTeX field/type conventions in place.
 
 ### Q: How do I handle entry types that pynakes doesn't recognize?
 
@@ -114,9 +114,6 @@ A: pynakes supports all standard BibTeX entry types:
 - misc, techreport, manual
 - And any custom entry type
 
-### Q: Can I create custom validation rules?
-
-A: Not yet. This is planned for v0.2. For now, use the standard linting rules.
 
 ### Q: Does pynakes support JabRef metadata?
 
@@ -162,7 +159,7 @@ Parse the JSON and make decisions in your workflow.
 ### Q: Does pynakes have an MCP server?
 
 A: No, and it isn't planned for the core. pynakes' agent interface *is* the CLI —
-`pynakes capabilities --json`, the stable JSON envelope, exit codes, and
+`pynakes capabilities --json`, the structured JSON envelope, exit codes, and
 `--dry-run`. An agent drives pynakes by calling the CLI as a tool (see the
 [LLM integration guide](llm-integration.md)). An MCP server is a downstream
 concern — it suits querying a personal library/corpus, which belongs to a

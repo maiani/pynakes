@@ -10,6 +10,7 @@ from pynakes import dedupe as dedupe_ops
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     CheckOutcome,
+    RunParams,
     _emit_conflict,
     _finish_mod,
     _resolve_input_bib,
@@ -70,6 +71,7 @@ def dedupe_merge(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Conservatively merge duplicate works into their first entry."""
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
     try:
@@ -95,18 +97,15 @@ def dedupe_merge(
         return
 
     human = [
-        f"{_verb('merge', dry_run)} {report.merged_clusters} duplicate work cluster(s).",
+        f"{_verb('merge', params)} {report.merged_clusters} duplicate work cluster(s).",
         f"  removed_entries={report.removed_entry_count}, field_changes={report.field_changes}",
     ]
     _finish_mod(
         file,
         "dedupe_merge",
         coll,
-        dry_run,
-        diff,
-        json_output,
+        params,
         human,
-        backup=backup,
         modified_entries=report.modified_entries,
         **report.to_dict(),
     )

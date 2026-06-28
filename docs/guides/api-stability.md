@@ -1,9 +1,14 @@
 # Public API & stability
 
-This page is the authoritative Python API contract for pynakes 1.0. The API is
-available in 0.3.0 so consumers can adopt and test it before the 1.0 release.
-Until 1.0, any intentional incompatibility will be called out in the changelog;
-from 1.0 onward, the semantic-versioning policy below applies.
+This page describes the intended public surface for pynakes, but v0.5 is still
+an alpha release. Until 1.0, pynakes does **not** guarantee backward
+compatibility for the Python API, CLI syntax, or JSON envelopes. Breaking
+changes may ship in any `0.x` release, and consumers that need reproducibility
+should pin exact versions.
+
+The project still treats these surfaces seriously: intentional incompatibilities
+should be documented in `CHANGELOG.md`, and the 1.0 release is expected to
+freeze the public contract described below.
 
 The CLI and its JSON envelopes are a co-equal public API. Their command syntax,
 exit codes, and response shapes are defined in the [LLM & automation integration
@@ -11,9 +16,10 @@ guide](llm-integration.md).
 
 ## Supported Python modules
 
-Every non-underscore class, function, exception, and constant in the following
-modules is public and stable. New names may be added in a minor release;
-removing a name or changing its documented behavior is a breaking change.
+The following modules are the intended public Python surface. During the alpha
+period, non-underscore classes, functions, exceptions, and constants in these
+modules are the supported way to integrate with pynakes, but they are not yet
+covered by a backward-compatibility guarantee.
 
 | Area | Stable modules |
 | --- | --- |
@@ -80,6 +86,5 @@ Starting with 1.0.0:
   or make an incompatible JSON-envelope change.
 
 The `capabilities --json` schema and the documented command envelopes follow
-the same policy. Consumers that need reproducibility should pin a compatible
-major version and use `pynakes.__version__` or `capabilities.VERSION` in their
-own diagnostics.
+the same policy starting at 1.0.0. Before 1.0, pin exact versions and include
+`pynakes.__version__` or `capabilities.VERSION` in diagnostics.

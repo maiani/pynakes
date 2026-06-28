@@ -9,6 +9,7 @@ import typer
 from pynakes import fields as fields_ops
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    RunParams,
     _entries,
     _finish_mod,
     _resolve_input_bib,
@@ -32,10 +33,7 @@ def _run_field_op(
     file: str,
     action: str,
     op: object,
-    dry_run: bool,
-    diff: bool,
-    json_output: bool,
-    backup: bool,
+    params: RunParams,
     details: dict,
     verb: str,
 ) -> None:
@@ -45,11 +43,8 @@ def _run_field_op(
         file,
         action,
         coll,
-        dry_run,
-        diff,
-        json_output,
+        params,
         [f"{verb} ({count} {_entries(count)} changed)."],
-        backup=backup,
         **details,
     )
 
@@ -68,17 +63,15 @@ def fields_rename(
 ) -> None:
     """Rename a field across entries."""
     file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     flt = _build_filter(where)
     _run_field_op(
         file,
         "fields_rename",
         lambda coll: coll.rename_field(old, new, flt),
-        dry_run,
-        diff,
-        json_output,
-        backup,
+        params,
         {"old": old, "new": new, "where": where},
-        f"{_verb('rename', dry_run)} field {old!r} to {new!r}",
+        f"{_verb('rename', params)} field {old!r} to {new!r}",
     )
 
 
@@ -96,17 +89,15 @@ def fields_move(
 ) -> None:
     """Move a field to a new name, skipping entries that already have the target."""
     file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     flt = _build_filter(where)
     _run_field_op(
         file,
         "fields_move",
         lambda coll: coll.move_field(old, new, flt),
-        dry_run,
-        diff,
-        json_output,
-        backup,
+        params,
         {"old": old, "new": new, "where": where},
-        f"{_verb('move', dry_run)} field {old!r} to {new!r}",
+        f"{_verb('move', params)} field {old!r} to {new!r}",
     )
 
 
@@ -124,17 +115,15 @@ def fields_append(
 ) -> None:
     """Append a value to a (comma-delimited) field across entries."""
     file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     flt = _build_filter(where)
     _run_field_op(
         file,
         "fields_append",
         lambda coll: coll.append_field(field, value, flt),
-        dry_run,
-        diff,
-        json_output,
-        backup,
+        params,
         {"field": field, "value": value, "where": where},
-        f"{_verb('append', dry_run, 'Appended')} {value!r} to field {field!r}",
+        f"{_verb('append', params, 'Appended')} {value!r} to field {field!r}",
     )
 
 
@@ -151,17 +140,15 @@ def fields_clear(
 ) -> None:
     """Remove a field from entries."""
     file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     flt = _build_filter(where)
     _run_field_op(
         file,
         "fields_clear",
         lambda coll: coll.clear_field(field, flt),
-        dry_run,
-        diff,
-        json_output,
-        backup,
+        params,
         {"field": field, "where": where},
-        f"{_verb('clear', dry_run, 'Cleared')} field {field!r}",
+        f"{_verb('clear', params, 'Cleared')} field {field!r}",
     )
 
 
@@ -181,18 +168,16 @@ def fields_protect_title(
 ) -> None:
     """Brace-protect capitalization-sensitive tokens in title-like fields."""
     file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     flt = _build_filter(where)
     terms = term or []
     _run_field_op(
         file,
         "fields_protect_title",
         lambda coll: coll.protect_title(field, flt, terms),
-        dry_run,
-        diff,
-        json_output,
-        backup,
+        params,
         {"field": field, "terms": terms, "where": where},
-        f"{_verb('protect', dry_run, 'Protected')} capitalization in field {field!r}",
+        f"{_verb('protect', params, 'Protected')} capitalization in field {field!r}",
     )
 
 

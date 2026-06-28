@@ -8,11 +8,13 @@ plan.
 This document is the **road to 1.0** and the major releases beyond it.
 Completed work is recorded in [CHANGELOG.md](CHANGELOG.md) and the git log.
 
-## Current state (v0.4.0)
+## Current state (v0.5 alpha candidate)
 
-v0.4 is the first public pre-release. The single-file engine is feature-complete
-for the 0.4 scope; input conformance is verified against the TeX Live 2025
-baseline (BibTeX 0.99d, BibLaTeX 3.20, Biber 2.20).
+v0.5 is the first public alpha release. The single-file engine is
+feature-complete for this release; input conformance is verified against the TeX
+Live 2026 baseline (BibTeX 0.99d, BibLaTeX 3.21, Biber 2.21). Until v1.0,
+pynakes does **not** guarantee backward compatibility for the Python API, CLI
+syntax, or JSON envelopes.
 
 - **Parser/writer**: byte-for-byte round-trip fidelity; atomic, re-parse-validated
   writes; surgical minimal-diff editing. Handles `{…}`/`(…)` entry forms, all
@@ -29,15 +31,15 @@ baseline (BibTeX 0.99d, BibLaTeX 3.20, Biber 2.20).
   `split`, `batch`.
 - **Pinax corpus mode (steps 1–8)**: `FileStore`, arXiv download, `fetch` command,
   agent surface, provenance manifest, pinax-aware `combine`/`split`, coordinated
-  key edits, `add --fetch`. Steps 9–10 (OA PDFs, dedupe material merge) ship in
-  v0.5. See [Pinax implementation steps](#pinax-implementation-steps).
+  key edits, `add --fetch`. Steps 9–10 (OA PDFs, dedupe material merge) are
+  deferred. See [Pinax implementation steps](#pinax-implementation-steps).
 - **JabRef v5.15 parity**: full `saveActions` formatter suite, complete metadata
   vocabulary, JabRef key patterns, group management.
-- **Agent-native surface**: stable JSON envelope + exit codes (0/1/2),
+- **Agent-native surface**: structured JSON envelope + exit codes (0/1/2),
   `--dry-run`/`--diff`/`--json`, structured `plan` objects, self-describing
   `capabilities`, multi-file `--strict` gate checks, `.pre-commit-hooks.yaml`.
-- **Parser conformance**: versioned corpus pinned to TeX Live 2025; differential
-  tests against BibTeX 0.99d and Biber 2.20; property-based tests (Hypothesis).
+- **Parser conformance**: versioned corpus pinned to TeX Live 2026; differential
+  tests against BibTeX 0.99d and Biber 2.21; property-based tests (Hypothesis).
 - **Quality**: ~951 tests, coverage ≥90%, `ruff` clean, docs site builds.
 - **Refactoring (post-v0.4 quality pass)**: ``engine.py`` split into ``_engine_helpers.py`` /
   ``_engine_ops.py`` + mixin (~400 lines, within the 500-line convention); ``formatters.py`` split
@@ -52,18 +54,19 @@ baseline (BibTeX 0.99d, BibLaTeX 3.20, Biber 2.20).
 
 ## Road to 1.0
 
-### v0.5 — Pinax completion
+### v0.5 — First public alpha
 
-All ten Pinax implementation steps, plus the remaining v0.4-to-v0.5 agent polish
-items. The pinned conformance baseline moves from TeX Live 2025 → TeX Live 2026.
+Release the feature-complete single-file engine publicly as an alpha, with the
+core Pinax layer implemented through arXiv PDF/source download. The pinned
+conformance baseline is TeX Live 2026. Backward compatibility remains
+explicitly unguaranteed until v1.0.
 
-**Pinax steps**
+**Deferred Pinax steps**
 - [ ] **9. Open-access published PDFs.** DOI → open-access resolver landing the
       published version at `<citekey>.pdf`, when a resolvable open-access copy
-      exists. Follows the same injectable-fetcher, atomic-write, metadata-gated
-      pattern as arXiv downloads.
+      exists. Deferred beyond the public alpha.
 - [ ] **10. Dedupe material merge.** `dedupe` merge reconciles Pinax materials
-      onto the surviving key.
+      onto the surviving key. Deferred beyond the public alpha.
 
 **Agent polish**
 - [x] **Citekey shell completion.** Register Click shell-completion callbacks on
@@ -87,11 +90,11 @@ items. The pinned conformance baseline moves from TeX Live 2025 → TeX Live 202
       directory when omitted.
 
 **Conformance baseline**
-- [ ] **Bump pinned TeX Live baseline to 2026.** Update the versioned conformance
+- [x] **Bump pinned TeX Live baseline to 2026.** Update the versioned conformance
       corpus, differential test expectations, and CI configuration to match
       TeX Live 2026 (BibTeX 0.99d, BibLaTeX 3.21, Biber 2.21).
 
-**Done when**: all checklist items implemented, tested, and documented;
+**Done when**: alpha scope implemented, tested, and documented;
 `pytest && ruff check src tests` passes; CHANGELOG updated; version bumped to
 0.5.0.
 
@@ -246,7 +249,7 @@ reviewed, then the next.
       and the `FileStore` atomic writers for the preprint PDF and extracted
       source. Unit-tested with fixtures; no real network.
 - [x] **3. The top-level `fetch` command.** `pynakes fetch [target] [file]
-      [--online] [--dry-run] [--json]`, with what-to-download governed by the
+      [--dry-run] [--json]`, with what-to-download governed by the
       `fetch-preprint`/`fetch-source`/`fetch-published` metadata keys;
       `Bibliography.ensure_files_dir` + `fetch_materials`; zero-config default
       `files-dir`; JSON envelope; registration in `cli.py` and `capabilities.py`.
@@ -270,10 +273,10 @@ reviewed, then the next.
 - [x] **8. `add --fetch` for arXiv Pinax materials.** One-step
       import-and-download for arXiv references, using the existing Pinax fetch
       policy for preprint PDF/source materials.
-- [ ] **9. Open-access published PDFs.** (v0.5) DOI → open-access resolver
+- [ ] **9. Open-access published PDFs.** (deferred) DOI → open-access resolver
       landing the published version at `<citekey>.pdf`, when a resolvable
       open-access copy exists.
-- [ ] **10. Dedupe material merge.** (v0.5) `dedupe` merge reconciles Pinax
+- [ ] **10. Dedupe material merge.** (deferred) `dedupe` merge reconciles Pinax
       materials onto the surviving key.
 
 ## Out of scope (for the deterministic core)

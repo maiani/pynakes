@@ -4,18 +4,18 @@ Get up and running with `pynakes` in a few minutes.
 
 ## 1. Install
 
+For normal use:
+
+```bash
+pip install pynakes
+```
+
 For local development:
 
 ```bash
 git clone https://github.com/maiani/pynakes.git
 cd pynakes
 pip install -e ".[dev]"
-```
-
-Once published, end users will install with:
-
-```bash
-pip install pynakes
 ```
 
 ## 2. Inspect a Bibliography

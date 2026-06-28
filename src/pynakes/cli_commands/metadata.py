@@ -11,6 +11,7 @@ import typer
 from pynakes import metadata as metadata_ops
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    RunParams,
     _emit_conflict,
     _emit_error,
     _finish_mod,
@@ -89,6 +90,7 @@ def metadata_set(
 ) -> None:
     """Set one top-level metadata block (jabref-meta or pynakes-meta)."""
     file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     if namespace is not None and namespace not in {"jabref", "pynakes"}:
         _emit_error(
             json_output,
@@ -117,11 +119,8 @@ def metadata_set(
         file,
         "metadata_set",
         coll,
-        dry_run,
-        diff,
-        json_output,
-        [f"{_verb('set', dry_run, 'Set')} {update.namespace}-meta {update.key!r}."],
-        backup=backup,
+        params,
+        [f"{_verb('set', params, 'Set')} {update.namespace}-meta {update.key!r}."],
         modified_entries=0,
         key=update.key,
         value=update.value.rstrip(";").strip(),

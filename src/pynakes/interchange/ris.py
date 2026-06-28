@@ -110,8 +110,8 @@ _RIS_IMPORT_SPEC = _ImportFormatSpec(
     year_tags=frozenset({"PY", "Y1"}),
     keyword_tag="KW",
     field_map=_RIS_TO_BIB_FIELD,
-    preserve_key=False,
-    key_tag=None,
+    preserve_key=True,
+    key_tag="ID",
 )
 
 

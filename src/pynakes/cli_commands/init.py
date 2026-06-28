@@ -16,8 +16,7 @@ from pathlib import Path
 
 import typer
 
-from pynakes.cli_common import _emit, _emit_error, _safe, _verb
-from pynakes.diff import generate_diff
+from pynakes.cli_common import RunParams, _emit_error, _finish_create, _finish_mod, _safe, _verb
 from pynakes.engine import Bibliography
 from pynakes.filestore import FILES_DIR_KEY
 from pynakes.initialize import (
@@ -27,7 +26,6 @@ from pynakes.initialize import (
     render_agents_md,
     render_library,
 )
-from pynakes.io import save_text
 
 # --- init ------------------------------------------------------------------
 
@@ -50,9 +48,7 @@ def _convert_to_pinax(
     coll: Bibliography,
     file: str,
     *,
-    dry_run: bool,
-    diff: bool,
-    json_output: bool,
+    params: RunParams,
     agent_guide: bool,
 ) -> None:
     """Add Pinax metadata to an existing bibliography and optionally write AGENTS.md."""
@@ -68,37 +64,27 @@ def _convert_to_pinax(
         warnings.append("files-dir already set; pinax metadata unchanged")
 
     store = coll.files
-    if store is not None and not dry_run:
+    if store is not None and not params.dry_run:
         store.ensure_root()
-
-    modified = coll.is_modified
-    diff_text = coll.diff() if diff else ""
-
-    if not dry_run and modified:
-        coll.commit(backup=True)
 
     if coll.externally_changed():
         warnings.append("file was modified externally; changes were merged on commit")
 
-    agents_path = _write_agents_guide(file, dry_run=dry_run) if agent_guide else None
+    agents_path = _write_agents_guide(file, dry_run=params.dry_run) if agent_guide else None
 
-    human = [f"Initialized pinax for {file}."]
+    extra = {"pinax": True, "files_dir": f"{stem}.files", "agent_guide": agents_path}
     if agents_path:
-        human.append(f"Wrote agent guide to {agents_path}.")
-    if warnings:
-        human.extend(warnings)
-    payload = {
-        "status": "success",
-        "action": "init",
-        "file": file,
-        "dry_run": dry_run,
-        "pinax": True,
-        "files_dir": f"{stem}.files",
-        "modified": modified,
-        "agent_guide": agents_path,
-        "warnings": warnings,
-    }
-    _emit(json_output, payload, human, diff_text, diff)
+        warnings.append(f"Wrote agent guide to {agents_path}.")
+
+    _finish_mod(
+        file,
+        "init",
+        coll,
+        params,
+        [f"Initialized pinax for {file}."] + [f"  {w}" for w in warnings],
+        warnings=warnings,
+        **extra,
+    )
 
 
 def init(
@@ -139,9 +125,13 @@ def init(
     exists, converts it in place. ``--agent-guide`` writes AGENTS.md (only
     meaningful alongside ``--pinax``).
     """
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output)
+
     if type_ is not None and type_ not in {"biblatex", "bibtex"}:
         _emit_error(
-            json_output, "InvalidInput", f"Invalid --type {type_!r}; expected biblatex or bibtex"
+            params.json_output,
+            "InvalidInput",
+            f"Invalid --type {type_!r}; expected biblatex or bibtex",
         )
 
     exists = Path(file).exists()
@@ -149,16 +139,18 @@ def init(
     # Pinax conversion: additive metadata update on an existing file.
     if pinax and exists:
         coll = Bibliography.open(file)
-        _convert_to_pinax(
-            coll, file, dry_run=dry_run, diff=diff, json_output=json_output, agent_guide=agent_guide
-        )
+        _convert_to_pinax(coll, file, params=params, agent_guide=agent_guide)
         return
 
     # New file creation: refuse overwrite unless --force.
     if exists and not force:
         _emit_error(
-            json_output, "FileExists", f"{file} already exists; pass --force to overwrite it"
+            params.json_output,
+            "FileExists",
+            f"{file} already exists; pass --force to overwrite it",
         )
+
+    previous_content = Path(file).read_bytes().decode("utf-8", "replace") if exists else ""
 
     # Base profile: a copied template (authoritative, no defaults injected) or
     # the sensible default profile for a fresh library.
@@ -180,46 +172,40 @@ def init(
 
     content = render_library(entries)
 
-    original = Path(file).read_bytes().decode("utf-8", "replace") if exists else ""
-    diff_text = generate_diff(original, content, file) if diff else ""
+    if pinax and not params.dry_run:
+        target = Path(file)
+        target.with_name(f"{target.stem}.files").mkdir(parents=True, exist_ok=True)
 
-    created = False
-    if not dry_run:
-        result = save_text(content, file, backup=(exists and force))
-        if not result.success:
-            _emit_error(json_output, "IOError", result.error or "Failed to write the new library")
-        created = True
-
-    if pinax and not dry_run:
-        coll = Bibliography.open(file)
-        store = coll.files
-        if store is not None:
-            store.ensure_root()
-
-    agents_path = _write_agents_guide(file, dry_run=dry_run) if (agent_guide and pinax) else None
+    agents_path = (
+        _write_agents_guide(file, dry_run=params.dry_run) if (agent_guide and pinax) else None
+    )
 
     keys = sorted({entry.key for entry in entries})
     effective = next((e.value for e in entries if e.key.lower() == "databasetype"), None)
     effective_type = effective.strip().rstrip(";").strip().lower() if effective else None
 
     detail = f" [{effective_type}]" if effective_type else ""
-    human = [f"{_verb('create', dry_run)} {file}{detail} with {len(keys)} metadata key(s)."]
+    human = [f"{_verb('create', params)} {file}{detail} with {len(keys)} metadata key(s)."]
     if agents_path:
         human.append(f"Wrote agent guide to {agents_path}.")
-    payload = {
-        "status": "success",
-        "action": "init",
-        "file": file,
-        "dry_run": dry_run,
-        "created": created,
-        "pinax": pinax,
-        "type": effective_type,
-        "from": from_,
-        "keys": keys,
-        "agent_guide": agents_path,
-        "warnings": [],
-    }
-    _emit(json_output, payload, human, diff_text, diff)
+
+    created = not params.dry_run
+
+    _finish_create(
+        params=params,
+        path=file,
+        action="init",
+        content=content,
+        human=human,
+        previous_content=previous_content,
+        backup=force,
+        pinax=pinax,
+        type=effective_type,
+        keys=keys,
+        agent_guide=agents_path,
+        created=created,
+        **{"from": from_},
+    )
 
 
 def register(app: typer.Typer) -> None:

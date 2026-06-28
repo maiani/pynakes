@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-28
+
 ### Added
 
 - **`remove` command** (`pynakes remove <bib> <citekey>...`). Removes entries
@@ -46,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Move the documented parser-conformance baseline for the v0.5 alpha to TeX
+  Live 2026 (BibTeX 0.99d, BibLaTeX 3.21, Biber 2.21).
 - Treat differing raw BibTeX spelling as a `combine --dedupe` conflict even
   when parsed fields match, preserving round-trip intent.
 - Derive subset, split, and merge output libraries through `BibFile.derive()`,
@@ -87,6 +91,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Mark v0.5 as a public alpha and document that backward compatibility is not
+  guaranteed for the Python API, CLI syntax, or JSON envelopes until v1.0.
 - Document the optional Pinax corpus mode while preserving the plain `.bib`
   maintenance engine as the base identity.
 - Clarify that `MetadataBlock.normalized_value` is a display/semantic view,
@@ -96,8 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - 2026-06-26
 Complete single-file BibTeX/BibLaTeX maintenance engine
-with parser conformance pinned to TeX Live 2026 (BibTeX 0.99d, BibLaTeX 3.21,
-Biber 2.20).
+with parser conformance later pinned for the public alpha to TeX Live 2026
+(BibTeX 0.99d, BibLaTeX 3.21, Biber 2.21).
 
 ### Parser and round-trip fidelity
 
@@ -112,7 +118,7 @@ Biber 2.20).
   default data-model inheritance (own > xdata > crossref; `xref`/sets opaque).
 - Arbitrary BibLaTeX entry types (`@online`, `@set`, `@xdata`, …) and custom
   data-model fields pass through without a closed schema.
-- Versioned conformance corpus pinned to TeX Live 2025; differential tests against
+- Versioned conformance corpus pinned to TeX Live 2026; differential tests against
   `bibtex 0.99d` and `biber --tool`; property-based tests (Hypothesis) for
   parenthesis-delimited entries and all modifying operations.
 

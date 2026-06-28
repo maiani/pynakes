@@ -11,10 +11,10 @@ import typer
 from pynakes.batch import BatchError, apply_operations
 from pynakes.cli_common import (
     _BACKUP_OPTION,
-    _emit,
+    RunParams,
     _emit_conflict,
     _emit_error,
-    _preview_or_commit,
+    _finish_mod,
     _resolve_input_bib,
     _safe,
     _verb,
@@ -56,6 +56,7 @@ def batch(
         return
 
     file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     coll = Bibliography.open(file)
     try:
         op_results = apply_operations(coll, operations)
@@ -72,27 +73,13 @@ def batch(
         )
         return
 
-    plan = coll.change_plan()  # combined, before commit
-    diff_text, modified, changed = _preview_or_commit(coll, dry_run, backup)
-    _emit(
-        json_output,
-        {
-            "status": "success",
-            "action": "batch",
-            "file": file,
-            "dry_run": dry_run,
-            "modified": modified,
-            "modified_entries": changed,
-            "warnings": [],
-            "operations": op_results,
-            "plan": plan,
-        },
-        [
-            f"{_verb('apply', dry_run, 'Applied')} {len(op_results)} operation(s); "
-            f"{changed} entry change(s)."
-        ],
-        diff_text,
-        diff,
+    _finish_mod(
+        file,
+        "batch",
+        coll,
+        params,
+        [f"{_verb('apply', params, 'Applied')} {len(op_results)} operation(s);"],
+        operations=op_results,
     )
 
 

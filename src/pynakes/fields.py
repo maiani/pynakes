@@ -77,6 +77,8 @@ _TITLE_TOKEN_RE = re.compile(r"(?:[A-Z]\.){2,}|[A-Za-z][A-Za-z0-9]*(?:[-+][A-Za-
 
 def _protect_token(token: str, terms: set[str]) -> bool:
     """Return whether ``token`` should be brace-protected in a BibTeX title."""
+    if not token:
+        return False
     if token in terms:
         return True
     if re.fullmatch(r"(?:[A-Z]\.){2,}", token):

@@ -9,6 +9,7 @@ import typer
 from pynakes import normalize as normalize_ops
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    RunParams,
     _emit_error,
     _finish_mod,
     _resolve_input_bib,
@@ -92,6 +93,7 @@ def normalize(
 ) -> None:
     """Run the standard bibliography normalization routine."""
     file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     try:
         options = normalize_ops.NormalizeOptions(
             protect_titles=_optional_bool(title_protection),
@@ -111,7 +113,7 @@ def normalize(
         _emit_error(json_output, "InvalidNormalizeOption", str(exc))
 
     human = [
-        f"{_verb('normalize', dry_run)} entries.",
+        f"{_verb('normalize', params)} entries.",
         "  "
         f"titles={sum(report.title_fields.values())}, "
         f"authors={report.authors}, journals={report.journals}, dois={report.dois}, "
@@ -125,13 +127,10 @@ def normalize(
         file,
         "normalize",
         coll,
-        dry_run,
-        diff,
-        json_output,
+        params,
         human,
         warnings=report.warnings,
         operations=report.operations,
-        backup=backup,
     )
 
 
