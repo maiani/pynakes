@@ -128,3 +128,4 @@ dmypy.json
 
 # Project specific
 *.bak
+.agent-eval-runs/

@@ -270,8 +270,15 @@ def build_fetch_queue(lib: BibFile, target: str | None) -> list[BibEntry]:
 
     duplicates = lib.entries.duplicate_keys()
     if duplicates:
-        keys = ", ".join(sorted(duplicates))
-        raise ValueError(f"Pinax material addressing requires unique citation keys: {keys}")
+        instances = lib.entries.duplicate_key_instances()
+        parts = []
+        for key in sorted(duplicates):
+            indices = instances.get(key, [])
+            line_refs = f" (entry {', '.join(f'#{i}' for i in indices)})" if indices else ""
+            parts.append(f"{key} ×{duplicates[key]}{line_refs}")
+        raise ValueError(
+            f"Pinax material addressing requires unique citation keys: {'; '.join(parts)}"
+        )
     return list(lib.entries.values())
 
 

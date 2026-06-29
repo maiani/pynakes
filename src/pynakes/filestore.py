@@ -309,6 +309,68 @@ class FileStore:
         _copy_manifest_row(source, self, key)
         return copied
 
+    def plan_material_merge(self, old: str, new: str) -> list[dict[str, str]]:
+        """Return planned in-place material moves from ``old`` onto ``new``.
+
+        The merge is conservative: a source material kind may move only when the
+        surviving key has no file/directory and no manifest record for that kind.
+        """
+        old = _validate_key(old)
+        new = _validate_key(new)
+        if old == new:
+            return []
+
+        planned: list[dict[str, str]] = []
+        old_paths = self.paths_for(old)
+        new_paths = self.paths_for(new)
+        for kind in ARTIFACT_KINDS:
+            src = getattr(old_paths, kind)
+            dst = getattr(new_paths, kind)
+            if not _material_exists(src, kind):
+                continue
+            if dst.exists():
+                raise ValueError(f"Cannot merge Pinax material {src}: target exists: {dst}")
+            planned.append(
+                {
+                    "source_key": old,
+                    "target_key": new,
+                    "kind": kind,
+                    "source_path": str(src),
+                    "target_path": str(dst),
+                }
+            )
+
+        if self.manifest_path.exists():
+            self._validate_manifest_row_merge(old, new, {item["kind"] for item in planned})
+        return planned
+
+    def merge_materials(self, old: str, new: str) -> PinaxRenameTransaction:
+        """Move one duplicate key's materials and provenance onto ``new``."""
+        old = _validate_key(old)
+        new = _validate_key(new)
+        transaction = PinaxRenameTransaction(
+            store=self,
+            moved=[],
+            original_manifest=self.read_manifest() if self.manifest_path.exists() else None,
+            manifest_existed=self.manifest_path.exists(),
+        )
+        if old == new:
+            return transaction
+
+        plan = self.plan_material_merge(old, new)
+        try:
+            for item in plan:
+                src = Path(item["source_path"])
+                dst = Path(item["target_path"])
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                src.replace(dst)
+                transaction.moved.append((src, dst))
+            self._merge_manifest_row(old, new, {item["kind"] for item in plan})
+        except Exception:
+            transaction.rollback()
+            raise
+        return transaction
+
     def fix_drift(
         self, keys: Iterable[str], *, added_date: str | None = None
     ) -> list[dict[str, str]]:
@@ -533,6 +595,55 @@ class FileStore:
         files[new] = files.pop(old)
         self.write_manifest(manifest)
 
+    def _validate_manifest_row_merge(self, old: str, new: str, moved_kinds: set[str]) -> None:
+        manifest = self.read_manifest()
+        files = manifest["files"]
+        if not isinstance(files, dict):
+            raise TypeError("Pinax manifest 'files' must be a dict")
+        old_row = files.get(old)
+        if not isinstance(old_row, dict):
+            return
+        new_row = files.get(new, {})
+        if not isinstance(new_row, dict):
+            raise ValueError(f"Cannot merge Pinax manifest row {old!r}: invalid target row {new!r}")
+        for kind in ARTIFACT_KINDS:
+            if kind in old_row and kind in new_row:
+                raise ValueError(
+                    f"Cannot merge Pinax manifest row {old!r}: target key {new!r} "
+                    f"already has {kind}"
+                )
+        if moved_kinds and "preprint_canonical" in old_row and "preprint_canonical" in new_row:
+            if bool(old_row["preprint_canonical"]) != bool(new_row["preprint_canonical"]):
+                raise ValueError(
+                    f"Cannot merge Pinax manifest row {old!r}: target key {new!r} "
+                    "has conflicting preprint_canonical state"
+                )
+
+    def _merge_manifest_row(self, old: str, new: str, moved_kinds: set[str]) -> None:
+        if not self.manifest_path.exists():
+            return
+        manifest = self.read_manifest()
+        files = manifest["files"]
+        if not isinstance(files, dict):
+            raise TypeError("Pinax manifest 'files' must be a dict")
+        old_row = files.get(old)
+        if not isinstance(old_row, dict):
+            files.pop(old, None)
+            self.write_manifest(manifest)
+            return
+        new_row = files.setdefault(new, {})
+        if not isinstance(new_row, dict):
+            raise ValueError(f"Cannot merge Pinax manifest row {old!r}: invalid target row {new!r}")
+        for kind in moved_kinds:
+            if kind in old_row:
+                new_row[kind] = old_row[kind]
+        if moved_kinds and "preprint_canonical" in old_row:
+            new_row.setdefault("preprint_canonical", bool(old_row["preprint_canonical"]))
+        files.pop(old, None)
+        if not _manifest_row_has_state(new_row):
+            files.pop(new, None)
+        self.write_manifest(manifest)
+
 
 def resolve_files_dir(value: str, bib_path: str | Path) -> Path:
     """Resolve and validate a ``files-dir`` metadata value.
@@ -598,6 +709,14 @@ def _manifest_refetchable(manifest: dict[str, object], key: str) -> bool:
         if isinstance(record, dict) and record.get("refetchable") is True:
             return True
     return False
+
+
+def _material_exists(path: Path, kind: str) -> bool:
+    return path.is_dir() if kind == "preprint_source" else path.is_file()
+
+
+def _manifest_row_has_state(row: dict[str, object]) -> bool:
+    return any(kind in row for kind in ARTIFACT_KINDS) or bool(row.get("preprint_canonical", False))
 
 
 def _copy_manifest_row(source: FileStore, target: FileStore, key: str) -> None:

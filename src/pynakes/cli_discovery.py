@@ -9,14 +9,60 @@ from typer.core import TyperGroup
 
 _BIB_ARGUMENT_NAMES = {"file", "bib_file", "files"}
 
+# Commands whose leading ``.bib`` argument names a file to *create*, not an
+# existing library to discover. Auto-detecting and substituting a local ``.bib``
+# would be actively wrong for these, so they are excluded from auto-insertion.
+_NO_AUTODETECT_COMMANDS = {"init"}
 
-def _single_bib_file(directory: Path) -> Path | None:
-    """Return the only regular ``.bib`` file in *directory*, if there is one."""
-    candidates = sorted(
+# Context-meta key recording whether the caller asked for JSON output, so the
+# group can honor the JSON contract when reframing a usage error.
+_JSON_META_KEY = "pynakes_json_output"
+
+
+def _bib_candidates(directory: Path) -> list[Path]:
+    """Return the regular ``.bib`` files in *directory*, name-sorted."""
+    return sorted(
         (path for path in directory.iterdir() if path.is_file() and path.suffix.lower() == ".bib"),
         key=lambda path: path.name.casefold(),
     )
+
+
+def _single_bib_file(directory: Path) -> Path | None:
+    """Return the only regular ``.bib`` file in *directory*, if there is one."""
+    candidates = _bib_candidates(directory)
     return candidates[0] if len(candidates) == 1 else None
+
+
+def _emit_cli_error(json_output: bool, error: str, message: str) -> None:
+    """Emit a structured (or plain) error and exit 1, via the shared helper.
+
+    Imported lazily to avoid a circular import with :mod:`pynakes.cli_common`.
+    """
+    from pynakes.cli_common import _emit_error
+
+    _emit_error(json_output, error, message)
+
+
+def _report_missing_bib(json_output: bool, candidates: list[Path]) -> None:
+    """Report the real cause when a leading ``.bib`` was omitted and undetectable.
+
+    Mirrors :func:`pynakes.cli_common._resolve_input_bib` so a command that
+    omits its library argument fails the same way whether the failure surfaces
+    here (a multi-positional command whose parsing would otherwise report a
+    misleading "Missing argument") or in the handler. Never returns.
+    """
+    if not candidates:
+        _emit_cli_error(
+            json_output,
+            "InvalidInput",
+            "No *.bib file found in current directory; specify one as an argument",
+        )
+    names = "  ".join(path.name for path in candidates)
+    _emit_cli_error(
+        json_output,
+        "InvalidInput",
+        f"Multiple *.bib files found; specify one as an argument:\n{names}",
+    )
 
 
 def _positional_tokens(command: click.Command, tokens: list[str]) -> list[str]:
@@ -90,13 +136,39 @@ class AutoBibGroup(TyperGroup):
     This operates before Click binds positional arguments, allowing commands
     such as ``fields append keywords ml`` to retain their existing positional
     syntax while using the discovered library as the leading argument.
+
+    When the library argument is omitted but cannot be auto-detected (no local
+    ``.bib``, or more than one), it reports the real cause instead of Click's
+    misleading downstream "Missing argument". And so the JSON contract is never
+    broken by a parse failure, any usage error is reframed as a structured
+    ``{"status":"error",...}`` envelope (exit 1) when ``--json`` was requested.
     """
 
     def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        # ``ctx.meta`` is shared across the context tree, so recording the JSON
+        # request once makes it visible to ``invoke`` at every nesting level.
+        if "--json" in args:
+            ctx.meta[_JSON_META_KEY] = True
+        json_output = ctx.meta.get(_JSON_META_KEY, False)
         if len(args) >= 2 and "--help" not in args and "-h" not in args:
             command = self.get_command(ctx, args[0])
-            if command is not None and not hasattr(command, "commands"):
-                candidate = _single_bib_file(Path.cwd())
-                if candidate is not None and _should_insert_bib(command, args[1:]):
-                    args.insert(1, candidate.name)
+            if (
+                command is not None
+                and not hasattr(command, "commands")
+                and command.name not in _NO_AUTODETECT_COMMANDS
+            ):
+                if _should_insert_bib(command, args[1:]):
+                    candidates = _bib_candidates(Path.cwd())
+                    if len(candidates) == 1:
+                        args.insert(1, candidates[0].name)
+                    else:
+                        _report_missing_bib(json_output, candidates)
         return super().parse_args(ctx, args)
+
+    def invoke(self, ctx: click.Context):
+        try:
+            return super().invoke(ctx)
+        except click.UsageError as exc:
+            if not ctx.meta.get(_JSON_META_KEY, False):
+                raise  # Humans keep Click's usage text and exit code 2.
+            _emit_cli_error(True, "UsageError", exc.format_message())

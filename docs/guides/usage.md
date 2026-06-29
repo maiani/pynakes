@@ -234,29 +234,43 @@ This protects acronyms, uppercase/digit tokens, mixed-case terms such as
 
 ## add
 
-Add a reference by DOI **or** arXiv identifier. The identifier type is
+Add a manually specified reference entry:
+
+```bash
+pynakes add Manual2026 refs.bib --field title="Manual Reference" --field year=2026
+pynakes add Manual2026 refs.bib --type book --field author="Ada Lovelace"
+pynakes add Manual2026 --field title="Manual Reference"  # auto-detects one .bib file
+```
+
+`--field` is repeatable and uses `name=value` syntax. `--type` defaults to
+`article`. Existing citation keys are rejected unless `--allow-duplicate` is
+passed.
+
+## import
+
+Import a reference by DOI **or** arXiv identifier. The identifier type is
 auto-detected, so the same command handles all of these:
 
 ```bash
-pynakes add 10.5555/example refs.bib --dry-run --diff
-pynakes add https://doi.org/10.5555/example refs.bib
-pynakes add arXiv:2301.00001 refs.bib
-pynakes add https://arxiv.org/abs/2301.00001 refs.bib
+pynakes import 10.5555/example refs.bib --dry-run --diff
+pynakes import https://doi.org/10.5555/example refs.bib
+pynakes import arXiv:2301.00001 refs.bib
+pynakes import https://arxiv.org/abs/2301.00001 refs.bib
 ```
 
 Options:
 
 ```bash
-pynakes add 10.5555/example refs.bib --key ManualKey2026
-pynakes add 10.5555/example refs.bib --key-source provider
-pynakes add 10.5555/example refs.bib --allow-duplicate
-pynakes add arXiv:2301.00001 refs.bib --fetch
+pynakes import 10.5555/example refs.bib --key ManualKey2026
+pynakes import 10.5555/example refs.bib --key-source provider
+pynakes import 10.5555/example refs.bib --allow-duplicate
+pynakes import arXiv:2301.00001 refs.bib --fetch
 ```
 
 DOIs are fetched through DOI-resolver content negotiation; arXiv ids are fetched
-from the arXiv Atom API. By default `add` imports metadata only; `--fetch` also
-downloads configured Pinax materials for the new arXiv entry according to the
-library's `fetch-preprint` and `fetch-source` metadata. Existing matching
+from the arXiv Atom API. By default `import` imports metadata only; `--fetch`
+also downloads configured Pinax materials for the new arXiv entry according to
+the library's `fetch-preprint` and `fetch-source` metadata. Existing matching
 DOI/arXiv references are detected before importing. arXiv entries are written as
 `@online` in BibLaTeX libraries and `@misc` in BibTeX ones, following the
 library's `databaseType` metadata (defaulting to BibTeX when unset).
@@ -465,9 +479,9 @@ pynakes capabilities --json
 Search entries without modifying the library.
 
 ```bash
-pynakes search refs.bib learning
-pynakes search refs.bib 'title:"natural language" type:article' --json
-pynakes search refs.bib widgets --field title --where 'year = 2024' --json
+pynakes search learning refs.bib
+pynakes search 'title:"natural language" type:article' refs.bib --json
+pynakes search widgets refs.bib --field title --where 'year = 2024' --json
 ```
 
 Terms are ANDed. Quoted phrases stay together. `field:term` scopes a term to a
@@ -483,7 +497,10 @@ pynakes dedupe merge refs.bib --dry-run --diff
 ```
 
 `merge` exits with code `2` when field values disagree and cannot be safely
-resolved.
+resolved. In a Pinax library, `merge` also moves the duplicate entries'
+materials and provenance onto the surviving key when the survivor has no
+material of the same kind; an existing survivor material is reported as a
+conflict rather than overwritten.
 
 ## verify / enrich
 

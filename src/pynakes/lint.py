@@ -278,15 +278,16 @@ def lint(lib: BibFile) -> list[LintIssue]:
             )
         )
 
-    for key, count in lib.entries.duplicate_keys().items():
+    for key, indices in lib.entries.duplicate_key_instances().items():
         if not key.strip():
             # Empty keys are reported per-entry below, not as a duplicate set.
             continue
+        line_refs = ", ".join(f"#{i}" for i in indices)
         issues.append(
             LintIssue(
                 "duplicate_key",
                 "error",
-                f"Citation key {key!r} appears {count} times",
+                f"Citation key {key!r} appears {len(indices)} times (entry {line_refs})",
                 key=key,
             )
         )

@@ -134,7 +134,7 @@ def parse_bib(text: str) -> BibFile:
         else:
             entry = _parse_entry(entry_type, body, raw_block)
             if entry.key in entries:
-                logger.warning(
+                logger.info(
                     "Duplicate citation key %r (line %d); preserving both entries",
                     entry.key,
                     line_num,

@@ -92,6 +92,7 @@ class DedupeMergeReport:
     merged: list[ClusterMerge]
     removed_entries: list[BibEntry]
     field_changes: int = 0
+    pinax_materials: list[dict[str, str]] = field(default_factory=list)
 
     @property
     def merged_clusters(self) -> int:
@@ -116,6 +117,7 @@ class DedupeMergeReport:
             "merged_clusters": self.merged_clusters,
             "removed_entries": self.removed_entry_count,
             "field_changes": self.field_changes,
+            "pinax_materials": list(self.pinax_materials),
         }
 
 

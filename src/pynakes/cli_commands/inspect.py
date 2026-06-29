@@ -103,7 +103,12 @@ def inspect(
         suffix = " resolved" if resolved else ""
         typer.echo(f"  @{entry.type}{{{entry.key}}}  ({count}{suffix} fields)")
     if duplicates:
-        typer.echo(f"Duplicate keys: {', '.join(f'{k} ×{n}' for k, n in duplicates.items())}")
+        instances = lib.entries.duplicate_key_instances()
+        parts = []
+        for key, indices in instances.items():
+            line_refs = ", ".join(f"#{i}" for i in indices)
+            parts.append(f"{key} ({line_refs})")
+        typer.echo(f"Duplicate keys: {', '.join(parts)}")
 
 
 def register(app: typer.Typer) -> None:

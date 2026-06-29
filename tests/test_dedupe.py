@@ -175,6 +175,103 @@ def test_dedupe_merge_cli_dry_run_diff_json(tmp_path: Path) -> None:
     assert bib.read_text() == original
 
 
+def test_dedupe_merge_moves_pinax_materials_to_surviving_key(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@article{Survivor,\n"
+        "  author = {John Smith},\n"
+        "  title = {A Practical Test},\n"
+        "  year = {2020},\n"
+        "  doi = {10.5555/abc}\n"
+        "}\n\n"
+        "@article{Duplicate,\n"
+        "  author = {John Smith},\n"
+        "  title = {A Practical Test},\n"
+        "  year = {2020},\n"
+        "  doi = {10.5555/abc}\n"
+        "}\n"
+        "@comment{pynakes-meta:\nfiles-dir:\n}\n"
+    )
+    files = tmp_path / "refs.files"
+    files.mkdir()
+    (files / "Duplicate_preprint.pdf").write_bytes(b"pdf")
+    (files / ".pinax").mkdir()
+    (files / ".pinax" / "manifest.json").write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "files": {
+                    "Duplicate": {
+                        "preprint_canonical": False,
+                        "preprint_pdf": {
+                            "source": "https://arxiv.org/pdf/2101.00001",
+                            "fetched_date": "2026-06-27",
+                            "sha256": "0" * 64,
+                            "refetchable": True,
+                        },
+                    }
+                },
+            }
+        )
+    )
+
+    result = runner.invoke(app, ["dedupe", "merge", str(bib), "--json"])
+    data = json.loads(result.output)
+
+    assert result.exit_code == 0, result.output
+    assert data["pinax_materials"][0]["source_key"] == "Duplicate"
+    assert data["pinax_materials"][0]["target_key"] == "Survivor"
+    assert not (files / "Duplicate_preprint.pdf").exists()
+    assert (files / "Survivor_preprint.pdf").read_bytes() == b"pdf"
+    manifest = json.loads((files / ".pinax" / "manifest.json").read_text())
+    assert "Duplicate" not in manifest["files"]
+    assert manifest["files"]["Survivor"]["preprint_pdf"]["refetchable"] is True
+
+
+def test_dedupe_merge_pinax_materials_respects_dry_run(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@article{Survivor,\n  title = {A Practical Test},\n  doi = {10.5555/abc}\n}\n"
+        "@article{Duplicate,\n  title = {A Practical Test},\n  doi = {10.5555/abc}\n}\n"
+        "@comment{pynakes-meta:\nfiles-dir:\n}\n"
+    )
+    files = tmp_path / "refs.files"
+    files.mkdir()
+    (files / "Duplicate_preprint.pdf").write_bytes(b"pdf")
+
+    result = runner.invoke(app, ["dedupe", "merge", str(bib), "--dry-run", "--json"])
+    data = json.loads(result.output)
+
+    assert result.exit_code == 0, result.output
+    assert data["dry_run"] is True
+    assert data["pinax_materials"][0]["kind"] == "preprint_pdf"
+    assert (files / "Duplicate_preprint.pdf").read_bytes() == b"pdf"
+    assert not (files / "Survivor_preprint.pdf").exists()
+
+
+def test_dedupe_merge_pinax_material_conflict_exit_2(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@article{Survivor,\n  title = {A Practical Test},\n  doi = {10.5555/abc}\n}\n"
+        "@article{Duplicate,\n  title = {A Practical Test},\n  doi = {10.5555/abc}\n}\n"
+        "@comment{pynakes-meta:\nfiles-dir:\n}\n"
+    )
+    files = tmp_path / "refs.files"
+    files.mkdir()
+    (files / "Survivor_preprint.pdf").write_bytes(b"target")
+    (files / "Duplicate_preprint.pdf").write_bytes(b"source")
+
+    result = runner.invoke(app, ["dedupe", "merge", str(bib), "--json"])
+    data = json.loads(result.output)
+
+    assert result.exit_code == 2, result.output
+    assert data["status"] == "conflict"
+    assert data["error"] == "DedupeConflict"
+    assert data["conflicts"][0]["field"] == "pinax_materials"
+    assert "@article{Duplicate," in bib.read_text()
+    assert (files / "Duplicate_preprint.pdf").read_bytes() == b"source"
+
+
 def test_dedupe_merge_cli_conflict_exit_2(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text(

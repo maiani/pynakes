@@ -45,7 +45,7 @@ pynakes capabilities --json
 Read-only:
 
 - `pynakes inspect <file> [--json]`
-- `pynakes search <file> <query> [--field ...] [--where ...] [--json]`
+- `pynakes search <query> [file] [--field ...] [--where ...] [--json]`
 - `pynakes lint <file>... [--strict] [--json]`
 - `pynakes groups list <file> [--json]`
 - `pynakes keys check <file>... [--strict] [--json]`
@@ -77,7 +77,8 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 - `pynakes fields append <file> <field> <value> [--where ...]`
 - `pynakes fields clear <file> <field> [--where ...]`
 - `pynakes fields protect-title <file> [--field ...] [--term ...] [--where ...]`
-- `pynakes add <identifier> [file] [--key ...] [--key-source generated|provider] [--allow-duplicate] [--fetch]` — `<identifier>` is a DOI, DOI URL, arXiv id, or arXiv URL
+- `pynakes add <key> [file] --field name=value ... [--type ...]` — add a manually specified entry
+- `pynakes import <identifier> [file] [--key ...] [--key-source generated|provider] [--allow-duplicate] [--fetch]` — `<identifier>` is a DOI, DOI URL, arXiv id, or arXiv URL
 - `pynakes metadata set <file> <key> <value> [--allow-unknown]`
 - `pynakes metadata adopt-jabref <file>` — start maintaining a JabRef metadata
   projection for a pynakes-native library (mirrors JabRef-native settings into
@@ -147,9 +148,9 @@ cluster.
 `search` is read-only and returns matching entries without touching the file:
 
 ```bash
-pynakes search refs.bib learning
-pynakes search refs.bib 'title:"natural language" type:article' --json
-pynakes search refs.bib widgets --field title --where 'year = 2024' --json
+pynakes search learning refs.bib
+pynakes search 'title:"natural language" type:article' refs.bib --json
+pynakes search widgets refs.bib --field title --where 'year = 2024' --json
 ```
 
 Search terms are whitespace-separated and ANDed. Quoted phrases stay together.
@@ -190,13 +191,14 @@ normalize DOI values, and abbreviate or expand journal titles when a journal
 style is configured. It honors project metadata overrides via `jabref-meta`
 comments and CLI options.
 
-### Add a reference (DOI or arXiv)
+### Import or add a reference
 
 ```bash
-pynakes add 10.1145/3377811.3380368 refs.bib --dry-run --diff --json
-pynakes add 10.1145/3377811.3380368 refs.bib --json
-pynakes add arXiv:2301.00001 refs.bib --json
-pynakes add arXiv:2301.00001 refs.bib --fetch --json
+pynakes import 10.1145/3377811.3380368 refs.bib --dry-run --diff --json
+pynakes import 10.1145/3377811.3380368 refs.bib --json
+pynakes import arXiv:2301.00001 refs.bib --json
+pynakes import arXiv:2301.00001 refs.bib --fetch --json
+pynakes add Manual2026 refs.bib --field title="Manual Reference" --field year=2026 --json
 ```
 
 Citation-key priority:
@@ -205,8 +207,8 @@ Citation-key priority:
 - `--key-source provider` keeps the provider's key when one is available.
 - `--key-source generated` (default) generates a key locally, using JabRef
   citation-key metadata when present.
-- `--fetch` downloads configured Pinax arXiv materials for the new key after the
-  import succeeds.
+- `import --fetch` downloads configured Pinax arXiv materials for the new key
+  after the import succeeds.
 
 ### Repair duplicate keys
 

@@ -374,7 +374,9 @@ def fetch_doi_entry(doi: str, *, cache_dir: str | Path | None = None) -> BibEntr
         try:
             text = fetch_doi_bibtex(normalized)
         except DOIImportError as exc:
-            raise MetadataFetchError(f"Could not fetch DOI {normalized!r}: {exc}") from exc
+            raise MetadataFetchError(
+                f"Could not fetch DOI {normalized!r} via doi.org content negotiation: {exc}"
+            ) from exc
         if cache_path is not None:
             cache_path.parent.mkdir(parents=True, exist_ok=True)
             cache_path.write_text(text, encoding="utf-8")

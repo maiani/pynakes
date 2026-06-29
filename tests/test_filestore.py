@@ -181,6 +181,57 @@ def test_rename_materials_moves_paths_and_manifest_with_rollback(tmp_path: Path)
     assert "Old" in manifest["files"]
 
 
+def test_merge_materials_moves_missing_kinds_and_manifest_row(tmp_path: Path) -> None:
+    root = tmp_path / "refs.files"
+    root.mkdir()
+    (root / "Survivor.pdf").write_bytes(b"published")
+    (root / "Duplicate_preprint.pdf").write_bytes(b"preprint")
+    store = FileStore(root=root, bib_path=tmp_path / "refs.bib")
+    store.record_artifact(
+        "Duplicate",
+        "preprint_pdf",
+        source="https://arxiv.org/pdf/2101.00001",
+        fetched_date="2026-06-27",
+        refetchable=True,
+    )
+
+    planned = store.plan_material_merge("Duplicate", "Survivor")
+    transaction = store.merge_materials("Duplicate", "Survivor")
+
+    assert planned == [
+        {
+            "source_key": "Duplicate",
+            "target_key": "Survivor",
+            "kind": "preprint_pdf",
+            "source_path": str(root / "Duplicate_preprint.pdf"),
+            "target_path": str(root / "Survivor_preprint.pdf"),
+        }
+    ]
+    assert not (root / "Duplicate_preprint.pdf").exists()
+    assert (root / "Survivor_preprint.pdf").read_bytes() == b"preprint"
+    manifest = json.loads((root / ".pinax" / "manifest.json").read_text())
+    assert "Duplicate" not in manifest["files"]
+    assert manifest["files"]["Survivor"]["preprint_pdf"]["refetchable"] is True
+
+    transaction.rollback()
+
+    assert (root / "Duplicate_preprint.pdf").read_bytes() == b"preprint"
+    assert not (root / "Survivor_preprint.pdf").exists()
+    manifest = json.loads((root / ".pinax" / "manifest.json").read_text())
+    assert "Duplicate" in manifest["files"]
+
+
+def test_merge_materials_rejects_existing_target_kind(tmp_path: Path) -> None:
+    root = tmp_path / "refs.files"
+    root.mkdir()
+    (root / "Survivor_preprint.pdf").write_bytes(b"target")
+    (root / "Duplicate_preprint.pdf").write_bytes(b"source")
+    store = FileStore(root=root, bib_path=tmp_path / "refs.bib")
+
+    with pytest.raises(ValueError, match="target exists"):
+        store.plan_material_merge("Duplicate", "Survivor")
+
+
 def test_scan_deduplicates_keys(tmp_path: Path) -> None:
     # Duplicate keys must be tolerated (invariant #5): scan silently deduplicates.
     store = FileStore(root=tmp_path / "refs.files", bib_path=tmp_path / "refs.bib")

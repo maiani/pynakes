@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`import` command and manual `add`.** DOI/arXiv metadata resolution now lives
+  under `pynakes import <identifier> [file]`, while `pynakes add <key> [file]
+  --field name=value ...` creates a manually specified entry. `import --fetch`
+  keeps the previous import-then-fetch Pinax workflow.
+
+- **Dedupe material merge for Pinax libraries.** `pynakes dedupe merge` now
+  reconciles duplicate keys' Pinax materials onto the surviving citation key,
+  preserving moved provenance manifest rows and respecting `--dry-run`. It
+  reports a dedupe conflict instead of overwriting an existing survivor material
+  kind or ambiguous manifest state.
+
+- **Manual agent beta-test evaluation harness.** Added an opt-in real-agent
+  runner under `tests/agent_eval` that has a supervisor generate task scenarios
+  and a fresh beta-tester agent drive `pynakes` from the published CLI/docs
+  surface. Normal pytest uses a deterministic fake provider; real `codex` runs
+  are manual via `PYNAKES_RUN_AGENT_EVAL=1` and can include online DOI/arXiv
+  workflows with `--include-online`.
+
 - **`--help` and `capabilities` group commands by nature.** The top-level
   `pynakes --help` now organizes commands into panels — *Inspect & validate*,
   *Edit references*, *Materials (pinax)*, *Corpus (multiple files)*, *Create* —
@@ -51,8 +69,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Usage errors no longer break the JSON contract.** When the library
+  argument was omitted and could not be auto-detected (no local `.bib`, or more
+  than one), commands with additional positionals (e.g. `remove`, `fields
+  rename`, `groups add-entry`) leaked a raw Click "Missing argument" usage error
+  to stderr with exit code 2, bypassing the `--json` envelope. Such commands now
+  report the real cause (`InvalidInput`: "No/Multiple *.bib files found") and any
+  residual usage error is reframed as a structured `{"status":"error",...}`
+  envelope with exit code 1 under `--json`. Without `--json`, humans still get
+  Click's usage text and exit code 2. Relatedly, `init` is now excluded from
+  library auto-detection: it creates a library, so omitting its path no longer
+  substitutes (and risks clobbering) an existing local `.bib` — it reports the
+  missing argument instead.
 - Declare Click as a direct runtime dependency for CLI discovery and shell
   completion support, fixing clean CI installs with newer Typer releases.
+
+### Fixed (agent beta eval issues)
+
+- **Search argument order in docs now matches the live CLI.** The synopsis and
+  examples in `docs/guides/llm-integration.md` and `docs/guides/usage.md` had
+  `pynakes search <file> <query>` but the CLI expects `pynakes search <query>
+  [file]`. Docs have been updated to match the CLI.
+- **Duplicate-key log noise in JSON mode.** The parser emitted duplicate-key
+  diagnostics at `WARNING` level, appearing on stderr alongside JSON output.
+  Lowered to `INFO` level so it no longer shows in normal terminal output.
+  Duplicate keys remain structurally available via `lint`, `inspect`, and
+  `keys check`.
+- **Verify/enrich DOI error messages now name the provider.** When a DOI lookup
+  fails, the error now explicitly reads `via doi.org content negotiation` so
+  users can tell where the lookup went and whether a retry might help.
+- **Verify reports "all lookups failed" when nothing was verified.** Both human
+  and JSON output now include an explicit note when `checked=0` and errors are
+  present, rather than silently reporting "verified 0 DOI-backed entries".
+- **Duplicate-key reports include entry indices.** Added
+  `EntryStore.duplicate_key_instances()` returning `{key: [indices]}`. Lint,
+  `inspect`, `keys check`, and Pinax error messages now show entry position
+  (e.g. `#0, #3`) so users can identify which physical entry a message refers to.
 
 ## [0.5.0] - 2026-06-28
 

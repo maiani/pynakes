@@ -37,10 +37,14 @@ def _verify_one(
         "strict": strict,
         **report.to_dict(),
     }
+    if report.errors and report.checked == 0:
+        result["note"] = "No DOIs could be verified — all lookups failed."
     human = [
         f"{file}: verified {report.checked} DOI-backed {_entries(report.checked)}.",
         f"  errors={report.errors}, warnings={report.warnings}, infos={report.infos}",
     ]
+    if report.errors and report.checked == 0:
+        human.append("  No DOIs could be verified — all lookups failed.")
     human += [f"  [{issue.severity}] {issue.key}: {issue.message}" for issue in report.issues]
     if published:
         # Read-only preprint check, folded in from the former `published` command.

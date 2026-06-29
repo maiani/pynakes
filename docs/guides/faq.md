@@ -132,7 +132,7 @@ known metadata block. Unknown metadata is preserved, unknown writes require
 A: DOI import is implemented:
 
 ```bash
-pynakes add 10.5555/example refs.bib --dry-run --diff
+pynakes import 10.5555/example refs.bib --dry-run --diff
 ```
 
 `verify` and `enrich` also support opt-in provider lookups with `--online` (and

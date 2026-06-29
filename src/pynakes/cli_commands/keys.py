@@ -40,17 +40,22 @@ from pynakes.usage import (
 def _keys_check_one(file: str) -> CheckOutcome:
     coll = Bibliography.open(file)
     duplicates = keys_ops.duplicate_key_counts(coll.lib)
+    instances = coll.lib.entries.duplicate_key_instances()
     result = {
         "status": "success",
         "action": "keys_check",
         "file": file,
         "has_duplicates": bool(duplicates),
         "duplicate_keys": duplicates,
+        "duplicate_key_instances": instances,
     }
     if not duplicates:
         human = [f"{file}: all citation keys are unique."]
     else:
-        human = [f"  {key}: appears {count} times" for key, count in duplicates.items()]
+        human = []
+        for key, indices in instances.items():
+            line_refs = ", ".join(f"#{i}" for i in indices)
+            human.append(f"  {key}: appears {len(indices)} times (entry {line_refs})")
         human.append(f"{len(duplicates)} duplicated key(s).")
     return CheckOutcome(
         result=result,

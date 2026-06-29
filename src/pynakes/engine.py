@@ -76,6 +76,7 @@ class Bibliography(BibliographyOperations):
     _text_replacements: list[tuple[str | None, str]] = field(default_factory=list)
     _consolidate_metadata: bool = False
     _pinax_renames: list[tuple[str, str]] = field(default_factory=list)
+    _pinax_material_merges: list[tuple[str, str]] = field(default_factory=list)
 
     @classmethod
     def open(cls, path: str | Path) -> "Bibliography":
@@ -212,6 +213,7 @@ class Bibliography(BibliographyOperations):
         transactions: list[PinaxRenameTransaction] = []
         try:
             transactions = self._apply_pinax_renames()
+            transactions.extend(self._apply_pinax_material_merges())
             if modified:
                 result = save_text(
                     new_text, str(self.path), encoding=self.lib.encoding, backup=backup
@@ -230,6 +232,7 @@ class Bibliography(BibliographyOperations):
         self._removed_entries.clear()
         self._text_replacements.clear()
         self._pinax_renames.clear()
+        self._pinax_material_merges.clear()
         self._consolidate_metadata = False
         self._dirty = False
 
@@ -354,6 +357,22 @@ class Bibliography(BibliographyOperations):
         transactions: list[PinaxRenameTransaction] = []
         for old, new in self._pinax_renames:
             transactions.append(store.rename_materials(old, new))
+        return transactions
+
+    def _stage_pinax_material_merges(self, merges: list[tuple[str, str]]) -> None:
+        if not merges or self.files is None:
+            return
+        self._pinax_material_merges.extend((old, new) for old, new in merges if old != new)
+
+    def _apply_pinax_material_merges(self) -> list[PinaxRenameTransaction]:
+        if not self._pinax_material_merges:
+            return []
+        store = self.files
+        if store is None:
+            return []
+        transactions: list[PinaxRenameTransaction] = []
+        for old, new in self._pinax_material_merges:
+            transactions.append(store.merge_materials(old, new))
         return transactions
 
     def _file_name(self) -> str:

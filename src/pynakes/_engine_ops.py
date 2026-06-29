@@ -310,6 +310,29 @@ class BibliographyOperations:
         self._mark(True)
         return kind, entry
 
+    def add_entry(
+        self,
+        entry_type: str,
+        key: str,
+        fields: dict[str, str],
+        *,
+        allow_duplicate: bool = False,
+    ) -> BibEntry:
+        """Append one manually specified entry to the bibliography."""
+        key = key.strip()
+        entry_type = entry_type.strip().lower()
+        if not key:
+            raise ValueError("Citation key must not be empty")
+        if not entry_type:
+            raise ValueError("Entry type must not be empty")
+        if self.lib.entries.get_all(key) and not allow_duplicate:
+            raise ValueError(f"Citation key already exists: {key}")
+        entry = BibEntry(key=key, type=entry_type, fields=dict(fields), modified=True)
+        self.lib.entries.add(entry)
+        self._appended_entries.append(entry)
+        self._mark(True)
+        return entry
+
     def set_metadata(
         self,
         key: str,
@@ -375,13 +398,48 @@ class BibliographyOperations:
 
     def dedupe_merge(self) -> dedupe_ops.DedupeMergeReport:
         """Merge duplicate-work clusters in memory."""
-        report = dedupe_ops.merge_duplicates(self.lib)
+        clusters = dedupe_ops.find_duplicate_clusters(self.lib)
+        pinax_materials, pinax_merges = self._plan_pinax_dedupe_materials(clusters)
+        report = dedupe_ops.merge_duplicates(self.lib, clusters)
         for entry in report.removed_entries:
             if entry.raw_content:
                 self._text_replacements.append((entry.raw_content, ""))
         self._removed_entries.extend(report.removed_entries)
+        report.pinax_materials = pinax_materials
+        self._stage_pinax_material_merges(pinax_merges)
         self._mark(report.removed_entry_count or report.field_changes)
         return report
+
+    def _plan_pinax_dedupe_materials(
+        self, clusters: list[dedupe_ops.DuplicateCluster]
+    ) -> tuple[list[dict[str, str]], list[tuple[str, str]]]:
+        store = self.files
+        if store is None or not clusters:
+            return [], []
+        planned: list[dict[str, str]] = []
+        merges: list[tuple[str, str]] = []
+        conflicts: list[dedupe_ops.MergeConflict] = []
+        for cluster in clusters:
+            primary = cluster.entries[0]
+            for entry in cluster.entries[1:]:
+                if entry.key == primary.key:
+                    continue
+                try:
+                    material_plan = store.plan_material_merge(entry.key, primary.key)
+                except ValueError as exc:
+                    conflicts.append(
+                        dedupe_ops.MergeConflict(
+                            cluster.identity,
+                            "pinax_materials",
+                            {primary.key: "survivor", entry.key: str(exc)},
+                        )
+                    )
+                    continue
+                planned.extend(material_plan)
+                merges.append((entry.key, primary.key))
+        if conflicts:
+            raise dedupe_ops.DedupeConflictError(conflicts, clusters)
+        return planned, merges
 
     def remove_entry(self, key: str) -> int:
         """Remove every entry with the given citation key from memory.

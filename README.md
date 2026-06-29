@@ -36,7 +36,7 @@ then:
 - **Inspect** — entry count, encoding, duplicates, JabRef metadata
 - **Lint** — validate required fields, DOI shape, key conflicts (CI-gate multiple files)
 - **Normalize** — authors, DOIs, months, journals, `saveActions` pipeline
-- **Add** by DOI or arXiv identifier, with configurable key generation
+- **Import** by DOI or arXiv identifier, with configurable key generation, or add a manual entry
 - **Dedupe & merge** — detect and resolve duplicates, with conflict reporting
 - **Edit fields** — rename, move, append, clear, protect title capitalization
 - **Manage groups and keys** — list, rename, repair, generate from patterns
@@ -86,9 +86,10 @@ pynakes init mylib.bib
 pynakes inspect mylib.bib
 pynakes lint mylib.bib --json
 
-# Add a reference by DOI or arXiv id
-pynakes add 10.5555/example mylib.bib
-pynakes add arXiv:2301.00001 mylib.bib
+# Import a reference by DOI or arXiv id, or add one manually
+pynakes import 10.5555/example mylib.bib
+pynakes import arXiv:2301.00001 mylib.bib
+pynakes add Manual2026 mylib.bib --field title="Manual Reference" --field year=2026
 
 # Preview the standard maintenance pass before committing
 pynakes normalize mylib.bib --dry-run --diff
@@ -145,7 +146,7 @@ engine is feature-complete for this release: parser/writer with byte-for-byte
 round-trip fidelity, all maintenance operations, full JabRef metadata parity,
 and a self-describing agent surface (~950+ tests, ≥90% coverage). The Pinax
 corpus layer is implemented through arXiv download; open-access published-PDF
-import and dedupe material merge are deferred.
+import is deferred.
 
 Until v1.0, pynakes does **not** guarantee backward compatibility for the Python
 API, CLI syntax, or JSON envelopes. The project aims to keep automation

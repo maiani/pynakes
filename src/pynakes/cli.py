@@ -19,6 +19,7 @@ from pynakes.cli_commands import (
     fields,
     files,
     groups,
+    import_ref,
     init,
     inspect,
     integrity,
@@ -74,6 +75,7 @@ metadata.register(metadata_app)
 lint.register(app)
 files.register(files_app)
 add.register(app)
+import_ref.register(app)
 dedupe.register(dedupe_app)
 integrity.register(app)
 groups.register(groups_app)

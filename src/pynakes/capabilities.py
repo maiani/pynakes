@@ -35,9 +35,9 @@ _ERROR_CODES = {
             "InvalidNamespace": "metadata set: namespace was not 'jabref' or 'pynakes'.",
             "InvalidNormalizeOption": "normalize: an option value was not allowed.",
             "KeyNotFound": "A referenced citation key is not in the library (remove, keys rename, etc.).",
-            "InvalidIdentifier": "add: an identifier value was malformed.",
-            "UnsupportedIdentifier": "add: the identifier was not a DOI, arXiv id/URL, or supported journal URL.",
-            "ReferenceImportError": "add: a DOI/arXiv reference could not be resolved or imported.",
+            "InvalidIdentifier": "import: an identifier value was malformed.",
+            "UnsupportedIdentifier": "import: the identifier was not a DOI, arXiv id/URL, or supported journal URL.",
+            "ReferenceImportError": "import: a DOI/arXiv reference could not be resolved or imported.",
         },
     },
     "conflict": {
@@ -47,8 +47,8 @@ _ERROR_CODES = {
             "DuplicateMetadata": "metadata set: multiple blocks match the key (ambiguous).",
             "DuplicateMergeKey": "combine/split --dedupe: a shared key has differing content.",
             "DedupeConflict": "dedupe merge: a cluster has irreconcilable field values.",
-            "DuplicateReference": "add: the DOI/arXiv reference is already present.",
-            "CitationKeyConflict": "add: the chosen citation key already exists.",
+            "DuplicateReference": "import: the DOI/arXiv reference is already present.",
+            "CitationKeyConflict": "import: the chosen citation key already exists.",
         },
     },
 }
@@ -97,6 +97,7 @@ COMMAND_GROUPS: dict[str, list[str]] = {
     "Inspect & validate": ["inspect", "search", "lint", "verify", "capabilities"],
     "Edit references": [
         "add",
+        "import",
         "remove",
         "normalize",
         "convert",
@@ -297,7 +298,8 @@ def get_capabilities() -> dict:
             "normalize": "Run the standard normalization routine",
             "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "
             "formats (export/import CSL-JSON, RIS, MODS, and EndNote)",
-            "add": "Add a reference by DOI, arXiv identifier, or journal article URL; optionally fetch configured Pinax arXiv materials",
+            "add": "Add a manually specified reference entry",
+            "import": "Import a reference by DOI, arXiv identifier, or journal article URL; optionally fetch configured Pinax arXiv materials",
             "fetch": "Download arXiv materials (PDF and source) into the Pinax files-dir",
             "search": "Search entries by free text, phrases, or field-scoped terms",
             "used": "Report/tag/export entries cited in LaTeX sources",

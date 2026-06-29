@@ -37,6 +37,7 @@ nav:
   - Library Profile: guides/library-profile.md
   - Public API & Stability: guides/api-stability.md
   - LLM Integration: guides/llm-integration.md
+  - Agent Beta Eval: guides/agent-beta-eval.md
   - Git Workflows: guides/git-workflows.md
   - Philosophy: vision.md
   - Architecture: guides/architecture.md

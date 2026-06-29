@@ -30,10 +30,10 @@ syntax, or JSON envelopes.
   (DOI/arXiv/journal-URL), `search`, `used`, `dedupe`, `verify`/`enrich`
   (opt-in `--online`; `--published` folds in preprint promotion), `combine`,
   `split`, `batch`.
-- **Pinax corpus mode (steps 1–8)**: `FileStore`, arXiv download, `fetch` command,
+- **Pinax corpus mode (steps 1–8, 10)**: `FileStore`, arXiv download, `fetch` command,
   agent surface, provenance manifest, pinax-aware `combine`/`split`, coordinated
-  key edits, `add --fetch`. Steps 9–10 (OA PDFs, dedupe material merge) are
-  deferred. See [Pinax implementation steps](#pinax-implementation-steps).
+  key edits, `add --fetch`, dedupe material merge. Step 9 (OA PDFs) is deferred.
+  See [Pinax implementation steps](#pinax-implementation-steps).
 - **JabRef v5.15 parity**: full `saveActions` formatter suite, complete metadata
   vocabulary, JabRef key patterns, group management.
 - **Agent-native surface**: structured JSON envelope + exit codes (0/1/2),
@@ -66,8 +66,8 @@ explicitly unguaranteed until v1.0.
 - [ ] **9. Open-access published PDFs.** DOI → open-access resolver landing the
       published version at `<citekey>.pdf`, when a resolvable open-access copy
       exists. Deferred beyond the public alpha.
-- [ ] **10. Dedupe material merge.** `dedupe` merge reconciles Pinax materials
-      onto the surviving key. Deferred beyond the public alpha.
+- [x] **10. Dedupe material merge.** `dedupe` merge reconciles Pinax materials
+      onto the surviving key.
 
 **Agent polish**
 - [x] **Citekey shell completion.** Register Click shell-completion callbacks on
@@ -277,8 +277,8 @@ reviewed, then the next.
 - [ ] **9. Open-access published PDFs.** (deferred) DOI → open-access resolver
       landing the published version at `<citekey>.pdf`, when a resolvable
       open-access copy exists.
-- [ ] **10. Dedupe material merge.** (deferred) `dedupe` merge reconciles Pinax
-      materials onto the surviving key.
+- [x] **10. Dedupe material merge.** `dedupe` merge reconciles Pinax materials
+      onto the surviving key.
 - [ ] **11. DOI → arXiv backfill.** (deferred) Extend `enrich --published
       --online` to reconcile identity both ways: when an entry has a publisher
       DOI but no resolvable arXiv id, resolve the work via OpenAlex (injectable

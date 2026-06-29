@@ -79,20 +79,21 @@ pynakes normalize refs.bib --journal-table journals.csv --ltwa-table ltwa.csv
 `journals.csv` should contain `title`, `abbreviation`, and optional `issn`
 columns. LTWA tables should contain `Word` and `Abbreviation` columns.
 
-## 7. Add by DOI or arXiv id
+## 7. Import or add a reference
 
 ```bash
-pynakes add 10.5555/example refs.bib --dry-run --diff
-pynakes add 10.5555/example refs.bib
-pynakes add arXiv:2301.00001 refs.bib
-pynakes add arXiv:2301.00001 refs.bib --fetch
+pynakes import 10.5555/example refs.bib --dry-run --diff
+pynakes import 10.5555/example refs.bib
+pynakes import arXiv:2301.00001 refs.bib
+pynakes import arXiv:2301.00001 refs.bib --fetch
+pynakes add Manual2026 refs.bib --field title="Manual Reference" --field year=2026
 ```
 
 Citation-key choices:
 
 ```bash
-pynakes add 10.5555/example refs.bib --key-source provider
-pynakes add 10.5555/example refs.bib --key ManualKey2026
+pynakes import 10.5555/example refs.bib --key-source provider
+pynakes import 10.5555/example refs.bib --key ManualKey2026
 ```
 
 By default, imported entries use generated keys. If the library has JabRef

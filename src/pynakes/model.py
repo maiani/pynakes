@@ -344,6 +344,19 @@ class EntryStore:
             counts[entry.key] = counts.get(entry.key, 0) + 1
         return {key: count for key, count in counts.items() if count > 1}
 
+    def duplicate_key_instances(self) -> dict[str, list[int]]:
+        """Return ``{key: [indices]}`` for keys that appear more than once.
+
+        Each index is the 0-based position in the store, allowing callers to
+        report which physical entry a message refers to.
+        """
+        instances: dict[str, list[int]] = {}
+        for i, entry in enumerate(self._entries):
+            if entry.key not in instances:
+                instances[entry.key] = []
+            instances[entry.key].append(i)
+        return {key: indices for key, indices in instances.items() if len(indices) > 1}
+
     def to_dict(self) -> dict[str, dict]:
         """Serialize to a JSON-friendly dict keyed by citation key.
 

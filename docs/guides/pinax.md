@@ -567,7 +567,8 @@ checklist.
    published version at `<citekey>.pdf`, when a resolvable open-access copy
    exists.
 10. **Dedupe material merge.** `dedupe` merge reconciles Pinax materials onto the
-    surviving key.
+    surviving key, preserving moved provenance and refusing ambiguous material
+    overwrites. *(Implemented.)*
 11. **DOI → arXiv backfill.** `enrich --published --online` reconciles identity
     both ways: when an entry has a publisher DOI but no arXiv id, resolve the
     work via OpenAlex and backfill `eprint` (+ `eprinttype`/`archiveprefix` per
