@@ -24,7 +24,7 @@ A `.bib` file is the index card; a **pinax** is the card together with the shelf
 - **Reviewable by design.** Every modifying command previews as a unified diff (`--dry-run --diff`) before anything is written, then writes atomically with a `.bak` backup. Ambiguous cases — conflicting merges, duplicate DOIs — are reported with exit code `2` rather than guessed.
 - **Round-trip fidelity.** An entry you don't touch is written back byte-for-byte. pynakes never normalizes whitespace, reorders fields, or re-quotes values behind your back — so diffs stay tiny and reviewable.
 - **Built for agents and CI.** Stable JSON output and exit codes, machine-readable `capabilities`, and `--strict` / pre-commit gates that lint a bibliography like source code.
-- **Deterministic and offline by default.** No hidden time, randomness, or ordering; network access is explicit (`add`, `fetch`, or `--online`) and confined to the few commands that need it.
+- **Deterministic and offline by default.** No hidden time, randomness, or ordering; network access is explicit (`ref import`, `asset fetch`, or `--online`) and confined to the few commands that need it.
 - **Losslessly interoperable.** Reads and writes the BibTeX/BibLaTeX toolchain's files unchanged, and round-trips JabRef's own metadata and `saveActions` — adding the `pynakes-meta` namespace only where no existing equivalent exists.
 
 ## Two workflows
@@ -54,11 +54,11 @@ preview/diff → commit. Full JabRef metadata parity, including round-trip
 Opt in by setting a `files-dir` in the library metadata. Now every citation key can carry materials:
 
 - **arXiv download** — PDFs and source bundles, automatically fetched, verified, and extracted with provenance tracking (source hash, download timestamp)
-- **`fetch`** — download materials for specific keys or `--all`
-- **`files check`** — validate presence, detect orphans, verify checksums, optionally fix (`--fix`)
-- **`remove`** — removes both the entry and its materials 
+- **`asset fetch`** — download materials for specific keys or `--all`
+- **`asset check`** — validate presence, detect orphans, verify checksums, optionally fix (`--fix`)
+- **`ref remove`** — removes both the entry and its materials 
 - **Coordinated key edits** — renaming a key moves its materials
-- **Combine/split** — materials follow their entries
+- **`corpus combine`/`corpus split`** — materials follow their entries
 
 The `.bib` stays the source of truth; Pinax just keeps the shelf tidy. 
 
@@ -87,21 +87,21 @@ pynakes inspect mylib.bib
 pynakes lint mylib.bib --json
 
 # Import a reference by DOI or arXiv id, or add one manually
-pynakes import 10.5555/example mylib.bib
-pynakes import arXiv:2301.00001 mylib.bib
-pynakes add Manual2026 mylib.bib --field title="Manual Reference" --field year=2026
+pynakes ref import 10.5555/example mylib.bib
+pynakes ref import arXiv:2301.00001 mylib.bib
+pynakes ref add Manual2026 mylib.bib --field title="Manual Reference" --field year=2026
 
-# Preview the standard maintenance pass before committing
+# Preview the normalization pass before committing
 pynakes normalize mylib.bib --dry-run --diff
 
 # Remove entries by citation key (with pinax material cleanup)
-pynakes remove mylib.bib DeprecatedKey2020
+pynakes ref remove mylib.bib DeprecatedKey2020
 
 # Rename a citation key across the .bib file and .tex sources
 pynakes keys rename mylib.bib OldKey2020 NewKey2020 paper.tex chapters/
 
 # Fetch arXiv materials for an entry (Pinax mode)
-pynakes fetch mylib.bib arXivKey2024
+pynakes asset fetch mylib.bib arXivKey2024
 
 # Search entries
 pynakes search mylib.bib "neural network" --json

@@ -140,4 +140,4 @@ def used(
 
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
-    app.command()(_safe(used))
+    app.command("scan")(_safe(used))

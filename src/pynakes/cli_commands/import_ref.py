@@ -1,4 +1,4 @@
-"""CLI command registration for ``pynakes import``."""
+"""CLI command registration for ``pynakes ref import``."""
 
 import json as _json
 

@@ -129,14 +129,14 @@ class TestOtherStrictChecks:
     def test_files_check_strict(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text("@article{A,\n  title = {T},\n  file = {missing.pdf}\n}\n")
-        assert runner.invoke(app, ["files", "check", str(bib)]).exit_code == 0
-        assert runner.invoke(app, ["files", "check", str(bib), "--strict"]).exit_code == 1
+        assert runner.invoke(app, ["asset", "check", str(bib)]).exit_code == 0
+        assert runner.invoke(app, ["asset", "check", str(bib), "--strict"]).exit_code == 1
 
     def test_files_check_strict_ok(self, tmp_path: Path) -> None:
         (tmp_path / "A.pdf").write_text("pdf")
         bib = tmp_path / "refs.bib"
         bib.write_text("@article{A,\n  title = {T},\n  file = {A:A.pdf:PDF}\n}\n")
-        assert runner.invoke(app, ["files", "check", str(bib), "--strict"]).exit_code == 0
+        assert runner.invoke(app, ["asset", "check", str(bib), "--strict"]).exit_code == 0
 
     def test_dedupe_check_strict(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"

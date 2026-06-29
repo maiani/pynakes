@@ -68,7 +68,7 @@ OPERATION_SPECS: dict[str, OperationSpec] = {
             "identifier_case",
             "format_metadata",
         ),
-        "Run the standard normalization routine",
+        "Normalize entries (titles, authors, journals, DOIs, identifier case, ordering)",
     ),
     "convert": OperationSpec(("to",), (), "Convert between bibtex and biblatex"),
     "metadata.set": OperationSpec(("key", "value"), ("namespace",), "Set a metadata key"),

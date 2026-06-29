@@ -199,16 +199,16 @@ These extend — never weaken — the guiding principles in
    `filestore`/`fetch` mechanism. When references and materials drift apart,
    pynakes **reports** it and offers a reconcile; it never silently resolves it.
 6. **Determinism and the offline default hold.** Fetching is network I/O, but it
-   only happens when the user runs the explicit `fetch` command or passes
+   only happens when the user runs the explicit `asset fetch` command or passes
    `add --fetch`. Nothing about a pinax introduces hidden time, randomness, or
    network into core logic.
 7. **Operations preserve the pinax.** Any operation that produces a `.bib` from a
    pinax produces a *pinax* — carrying the materials and per-entry state for the
-   entries it emits. `combine` of pinakes yields a pinax whose files-dir is the
-   union; `split` yields several pinakes, each with its entries' materials. These
+   entries it emits. `corpus combine` of pinakes yields a pinax whose files-dir is the
+   union; `corpus split` yields several pinakes, each with its entries' materials. These
    stay **non-destructive**: materials are plainly **copied** into the outputs (no
    hardlinks or clever sharing), so inputs remain intact and a wrong result is
-   undone by deleting the outputs. To reclaim disk after a `split`, delete the
+   undone by deleting the outputs. To reclaim disk after a `corpus split`, delete the
    source pinax — an explicit, reversible step rather than baked-in destruction.
    Per-entry state (`preprint_canonical`, provenance) is copied alongside, so it
    survives the move between files without having to live on the entry.
@@ -216,7 +216,7 @@ These extend — never weaken — the guiding principles in
 ## No new command namespace
 
 A pinax is a mode, not a tool, so the CLI gains **no `pinax` namespace** — at most
-one new top-level verb (`fetch`). Existing commands become file-aware when — and
+one new top-level verb (`asset fetch`). Existing commands become file-aware when — and
 only when — a `files-dir` is set:
 
 | To… | Use | What changes for a pinax |
@@ -225,8 +225,8 @@ only when — a `files-dir` is set:
 | See what materials exist | `inspect [--json]` | The report gains per-entry presence and local paths — the [agent surface](#agent-surface). |
 | Validate materials | `files check [--fix]` | Reports missing/orphan/drift between references and `files-dir`; reconciles with `--fix`. |
 | Rename / regenerate keys | `keys rename`, `keys generate`, `keys repair` | Every material sharing the key — `<citekey>.pdf`, `<citekey>_preprint.pdf`, `<citekey>_preprint/` — moves with it (see [Coordinated edits](#coordinated-edits-and-atomicity)). |
-| Download missing materials | `fetch` (the one new download verb) | See [Fetch](#fetch-the-first-slice). |
-| Combine / split | `combine`, `split` | Produce pinakes; each output entry's materials are copied into the output's files-dir. Non-destructive — inputs untouched. |
+| Download missing materials | `asset fetch` (the one new download verb) | See [Fetch](#fetch-the-first-slice). |
+| Combine / split | `corpus combine`, `corpus split` | Produce pinakes; each output entry's materials are copied into the output's files-dir. Non-destructive — inputs untouched. |
 
 Everything else keeps working unchanged and simply *gains* file-awareness the
 moment the metadata key is present. That is the whole point of making a pinax a
@@ -254,7 +254,7 @@ unaffected.
 
 ## Fetch — the first slice
 
-`fetch` is the first concrete brick, and it sits dead-center on the identity:
+`asset fetch` is the first concrete brick, and it sits dead-center on the identity:
 materials, addressed by citekey, with the `.bib` staying authoritative,
 deterministic, reviewable, and no content-intelligence.
 
@@ -279,24 +279,24 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
   `arxiv.org/e-print/<id>`, stored as the `_preprint` artifacts. An open-access
   published PDF (resolved from the entry's DOI) lands as the unsuffixed
   `<citekey>.pdf`. Both come behind the same opt-in.
-- **Zero-config.** If the `.bib` is not yet a pinax, `fetch` records the default
+- **Zero-config.** If the `.bib` is not yet a pinax, `asset fetch` records the default
   `files-dir` (`<stem>.files`) and creates it — one command bootstraps the corpus.
 - **Atomic writes.** A download lands in a temporary name inside `files-dir` and
   is atomically renamed into place; a partial download never leaves a half-file
   under a citation key. Source tarballs extract safely (no path traversal, no
   symlinks) into `<citekey>_preprint/`.
-- **Bytes only, never extraction.** `fetch` retrieves and stores files. It does
+- **Bytes only, never extraction.** `asset fetch` retrieves and stores files. It does
   **not** parse PDF content — that is [deferred](#deliberately-deferred).
-- **Graceful gaps.** `fetch` stores only what exists and never errors on a gap.
+- **Graceful gaps.** `asset fetch` stores only what exists and never errors on a gap.
   An entry with no arXiv id and no resolvable open-access DOI simply has nothing
   to fetch — it lands in `skipped` with a reason, not `failed`. A PDF-only e-print
   (no source tree) skips the source step, so no empty `<citekey>_preprint/` is
   created. `failed` is reserved for an actual download or I/O error.
-- **Envelope.** `fetch` extends the standard JSON envelope with `fetched` /
+- **Envelope.** `asset fetch` extends the standard JSON envelope with `fetched` /
   `skipped` / `failed` lists; `modified` reflects whether the `.bib` changed (e.g.
   a `files-dir` was recorded), not the downloads themselves.
 
-What `fetch` downloads is **governed by metadata**, not a per-invocation flag —
+What `asset fetch` downloads is **governed by metadata**, not a per-invocation flag —
 what a pinax fetches is part of its configuration. Three per-pinax policy keys,
 one per artifact, select it (and they never trigger network access on their own
 during offline operations):
@@ -320,7 +320,7 @@ and the two version classes hang off it by name:
 - `<citekey>.pdf` — the **published** version of record (unsuffixed).
 - `<citekey>_preprint.pdf` and `<citekey>_preprint/` — the **arXiv** PDF and source.
 
-The three `fetch-*` keys select what `fetch` downloads: `fetch-preprint` the arXiv
+The three `fetch-*` keys select what `asset fetch` downloads: `fetch-preprint` the arXiv
 PDF, `fetch-source` the arXiv source tree, `fetch-published` the unsuffixed
 published PDF — set in metadata, not per invocation. Because
 published PDFs are usually paywalled, the preprint is what reliably arrives; the
@@ -339,7 +339,7 @@ artifact (what you read and work from) is chosen by a simple per-entry boolean,
 Set `preprint_canonical: true` when the arXiv version is the one to trust — most
 often because the authors revised it *after* publication, and because it carries
 **source** (LaTeX) the published PDF does not. It is a deliberate, explicit flag,
-not an inferred rule: `fetch` may initialize it (e.g. when the arXiv `updated`
+not an inferred rule: `asset fetch` may initialize it (e.g. when the arXiv `updated`
 date postdates publication), but the stored truth is just the boolean and you can
 flip it. Filenames stay fixed to the version *class* — they never flip — so only
 the `canonical` pointer changes.
@@ -411,14 +411,14 @@ atomic transaction.
 The rule: **filesystem first (it is reversible), then the `.bib` commit; roll
 back the moves if the commit fails.** `files check --fix` is the backstop: if a
 process dies mid-operation or a user renames a file by hand, the references and
-materials drift, and `files check` reports the drift and reconciles it — never by
+materials drift, and `asset check` reports the drift and reconciles it — never by
 guessing, always by reporting first. Accepting this reconcile step is the honest
 cost of addressing materials by citation key, and it is acceptable because the
 drift is always detectable and the fix always reviewable.
 
 Rename is the **only in-place** material operation, and so the riskiest: it
-mutates an existing files-dir rather than writing fresh outputs the way `combine`
-/ `split` do (where a failure just discards a half-written output). It warrants
+mutates an existing files-dir rather than writing fresh outputs the way `corpus combine`
+/ `corpus split` do (where a failure just discards a half-written output). It warrants
 its own focused design pass before implementation.
 
 ## Provenance manifest (Tier 1)
@@ -448,7 +448,7 @@ records **provenance only**:
   binary move). The durable identity lives *inside* each row (`source`), so even a
   botched rename is recoverable.
 - It never records presence. A row may exist for a deleted file; that is drift,
-  surfaced by `files check`, not a second source of truth.
+  surfaced by `asset check`, not a second source of truth.
 - `refetchable: false` marks a precious file — the one thing in `.pinax/` worth
   keeping for its own sake.
 - `preprint_canonical` (per entry, default `false`) marks the preprint as the
@@ -457,7 +457,7 @@ records **provenance only**:
   `true` → the `_preprint` artifacts. See [Preprint and published
   versions](#preprint-and-published-versions).
 - Each artifact records when it was obtained — `fetched_date` (downloaded by
-  `fetch`) or `added_date` (manually placed) — as provenance. It is not a
+  `asset fetch`) or `added_date` (manually placed) — as provenance. It is not a
   canonical-selection input; `preprint_canonical` decides that.
 
 ## Agent surface
@@ -481,7 +481,7 @@ This is the contract that lets an agent working in the repository **resolve a
 local path and read the paper without re-downloading it** — it reads
 `canonical_pdf` (here the arXiv version, because `preprint_canonical` is set,
 which also brings `canonical_source`) — and knows, for what is missing, whether a
-`fetch` could retrieve it. It is a derived view over the
+`asset fetch` could retrieve it. It is a derived view over the
 filesystem scan, emitted through the same documented JSON envelope as every other
 command.
 
@@ -537,7 +537,7 @@ checklist.
    `fetch_arxiv_source`, the URL builders, and safe tar extraction; add the
    `FileStore` atomic writers for the preprint PDF and the extracted source.
    Unit-tested with fixtures, no real network. *(Implemented.)*
-3. **The top-level `fetch` command.** `pynakes fetch [target] [file]
+3. **The `asset fetch` command.** `pynakes asset fetch [target] [file]
    [--dry-run] [--json]`, with what-to-download governed by the `fetch-preprint` /
    `fetch-source` / `fetch-published` metadata keys; `Bibliography.ensure_files_dir`
    + `fetch_materials`; the zero-config default `files-dir`; the JSON envelope;
@@ -545,14 +545,14 @@ checklist.
    slice — "given an arXiv entry, download the PDF and source into the right
    place.")*
 4. **Agent surface.** `inspect --json` reports per-entry `published_pdf` /
-   `preprint_pdf` / `preprint_source` / `canonical_pdf`; `files check` reports
+   `preprint_pdf` / `preprint_source` / `canonical_pdf`; `asset check` reports
    presence, orphans, and drift, and enforces the unique-key precondition for
    file-addressing operations. *(Implemented.)*
 5. **`preprint_canonical` + provenance manifest (Tier 1).** `.pinax/manifest.json`
    with `source` / `fetched_date` / `sha256` / `refetchable` per artifact and the
-   per-entry `preprint_canonical` boolean (default `false`); `fetch` writes it and
+   per-entry `preprint_canonical` boolean (default `false`); `asset fetch` writes it and
    may initialize the boolean; `canonical_*` resolves from it. *(Implemented.)*
-6. **Pinax-aware `combine` / `split`.** Each output is a pinax; an output entry's
+6. **Pinax-aware `corpus combine` / `corpus split`.** Each output is a pinax; an output entry's
    materials and per-entry state are copied into its files-dir. Non-destructive —
    inputs untouched. (Lower-risk than rename: outputs are fresh, so a failure just
    discards a half-written output.) *(Implemented.)*
@@ -580,7 +580,7 @@ checklist.
 
 Settled in discussion:
 
-- **`fetch` is a top-level command** (like `add` / `normalize`), not a new
+- **`asset fetch` is a top-level command** (like `add` / `normalize`), not a new
   namespace.
 - **What to fetch is metadata-driven** — the `fetch-preprint` / `fetch-source` /
   `fetch-published` keys, not a per-invocation flag.
@@ -588,7 +588,7 @@ Settled in discussion:
   runs the same metadata-driven fetch policy for the new key.
 - **Canonical is a per-entry `preprint_canonical` boolean**, default `false`.
 - **PDF-only e-prints** are handled gracefully (the source step is skipped).
-- **Operations preserve the pinax** — `combine` / `split` produce pinakes,
+- **Operations preserve the pinax** — `corpus combine` / `corpus split` produce pinakes,
   **plainly copying** materials into the outputs (no hardlinks); both stay
   non-destructive, and you delete the source pinax to reclaim disk after a split.
   `preprint_canonical` and provenance travel as copied per-entry state.
@@ -603,9 +603,9 @@ Still open:
    `fetch-source` / `fetch-published`, and whether `fetch-published` should mean
    "fetch when an open-access copy is resolvable." Leaning: preprint PDF + source
    on, published attempted when an OA copy is found.
-2. **Command-surface migration** — how `files check` reports both legacy JabRef
+2. **Command-surface migration** — how `asset check` reports both legacy JabRef
    `file` fields and Pinax `files-dir` materials without confusing plain `.bib`
    users. Leaning: file-awareness is gated on `files-dir`, so a plain `.bib` sees
-   `files check` exactly as today; a pinax adds a separate, clearly-labeled
+   `asset check` exactly as today; a pinax adds a separate, clearly-labeled
    materials section (presence / orphans / drift) while still validating any
    legacy `file` descriptors it finds.

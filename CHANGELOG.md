@@ -17,12 +17,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still reframed as `{"status":"error",...}` under `--json` (exit 1) on newer
   Typer versions.
 
+### Changed
+
+- **Command tree reorganized into resource sub-apps.** Commands are now grouped
+  by the resource they act on, following one rule: whole-library transforms stay
+  flat (`normalize`, `convert`, `dedupe`, `lint`, `verify`, `enrich`, `search`,
+  `inspect`), while operations on a many-of-a-kind resource live under a noun.
+  Renamed paths:
+  - `add` / `import` / `remove` → `ref add` / `ref import` / `ref remove`
+  - `sources` (linked TeX files) → `tex`; `used` → `tex scan`
+  - `fetch` → `asset fetch`; `files check` → `asset check`
+  - `combine` / `split` / `batch` → `corpus combine` / `corpus split` / `corpus batch`
+
+  The renamed `tex`/`asset` nouns also encode direction — TeX sources cite *into*
+  the library, Pinax materials are what entries point *out* to — retiring the
+  overloaded "source" term. The JSON envelope, exit codes, and per-command flags
+  are unchanged.
+
+- **`pynakes --help` now lists each sub-app's subcommands inline** (e.g.
+  `ref → add, import, remove`), colored for clarity, so the grouped surface stays
+  discoverable at a glance.
+
 ### Added
 
-- **`import` command and manual `add`.** DOI/arXiv metadata resolution now lives
-  under `pynakes import <identifier> [file]`, while `pynakes add <key> [file]
-  --field name=value ...` creates a manually specified entry. `import --fetch`
-  keeps the previous import-then-fetch Pinax workflow.
+- **`tex` command family.** `pynakes tex` manages the list of TeX source files
+  that cite the library (stored as the `tex-sources` metadata key). Subcommands:
+  `list` (show linked sources), `add` (link one or more paths), `remove` (unlink
+  paths), `clear` (unlink all), and `scan` (report/tag entries cited in those
+  sources). More discoverable than the generic `metadata set tex-sources` — path
+  arguments are positional, the bib file is specified via `--file` or
+  auto-detected.
+
+- **`ref import` and manual `ref add`.** DOI/arXiv metadata resolution lives
+  under `pynakes ref import <identifier> [file]`, while `pynakes ref add <key>
+  [file] --field name=value ...` creates a manually specified entry.
+  `ref import --fetch` keeps the import-then-fetch Pinax workflow.
 
 - **Dedupe material merge for Pinax libraries.** `pynakes dedupe merge` now
   reconciles duplicate keys' Pinax materials onto the surviving citation key,
@@ -81,7 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Usage errors no longer break the JSON contract.** When the library
   argument was omitted and could not be auto-detected (no local `.bib`, or more
-  than one), commands with additional positionals (e.g. `remove`, `fields
+  than one), commands with additional positionals (e.g. `ref remove`, `fields
   rename`, `groups add-entry`) leaked a raw Click "Missing argument" usage error
   to stderr with exit code 2, bypassing the `--json` envelope. Such commands now
   report the real cause (`InvalidInput`: "No/Multiple *.bib files found") and any
@@ -101,10 +130,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the harness rejecting the run before the beta tester starts. The schema still
   validates task shape and online/offline gating.
 - **Online command docs match the current CLI.** The LLM integration guide and
-  generated Pinax agent rules now describe `import`, `fetch`, `verify --online`,
-  and `enrich --online` as the network-backed paths, while `add` is documented
-  as manual local entry creation. The guide also includes a concise `.bib` plus
-  TeX citation validation recipe using `used`.
+  generated Pinax agent rules now describe `ref import`, `asset fetch`,
+  `verify --online`, and `enrich --online` as the network-backed paths, while
+  `ref add` is documented as manual local entry creation. The guide also includes
+  a concise `.bib` plus TeX citation validation recipe using `tex scan`.
 - **Import dry-run failures now say no file was written.** When
   `import --dry-run --json` fails during DOI/arXiv lookup, the error response
   includes `dry_run: true`, `modified: false`, and a no-write message so agents

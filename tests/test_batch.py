@@ -110,7 +110,7 @@ def test_cli_batch_atomic_commit(tmp_path: Path) -> None:
             {"op": "normalize", "journal_style": "abbreviated"},
         ]
     )
-    result = runner.invoke(app, ["batch", str(bib), "--ops", ops, "--json"])
+    result = runner.invoke(app, ["corpus", "batch", str(bib), "--ops", ops, "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["action"] == "batch"
@@ -131,7 +131,7 @@ def test_cli_batch_failure_writes_nothing(tmp_path: Path) -> None:
             {"op": "bogus.op"},
         ]
     )
-    result = runner.invoke(app, ["batch", str(bib), "--ops", ops, "--json"])
+    result = runner.invoke(app, ["corpus", "batch", str(bib), "--ops", ops, "--json"])
     assert result.exit_code == 1, result.output
     assert json.loads(result.output)["status"] == "error"
     assert bib.read_text() == original  # all-or-nothing
@@ -140,6 +140,6 @@ def test_cli_batch_failure_writes_nothing(tmp_path: Path) -> None:
 def test_cli_batch_requires_exactly_one_source(tmp_path: Path) -> None:
     bib = tmp_path / "r.bib"
     bib.write_text(SRC)
-    result = runner.invoke(app, ["batch", str(bib), "--json"])
+    result = runner.invoke(app, ["corpus", "batch", str(bib), "--json"])
     assert result.exit_code == 1, result.output
     assert json.loads(result.output)["status"] == "error"

@@ -101,7 +101,7 @@ Otherwise use git (or your editor's history) to revert.
 
 ### Q: Can pynakes check whether JabRef linked files exist?
 
-A: Yes. Use `pynakes files check refs.bib --json`. It validates JabRef `file`
+A: Yes. Use `pynakes asset check refs.bib --json`. It validates JabRef `file`
 fields, including multiple attachments, directory links, relative paths,
 explicit `--root` directories, and JabRef `fileDirectory*` metadata. It is
 read-only; linked-file repair is planned separately.
@@ -132,7 +132,7 @@ known metadata block. Unknown metadata is preserved, unknown writes require
 A: DOI import is implemented:
 
 ```bash
-pynakes import 10.5555/example refs.bib --dry-run --diff
+pynakes ref import 10.5555/example refs.bib --dry-run --diff
 ```
 
 `verify` and `enrich` also support opt-in provider lookups with `--online` (and

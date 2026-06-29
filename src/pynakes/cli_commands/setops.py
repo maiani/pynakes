@@ -1,4 +1,4 @@
-"""CLI commands for whole-file set operations: ``combine`` and ``split``.
+"""CLI commands for whole-file set operations: ``corpus combine`` and ``corpus split``.
 
 ``combine`` unions several ``.bib`` files into one; ``split`` routes the entries
 of one or more inputs into several outputs selected by per-bucket predicates.

@@ -277,7 +277,7 @@ exception where callers need structured recovery:
 | --- | --- |
 | Structurally malformed BibTeX | ParseError |
 | Reference import failure, duplicate DOI/arXiv, explicit key conflict | ReferenceImportError (DOIImportError/ArxivImportError), DuplicateReferenceError (DuplicateDOIError/DuplicateArxivError), CitationKeyConflictError |
-| Unrecognized identifier passed to `add` | UnsupportedIdentifierError |
+| Unrecognized identifier passed to `ref import` | UnsupportedIdentifierError |
 | Unsupported JabRef key pattern | UnsupportedCitationKeyPatternError |
 | Duplicate/ambiguous metadata block | DuplicateMetadataError |
 | Ambiguous duplicate-work merge | DedupeConflictError with MergeConflict values |
@@ -296,7 +296,7 @@ interactive choice is possible. Modifying command responses share `status`,
 Only DOI/arXiv import, integrity workflows, and the Pinax arXiv download
 primitives contact providers in the current implementation. Integrity workflows
 require an explicit `online=True`/`--online` opt-in and support deterministic
-caching; Pinax downloads require the explicit `fetch` command or `add --fetch`.
+caching; Pinax downloads require the explicit `asset fetch` command or `ref import --fetch`.
 Plain `.bib` maintenance never fetches materials. Network parsing lives in
 `importer.py`, `integrity.py`, and `fetch.py`; tests mock or fixture this
 boundary so the normal suite never relies on external availability.

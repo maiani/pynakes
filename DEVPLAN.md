@@ -24,15 +24,16 @@ syntax, or JSON envelopes.
   external-change detection; `reset()`/`reload()`.
 - **Operations**: `init`, `inspect`, `lint`, `groups`, `keys`
   (generate/check/repair/rename + JabRef key patterns), `fields` (with `--where`),
-  `convert` (BibTeX↔BibLaTeX + CSL-JSON/RIS/MODS/EndNote), `files check`, `normalize`
+  `convert` (BibTeX↔BibLaTeX + CSL-JSON/RIS/MODS/EndNote), `asset check`, `normalize`
   (authors, DOIs, months, journals, `saveActions` pipeline, `saveOrderConfig`
-  entry sorting), `add`
-  (DOI/arXiv/journal-URL), `search`, `used`, `dedupe`, `verify`/`enrich`
-  (opt-in `--online`; `--published` folds in preprint promotion), `combine`,
-  `split`, `batch`.
-- **Pinax corpus mode (steps 1–8, 10)**: `FileStore`, arXiv download, `fetch` command,
-  agent surface, provenance manifest, pinax-aware `combine`/`split`, coordinated
-  key edits, `add --fetch`, dedupe material merge. Step 9 (OA PDFs) is deferred.
+  entry sorting), `ref add`/`ref import`
+  (DOI/arXiv/journal-URL), `search`, `tex scan`, `dedupe`, `verify`/`enrich`
+  (opt-in `--online`; `--published` folds in preprint promotion), `corpus combine`,
+  `corpus split`, `corpus batch`.
+- **Pinax corpus mode (steps 1–8, 10)**: `FileStore`, arXiv download, `asset fetch`
+  command, agent surface, provenance manifest, pinax-aware `corpus combine`/`split`,
+  coordinated key edits, `ref import --fetch`, dedupe material merge. Step 9 (OA PDFs)
+  is deferred.
   See [Pinax implementation steps](#pinax-implementation-steps).
 - **JabRef v5.15 parity**: full `saveActions` formatter suite, complete metadata
   vocabulary, JabRef key patterns, group management.
@@ -75,7 +76,7 @@ explicitly unguaranteed until v1.0.
       The `.bib`-file completer also shows citekeys alongside the filename when a
       single `.bib` is auto-detectable. Usable via
       `eval "$(pynakes --show-completion bash)"` / `zsh` / `fish`.
-- [x] **`remove` command.** `pynakes remove <bib> <citekey>... [--keep-files]
+- [x] **`remove` command.** `pynakes ref remove <bib> <citekey>... [--keep-files]
       [--dry-run] [--diff] [--json] [--backup]`. Removes entries by citation key
       through the standard lifecycle. In a pinax, removes the entry's materials
       from `files-dir` by default (`--keep-files` opts out). Dry-run correctly
@@ -249,7 +250,7 @@ reviewed, then the next.
       `fetch_arxiv_pdf`/`fetch_arxiv_source`, URL builders, safe tar extraction)
       and the `FileStore` atomic writers for the preprint PDF and extracted
       source. Unit-tested with fixtures; no real network.
-- [x] **3. The top-level `fetch` command.** `pynakes fetch [target] [file]
+- [x] **3. The top-level `fetch` command.** `pynakes asset fetch [target] [file]
       [--dry-run] [--json]`, with what-to-download governed by the
       `fetch-preprint`/`fetch-source`/`fetch-published` metadata keys;
       `Bibliography.ensure_files_dir` + `fetch_materials`; zero-config default

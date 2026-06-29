@@ -26,6 +26,28 @@ class TestVersion:
         assert result.output == f"{__version__}\n"
 
 
+class TestTopLevelHelp:
+    def test_lists_subcommands_for_each_group(self) -> None:
+        # Grouping commands under sub-apps must not hide the operations: the
+        # top-level --help enumerates each group's subcommands inline.
+        result = runner.invoke(app, ["--help"])
+        assert result.exit_code == 0, result.output
+        # Strip box borders, then collapse rich line-wrapping into single spaces.
+        out = " ".join(result.output.replace("│", " ").split())
+        # The group name sits in its own table column; the description column
+        # ends with "→ <subcommands>".
+        assert "→ add, import, remove" in out
+        assert "→ fetch, check" in out
+        assert "→ combine, split, batch" in out
+        assert "→ list, add, remove, clear, scan" in out
+
+    def test_leaf_commands_have_no_arrow(self) -> None:
+        result = runner.invoke(app, ["--help"])
+        out = " ".join(result.output.split())
+        # A flat command like `normalize` is not a group; it gets no subcommand list.
+        assert "normalize →" not in out
+
+
 class TestChangePlanEnvelope:
     def test_modifying_command_json_includes_structured_plan(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -51,7 +73,7 @@ class TestUsedCommand:
         (sources / "paper.tex").write_text(r"\cite{Smith2020}" "\n")
         monkeypatch.chdir(tmp_path)
 
-        result = runner.invoke(app, ["used", "sources", "--json"])
+        result = runner.invoke(app, ["tex", "scan", "sources", "--json"])
 
         assert result.exit_code == 0, result.output
         assert json.loads(result.output)["report"]["used"] == ["Smith2020"]
@@ -60,7 +82,9 @@ class TestUsedCommand:
         bib = tmp_path / "refs.bib"
         bib.write_text((FIXTURES / "simple.bib").read_text())
 
-        result = runner.invoke(app, ["used", str(bib), str(FIXTURES / "paper.aux"), "--json"])
+        result = runner.invoke(
+            app, ["tex", "scan", str(bib), str(FIXTURES / "paper.aux"), "--json"]
+        )
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         assert set(data["report"]["used"]) == {"Smith2020", "Brown2022"}
@@ -73,7 +97,7 @@ class TestUsedCommand:
 
         result = runner.invoke(
             app,
-            ["used", str(bib), str(FIXTURES / "paper.aux"), "--group", "Used", "--dry-run"],
+            ["tex", "scan", str(bib), str(FIXTURES / "paper.aux"), "--group", "Used", "--dry-run"],
         )
         assert result.exit_code == 0, result.output
         assert bib.read_text() == original  # unchanged
@@ -84,7 +108,7 @@ class TestUsedCommand:
         bib.write_text((FIXTURES / "simple.bib").read_text())
 
         result = runner.invoke(
-            app, ["used", str(bib), str(FIXTURES / "paper.aux"), "--group", "Cited"]
+            app, ["tex", "scan", str(bib), str(FIXTURES / "paper.aux"), "--group", "Cited"]
         )
         assert result.exit_code == 0, result.output
         text = bib.read_text()
@@ -102,7 +126,7 @@ class TestUsedCommand:
         (tmp_path / "paper.tex").write_text(r"\cite{Smith2020}" "\n")
 
         # No sources argument: scan the files listed in tex-sources metadata.
-        result = runner.invoke(app, ["used", str(bib), "--json"])
+        result = runner.invoke(app, ["tex", "scan", str(bib), "--json"])
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -112,7 +136,7 @@ class TestUsedCommand:
         bib = tmp_path / "refs.bib"
         bib.write_text("@article{A,\n  title = {T}\n}\n")
 
-        result = runner.invoke(app, ["used", str(bib), "--json"])
+        result = runner.invoke(app, ["tex", "scan", str(bib), "--json"])
 
         assert result.exit_code == 1, result.output
         assert json.loads(result.output)["error"] == "NoSources"
@@ -122,7 +146,9 @@ class TestUsedCommand:
         original = (FIXTURES / "simple.bib").read_text()
         bib.write_text(original)
 
-        runner.invoke(app, ["used", str(bib), str(FIXTURES / "paper.aux"), "--group", "Cited"])
+        runner.invoke(
+            app, ["tex", "scan", str(bib), str(FIXTURES / "paper.aux"), "--group", "Cited"]
+        )
         new = bib.read_text()
         # Exactly the two used entries gained a group line; no entry dropped.
         assert new.count("groups = {Cited}") == 2
@@ -139,7 +165,7 @@ class TestUsedCommand:
         out = tmp_path / "cited.bib"
 
         result = runner.invoke(
-            app, ["used", str(bib), str(FIXTURES / "paper.aux"), "--out", str(out)]
+            app, ["tex", "scan", str(bib), str(FIXTURES / "paper.aux"), "--out", str(out)]
         )
         assert result.exit_code == 0, result.output
         assert out.exists()
@@ -387,7 +413,7 @@ class TestFilesCommand:
             "@article{A,\n  title = {T},\n  file = {A:A.pdf:PDF; Missing:missing.pdf:PDF}\n}\n"
         )
 
-        result = runner.invoke(app, ["files", "check", str(bib), "--json"])
+        result = runner.invoke(app, ["asset", "check", str(bib), "--json"])
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -403,7 +429,7 @@ class TestFilesCommand:
         bib = tmp_path / "refs.bib"
         bib.write_text("@article{A,\n  title = {T},\n  file = {A.pdf}\n}\n")
 
-        result = runner.invoke(app, ["files", "check", str(bib), "--root", str(root), "--json"])
+        result = runner.invoke(app, ["asset", "check", str(bib), "--root", str(root), "--json"])
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -414,7 +440,7 @@ class TestFilesCommand:
         bib = tmp_path / "refs.bib"
         bib.write_text("@article{A,\n  title = {T},\n  file = {missing.pdf}\n}\n")
 
-        result = runner.invoke(app, ["files", "check", str(bib)])
+        result = runner.invoke(app, ["asset", "check", str(bib)])
 
         assert result.exit_code == 0, result.output
         assert "checked 1 linked file" in result.output
@@ -445,7 +471,7 @@ class TestFilesCommand:
         bib = tmp_path / "refs.bib"
         bib.write_text("@article{A,\n  title = {T}\n}\n@comment{pynakes-meta:\nfiles-dir:\n}\n")
 
-        result = runner.invoke(app, ["files", "check", str(bib), "--json"])
+        result = runner.invoke(app, ["asset", "check", str(bib), "--json"])
 
         assert result.exit_code == 0, result.output
         pinax = json.loads(result.output)["pinax"]
@@ -482,7 +508,7 @@ class TestFilesCommand:
         bib = tmp_path / "refs.bib"
         bib.write_text("@article{A,\n  title = {T}\n}\n@comment{pynakes-meta:\nfiles-dir:\n}\n")
 
-        result = runner.invoke(app, ["files", "check", str(bib), "--fix", "--json"])
+        result = runner.invoke(app, ["asset", "check", str(bib), "--fix", "--json"])
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -528,7 +554,7 @@ class TestImportCommand:
 
         result = runner.invoke(
             app,
-            ["import", "10.5555/provider", str(bib), "--dry-run", "--diff", "--json"],
+            ["ref", "import", "10.5555/provider", str(bib), "--dry-run", "--diff", "--json"],
         )
 
         assert result.exit_code == 0, result.output
@@ -542,7 +568,7 @@ class TestImportCommand:
         bib = _copy(tmp_path, "simple.bib")
         monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
-        result = runner.invoke(app, ["import", "10.5555/provider", str(bib)])
+        result = runner.invoke(app, ["ref", "import", "10.5555/provider", str(bib)])
 
         assert result.exit_code == 0, result.output
         text = bib.read_text()
@@ -560,7 +586,7 @@ class TestImportCommand:
         )
         monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
-        result = runner.invoke(app, ["import", "10.5555/provider", str(bib)])
+        result = runner.invoke(app, ["ref", "import", "10.5555/provider", str(bib)])
 
         assert result.exit_code == 0, result.output
         text = bib.read_text()
@@ -571,7 +597,7 @@ class TestImportCommand:
         bib = _copy(tmp_path, "simple.bib")
         monkeypatch.setattr(importer_ops, "fetch_arxiv_atom", lambda identifier: ARXIV_ATOM)
 
-        result = runner.invoke(app, ["import", "arXiv:2301.00001", str(bib), "--json"])
+        result = runner.invoke(app, ["ref", "import", "arXiv:2301.00001", str(bib), "--json"])
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -592,7 +618,7 @@ class TestImportCommand:
         monkeypatch.setattr(importer_ops, "fetch_arxiv_atom", lambda identifier: ARXIV_ATOM)
 
         result = runner.invoke(
-            app, ["import", "https://arxiv.org/abs/2301.00001v1", str(bib), "--json"]
+            app, ["ref", "import", "https://arxiv.org/abs/2301.00001v1", str(bib), "--json"]
         )
 
         assert result.exit_code == 0, result.output
@@ -614,7 +640,9 @@ class TestImportCommand:
             lambda arxiv_id: _tar_bytes({"paper.tex": b"\\title{A Deep Test}\n"}),
         )
 
-        result = runner.invoke(app, ["import", "arXiv:2301.00001", str(bib), "--fetch", "--json"])
+        result = runner.invoke(
+            app, ["ref", "import", "arXiv:2301.00001", str(bib), "--fetch", "--json"]
+        )
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -639,7 +667,9 @@ class TestImportCommand:
 
         monkeypatch.setattr("pynakes.fetch.fetch_arxiv_source", fail_source)
 
-        result = runner.invoke(app, ["import", "arXiv:2301.00001", str(bib), "--fetch", "--json"])
+        result = runner.invoke(
+            app, ["ref", "import", "arXiv:2301.00001", str(bib), "--fetch", "--json"]
+        )
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -657,7 +687,7 @@ class TestImportCommand:
         )
         monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
-        result = runner.invoke(app, ["import", "10.5555/provider", str(bib), "--json"])
+        result = runner.invoke(app, ["ref", "import", "10.5555/provider", str(bib), "--json"])
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -671,7 +701,7 @@ class TestImportCommand:
 
         result = runner.invoke(
             app,
-            ["import", "10.5555/provider", str(bib), "--key-source", "provider", "--json"],
+            ["ref", "import", "10.5555/provider", str(bib), "--key-source", "provider", "--json"],
         )
 
         assert result.exit_code == 0, result.output
@@ -686,6 +716,7 @@ class TestImportCommand:
         result = runner.invoke(
             app,
             [
+                "ref",
                 "import",
                 "10.5555/provider",
                 str(bib),
@@ -707,7 +738,7 @@ class TestImportCommand:
 
         result = runner.invoke(
             app,
-            ["import", "10.5555/provider", str(bib), "--key-source", "garbage", "--json"],
+            ["ref", "import", "10.5555/provider", str(bib), "--key-source", "garbage", "--json"],
         )
 
         assert result.exit_code == 1, result.output
@@ -719,7 +750,7 @@ class TestImportCommand:
 
         result = runner.invoke(
             app,
-            ["import", "https://doi.org/10.1234/nature.ml.2020", str(bib), "--json"],
+            ["ref", "import", "https://doi.org/10.1234/nature.ml.2020", str(bib), "--json"],
         )
 
         assert result.exit_code == 2, result.output
@@ -734,7 +765,7 @@ class TestImportCommand:
 
         result = runner.invoke(
             app,
-            ["import", "10.5555/provider", str(bib), "--key", "Smith2020", "--json"],
+            ["ref", "import", "10.5555/provider", str(bib), "--key", "Smith2020", "--json"],
         )
 
         assert result.exit_code == 2, result.output
@@ -747,13 +778,15 @@ class TestImportCommand:
         bib = _copy(tmp_path, "simple.bib")
         monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
-        result = runner.invoke(app, ["import", "10.5555/provider", str(bib), "--key", "Smith2020"])
+        result = runner.invoke(
+            app, ["ref", "import", "10.5555/provider", str(bib), "--key", "Smith2020"]
+        )
         assert result.exit_code == 2, result.output
         assert "CitationKeyConflict" in result.output
 
     def test_add_unrecognized_identifier_errors(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        result = runner.invoke(app, ["import", "not-an-identifier", str(bib), "--json"])
+        result = runner.invoke(app, ["ref", "import", "not-an-identifier", str(bib), "--json"])
         assert result.exit_code == 1, result.output
         assert json.loads(result.output)["error"] == "UnsupportedIdentifier"
 
@@ -764,7 +797,7 @@ class TestImportCommand:
             raise importer_ops.DOIImportError("resolver offline")
 
         monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", _boom)
-        result = runner.invoke(app, ["import", "10.5555/provider", str(bib), "--json"])
+        result = runner.invoke(app, ["ref", "import", "10.5555/provider", str(bib), "--json"])
         assert result.exit_code == 1, result.output
         assert json.loads(result.output)["error"] == "ReferenceImportError"
 
@@ -778,7 +811,9 @@ class TestImportCommand:
             raise importer_ops.DOIImportError("resolver offline")
 
         monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", _boom)
-        result = runner.invoke(app, ["import", "10.5555/provider", str(bib), "--dry-run", "--json"])
+        result = runner.invoke(
+            app, ["ref", "import", "10.5555/provider", str(bib), "--dry-run", "--json"]
+        )
 
         assert result.exit_code == 1, result.output
         data = json.loads(result.output)
@@ -790,7 +825,9 @@ class TestImportCommand:
 
     def test_add_duplicate_doi_human_output(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        result = runner.invoke(app, ["import", "https://doi.org/10.1234/nature.ml.2020", str(bib)])
+        result = runner.invoke(
+            app, ["ref", "import", "https://doi.org/10.1234/nature.ml.2020", str(bib)]
+        )
         assert result.exit_code == 2, result.output
         assert "DuplicateReference" in result.output
         assert "--allow-duplicate" in result.output
@@ -804,6 +841,7 @@ class TestAddCommand:
         result = runner.invoke(
             app,
             [
+                "ref",
                 "add",
                 "Manual2026",
                 str(bib),
@@ -836,6 +874,7 @@ class TestAddCommand:
         result = runner.invoke(
             app,
             [
+                "ref",
                 "add",
                 "Manual2026",
                 str(bib),
@@ -856,7 +895,9 @@ class TestAddCommand:
         bib = _copy(tmp_path, "simple.bib")
         monkeypatch.chdir(tmp_path)
 
-        result = runner.invoke(app, ["add", "Manual2026", "--field", "title=Manual Reference"])
+        result = runner.invoke(
+            app, ["ref", "add", "Manual2026", "--field", "title=Manual Reference"]
+        )
 
         assert result.exit_code == 0, result.output
         assert "@article{Manual2026," in bib.read_text()
@@ -864,7 +905,9 @@ class TestAddCommand:
     def test_add_manual_entry_rejects_existing_key(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
 
-        result = runner.invoke(app, ["add", "Smith2020", str(bib), "--field", "title=X", "--json"])
+        result = runner.invoke(
+            app, ["ref", "add", "Smith2020", str(bib), "--field", "title=X", "--json"]
+        )
 
         assert result.exit_code == 1, result.output
         assert json.loads(result.output)["error"] == "InvalidInput"
@@ -872,7 +915,9 @@ class TestAddCommand:
     def test_add_manual_entry_rejects_bad_field_assignment(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
 
-        result = runner.invoke(app, ["add", "Manual2026", str(bib), "--field", "title", "--json"])
+        result = runner.invoke(
+            app, ["ref", "add", "Manual2026", str(bib), "--field", "title", "--json"]
+        )
 
         assert result.exit_code == 1, result.output
         assert json.loads(result.output)["error"] == "InvalidInput"
@@ -1836,7 +1881,7 @@ class TestErrorHandling:
         (tmp_path / "b.bib").write_text("@article{B,\n  title = {U}\n}\n")
         monkeypatch.chdir(tmp_path)
 
-        result = runner.invoke(app, ["remove", "A", "--json"])
+        result = runner.invoke(app, ["ref", "remove", "A", "--json"])
 
         assert result.exit_code == 1, result.output
         data = json.loads(result.output)  # parseable JSON, not a usage banner
@@ -1856,7 +1901,7 @@ class TestErrorHandling:
         # File supplied, but a required positional is missing: the catch-all
         # reframes Click's usage error as the JSON envelope under --json.
         bib = _copy(tmp_path, "simple.bib")
-        result = runner.invoke(app, ["remove", str(bib), "--json"])
+        result = runner.invoke(app, ["ref", "remove", str(bib), "--json"])
         assert result.exit_code == 1, result.output
         data = json.loads(result.output)
         assert data["status"] == "error"
@@ -1865,7 +1910,7 @@ class TestErrorHandling:
     def test_usage_error_human_mode_keeps_click_text(self, tmp_path: Path, monkeypatch) -> None:
         # Without --json, humans keep Click's usage text and its exit code 2.
         bib = _copy(tmp_path, "simple.bib")
-        result = runner.invoke(app, ["remove", str(bib)])
+        result = runner.invoke(app, ["ref", "remove", str(bib)])
         assert result.exit_code == 2
         assert not result.output.strip().startswith("{")
         assert "Usage:" in result.output
@@ -1938,7 +1983,16 @@ class TestEnvelopeConsistency:
         bib = _copy(tmp_path, "simple.bib")
         r = runner.invoke(
             app,
-            ["used", str(bib), str(FIXTURES / "paper.aux"), "--group", "X", "--dry-run", "--json"],
+            [
+                "tex",
+                "scan",
+                str(bib),
+                str(FIXTURES / "paper.aux"),
+                "--group",
+                "X",
+                "--dry-run",
+                "--json",
+            ],
         )
         data = json.loads(r.output)
         assert self.ENVELOPE <= set(data)
@@ -1948,6 +2002,168 @@ class TestEnvelopeConsistency:
 # Each case: (command prefix, positional suffix after <file>, fixture). The
 # runner inserts the bib path right after the prefix. Every case is chosen to
 # actually modify its fixture, so --diff must produce a diff.
+class TestSourcesCommand:
+    def test_list_no_sources(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n")
+        result = runner.invoke(app, ["tex", "list", "--file", str(bib)])
+        assert result.exit_code == 0, result.output
+        assert "no TeX sources linked" in result.output
+
+    def test_list_with_sources(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex;}\n@article{A,\n  title = {T}\n}\n"
+        )
+        result = runner.invoke(app, ["tex", "list", "--file", str(bib)])
+        assert result.exit_code == 0, result.output
+        assert "paper.tex" in result.output
+
+    def test_list_json(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex;}\n@article{A,\n  title = {T}\n}\n"
+        )
+        result = runner.invoke(app, ["tex", "list", "--file", str(bib), "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["sources"] == [str(tmp_path / "paper.tex")]
+
+    def test_add(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n")
+
+        result = runner.invoke(app, ["tex", "add", "paper.tex", "--file", str(bib)])
+        assert result.exit_code == 0, result.output
+        assert "linked" in result.output.lower() or "link" in result.output.lower()
+        text = bib.read_text()
+        assert "tex-sources" in text
+        assert "paper.tex" in text
+
+    def test_add_dry_run(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n")
+        before = bib.read_text()
+
+        result = runner.invoke(
+            app, ["tex", "add", "paper.tex", "--file", str(bib), "--dry-run", "--json"]
+        )
+        assert result.exit_code == 0, result.output
+        assert bib.read_text() == before
+        data = json.loads(result.output)
+        assert data["dry_run"] is True
+
+    def test_add_duplicate_is_noop(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex;}\n@article{A,\n  title = {T}\n}\n"
+        )
+        before = bib.read_text()
+
+        result = runner.invoke(app, ["tex", "add", "paper.tex", "--file", str(bib), "--json"])
+        assert result.exit_code == 0, result.output
+        assert bib.read_text() == before
+        data = json.loads(result.output)
+        assert data["added"] == []
+
+    def test_remove(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex;}\n@article{A,\n  title = {T}\n}\n"
+        )
+
+        result = runner.invoke(app, ["tex", "remove", "paper.tex", "--file", str(bib), "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert "paper.tex" in data["removed"]
+        assert "tex-sources" not in bib.read_text()
+
+    def test_remove_nonexistent_is_noop(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n")
+
+        result = runner.invoke(app, ["tex", "remove", "paper.tex", "--file", str(bib), "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["removed"] == []
+
+    def test_clear(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex;}\n@article{A,\n  title = {T}\n}\n"
+        )
+
+        result = runner.invoke(app, ["tex", "clear", "--file", str(bib), "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["cleared"] is True
+        assert "tex-sources" not in bib.read_text()
+
+    def test_clear_when_empty(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n")
+
+        result = runner.invoke(app, ["tex", "clear", "--file", str(bib), "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["cleared"] is False
+
+    def test_add_discoverable_via_help(self) -> None:
+        result = runner.invoke(app, ["tex", "--help"])
+        assert result.exit_code == 0, result.output
+        assert "add" in result.output
+        assert "list" in result.output
+        assert "remove" in result.output
+        assert "clear" in result.output
+
+    def test_auto_discover_bib(self, tmp_path: Path, monkeypatch) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n")
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["tex", "add", "paper.tex", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["file"] == "refs.bib"
+        assert "paper.tex" in str(data["sources"])
+
+    def test_add_dry_run_diff_json_integration(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        before = bib.read_text()
+        result = runner.invoke(
+            app,
+            ["tex", "add", "paper.tex", "--file", str(bib), "--dry-run", "--diff", "--json"],
+        )
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert {
+            "status",
+            "action",
+            "file",
+            "dry_run",
+            "modified",
+            "modified_entries",
+            "warnings",
+        } <= set(data)
+        assert data["dry_run"] is True
+        assert data["modified"] is True
+        assert data["diff"]
+        assert bib.read_text() == before
+
+    def test_list_auto_discover_bib(self, tmp_path: Path, monkeypatch) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex;}\n@article{A,\n  title = {T}\n}\n"
+        )
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["tex", "list", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["file"] == "refs.bib"
+        assert data["sources"]
+
+
 _MODIFYING_CASES = [
     (["groups", "add-entry"], ["Smith2020", "Fav"], "simple.bib"),
     (["keys", "repair"], [], "duplicate_entries.bib"),

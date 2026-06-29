@@ -1,4 +1,4 @@
-"""CLI command registration for ``pynakes fetch``.
+"""CLI command registration for ``pynakes asset fetch``.
 
 Downloads arXiv materials (PDF and source) for entries into the Pinax files-dir.
 """

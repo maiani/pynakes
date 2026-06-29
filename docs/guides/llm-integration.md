@@ -11,8 +11,8 @@ structured JSON contract. It is written for a program (or an agent) that calls
 ## Why pynakes is automation-friendly
 
 - **Deterministic by default.** The same local input produces the same output.
-  Network access is limited to explicit online workflows: `import`, `fetch`,
-  `import --fetch`, `verify --online`, and `enrich --online`.
+  Network access is limited to explicit online workflows: `ref import`,
+  `asset fetch`, `ref import --fetch`, `verify --online`, and `enrich --online`.
 - **Preview before writing.** Every modifying command supports `--dry-run`.
 - **Structured output.** `--json` returns a documented envelope (see below).
 - **Conflicts return options, not guesses.** Blocked operations exit `2` with a
@@ -39,7 +39,7 @@ pynakes capabilities --json
 - `error_codes` — every `error` (exit 1) and `conflict` (exit 2) code the JSON
   envelope can carry, with a one-line meaning, so you can branch on failures.
 - `predicate_grammar` — the operators and special predicates accepted by
-  `fields --where` and `split --to`.
+  `fields --where` and `corpus split --to`.
 
 ## Command surface
 
@@ -51,13 +51,13 @@ Read-only:
 - `pynakes groups list <file> [--json]`
 - `pynakes keys check <file>... [--strict] [--json]`
 - `pynakes metadata list <file> [--json]`
-- `pynakes files check <file>... [--root ...] [--strict] [--json]`
+- `pynakes asset check <file>... [--root ...] [--strict] [--json]`
 - `pynakes dedupe check <file>... [--strict] [--json]`
 - `pynakes verify <file>... [--online] [--published] [--strict] [--json]` —
   `--published` also reports preprints that now have a published version
 - `pynakes capabilities [--json]`
 
-The five gate checks (`lint`, `keys check`, `files check`, `dedupe check`,
+The five gate checks (`lint`, `keys check`, `asset check`, `dedupe check`,
 `verify`) accept multiple `.bib` files and support `--strict` to exit `1` on a
 finding — the primitives for CI and pre-commit gating. See
 [Git Workflows](git-workflows.md). A single file keeps its per-file JSON
@@ -65,9 +65,9 @@ envelope; multiple files emit an aggregate `{status, action, strict, files,
 summary}` envelope.
 
 `lint` and `keys check` validate the bibliography itself. To check whether TeX
-sources cite missing or unused bibliography entries, run `used` with the `.bib`
-file and the `.tex` / `.aux` sources; that is a separate read-only citation
-usage check.
+sources cite missing or unused bibliography entries, run `tex scan` with the
+`.bib` file and the `.tex` / `.aux` sources; that is a separate read-only
+citation usage check.
 
 Modifying (all support `--dry-run`, `--diff`, `--json`):
 
@@ -83,9 +83,9 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 - `pynakes fields append <file> <field> <value> [--where ...]`
 - `pynakes fields clear <file> <field> [--where ...]`
 - `pynakes fields protect-title <file> [--field ...] [--term ...] [--where ...]`
-- `pynakes add <key> [file] --field name=value ... [--type ...]` — add a manually specified entry
-- `pynakes import <identifier> [file] [--key ...] [--key-source generated|provider] [--allow-duplicate] [--fetch]` — `<identifier>` is a DOI, DOI URL, arXiv id, or arXiv URL
-- `pynakes fetch [key] [file]` — download configured Pinax materials for arXiv entries
+- `pynakes ref add <key> [file] --field name=value ... [--type ...]` — add a manually specified entry
+- `pynakes ref import <identifier> [file] [--key ...] [--key-source generated|provider] [--allow-duplicate] [--fetch]` — `<identifier>` is a DOI, DOI URL, arXiv id, or arXiv URL
+- `pynakes asset fetch [key] [file]` — download configured Pinax materials for arXiv entries
 - `pynakes metadata set <file> <key> <value> [--allow-unknown]`
 - `pynakes metadata adopt-jabref <file>` — start maintaining a JabRef metadata
   projection for a pynakes-native library (mirrors JabRef-native settings into
@@ -96,7 +96,7 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 - `pynakes dedupe merge <file>` — conservatively merge duplicate-work clusters
 - `pynakes enrich <file> [--online] [--published]` — conservatively fill missing
   metadata; `--published` also promotes preprints to their published version
-- `pynakes used <bib-file> <source>... [--out ...] [--group ...] [--keyword ...]`
+- `pynakes tex scan <bib-file> <source>... [--out ...] [--group ...] [--keyword ...]`
 
 Creating / projecting — **create** new files (support `--dry-run`, `--diff`,
 `--json`):
@@ -105,10 +105,10 @@ Creating / projecting — **create** new files (support `--dry-run`, `--diff`,
   — create a new library seeded with a metadata profile (a sensible default, or
   one copied from `--from`). Refuses to overwrite an existing file without
   `--force`; emits `FileExists` (exit `1`) otherwise.
-- `pynakes combine <file>... --out <file> [--dedupe]` — union several `.bib`
+- `pynakes corpus combine <file>... --out <file> [--dedupe]` — union several `.bib`
   files into one. `--dedupe` collapses identical same-key entries and reports a
   conflict (exit `2`) when same-key entries differ.
-- `pynakes split <file>... --to <FILE>='<predicate>'... [--copy] [--tex ...]
+- `pynakes corpus split <file>... --to <FILE>='<predicate>'... [--copy] [--tex ...]
   [--aux ...] [--dedupe]` — combine inputs in memory and route entries into
   several outputs. Each `--to` pairs an output file with a predicate: a
   [`--where`](#the-where-filter) expression, or one of `*`, `used` / `unused`
@@ -117,7 +117,7 @@ Creating / projecting — **create** new files (support `--dry-run`, `--diff`,
 
 Transactional:
 
-- `pynakes batch <file> --ops '<json>' | --ops-file <path>` — apply a sequence
+- `pynakes corpus batch <file> --ops '<json>' | --ops-file <path>` — apply a sequence
   of operations to one file atomically (one preview, one commit; nothing is
   written if any operation fails). The operation vocabulary (op name → required/
   optional params) is in `capabilities` under `batch_operations`. Example:
@@ -192,8 +192,8 @@ pynakes inspect refs.bib --json
 pynakes lint refs.bib --json
 pynakes keys check refs.bib --json
 pynakes dedupe check refs.bib --json
-pynakes used refs.bib paper.tex --json
-pynakes files check refs.bib --json
+pynakes tex scan refs.bib paper.tex --json
+pynakes asset check refs.bib --json
 pynakes verify refs.bib --json
 ```
 
@@ -216,11 +216,11 @@ comments and CLI options.
 ### Import or add a reference
 
 ```bash
-pynakes import 10.1145/3377811.3380368 refs.bib --dry-run --diff --json
-pynakes import 10.1145/3377811.3380368 refs.bib --json
-pynakes import arXiv:2301.00001 refs.bib --json
-pynakes import arXiv:2301.00001 refs.bib --fetch --json
-pynakes add Manual2026 refs.bib --field title="Manual Reference" --field year=2026 --json
+pynakes ref import 10.1145/3377811.3380368 refs.bib --dry-run --diff --json
+pynakes ref import 10.1145/3377811.3380368 refs.bib --json
+pynakes ref import arXiv:2301.00001 refs.bib --json
+pynakes ref import arXiv:2301.00001 refs.bib --fetch --json
+pynakes ref add Manual2026 refs.bib --field title="Manual Reference" --field year=2026 --json
 ```
 
 `import` performs DOI/arXiv metadata lookup and is network-backed. `add` is
@@ -293,8 +293,8 @@ pynakes fields protect-title refs.bib --term OpenAI --term iOS --json
 ### Validate linked files
 
 ```bash
-pynakes files check refs.bib --json
-pynakes files check refs.bib --root ~/papers --json
+pynakes asset check refs.bib --json
+pynakes asset check refs.bib --root ~/papers --json
 ```
 
 The checker is read-only. It reports `ok`, `missing`, `wrong_type`, and
@@ -303,8 +303,8 @@ The checker is read-only. It reports `ok`, `missing`, `wrong_type`, and
 ### Track cited and uncited entries
 
 ```bash
-pynakes used refs.bib paper.tex --json
-pynakes used refs.bib paper.tex --group Used --dry-run --diff --json
+pynakes tex scan refs.bib paper.tex --json
+pynakes tex scan refs.bib paper.tex --group Used --dry-run --diff --json
 ```
 
 ## Exit codes
@@ -316,8 +316,8 @@ pynakes used refs.bib paper.tex --group Used --dry-run --diff --json
 ## JSON output
 
 **Every modifying command** (`groups`, `keys`, `fields`, `metadata`,
-`normalize`, `convert`, `add`, `import`, `fetch`, `dedupe merge`, `enrich`,
-`used`) shares one envelope:
+`normalize`, `convert`, `ref add`, `ref import`, `asset fetch`, `dedupe merge`,
+`enrich`, `tex scan`) shares one envelope:
 
 ```json
 {
@@ -372,7 +372,7 @@ compared best-effort.
 
 Command-specific keys are added alongside these (e.g. `renames` for
 `keys generate`/`repair`, `sources` for `keys rename`,
-`report`/`tagged`/`exported` for `used`,
+`report`/`tagged`/`exported` for `tex scan`,
 `operations` for `normalize`).
 
 **Errors** return `{"status":"error","error":"<Type>","message":"..."}` with
@@ -381,16 +381,16 @@ exit code 1 (e.g. `FileNotFound`, `ParseError` with `line`, `InvalidInput`).
 exit code 2, where `options` lists the resolutions to choose from.
 
 Read-only commands (`inspect`, `search`, `lint`, `groups list`, `keys check`,
-`metadata list`, `files check`, `capabilities`) return
+`metadata list`, `asset check`, `capabilities`) return
 `status`, `action`, `file`, plus command-specific data (e.g. `lint` returns
 `issues`; `inspect` returns `duplicate_keys`; group and metadata commands return
 `groups` and `metadata` respectively).
 
-### Projection envelopes (`combine`, `split`)
+### Projection envelopes (`corpus combine`, `corpus split`)
 
 The projection commands read inputs read-only and create new files, so instead
 of the single-`file` / `modified` envelope they report `inputs` and the files
-they produce. `combine`:
+they produce. `corpus combine`:
 
 ```json
 {
@@ -407,7 +407,7 @@ they produce. `combine`:
 }
 ```
 
-`split` reports one entry per output bucket and how many entries matched no rule:
+`corpus split` reports one entry per output bucket and how many entries matched no rule:
 
 ```json
 {

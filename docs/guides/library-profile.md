@@ -41,7 +41,7 @@ The older one-comment-per-key and `key:value;` layouts are still read;
 | `normalize-format-metadata` | Boolean | `normalize` |
 | `lint-required-fields` | Fields required on every entry | `lint` |
 | `lint-required-fields-<entrytype>` | Extra fields required on one entry type | `lint` |
-| `tex-sources` | List of TeX files or directories, relative to the `.bib` file | `keys`, `used` |
+| `tex-sources` | List of TeX files or directories, relative to the `.bib` file | `keys`, `tex scan` |
 
 `lint-required-fields` values are additive to pynakes' built-in requirements,
 which follow the library's `databaseType` (`bibtex` or `biblatex`). The

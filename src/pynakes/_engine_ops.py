@@ -202,7 +202,7 @@ class BibliographyOperations:
         self,
         options: normalize_ops.NormalizeOptions | None = None,
     ) -> normalize_ops.NormalizeResult:
-        """Run the standard normalization routine in memory."""
+        """Apply the configured normalization steps to the staged library in memory."""
         opts = options or normalize_ops.NormalizeOptions()
         report = normalize_ops.normalize_library(self.lib, opts)
         self._consolidate_metadata = normalize_ops.resolve_format_metadata(

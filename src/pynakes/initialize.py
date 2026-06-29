@@ -142,22 +142,22 @@ file (key: `files-dir`). Fetch behaviour is configured by:
    The source contains semantically meaningful content (equations, citations,
    structured sections) that PDF reading tools cannot reliably extract.
 
-2. **Use `pynakes fetch` to download** — never manually download materials.
-   `pynakes fetch` handles the download and updates the manifest.
+2. **Use `pynakes asset fetch` to download** — never manually download materials.
+   `pynakes asset fetch` handles the download and updates the manifest.
    Run it from this directory (it auto-detects the `.bib` file).
 
 3. **Validate before editing** — run `pynakes lint --strict {bibname}.bib`
-   and `pynakes files check {bibname}.bib --root .` before and after changes.
+   and `pynakes asset check {bibname}.bib --root .` before and after changes.
 
 4. **Add new references through pynakes** — use
-   `pynakes import <identifier> {bibname}.bib` for DOI/arXiv metadata lookup,
-   or `pynakes add <key> {bibname}.bib --field name=value` for a manual entry,
-   rather than writing entries by hand. `import` auto-detects DOI
+   `pynakes ref import <identifier> {bibname}.bib` for DOI/arXiv metadata lookup,
+   or `pynakes ref add <key> {bibname}.bib --field name=value` for a manual entry,
+   rather than writing entries by hand. `ref import` auto-detects DOI
    (`10.1103/PhysRevLett.116.061102`), arXiv ID (`2301.00001`), or a journal
    article URL and ensures consistent formatting and citation-key generation.
 
-5. **Remove entries with `pynakes remove`** — use
-   `pynakes remove {bibname}.bib <citekey>` to delete an entry and its Pinax
+5. **Remove entries with `pynakes ref remove`** — use
+   `pynakes ref remove {bibname}.bib <citekey>` to delete an entry and its Pinax
    materials.
 
 6. **Inspect before deciding** — `pynakes inspect --json {bibname}.bib` gives a
@@ -168,7 +168,7 @@ file (key: `files-dir`). Fetch behaviour is configured by:
    `--dry-run --diff`; use them to preview before applying.
 
 8. **Check pinax integrity** — after any fetch or modify operation, verify with
-   `pynakes files check --strict {bibname}.bib --root .`. The manifest tracks
+   `pynakes asset check --strict {bibname}.bib --root .`. The manifest tracks
    SHA-256 hashes and fetch dates; report any drift (mismatched checksums) to
    the user rather than silently fixing.
 """

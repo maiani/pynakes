@@ -4,7 +4,7 @@ Practical examples for the currently implemented `pynakes` workflow.
 
 ## Example 1: Daily Bibliography Maintenance
 
-Preview, then apply the standard normalization pass.
+Preview, then apply the normalization pass.
 
 ```bash
 pynakes inspect refs.bib
@@ -59,18 +59,18 @@ pynakes normalize refs.bib --ltwa-table ltwa.csv --dry-run --diff
 ## Example 3: Import or Add a Reference
 
 ```bash
-pynakes import 10.5555/example refs.bib --dry-run --diff
-pynakes import 10.5555/example refs.bib
-pynakes import arXiv:2301.00001 refs.bib
-pynakes import arXiv:2301.00001 refs.bib --fetch
-pynakes add Manual2026 refs.bib --field title="Manual Reference" --field year=2026
+pynakes ref import 10.5555/example refs.bib --dry-run --diff
+pynakes ref import 10.5555/example refs.bib
+pynakes ref import arXiv:2301.00001 refs.bib
+pynakes ref import arXiv:2301.00001 refs.bib --fetch
+pynakes ref add Manual2026 refs.bib --field title="Manual Reference" --field year=2026
 ```
 
 Use the provider key or an explicit key:
 
 ```bash
-pynakes import 10.5555/example refs.bib --key-source provider
-pynakes import 10.5555/example refs.bib --key Smith2026Example
+pynakes ref import 10.5555/example refs.bib --key-source provider
+pynakes ref import 10.5555/example refs.bib --key Smith2026Example
 ```
 
 If the DOI already exists, the command exits with a conflict unless you pass
@@ -147,20 +147,20 @@ pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/
 ## Example 8: Analyze Cited and Unused Entries
 
 ```bash
-pynakes used refs.bib paper.tex paper.aux --json
+pynakes tex scan refs.bib paper.tex paper.aux --json
 ```
 
 Tag cited entries:
 
 ```bash
-pynakes used refs.bib paper.tex --group Cited --dry-run --diff
-pynakes used refs.bib paper.tex --group Cited
+pynakes tex scan refs.bib paper.tex --group Cited --dry-run --diff
+pynakes tex scan refs.bib paper.tex --group Cited
 ```
 
 Export a cited-only `.bib` file:
 
 ```bash
-pynakes used refs.bib paper.tex --out cited-only.bib
+pynakes tex scan refs.bib paper.tex --out cited-only.bib
 ```
 
 ## Example 8b: Combine and Split Across Files
@@ -168,14 +168,14 @@ pynakes used refs.bib paper.tex --out cited-only.bib
 Combine two libraries into one:
 
 ```bash
-pynakes combine 1.bib 2.bib --out combined.bib --dedupe --dry-run --diff
+pynakes corpus combine 1.bib 2.bib --out combined.bib --dedupe --dry-run --diff
 ```
 
 Combine `1.bib` and `2.bib` and split the result into two outputs — here cited
 entries go to `3.bib` and the rest to `4.bib`:
 
 ```bash
-pynakes split 1.bib 2.bib --tex paper.tex \
+pynakes corpus split 1.bib 2.bib --tex paper.tex \
   --to 3.bib='used' \
   --to 4.bib='*'
 ```
@@ -183,7 +183,7 @@ pynakes split 1.bib 2.bib --tex paper.tex \
 Or partition by group instead (first match wins; `*` is the catch-all):
 
 ```bash
-pynakes split 1.bib 2.bib \
+pynakes corpus split 1.bib 2.bib \
   --to ml.bib='group "Machine Learning"' \
   --to archive.bib='group "Archive"' \
   --to rest.bib='*'

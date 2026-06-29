@@ -30,21 +30,29 @@ from pynakes.cli_commands import (
     remove,
     search,
     setops,
+    tex,
     used,
 )
 from pynakes.cli_common import _bibfile_completer
 from pynakes.cli_common import _citekey_completer as _complete_fn
 from pynakes.cli_discovery import AutoBibGroup
 
-app = typer.Typer(help="Agent-friendly BibTeX library management tool", cls=AutoBibGroup)
-groups_app = typer.Typer(help="Manage entry groups", cls=AutoBibGroup)
-keys_app = typer.Typer(help="Generate and check citation keys", cls=AutoBibGroup)
-fields_app = typer.Typer(
-    help="Edit fields (rename, move, append, clear, protect titles)", cls=AutoBibGroup
+app = typer.Typer(
+    help="Agent-friendly BibTeX library management tool",
+    cls=AutoBibGroup,
+    rich_markup_mode="rich",
 )
-files_app = typer.Typer(help="Validate linked-file references", cls=AutoBibGroup)
+ref_app = typer.Typer(help="Manage individual reference entries", cls=AutoBibGroup)
+groups_app = typer.Typer(help="Manage entry groups", cls=AutoBibGroup)
+keys_app = typer.Typer(help="Work with citation keys", cls=AutoBibGroup)
+fields_app = typer.Typer(help="Edit entry fields", cls=AutoBibGroup)
 dedupe_app = typer.Typer(help="Detect and merge duplicate works", cls=AutoBibGroup)
 metadata_app = typer.Typer(help="Inspect and update library metadata", cls=AutoBibGroup)
+tex_app = typer.Typer(
+    help="Manage linked TeX sources and scan them for citations", cls=AutoBibGroup
+)
+asset_app = typer.Typer(help="Fetch and validate Pinax materials", cls=AutoBibGroup)
+corpus_app = typer.Typer(help="Operate across multiple .bib files", cls=AutoBibGroup)
 
 
 def _version_callback(value: bool) -> None:
@@ -70,12 +78,8 @@ def main(
 
 init.register(app)
 inspect.register(app)
-fetch.register(app)
 metadata.register(metadata_app)
 lint.register(app)
-files.register(files_app)
-add.register(app)
-import_ref.register(app)
 dedupe.register(dedupe_app)
 integrity.register(app)
 groups.register(groups_app)
@@ -85,17 +89,33 @@ normalize.register(app)
 convert.register(app)
 capabilities.register(app)
 search.register(app)
-used.register(app)
-setops.register(app)
-remove.register(app)
-batch.register(app)
 
+# ref: per-entry lifecycle (add, import, remove)
+add.register(ref_app)
+import_ref.register(ref_app)
+remove.register(ref_app)
+
+# tex: linked TeX sources (add/list/remove/clear) + scan (formerly `used`)
+tex.register(tex_app)
+used.register(tex_app)
+
+# asset: Pinax materials (fetch download + linked-file check)
+fetch.register(asset_app)
+files.register(asset_app)
+
+# corpus: operations across multiple .bib files
+setops.register(corpus_app)
+batch.register(corpus_app)
+
+app.add_typer(ref_app, name="ref")
 app.add_typer(groups_app, name="groups")
 app.add_typer(keys_app, name="keys")
 app.add_typer(fields_app, name="fields")
-app.add_typer(files_app, name="files")
 app.add_typer(dedupe_app, name="dedupe")
 app.add_typer(metadata_app, name="metadata")
+app.add_typer(tex_app, name="tex")
+app.add_typer(asset_app, name="asset")
+app.add_typer(corpus_app, name="corpus")
 
 # --- Group top-level --help by nature ---------------------------------------
 # The taxonomy lives once in capabilities.COMMAND_GROUPS (shared with the
@@ -139,8 +159,8 @@ app.registered_groups.sort(key=lambda info: _panel_sort_key(info.name))
 
 # Maps (command_path, parameter_name) → shell_complete callback.
 _CITEKEY_ARGS: dict[tuple[str, ...], str] = {
-    ("remove",): "citekeys",
-    ("fetch",): "target",
+    ("ref", "remove"): "citekeys",
+    ("asset", "fetch"): "target",
     ("keys", "rename"): "old",
     ("groups", "add-entry"): "key",
     ("groups", "remove-entry"): "key",

@@ -99,7 +99,11 @@ def normalize(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
     backup: bool = _BACKUP_OPTION,
 ) -> None:
-    """Run the standard bibliography normalization routine."""
+    """Normalize entries: titles, authors, journals, DOIs, identifier case, and ordering.
+
+    Each step follows the library's configured settings (its normalization
+    metadata) unless overridden by a flag.
+    """
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     try:

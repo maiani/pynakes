@@ -1,4 +1,4 @@
-"""CLI command for transactional multi-operation edits: ``batch``.
+"""CLI command for transactional multi-operation edits: ``corpus batch``.
 
 Applies a JSON list of operations to one `.bib` file in memory, previews a single
 combined diff/plan, and commits them atomically (all-or-nothing).

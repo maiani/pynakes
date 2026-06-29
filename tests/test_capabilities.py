@@ -81,7 +81,7 @@ class TestCommandSchemas:
         assert all(not name.startswith("journals ") for name in schemas)
 
     def test_schema_shape_for_a_command(self) -> None:
-        split = get_capabilities()["command_schemas"]["split"]
+        split = get_capabilities()["command_schemas"]["corpus split"]
         assert split["help"]
         # variadic positional input
         inputs = next(a for a in split["arguments"] if a["name"] == "inputs")

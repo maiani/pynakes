@@ -145,6 +145,34 @@ class AutoBibGroup(TyperGroup):
     ``{"status":"error",...}`` envelope (exit 1) when ``--json`` was requested.
     """
 
+    def format_help(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        """Render help, but enumerate each sub-group's subcommands inline.
+
+        Grouping commands under sub-apps (``ref``, ``tex``, ``asset`` …) hides
+        the actual operations behind a noun in the top-level ``--help``. To keep
+        that listing useful, temporarily append each sub-group's subcommand names
+        to its short help so the second level is visible at a glance. Leaf
+        commands and the per-group ``--help`` are untouched.
+        """
+        rich = getattr(self, "rich_markup_mode", None) == "rich"
+        saved: list[tuple[click.Command, str | None]] = []
+        for command in self.commands.values():
+            subcommands = getattr(command, "commands", None)
+            if not subcommands:
+                continue
+            saved.append((command, command.short_help))
+            base = (command.help or command.short_help or "").strip().splitlines()
+            head = base[0].rstrip(".") if base else ""
+            names = ", ".join(subcommands)
+            if rich:
+                names = f"[cyan]{names}[/cyan]"
+            command.short_help = f"{head} → {names}" if head else names
+        try:
+            super().format_help(ctx, formatter)
+        finally:
+            for command, original in saved:
+                command.short_help = original
+
     def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
         # ``ctx.meta`` is shared across the context tree, so recording the JSON
         # request once makes it visible to ``invoke`` at every nesting level.

@@ -77,7 +77,7 @@ rewrites them to the standard macro (`month = jun`) and canonicalizes macro
 casing (`month = Jan` → `month = jan`), while preserving literals such as
 `month = {June}` and declared custom strings.
 
-`lint` (along with `keys check`, `files check`, `dedupe check`, and `verify`)
+`lint` (along with `keys check`, `asset check`, `dedupe check`, and `verify`)
 accepts multiple files and supports `--strict`, which exits `1` for errors or
 profile deviations so it can gate a build. See [Library Profile](library-profile.md)
 for the complete schema and [Git Workflows](git-workflows.md) for pre-commit
@@ -237,9 +237,9 @@ This protects acronyms, uppercase/digit tokens, mixed-case terms such as
 Add a manually specified reference entry:
 
 ```bash
-pynakes add Manual2026 refs.bib --field title="Manual Reference" --field year=2026
-pynakes add Manual2026 refs.bib --type book --field author="Ada Lovelace"
-pynakes add Manual2026 --field title="Manual Reference"  # auto-detects one .bib file
+pynakes ref add Manual2026 refs.bib --field title="Manual Reference" --field year=2026
+pynakes ref add Manual2026 refs.bib --type book --field author="Ada Lovelace"
+pynakes ref add Manual2026 --field title="Manual Reference"  # auto-detects one .bib file
 ```
 
 `--field` is repeatable and uses `name=value` syntax. `--type` defaults to
@@ -252,23 +252,23 @@ Import a reference by DOI **or** arXiv identifier. The identifier type is
 auto-detected, so the same command handles all of these:
 
 ```bash
-pynakes import 10.5555/example refs.bib --dry-run --diff
-pynakes import https://doi.org/10.5555/example refs.bib
-pynakes import arXiv:2301.00001 refs.bib
-pynakes import https://arxiv.org/abs/2301.00001 refs.bib
+pynakes ref import 10.5555/example refs.bib --dry-run --diff
+pynakes ref import https://doi.org/10.5555/example refs.bib
+pynakes ref import arXiv:2301.00001 refs.bib
+pynakes ref import https://arxiv.org/abs/2301.00001 refs.bib
 ```
 
 Options:
 
 ```bash
-pynakes import 10.5555/example refs.bib --key ManualKey2026
-pynakes import 10.5555/example refs.bib --key-source provider
-pynakes import 10.5555/example refs.bib --allow-duplicate
-pynakes import arXiv:2301.00001 refs.bib --fetch
+pynakes ref import 10.5555/example refs.bib --key ManualKey2026
+pynakes ref import 10.5555/example refs.bib --key-source provider
+pynakes ref import 10.5555/example refs.bib --allow-duplicate
+pynakes ref import arXiv:2301.00001 refs.bib --fetch
 ```
 
 DOIs are fetched through DOI-resolver content negotiation; arXiv ids are fetched
-from the arXiv Atom API. By default `import` imports metadata only; `--fetch`
+from the arXiv Atom API. By default `ref import` imports metadata only; `--fetch`
 also downloads configured Pinax materials for the new arXiv entry according to
 the library's `fetch-preprint` and `fetch-source` metadata. Existing matching
 DOI/arXiv references are detected before importing. arXiv entries are written as
@@ -280,9 +280,9 @@ library's `databaseType` metadata (defaulting to BibTeX when unset).
 Validate JabRef linked files stored in `file` fields.
 
 ```bash
-pynakes files check refs.bib
-pynakes files check refs.bib --json
-pynakes files check refs.bib --root ~/papers --json
+pynakes asset check refs.bib
+pynakes asset check refs.bib --json
+pynakes asset check refs.bib --root ~/papers --json
 ```
 
 The checker parses plain paths and JabRef descriptors such as:
@@ -375,21 +375,21 @@ doi[clean_up_doi]
 Analyze which entries are cited by `.tex` or `.aux` files.
 
 ```bash
-pynakes used refs.bib paper.tex paper.aux
-pynakes used refs.bib paper.tex --json
+pynakes tex scan refs.bib paper.tex paper.aux
+pynakes tex scan refs.bib paper.tex --json
 ```
 
 Tag cited entries:
 
 ```bash
-pynakes used refs.bib paper.tex --group Cited --dry-run --diff
-pynakes used refs.bib paper.tex --keyword cited
+pynakes tex scan refs.bib paper.tex --group Cited --dry-run --diff
+pynakes tex scan refs.bib paper.tex --keyword cited
 ```
 
 Export only cited entries:
 
 ```bash
-pynakes used refs.bib paper.tex --out cited-only.bib
+pynakes tex scan refs.bib paper.tex --out cited-only.bib
 ```
 
 ## combine
@@ -400,12 +400,12 @@ reported by default; `--dedupe` collapses entries that share a key when their
 content is identical and reports a **conflict** (exit `2`) when it differs,
 rather than guessing.
 
-(`combine` unions whole files; merging two records of the *same* work is a
+(`corpus combine` unions whole files; merging two records of the *same* work is a
 different operation — see [`dedupe merge`](#dedupe).)
 
 ```bash
-pynakes combine a.bib b.bib --out combined.bib
-pynakes combine a.bib b.bib --out combined.bib --dedupe --dry-run --diff
+pynakes corpus combine a.bib b.bib --out combined.bib
+pynakes corpus combine a.bib b.bib --out combined.bib --dedupe --dry-run --diff
 ```
 
 ## split
@@ -421,12 +421,12 @@ predicate is a [`--where`](#fields) expression, or one of `*` (catch-all),
 
 ```bash
 # Partition by group (first match wins; `*` collects the rest)
-pynakes split refs.bib extra.bib \
+pynakes corpus split refs.bib extra.bib \
   --to ml.bib='group "Machine Learning"' \
   --to rest.bib='*'
 
 # Partition into cited vs uncited against a manuscript
-pynakes split refs.bib --tex paper.tex \
+pynakes corpus split refs.bib --tex paper.tex \
   --to used.bib='used' \
   --to unused.bib='*' --dry-run --diff
 ```
@@ -435,7 +435,7 @@ Routing is **first match** by default — each entry lands in the first output
 whose predicate matches, so the outputs are a partition. Pass `--copy` to send an
 entry to *every* matching output instead (outputs may then overlap). Entries that
 match no rule are dropped and reported under `unrouted`. `--dedupe` applies to the
-in-memory merge, exactly as for `combine`.
+in-memory merge, exactly as for `corpus combine`.
 
 ## convert
 

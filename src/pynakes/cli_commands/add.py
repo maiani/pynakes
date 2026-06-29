@@ -1,4 +1,4 @@
-"""CLI command registration for ``pynakes add``."""
+"""CLI command registration for ``pynakes ref add``."""
 
 import re
 

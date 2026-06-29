@@ -212,7 +212,7 @@ def normalize_month_macros(lib: BibFile) -> int:
 
 
 def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> NormalizeResult:
-    """Apply the standard daily-driver normalization routine in-place."""
+    """Apply the configured normalization steps to the bibliography in-place."""
     opts = options or NormalizeOptions()
     result = NormalizeResult()
 

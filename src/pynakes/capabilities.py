@@ -96,9 +96,7 @@ _SEARCH_QUERY_GRAMMAR = {
 COMMAND_GROUPS: dict[str, list[str]] = {
     "Inspect & validate": ["inspect", "search", "lint", "verify", "capabilities"],
     "Edit references": [
-        "add",
-        "import",
-        "remove",
+        "ref",
         "normalize",
         "convert",
         "enrich",
@@ -107,10 +105,10 @@ COMMAND_GROUPS: dict[str, list[str]] = {
         "keys",
         "groups",
         "metadata",
-        "used",
+        "tex",
     ],
-    "Materials (pinax)": ["fetch", "files"],
-    "Corpus (multiple files)": ["combine", "split", "batch"],
+    "Materials (pinax)": ["asset"],
+    "Corpus (multiple files)": ["corpus"],
     "Create": ["init"],
 }
 
@@ -227,7 +225,7 @@ def get_capabilities() -> dict:
             "lint",
             "verify",
             "keys check",
-            "files check",
+            "asset check",
             "dedupe check",
         ],
         "capabilities": [
@@ -285,28 +283,27 @@ def get_capabilities() -> dict:
             "init": "Create a new .bib library, optionally seeded with a metadata profile (--pinax for pinax mode)",
             "inspect": "Inspect a .bib file structure",
             "lint": "Validate entries and report issues",
+            "ref": "Add, import (by DOI/arXiv/URL), and remove reference entries "
+            "(add, import, remove)",
             "groups": "Manage entry groups (list, add-entry, remove-entry)",
             "keys": "Generate, check, rename, and repair citation keys",
             "fields": "Edit fields (rename, move, append, clear, protect-title)",
-            "files": "Validate linked-file references and Pinax material presence/drift",
             "dedupe": "Detect and conservatively merge duplicate works",
             "verify": "Verify entries against authoritative metadata "
             "(--published also reports preprints with a published version)",
             "enrich": "Conservatively fill missing metadata "
             "(--published also promotes preprints to their published version)",
+            "tex": "Manage linked TeX sources and scan them for citations "
+            "(list, add, remove, clear, scan)",
             "metadata": "Inspect and update top-level library metadata",
-            "normalize": "Run the standard normalization routine",
+            "normalize": "Normalize entries (titles, authors, journals, DOIs, "
+            "identifier case, ordering) per the library's configured settings",
             "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "
             "formats (export/import CSL-JSON, RIS, MODS, and EndNote)",
-            "add": "Add a manually specified reference entry",
-            "import": "Import a reference by DOI, arXiv identifier, or journal article URL; optionally fetch configured Pinax arXiv materials",
-            "fetch": "Download arXiv materials (PDF and source) into the Pinax files-dir",
             "search": "Search entries by free text, phrases, or field-scoped terms",
-            "used": "Report/tag/export entries cited in LaTeX sources",
-            "combine": "Union several .bib files into one (optionally deduping by key), copying Pinax materials when present",
-            "split": "Combine inputs and route entries into several outputs by predicate, copying Pinax materials when present",
-            "remove": "Remove one or more entries by citation key (removes Pinax materials by default)",
-            "batch": "Apply a sequence of operations atomically (one preview, one commit)",
+            "asset": "Fetch and validate Pinax materials — arXiv PDF/source download "
+            "and linked-file checks (fetch, check)",
+            "corpus": "Operate across multiple .bib files (combine, split, batch)",
             "capabilities": "Show this capability description",
         },
         # Self-description for agents: the full per-command schema (args/options/

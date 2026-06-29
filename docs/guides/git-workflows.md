@@ -14,7 +14,7 @@ build. Pass `--strict` to turn a finding into a non-zero exit code:
 | --- | --- |
 | `pynakes lint --strict` | any **error** or stored-profile deviation; ordinary warnings stay advisory |
 | `pynakes keys check --strict` | any citation key is duplicated |
-| `pynakes files check --strict` | any linked file is missing or the wrong type |
+| `pynakes asset check --strict` | any linked file is missing or the wrong type |
 | `pynakes dedupe check --strict` | duplicate works (same DOI/arXiv/title) are present |
 | `pynakes verify --strict` | any **error or warning** vs. authoritative metadata |
 
@@ -26,7 +26,7 @@ remain advisory. See [Library Profile](library-profile.md).
 
 ## Multiple files
 
-The gate checks — `lint`, `verify`, `keys check`, `files check`,
+The gate checks — `lint`, `verify`, `keys check`, `asset check`,
 `dedupe check` — accept one or more `.bib` files:
 
 ```bash

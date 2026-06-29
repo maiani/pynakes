@@ -82,18 +82,18 @@ columns. LTWA tables should contain `Word` and `Abbreviation` columns.
 ## 7. Import or add a reference
 
 ```bash
-pynakes import 10.5555/example refs.bib --dry-run --diff
-pynakes import 10.5555/example refs.bib
-pynakes import arXiv:2301.00001 refs.bib
-pynakes import arXiv:2301.00001 refs.bib --fetch
-pynakes add Manual2026 refs.bib --field title="Manual Reference" --field year=2026
+pynakes ref import 10.5555/example refs.bib --dry-run --diff
+pynakes ref import 10.5555/example refs.bib
+pynakes ref import arXiv:2301.00001 refs.bib
+pynakes ref import arXiv:2301.00001 refs.bib --fetch
+pynakes ref add Manual2026 refs.bib --field title="Manual Reference" --field year=2026
 ```
 
 Citation-key choices:
 
 ```bash
-pynakes import 10.5555/example refs.bib --key-source provider
-pynakes import 10.5555/example refs.bib --key ManualKey2026
+pynakes ref import 10.5555/example refs.bib --key-source provider
+pynakes ref import 10.5555/example refs.bib --key ManualKey2026
 ```
 
 By default, imported entries use generated keys. If the library has JabRef
@@ -121,8 +121,8 @@ pynakes fields protect-title refs.bib --dry-run --diff
 ## 10. Linked Files
 
 ```bash
-pynakes files check refs.bib --json
-pynakes files check refs.bib --root ~/papers
+pynakes asset check refs.bib --json
+pynakes asset check refs.bib --root ~/papers
 ```
 
 This validates JabRef `file` fields without modifying the library.
@@ -130,9 +130,9 @@ This validates JabRef `file` fields without modifying the library.
 ## 11. Citation Usage
 
 ```bash
-pynakes used refs.bib paper.tex paper.aux --json
-pynakes used refs.bib paper.tex --group Cited --dry-run --diff
-pynakes used refs.bib paper.tex --out cited-only.bib
+pynakes tex scan refs.bib paper.tex paper.aux --json
+pynakes tex scan refs.bib paper.tex --group Cited --dry-run --diff
+pynakes tex scan refs.bib paper.tex --out cited-only.bib
 ```
 
 ## Development Checks
