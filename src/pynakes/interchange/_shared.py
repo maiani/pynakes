@@ -3,6 +3,7 @@
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
+from pynakes._calendar import MONTH_ABBR_TO_NUM as MONTH_NUMBERS
 from pynakes.authors import split_name_list
 from pynakes.keys import generate_key, unique_key
 from pynakes.model import BibEntry, BibFile, EntryStore
@@ -67,12 +68,6 @@ def assign_container(fields: dict[str, str], bib_type: str, value: str) -> None:
     if not value:
         return
     fields["booktitle" if bib_type in BOOKTITLE_TYPES else "journal"] = value
-
-
-MONTH_NUMBERS = {
-    "jan": "1", "feb": "2", "mar": "3", "apr": "4", "may": "5", "jun": "6",
-    "jul": "7", "aug": "8", "sep": "9", "oct": "10", "nov": "11", "dec": "12",
-}  # fmt: skip
 
 
 def month_number(value: str) -> str:

@@ -6,9 +6,10 @@ JabRef-compatible files without disturbing what it does not change.
 
 > **Status — v0.5 public alpha.** The single-file bibliography engine is
 > feature-complete for this release, with Pinax material handling implemented
-> through arXiv PDF/source download. Until v1.0, pynakes does **not** guarantee
-> backward compatibility for the Python API, CLI syntax, or JSON envelopes; pin
-> exact `0.x` versions for reproducible automation.
+> through arXiv PDF/source download and open-access published PDF fetches. Until
+> v1.0, pynakes does **not** guarantee backward compatibility for the Python API,
+> CLI syntax, or JSON envelopes; pin exact `0.x` versions for reproducible
+> automation.
 
 ## Overview
 

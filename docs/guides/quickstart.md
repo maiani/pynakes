@@ -98,7 +98,9 @@ pynakes ref import 10.5555/example refs.bib --key ManualKey2026
 
 By default, imported entries use generated keys. If the library has JabRef
 `keypatterndefault` or `keypattern_<entrytype>` metadata, that pattern is used.
-`--fetch` also downloads configured Pinax materials for the new arXiv entry.
+`--fetch` also downloads configured Pinax materials for the new entry: arXiv
+preprint artifacts when an arXiv id is present, and published PDFs when
+`fetch-published: true` can resolve an open-access DOI copy.
 
 ## 8. Organize with Groups
 

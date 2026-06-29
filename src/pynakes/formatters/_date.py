@@ -2,33 +2,9 @@
 
 import re
 
-_MONTH_ABBR = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
-_MONTH_FULL = [
-    "january",
-    "february",
-    "march",
-    "april",
-    "may",
-    "june",
-    "july",
-    "august",
-    "september",
-    "october",
-    "november",
-    "december",
-]
-_MONTH_TO_NUM = {name: i + 1 for i, name in enumerate(_MONTH_ABBR)}
-_MONTH_TO_NUM.update({name: i + 1 for i, name in enumerate(_MONTH_FULL)})
-
-
-def _month_number(token: str) -> int | None:
-    """Return 1–12 for a month name/abbreviation, or ``None``."""
-    return _MONTH_TO_NUM.get(token.strip().lower().rstrip("."))
-
-
-# Two-digit month string → BibTeX-idiomatic three-letter abbreviation.
-# Used by BibLaTeX→BibTeX date splitting in convert.py.
-_MONTH_NUM_TO_ABBR: dict[str, str] = {f"{i + 1:02d}": abbr for i, abbr in enumerate(_MONTH_ABBR)}
+from pynakes._calendar import _MONTH_TO_NUM
+from pynakes._calendar import MONTH_ABBRS as _MONTH_ABBR
+from pynakes._calendar import month_name_to_int as _month_number
 
 # ISO date: year, optional month, optional day.
 _ISO_DATE_RE = re.compile(r"^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?$")

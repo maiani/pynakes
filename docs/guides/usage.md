@@ -265,15 +265,17 @@ pynakes ref import 10.5555/example refs.bib --key ManualKey2026
 pynakes ref import 10.5555/example refs.bib --key-source provider
 pynakes ref import 10.5555/example refs.bib --allow-duplicate
 pynakes ref import arXiv:2301.00001 refs.bib --fetch
+pynakes ref import 10.5555/example refs.bib --fetch --cache-dir .pynakes-cache
 ```
 
 DOIs are fetched through DOI-resolver content negotiation; arXiv ids are fetched
 from the arXiv Atom API. By default `ref import` imports metadata only; `--fetch`
-also downloads configured Pinax materials for the new arXiv entry according to
-the library's `fetch-preprint` and `fetch-source` metadata. Existing matching
-DOI/arXiv references are detected before importing. arXiv entries are written as
-`@online` in BibLaTeX libraries and `@misc` in BibTeX ones, following the
-library's `databaseType` metadata (defaulting to BibTeX when unset).
+also downloads configured Pinax materials for the new entry: arXiv preprint
+PDF/source when an arXiv id is present, and an open-access published PDF when
+the entry has a DOI and `fetch-published: true`. Existing matching DOI/arXiv
+references are detected before importing. arXiv entries are written as `@online`
+in BibLaTeX libraries and `@misc` in BibTeX ones, following the library's
+`databaseType` metadata (defaulting to BibTeX when unset).
 
 ## files
 

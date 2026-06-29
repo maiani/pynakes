@@ -13,11 +13,15 @@ import pytest
 
 from pynakes.fetch import (
     ArxivFetchError,
+    PublishedPdfFetchError,
     arxiv_pdf_url,
     arxiv_source_url,
     download_arxiv_materials,
+    download_published_material,
     extract_arxiv_source,
     fetch_arxiv_pdf,
+    fetch_published_pdf,
+    openalex_oa_pdf_url,
 )
 from pynakes.filestore import FileStore
 
@@ -147,6 +151,172 @@ def test_failed_source_download_leaves_existing_source_tree(tmp_path: Path) -> N
 
     assert (existing / "old.tex").read_text() == "old\n"
     assert not (tmp_path / "escape.tex").exists()
+
+
+# ---------------------------------------------------------------------------
+# Open-access published PDF helpers
+# ---------------------------------------------------------------------------
+
+
+class _FakeResponse:
+    """Minimal file-like response for injected ``urlopen``."""
+
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+
+    def __enter__(self) -> "_FakeResponse":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self._data
+
+
+_OPENALEX_WITH_OA = json.dumps(
+    {
+        "best_oa_location": {
+            "pdf_url": "https://example.com/paper.pdf",
+        }
+    }
+).encode("utf-8")
+
+_OPENALEX_WITHOUT_OA = json.dumps(
+    {
+        "best_oa_location": None,
+    }
+).encode("utf-8")
+
+
+def test_openalex_oa_pdf_url_resolves_url(tmp_path: Path) -> None:
+    def fake_urlopen(request: object, timeout: float = 30.0) -> _FakeResponse:
+        target = request.full_url if hasattr(request, "full_url") else str(request)
+        assert "api.openalex.org/works/doi:" in str(target)
+        return _FakeResponse(_OPENALEX_WITH_OA)
+
+    url = openalex_oa_pdf_url("10.1103/PhysRevLett.100.123456", urlopen=fake_urlopen)
+    assert url == "https://example.com/paper.pdf"
+
+
+def test_openalex_oa_pdf_url_returns_none_when_no_oa(tmp_path: Path) -> None:
+    def fake_urlopen(request: object, timeout: float = 30.0) -> _FakeResponse:
+        return _FakeResponse(_OPENALEX_WITHOUT_OA)
+
+    url = openalex_oa_pdf_url("10.1103/PhysRevLett.100.123456", urlopen=fake_urlopen)
+    assert url is None
+
+
+def test_openalex_oa_pdf_url_uses_cache(tmp_path: Path) -> None:
+    cache_dir = tmp_path / "cache"
+    calls: list[int] = []
+
+    def fake_urlopen(request: object, timeout: float = 30.0) -> _FakeResponse:
+        calls.append(1)
+        return _FakeResponse(_OPENALEX_WITH_OA)
+
+    url1 = openalex_oa_pdf_url(
+        "10.1103/PhysRevLett.100.123456", urlopen=fake_urlopen, cache_dir=cache_dir
+    )
+    assert url1 == "https://example.com/paper.pdf"
+    assert len(calls) == 1
+
+    url2 = openalex_oa_pdf_url(
+        "10.1103/PhysRevLett.100.123456", urlopen=fake_urlopen, cache_dir=cache_dir
+    )
+    assert url2 == "https://example.com/paper.pdf"
+    assert len(calls) == 1  # served from cache, no second call
+
+
+def test_openalex_oa_pdf_url_does_not_cache_invalid_json(tmp_path: Path) -> None:
+    cache_dir = tmp_path / "cache"
+
+    def fake_urlopen(request: object, timeout: float = 30.0) -> _FakeResponse:
+        return _FakeResponse(b"<html>not json</html>")
+
+    with pytest.raises(PublishedPdfFetchError, match="invalid JSON"):
+        openalex_oa_pdf_url(
+            "10.1103/PhysRevLett.100.123456",
+            urlopen=fake_urlopen,
+            cache_dir=cache_dir,
+        )
+
+    assert not list(cache_dir.rglob("*.json"))
+
+
+def test_fetch_published_pdf_reads_bytes(tmp_path: Path) -> None:
+    def fake_urlopen(request: object, timeout: float = 30.0) -> _FakeResponse:
+        target = request.full_url if hasattr(request, "full_url") else str(request)
+        assert "example.com/paper.pdf" in str(target)
+        return _FakeResponse(b"%PDF published")
+
+    data = fetch_published_pdf("https://example.com/paper.pdf", urlopen=fake_urlopen)
+    assert data == b"%PDF published"
+
+
+def test_fetch_published_pdf_wraps_errors(tmp_path: Path) -> None:
+    from urllib.error import URLError
+
+    def fake_urlopen(request: object, timeout: float = 30.0) -> None:
+        raise URLError("offline")
+
+    with pytest.raises(PublishedPdfFetchError, match="Failed to download"):
+        fetch_published_pdf("https://example.com/paper.pdf", urlopen=fake_urlopen)
+
+
+def test_download_published_material_writes_pdf_and_manifest(tmp_path: Path) -> None:
+    store = FileStore(root=tmp_path / "refs.files", bib_path=tmp_path / "refs.bib")
+
+    def url_resolver(doi: str) -> str | None:
+        return "https://example.com/paper.pdf"
+
+    def pdf_fetcher(url: str) -> bytes:
+        return b"%PDF published"
+
+    result = download_published_material(
+        store,
+        "Noether1918",
+        "10.1103/PhysRevLett.100.123456",
+        url_resolver=url_resolver,
+        pdf_fetcher=pdf_fetcher,
+        fetched_date="2026-06-27",
+    )
+
+    assert result.pdf_path == tmp_path / "refs.files" / "Noether1918.pdf"
+    assert result.doi == "10.1103/PhysRevLett.100.123456"
+    assert (tmp_path / "refs.files" / "Noether1918.pdf").read_bytes() == b"%PDF published"
+
+    manifest = json.loads((tmp_path / "refs.files" / ".pinax" / "manifest.json").read_text())
+    row = manifest["files"]["Noether1918"]
+    assert row["preprint_canonical"] is False
+    assert row["published_pdf"]["source"] == "https://example.com/paper.pdf"
+    assert row["published_pdf"]["fetched_date"] == "2026-06-27"
+    assert row["published_pdf"]["refetchable"] is True
+    assert len(row["published_pdf"]["sha256"]) == 64
+
+
+def test_download_published_material_returns_none_when_no_oa(tmp_path: Path) -> None:
+    store = FileStore(root=tmp_path / "refs.files", bib_path=tmp_path / "refs.bib")
+
+    def url_resolver(doi: str) -> str | None:
+        return None
+
+    result = download_published_material(
+        store,
+        "Noether1918",
+        "10.1103/PhysRevLett.100.123456",
+        url_resolver=url_resolver,
+    )
+
+    assert result.pdf_path is None
+    assert not (tmp_path / "refs.files" / "Noether1918.pdf").exists()
+
+
+def test_download_published_material_wraps_malformed_doi(tmp_path: Path) -> None:
+    store = FileStore(root=tmp_path / "refs.files", bib_path=tmp_path / "refs.bib")
+
+    with pytest.raises(PublishedPdfFetchError, match="Malformed DOI"):
+        download_published_material(store, "Noether1918", "not-a-doi")
 
 
 def _tar_bytes(files: dict[str, bytes], *, symlinks: dict[str, str] | None = None) -> bytes:

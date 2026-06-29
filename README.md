@@ -54,7 +54,7 @@ preview/diff → commit. Full JabRef metadata parity, including round-trip
 Opt in by setting a `files-dir` in the library metadata. Now every citation key can carry materials:
 
 - **arXiv download** — PDFs and source bundles, automatically fetched, verified, and extracted with provenance tracking (source hash, download timestamp)
-- **`asset fetch`** — download materials for specific keys or `--all`
+- **`asset fetch`** — download configured materials for all entries or one key
 - **`asset check`** — validate presence, detect orphans, verify checksums, optionally fix (`--fix`)
 - **`ref remove`** — removes both the entry and its materials 
 - **Coordinated key edits** — renaming a key moves its materials
@@ -100,8 +100,8 @@ pynakes ref remove mylib.bib DeprecatedKey2020
 # Rename a citation key across the .bib file and .tex sources
 pynakes keys rename mylib.bib OldKey2020 NewKey2020 paper.tex chapters/
 
-# Fetch arXiv materials for an entry (Pinax mode)
-pynakes asset fetch mylib.bib arXivKey2024
+# Fetch configured materials for one entry (Pinax mode)
+pynakes asset fetch arXivKey2024 mylib.bib
 
 # Search entries
 pynakes search mylib.bib "neural network" --json

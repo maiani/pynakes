@@ -4,6 +4,7 @@ import re
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 
+from pynakes._calendar import MONTH_ABBR_TO_NAME as COMMON_STRINGS
 from pynakes._text_utils import iter_toplevel_splits, strip_jabref_terminator
 from pynakes.inheritance import Lookup, resolve_entry_fields
 
@@ -14,20 +15,6 @@ _BARE_IDENTIFIER = re.compile(r"^[A-Za-z][A-Za-z0-9_:-]*$")
 # BibTeX 0.99d predefines these identifiers. They participate in value
 # interpolation but are not added to ``BibFile.strings`` because they were not
 # declarations in the source file.
-COMMON_STRINGS = {
-    "jan": "January",
-    "feb": "February",
-    "mar": "March",
-    "apr": "April",
-    "may": "May",
-    "jun": "June",
-    "jul": "July",
-    "aug": "August",
-    "sep": "September",
-    "oct": "October",
-    "nov": "November",
-    "dec": "December",
-}
 
 
 def resolve_field_value(value: str, strings: dict[str, str]) -> str:

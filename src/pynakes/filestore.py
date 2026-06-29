@@ -179,6 +179,13 @@ class FileStore:
         _atomic_write_bytes(path, data, self.root)
         return path
 
+    def write_published_pdf(self, key: str, data: bytes) -> Path:
+        """Atomically write the published (version-of-record) PDF for ``key``."""
+        path = self.paths_for(key).published_pdf
+        self.ensure_root()
+        _atomic_write_bytes(path, data, self.root)
+        return path
+
     def write_preprint_source(self, key: str, source_dir: str | Path) -> Path:
         """Atomically install an extracted arXiv source tree for ``key``."""
         source = Path(source_dir)

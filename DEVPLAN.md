@@ -64,9 +64,9 @@ conformance baseline is TeX Live 2026. Backward compatibility remains
 explicitly unguaranteed until v1.0.
 
 **Deferred Pinax steps**
-- [ ] **9. Open-access published PDFs.** DOI → open-access resolver landing the
+- [x] **9. Open-access published PDFs.** DOI → open-access resolver landing the
       published version at `<citekey>.pdf`, when a resolvable open-access copy
-      exists. Deferred beyond the public alpha.
+      exists.
 - [x] **10. Dedupe material merge.** `dedupe` merge reconciles Pinax materials
       onto the surviving key.
 
@@ -275,9 +275,9 @@ reviewed, then the next.
 - [x] **8. `add --fetch` for arXiv Pinax materials.** One-step
       import-and-download for arXiv references, using the existing Pinax fetch
       policy for preprint PDF/source materials.
-- [ ] **9. Open-access published PDFs.** (deferred) DOI → open-access resolver
-      landing the published version at `<citekey>.pdf`, when a resolvable
-      open-access copy exists.
+- [x] **9. Open-access published PDFs.** DOI → open-access resolver landing the
+      published version at `<citekey>.pdf`, when a resolvable open-access copy
+      exists.
 - [x] **10. Dedupe material merge.** `dedupe` merge reconciles Pinax materials
       onto the surviving key.
 - [ ] **11. DOI → arXiv backfill.** (deferred) Extend `enrich --published

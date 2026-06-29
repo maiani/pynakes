@@ -268,3 +268,10 @@ def test_bibliography_set_metadata_validates_files_dir(tmp_path: Path) -> None:
     assert coll.files.root == tmp_path / "materials"
     with pytest.raises(ValueError, match="must not escape"):
         coll.set_metadata("files-dir", "../outside")
+
+
+def test_write_published_pdf_writes_atomically(tmp_path: Path) -> None:
+    store = FileStore(root=tmp_path / "refs.files", bib_path=tmp_path / "refs.bib")
+    path = store.write_published_pdf("Einstein1905", b"%PDF version of record")
+    assert path == tmp_path / "refs.files" / "Einstein1905.pdf"
+    assert path.read_bytes() == b"%PDF version of record"

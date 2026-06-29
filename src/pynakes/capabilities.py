@@ -301,8 +301,8 @@ def get_capabilities() -> dict:
             "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "
             "formats (export/import CSL-JSON, RIS, MODS, and EndNote)",
             "search": "Search entries by free text, phrases, or field-scoped terms",
-            "asset": "Fetch and validate Pinax materials — arXiv PDF/source download "
-            "and linked-file checks (fetch, check)",
+            "asset": "Fetch and validate Pinax materials — arXiv PDF/source, "
+            "open-access published PDF download, and linked-file checks (fetch, check)",
             "corpus": "Operate across multiple .bib files (combine, split, batch)",
             "capabilities": "Show this capability description",
         },

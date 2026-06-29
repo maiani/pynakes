@@ -5,12 +5,14 @@ import json as _json
 import typer
 
 from pynakes import importer as importer_ops
+from pynakes.cli_commands._fetch_report import fetch_report_lines
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     RunParams,
     _emit_conflict,
     _emit_error,
     _finish_mod,
+    _metadata_cache_dir,
     _resolve_input_bib,
     _safe,
     _verb,
@@ -40,6 +42,9 @@ def import_reference(
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    cache_dir: str | None = typer.Option(
+        None, "--cache-dir", help="Directory for deterministic provider-response cache"
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Import a reference by DOI or arXiv identifier."""
@@ -125,7 +130,12 @@ def import_reference(
     fetch_report = None
     if fetch:
         try:
-            fetch_report = coll.fetch_materials(target=entry.key, dry_run=params.dry_run)
+            cache = _metadata_cache_dir(file, cache_dir, True)
+            fetch_report = coll.fetch_materials(
+                target=entry.key,
+                dry_run=params.dry_run,
+                cache_dir=cache,
+            )
         except ValueError as exc:
             _emit_error(json_output, "InvalidInput", str(exc))
             return
@@ -133,7 +143,13 @@ def import_reference(
     label = entry.fields.get("doi") or entry.fields.get("eprint") or entry.key
     human = [f"{_verb('import', params, 'Imported')} {kind} {label} as {entry.key}."]
     if fetch_report is not None:
-        human.extend(_fetch_human_lines(fetch_report))
+        human.extend(
+            fetch_report_lines(
+                fetch_report,
+                skipped_prefix="Skipped fetch for",
+                failed_prefix="Failed fetch for",
+            )
+        )
 
     details = {
         "identifier_type": kind,
@@ -154,23 +170,6 @@ def import_reference(
         human,
         **details,
     )
-
-
-def _fetch_human_lines(report: dict) -> list[str]:
-    lines: list[str] = []
-    for item in report["fetched"]:
-        parts = []
-        if item["pdf_path"]:
-            parts.append("PDF")
-        if item["source_path"]:
-            parts.append("source")
-        label = "+".join(parts) if parts else "materials"
-        lines.append(f"Fetched {label} for {item['key']} (arXiv:{item['arxiv_id']}).")
-    for item in report["skipped"]:
-        lines.append(f"Skipped fetch for {item['key']} ({item['reason']}).")
-    for item in report["failed"]:
-        lines.append(f"Failed fetch for {item['key']} ({item['error']}).")
-    return lines
 
 
 def register(app: typer.Typer) -> None:

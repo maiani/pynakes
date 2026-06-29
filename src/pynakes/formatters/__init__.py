@@ -15,6 +15,7 @@ in ``tests/test_jabref_parity.py`` against vectors lifted from JabRef's own
 tests.
 """
 
+from pynakes._calendar import MONTH_NUM_TO_ABBR as _MONTH_NUM_TO_ABBR
 from pynakes.formatters._case import (
     capitalize,
     lower_case,
@@ -24,7 +25,6 @@ from pynakes.formatters._case import (
 )
 from pynakes.formatters._date import (
     _ISO_DATE_RE,
-    _MONTH_NUM_TO_ABBR,
     month_number_str,
     normalize_date,
     normalize_month,

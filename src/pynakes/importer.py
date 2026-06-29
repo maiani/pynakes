@@ -19,16 +19,18 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-from pynakes import __version__
+from pynakes._constants import ARXIV_BASE, ARXIV_EXPORT_API, DOI_ORG, USER_AGENT
+from pynakes._identifiers import (
+    arxiv_id_from_text,
+    canonical_doi,
+    looks_like_arxiv_id,
+    normalize_arxiv,
+    normalize_doi,
+)
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.keys import UnsupportedCitationKeyPatternError, generate_key, unique_key
 from pynakes.model import BibEntry, BibFile
-
-_USER_AGENT = f"pynakes/{__version__} reference import (mailto:unknown@example.invalid)"
-
-_DOI_URL_RE = re.compile(r"^https?://(?:dx\.)?doi\.org/", re.IGNORECASE)
-_DOI_RE = re.compile(r"^10\.\d{4,9}/\S+$", re.IGNORECASE)
 
 # Table of known journal URL patterns that encode the DOI directly.
 # Each entry is (compiled pattern, extractor callable).  The extractor
@@ -54,14 +56,6 @@ _JOURNAL_URL_RESOLVERS: list[tuple[re.Pattern[str], Callable[[re.Match[str]], st
         lambda m: m.group(1),
     ),
 ]
-
-# arXiv identifiers come in the post-2007 ``YYMM.NNNNN`` form and the legacy
-# ``archive/YYMMNNN`` form (e.g. ``hep-th/9901001``), each optionally suffixed
-# with a version (``v2``). URLs and an ``arXiv:`` prefix are also accepted.
-_ARXIV_URL_RE = re.compile(r"arxiv\.org/(?:abs|pdf)/([^?#\s]+)", re.IGNORECASE)
-_ARXIV_VERSION_RE = re.compile(r"v\d+$", re.IGNORECASE)
-_ARXIV_NEW_RE = re.compile(r"^\d{4}\.\d{4,5}(v\d+)?$", re.IGNORECASE)
-_ARXIV_OLD_RE = re.compile(r"^[a-z][a-z-]+(\.[a-z]{2})?/\d{7}(v\d+)?$", re.IGNORECASE)
 
 KEY_SOURCES = {"generated", "provider"}
 
@@ -157,8 +151,10 @@ def extract_doi_from_journal_url(url: str) -> str | None:
         m = pattern.match(stripped)
         if m:
             doi = extractor(m)
-            if _DOI_RE.match(doi):
-                return doi
+            try:
+                return normalize_doi(doi)
+            except ValueError:
+                continue
     return None
 
 
@@ -182,12 +178,13 @@ def resolve_identifier(value: str) -> tuple[str, str]:
             raise UnsupportedIdentifierError(f"Malformed arXiv identifier: {value!r}")
         return ARXIV, normalized
 
-    # A DOI URL or bare DOI.
-    if _DOI_URL_RE.match(raw) or _DOI_RE.match(re.sub(r"^doi:\s*", "", raw, flags=re.IGNORECASE)):
+    try:
         return DOI, normalize_doi(raw)
+    except ValueError:
+        pass
 
     # A bare arXiv identifier (no scheme), new or legacy form.
-    if _ARXIV_NEW_RE.match(raw) or _ARXIV_OLD_RE.match(raw):
+    if looks_like_arxiv_id(raw):
         normalized = normalize_arxiv(raw)
         if normalized is not None:
             return ARXIV, normalized
@@ -201,25 +198,6 @@ def resolve_identifier(value: str) -> tuple[str, str]:
         f"Unrecognized identifier {value!r}; expected a DOI, arXiv id/URL, "
         f"or a supported journal article URL (nature.com, journals.aps.org)"
     )
-
-
-# --- DOI ------------------------------------------------------------------
-
-
-def normalize_doi(value: str) -> str:
-    """Normalize a DOI or DOI URL to the canonical bare DOI string."""
-    doi = value.strip()
-    doi = _DOI_URL_RE.sub("", doi)
-    doi = re.sub(r"^doi:\s*", "", doi, flags=re.IGNORECASE).strip()
-    doi = doi.strip("<> \t\r\n")
-    if not _DOI_RE.match(doi):
-        raise ValueError(f"Malformed DOI: {value!r}")
-    return doi
-
-
-def canonical_doi(value: str) -> str:
-    """Return a lowercase DOI string suitable for equality checks."""
-    return normalize_doi(value).lower()
 
 
 def _fetch_url(
@@ -238,7 +216,7 @@ def _fetch_url(
     HTTP and network errors so callers get domain-specific exceptions without
     duplicating the try/except pattern.
     """
-    headers: dict[str, str] = {"User-Agent": _USER_AGENT}
+    headers: dict[str, str] = {"User-Agent": USER_AGENT}
     if accept is not None:
         headers["Accept"] = accept
     request = Request(url, headers=headers)
@@ -256,7 +234,7 @@ def _fetch_url(
 def fetch_bibtex_for_doi(doi: str, timeout: float = 15.0) -> str:
     """Fetch BibTeX metadata for ``doi`` using DOI content negotiation."""
     normalized = normalize_doi(doi)
-    url = f"https://doi.org/{quote(normalized, safe='/')}"
+    url = f"{DOI_ORG}/{quote(normalized, safe='/')}"
     data = _fetch_url(
         url,
         accept="application/x-bibtex",
@@ -314,19 +292,6 @@ class ArxivRecord:
     journal: str = ""
 
 
-def normalize_arxiv(value: str) -> str | None:
-    """Normalize an arXiv id/URL to its bare, version-stripped, lowercase form."""
-    cleaned = value.strip().strip("{}<>")
-    cleaned = re.sub(r"^arxiv:\s*", "", cleaned, flags=re.IGNORECASE)
-    match = _ARXIV_URL_RE.search(cleaned)
-    if match:
-        cleaned = match.group(1)
-    cleaned = cleaned.removesuffix(".pdf")
-    cleaned = _ARXIV_VERSION_RE.sub("", cleaned)
-    cleaned = cleaned.strip("/")
-    return cleaned.lower() or None
-
-
 def entry_arxiv_id(entry: BibEntry) -> str | None:
     """Return the normalized arXiv id an entry already carries, if any."""
     for field_name in ("arxiv", "eprint"):
@@ -339,11 +304,9 @@ def entry_arxiv_id(entry: BibEntry) -> str | None:
             if normalized:
                 return normalized
     for field_name in ("url", "howpublished", "note"):
-        match = _ARXIV_URL_RE.search(entry.fields.get(field_name, ""))
-        if match:
-            normalized = normalize_arxiv(match.group(1))
-            if normalized:
-                return normalized
+        normalized = arxiv_id_from_text(entry.fields.get(field_name, ""))
+        if normalized:
+            return normalized
     return None
 
 
@@ -357,7 +320,7 @@ def existing_keys_for_arxiv(lib: BibFile, identifier: str) -> list[str]:
 
 def fetch_arxiv_atom(identifier: str, timeout: float = 15.0) -> str:
     """Fetch arXiv Atom XML for ``identifier``. Split out so tests can stub it."""
-    url = f"https://export.arxiv.org/api/query?id_list={quote(identifier)}"
+    url = f"{ARXIV_EXPORT_API}?id_list={quote(identifier)}"
     data = _fetch_url(url, timeout=timeout, error_class=ArxivImportError, label=identifier)
     return data.decode("utf-8", errors="replace")
 
@@ -419,7 +382,7 @@ def arxiv_entry(record: ArxivRecord, *, dialect: str = "bibtex") -> BibEntry:
     fields["eprinttype" if biblatex else "archivePrefix"] = "arxiv" if biblatex else "arXiv"
     if record.primary_class:
         fields["eprintclass" if biblatex else "primaryClass"] = record.primary_class
-    fields["url"] = f"https://arxiv.org/abs/{record.arxiv_id}"
+    fields["url"] = f"{ARXIV_BASE}/abs/{record.arxiv_id}"
     if record.doi:
         fields["doi"] = record.doi
 

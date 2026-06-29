@@ -1,7 +1,7 @@
 # Pinax — a bibliography and its materials
 
-> **Status: core Pinax layer implemented; open-access published PDF import is
-> deferred.** This document specifies the optional *Pinax* layer (a bibliography
+> **Status: core Pinax layer implemented including open-access published PDF
+> import.** This document specifies the optional *Pinax* layer (a bibliography
 > plus its materials) without replacing the plain `.bib` maintenance engine, and
 > scopes what is deliberately deferred. For the engine it builds on, see
 > [Architecture](architecture.md); for philosophy, [vision](../vision.md); for
@@ -262,8 +262,8 @@ Given an arXiv entry, it downloads the PDF and the source bundle into the right
 place:
 
 ```text
-fetch refs.bib alvarez2019      →  refs.files/alvarez2019_preprint.pdf
-                                   refs.files/alvarez2019_preprint/   (extracted source)
+pynakes asset fetch alvarez2019 refs.bib  →  refs.files/alvarez2019_preprint.pdf
+                                             refs.files/alvarez2019_preprint/
 ```
 
 (arXiv yields the preprint; a published `<citekey>.pdf` lands only when an
@@ -375,8 +375,8 @@ a preprint exists, backfills the arXiv id.
   backbone named for [v0.7](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
   OpenAlex represents arXiv as a *location*, not an id field, so the resolver
   scans the work's `locations[]` for an `arxiv.org/abs/<id>` URL and parses it
-  with the existing `_ARXIV_URL_RE` / `normalize_arxiv`. (Semantic Scholar's
-  `externalIds.ArXiv` is a clean fallback for later; v1 stays single-source.)
+  with the shared identifier helpers. (Semantic Scholar's `externalIds.ArXiv`
+  is a clean fallback for later; v1 stays single-source.)
 - **Network boundary.** Behind `--online`, fetcher injectable exactly like
   `importer.fetch_arxiv_atom`, with the same deterministic on-disk cache
   (`integrity._cache_path`). The default test suite never touches the network.
@@ -538,12 +538,12 @@ checklist.
    `FileStore` atomic writers for the preprint PDF and the extracted source.
    Unit-tested with fixtures, no real network. *(Implemented.)*
 3. **The `asset fetch` command.** `pynakes asset fetch [target] [file]
-   [--dry-run] [--json]`, with what-to-download governed by the `fetch-preprint` /
-   `fetch-source` / `fetch-published` metadata keys; `Bibliography.ensure_files_dir`
-   + `fetch_materials`; the zero-config default `files-dir`; the JSON envelope;
-   registration in `cli.py` and `capabilities.py`. *(The first end-to-end useful
-   slice — "given an arXiv entry, download the PDF and source into the right
-   place.")*
+   [--dry-run] [--cache-dir DIR] [--json]`, with what-to-download governed by
+   the `fetch-preprint` / `fetch-source` / `fetch-published` metadata keys;
+   `Bibliography.ensure_files_dir` + `fetch_materials`; the zero-config default
+   `files-dir`; the JSON envelope; registration in `cli.py` and
+   `capabilities.py`. *(The first end-to-end useful slice — "given an arXiv
+   entry, download the PDF and source into the right place.")*
 4. **Agent surface.** `inspect --json` reports per-entry `published_pdf` /
    `preprint_pdf` / `preprint_source` / `canonical_pdf`; `asset check` reports
    presence, orphans, and drift, and enforces the unique-key precondition for
@@ -564,8 +564,8 @@ checklist.
    arXiv references, using the existing Pinax fetch policy for preprint
    PDF/source materials. *(Implemented.)*
 9. **Open-access published PDFs.** DOI → open-access resolver landing the
-   published version at `<citekey>.pdf`, when a resolvable open-access copy
-   exists.
+    published version at `<citekey>.pdf`, when a resolvable open-access copy
+    exists. *(Implemented.)*
 10. **Dedupe material merge.** `dedupe` merge reconciles Pinax materials onto the
     surviving key, preserving moved provenance and refusing ambiguous material
     overwrites. *(Implemented.)*

@@ -1,6 +1,7 @@
 """CLI smoke tests."""
 
 import json
+import re
 import tarfile
 from io import BytesIO
 from pathlib import Path
@@ -15,6 +16,12 @@ from pynakes.cli import app
 runner = CliRunner()
 
 FIXTURES = Path(__file__).parent / "fixtures"
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _plain_cli_output(value: str) -> str:
+    """Strip Rich ANSI styling and collapse help-table wrapping."""
+    return " ".join(_ANSI_RE.sub("", value).replace("│", " ").split())
 
 
 class TestVersion:
@@ -32,8 +39,7 @@ class TestTopLevelHelp:
         # top-level --help enumerates each group's subcommands inline.
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0, result.output
-        # Strip box borders, then collapse rich line-wrapping into single spaces.
-        out = " ".join(result.output.replace("│", " ").split())
+        out = _plain_cli_output(result.output)
         # The group name sits in its own table column; the description column
         # ends with "→ <subcommands>".
         assert "→ add, import, remove" in out
@@ -43,7 +49,7 @@ class TestTopLevelHelp:
 
     def test_leaf_commands_have_no_arrow(self) -> None:
         result = runner.invoke(app, ["--help"])
-        out = " ".join(result.output.split())
+        out = _plain_cli_output(result.output)
         # A flat command like `normalize` is not a group; it gets no subcommand list.
         assert "normalize →" not in out
 
@@ -679,6 +685,53 @@ class TestImportCommand:
         assert fetched["pdf_path"] == str(tmp_path / "refs.files" / f"{key}_preprint.pdf")
         assert fetched["source_path"] is None
         assert not (tmp_path / "refs.files" / f"{key}_preprint").exists()
+
+    def test_import_fetch_reuses_published_fetch_path(self, tmp_path: Path, monkeypatch) -> None:
+        bib = tmp_path / "refs.bib"
+        cache = tmp_path / "provider-cache"
+        bib.write_text("@comment{pynakes-meta:\nfetch-published: true\n}\n")
+        monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
+
+        def fake_urlopen(request: object, timeout: float = 30.0) -> BytesIO:
+            url = request.full_url if hasattr(request, "full_url") else str(request)
+            if "openalex.org" in str(url):
+                body = json.dumps(
+                    {"best_oa_location": {"pdf_url": "https://example.com/provider.pdf"}}
+                ).encode("utf-8")
+                return BytesIO(body)
+            return BytesIO(b"%PDF published")
+
+        monkeypatch.setattr("pynakes.fetch._default_urlopen", fake_urlopen)
+
+        result = runner.invoke(
+            app,
+            [
+                "ref",
+                "import",
+                "10.5555/provider",
+                str(bib),
+                "--fetch",
+                "--cache-dir",
+                str(cache),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        key = data["key"]
+        assert data["fetch"]["fetch_published"] is True
+        assert data["fetch"]["fetched"] == [
+            {
+                "key": key,
+                "doi": "10.5555/provider",
+                "arxiv_id": None,
+                "pdf_path": str(tmp_path / "refs.files" / f"{key}.pdf"),
+                "source_path": None,
+            }
+        ]
+        assert (tmp_path / "refs.files" / f"{key}.pdf").read_bytes() == b"%PDF published"
+        assert len(list((cache / "openalex").glob("*.json"))) == 1
 
     def test_add_uses_jabref_key_pattern_metadata(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
@@ -2213,3 +2266,129 @@ class TestDryRunDiffJsonIntegration:
         assert result.exit_code == 0, result.output
         assert json.loads(result.output)["diff"] == preview_diff
         assert bib2.read_text() != before  # real run wrote the change
+
+
+class TestAssetFetchPublished:
+    """`asset fetch` with `fetch-published` metadata."""
+
+    def test_fetch_published_downloads_oa_pdf(self, tmp_path: Path, monkeypatch) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Einstein1905,\n"
+            '  title = {Zur Elektrodynamik bewegter K{\\"o}rper},\n'
+            "  doi = {10.1002/andp.19053221004}\n"
+            "}\n"
+            "@comment{pynakes-meta:\n"
+            "files-dir: refs.files\n"
+            "fetch-published: true\n"
+            "}\n"
+        )
+
+        def fake_urlopen(request: object, timeout: float = 30.0) -> BytesIO:
+            url = request.full_url if hasattr(request, "full_url") else str(request)
+            if "openalex.org" in str(url):
+                body = json.dumps(
+                    {"best_oa_location": {"pdf_url": "https://example.com/paper.pdf"}}
+                ).encode("utf-8")
+                return BytesIO(body)
+            return BytesIO(b"%PDF published")
+
+        monkeypatch.setattr("pynakes.fetch._default_urlopen", fake_urlopen)
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["asset", "fetch", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["fetch_published"] is True
+        assert len(data["fetched"]) == 1
+        assert data["fetched"][0]["key"] == "Einstein1905"
+        assert data["fetched"][0]["pdf_path"] is not None
+        assert (tmp_path / "refs.files" / "Einstein1905.pdf").read_bytes() == (b"%PDF published")
+        assert len(list((tmp_path / ".pynakes-cache" / "openalex").glob("*.json"))) == 1
+
+    def test_fetch_published_reports_malformed_doi_per_entry(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{BadDoi,\n"
+            "  title = {A Generic Example},\n"
+            "  doi = {not-a-doi}\n"
+            "}\n"
+            "@comment{pynakes-meta:\n"
+            "files-dir: refs.files\n"
+            "fetch-published: true\n"
+            "}\n"
+        )
+
+        def fail_urlopen(request: object, timeout: float = 30.0) -> None:
+            raise AssertionError("network should not be called for a malformed DOI")
+
+        monkeypatch.setattr("pynakes.fetch._default_urlopen", fail_urlopen)
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["asset", "fetch", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["fetched"] == []
+        assert data["skipped"] == []
+        assert len(data["failed"]) == 1
+        assert data["failed"][0]["key"] == "BadDoi"
+        assert "Malformed DOI" in data["failed"][0]["error"]
+
+    def test_fetch_dry_run_reports_would_fetch(self, tmp_path: Path, monkeypatch) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Einstein1905,\n"
+            "  title = {Zur Elektrodynamik},\n"
+            "  doi = {10.1002/andp.19053221004}\n"
+            "}\n"
+            "@comment{pynakes-meta:\n"
+            "files-dir: refs.files\n"
+            "fetch-published: true\n"
+            "}\n"
+        )
+
+        def fail_urlopen(request: object, timeout: float = 30.0) -> None:
+            raise AssertionError("dry-run should not call network")
+
+        monkeypatch.setattr("pynakes.fetch._default_urlopen", fail_urlopen)
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["asset", "fetch", "--dry-run", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["fetched"] == []
+        assert data["skipped"] == [{"key": "Einstein1905", "reason": "would fetch"}]
+        assert data["failed"] == []
+
+    def test_fetch_published_skips_when_disabled(self, tmp_path: Path, monkeypatch) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Einstein1905,\n"
+            "  title = {Zur Elektrodynamik},\n"
+            "  doi = {10.1002/andp.19053221004}\n"
+            "}\n"
+            "@comment{pynakes-meta:\n"
+            "files-dir: refs.files\n"
+            "fetch-published: false\n"
+            "}\n"
+        )
+
+        def fail_urlopen(request: object, timeout: float = 30.0) -> None:
+            raise AssertionError("network should not be called")
+
+        monkeypatch.setattr("pynakes.fetch._default_urlopen", fail_urlopen)
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["asset", "fetch", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["fetch_published"] is False
+        assert len(data["fetched"]) == 0
+        assert len(data["skipped"]) == 1
+        assert data["skipped"][0]["reason"] == "no arXiv id"

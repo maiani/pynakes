@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Step 9: Open-access published PDFs.** `asset fetch` now resolves DOIs to
+  open-access published PDFs via OpenAlex and downloads them as `<citekey>.pdf`
+  when `fetch-published: true` is set in `pynakes-meta`. New injection points
+  `published_url_fetcher` / `published_pdf_fetcher` make it testable without
+  network. Requires `fetch-published: true` (default `false`). Includes
+  deterministic on-disk caching of OpenAlex responses. (#9)
+
 ### Fixed
 
 - **Usage errors under Typer 0.26+ now produce structured JSON with `--json`.**

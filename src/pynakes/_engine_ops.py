@@ -506,18 +506,25 @@ class BibliographyOperations:
         dry_run: bool = False,
         pdf_fetcher: Callable[[str], bytes] | None = None,
         source_fetcher: Callable[[str], bytes] | None = None,
+        published_url_fetcher: Callable[[str], str | None] | None = None,
+        published_pdf_fetcher: Callable[[str], bytes] | None = None,
+        cache_dir: str | Path | None = None,
     ) -> dict:
-        """Download arXiv materials for entries into the Pinax files-dir.
+        """Download arXiv materials and/or open-access published PDFs for entries.
 
         Args:
             target: Optional single citation key to fetch. If None, fetch all.
             dry_run: If True, report what would be fetched without downloading.
-            pdf_fetcher: Injectable PDF fetcher for testing.
-            source_fetcher: Injectable source fetcher for testing.
+            pdf_fetcher: Injectable arXiv PDF fetcher for testing.
+            source_fetcher: Injectable arXiv source fetcher for testing.
+            published_url_fetcher: Injectable OA PDF URL resolver for testing.
+            published_pdf_fetcher: Injectable published PDF bytes fetcher.
+            cache_dir: Optional provider-response cache directory.
 
         Returns:
             A dict with ``fetched``, ``skipped``, ``failed`` lists, plus
-            ``fetch_preprint`` and ``fetch_source`` settings from metadata.
+            ``fetch_preprint``, ``fetch_source``, and ``fetch_published``
+            settings from metadata.
         """
         store = self.files
         if store is None:
@@ -538,9 +545,13 @@ class BibliographyOperations:
             store,
             fetch_preprint,
             fetch_source,
+            fetch_published,
             dry_run,
-            pdf_fetcher,
-            source_fetcher,
+            pdf_fetcher=pdf_fetcher,
+            source_fetcher=source_fetcher,
+            published_url_fetcher=published_url_fetcher,
+            published_pdf_fetcher=published_pdf_fetcher,
+            cache_dir=cache_dir,
         )
 
         return {

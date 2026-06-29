@@ -287,16 +287,29 @@ def run_fetch_loop(
     store: "object",  # FileStore — typed as object to avoid import
     fetch_preprint: bool,
     fetch_source: bool,
+    fetch_published: bool,
     dry_run: bool,
-    pdf_fetcher: Callable[[str], bytes] | None,
-    source_fetcher: Callable[[str], bytes] | None,
+    pdf_fetcher: Callable[[str], bytes] | None = None,
+    source_fetcher: Callable[[str], bytes] | None = None,
+    published_url_fetcher: Callable[[str], str | None] | None = None,
+    published_pdf_fetcher: Callable[[str], bytes] | None = None,
+    cache_dir: str | Path | None = None,
 ) -> tuple[list[dict], list[dict], list[dict]]:
-    """Iterate *entry_queue* and download arXiv materials into *store*.
+    """Iterate *entry_queue* and download materials into *store*.
+
+    For entries with an arXiv id, downloads the preprint PDF and/or source
+    bundle. For entries with a DOI, downloads the open-access published PDF
+    when ``fetch_published`` is true.
 
     Returns ``(fetched, skipped, failed)`` lists.
     """
-    from pynakes.fetch import ArxivFetchError, download_arxiv_materials  # local import
-    from pynakes.importer import entry_arxiv_id  # local import
+    from pynakes.fetch import (
+        ArxivFetchError,
+        PublishedPdfFetchError,
+        download_arxiv_materials,
+        download_published_material,
+    )
+    from pynakes.importer import entry_arxiv_id
 
     fetched: list[dict] = []
     skipped: list[dict] = []
@@ -307,37 +320,67 @@ def run_fetch_loop(
             skipped.append({"key": entry.key, "reason": "empty key"})
             continue
 
+        key = entry.key
         arxiv_id = entry_arxiv_id(entry)
-        if arxiv_id is None:
-            skipped.append({"key": entry.key, "reason": "no arXiv id"})
-            continue
+        doi = entry.fields.get("doi", "").strip()
+        presence = store.presence_for(key)
 
-        presence = store.presence_for(entry.key)
-        all_present = True
-        if fetch_preprint and not presence.preprint_pdf:
-            all_present = False
-        if fetch_source and not presence.preprint_source:
-            all_present = False
-        if all_present:
-            skipped.append({"key": entry.key, "reason": "materials already present"})
+        can_fetch_preprint = arxiv_id is not None and fetch_preprint and not presence.preprint_pdf
+        can_fetch_source = arxiv_id is not None and fetch_source and not presence.preprint_source
+        can_fetch_published = fetch_published and bool(doi) and not presence.published_pdf
+
+        anything_to_fetch = can_fetch_preprint or can_fetch_source or can_fetch_published
+
+        if not anything_to_fetch:
+            needs_arxiv = fetch_preprint or fetch_source
+            missing_arxiv = needs_arxiv and arxiv_id is None
+            missing_doi = fetch_published and not doi
+            if missing_arxiv and missing_doi:
+                skipped.append({"key": key, "reason": "no arXiv id and no DOI"})
+            elif missing_arxiv:
+                skipped.append({"key": key, "reason": "no arXiv id"})
+            elif missing_doi:
+                skipped.append({"key": key, "reason": "no DOI"})
+            else:
+                skipped.append({"key": key, "reason": "materials already present"})
             continue
 
         if dry_run:
-            skipped.append({"key": entry.key, "reason": "would fetch (use --dry-run to preview)"})
+            skipped.append({"key": key, "reason": "would fetch"})
             continue
 
-        try:
-            result = download_arxiv_materials(
-                store,
-                entry.key,
-                arxiv_id,
-                pdf=fetch_preprint,
-                source=fetch_source,
-                pdf_fetcher=pdf_fetcher,
-                source_fetcher=source_fetcher,
-            )
-            fetched.append(result.to_dict())
-        except ArxivFetchError as exc:
-            failed.append({"key": entry.key, "error": str(exc)})
+        # --- Fetch arXiv preprint materials ---
+        if can_fetch_preprint or can_fetch_source:
+            try:
+                result = download_arxiv_materials(
+                    store,
+                    key,
+                    arxiv_id,
+                    pdf=can_fetch_preprint,
+                    source=can_fetch_source,
+                    pdf_fetcher=pdf_fetcher,
+                    source_fetcher=source_fetcher,
+                )
+                fetched.append(result.to_dict())
+            except ArxivFetchError as exc:
+                failed.append({"key": key, "error": str(exc)})
+
+        # --- Fetch published PDF ---
+        if can_fetch_published:
+            try:
+                pub_result = download_published_material(
+                    store,
+                    key,
+                    doi,
+                    url_resolver=published_url_fetcher,
+                    pdf_fetcher=published_pdf_fetcher,
+                    cache_dir=cache_dir,
+                )
+                if pub_result.pdf_path is not None:
+                    fetched.append(pub_result.to_dict())
+                else:
+                    skipped.append({"key": key, "reason": "no open-access copy found"})
+            except PublishedPdfFetchError as exc:
+                failed.append({"key": key, "error": str(exc)})
 
     return fetched, skipped, failed

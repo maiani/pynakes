@@ -3,24 +3,21 @@
 from __future__ import annotations
 
 import hashlib
-import re
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
 
+from pynakes._identifiers import canonical_doi, doi_from_text, normalize_arxiv, normalize_doi
 from pynakes.authors import last_name, split_name_list
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.editing import set_entry_field, set_entry_type
 from pynakes.importer import (
     ArxivImportError,
     DOIImportError,
-    canonical_doi,
     entry_arxiv_id,
     entry_year,
     fetch_arxiv_atom,
     fetch_bibtex_for_doi,
-    normalize_arxiv,
-    normalize_doi,
     parse_arxiv_atom,
 )
 from pynakes.model import BibEntry, BibFile, _normalize_text
@@ -185,7 +182,6 @@ class MetadataFetchError(Exception):
     """Raised when authoritative metadata cannot be fetched or parsed."""
 
 
-_DOI_URL_RE = re.compile(r"(?:https?://(?:dx\.)?doi\.org/|doi:\s*)(10\.\d{4,9}/\S+)", re.I)
 _PREPRINT_DOI_PREFIXES = ("10.1101/", "10.21203/", "10.2139/")
 
 
@@ -540,12 +536,9 @@ def _cache_path(
 
 def _doi_from_entry_urls(entry: BibEntry) -> str | None:
     for field_name in ("url", "howpublished", "note"):
-        match = _DOI_URL_RE.search(entry.fields.get(field_name, ""))
-        if match:
-            try:
-                return normalize_doi(match.group(1).rstrip(").,;"))
-            except ValueError:
-                continue
+        normalized = doi_from_text(entry.fields.get(field_name, ""))
+        if normalized is not None:
+            return normalized
     return None
 
 

@@ -4,8 +4,9 @@ from dataclasses import dataclass, field
 
 from pynakes import authors as author_ops
 from pynakes import fields as field_ops
-from pynakes import importer as importer_ops
 from pynakes import journals as journal_ops
+from pynakes._constants import NAME_FIELDS, TITLE_FIELDS
+from pynakes._identifiers import normalize_doi
 from pynakes.editing import (
     normalize_entry_field_names,
     raw_field_value,
@@ -25,12 +26,10 @@ from pynakes.metadata import (
 from pynakes.model import COMMON_STRINGS, BibFile
 
 # JabRef saveActions formatter keys mapped to pynakes normalization concerns.
-_NAME_FIELDS = ("author", "editor")
 _DOI_FORMATTERS = ("clean_up_doi", "short_doi")
 
 # Normalize settings live under the ``normalize-`` key prefix.
 METADATA_PREFIX = "normalize-"
-TITLE_FIELDS = ("title", "booktitle", "maintitle", "subtitle")
 # Recognized month spellings mapped to their canonical BibTeX macro. BibTeX
 # predefines only the three-letter macros ``jan``..``dec``; full names ("June")
 # and common abbreviation variants ("Sept") are noncanonical — and, unbraced,
@@ -167,7 +166,7 @@ def normalize_dois(lib: BibFile) -> tuple[int, list[dict[str, str]]]:
         if not value:
             continue
         try:
-            normalized = importer_ops.normalize_doi(value)
+            normalized = normalize_doi(value)
         except ValueError as exc:
             warnings.append(
                 {
@@ -222,7 +221,7 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
     # exists. An explicit CLI option or a pynakes-meta key still overrides.
     save_actions = library_save_actions(lib)
     if save_actions is not None and save_actions.enabled:
-        author_default = "jabref" if save_actions.has("normalize_names", _NAME_FIELDS) else "none"
+        author_default = "jabref" if save_actions.has("normalize_names", NAME_FIELDS) else "none"
         doi_default = save_actions.has(_DOI_FORMATTERS, ("doi",))
     else:
         author_default, doi_default = "jabref", True

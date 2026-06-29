@@ -84,8 +84,10 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 - `pynakes fields clear <file> <field> [--where ...]`
 - `pynakes fields protect-title <file> [--field ...] [--term ...] [--where ...]`
 - `pynakes ref add <key> [file] --field name=value ... [--type ...]` — add a manually specified entry
-- `pynakes ref import <identifier> [file] [--key ...] [--key-source generated|provider] [--allow-duplicate] [--fetch]` — `<identifier>` is a DOI, DOI URL, arXiv id, or arXiv URL
-- `pynakes asset fetch [key] [file]` — download configured Pinax materials for arXiv entries
+- `pynakes ref import <identifier> [file] [--key ...] [--key-source generated|provider] [--allow-duplicate] [--fetch] [--cache-dir DIR]` — `<identifier>` is a DOI, DOI URL, arXiv id, or arXiv URL
+- `pynakes asset fetch [key] [file] [--cache-dir DIR]` — download configured
+  Pinax materials: arXiv PDF/source and, when `fetch-published: true`,
+  open-access published PDFs for DOI-backed entries
 - `pynakes metadata set <file> <key> <value> [--allow-unknown]`
 - `pynakes metadata adopt-jabref <file>` — start maintaining a JabRef metadata
   projection for a pynakes-native library (mirrors JabRef-native settings into
@@ -234,8 +236,8 @@ Citation-key priority:
 - `--key-source provider` keeps the provider's key when one is available.
 - `--key-source generated` (default) generates a key locally, using JabRef
   citation-key metadata when present.
-- `import --fetch` downloads configured Pinax arXiv materials for the new key
-  after the import succeeds.
+- `import --fetch` downloads configured Pinax materials for the new key after
+  the import succeeds, using the same fetch policy as `asset fetch`.
 
 ### Repair duplicate keys
 
