@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 from pynakes import authors as author_ops
 from pynakes import fields as field_ops
 from pynakes import journals as journal_ops
-from pynakes._constants import NAME_FIELDS, TITLE_FIELDS
 from pynakes._identifiers import normalize_doi
+from pynakes.authors import NAME_FIELDS
 from pynakes.editing import (
     normalize_entry_field_names,
     raw_field_value,
@@ -14,6 +14,7 @@ from pynakes.editing import (
     set_entry_field_expression,
     set_entry_type,
 )
+from pynakes.fields import TITLE_FIELDS
 from pynakes.formatters import FIELD_FORMATTERS
 from pynakes.metadata import (
     SAVE_ORDER_KEY_FIELDS,

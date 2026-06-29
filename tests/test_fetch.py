@@ -13,9 +13,8 @@ import pytest
 
 from pynakes.fetch import (
     ArxivFetchError,
+    ArxivSourceUnavailableError,
     PublishedPdfFetchError,
-    arxiv_pdf_url,
-    arxiv_source_url,
     download_arxiv_materials,
     download_published_material,
     extract_arxiv_source,
@@ -24,15 +23,6 @@ from pynakes.fetch import (
     openalex_oa_pdf_url,
 )
 from pynakes.filestore import FileStore
-
-
-def test_arxiv_material_urls_normalize_identifiers() -> None:
-    assert arxiv_pdf_url("https://arxiv.org/pdf/2101.00001v2.pdf") == (
-        "https://arxiv.org/pdf/2101.00001"
-    )
-    assert arxiv_source_url("arXiv:hep-th/9901001v3") == (
-        "https://arxiv.org/e-print/hep-th/9901001"
-    )
 
 
 def test_fetch_arxiv_pdf_reads_bytes_with_user_agent(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -53,7 +43,7 @@ def test_fetch_arxiv_pdf_reads_bytes_with_user_agent(monkeypatch: pytest.MonkeyP
         assert timeout == 30.0
         return Response()
 
-    monkeypatch.setattr("pynakes.importer.urlopen", fake_urlopen)
+    monkeypatch.setattr("pynakes.providers._http._default_urlopen", fake_urlopen)
 
     data = fetch_arxiv_pdf("2101.00001v2")
 
@@ -66,7 +56,7 @@ def test_fetch_arxiv_pdf_wraps_url_errors(monkeypatch: pytest.MonkeyPatch) -> No
     def fake_urlopen(request: Request, timeout: float) -> None:
         raise URLError("offline")
 
-    monkeypatch.setattr("pynakes.importer.urlopen", fake_urlopen)
+    monkeypatch.setattr("pynakes.providers._http._default_urlopen", fake_urlopen)
 
     with pytest.raises(ArxivFetchError, match="2101.00001"):
         fetch_arxiv_pdf("2101.00001")
@@ -131,6 +121,38 @@ def test_source_extraction_rejects_symlinks(tmp_path: Path) -> None:
 
     with pytest.raises(ArxivFetchError, match="Unsafe arXiv source archive link"):
         extract_arxiv_source(_tar_bytes({}, symlinks={"paper.tex": "../escape.tex"}), target)
+
+
+def test_source_extraction_reports_pdf_only_deposit(tmp_path: Path) -> None:
+    target = tmp_path / "source"
+
+    with pytest.raises(ArxivSourceUnavailableError, match="PDF-only submission"):
+        extract_arxiv_source(b"%PDF-1.5\n...binary...", target)
+
+
+def test_download_arxiv_materials_pdf_only_source_keeps_pdf(tmp_path: Path) -> None:
+    """A PDF-only deposit must not discard the successfully fetched PDF."""
+    store = FileStore(root=tmp_path / "refs.files", bib_path=tmp_path / "refs.bib")
+
+    result = download_arxiv_materials(
+        store,
+        "Noether1918",
+        "2101.00001",
+        pdf_fetcher=lambda arxiv_id: b"%PDF preprint",
+        source_fetcher=lambda arxiv_id: b"%PDF-1.5 not a tar",
+        fetched_date="2026-06-27",
+    )
+
+    assert result.pdf_path == tmp_path / "refs.files" / "Noether1918_preprint.pdf"
+    assert result.source_path is None
+    assert result.source_unavailable is True
+    assert (tmp_path / "refs.files" / "Noether1918_preprint.pdf").read_bytes() == b"%PDF preprint"
+    assert not (tmp_path / "refs.files" / "Noether1918_preprint").exists()
+
+    manifest = json.loads((tmp_path / "refs.files" / ".pinax" / "manifest.json").read_text())
+    row = manifest["files"]["Noether1918"]
+    assert "preprint_pdf" in row
+    assert "preprint_source" not in row
 
 
 def test_failed_source_download_leaves_existing_source_tree(tmp_path: Path) -> None:

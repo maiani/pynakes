@@ -17,11 +17,10 @@ import csv
 from dataclasses import dataclass
 from typing import Literal
 
-from pynakes._constants import TITLE_FIELDS
 from pynakes._identifiers import normalize_doi
 from pynakes.bibtex_parser import parse_raw_string_definition
 from pynakes.editing import raw_field_names, raw_field_value
-from pynakes.fields import title_capitalization_is_protected
+from pynakes.fields import TITLE_FIELDS, title_capitalization_is_protected
 from pynakes.journals import JOURNAL_FIELDS, JournalSources, expected_journal_title, load_sources
 from pynakes.keys import (
     UnsupportedCitationKeyPatternError,

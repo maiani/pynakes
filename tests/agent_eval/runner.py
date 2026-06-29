@@ -21,18 +21,53 @@ from tests.agent_eval.schemas import (
 from tests.agent_eval.workspace import LabWorkspace, create_lab_workspace
 
 OFFLINE_CATALOG = [
-    "Inspect refs.bib and explain the bibliography contents.",
-    "Run lint/key checks and report duplicate-key or metadata issues.",
-    "Repair duplicate citation keys and update paper.tex citations if needed.",
-    "Normalize DOI and formatting fields with dry-run before applying.",
-    "Add or remove groups/keywords for selected entries.",
-    "Split or combine small bibliographies in the lab workspace.",
+    "Discover the CLI from `pynakes --help`, `pynakes capabilities --json`, and "
+    "`docs/llm-integration.md`, then summarize the safest workflow for editing refs.bib.",
+    "Inspect refs.bib with JSON output and explain entry count, duplicate keys, metadata, "
+    "and any Pinax material fields visible to an agent.",
+    "Run lint and key checks with JSON output, identify duplicate-key or metadata issues, "
+    "and explain which issues are warnings versus errors.",
+    "Repair duplicate citation keys in refs.bib and update paper.tex citations if needed, "
+    "using a dry-run/diff before applying.",
+    "Normalize DOI and formatting fields with dry-run and diff first, then apply only if "
+    "the preview is narrow and understandable.",
+    "Use `search` or `--where` filters to target a single entry, then add and remove a "
+    "group or keyword without touching unrelated entries.",
+    "Edit one field on one entry and verify the resulting diff is surgical rather than a "
+    "full-entry rewrite.",
+    "Exercise metadata operations: list current metadata, set a pynakes-meta option, "
+    "dry-run the change, apply it, and inspect the resulting file.",
+    "Create a small second bibliography in the lab workspace, combine it with refs.bib, "
+    "then split a subset back out and inspect both outputs.",
+    "Trigger at least one expected structured error, such as a missing file or bad query, "
+    "and report whether the JSON envelope is actionable.",
+    "Create or inspect a Pinax files-dir without online access, then verify inspect/json "
+    "and asset-check behavior on a bibliography with no fetched materials.",
+    "Remove or rename an entry in a Pinax-style bibliography and verify the command output "
+    "makes material cleanup or rename behavior clear.",
 ]
 
 ONLINE_CATALOG = [
-    "Import an old/stable DOI or arXiv identifier into refs.bib.",
-    "Create or inspect a Pinax files-dir and fetch arXiv materials.",
-    "Run online verify/enrich and distinguish product issues from provider failures.",
+    "Import an old/stable DOI into refs.bib, inspect the generated entry, and report "
+    "whether duplicate detection and citation-key selection are understandable.",
+    "Import an old/stable arXiv identifier into refs.bib, then compare the imported "
+    "metadata against the arXiv URL/eprint fields.",
+    "Use `ref import --fetch` with an arXiv identifier to create a Pinax entry and fetch "
+    "preprint PDF/source materials in one workflow.",
+    "Create or inspect a Pinax files-dir, enable fetch-preprint and fetch-source metadata, "
+    "then fetch arXiv materials and inspect the manifest.",
+    "Enable fetch-published for a DOI-backed entry and run `asset fetch`, distinguishing "
+    "product issues from OpenAlex/provider failures.",
+    "Start from a DOI-backed paper, use online published enrichment to backfill its arXiv id, "
+    "then build a Pinax and fetch the arXiv PDF/source materials.",
+    "Run online verify on entries with DOI/arXiv metadata and report whether mismatches, "
+    "provider errors, and clean entries are easy to distinguish.",
+    "Run online enrich with dry-run/diff first, apply a safe metadata fill, and verify the "
+    "post-apply inspect output.",
+    "Exercise provider-cache behavior by repeating an online verify/enrich/fetch command "
+    "with the same cache directory and reporting whether the workflow is clear.",
+    "Attempt an online operation with an intentionally invalid DOI or arXiv id and report "
+    "whether the failure looks actionable rather than like a traceback.",
 ]
 
 

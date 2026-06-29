@@ -12,14 +12,8 @@ arXiv Atom API. Neither path downloads PDFs or linked files — only metadata.
 from __future__ import annotations
 
 import re
-import xml.etree.ElementTree as ET
 from collections.abc import Callable
-from dataclasses import dataclass, field
-from urllib.error import HTTPError, URLError
-from urllib.parse import quote
-from urllib.request import Request, urlopen
 
-from pynakes._constants import ARXIV_BASE, ARXIV_EXPORT_API, DOI_ORG, USER_AGENT
 from pynakes._identifiers import (
     arxiv_id_from_text,
     canonical_doi,
@@ -31,6 +25,12 @@ from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.keys import UnsupportedCitationKeyPatternError, generate_key, unique_key
 from pynakes.model import BibEntry, BibFile
+from pynakes.providers import arxiv
+from pynakes.providers import doi as doi_provider
+from pynakes.providers._http import ProviderFetchError
+
+# Re-exported for callers that import the parsed-record type from this module.
+ArxivRecord = arxiv.ArxivRecord
 
 # Table of known journal URL patterns that encode the DOI directly.
 # Each entry is (compiled pattern, extractor callable).  The extractor
@@ -200,49 +200,16 @@ def resolve_identifier(value: str) -> tuple[str, str]:
     )
 
 
-def _fetch_url(
-    url: str,
-    *,
-    accept: str | None = None,
-    timeout: float = 15.0,
-    error_class: type[Exception] = ReferenceImportError,
-    label: str | None = None,
-) -> bytes:
-    """Fetch ``url`` and return raw response bytes.
-
-    Shared low-level helper used by DOI and arXiv fetchers. ``accept`` sets the
-    ``Accept`` header when provided. ``label`` replaces the URL in error messages
-    (useful for human-readable identifiers like DOIs). Raises ``error_class`` for
-    HTTP and network errors so callers get domain-specific exceptions without
-    duplicating the try/except pattern.
-    """
-    headers: dict[str, str] = {"User-Agent": USER_AGENT}
-    if accept is not None:
-        headers["Accept"] = accept
-    request = Request(url, headers=headers)
-    display = label or url
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            return response.read()
-    except HTTPError as exc:
-        raise error_class(f"Server returned HTTP {exc.code} for {display}") from exc
-    except URLError as exc:
-        reason = getattr(exc, "reason", exc)
-        raise error_class(f"Network error fetching {display}: {reason}") from exc
-
-
 def fetch_bibtex_for_doi(doi: str, timeout: float = 15.0) -> str:
-    """Fetch BibTeX metadata for ``doi`` using DOI content negotiation."""
-    normalized = normalize_doi(doi)
-    url = f"{DOI_ORG}/{quote(normalized, safe='/')}"
-    data = _fetch_url(
-        url,
-        accept="application/x-bibtex",
-        timeout=timeout,
-        error_class=DOIImportError,
-        label=normalized,
-    )
-    return data.decode("utf-8", errors="replace")
+    """Fetch BibTeX metadata for ``doi`` via DOI content negotiation.
+
+    Thin domain wrapper over :func:`pynakes.providers.doi.fetch_bibtex` that
+    translates provider transport errors into :class:`DOIImportError`.
+    """
+    try:
+        return doi_provider.fetch_bibtex(doi, timeout=timeout)
+    except ProviderFetchError as exc:
+        raise DOIImportError(str(exc)) from exc
 
 
 def entry_from_bibtex(text: str) -> BibEntry:
@@ -279,19 +246,6 @@ def existing_keys_for_doi(lib: BibFile, doi: str) -> list[str]:
 # --- arXiv ----------------------------------------------------------------
 
 
-@dataclass
-class ArxivRecord:
-    """The subset of arXiv Atom metadata pynakes turns into a BibTeX entry."""
-
-    arxiv_id: str
-    title: str = ""
-    authors: list[str] = field(default_factory=list)
-    published: str = ""  # ISO date, ``YYYY-MM-DD``
-    primary_class: str = ""
-    doi: str = ""
-    journal: str = ""
-
-
 def entry_arxiv_id(entry: BibEntry) -> str | None:
     """Return the normalized arXiv id an entry already carries, if any."""
     for field_name in ("arxiv", "eprint"):
@@ -319,45 +273,15 @@ def existing_keys_for_arxiv(lib: BibFile, identifier: str) -> list[str]:
 
 
 def fetch_arxiv_atom(identifier: str, timeout: float = 15.0) -> str:
-    """Fetch arXiv Atom XML for ``identifier``. Split out so tests can stub it."""
-    url = f"{ARXIV_EXPORT_API}?id_list={quote(identifier)}"
-    data = _fetch_url(url, timeout=timeout, error_class=ArxivImportError, label=identifier)
-    return data.decode("utf-8", errors="replace")
+    """Fetch arXiv Atom XML for ``identifier``. Split out so tests can stub it.
 
-
-_ATOM_NS = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
-
-
-def parse_arxiv_atom(text: str, identifier: str) -> ArxivRecord:
-    """Parse an arXiv Atom feed into an :class:`ArxivRecord`."""
+    Thin domain wrapper over :func:`pynakes.providers.arxiv.fetch_atom` that
+    translates provider transport errors into :class:`ArxivImportError`.
+    """
     try:
-        root = ET.fromstring(text)
-    except ET.ParseError as exc:
-        raise ArxivImportError(f"arXiv returned invalid XML for {identifier}") from exc
-    entry = root.find("atom:entry", _ATOM_NS)
-    if entry is None:
-        raise ArxivImportError(f"arXiv returned no entry for {identifier}")
-
-    authors = [
-        name
-        for author in entry.findall("atom:author", _ATOM_NS)
-        if (name := _xml_text(author, "atom:name"))
-    ]
-    primary = entry.find("arxiv:primary_category", _ATOM_NS)
-    return ArxivRecord(
-        arxiv_id=normalize_arxiv(identifier) or identifier,
-        title=_xml_text(entry, "atom:title"),
-        authors=authors,
-        published=_xml_text(entry, "atom:published")[:10],
-        primary_class=primary.get("term", "") if primary is not None else "",
-        doi=_xml_text(entry, "arxiv:doi"),
-        journal=_xml_text(entry, "arxiv:journal_ref"),
-    )
-
-
-def _xml_text(element: ET.Element, path: str) -> str:
-    found = element.find(path, _ATOM_NS)
-    return " ".join((found.text or "").split()) if found is not None else ""
+        return arxiv.fetch_atom(identifier, timeout=timeout)
+    except ProviderFetchError as exc:
+        raise ArxivImportError(str(exc)) from exc
 
 
 def arxiv_entry(record: ArxivRecord, *, dialect: str = "bibtex") -> BibEntry:
@@ -382,7 +306,7 @@ def arxiv_entry(record: ArxivRecord, *, dialect: str = "bibtex") -> BibEntry:
     fields["eprinttype" if biblatex else "archivePrefix"] = "arxiv" if biblatex else "arXiv"
     if record.primary_class:
         fields["eprintclass" if biblatex else "primaryClass"] = record.primary_class
-    fields["url"] = f"{ARXIV_BASE}/abs/{record.arxiv_id}"
+    fields["url"] = arxiv.abs_url(record.arxiv_id)
     if record.doi:
         fields["doi"] = record.doi
 
@@ -396,13 +320,21 @@ def arxiv_entry(record: ArxivRecord, *, dialect: str = "bibtex") -> BibEntry:
 
 
 def fetch_arxiv_record(identifier: str, fetcher: FetchArxivAtom | None = None) -> ArxivRecord:
-    """Fetch and parse arXiv metadata for ``identifier``."""
+    """Fetch and parse arXiv metadata for ``identifier``.
+
+    Delegates fetch/parse to :mod:`pynakes.providers.arxiv`. The default Atom
+    fetcher is this module's :func:`fetch_arxiv_atom` wrapper so callers and
+    tests can substitute it; provider errors become :class:`ArxivImportError`.
+    """
     normalized = normalize_arxiv(identifier)
     if normalized is None:
         raise ArxivImportError(f"Malformed arXiv identifier: {identifier!r}")
     if fetcher is None:
         fetcher = fetch_arxiv_atom
-    return parse_arxiv_atom(fetcher(normalized), normalized)
+    try:
+        return arxiv.fetch_record(normalized, fetcher=fetcher)
+    except ProviderFetchError as exc:
+        raise ArxivImportError(str(exc)) from exc
 
 
 # --- preparation -----------------------------------------------------------

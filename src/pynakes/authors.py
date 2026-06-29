@@ -8,10 +8,11 @@ into individual people and extracting a person's last name; other modules
 import re
 import unicodedata
 
-from pynakes._constants import NAME_FIELDS
 from pynakes._text_utils import iter_toplevel_splits
 from pynakes.editing import set_entry_field
 from pynakes.model import BibFile
+
+NAME_FIELDS = ("author", "editor")
 
 # Latin letters that NFKD does not decompose into an ASCII base plus combining
 # marks. JabRef transliterates these (rather than dropping them) when reducing

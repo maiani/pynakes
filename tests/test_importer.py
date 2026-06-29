@@ -218,7 +218,7 @@ def test_fetch_bibtex_for_doi_wraps_http_error(monkeypatch: pytest.MonkeyPatch) 
     def _raise(*args, **kwargs):
         raise HTTPError("https://doi.org/x", 404, "Not Found", {}, None)
 
-    monkeypatch.setattr("pynakes.importer.urlopen", _raise)
+    monkeypatch.setattr("pynakes.providers._http._default_urlopen", _raise)
     with pytest.raises(DOIImportError, match="HTTP 404"):
         fetch_bibtex_for_doi("10.5555/missing")
 
@@ -227,7 +227,7 @@ def test_fetch_bibtex_for_doi_wraps_url_error(monkeypatch: pytest.MonkeyPatch) -
     def _raise(*args, **kwargs):
         raise URLError("offline")
 
-    monkeypatch.setattr("pynakes.importer.urlopen", _raise)
+    monkeypatch.setattr("pynakes.providers._http._default_urlopen", _raise)
     with pytest.raises(DOIImportError, match="10.5555/missing"):
         fetch_bibtex_for_doi("10.5555/missing")
 

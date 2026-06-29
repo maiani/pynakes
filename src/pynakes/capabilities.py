@@ -244,6 +244,7 @@ def get_capabilities() -> dict:
             "merge_duplicate_works",
             "verify_references",
             "check_published_preprints",
+            "backfill_arxiv_ids",
             "enrich_metadata",
             "normalize_library",
             "convert_to_biblatex",
@@ -290,9 +291,9 @@ def get_capabilities() -> dict:
             "fields": "Edit fields (rename, move, append, clear, protect-title)",
             "dedupe": "Detect and conservatively merge duplicate works",
             "verify": "Verify entries against authoritative metadata "
-            "(--published also reports preprints with a published version)",
+            "(--published also reports published/preprint identity links)",
             "enrich": "Conservatively fill missing metadata "
-            "(--published also promotes preprints to their published version)",
+            "(--published also promotes preprints and backfills arXiv ids)",
             "tex": "Manage linked TeX sources and scan them for citations "
             "(list, add, remove, clear, scan)",
             "metadata": "Inspect and update top-level library metadata",

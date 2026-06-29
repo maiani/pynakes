@@ -7,8 +7,6 @@ deterministic. The CLI layer decides when online fetching is allowed.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import shutil
 import tarfile
 import tempfile
@@ -17,14 +15,13 @@ from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path, PurePosixPath
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
 from urllib.request import Request
 from urllib.request import urlopen as _default_urlopen
 
-from pynakes._constants import ARXIV_BASE, OPENALEX_API, USER_AGENT
 from pynakes._identifiers import normalize_arxiv, normalize_doi
 from pynakes.filestore import FileStore
-from pynakes.importer import _fetch_url
+from pynakes.providers import arxiv, openalex
+from pynakes.providers._http import USER_AGENT, ProviderFetchError
 
 FetchArxivBytes = Callable[[str], bytes]
 FetchPublishedPdfUrl = Callable[[str], str | None]
@@ -32,6 +29,17 @@ FetchPublishedPdfUrl = Callable[[str], str | None]
 
 class ArxivFetchError(Exception):
     """Raised when arXiv material download or extraction fails."""
+
+
+class ArxivSourceUnavailableError(ArxivFetchError):
+    """Raised when arXiv has no TeX/source archive for a preprint.
+
+    Distinct from a corrupt-archive failure: it means the e-print endpoint
+    returned a PDF-only submission rather than an extractable source bundle, so
+    there is simply nothing to extract. A subclass of :class:`ArxivFetchError`
+    so existing ``except ArxivFetchError`` handlers still catch it, while callers
+    that care can treat it as a benign "no source" outcome.
+    """
 
 
 class PublishedPdfFetchError(Exception):
@@ -46,6 +54,7 @@ class ArxivDownloadResult:
     arxiv_id: str
     pdf_path: Path | None = None
     source_path: Path | None = None
+    source_unavailable: bool = False
 
     def to_dict(self) -> dict[str, str | None]:
         """Serialize the result to a JSON-friendly dict."""
@@ -81,28 +90,28 @@ class PublishedDownloadResult:
         }
 
 
-def arxiv_pdf_url(identifier: str) -> str:
-    """Return the canonical arXiv PDF URL for ``identifier``."""
-    normalized = _normalize_or_raise(identifier)
-    return f"{ARXIV_BASE}/pdf/{quote(normalized, safe='/')}"
-
-
-def arxiv_source_url(identifier: str) -> str:
-    """Return the canonical arXiv source archive URL for ``identifier``."""
-    normalized = _normalize_or_raise(identifier)
-    return f"{ARXIV_BASE}/e-print/{quote(normalized, safe='/')}"
-
-
 def fetch_arxiv_pdf(identifier: str, timeout: float = 30.0) -> bytes:
-    """Fetch arXiv PDF bytes for ``identifier``."""
-    return _fetch_bytes(arxiv_pdf_url(identifier), _normalize_or_raise(identifier), "PDF", timeout)
+    """Fetch arXiv PDF bytes for ``identifier``.
+
+    Thin wrapper over :func:`pynakes.providers.arxiv.fetch_pdf` translating
+    provider errors into :class:`ArxivFetchError`.
+    """
+    try:
+        return arxiv.fetch_pdf(identifier, timeout=timeout)
+    except (ProviderFetchError, ValueError) as exc:
+        raise ArxivFetchError(str(exc)) from exc
 
 
 def fetch_arxiv_source(identifier: str, timeout: float = 30.0) -> bytes:
-    """Fetch arXiv source archive bytes for ``identifier``."""
-    return _fetch_bytes(
-        arxiv_source_url(identifier), _normalize_or_raise(identifier), "source", timeout
-    )
+    """Fetch arXiv source archive bytes for ``identifier``.
+
+    Thin wrapper over :func:`pynakes.providers.arxiv.fetch_source` translating
+    provider errors into :class:`ArxivFetchError`.
+    """
+    try:
+        return arxiv.fetch_source(identifier, timeout=timeout)
+    except (ProviderFetchError, ValueError) as exc:
+        raise ArxivFetchError(str(exc)) from exc
 
 
 def download_arxiv_materials(
@@ -125,6 +134,7 @@ def download_arxiv_materials(
     arxiv_id = _normalize_or_raise(identifier)
     pdf_path: Path | None = None
     source_path: Path | None = None
+    source_unavailable = False
 
     if pdf:
         pdf_bytes = (pdf_fetcher or fetch_arxiv_pdf)(arxiv_id)
@@ -132,7 +142,7 @@ def download_arxiv_materials(
         store.record_artifact(
             key,
             "preprint_pdf",
-            source=arxiv_pdf_url(arxiv_id),
+            source=arxiv.pdf_url(arxiv_id),
             fetched_date=fetched_date,
             refetchable=True,
         )
@@ -140,24 +150,31 @@ def download_arxiv_materials(
     if source:
         source_bytes = (source_fetcher or fetch_arxiv_source)(arxiv_id)
         store.ensure_root()
-        with tempfile.TemporaryDirectory(prefix=f".{key}_preprint.", dir=store.root) as tmp:
-            extracted = Path(tmp) / "source"
-            extracted.mkdir()
-            extract_arxiv_source(source_bytes, extracted)
-            source_path = store.write_preprint_source(key, extracted)
-        store.record_artifact(
-            key,
-            "preprint_source",
-            source=arxiv_source_url(arxiv_id),
-            fetched_date=fetched_date,
-            refetchable=True,
-        )
+        try:
+            with tempfile.TemporaryDirectory(prefix=f".{key}_preprint.", dir=store.root) as tmp:
+                extracted = Path(tmp) / "source"
+                extracted.mkdir()
+                extract_arxiv_source(source_bytes, extracted)
+                source_path = store.write_preprint_source(key, extracted)
+        except ArxivSourceUnavailableError:
+            # PDF-only deposit: nothing to extract. Not a corrupt-archive failure,
+            # so don't discard a PDF fetched above — report it as unavailable.
+            source_unavailable = True
+        else:
+            store.record_artifact(
+                key,
+                "preprint_source",
+                source=arxiv.source_url(arxiv_id),
+                fetched_date=fetched_date,
+                refetchable=True,
+            )
 
     return ArxivDownloadResult(
         key=key,
         arxiv_id=arxiv_id,
         pdf_path=pdf_path,
         source_path=source_path,
+        source_unavailable=source_unavailable,
     )
 
 
@@ -177,43 +194,10 @@ def openalex_oa_pdf_url(
     provided, following the same deterministic SHA256 digest pattern as
     :mod:`pynakes.integrity`.
     """
-    normalized = _normalize_doi_or_raise(doi)
-    url = f"{OPENALEX_API}{quote(normalized, safe='')}"
-
-    opener = urlopen or _default_urlopen
-    cache_path = _openalex_cache_path(cache_dir, normalized)
-    if cache_path is not None and cache_path.exists():
-        text = cache_path.read_text(encoding="utf-8", errors="replace")
-    else:
-        text = _fetch_published_bytes(
-            url,
-            opener=opener,
-            timeout=15.0,
-            error_prefix=f"OpenAlex lookup failed for DOI {normalized!r}",
-        ).decode("utf-8", errors="replace")
-
     try:
-        data = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise PublishedPdfFetchError(
-            f"OpenAlex returned invalid JSON for DOI {normalized!r}: {exc}"
-        ) from exc
-
-    if cache_path is not None and not cache_path.exists():
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        cache_path.write_text(text, encoding="utf-8")
-
-    if not isinstance(data, dict):
-        return None
-
-    best_oa = data.get("best_oa_location")
-    if not isinstance(best_oa, dict):
-        return None
-
-    pdf_url = best_oa.get("pdf_url")
-    if not isinstance(pdf_url, str) or not pdf_url.strip():
-        return None
-    return pdf_url.strip()
+        return openalex.oa_pdf_url_for_doi(doi, cache_dir=cache_dir, urlopen=urlopen)
+    except (ProviderFetchError, ValueError) as exc:
+        raise PublishedPdfFetchError(str(exc)) from exc
 
 
 def fetch_published_pdf(url: str, *, urlopen: Callable[..., object] | None = None) -> bytes:
@@ -250,8 +234,13 @@ def download_published_material(
     Returns a ``PublishedDownloadResult`` with ``pdf_path`` set when the
     download succeeded, or ``None`` when no OA copy was found.
     """
-    normalized = _normalize_doi_or_raise(doi)
-    resolver = url_resolver or (lambda d: openalex_oa_pdf_url(d, cache_dir=cache_dir))
+    try:
+        normalized = normalize_doi(doi)
+    except ValueError as exc:
+        raise PublishedPdfFetchError(str(exc)) from exc
+    resolver = url_resolver or (
+        lambda d: openalex_oa_pdf_url(d, urlopen=_default_urlopen, cache_dir=cache_dir)
+    )
     pdf_url = resolver(normalized)
     if pdf_url is None:
         return PublishedDownloadResult(key=key, doi=normalized)
@@ -270,7 +259,18 @@ def download_published_material(
 
 
 def extract_arxiv_source(data: bytes, target_dir: str | Path) -> Path:
-    """Safely extract an arXiv source tar archive into ``target_dir``."""
+    """Safely extract an arXiv source tar archive into ``target_dir``.
+
+    Raises :class:`ArxivSourceUnavailableError` when the e-print endpoint
+    returned a PDF instead of a source bundle (a PDF-only submission has no
+    extractable TeX/source), and :class:`ArxivFetchError` when the bytes are an
+    actual but unreadable/corrupt archive.
+    """
+    if data.startswith(b"%PDF"):
+        raise ArxivSourceUnavailableError(
+            "arXiv has no TeX/source archive for this preprint; the e-print "
+            "endpoint returned a PDF (PDF-only submission)"
+        )
     target = Path(target_dir)
     target.mkdir(parents=True, exist_ok=True)
     root = target.resolve(strict=False)
@@ -286,27 +286,11 @@ def extract_arxiv_source(data: bytes, target_dir: str | Path) -> Path:
     return target
 
 
-def _fetch_bytes(url: str, identifier: str, kind: str, timeout: float) -> bytes:
-    return _fetch_url(
-        url,
-        timeout=timeout,
-        error_class=ArxivFetchError,
-        label=f"{identifier} {kind}",
-    )
-
-
 def _normalize_or_raise(identifier: str) -> str:
     normalized = normalize_arxiv(identifier)
     if normalized is None:
         raise ArxivFetchError(f"Malformed arXiv identifier: {identifier!r}")
     return normalized
-
-
-def _normalize_doi_or_raise(doi: str) -> str:
-    try:
-        return normalize_doi(doi)
-    except ValueError as exc:
-        raise PublishedPdfFetchError(str(exc)) from exc
 
 
 def _fetch_published_bytes(
@@ -356,11 +340,3 @@ def _extract_validated_member(
         raise ArxivFetchError(f"Could not read arXiv source archive member: {member.name!r}")
     with source, target.open("wb") as output:
         shutil.copyfileobj(source, output)
-
-
-def _openalex_cache_path(cache_dir: str | Path | None, doi: str) -> Path | None:
-    """Return a deterministic cache path for an OpenAlex DOI lookup, or ``None``."""
-    if cache_dir is None:
-        return None
-    digest = hashlib.sha256(doi.lower().encode("utf-8")).hexdigest()
-    return Path(cache_dir) / "openalex" / f"{digest}.json"

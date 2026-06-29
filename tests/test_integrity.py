@@ -9,6 +9,7 @@ from pynakes import integrity
 from pynakes.bibtex_parser import parse_bib
 from pynakes.cli import app
 from pynakes.integrity import enrich_library, verify_library
+from pynakes.providers import arxiv, doi, openalex, semantic_scholar
 
 runner = CliRunner()
 
@@ -33,9 +34,30 @@ ARXIV_XML = """<?xml version="1.0" encoding="UTF-8"?>
 </feed>
 """
 
+OPENALEX_WORK = {
+    "locations": [
+        {"landing_page_url": "https://doi.org/10.5555/published-first"},
+        {"landing_page_url": "https://arxiv.org/abs/2401.00001v3"},
+    ]
+}
+
+OPENALEX_WORK_WITHOUT_ARXIV = {
+    "locations": [
+        {"landing_page_url": "https://doi.org/10.5555/published-first"},
+    ]
+}
+
+SEMANTIC_SCHOLAR_PAPER = {
+    "externalIds": {
+        "DOI": "10.5555/published-first",
+        "ArXiv": "2402.00002v4",
+    },
+    "url": "https://www.semanticscholar.org/paper/test",
+}
+
 
 def test_verify_library_reports_provider_mismatch(monkeypatch) -> None:
-    monkeypatch.setattr(integrity, "fetch_doi_bibtex", lambda doi: PROVIDER_BIBTEX)
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
     lib = parse_bib(
         "@article{A,\n"
         "  author = {John Smith},\n"
@@ -53,7 +75,7 @@ def test_verify_library_reports_provider_mismatch(monkeypatch) -> None:
 
 
 def test_enrich_library_fills_missing_doi_from_url_and_provider_fields(monkeypatch) -> None:
-    monkeypatch.setattr(integrity, "fetch_doi_bibtex", lambda doi: PROVIDER_BIBTEX)
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
     lib = parse_bib(
         "@article{A,\n"
         "  author = {John Smith},\n"
@@ -71,7 +93,7 @@ def test_enrich_library_fills_missing_doi_from_url_and_provider_fields(monkeypat
 
 
 def test_verify_cli_strict_exits_one_with_json(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setattr(integrity, "fetch_doi_bibtex", lambda doi: PROVIDER_BIBTEX)
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
     bib = tmp_path / "refs.bib"
     bib.write_text(
         "@article{A,\n"
@@ -92,7 +114,7 @@ def test_verify_cli_strict_exits_one_with_json(monkeypatch, tmp_path: Path) -> N
 
 
 def test_enrich_cli_dry_run_diff_json(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setattr(integrity, "fetch_doi_bibtex", lambda doi: PROVIDER_BIBTEX)
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
     bib = tmp_path / "refs.bib"
     original = (
         "@article{A,\n"
@@ -116,7 +138,7 @@ def test_enrich_cli_dry_run_diff_json(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_enrich_published_cli_uses_arxiv_metadata(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setattr(integrity, "fetch_arxiv_atom", lambda identifier: ARXIV_XML)
+    monkeypatch.setattr(arxiv, "fetch_atom", lambda identifier: ARXIV_XML)
     bib = tmp_path / "refs.bib"
     original = (
         "@misc{Preprint,\n"
@@ -144,4 +166,122 @@ def test_enrich_published_cli_uses_arxiv_metadata(monkeypatch, tmp_path: Path) -
     assert "+  journal = {Journal of Published Tests 12, 34}" in data["diff"]
     assert "-@misc{Preprint," in data["diff"]
     assert "+@article{Preprint," in data["diff"]
+    assert bib.read_text() == original
+
+
+def test_check_published_backfills_arxiv_for_bibtex_doi_entry() -> None:
+    lib = parse_bib(
+        "@article{PublishedFirst,\n"
+        "  author = {Ada Lovelace},\n"
+        "  title = {A Published First Test},\n"
+        "  doi = {10.5555/published-first},\n"
+        "  year = {2024}\n"
+        "}\n"
+    )
+
+    report = integrity.check_published(
+        lib,
+        online=True,
+        apply=True,
+        openalex_fetcher=lambda doi: OPENALEX_WORK,
+        semantic_scholar_fetcher=lambda doi: None,
+    )
+
+    entry = lib.entries["PublishedFirst"]
+    assert report.changed_entries == 1
+    assert [update.field for update in report.updates] == ["eprint", "archiveprefix"]
+    assert entry.fields["eprint"] == "2401.00001"
+    assert entry.fields["archiveprefix"] == "arXiv"
+    assert integrity.entry_arxiv_id(entry) == "2401.00001"
+
+
+def test_check_published_backfills_arxiv_for_biblatex_doi_entry() -> None:
+    lib = parse_bib(
+        "@comment{jabref-meta: databaseType:biblatex;}\n"
+        "@article{PublishedFirst,\n"
+        "  author = {Ada Lovelace},\n"
+        "  title = {A Published First Test},\n"
+        "  doi = {10.5555/published-first},\n"
+        "  date = {2024}\n"
+        "}\n"
+    )
+
+    report = integrity.check_published(
+        lib,
+        online=True,
+        apply=True,
+        openalex_fetcher=lambda doi: OPENALEX_WORK,
+        semantic_scholar_fetcher=lambda doi: None,
+    )
+
+    entry = lib.entries["PublishedFirst"]
+    assert report.changed_entries == 1
+    assert [update.field for update in report.updates] == ["eprint", "eprinttype"]
+    assert entry.fields["eprint"] == "2401.00001"
+    assert entry.fields["eprinttype"] == "arxiv"
+
+
+def test_enrich_published_cli_backfills_arxiv_from_openalex(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
+    monkeypatch.setattr(openalex, "fetch_work_by_doi", lambda doi, cache_dir=None: OPENALEX_WORK)
+    bib = tmp_path / "refs.bib"
+    original = (
+        "@article{PublishedFirst,\n"
+        "  author = {Ada Lovelace},\n"
+        "  title = {A Published First Test},\n"
+        "  doi = {10.5555/published-first},\n"
+        "  year = {2024}\n"
+        "}\n"
+    )
+    bib.write_text(original)
+
+    result = runner.invoke(
+        app,
+        ["enrich", str(bib), "--published", "--online", "--dry-run", "--diff", "--json"],
+    )
+    data = json.loads(result.output)
+
+    assert result.exit_code == 0, result.output
+    assert data["status"] == "success"
+    assert data["action"] == "enrich"
+    assert data["modified"] is True
+    assert "+  eprint = {2401.00001}" in data["diff"]
+    assert "+  archiveprefix = {arXiv}" in data["diff"]
+    assert {"key": "PublishedFirst", "field": "eprint", "value": "2401.00001"} in data["updates"]
+    assert bib.read_text() == original
+
+
+def test_enrich_published_cli_backfills_arxiv_from_semantic_scholar(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
+    monkeypatch.setattr(
+        openalex, "fetch_work_by_doi", lambda doi, cache_dir=None: OPENALEX_WORK_WITHOUT_ARXIV
+    )
+    monkeypatch.setattr(
+        semantic_scholar,
+        "fetch_paper_by_doi",
+        lambda doi, cache_dir=None: SEMANTIC_SCHOLAR_PAPER,
+    )
+    bib = tmp_path / "refs.bib"
+    original = (
+        "@article{PublishedFirst,\n"
+        "  author = {Ada Lovelace},\n"
+        "  title = {A Published First Test},\n"
+        "  doi = {10.5555/published-first},\n"
+        "  year = {2024}\n"
+        "}\n"
+    )
+    bib.write_text(original)
+
+    result = runner.invoke(
+        app,
+        ["enrich", str(bib), "--published", "--online", "--dry-run", "--diff", "--json"],
+    )
+    data = json.loads(result.output)
+
+    assert result.exit_code == 0, result.output
+    assert data["modified"] is True
+    assert "+  eprint = {2402.00002}" in data["diff"]
+    assert {"key": "PublishedFirst", "field": "eprint", "value": "2402.00002"} in data["updates"]
     assert bib.read_text() == original

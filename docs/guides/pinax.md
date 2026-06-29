@@ -370,16 +370,18 @@ entry that has a publisher DOI but no resolvable arXiv id
 (`importer.entry_arxiv_id` returns `None`), it looks the work up by DOI and, when
 a preprint exists, backfills the arXiv id.
 
-- **Source: OpenAlex** (`https://api.openalex.org/works/doi:<doi>`). Chosen
-  because it needs no API key, its data is CC0, and it is already the identity
-  backbone named for [v0.7](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
-  OpenAlex represents arXiv as a *location*, not an id field, so the resolver
-  scans the work's `locations[]` for an `arxiv.org/abs/<id>` URL and parses it
-  with the shared identifier helpers. (Semantic Scholar's `externalIds.ArXiv`
-  is a clean fallback for later; v1 stays single-source.)
-- **Network boundary.** Behind `--online`, fetcher injectable exactly like
-  `importer.fetch_arxiv_atom`, with the same deterministic on-disk cache
-  (`integrity._cache_path`). The default test suite never touches the network.
+- **Sources: OpenAlex first, Semantic Scholar fallback.** OpenAlex
+  (`https://api.openalex.org/works/doi:<doi>`) needs no API key, its data is CC0,
+  and it is already the identity backbone named for
+  [v0.7](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md). OpenAlex
+  represents arXiv as a *location*, not an id field, so the resolver scans the
+  work's `locations[]` for an `arxiv.org/abs/<id>` URL and parses it with the
+  shared identifier helpers. When OpenAlex has the work but not the arXiv
+  location, the resolver falls back to Semantic Scholar's `externalIds.ArXiv`.
+- **Network boundary.** Behind `--online`, provider fetchers are injectable
+  exactly like `importer.fetch_arxiv_atom`, with the same deterministic on-disk
+  cache (`integrity._cache_path`). The default test suite never touches the
+  network.
 - **Fields written**, dialect-aware (via `library_database_type`), through the
   surgical `editing.set_entry_field` and never overwriting an existing value:
   - biblatex → `eprint = {<id>}`, `eprinttype = {arxiv}`
@@ -387,8 +389,8 @@ a preprint exists, backfills the arXiv id.
 
   Both pairs are read back by `entry_arxiv_id`, so either makes `fetch-source`
   work; the dialect choice is only about idiomatic output.
-- **Graceful gaps.** No OpenAlex record, or a record with no arXiv location, is a
-  skip with a reason — never an error. The backfill only *adds* an identifier; it
+- **Graceful gaps.** No provider record, or records with no arXiv id, is a skip
+  with a reason — never an error. The backfill only *adds* an identifier; it
   never changes the citation identity (`doi` / `journal` / type stay put).
 - **Envelope.** It reuses `enrich`'s existing `updates` (a `FieldUpdate` per
   `eprint`/`eprinttype` written) and `changed_entries` / `changed_fields`; no new
@@ -575,6 +577,7 @@ checklist.
     dialect), so a published-first entry becomes a `fetch-source` target. See
     [Recovering the arXiv source for published papers](#recovering-the-arxiv-source-for-published-papers-doi-to-arxiv-backfill).
     Lands in `integrity.py`; useful to any library, pinax or not.
+    *(Implemented.)*
 
 ## Decisions and open questions
 

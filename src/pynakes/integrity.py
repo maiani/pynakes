@@ -2,25 +2,27 @@
 
 from __future__ import annotations
 
-import hashlib
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
 
-from pynakes._identifiers import canonical_doi, doi_from_text, normalize_arxiv, normalize_doi
+from pynakes._identifiers import (
+    canonical_doi,
+    doi_from_text,
+    normalize_arxiv,
+    normalize_doi,
+)
 from pynakes.authors import last_name, split_name_list
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.editing import set_entry_field, set_entry_type
-from pynakes.importer import (
-    ArxivImportError,
-    DOIImportError,
-    entry_arxiv_id,
-    entry_year,
-    fetch_arxiv_atom,
-    fetch_bibtex_for_doi,
-    parse_arxiv_atom,
-)
+from pynakes.importer import entry_arxiv_id, entry_year
+from pynakes.metadata import library_database_type
 from pynakes.model import BibEntry, BibFile, _normalize_text
+from pynakes.providers import arxiv as arxiv_provider
+from pynakes.providers import doi as doi_provider
+from pynakes.providers._http import ProviderFetchError, cache_path
+from pynakes.providers.identity import resolve_arxiv_id_for_doi
 
 
 @dataclass
@@ -130,6 +132,7 @@ class PublishedCandidate:
     status: str
     doi: str | None = None
     journal: str | None = None
+    arxiv_id: str | None = None
     message: str = ""
 
     def to_dict(self) -> dict[str, object]:
@@ -141,6 +144,7 @@ class PublishedCandidate:
             "status": self.status,
             "doi": self.doi,
             "journal": self.journal,
+            "arxiv_id": self.arxiv_id,
             "message": self.message,
         }
 
@@ -289,12 +293,25 @@ def check_published(
     online: bool = False,
     apply: bool = False,
     cache_dir: str | Path | None = None,
+    openalex_fetcher: Callable[[str], dict | None] | None = None,
+    semantic_scholar_fetcher: Callable[[str], dict | None] | None = None,
 ) -> PublishedReport:
     """Detect preprints and optionally apply published DOI/journal metadata."""
     report = PublishedReport()
+    dialect = library_database_type(lib)
     for entry in lib.entries.values():
         preprint = _preprint_identity(entry)
         if preprint is None:
+            if online:
+                _check_doi_to_arxiv_backfill(
+                    entry,
+                    report,
+                    apply=apply,
+                    dialect=dialect,
+                    cache_dir=cache_dir,
+                    openalex_fetcher=openalex_fetcher,
+                    semantic_scholar_fetcher=semantic_scholar_fetcher,
+                )
             continue
         source, identifier = preprint
         existing_doi = entry.fields.get("doi", "").strip()
@@ -363,19 +380,19 @@ def check_published(
 def fetch_doi_entry(doi: str, *, cache_dir: str | Path | None = None) -> BibEntry:
     """Fetch DOI BibTeX metadata, using a deterministic cache when provided."""
     normalized = normalize_doi(doi)
-    cache_path = _cache_path(cache_dir, "doi", normalized, ".bib")
-    if cache_path is not None and cache_path.exists():
-        text = cache_path.read_text(encoding="utf-8", errors="replace")
+    path = cache_path(cache_dir, "doi", normalized, ".bib")
+    if path is not None and path.exists():
+        text = path.read_text(encoding="utf-8", errors="replace")
     else:
         try:
-            text = fetch_doi_bibtex(normalized)
-        except DOIImportError as exc:
+            text = doi_provider.fetch_bibtex(normalized)
+        except ProviderFetchError as exc:
             raise MetadataFetchError(
                 f"Could not fetch DOI {normalized!r} via doi.org content negotiation: {exc}"
             ) from exc
-        if cache_path is not None:
-            cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_path.write_text(text, encoding="utf-8")
+        if path is not None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
 
     try:
         entries = parse_bib(text).entries.values()
@@ -388,31 +405,27 @@ def fetch_doi_entry(doi: str, *, cache_dir: str | Path | None = None) -> BibEntr
     return entries[0]
 
 
-def fetch_doi_bibtex(doi: str) -> str:
-    """Fetch DOI BibTeX. Split out for tests to stub without network."""
-    return fetch_bibtex_for_doi(doi)
-
-
 def fetch_arxiv_metadata(identifier: str, *, cache_dir: str | Path | None = None) -> dict[str, str]:
     """Fetch the published DOI/journal an arXiv preprint links to, if any.
 
-    Delegates the Atom fetch/parse to :mod:`pynakes.importer` and keeps only the
-    deterministic on-disk cache here. Returns ``{"doi": ..., "journal": ...}``.
+    Delegates the Atom fetch/parse to :mod:`pynakes.providers.arxiv` and keeps
+    only the deterministic on-disk cache here. Returns
+    ``{"doi": ..., "journal": ...}``.
     """
     normalized = normalize_arxiv(identifier)
     if normalized is None:
         raise MetadataFetchError(f"Malformed arXiv identifier: {identifier!r}")
-    cache_path = _cache_path(cache_dir, "arxiv", normalized, ".xml")
+    path = cache_path(cache_dir, "arxiv", normalized, ".xml")
     try:
-        if cache_path is not None and cache_path.exists():
-            text = cache_path.read_text(encoding="utf-8", errors="replace")
+        if path is not None and path.exists():
+            text = path.read_text(encoding="utf-8", errors="replace")
         else:
-            text = fetch_arxiv_atom(normalized)
-            if cache_path is not None:
-                cache_path.parent.mkdir(parents=True, exist_ok=True)
-                cache_path.write_text(text, encoding="utf-8")
-        record = parse_arxiv_atom(text, normalized)
-    except ArxivImportError as exc:
+            text = arxiv_provider.fetch_atom(normalized)
+            if path is not None:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text, encoding="utf-8")
+        record = arxiv_provider.parse_atom(text, normalized)
+    except ProviderFetchError as exc:
         raise MetadataFetchError(str(exc)) from exc
     return {"doi": record.doi, "journal": record.journal}
 
@@ -525,13 +538,94 @@ def _apply_published_candidate(
             report.updates.append(FieldUpdate(entry.key, "type", "article"))
 
 
-def _cache_path(
-    cache_dir: str | Path | None, namespace: str, identifier: str, suffix: str
-) -> Path | None:
-    if cache_dir is None:
-        return None
-    digest = hashlib.sha256(identifier.lower().encode("utf-8")).hexdigest()
-    return Path(cache_dir) / namespace / f"{digest}{suffix}"
+def _check_doi_to_arxiv_backfill(
+    entry: BibEntry,
+    report: PublishedReport,
+    *,
+    apply: bool,
+    dialect: str,
+    cache_dir: str | Path | None,
+    openalex_fetcher: Callable[[str], dict | None] | None,
+    semantic_scholar_fetcher: Callable[[str], dict | None] | None,
+) -> None:
+    doi = entry.fields.get("doi", "").strip()
+    if not doi:
+        return
+    try:
+        normalized = normalize_doi(doi)
+    except ValueError:
+        return
+
+    try:
+        arxiv_id = resolve_arxiv_id_for_doi(
+            normalized,
+            cache_dir=cache_dir,
+            openalex_fetcher=openalex_fetcher,
+            semantic_scholar_fetcher=semantic_scholar_fetcher,
+        )
+    except ProviderFetchError as exc:
+        report.warnings.append(
+            {"type": "doi_to_arxiv_lookup_failed", "key": entry.key, "message": str(exc)}
+        )
+        return
+
+    if arxiv_id is None:
+        report.candidates.append(
+            PublishedCandidate(
+                entry.key,
+                "doi",
+                normalized,
+                "not_found",
+                doi=normalized,
+                message="No arXiv id found in OpenAlex or Semantic Scholar",
+            )
+        )
+        return
+
+    candidate = PublishedCandidate(
+        entry.key,
+        "doi",
+        normalized,
+        "arxiv_found",
+        doi=normalized,
+        arxiv_id=arxiv_id,
+        message="arXiv identity found",
+    )
+    report.candidates.append(candidate)
+    if apply:
+        _apply_arxiv_backfill_candidate(entry, candidate, report, dialect)
+
+
+def _apply_arxiv_backfill_candidate(
+    entry: BibEntry,
+    candidate: PublishedCandidate,
+    report: PublishedReport,
+    dialect: str,
+) -> None:
+    if not candidate.arxiv_id:
+        return
+
+    existing_eprint = _field_value(entry, "eprint").strip()
+    if existing_eprint:
+        existing_arxiv = normalize_arxiv(existing_eprint)
+        if existing_arxiv != candidate.arxiv_id:
+            return
+    elif set_entry_field(entry, "eprint", candidate.arxiv_id):
+        report.updates.append(FieldUpdate(entry.key, "eprint", candidate.arxiv_id))
+
+    archive_field = "eprinttype" if dialect == "biblatex" else "archiveprefix"
+    archive_value = "arxiv" if dialect == "biblatex" else "arXiv"
+    if not _field_value(entry, archive_field).strip():
+        if set_entry_field(entry, archive_field, archive_value):
+            report.updates.append(FieldUpdate(entry.key, archive_field, archive_value))
+
+
+def _field_value(entry: BibEntry, field_name: str) -> str:
+    target = field_name.lower()
+    for name, value in entry.fields.items():
+        if name.lower() == target:
+            return value
+    return ""
 
 
 def _doi_from_entry_urls(entry: BibEntry) -> str | None:

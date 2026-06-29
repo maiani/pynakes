@@ -16,7 +16,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   network. Requires `fetch-published: true` (default `false`). Includes
   deterministic on-disk caching of OpenAlex responses. (#9)
 
+- **Step 11: DOI → arXiv backfill.** `enrich --published --online` now resolves
+  DOI-backed published entries through OpenAlex, falling back to Semantic
+  Scholar when OpenAlex lacks an arXiv location, and backfills arXiv `eprint`
+  metadata when a link is present. The update is dialect-aware (`eprinttype` for
+  BibLaTeX, `archiveprefix` for BibTeX), uses deterministic provider-response
+  caching, and remains testable without network through injectable fetchers.
+
+- **Agent beta eval has a broader task catalog.** The manual beta-test
+  supervisor now chooses from concrete discovery, dry-run/diff, metadata,
+  Pinax, structured-error, online provider, cache, and DOI → arXiv → Pinax
+  source-recovery workflows instead of a thin generic prompt list.
+
 ### Fixed
+
+- **PDF-only arXiv e-prints no longer count as a source-fetch failure.** When the
+  e-print endpoint returns a PDF instead of a TeX/source archive (a PDF-only
+  submission), `asset fetch` now records the entry under `skipped` with reason
+  `no arXiv source archive (PDF-only submission)` instead of `failed`, matching
+  the documented "graceful gaps" contract. A PDF fetched in the same call is
+  preserved (it was previously discarded when the source step raised). A genuinely
+  corrupt archive still lands in `failed`. New `ArxivSourceUnavailableError`
+  (subclass of `ArxivFetchError`) distinguishes the two cases.
 
 - **Usage errors under Typer 0.26+ now produce structured JSON with `--json`.**
   Typer 0.26 vendors its own exception hierarchy (`typer._click.exceptions`
@@ -27,6 +48,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Typer versions.
 
 ### Changed
+
+- **Provider transport consolidated into `providers/`.** External-service
+  transport and response parsing now live with their provider client: byte
+  fetching is a single `providers/_http.fetch_bytes` (replacing the duplicate
+  `importer._fetch_url`); DOI content negotiation is `providers/doi.fetch_bibtex`;
+  arXiv Atom fetch/parse, the `ArxivRecord` type, and PDF/source downloads are in
+  `providers/arxiv`; and OpenAlex gains `oa_pdf_url_for_doi`. `integrity` now uses
+  the shared `providers/_http.cache_path` instead of a private copy. `importer`,
+  `fetch`, and `integrity` keep their public functions as thin wrappers that
+  delegate to providers and translate `ProviderFetchError` into domain errors;
+  the CLI, JSON envelope, exit codes, and behavior are unchanged.
 
 - **Command tree reorganized into resource sub-apps.** Commands are now grouped
   by the resource they act on, following one rule: whole-library transforms stay

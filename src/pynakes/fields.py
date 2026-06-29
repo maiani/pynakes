@@ -19,6 +19,8 @@ from pynakes.model import BibEntry, BibFile
 
 QueryFilter = Callable[[BibEntry], bool] | None
 
+TITLE_FIELDS = ("title", "booktitle", "maintitle", "subtitle")
+
 
 def _selected(lib: BibFile, where: QueryFilter) -> Iterator[BibEntry]:
     for entry in lib.entries.values():

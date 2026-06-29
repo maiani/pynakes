@@ -54,7 +54,8 @@ Read-only:
 - `pynakes asset check <file>... [--root ...] [--strict] [--json]`
 - `pynakes dedupe check <file>... [--strict] [--json]`
 - `pynakes verify <file>... [--online] [--published] [--strict] [--json]` —
-  `--published` also reports preprints that now have a published version
+  `--published` also reports preprint/published identity links, including
+  DOI-backed entries that can be linked to arXiv through provider metadata
 - `pynakes capabilities [--json]`
 
 The five gate checks (`lint`, `keys check`, `asset check`, `dedupe check`,
@@ -97,7 +98,9 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 - `pynakes convert <file> --to biblatex|bibtex`
 - `pynakes dedupe merge <file>` — conservatively merge duplicate-work clusters
 - `pynakes enrich <file> [--online] [--published]` — conservatively fill missing
-  metadata; `--published` also promotes preprints to their published version
+  metadata; `--published` also promotes preprints to their published version and
+  backfills arXiv ids for DOI-backed entries when OpenAlex or Semantic Scholar
+  exposes one
 - `pynakes tex scan <bib-file> <source>... [--out ...] [--group ...] [--keyword ...]`
 
 Creating / projecting — **create** new files (support `--dry-run`, `--diff`,

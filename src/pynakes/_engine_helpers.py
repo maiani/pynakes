@@ -361,7 +361,12 @@ def run_fetch_loop(
                     pdf_fetcher=pdf_fetcher,
                     source_fetcher=source_fetcher,
                 )
-                fetched.append(result.to_dict())
+                if result.pdf_path is not None or result.source_path is not None:
+                    fetched.append(result.to_dict())
+                if result.source_unavailable:
+                    skipped.append(
+                        {"key": key, "reason": "no arXiv source archive (PDF-only submission)"}
+                    )
             except ArxivFetchError as exc:
                 failed.append({"key": key, "error": str(exc)})
 
