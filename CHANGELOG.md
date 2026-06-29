@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Usage errors under Typer 0.26+ now produce structured JSON with `--json`.**
+  Typer 0.26 vendors its own exception hierarchy (`typer._click.exceptions`
+  separate from `click.exceptions`).  `AutoBibGroup.invoke` and
+  `AutoBibGroup.main` now catch both `click.UsageError` and
+  `typer._click.exceptions.UsageError` so that missing-argument errors are
+  still reframed as `{"status":"error",...}` under `--json` (exit 1) on newer
+  Typer versions.
+
 ### Added
 
 - **`import` command and manual `add`.** DOI/arXiv metadata resolution now lives
@@ -86,6 +96,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed (agent beta eval issues)
 
+- **Agent beta eval accepts nondeterministic task labels.** The supervisor can
+  now emit task kinds such as `check`, `repair`, `import`, or `online` without
+  the harness rejecting the run before the beta tester starts. The schema still
+  validates task shape and online/offline gating.
+- **Online command docs match the current CLI.** The LLM integration guide and
+  generated Pinax agent rules now describe `import`, `fetch`, `verify --online`,
+  and `enrich --online` as the network-backed paths, while `add` is documented
+  as manual local entry creation. The guide also includes a concise `.bib` plus
+  TeX citation validation recipe using `used`.
+- **Import dry-run failures now say no file was written.** When
+  `import --dry-run --json` fails during DOI/arXiv lookup, the error response
+  includes `dry_run: true`, `modified: false`, and a no-write message so agents
+  can distinguish provider failure from an applied change.
 - **Search argument order in docs now matches the live CLI.** The synopsis and
   examples in `docs/guides/llm-integration.md` and `docs/guides/usage.md` had
   `pynakes search <file> <query>` but the CLI expects `pynakes search <query>

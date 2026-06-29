@@ -149,11 +149,12 @@ file (key: `files-dir`). Fetch behaviour is configured by:
 3. **Validate before editing** — run `pynakes lint --strict {bibname}.bib`
    and `pynakes files check {bibname}.bib --root .` before and after changes.
 
-4. **Add new references with `pynakes add`** — use
-   `pynakes add {bibname}.bib <identifier>` rather than writing entries by
-   hand. Identifiers are auto-detected: DOI (`10.1103/PhysRevLett.116.061102`),
-   arXiv ID (`2301.00001`), or a journal article URL. This ensures consistent
-   formatting, citation-key generation, and group propagation.
+4. **Add new references through pynakes** — use
+   `pynakes import <identifier> {bibname}.bib` for DOI/arXiv metadata lookup,
+   or `pynakes add <key> {bibname}.bib --field name=value` for a manual entry,
+   rather than writing entries by hand. `import` auto-detects DOI
+   (`10.1103/PhysRevLett.116.061102`), arXiv ID (`2301.00001`), or a journal
+   article URL and ensures consistent formatting and citation-key generation.
 
 5. **Remove entries with `pynakes remove`** — use
    `pynakes remove {bibname}.bib <citekey>` to delete an entry and its Pinax

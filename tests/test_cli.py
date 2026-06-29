@@ -768,6 +768,26 @@ class TestImportCommand:
         assert result.exit_code == 1, result.output
         assert json.loads(result.output)["error"] == "ReferenceImportError"
 
+    def test_import_dry_run_failure_reports_no_write_context(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        original = bib.read_text()
+
+        def _boom(doi: str) -> str:
+            raise importer_ops.DOIImportError("resolver offline")
+
+        monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", _boom)
+        result = runner.invoke(app, ["import", "10.5555/provider", str(bib), "--dry-run", "--json"])
+
+        assert result.exit_code == 1, result.output
+        data = json.loads(result.output)
+        assert data["error"] == "ReferenceImportError"
+        assert data["dry_run"] is True
+        assert data["modified"] is False
+        assert "No changes were written" in data["message"]
+        assert bib.read_text() == original
+
     def test_add_duplicate_doi_human_output(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
         result = runner.invoke(app, ["import", "https://doi.org/10.1234/nature.ml.2020", str(bib)])

@@ -10,8 +10,9 @@ structured JSON contract. It is written for a program (or an agent) that calls
 
 ## Why pynakes is automation-friendly
 
-- **Deterministic.** The same input always produces the same output (the one
-  exception is `add`, which makes a network call).
+- **Deterministic by default.** The same local input produces the same output.
+  Network access is limited to explicit online workflows: `import`, `fetch`,
+  `import --fetch`, `verify --online`, and `enrich --online`.
 - **Preview before writing.** Every modifying command supports `--dry-run`.
 - **Structured output.** `--json` returns a documented envelope (see below).
 - **Conflicts return options, not guesses.** Blocked operations exit `2` with a
@@ -63,6 +64,11 @@ finding — the primitives for CI and pre-commit gating. See
 envelope; multiple files emit an aggregate `{status, action, strict, files,
 summary}` envelope.
 
+`lint` and `keys check` validate the bibliography itself. To check whether TeX
+sources cite missing or unused bibliography entries, run `used` with the `.bib`
+file and the `.tex` / `.aux` sources; that is a separate read-only citation
+usage check.
+
 Modifying (all support `--dry-run`, `--diff`, `--json`):
 
 - `pynakes groups add-entry <file> <key> <group>`
@@ -79,6 +85,7 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 - `pynakes fields protect-title <file> [--field ...] [--term ...] [--where ...]`
 - `pynakes add <key> [file] --field name=value ... [--type ...]` — add a manually specified entry
 - `pynakes import <identifier> [file] [--key ...] [--key-source generated|provider] [--allow-duplicate] [--fetch]` — `<identifier>` is a DOI, DOI URL, arXiv id, or arXiv URL
+- `pynakes fetch [key] [file]` — download configured Pinax materials for arXiv entries
 - `pynakes metadata set <file> <key> <value> [--allow-unknown]`
 - `pynakes metadata adopt-jabref <file>` — start maintaining a JabRef metadata
   projection for a pynakes-native library (mirrors JabRef-native settings into
@@ -177,6 +184,21 @@ and entry types. Plain terms search the key, type, and stored fields.
 3. **Prefer small, composed operations** over one big step — e.g. normalize
    formatting, then repair keys, then add groups.
 
+For a full local validation pass over a bibliography and linked TeX source, use
+the checks in this order:
+
+```bash
+pynakes inspect refs.bib --json
+pynakes lint refs.bib --json
+pynakes keys check refs.bib --json
+pynakes dedupe check refs.bib --json
+pynakes used refs.bib paper.tex --json
+pynakes files check refs.bib --json
+pynakes verify refs.bib --json
+```
+
+Only add `verify --online` when provider lookups are intentionally allowed.
+
 ## Common tasks
 
 ### Normalize a bibliography
@@ -200,6 +222,11 @@ pynakes import arXiv:2301.00001 refs.bib --json
 pynakes import arXiv:2301.00001 refs.bib --fetch --json
 pynakes add Manual2026 refs.bib --field title="Manual Reference" --field year=2026 --json
 ```
+
+`import` performs DOI/arXiv metadata lookup and is network-backed. `add` is
+local and manual: it appends exactly the key, entry type, and fields you supply.
+If an `import --dry-run` lookup fails, the command reports that no changes were
+written before returning the provider/network error.
 
 Citation-key priority:
 
@@ -289,7 +316,8 @@ pynakes used refs.bib paper.tex --group Used --dry-run --diff --json
 ## JSON output
 
 **Every modifying command** (`groups`, `keys`, `fields`, `metadata`,
-`normalize`, `convert`, `add`, `used`) shares one envelope:
+`normalize`, `convert`, `add`, `import`, `fetch`, `dedupe merge`, `enrich`,
+`used`) shares one envelope:
 
 ```json
 {

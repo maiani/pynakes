@@ -14,22 +14,6 @@ class PayloadError(ValueError):
     """Raised when an agent returns malformed structured output."""
 
 
-TASK_KINDS = {
-    "inspect",
-    "lint",
-    "fields",
-    "keys",
-    "groups",
-    "normalize",
-    "dedupe",
-    "metadata",
-    "used",
-    "setops",
-    "online-import",
-    "online-fetch",
-    "online-verify",
-}
-
 FINDING_CATEGORIES = {"bug", "documentation", "inconsistent-behavior", "ux", "external"}
 
 
@@ -86,6 +70,13 @@ def _require_optional_str_list(value: Any, path: str) -> list[str]:
     return result
 
 
+def _require_task_kind(value: Any, path: str) -> str:
+    kind = _require_str(value, path)
+    if not all(char.isalnum() or char in {"-", "_"} for char in kind):
+        raise PayloadError(f"{path} must contain only letters, digits, '-' or '_'")
+    return kind
+
+
 def validate_tasks_payload(
     payload: dict[str, Any], *, include_online: bool
 ) -> list[dict[str, Any]]:
@@ -105,13 +96,11 @@ def validate_tasks_payload(
             raise PayloadError(f"duplicate task id: {task_id}")
         seen_ids.add(task_id)
 
-        kind = _require_str(raw_task.get("kind"), f"tasks[{idx}].kind")
-        if kind not in TASK_KINDS:
-            raise PayloadError(f"unsupported task kind: {kind}")
+        kind = _require_task_kind(raw_task.get("kind"), f"tasks[{idx}].kind")
         online = bool(raw_task.get("online", False))
         if online and not include_online:
             raise PayloadError(f"online task emitted without --include-online: {task_id}")
-        if kind.startswith("online-") and not online:
+        if (kind == "online" or kind.startswith("online-")) and not online:
             raise PayloadError(f"{task_id} has online kind but online=false")
 
         tasks.append(

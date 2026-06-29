@@ -110,7 +110,14 @@ def import_reference(
         )
         return
     except importer_ops.ReferenceImportError as exc:
-        _emit_error(json_output, "ReferenceImportError", str(exc))
+        message = str(exc)
+        extra = {}
+        if params.dry_run:
+            message = (
+                f"{message}. No changes were written; --dry-run failed before staging an entry."
+            )
+            extra = {"dry_run": True, "modified": False}
+        _emit_error(json_output, "ReferenceImportError", message, **extra)
         return
     if entry is None:
         return

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import click
+import typer._click.exceptions as _typer_exc
 from typer.core import TyperGroup
 
 _BIB_ARGUMENT_NAMES = {"file", "bib_file", "files"}
@@ -165,10 +166,31 @@ class AutoBibGroup(TyperGroup):
                         _report_missing_bib(json_output, candidates)
         return super().parse_args(ctx, args)
 
+    def main(
+        self, args: list[str] | None = None, prog_name: str | None = None, **extra: object
+    ) -> object:
+        """Override :meth:`click.BaseCommand.main` to catch ``UsageError`` before
+        Click formats it when ``--json`` was requested.
+
+        Click's ``main()`` wraps ``invoke()`` in a try/except that converts
+        ``UsageError`` to ``SystemExit(2)`` in standalone mode.  That conversion
+        bypasses the ``invoke`` override, so we intercept at the ``main`` level.
+        """
+        json_output = "--json" in (args or [])
+        try:
+            return super().main(args=args, prog_name=prog_name, **extra)
+        except (click.UsageError, _typer_exc.UsageError) as exc:
+            if json_output:
+                _emit_cli_error(True, "UsageError", exc.format_message())
+            raise
+
     def invoke(self, ctx: click.Context):
+        """Override :meth:`click.Group.invoke` to catch ``UsageError`` raised during
+        subcommand argument parsing (visible in ``standalone_mode=False`` paths such
+        as the test runner)."""
         try:
             return super().invoke(ctx)
-        except click.UsageError as exc:
+        except (click.UsageError, _typer_exc.UsageError) as exc:
             if not ctx.meta.get(_JSON_META_KEY, False):
                 raise  # Humans keep Click's usage text and exit code 2.
             _emit_cli_error(True, "UsageError", exc.format_message())
