@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from urllib.parse import quote
 
 from pynakes._identifiers import normalize_arxiv
-from pynakes.providers._http import ProviderFetchError, fetch_bytes
+from pynakes.providers._http import ProviderFetchError, fetch_bytes, fetch_text
 
 BASE_URL = "https://arxiv.org"
 EXPORT_API = "https://export.arxiv.org/api/query"
@@ -54,6 +54,8 @@ class ArxivRecord:
     title: str = ""
     authors: list[str] = field(default_factory=list)
     published: str = ""  # ISO date, ``YYYY-MM-DD``
+    updated: str = ""  # last-updated ISO date, ``YYYY-MM-DD``
+    summary: str = ""  # abstract text
     primary_class: str = ""
     doi: str = ""
     journal: str = ""
@@ -64,8 +66,7 @@ _ATOM_NS = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/sc
 
 def fetch_atom(identifier: str, timeout: float = 15.0) -> str:
     """Fetch arXiv Atom XML for ``identifier``. Split out so tests can stub it."""
-    data = fetch_bytes(atom_url(identifier), timeout=timeout, label=identifier)
-    return data.decode("utf-8", errors="replace")
+    return fetch_text(atom_url(identifier), timeout=timeout, label=identifier)
 
 
 def parse_atom(text: str, identifier: str) -> ArxivRecord:
@@ -89,6 +90,8 @@ def parse_atom(text: str, identifier: str) -> ArxivRecord:
         title=_xml_text(entry, "atom:title"),
         authors=authors,
         published=_xml_text(entry, "atom:published")[:10],
+        updated=_xml_text(entry, "atom:updated")[:10],
+        summary=_xml_text(entry, "atom:summary"),
         primary_class=primary.get("term", "") if primary is not None else "",
         doi=_xml_text(entry, "arxiv:doi"),
         journal=_xml_text(entry, "arxiv:journal_ref"),

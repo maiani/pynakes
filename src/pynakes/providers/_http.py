@@ -19,6 +19,27 @@ class ProviderFetchError(Exception):
     """Raised when an external provider response cannot be fetched or parsed."""
 
 
+def iter_strings(value: object) -> list[str]:
+    """Walk a JSON-like structure and return every string leaf.
+
+    Handles nested dicts and lists recursively; used to search provider
+    responses for arXiv identifiers and other embedded references.
+    """
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        strings: list[str] = []
+        for nested in value.values():
+            strings.extend(iter_strings(nested))
+        return strings
+    if isinstance(value, list):
+        strings = []
+        for nested in value:
+            strings.extend(iter_strings(nested))
+        return strings
+    return []
+
+
 def cache_path(
     cache_dir: str | Path | None,
     namespace: str,
@@ -63,6 +84,26 @@ def fetch_bytes(
     except URLError as exc:
         reason = getattr(exc, "reason", exc)
         raise error_class(f"Network error fetching {display}: {reason}") from exc
+
+
+def fetch_text(
+    url: str,
+    *,
+    accept: str | None = None,
+    timeout: float = 15.0,
+    error_class: type[Exception] = ProviderFetchError,
+    label: str | None = None,
+    opener: Callable[..., object] | None = None,
+) -> str:
+    """Fetch ``url`` and return the response decoded as UTF-8 text.
+
+    Thin wrapper around :func:`fetch_bytes` for providers that retrieve
+    XML, BibTeX, or other text payloads.
+    """
+    data = fetch_bytes(
+        url, accept=accept, timeout=timeout, error_class=error_class, label=label, opener=opener
+    )
+    return data.decode("utf-8", errors="replace")
 
 
 def fetch_json(

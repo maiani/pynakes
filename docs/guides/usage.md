@@ -147,7 +147,7 @@ pynakes metadata set refs.bib tex-sources "paper.tex, chapters_src/"
 
 Paths are stored relative to the `.bib` (so the library stays portable). With it
 set, `keys rename refs.bib Old New` updates the linked sources automatically, and
-`used refs.bib` scans them when no paths are given. Explicit arguments still
+`tex scan refs.bib` scans them when no paths are given. Explicit arguments still
 override the metadata. `keys repair` consults the list too, but only to **warn**
 when a de-duplicated key is still cited (the citation is ambiguous, so it is not
 rewritten).
@@ -372,7 +372,7 @@ doi[clean_up_doi]
 ;}
 ```
 
-## used
+## tex scan
 
 Analyze which entries are cited by `.tex` or `.aux` files.
 

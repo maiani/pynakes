@@ -7,7 +7,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from pynakes._identifiers import arxiv_id_from_text, normalize_arxiv, normalize_doi
-from pynakes.providers._http import fetch_json
+from pynakes.providers._http import fetch_json, iter_strings
 
 GRAPH_API_URL = "https://api.semanticscholar.org/graph/v1"
 
@@ -38,24 +38,8 @@ def arxiv_id_from_paper(paper: dict) -> str | None:
         for name, value in external_ids.items():
             if name.lower() == "arxiv" and isinstance(value, str):
                 return normalize_arxiv(value)
-    for value in _iter_strings(paper):
+    for value in iter_strings(paper):
         arxiv_id = arxiv_id_from_text(value)
         if arxiv_id:
             return arxiv_id
     return None
-
-
-def _iter_strings(value: object) -> list[str]:
-    if isinstance(value, str):
-        return [value]
-    if isinstance(value, dict):
-        strings: list[str] = []
-        for nested in value.values():
-            strings.extend(_iter_strings(nested))
-        return strings
-    if isinstance(value, list):
-        strings = []
-        for nested in value:
-            strings.extend(_iter_strings(nested))
-        return strings
-    return []

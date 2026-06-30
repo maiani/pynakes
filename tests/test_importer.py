@@ -5,6 +5,7 @@ from urllib.error import HTTPError, URLError
 import pytest
 
 from pynakes.bibtex_parser import parse_bib
+from pynakes.bibtex_writer import write_bib
 from pynakes.importer import (
     ARXIV,
     DOI,
@@ -25,16 +26,18 @@ from pynakes.importer import (
     prepare_imported_arxiv,
     prepare_imported_entry,
     prepare_imported_reference,
-    render_entry,
     resolve_identifier,
 )
+from pynakes.model import BibFile
 
 ARXIV_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
   <entry>
     <id>http://arxiv.org/abs/2301.00001v2</id>
     <published>2023-01-02T10:00:00Z</published>
+    <updated>2023-01-15T12:00:00Z</updated>
     <title>A Deep Test of arXiv Import</title>
+    <summary>We present a deep test of the arXiv import functionality.</summary>
     <author><name>Ada Lovelace</name></author>
     <author><name>Alan Turing</name></author>
     <arxiv:primary_category term="cs.LG"/>
@@ -208,7 +211,7 @@ def test_canonical_doi_is_lowercased() -> None:
 
 def test_render_entry_roundtrips() -> None:
     entry = entry_from_bibtex(PROVIDER_BIBTEX)
-    rendered = render_entry(entry)
+    rendered = write_bib(BibFile(entries=[entry])).rstrip("\r\n")
     assert rendered.startswith("@article{provider-key")
     assert not rendered.endswith("\n")
     assert "doi = {10.5555/provider}" in rendered
@@ -350,8 +353,11 @@ def test_prepare_imported_arxiv_builds_misc_entry_for_bibtex() -> None:
     assert entry.fields["archivePrefix"] == "arXiv"
     assert entry.fields["primaryClass"] == "cs.LG"
     assert entry.fields["year"] == "2023"
+    assert entry.fields["month"] == "jan"
     assert entry.fields["url"] == "https://arxiv.org/abs/2301.00001"
     assert entry.fields["doi"] == "10.5555/published"
+    assert entry.fields["abstract"] == "We present a deep test of the arXiv import functionality."
+    assert entry.fields["updated"] == "2023-01-15"
     assert entry.key == "Lovelace2023Deep"
 
 
@@ -365,6 +371,9 @@ def test_prepare_imported_arxiv_builds_online_entry_for_biblatex() -> None:
     assert entry.fields["eprintclass"] == "cs.LG"
     assert entry.fields["date"] == "2023-01-02"
     assert "year" not in entry.fields
+    assert "month" not in entry.fields
+    assert entry.fields["abstract"] == "We present a deep test of the arXiv import functionality."
+    assert entry.fields["updated"] == "2023-01-15"
 
 
 def test_prepare_imported_arxiv_detects_duplicate() -> None:

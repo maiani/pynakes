@@ -534,7 +534,9 @@ ARXIV_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
   <entry>
     <id>http://arxiv.org/abs/2301.00001v1</id>
     <published>2023-01-02T00:00:00Z</published>
+    <updated>2023-01-15T12:00:00Z</updated>
     <title>A Deep Test of arXiv Import</title>
+    <summary>We present a deep test of the arXiv import functionality.</summary>
     <author><name>Ada Lovelace</name></author>
     <author><name>Alan Turing</name></author>
     <arxiv:primary_category term="cs.LG"/>
@@ -615,6 +617,9 @@ class TestImportCommand:
         assert "eprint = {2301.00001}" in text
         assert "archivePrefix = {arXiv}" in text
         assert "year = {2023}" in text
+        assert "month = {jan}" in text
+        assert "abstract = {We present a deep test of the arXiv import functionality.}" in text
+        assert "updated = {2023-01-15}" in text
 
     def test_add_arxiv_url_in_biblatex_writes_online_entry(
         self, tmp_path: Path, monkeypatch

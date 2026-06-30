@@ -14,6 +14,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 
+from pynakes._calendar import MONTH_NUM_TO_ABBR
 from pynakes._identifiers import (
     arxiv_id_from_text,
     canonical_doi,
@@ -22,7 +23,7 @@ from pynakes._identifiers import (
     normalize_doi,
 )
 from pynakes.bibtex_parser import ParseError, parse_bib
-from pynakes.bibtex_writer import write_bib
+from pynakes.editing import set_entry_field
 from pynakes.keys import UnsupportedCitationKeyPatternError, generate_key, unique_key
 from pynakes.model import BibEntry, BibFile
 from pynakes.providers import arxiv
@@ -299,9 +300,13 @@ def arxiv_entry(record: ArxivRecord, *, dialect: str = "bibtex") -> BibEntry:
     if record.title:
         fields["title"] = record.title
     if record.published:
-        fields["date" if biblatex else "year"] = (
-            record.published if biblatex else record.published[:4]
-        )
+        if biblatex:
+            fields["date"] = record.published
+        else:
+            fields["year"] = record.published[:4]
+            month_part = record.published[5:7]
+            if month_part in MONTH_NUM_TO_ABBR:
+                fields["month"] = MONTH_NUM_TO_ABBR[month_part]
     fields["eprint"] = record.arxiv_id
     fields["eprinttype" if biblatex else "archivePrefix"] = "arxiv" if biblatex else "arXiv"
     if record.primary_class:
@@ -309,6 +314,10 @@ def arxiv_entry(record: ArxivRecord, *, dialect: str = "bibtex") -> BibEntry:
     fields["url"] = arxiv.abs_url(record.arxiv_id)
     if record.doi:
         fields["doi"] = record.doi
+    if record.summary:
+        fields["abstract"] = record.summary
+    if record.updated:
+        fields["updated"] = record.updated
 
     return BibEntry(
         key="arxiv",  # replaced with a unique key by prepare_imported_*
@@ -393,11 +402,9 @@ def prepare_imported_entry(
         fetcher = fetch_bibtex_for_doi
     entry = entry_from_bibtex(fetcher(normalized))
     provider_key = entry.key
-    entry.fields["doi"] = normalized
+    set_entry_field(entry, "doi", normalized)
 
     _assign_key(entry, lib, key=key, key_source=key_source, provider_key=provider_key)
-    entry.modified = True
-    entry.raw_content = None
     return entry
 
 
@@ -433,8 +440,6 @@ def prepare_imported_arxiv(
     # arXiv feeds carry no provider citation key, so "provider" falls back to
     # generation.
     _assign_key(entry, lib, key=key, key_source=key_source, provider_key=None)
-    entry.modified = True
-    entry.raw_content = None
     return entry
 
 
@@ -475,9 +480,3 @@ def prepare_imported_reference(
             fetcher=doi_fetcher,
         )
     return kind, entry
-
-
-def render_entry(entry: BibEntry, line_ending: str = "\n") -> str:
-    """Render a single entry as BibTeX text."""
-    lib = BibFile(entries=[entry], line_ending=line_ending)
-    return write_bib(lib).rstrip("\r\n")

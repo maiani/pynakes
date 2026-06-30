@@ -272,6 +272,7 @@ def _finish_mod(
     coll: Bibliography,
     params: RunParams,
     human,
+    diff_text: str | None = None,
     warnings=None,
     modified_entries: int | None = None,
     **details,
@@ -282,10 +283,17 @@ def _finish_mod(
     ``status, action, file, dry_run, modified, modified_entries, warnings``, a
     structured ``plan`` (machine-readable per-entry/field changes), plus
     command-specific keys, and an optional ``diff`` when ``--diff`` is set.
+
+    When ``diff_text`` is provided it is used as-is (useful for commands that
+    combine multiple diffs, e.g. ``keys rename``). Otherwise the diff is
+    generated from the bibliography changes.
     """
     # The plan must be read before commit, which refreshes the pristine baseline.
     plan = coll.change_plan()
-    diff_text, modified, changed = _preview_or_commit(coll, params)
+    if diff_text is None:
+        diff_text, modified, changed = _preview_or_commit(coll, params)
+    else:
+        _, modified, changed = _preview_or_commit(coll, params)
     if modified_entries is not None:
         changed = modified_entries
     result = {

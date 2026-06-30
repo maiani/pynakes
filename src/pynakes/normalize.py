@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from pynakes import authors as author_ops
 from pynakes import fields as field_ops
 from pynakes import journals as journal_ops
+from pynakes._calendar import MONTH_ABBR_TO_NAME, MONTH_NUM_TO_ABBR, month_name_to_int
 from pynakes._identifiers import normalize_doi
 from pynakes.authors import NAME_FIELDS
 from pynakes.editing import (
@@ -24,22 +25,28 @@ from pynakes.metadata import (
     metadata_list,
     metadata_value,
 )
-from pynakes.model import COMMON_STRINGS, BibFile
+from pynakes.model import BibFile
 
 # JabRef saveActions formatter keys mapped to pynakes normalization concerns.
 _DOI_FORMATTERS = ("clean_up_doi", "short_doi")
 
 # Normalize settings live under the ``normalize-`` key prefix.
 METADATA_PREFIX = "normalize-"
-# Recognized month spellings mapped to their canonical BibTeX macro. BibTeX
-# predefines only the three-letter macros ``jan``..``dec``; full names ("June")
-# and common abbreviation variants ("Sept") are noncanonical — and, unbraced,
-# undefined string references — that normalization rewrites to the macro. A
-# trailing period (``Sept.``) is stripped before lookup.
-_MONTH_NAME_MACROS = {macro: macro for macro in COMMON_STRINGS}
-_MONTH_NAME_MACROS.update({name.lower(): macro for macro, name in COMMON_STRINGS.items()})
-# Common abbreviation variants that are neither the macro nor the full name.
-_MONTH_NAME_MACROS["sept"] = "sep"
+
+
+def _month_name_to_macro(token: str) -> str | None:
+    """Map a month name to its three-letter BibTeX macro (``jan``..``dec``), or ``None``.
+
+    Handles full names (``June``), three-letter macros (``jun``), variant
+    abbreviations (``Sept.``), and the nonstandard ``sept``.
+    """
+    cleaned = token.strip().rstrip(".")
+    if cleaned.lower() == "sept":
+        return "sep"
+    num = month_name_to_int(cleaned)
+    if num is None:
+        return None
+    return MONTH_NUM_TO_ABBR.get(f"{num:02d}")
 
 
 @dataclass
@@ -200,11 +207,12 @@ def normalize_month_macros(lib: BibFile) -> int:
         source_value = raw_field_value(entry.raw_content, "month")
         if source_value is None:
             continue
-        source_name = source_value.strip().lower().rstrip(".")
-        macro = _MONTH_NAME_MACROS.get(source_name)
-        if macro is None or source_name in declared:
+        source_name = source_value.strip().rstrip(".")
+        macro = _month_name_to_macro(source_name)
+        source_lower = source_name.lower()
+        if macro is None or source_lower in declared:
             continue
-        month_name = COMMON_STRINGS[macro]
+        month_name = MONTH_ABBR_TO_NAME[macro]
         expression = macro if macro not in declared else f"{{{month_name}}}"
         if set_entry_field_expression(entry, "month", expression, month_name):
             changed += 1

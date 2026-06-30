@@ -7,7 +7,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from pynakes._identifiers import arxiv_id_from_text, normalize_doi
-from pynakes.providers._http import fetch_json
+from pynakes.providers._http import fetch_json, iter_strings
 
 API_URL = "https://api.openalex.org/works/doi:"
 
@@ -47,7 +47,7 @@ def oa_pdf_url_for_doi(
 def arxiv_id_from_work(work: dict) -> str | None:
     """Return the first arXiv id encoded in an OpenAlex work's locations."""
     for location in _locations(work):
-        for value in _iter_strings(location):
+        for value in iter_strings(location):
             arxiv_id = arxiv_id_from_text(value)
             if arxiv_id:
                 return arxiv_id
@@ -76,19 +76,3 @@ def _locations(work: dict) -> list[dict]:
     if isinstance(raw_locations, list):
         locations.extend(location for location in raw_locations if isinstance(location, dict))
     return locations
-
-
-def _iter_strings(value: object) -> list[str]:
-    if isinstance(value, str):
-        return [value]
-    if isinstance(value, dict):
-        strings: list[str] = []
-        for nested in value.values():
-            strings.extend(_iter_strings(nested))
-        return strings
-    if isinstance(value, list):
-        strings = []
-        for nested in value:
-            strings.extend(_iter_strings(nested))
-        return strings
-    return []

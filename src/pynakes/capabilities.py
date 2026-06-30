@@ -31,7 +31,7 @@ _ERROR_CODES = {
             "ParseError": "A .bib or source file could not be parsed (includes 'line').",
             "InvalidInput": "An argument, option, or predicate was invalid.",
             "IOError": "A read or write failed.",
-            "NoSources": "used: no sources given and no 'tex-sources' metadata to use.",
+            "NoSources": "tex scan: no sources given and no 'tex-sources' metadata to use.",
             "InvalidNamespace": "metadata set: namespace was not 'jabref' or 'pynakes'.",
             "InvalidNormalizeOption": "normalize: an option value was not allowed.",
             "KeyNotFound": "A referenced citation key is not in the library (remove, keys rename, etc.).",

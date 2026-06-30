@@ -15,7 +15,6 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from pynakes import importer as importer_ops
 from pynakes import metadata as metadata_ops
 from pynakes._engine_helpers import (
     CommitResult,
@@ -314,7 +313,9 @@ class Bibliography(BibliographyOperations):
         for entry in self._appended_entries:
             text = append_entry_text(
                 text,
-                importer_ops.render_entry(entry, self.lib.line_ending),
+                write_bib(BibFile(entries=[entry], line_ending=self.lib.line_ending)).rstrip(
+                    "\r\n"
+                ),
                 self.lib.line_ending,
                 self.lib.metadata_blocks,
             )

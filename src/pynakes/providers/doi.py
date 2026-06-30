@@ -5,7 +5,7 @@ from __future__ import annotations
 from urllib.parse import quote
 
 from pynakes._identifiers import normalize_doi
-from pynakes.providers._http import fetch_bytes
+from pynakes.providers._http import fetch_text
 
 BASE_URL = "https://doi.org"
 
@@ -23,10 +23,9 @@ def fetch_bibtex(doi: str, timeout: float = 15.0) -> str:
     network failure.
     """
     normalized = normalize_doi(doi)
-    data = fetch_bytes(
+    return fetch_text(
         content_url(normalized),
         accept="application/x-bibtex",
         timeout=timeout,
         label=normalized,
     )
-    return data.decode("utf-8", errors="replace")

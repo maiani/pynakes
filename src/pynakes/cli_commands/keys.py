@@ -13,12 +13,10 @@ from pynakes.cli_common import (
     _BACKUP_OPTION,
     CheckOutcome,
     RunParams,
-    _emit,
     _emit_conflict,
     _emit_error,
     _entries,
     _finish_mod,
-    _preview_or_commit,
     _resolve_input_bib,
     _run_checks,
     _safe,
@@ -279,36 +277,28 @@ def keys_rename(
             }
         )
 
-    plan = coll.change_plan()  # before commit, which refreshes the baseline
-    bib_diff, bib_modified, changed_entries = _preview_or_commit(coll, params)
-
-    diff_text = "\n".join(part for part in [bib_diff, *source_diff_parts] if part)
-    source_modified = any(change["modified"] for change in source_changes)
-    modified = bib_modified or source_modified
-
     human = [
         f"{_verb('rename', params)} citation key {old!r} to {new!r}.",
         f"  bib entries changed={bib_changed}, TeX citations changed={total_source_occurrences}",
     ]
-    _emit(
-        params.json_output,
-        {
-            "status": "success",
-            "action": "keys_rename",
-            "file": file,
-            "dry_run": params.dry_run,
-            "modified": modified,
-            "modified_entries": changed_entries,
-            "warnings": [],
-            "plan": plan,
-            "old": old,
-            "new": new,
-            "source_occurrences": total_source_occurrences,
-            "sources": source_changes,
-        },
+
+    if params.diff:
+        bib_diff = coll.diff()
+        diff_text = "\n".join(part for part in [bib_diff, *source_diff_parts] if part)
+    else:
+        diff_text = None
+
+    _finish_mod(
+        file,
+        "keys_rename",
+        coll,
+        params,
         human,
-        diff_text,
-        params.diff,
+        diff_text=diff_text,
+        old=old,
+        new=new,
+        source_occurrences=total_source_occurrences,
+        sources=source_changes,
     )
 
 
