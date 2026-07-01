@@ -10,6 +10,7 @@ from pynakes.bibtex_parser import parse_bib
 from pynakes.cli import app
 from pynakes.integrity import enrich_library, verify_library
 from pynakes.providers import arxiv, doi, openalex, semantic_scholar
+from pynakes.providers._http import ProviderFetchError
 
 runner = CliRunner()
 
@@ -72,6 +73,21 @@ def test_verify_library_reports_provider_mismatch(monkeypatch) -> None:
     assert report.checked == 1
     assert report.errors == 1
     assert report.issues[0].type == "title_mismatch"
+
+
+def test_verify_library_separates_provider_errors(monkeypatch) -> None:
+    def fail_fetch(doi: str) -> str:
+        raise ProviderFetchError(f"Network error fetching {doi}: temporary failure")
+
+    monkeypatch.setattr(doi, "fetch_bibtex", fail_fetch)
+    lib = parse_bib("@article{A,\n  title = {A Paper},\n  doi = {10.5555/example}\n}\n")
+
+    report = verify_library(lib, online=True)
+
+    assert report.checked == 0
+    assert report.errors == 1
+    assert report.issues[0].type == "provider_error"
+    assert report.issues[0].field == "doi"
 
 
 def test_enrich_library_fills_missing_doi_from_url_and_provider_fields(monkeypatch) -> None:

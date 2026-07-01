@@ -28,6 +28,37 @@ def test_change_plan_reports_field_changes() -> None:
     }
 
 
+def test_change_plan_reports_modified_duplicate_key_entry() -> None:
+    coll = Bibliography.from_text(
+        "@article{A,\n"
+        "  title = {First},\n"
+        "  doi = {https://doi.org/10.5555/example}\n"
+        "}\n\n"
+        "@article{A,\n"
+        "  title = {Second},\n"
+        "  doi = {10.5555/example}\n"
+        "}\n"
+    )
+
+    coll.normalize(NormalizeOptions(protect_titles=False, author_style="none"))
+    plan = coll.change_plan()
+
+    assert plan["summary"]["modified"] == 1
+    assert plan["entries"] == [
+        {
+            "change": "modified",
+            "key": "A",
+            "entry_index": 0,
+            "fields": {
+                "doi": {
+                    "old": "https://doi.org/10.5555/example",
+                    "new": "10.5555/example",
+                }
+            },
+        }
+    ]
+
+
 def test_change_plan_detects_rename_not_remove_add() -> None:
     coll = Bibliography.from_text("@article{Old,\n  title = {t}\n}\n")
     from pynakes import keys as key_ops

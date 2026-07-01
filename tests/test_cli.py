@@ -1277,7 +1277,12 @@ class TestKeysCommand:
         bib = _copy(tmp_path, "duplicate_entries.bib")
         result = runner.invoke(app, ["keys", "check", str(bib), "--json"])
         assert result.exit_code == 0, result.output
-        assert json.loads(result.output)["has_duplicates"] is True
+        data = json.loads(result.output)
+        assert data["has_duplicates"] is True
+        assert any(
+            issue["type"] == "duplicate_key" and issue["severity"] == "error"
+            for issue in data["issues"]
+        )
 
     def test_repair_dry_run_diff(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "duplicate_entries.bib")
@@ -1561,6 +1566,72 @@ class TestNormalizeCommand:
         assert data["operations"]["dois"] == 1
         assert "title = {{DNA} repair with {eBay}}" in data["diff"]
         assert "journal = {Nat. Mach. Intell.}" in data["diff"]
+        assert bib.read_text() == original
+
+    def test_normalize_dry_run_diff_json_with_duplicate_keys(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        original = (
+            "@article{Smith2020,\n"
+            "  author = {Jane Smith and Alan Doe},\n"
+            "  title = {A Small Study of Deterministic Widgets},\n"
+            "  journal = {Journal of Widget Studies},\n"
+            "  year = {2020},\n"
+            "  doi = {https://doi.org/10.5555/widget.2020}\n"
+            "}\n\n"
+            "@article{Smith2020,\n"
+            "  author = {Jane Smith and Alan Doe},\n"
+            "  title = {A Small Study of Deterministic Widgets},\n"
+            "  journal = {Journal of Widget Studies},\n"
+            "  year = {2020},\n"
+            "  doi = {10.5555/widget.2020}\n"
+            "}\n"
+        )
+        bib.write_text(original)
+
+        result = runner.invoke(
+            app,
+            [
+                "normalize",
+                str(bib),
+                "--doi-normalization",
+                "on",
+                "--identifier-case",
+                "on",
+                "--metadata-formatting",
+                "on",
+                "--title-protection",
+                "off",
+                "--author-style",
+                "none",
+                "--journal-style",
+                "none",
+                "--sort-by",
+                "original",
+                "--dry-run",
+                "--diff",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["modified_entries"] == 1
+        assert data["plan"]["summary"]["modified"] == 1
+        assert data["plan"]["entries"] == [
+            {
+                "change": "modified",
+                "key": "Smith2020",
+                "entry_index": 0,
+                "fields": {
+                    "doi": {
+                        "old": "https://doi.org/10.5555/widget.2020",
+                        "new": "10.5555/widget.2020",
+                    }
+                },
+            }
+        ]
+        assert "+  doi = {10.5555/widget.2020}\n" in data["diff"]
+        assert "+  doi = {10.5555/widget.2020}}" not in data["diff"]
         assert bib.read_text() == original
 
     def test_normalize_leaves_journals_untouched_by_default(self, tmp_path: Path) -> None:

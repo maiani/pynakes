@@ -29,6 +29,11 @@ class TestRawFieldEdits:
         assert "year = {1954}" in out
         assert "title = {The {DNA} Helix}" in out  # untouched, nested braces intact
 
+    def test_set_final_braced_field_keeps_entry_close_on_own_line(self) -> None:
+        raw = "@article{k,\n  title = {Paper},\n  doi = {https://doi.org/10.5555/example}\n}"
+        out = set_raw_field(raw, "doi", "10.5555/example")
+        assert out == "@article{k,\n  title = {Paper},\n  doi = {10.5555/example}\n}"
+
     def test_set_missing_field_inserts_before_close(self) -> None:
         out = set_raw_field(RAW, "doi", "10.1/x")
         assert "doi = {10.1/x}" in out

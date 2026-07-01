@@ -236,8 +236,13 @@ def verify_library(
         try:
             remote = fetch_doi_entry(normalized, cache_dir=cache_dir)
         except MetadataFetchError as exc:
+            issue_type = (
+                "provider_error"
+                if isinstance(exc.__cause__, ProviderFetchError)
+                else "doi_unresolved"
+            )
             report.issues.append(
-                IntegrityIssue("doi_unresolved", "error", str(exc), entry.key, "doi", actual=doi)
+                IntegrityIssue(issue_type, "error", str(exc), entry.key, "doi", actual=doi)
             )
             continue
 

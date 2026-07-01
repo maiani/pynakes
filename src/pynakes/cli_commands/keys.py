@@ -39,6 +39,16 @@ def _keys_check_one(file: str) -> CheckOutcome:
     coll = Bibliography.open(file)
     duplicates = keys_ops.duplicate_key_counts(coll.lib)
     instances = coll.lib.entries.duplicate_key_instances()
+    issues = [
+        {
+            "type": "duplicate_key",
+            "severity": "error",
+            "message": f"Citation key {key!r} appears {count} times",
+            "key": key,
+            "instances": instances.get(key, []),
+        }
+        for key, count in duplicates.items()
+    ]
     result = {
         "status": "success",
         "action": "keys_check",
@@ -46,6 +56,7 @@ def _keys_check_one(file: str) -> CheckOutcome:
         "has_duplicates": bool(duplicates),
         "duplicate_keys": duplicates,
         "duplicate_key_instances": instances,
+        "issues": issues,
     }
     if not duplicates:
         human = [f"{file}: all citation keys are unique."]

@@ -178,38 +178,60 @@ def compute_change_plan(pristine_text: str, lib: BibFile) -> dict:
     from pynakes.bibtex_parser import parse_bib  # local import avoids top-level cycle
 
     pristine = parse_bib(pristine_text)
-    before = {entry.key: entry for entry in pristine.entries.values()}
-    after = {entry.key: entry for entry in lib.entries.values()}
+    before_rows = _indexed_entries(pristine)
+    after_rows = _indexed_entries(lib)
+    before = {token: (index, entry) for token, index, entry in before_rows}
+    after = {token: (index, entry) for token, index, entry in after_rows}
+    before_duplicate_keys = pristine.entries.duplicate_keys()
+    after_duplicate_keys = lib.entries.duplicate_keys()
 
     def signature(entry: BibEntry) -> tuple[str, tuple[tuple[str, str], ...]]:
         return (entry.type.lower(), tuple(sorted(entry.fields.items())))
 
-    added_keys = [key for key in after if key not in before]
-    removed_keys = [key for key in before if key not in after]
+    added_tokens = [token for token, _, _ in after_rows if token not in before]
+    removed_tokens = [token for token, _, _ in before_rows if token not in after]
 
     # Pair a removed key with an added key carrying the same record → rename.
-    added_by_sig = {signature(after[key]): key for key in added_keys}
-    renamed_to: set[str] = set()
+    added_by_sig: dict[tuple[str, tuple[tuple[str, str], ...]], list[tuple[str, int]]] = {}
+    for token in added_tokens:
+        _, entry = after[token]
+        added_by_sig.setdefault(signature(entry), []).append(token)
+    renamed_to: set[tuple[str, int]] = set()
     renames: list[dict] = []
-    plain_removed: list[str] = []
-    for key in removed_keys:
-        match = added_by_sig.get(signature(before[key]))
+    plain_removed: list[tuple[str, int]] = []
+    for token in removed_tokens:
+        before_index, before_entry = before[token]
+        candidates = added_by_sig.get(signature(before_entry), [])
+        match = next((candidate for candidate in candidates if candidate not in renamed_to), None)
         if match is not None and match not in renamed_to:
-            renames.append({"change": "renamed", "from": key, "to": match})
+            after_index, after_entry = after[match]
+            item = {"change": "renamed", "from": before_entry.key, "to": after_entry.key}
+            _add_entry_index(item, before_entry.key, before_index, before_duplicate_keys)
+            _add_entry_index(
+                item, after_entry.key, after_index, after_duplicate_keys, name="to_index"
+            )
+            renames.append(item)
             renamed_to.add(match)
         else:
-            plain_removed.append(key)
-    added_keys = [key for key in added_keys if key not in renamed_to]
+            plain_removed.append(token)
+    added_tokens = [token for token in added_tokens if token not in renamed_to]
 
     entries: list[dict] = list(renames)
-    entries += [{"change": "added", "key": key} for key in added_keys]
-    entries += [{"change": "removed", "key": key} for key in plain_removed]
+    entries += [
+        _entry_item("added", after[token][1], after[token][0], after_duplicate_keys)
+        for token in added_tokens
+    ]
+    entries += [
+        _entry_item("removed", before[token][1], before[token][0], before_duplicate_keys)
+        for token in plain_removed
+    ]
 
     modified = 0
-    for key, after_entry in after.items():
-        before_entry = before.get(key)
-        if before_entry is None:
+    for token, after_index, after_entry in after_rows:
+        row = before.get(token)
+        if row is None:
             continue
+        _, before_entry = row
         fields: dict[str, dict[str, str | None]] = {}
         for name in sorted(set(before_entry.fields) | set(after_entry.fields)):
             old = before_entry.fields.get(name)
@@ -220,7 +242,7 @@ def compute_change_plan(pristine_text: str, lib: BibFile) -> dict:
         if not fields and not type_changed:
             continue
         modified += 1
-        item: dict = {"change": "modified", "key": key}
+        item: dict = _entry_item("modified", after_entry, after_index, after_duplicate_keys)
         if type_changed:
             item["type"] = {"old": before_entry.type, "new": after_entry.type}
         if fields:
@@ -237,7 +259,7 @@ def compute_change_plan(pristine_text: str, lib: BibFile) -> dict:
 
     return {
         "summary": {
-            "added": len(added_keys),
+            "added": len(added_tokens),
             "removed": len(plain_removed),
             "renamed": len(renames),
             "modified": modified,
@@ -246,6 +268,40 @@ def compute_change_plan(pristine_text: str, lib: BibFile) -> dict:
         "entries": entries,
         "metadata": metadata,
     }
+
+
+def _indexed_entries(lib: BibFile) -> list[tuple[tuple[str, int], int, BibEntry]]:
+    """Return entries tagged by ``(key, occurrence)`` and absolute entry index."""
+    counts: dict[str, int] = {}
+    rows: list[tuple[tuple[str, int], int, BibEntry]] = []
+    for index, entry in enumerate(lib.entries.values()):
+        occurrence = counts.get(entry.key, 0)
+        counts[entry.key] = occurrence + 1
+        rows.append(((entry.key, occurrence), index, entry))
+    return rows
+
+
+def _entry_item(
+    change: str,
+    entry: BibEntry,
+    index: int,
+    duplicate_keys: dict[str, int],
+) -> dict:
+    item = {"change": change, "key": entry.key}
+    _add_entry_index(item, entry.key, index, duplicate_keys)
+    return item
+
+
+def _add_entry_index(
+    item: dict,
+    key: str,
+    index: int,
+    duplicate_keys: dict[str, int],
+    *,
+    name: str = "entry_index",
+) -> None:
+    if key in duplicate_keys:
+        item[name] = index
 
 
 # ---------------------------------------------------------------------------

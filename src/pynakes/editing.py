@@ -64,15 +64,27 @@ def _scan_value_end(raw: str, pos: int) -> int:
         char = raw[i]
         if char == '"' and not _is_escaped(raw, i) and brace_depth == 0:
             in_quotes = not in_quotes
+            if not in_quotes and _next_nonspace(raw, i + 1) != "#":
+                return i + 1
         elif not in_quotes:
             if char == "{":
                 brace_depth += 1
             elif char == "}" and brace_depth:
                 brace_depth -= 1
+                if brace_depth == 0 and _next_nonspace(raw, i + 1) != "#":
+                    return i + 1
             elif brace_depth == 0 and char in ",})":
                 return i
         i += 1
     return len(raw)
+
+
+def _next_nonspace(raw: str, pos: int) -> str | None:
+    """Return the next non-whitespace character after ``pos``."""
+    i = pos
+    while i < len(raw) and raw[i].isspace():
+        i += 1
+    return raw[i] if i < len(raw) else None
 
 
 def _find_field(raw: str, field_name: str) -> tuple[int, int, int] | None:

@@ -30,6 +30,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `normalize --dry-run --diff --json` now keeps valid BibTeX when normalizing a
+  final braced field such as a DOI with no trailing comma, and its structured
+  `plan` reports modified entries even when the bibliography already contains
+  duplicate citation keys.
+- `keys check --json` now includes duplicate-key findings in an `issues` array
+  with `severity: error`, matching the severity-bearing shape agents already
+  get from `lint --json` while preserving the existing duplicate summary fields.
+- `verify --online --json` now reports provider/network failures as
+  `provider_error` issues instead of folding them into `doi_unresolved`, so
+  automated users can distinguish external lookup failures from DOI metadata
+  problems without parsing the message text.
 - `keys generate` now treats single-key regeneration as the default:
   `keys generate KEY FILE` derives the new key from entry metadata, while
   whole-library regeneration is explicit via `--all`. The old `--key` selector
