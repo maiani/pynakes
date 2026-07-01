@@ -77,7 +77,10 @@ The key **owner** records who understands the setting: JabRef-native keys route
 to `jabref-meta` by default for compatibility; pynakes-owned and unknown keys
 route to `pynakes-meta`, where pynakes can extend JabRef without polluting
 JabRef's namespace. The key **category** is only a domain label for inspection
-and validation messages (`library`, `save`, `normalization`, `pinax`, …).
+and validation messages (`library`, `save`, `normalization`, `pinax`, …). See
+the [JabRef compatibility guide](jabref-compatibility.md) for the full
+namespace/owner/routing model and pynakes' native keys (`dialect`,
+`sort-order`) that alias a JabRef equivalent.
 For values, `MetadataBlock.raw` is the exact source comment, `value` is the
 parsed payload with JabRef's trailing semicolon preserved when present, and
 `normalized_value` is the stripped display/semantic view used in reports.
@@ -240,7 +243,7 @@ the CLI.
 | importer.py | Reference import: identifier resolution (DOI/arXiv), DOI canonicalization, arXiv normalization/Atom parsing, and entry preparation. It is the DOI and arXiv identifier authority. |
 | filestore.py | Pinax material paths, presence scanning, orphan/drift detection and repair, provenance manifests, material copying, and atomic writes inside a configured `files-dir`. |
 | fetch.py | arXiv material URL construction, injectable PDF/source byte fetchers, safe source archive extraction, and FileStore installation. |
-| metadata.py | Structured top-level metadata: parses both jabref-meta and pynakes-meta, separates JabRef-native and pynakes-owned key tables, classifies, and applies safe namespace-routed updates. |
+| metadata/ (core.py, schema.py, jabref.py) | Structured top-level metadata, layered by dependency direction: `core` is the namespace-neutral comment engine (parse/format/set/remove/consolidate); `schema` is pynakes' own canonical key registry and native reads, JabRef-unaware; `jabref` is the compatibility adapter — JabRef's key tables and value grammars, owner/namespace arbitration, and fallback-aware accessors (`library_dialect`, `library_sort_order`). Domain code depends on `schema`'s concepts through `jabref`'s accessors, never on JabRef's literal keys. See the [JabRef compatibility guide](jabref-compatibility.md). |
 | journals.py | Exact title/ISSN mapping plus LTWA-style journal abbreviation/expansion. |
 | normalize.py | Policy orchestration over title, author, journal, and DOI operations. |
 | convert.py | Conservative BibTeX/BibLaTeX convention conversion. |

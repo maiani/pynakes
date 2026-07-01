@@ -29,12 +29,14 @@ from pynakes.cli_common import (
 from pynakes.engine import Bibliography
 from pynakes.filestore import FILES_DIR_KEY
 from pynakes.initialize import (
+    ProfileEntry,
     apply_overrides,
     collect_profile,
     default_profile,
     render_agents_md,
     render_library,
 )
+from pynakes.metadata import jabref_projection
 
 # --- init ------------------------------------------------------------------
 
@@ -42,6 +44,26 @@ from pynakes.initialize import (
 def _has_pinax_metadata(coll: Bibliography) -> bool:
     """Return True when the bibliography already has a ``files-dir`` set."""
     return any(k.strip().lower() == FILES_DIR_KEY for k in coll.lib.metadata)
+
+
+def _project_jabref(entries: list[ProfileEntry]) -> list[ProfileEntry]:
+    """Append JabRef projections for aliased native keys (for ``init --jabref``).
+
+    Each pynakes-native aliased key (``dialect``, ``key-pattern``…) gains its
+    ``jabref-meta`` counterpart (``databaseType``, ``keypatterndefault``…) so the
+    library opens JabRef-tracked. Existing JabRef keys are left as-is.
+    """
+    result = list(entries)
+    have = {entry.key.lower() for entry in result}
+    for entry in entries:
+        if entry.namespace != "pynakes":
+            continue
+        projection = jabref_projection(entry.key, entry.value)
+        if projection is None or projection[0].lower() in have:
+            continue
+        result.append(ProfileEntry(projection[0], projection[1], "jabref"))
+        have.add(projection[0].lower())
+    return result
 
 
 def _write_agents_guide(file: str, *, dry_run: bool) -> str | None:
@@ -99,10 +121,18 @@ def _convert_to_pinax(
 def init(
     file: str = typer.Argument(..., help="Path to the .bib library to create or convert"),
     type_: str | None = typer.Option(
-        None, "--type", help="Library dialect: biblatex or bibtex (sets databaseType)"
+        None, "--type", help="Library dialect: biblatex or bibtex (sets the native 'dialect' key)"
     ),
     key_pattern: str | None = typer.Option(
-        None, "--key-pattern", help="Default citation-key pattern (sets keypatterndefault)"
+        None,
+        "--key-pattern",
+        help="Default citation-key pattern (sets the native 'key-pattern' key)",
+    ),
+    jabref: bool = typer.Option(
+        False,
+        "--jabref",
+        help="Also emit a JabRef metadata projection (databaseType, keypatterndefault) so the "
+        "library opens JabRef-tracked; by default a fresh library is pynakes-native only",
     ),
     from_: str | None = typer.Option(
         None, "--from", help="Copy the metadata profile from an existing .bib library"
@@ -127,13 +157,16 @@ def init(
 ) -> None:
     """Create or initialize a .bib library.
 
-    With no options it writes a sensible default profile (the BibLaTeX dialect
-    and pynakes' default citation-key pattern). ``--type`` / ``--key-pattern``
-    override individual settings; ``--from`` replaces the defaults with another
-    library's maintenance profile (its conventions, not its group tree or
-    TeX-source list). ``--pinax`` seeds pinax mode and, when the file already
-    exists, converts it in place. ``--agent-guide`` writes AGENTS.md (only
-    meaningful alongside ``--pinax``).
+    With no options it writes a sensible, pynakes-native default profile (the
+    BibLaTeX dialect and pynakes' default citation-key pattern, as the native
+    ``dialect``/``key-pattern`` keys in ``pynakes-meta`` — no ``jabref-meta``
+    unless requested). ``--type`` / ``--key-pattern`` override individual
+    settings; ``--jabref`` also emits the JabRef projection so the library opens
+    JabRef-tracked; ``--from`` replaces the defaults with another library's
+    maintenance profile (its conventions, not its group tree or TeX-source
+    list). ``--pinax`` seeds pinax mode and, when the file already exists,
+    converts it in place. ``--agent-guide`` writes AGENTS.md (only meaningful
+    alongside ``--pinax``).
     """
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
 
@@ -169,9 +202,9 @@ def init(
     )
     overrides: list[tuple[str, str, str]] = []
     if type_ is not None:
-        overrides.append(("databaseType", type_, "jabref"))
+        overrides.append(("dialect", type_, "pynakes"))
     if key_pattern is not None:
-        overrides.append(("keypatterndefault", key_pattern, "jabref"))
+        overrides.append(("key-pattern", key_pattern, "pynakes"))
     if pinax:
         stem = Path(file).stem
         overrides.append(("files-dir", f"{stem}.files", "pynakes"))
@@ -179,6 +212,11 @@ def init(
         overrides.append(("fetch-source", "true", "pynakes"))
         overrides.append(("fetch-published", "false", "pynakes"))
     entries = apply_overrides(entries, overrides)
+
+    # With --jabref, project the native dialect/key-pattern into their JabRef
+    # equivalents so the file opens JabRef-tracked from the start.
+    if jabref:
+        entries = _project_jabref(entries)
 
     content = render_library(entries)
 
@@ -191,7 +229,9 @@ def init(
     )
 
     keys = sorted({entry.key for entry in entries})
-    effective = next((e.value for e in entries if e.key.lower() == "databasetype"), None)
+    effective = next(
+        (e.value for e in entries if e.key.lower() in {"dialect", "databasetype"}), None
+    )
     effective_type = strip_jabref_terminator(effective).lower() if effective else None
 
     detail = f" [{effective_type}]" if effective_type else ""

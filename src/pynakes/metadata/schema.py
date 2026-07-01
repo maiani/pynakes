@@ -1,0 +1,150 @@
+"""pynakes' canonical metadata schema — pynakes' own keys, JabRef-unaware.
+
+This is the pure "what pynakes itself understands" layer: which keys pynakes
+owns natively, what domain category each belongs to, and how to read the
+native value for concepts that also have a JabRef counterpart (``dialect``,
+``sort-order``). It imports only :mod:`pynakes.metadata.core` and never
+:mod:`pynakes.metadata.jabref` — resolving a native value against a JabRef
+fallback, or deciding which namespace a key routes to, is compatibility
+policy, not schema, and belongs on the JabRef side instead.
+"""
+
+from typing import Literal
+
+from pynakes.metadata.core import metadata_list, metadata_value
+from pynakes.model import BibFile
+
+MetadataCategory = Literal[
+    "library",
+    "save",
+    "files",
+    "groups",
+    "selectors",
+    "citation-key",
+    "normalization",
+    "lint",
+    "usage",
+    "pinax",
+    "unknown",
+]
+
+CATEGORY_LIBRARY: MetadataCategory = "library"
+CATEGORY_SAVE: MetadataCategory = "save"
+CATEGORY_FILES: MetadataCategory = "files"
+CATEGORY_GROUPS: MetadataCategory = "groups"
+CATEGORY_SELECTORS: MetadataCategory = "selectors"
+CATEGORY_CITATION_KEY: MetadataCategory = "citation-key"
+CATEGORY_NORMALIZATION: MetadataCategory = "normalization"
+CATEGORY_LINT: MetadataCategory = "lint"
+CATEGORY_USAGE: MetadataCategory = "usage"
+CATEGORY_PINAX: MetadataCategory = "pinax"
+CATEGORY_UNKNOWN: MetadataCategory = "unknown"
+
+# pynakes-owned metadata keys. These live in ``pynakes-meta`` by default because
+# they have no JabRef equivalent or deliberately extend JabRef behavior.
+PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
+    # Native library dialect, aliasing JabRef's ``databaseType``.
+    "dialect": CATEGORY_LIBRARY,
+    # Native entry sort order, aliasing JabRef's ``saveOrderConfig``.
+    "sort-order": CATEGORY_SAVE,
+    # Native default citation-key pattern, aliasing JabRef's ``keypatterndefault``.
+    "key-pattern": CATEGORY_CITATION_KEY,
+    "protected-terms": CATEGORY_NORMALIZATION,
+    "journal-table": CATEGORY_NORMALIZATION,
+    "ltwa-table": CATEGORY_NORMALIZATION,
+    "files-dir": CATEGORY_PINAX,
+    "fetch-preprint": CATEGORY_PINAX,
+    "fetch-source": CATEGORY_PINAX,
+    "fetch-published": CATEGORY_PINAX,
+    # Linked LaTeX sources that cite this library; consulted by the citation-key
+    # commands so .tex edits stay consistent without re-specifying the files.
+    "tex-sources": CATEGORY_USAGE,
+    # Lint profile settings. ``lint-required-fields`` applies to every entry;
+    # the entry-type suffix form adds requirements for one type.
+    "lint-required-fields": CATEGORY_LINT,
+}
+
+PYNAKES_PREFIX_KEYS: dict[str, MetadataCategory] = {
+    # pynakes' normalization settings live under the canonical ``normalize-`` prefix.
+    "normalize-": CATEGORY_NORMALIZATION,
+    "lint-required-fields-": CATEGORY_LINT,
+    # Per-entry-type key patterns, aliasing JabRef's ``keypattern_<type>``.
+    "key-pattern-": CATEGORY_CITATION_KEY,
+}
+
+
+def metadata_category(key: str) -> MetadataCategory:
+    """Return the category for a pynakes-owned key, or ``"unknown"``.
+
+    Classifies only pynakes' own keys;
+    :func:`pynakes.metadata.jabref.metadata_category` layers JabRef's key
+    tables on top of this for the full picture.
+    """
+    normalized = key.lower()
+    if normalized in PYNAKES_EXACT_KEYS:
+        return PYNAKES_EXACT_KEYS[normalized]
+    for prefix, category in PYNAKES_PREFIX_KEYS.items():
+        if normalized.startswith(prefix):
+            return category
+    return CATEGORY_UNKNOWN
+
+
+def native_dialect(lib: BibFile) -> str | None:
+    """Return the library dialect from pynakes' native ``dialect`` key, or ``None``.
+
+    Recognizes ``bibtex``/``biblatex`` (case-insensitive); any other value, or
+    the key's absence, returns ``None``. See
+    :func:`pynakes.metadata.jabref.library_dialect` for the fallback-aware
+    accessor that also considers JabRef's ``databaseType``.
+    """
+    value = metadata_value(lib, "dialect")
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    return normalized if normalized in {"bibtex", "biblatex"} else None
+
+
+def parse_sort_order_value(value: str | None) -> list[tuple[str, bool]] | None:
+    """Parse a native ``sort-order`` value string into sort criteria, or ``None``.
+
+    The grammar matches the CLI ``--sort-by`` option: each comma-separated token
+    is ``field`` or ``field:asc``/``field:desc``; a lone ``original`` or ``none``
+    token means "keep current order" (an explicit empty criteria list, not
+    ``None``). Returns ``None`` when ``value`` is empty.
+    """
+    tokens = metadata_list(value)
+    if not tokens:
+        return None
+    if len(tokens) == 1 and tokens[0].lower() in {"original", "none"}:
+        return []
+    criteria: list[tuple[str, bool]] = []
+    for token in tokens:
+        name, _, direction = token.partition(":")
+        descending = direction.strip().lower() in {"desc", "descending", "true", "down"}
+        criteria.append((name.strip(), descending))
+    return criteria
+
+
+def native_sort_order(lib: BibFile) -> list[tuple[str, bool]] | None:
+    """Return the entry sort order from pynakes' native ``sort-order`` key, or ``None``.
+
+    See :func:`parse_sort_order_value` for the value grammar and
+    :func:`pynakes.metadata.jabref.library_sort_order` for the fallback-aware
+    accessor that also considers JabRef's ``saveOrderConfig``.
+    """
+    return parse_sort_order_value(metadata_value(lib, "sort-order"))
+
+
+def native_key_pattern(lib: BibFile, entry_type: str | None = None) -> str | None:
+    """Return pynakes' native citation-key pattern, or ``None`` when unset.
+
+    Reads the type-specific ``key-pattern-<entrytype>`` key first (when
+    ``entry_type`` is given), then the general ``key-pattern`` key. See
+    :func:`pynakes.metadata.jabref.library_key_pattern` for the fallback-aware
+    accessor that also considers JabRef's ``keypattern_*``/``keypatterndefault``.
+    """
+    if entry_type:
+        value = metadata_value(lib, f"key-pattern-{entry_type.lower()}")
+        if value is not None:
+            return value
+    return metadata_value(lib, "key-pattern")

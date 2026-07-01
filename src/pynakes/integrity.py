@@ -17,7 +17,7 @@ from pynakes.authors import last_name, split_name_list
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.editing import set_entry_field, set_entry_type
 from pynakes.importer import entry_arxiv_id, entry_year
-from pynakes.metadata import library_database_type
+from pynakes.metadata import library_dialect
 from pynakes.model import BibEntry, BibFile, _normalize_text
 from pynakes.providers import arxiv as arxiv_provider
 from pynakes.providers import doi as doi_provider
@@ -303,7 +303,7 @@ def check_published(
 ) -> PublishedReport:
     """Detect preprints and optionally apply published DOI/journal metadata."""
     report = PublishedReport()
-    dialect = library_database_type(lib)
+    dialect = library_dialect(lib)
     for entry in lib.entries.values():
         preprint = _preprint_identity(entry)
         if preprint is None:

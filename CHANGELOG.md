@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **pynakes-native metadata by default; JabRef as opt-in interop.** A fresh
+  `pynakes init` library now seeds native `dialect` and `key-pattern` keys in
+  `pynakes-meta` and emits no `jabref-meta` at all; the new `init --jabref` flag
+  (or `metadata adopt-jabref`) opts into the JabRef projection. Adds native
+  `key-pattern`/`key-pattern-<entrytype>` keys aliasing JabRef's
+  `keypatterndefault`/`keypattern_<entrytype>` (read native-first via
+  `library_key_pattern`). On a JabRef-tracked file, changing an aliased native
+  key (`dialect`, `sort-order`, `key-pattern`) is **mirrored** into its
+  `jabref-meta` counterpart so JabRef never sees a stale value (reported in
+  `metadata set`'s `mirrored` field); `metadata list` now warns when an aliased
+  pair disagrees. `saveActions`-absorb and a symmetric "go-native" strip are
+  noted as not-yet-implemented.
+
+- **Canonical metadata schema with a JabRef compatibility adapter.** Split
+  `metadata.py` into a `pynakes.metadata` package (`core`, `schema`, `jabref`)
+  so domain code (`normalize`, `lint`, `integrity`, the engine) reads pynakes'
+  own concepts through fallback-aware accessors instead of JabRef's literal
+  keys. Adds native `dialect` and `sort-order` `pynakes-meta` keys, aliasing
+  JabRef's `databaseType`/`saveOrderConfig` (read native-first, JabRef second);
+  `library_dialect` replaces `library_database_type` (kept as a back-compat
+  alias). Documents the boundary in a new
+  [JabRef compatibility guide](docs/guides/jabref-compatibility.md). Purely
+  additive/internal: existing `.bib` files, the CLI/JSON contract, and
+  `jabref-meta` behavior are unchanged.
+
 - **Step 9: Open-access published PDFs.** `asset fetch` now resolves DOIs to
   open-access published PDFs via OpenAlex and downloads them as `<citekey>.pdf`
   when `fetch-published: true` is set in `pynakes-meta`. New injection points
@@ -80,6 +105,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Typer versions.
 
 ### Changed
+
+- **`pynakes init` is now pynakes-native by default.** Previously a new library
+  was seeded with JabRef-native `databaseType`/`keypatterndefault` blocks in
+  `jabref-meta`, making every fresh file JabRef-tracked from birth. It now seeds
+  the native `dialect`/`key-pattern` keys in `pynakes-meta` and emits no
+  `jabref-meta` unless `--jabref` is passed. `--type`/`--key-pattern` now set the
+  native keys. Existing files are unaffected; the `metadata` JSON contract is
+  unchanged.
 
 - **Provider transport consolidated into `providers/`.** External-service
   transport and response parsing now live with their provider client: byte

@@ -1,11 +1,13 @@
 """Scaffold a new ``.bib`` library, optionally seeded with a metadata profile.
 
 A new library is just a ``.bib`` file whose only content is its top-level
-metadata profile — ``databaseType``, a citation-key pattern, ``saveActions``,
-and pynakes normalization/lint settings. This module renders that seed file in
-the canonical layout (JabRef-meta comments first, sorted by key, then one
-consolidated ``pynakes-meta`` block) and extracts the copyable profile from an
-existing library for ``init --from``.
+metadata profile. A fresh library is pynakes-native — the default profile seeds
+the native ``dialect`` and ``key-pattern`` keys in ``pynakes-meta`` and no
+``jabref-meta`` (the CLI's ``--jabref`` flag projects the JabRef equivalents on
+top). This module renders that seed file in the canonical layout (any
+``jabref-meta`` comments first, sorted by key, then one consolidated
+``pynakes-meta`` block) and extracts the copyable profile from an existing
+library for ``init --from``.
 
 It is deterministic (sorted output, no timestamps) and produces no entries; the
 CLI command writes the rendered text through the same atomic, re-parse-validated
@@ -59,10 +61,17 @@ class ProfileEntry:
 
 
 def default_profile() -> list[ProfileEntry]:
-    """Return the sensible default metadata profile for a brand-new library."""
+    """Return the sensible default metadata profile for a brand-new library.
+
+    A fresh library is pynakes-native: the dialect and citation-key pattern are
+    written as pynakes' own ``dialect``/``key-pattern`` keys in ``pynakes-meta``,
+    so a pynakes-only workflow never gains a ``jabref-meta`` section it did not
+    ask for. Pass ``--jabref`` to :func:`pynakes.cli_commands.init.init` (or run
+    ``metadata adopt-jabref`` later) to also emit the JabRef projection.
+    """
     return [
-        ProfileEntry("databaseType", DEFAULT_TYPE, "jabref"),
-        ProfileEntry("keypatterndefault", DEFAULT_KEY_PATTERN, "jabref"),
+        ProfileEntry("dialect", DEFAULT_TYPE, "pynakes"),
+        ProfileEntry("key-pattern", DEFAULT_KEY_PATTERN, "pynakes"),
     ]
 
 

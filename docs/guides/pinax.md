@@ -382,7 +382,7 @@ a preprint exists, backfills the arXiv id.
   exactly like `importer.fetch_arxiv_atom`, with the same deterministic on-disk
   cache (`integrity._cache_path`). The default test suite never touches the
   network.
-- **Fields written**, dialect-aware (via `library_database_type`), through the
+- **Fields written**, dialect-aware (via `library_dialect`), through the
   surgical `editing.set_entry_field` and never overwriting an existing value:
   - biblatex → `eprint = {<id>}`, `eprinttype = {arxiv}`
   - bibtex → `eprint = {<id>}`, `archiveprefix = {arXiv}`

@@ -300,7 +300,7 @@ class BibliographyOperations:
         kind, entry = importer_ops.prepare_imported_reference(
             self.lib,
             identifier,
-            dialect=metadata_ops.library_database_type(self.lib),
+            dialect=metadata_ops.library_dialect(self.lib),
             key=key,
             key_source=key_source,
             allow_duplicate=allow_duplicate,
@@ -348,6 +348,13 @@ class BibliographyOperations:
             self.lib, key, value, namespace=namespace, allow_unknown=allow_unknown
         )
         self._text_replacements.append((update.old_raw, update.new_raw))
+        # Mirror an aliased pynakes-native write (dialect, sort-order,
+        # key-pattern) into the jabref-meta projection on JabRef-tracked files so
+        # JabRef never sees a stale value; a no-op otherwise.
+        mirror = metadata_ops.project_aliased_to_jabref(self.lib, update)
+        if mirror is not None:
+            self._text_replacements.append((mirror.old_raw, mirror.new_raw))
+            update.mirrored = mirror
         self._mark(True)
         return update
 
@@ -386,7 +393,7 @@ class BibliographyOperations:
         database_type_added = False
         if not any(b.key.lower() == "databasetype" for b in self.lib.jabref_metadata_blocks):
             self.set_metadata(
-                "databaseType", metadata_ops.library_database_type(self.lib), namespace="jabref"
+                "databaseType", metadata_ops.library_dialect(self.lib), namespace="jabref"
             )
             database_type_added = True
 

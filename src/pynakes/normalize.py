@@ -17,14 +17,8 @@ from pynakes.editing import (
 )
 from pynakes.fields import TITLE_FIELDS
 from pynakes.formatters import FIELD_FORMATTERS
-from pynakes.metadata import (
-    SAVE_ORDER_KEY_FIELDS,
-    library_save_actions,
-    library_save_order,
-    metadata_bool,
-    metadata_list,
-    metadata_value,
-)
+from pynakes.metadata import metadata_bool, metadata_list, metadata_value
+from pynakes.metadata.jabref import SAVE_ORDER_KEY_FIELDS, library_save_actions, library_sort_order
 from pynakes.model import BibFile
 
 # JabRef saveActions formatter keys mapped to pynakes normalization concerns.
@@ -291,14 +285,15 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
 
 
 def _resolve_sort_criteria(lib: BibFile, sort_by: list[str] | None) -> list[tuple[str, bool]]:
-    """Resolve the entry sort order, JabRef-compatibly.
+    """Resolve the entry sort order.
 
     An explicit CLI ``sort_by`` wins: each token is ``field`` or
     ``field:asc``/``field:desc`` (the JabRef field name; ``key`` is accepted for
     the citation key). A lone ``original`` or ``none`` token means "keep current
-    order". With no CLI override, JabRef's ``saveOrderConfig`` metadata drives
-    the order — but only when its type is ``specified``, matching JabRef, which
-    leaves entries untouched for ``original``/``table``.
+    order". With no CLI override, :func:`~pynakes.metadata.jabref.library_sort_order`
+    drives the order: pynakes' native ``sort-order`` key first, else JabRef's
+    ``saveOrderConfig`` (only when its type is ``specified``, matching JabRef,
+    which leaves entries untouched for ``original``/``table``).
     """
     if sort_by:
         tokens = [token.strip() for token in sort_by if token.strip()]
@@ -311,10 +306,7 @@ def _resolve_sort_criteria(lib: BibFile, sort_by: list[str] | None) -> list[tupl
             criteria.append((name.strip(), descending))
         return criteria
 
-    save_order = library_save_order(lib)
-    if save_order is not None and save_order.order_type == "specified":
-        return list(save_order.criteria)
-    return []
+    return list(library_sort_order(lib) or [])
 
 
 def sort_entries(lib: BibFile, criteria: list[tuple[str, bool]]) -> int:

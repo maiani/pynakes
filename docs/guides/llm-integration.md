@@ -287,6 +287,10 @@ written to `jabref-meta` only when the file is already *JabRef-tracked* (carries
 `jabref-meta` and anchors a `databaseType`. Its envelope adds `moved_keys`,
 `database_type_added`, and `was_tracked`; re-running once tracked is a no-op.
 
+See the [JabRef compatibility guide](jabref-compatibility.md) for the full
+namespace/owner model and the native `dialect`/`sort-order` keys that alias
+`databaseType`/`saveOrderConfig`.
+
 ### Add entries to a group
 
 ```bash

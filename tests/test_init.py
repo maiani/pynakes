@@ -76,9 +76,12 @@ def test_init_creates_typed_library(tmp_path: Path) -> None:
     assert data["type"] == "biblatex"
     assert out.exists()
     lib = load_bib(str(out))
-    assert lib.metadata["databaseType"].rstrip(";") == "biblatex"
+    # A fresh library is pynakes-native: the dialect lands in the native key,
+    # not JabRef's databaseType.
+    assert lib.metadata["dialect"] == "biblatex"
+    assert "databaseType" not in lib.metadata
     # --type composes with the rest of the default profile.
-    assert "keypatterndefault" in lib.metadata
+    assert "key-pattern" in lib.metadata
 
 
 def test_init_type_overrides_default(tmp_path: Path) -> None:
@@ -86,7 +89,7 @@ def test_init_type_overrides_default(tmp_path: Path) -> None:
     result = runner.invoke(app, ["init", str(out), "--type", "bibtex", "--json"])
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["type"] == "bibtex"
-    assert load_bib(str(out)).metadata["databaseType"].rstrip(";") == "bibtex"
+    assert load_bib(str(out)).metadata["dialect"] == "bibtex"
 
 
 def test_init_bare_seeds_default_profile(tmp_path: Path) -> None:
@@ -95,11 +98,27 @@ def test_init_bare_seeds_default_profile(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["type"] == "biblatex"
-    # A bare init is useful, not empty: it carries the default profile.
+    # A bare init is useful, not empty: it carries the pynakes-native profile
+    # and no jabref-meta.
     keys = {key.lower() for key in data["keys"]}
-    assert {"databasetype", "keypatterndefault"} <= keys
+    assert {"dialect", "key-pattern"} == keys
     lib = load_bib(str(out))
     assert len(lib.entries) == 0
+    assert lib.jabref_metadata_blocks == []
+    assert lib.metadata["dialect"] == "biblatex"
+    assert lib.metadata["key-pattern"] == "[auth][year][veryshorttitle]"
+
+
+def test_init_jabref_projects_native_keys(tmp_path: Path) -> None:
+    out = tmp_path / "refs.bib"
+    result = runner.invoke(app, ["init", str(out), "--jabref", "--json"])
+    assert result.exit_code == 0, result.output
+    lib = load_bib(str(out))
+    # Native keys remain authoritative...
+    assert lib.metadata["dialect"] == "biblatex"
+    assert lib.metadata["key-pattern"] == "[auth][year][veryshorttitle]"
+    # ...and the JabRef projection is emitted so the file opens JabRef-tracked.
+    assert lib.jabref_metadata_blocks != []
     assert lib.metadata["databaseType"].rstrip(";") == "biblatex"
     assert lib.metadata["keypatterndefault"].rstrip(";") == "[auth][year][veryshorttitle]"
 
@@ -145,7 +164,7 @@ def test_init_dry_run_diff_writes_nothing(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["created"] is False
-    assert "databaseType" in data["diff"]
+    assert "dialect" in data["diff"]
     assert not out.exists()
 
 

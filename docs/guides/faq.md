@@ -118,9 +118,11 @@ A: pynakes supports all standard BibTeX entry types:
 ### Q: Does pynakes support JabRef metadata?
 
 A: Yes. JabRef group metadata is preserved, and `groups` fields can be managed
-with `pynakes groups`. `pynakes` also parses JabRef citation-key pattern
-metadata such as `keypatterndefault` and `keypattern_<entrytype>` for key
-generation and DOI imports.
+with `pynakes groups`. For citation-key patterns pynakes prefers its native
+`key-pattern`/`key-pattern-<entrytype>` keys and falls back to JabRef's
+`keypatterndefault`/`keypattern_<entrytype>` for key generation and DOI imports.
+See the [JabRef compatibility guide](jabref-compatibility.md) for the full
+native/JabRef alias model.
 
 Use `pynakes metadata list refs.bib --json` to inspect structured
 `jabref-meta` blocks, and `pynakes metadata set refs.bib KEY VALUE` to update a

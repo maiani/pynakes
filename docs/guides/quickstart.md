@@ -28,15 +28,18 @@ pynakes inspect refs.bib --json
 `inspect` reports entry count, encoding, line endings, entries, duplicate keys,
 and JabRef library metadata. Use `lint` for validation findings.
 
-## 3. Inspect JabRef Metadata
+## 3. Inspect and Set Metadata
 
 ```bash
 pynakes metadata list refs.bib --json
-pynakes metadata set refs.bib databaseType biblatex --dry-run --diff
+pynakes metadata set refs.bib dialect biblatex --dry-run --diff
 ```
 
-Use `metadata set` for known `jabref-meta` blocks. Unknown blocks are preserved
-and duplicate matching blocks are reported as conflicts.
+`metadata set` accepts pynakes-native keys (e.g. `dialect`, `key-pattern`, which
+land in `pynakes-meta`) as well as JabRef-native keys (e.g. `databaseType`).
+Unknown blocks are preserved and duplicate matching blocks are reported as
+conflicts. See the [JabRef compatibility guide](jabref-compatibility.md) for how
+native keys relate to their JabRef equivalents.
 
 ## 4. Check for Issues
 
@@ -96,8 +99,9 @@ pynakes ref import 10.5555/example refs.bib --key-source provider
 pynakes ref import 10.5555/example refs.bib --key ManualKey2026
 ```
 
-By default, imported entries use generated keys. If the library has JabRef
-`keypatterndefault` or `keypattern_<entrytype>` metadata, that pattern is used.
+By default, imported entries use generated keys. If the library stores a
+`key-pattern` or `key-pattern-<entrytype>` (or JabRef's
+`keypatterndefault`/`keypattern_<entrytype>` as a fallback), that pattern is used.
 `--fetch` also downloads configured Pinax materials for the new entry: arXiv
 preprint artifacts when an arXiv id is present, and published PDFs when
 `fetch-published: true` can resolve an open-access DOI copy.

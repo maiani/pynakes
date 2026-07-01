@@ -2,18 +2,19 @@
 
 Generated keys follow the ``AuthorYearTitle`` pattern (e.g. ``Smith2020Big``):
 first author's last name, four-digit year, first significant title word.
-If a library stores JabRef citation-key pattern metadata, that pattern is used
-instead. Generation is deterministic — the same entry always yields the same key.
+If a library stores a citation-key pattern (pynakes' native ``key-pattern`` keys,
+or JabRef's ``keypattern_*`` as a fallback), that pattern is used instead.
+Generation is deterministic — the same entry always yields the same key.
 """
 
 import re
 from collections.abc import Callable
 
-from pynakes._text_utils import strip_jabref_terminator
 from pynakes.authors import ascii_fold as _ascii_fold
 from pynakes.authors import last_name as _last_name
 from pynakes.authors import split_name_list as _split_name_list
 from pynakes.editing import rename_entry_key
+from pynakes.metadata import library_key_pattern
 from pynakes.model import BibEntry, BibFile
 
 # Common title words skipped when picking the "first significant" word.
@@ -182,19 +183,6 @@ def generate_key_from_pattern(entry: BibEntry, pattern: str) -> str:
     return _sanitize_key("".join(output)) or generate_fallback_key(entry)
 
 
-def get_jabref_key_pattern(lib: BibFile, entry_type: str) -> str | None:
-    """Return the JabRef citation-key pattern for ``entry_type`` if stored."""
-    type_key = f"keypattern_{entry_type.lower()}"
-    for key, value in lib.metadata.items():
-        normalized = key.lower()
-        if normalized == type_key:
-            return strip_jabref_terminator(value)
-    for key, value in lib.metadata.items():
-        if key.lower() == "keypatterndefault":
-            return strip_jabref_terminator(value)
-    return None
-
-
 def generate_fallback_key(entry: BibEntry) -> str:
     """Generate a citation key using pynakes' default ``AuthorYearTitle`` pattern."""
     return f"{_first_author_last_name(entry)}{_year(entry)}{_first_title_word(entry)}"
@@ -203,11 +191,13 @@ def generate_fallback_key(entry: BibEntry) -> str:
 def generate_key(entry: BibEntry, lib: BibFile | None = None) -> str:
     """Generate a citation key for an entry.
 
-    If ``lib`` stores JabRef citation-key metadata, the matching library pattern
-    is used. Otherwise this falls back to ``AuthorYearTitle``.
+    If ``lib`` stores a citation-key pattern (pynakes' native ``key-pattern``
+    keys, or JabRef's ``keypattern_*``/``keypatterndefault`` as a fallback), the
+    matching library pattern is used. Otherwise this falls back to
+    ``AuthorYearTitle``.
     """
     if lib is not None:
-        pattern = get_jabref_key_pattern(lib, entry.type)
+        pattern = library_key_pattern(lib, entry.type)
         if pattern:
             return generate_key_from_pattern(entry, pattern)
     return generate_fallback_key(entry)

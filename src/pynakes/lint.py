@@ -25,9 +25,14 @@ from pynakes.journals import JOURNAL_FIELDS, JournalSources, expected_journal_ti
 from pynakes.keys import (
     UnsupportedCitationKeyPatternError,
     generate_key_from_pattern,
-    get_jabref_key_pattern,
 )
-from pynakes.metadata import library_database_type, metadata_bool, metadata_list, metadata_value
+from pynakes.metadata import (
+    library_dialect,
+    library_key_pattern,
+    metadata_bool,
+    metadata_list,
+    metadata_value,
+)
 from pynakes.model import BibEntry, BibFile, undefined_string_references
 
 RequiredRules = dict[str, list[tuple[str, ...]]]
@@ -244,7 +249,7 @@ def lint(lib: BibFile) -> list[LintIssue]:
     issues: list[LintIssue] = []
     profile = resolve_lint_profile(lib)
     journal_sources = None
-    dialect = library_database_type(lib)
+    dialect = library_dialect(lib)
 
     if profile.journal_style not in {"none", "abbreviated", "full"}:
         issues.append(
@@ -537,8 +542,12 @@ def _lint_entry(
 
 
 def _lint_key_pattern(entry: BibEntry, lib: BibFile) -> list[LintIssue]:
-    """Check the entry's citation key against the configured JabRef key pattern."""
-    pattern = get_jabref_key_pattern(lib, entry.type)
+    """Check the entry's citation key against the configured key pattern.
+
+    Uses the native-first :func:`pynakes.metadata.library_key_pattern`, so a
+    pynakes ``key-pattern`` takes precedence over a JabRef ``keypattern_*``.
+    """
+    pattern = library_key_pattern(lib, entry.type)
     if not pattern:
         return []
     try:

@@ -34,6 +34,7 @@ def metadata_list(
     file = _resolve_input_bib(file, json_output)
     lib = Bibliography.open(file).lib
     all_blocks = lib.metadata_blocks
+    warnings = metadata_ops.aliased_drift_warnings(lib)
 
     if json_output:
         typer.echo(
@@ -51,6 +52,7 @@ def metadata_list(
                         "blocks": [b.to_dict() for b in lib.pynakes_metadata_blocks],
                     },
                     "effective": dict(lib.metadata),
+                    "warnings": warnings,
                 },
                 indent=2,
             )
@@ -66,6 +68,8 @@ def metadata_list(
             f"  [{block.namespace}:{marker}:{block.category}] "
             f"{block.key} = {block.normalized_value}"
         )
+    for warning in warnings:
+        typer.echo(f"  warning: {warning}")
 
 
 def metadata_set(
@@ -115,17 +119,26 @@ def metadata_set(
             ],
         )
 
+    summary = [f"{_verb('set', params, 'Set')} {update.namespace}-meta {update.key!r}."]
+    if update.mirrored is not None:
+        summary.append(f"Mirrored into jabref-meta {update.mirrored.key!r} to keep JabRef in sync.")
+
     _finish_mod(
         file,
         "metadata_set",
         coll,
         params,
-        [f"{_verb('set', params, 'Set')} {update.namespace}-meta {update.key!r}."],
+        summary,
         modified_entries=0,
         key=update.key,
         value=update.value.rstrip(";").strip(),
         created=update.created,
         namespace=update.namespace,
+        mirrored=(
+            {"key": update.mirrored.key, "namespace": update.mirrored.namespace}
+            if update.mirrored is not None
+            else None
+        ),
     )
 
 
