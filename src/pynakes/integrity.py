@@ -402,6 +402,8 @@ def fetch_doi_entry(doi: str, *, cache_dir: str | Path | None = None) -> BibEntr
     try:
         entries = parse_bib(text).entries.values()
     except ParseError as exc:
+        if path is not None and path.exists():
+            path.unlink(missing_ok=True)
         raise MetadataFetchError(
             f"Provider returned invalid BibTeX for {normalized}: {exc}"
         ) from exc

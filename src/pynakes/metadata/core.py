@@ -407,6 +407,11 @@ def _set_pynakes_metadata(
     else:
         target_index = None
 
+    # In-memory BibFile may carry synthetic blocks with comment_index=-1
+    # that have no raw_comments backing; treat them as "no existing comment".
+    if target_index is not None and target_index < 0:
+        target_index = None
+
     # Assemble the (key, value) lines for the target comment, setting ours.
     items: list[tuple[str, str]] = []
     replaced = False

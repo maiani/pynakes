@@ -87,6 +87,20 @@ def _next_nonspace(raw: str, pos: int) -> str | None:
     return raw[i] if i < len(raw) else None
 
 
+def _brace_depth(raw: str, pos: int) -> int:
+    """Return the nesting depth of ``raw`` at position ``pos`` (0 = top level).
+
+    Counts both ``{}`` and ``()`` pairs since BibTeX accepts both forms.
+    """
+    depth = 0
+    for ch in raw[:pos]:
+        if ch in "{(":
+            depth += 1
+        elif ch in ")}":
+            depth -= 1
+    return depth
+
+
 def _find_field(raw: str, field_name: str) -> tuple[int, int, int] | None:
     """Locate a field assignment in raw entry text.
 
@@ -97,6 +111,9 @@ def _find_field(raw: str, field_name: str) -> tuple[int, int, int] | None:
     ``field_name`` because they share the same letters.
     """
     for m in re.finditer(re.escape(field_name) + r"\s*=\s*", raw, re.IGNORECASE):
+        # Reject matches nested inside a braced field value (depth > 1).
+        if _brace_depth(raw, m.start()) > 1:
+            continue
         # Reject matches inside a value: the name must be preceded only by
         # whitespace back to an opening delimiter or "," (i.e. it starts a
         # field assignment).

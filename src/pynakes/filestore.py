@@ -39,7 +39,6 @@ class MaterialPaths:
     preprint_source: Path
 
     def to_dict(self) -> dict[str, str]:
-        """Serialize paths to a JSON-friendly dict."""
         return {
             "key": self.key,
             "published_pdf": str(self.published_pdf),
@@ -60,11 +59,9 @@ class MaterialPresence:
 
     @property
     def any_present(self) -> bool:
-        """Return whether any material exists for this citation key."""
         return self.published_pdf or self.preprint_pdf or self.preprint_source
 
     def to_dict(self) -> dict[str, object]:
-        """Serialize the presence record to a JSON-friendly dict."""
         return {
             "key": self.key,
             "paths": self.paths.to_dict(),
@@ -84,7 +81,6 @@ class OrphanMaterial:
     path: Path
 
     def to_dict(self) -> dict[str, str]:
-        """Serialize the orphan record to a JSON-friendly dict."""
         return {"key": self.key, "kind": self.kind, "path": str(self.path)}
 
 
@@ -98,7 +94,6 @@ class FileStoreScan:
     drift: list[dict[str, str]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, object]:
-        """Serialize the scan to a JSON-friendly dict."""
         return {
             "root": str(self.root),
             "entries": [entry.to_dict() for entry in self.entries],
@@ -476,7 +471,7 @@ class FileStore:
                 src.replace(dst)
                 transaction.moved.append((src, dst))
             self._rename_manifest_row(old, new)
-        except _FILESYSTEM_ERRORS:
+        except Exception:
             transaction.rollback()
             raise
         return transaction

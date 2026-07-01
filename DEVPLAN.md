@@ -42,7 +42,7 @@ syntax, or JSON envelopes.
   `capabilities`, multi-file `--strict` gate checks, `.pre-commit-hooks.yaml`.
 - **Parser conformance**: versioned corpus pinned to TeX Live 2026; differential
   tests against BibTeX 0.99d and Biber 2.21; property-based tests (Hypothesis).
-- **Quality**: ~951 tests, coverage ≥90%, `ruff` clean, docs site builds.
+- **Quality**: ~1087 tests, coverage ≥90%, `ruff` clean, docs site builds.
 - **Refactoring (post-v0.4 quality pass)**: ``engine.py`` split into ``_engine_helpers.py`` /
   ``_engine_ops.py`` + mixin (~400 lines, within the 500-line convention); ``formatters.py`` split
   into a ``formatters/`` package; ``_text_utils.py`` consolidates the 7+ brace/quote scanner copies
