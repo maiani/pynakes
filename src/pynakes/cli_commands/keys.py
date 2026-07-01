@@ -195,7 +195,7 @@ def _rewrite_tex_sources(
         if modified:
             source_diff_parts.append(generate_diff(before, after, path.name))
             if not params.dry_run:
-                saved = save_plain_text(after, str(path), encoding="utf-8")
+                saved = save_plain_text(after, str(path), encoding="utf-8", backup=params.backup)
                 if not saved.success:
                     raise OSError(saved.error or f"Could not write {path}")
         source_changes.append(

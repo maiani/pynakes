@@ -9,7 +9,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/maiani/pynakes/ci.yml?branch=main)](https://github.com/maiani/pynakes/actions)
 [![License](https://img.shields.io/pypi/l/pynakes.svg)](https://github.com/maiani/pynakes/blob/main/LICENSE)
 
-**Small diffs, big library. With or without the papers.** `pynakes` is a Python CLI that makes small, explicit, reviewable changes to `.bib`
+**Clean, complete, addressable. With or without the papers.** `pynakes` is a Python CLI that makes small, explicit, reviewable changes to `.bib`
 files — minimal diffs, dry-run previews, atomic writes, and structured JSON. Deterministic enough to hand to a script, a CI pipeline, or an LLM agent.
 
 Works on Python 3.11+, Linux, macOS, and Windows, with minimal dependencies.
@@ -144,9 +144,9 @@ See the [LLM Integration guide](docs/guides/llm-integration.md) for the full JSO
 v0.5 is the first public alpha release on PyPI. The single-file bibliography
 engine is feature-complete for this release: parser/writer with byte-for-byte
 round-trip fidelity, all maintenance operations, full JabRef metadata parity,
-and a self-describing agent surface (~950+ tests, ≥90% coverage). The Pinax
-corpus layer is implemented through arXiv download; open-access published-PDF
-import is deferred.
+and a self-describing agent surface (~1087 tests, ≥90% coverage). The Pinax
+corpus layer is fully implemented including arXiv download, open-access
+published-PDF import, and DOI↔arXiv backfill.
 
 Until v1.0, pynakes does **not** guarantee backward compatibility for the Python
 API, CLI syntax, or JSON envelopes. The project aims to keep automation

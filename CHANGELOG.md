@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`keys rename` and `keys generate` now respect `--backup` for `.tex` files.**
+  Previously the `.tex` source rewrite always created a `.bak` (via
+  `save_plain_text`'s default) regardless of the `--backup` flag; now `.tex`
+  backup is controlled by `--backup` like the `.bib` side.
+
 ### Added
 
 - **pynakes-native metadata by default; JabRef as opt-in interop.** A fresh

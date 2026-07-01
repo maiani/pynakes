@@ -8,7 +8,7 @@ plan.
 This document is the **road to 1.0** and the major releases beyond it.
 Completed work is recorded in [CHANGELOG.md](CHANGELOG.md) and the git log.
 
-## Current state (v0.5 alpha candidate)
+## Current state (v0.5 alpha)
 
 v0.5 is the first public alpha release. The single-file engine is
 feature-complete for this release; input conformance is verified against the TeX
@@ -30,10 +30,10 @@ syntax, or JSON envelopes.
   (DOI/arXiv/journal-URL), `search`, `tex scan`, `dedupe`, `verify`/`enrich`
   (opt-in `--online`; `--published` folds in preprint promotion), `corpus combine`,
   `corpus split`, `corpus batch`.
-- **Pinax corpus mode (steps 1–8, 10)**: `FileStore`, arXiv download, `asset fetch`
+- **Pinax corpus mode (steps 1–11)**: `FileStore`, arXiv download, `asset fetch`
   command, agent surface, provenance manifest, pinax-aware `corpus combine`/`split`,
-  coordinated key edits, `ref import --fetch`, dedupe material merge. Step 9 (OA PDFs)
-  is deferred.
+  coordinated key edits, `ref import --fetch`, open-access published-PDF import,
+  dedupe material merge, DOI↔arXiv backfill.
   See [Pinax implementation steps](#pinax-implementation-steps).
 - **JabRef v5.15 parity**: full `saveActions` formatter suite, complete metadata
   vocabulary, JabRef key patterns, group management.
@@ -50,7 +50,7 @@ syntax, or JSON envelopes.
   ``_shared.py``; CLI verb-string boilerplate consolidated via ``_verb`` helper; ``BibFile.derive()``
   replaces the duplicated ``_with_entries`` / ``subset_library`` pattern; ``_metadata_value`` /
   ``_metadata_list`` / ``_metadata_bool`` moved from ``lint.py`` / ``normalize.py`` into
-  ``metadata.py``; many ``ISSUES.md`` bugs, type-safety issues, and invariant violations addressed.
+  ``metadata.py``; many bugs, type-safety issues, and invariant violations addressed.
 
 ---
 
