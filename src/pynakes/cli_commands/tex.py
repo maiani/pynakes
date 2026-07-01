@@ -19,16 +19,25 @@ from pynakes.cli_common import (
     _verb,
 )
 from pynakes.engine import Bibliography
-from pynakes.metadata import metadata_list, metadata_value
+from pynakes.metadata import format_metadata_list, metadata_list_values
 from pynakes.usage import TEX_SOURCES_KEY, tex_sources_from_metadata
 
 
 def _parse_stored_sources(lib) -> list[str]:
     """Return the raw ``tex-sources`` paths as stored (not resolved)."""
-    value = metadata_value(lib, TEX_SOURCES_KEY)
-    if not value:
-        return []
-    return list(metadata_list(value))
+    return list(metadata_list_values(lib, TEX_SOURCES_KEY))
+
+
+def _set_stored_sources(coll: Bibliography, sources: list[str]) -> None:
+    """Store linked sources canonically in pynakes-meta and drop stale JabRef copies."""
+    coll.set_metadata(TEX_SOURCES_KEY, format_metadata_list(sources), namespace="pynakes")
+    coll.remove_metadata(TEX_SOURCES_KEY, namespace="jabref")
+
+
+def _clear_stored_sources(coll: Bibliography) -> None:
+    """Remove linked-source metadata from both namespaces."""
+    coll.remove_metadata(TEX_SOURCES_KEY, namespace="pynakes")
+    coll.remove_metadata(TEX_SOURCES_KEY, namespace="jabref")
 
 
 _FILE_OPTION = typer.Option(
@@ -108,8 +117,7 @@ def tex_add(
         )
         return
 
-    new_value = "; ".join(current)
-    coll.set_metadata(TEX_SOURCES_KEY, new_value)
+    _set_stored_sources(coll, current)
 
     human = [f"{_verb('link', params)} {len(added)} source(s):"] + [f"  + {p}" for p in added]
     _finish_mod(
@@ -164,10 +172,9 @@ def tex_remove(
         return
 
     if remaining:
-        new_value = "; ".join(remaining)
-        coll.set_metadata(TEX_SOURCES_KEY, new_value)
+        _set_stored_sources(coll, remaining)
     else:
-        coll.remove_metadata(TEX_SOURCES_KEY)
+        _clear_stored_sources(coll)
 
     human = [f"{_verb('unlink', params)} {len(removed)} source(s):"] + [f"  - {p}" for p in removed]
     _finish_mod(
@@ -214,7 +221,7 @@ def tex_clear(
         )
         return
 
-    coll.remove_metadata(TEX_SOURCES_KEY)
+    _clear_stored_sources(coll)
     human = [f"{_verb('clear', params, 'Cleared')} {len(current)} linked source(s)."]
     _finish_mod(
         file,

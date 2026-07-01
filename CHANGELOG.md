@@ -30,6 +30,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `keys generate` now treats single-key regeneration as the default:
+  `keys generate KEY FILE` derives the new key from entry metadata, while
+  whole-library regeneration is explicit via `--all`. The old `--key` selector
+  was removed. Shell completion no longer leaks an `InvalidInput` traceback
+  while completing the key-first form in a directory with multiple `.bib` files.
+  Generated renames now also update matching citations in linked `tex-sources`
+  TeX files, making `generate` an automated metadata-derived `rename`.
+- List-valued metadata now has a shared convention: commands write comma-separated
+  values, while readers still accept legacy semicolon-separated values. Linked
+  `tex-sources` values are merged across JabRef and pynakes metadata namespaces
+  when read, and `tex add/remove/clear` canonicalize the setting back into
+  `pynakes-meta` so stale namespace differences do not hide linked files.
+- `--backup` is now exposed on the remaining write-capable surfaces:
+  `init --force --backup` backs up an overwritten `.bib`, and
+  `asset check --fix --backup` backs up the Pinax manifest before reconciling
+  drift.
+
+- Pinax `files-dir` resolution now anchors a symlinked `.bib` at the link path
+  passed to `pynakes`, so `asset fetch` stores materials next to the linked
+  bibliography instead of next to the link target.
+
 - **PDF-only arXiv e-prints no longer count as a source-fetch failure.** When the
   e-print endpoint returns a PDF instead of a TeX/source archive (a PDF-only
   submission), `asset fetch` now records the entry under `skipped` with reason
@@ -326,8 +347,8 @@ with parser conformance later pinned for the public alpha to TeX Live 2026
   undefined BibTeX string references, cross-entry consistency findings (`--strict`
   for CI gating; multi-file aggregate envelope).
 - **`keys generate|check|rename|repair`** — JabRef-compatible key generation
-  (honors `keypatterndefault` and per-type metadata); `--key OLD` regenerates a
-  single entry.
+  (honors `keypatterndefault` and per-type metadata); passing a key regenerates a
+  single entry, while `--all` regenerates the whole library.
 - **`fields rename|move|append|clear|protect-title`** — surgical field edits with
   optional `--where` predicate filtering.
 - **`groups list|add-entry|remove-entry`** — manage JabRef group membership.

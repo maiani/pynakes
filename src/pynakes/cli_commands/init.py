@@ -17,7 +17,15 @@ from pathlib import Path
 import typer
 
 from pynakes._text_utils import strip_jabref_terminator
-from pynakes.cli_common import RunParams, _emit_error, _finish_create, _finish_mod, _safe, _verb
+from pynakes.cli_common import (
+    _BACKUP_OPTION,
+    RunParams,
+    _emit_error,
+    _finish_create,
+    _finish_mod,
+    _safe,
+    _verb,
+)
 from pynakes.engine import Bibliography
 from pynakes.filestore import FILES_DIR_KEY
 from pynakes.initialize import (
@@ -108,8 +116,9 @@ def init(
         help="Write an AGENTS.md guide for LLM agents (requires --pinax)",
     ),
     force: bool = typer.Option(
-        False, "--force", help="Overwrite the target file if it already exists (writes a .bak)"
+        False, "--force", help="Overwrite the target file if it already exists"
     ),
+    backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show what would be written without creating the file"
     ),
@@ -126,7 +135,7 @@ def init(
     exists, converts it in place. ``--agent-guide`` writes AGENTS.md (only
     meaningful alongside ``--pinax``).
     """
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
 
     if type_ is not None and type_ not in {"biblatex", "bibtex"}:
         _emit_error(
@@ -199,7 +208,7 @@ def init(
         content=content,
         human=human,
         previous_content=previous_content,
-        backup=force,
+        backup=backup,
         pinax=pinax,
         type=effective_type,
         keys=keys,

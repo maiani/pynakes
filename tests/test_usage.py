@@ -12,6 +12,7 @@ from pynakes.usage import (
     extract_keys_from_aux,
     extract_keys_from_tex,
     rename_citation_key_in_tex,
+    rename_citation_keys_in_tex,
     splice_into_text,
     subset_library,
     tag_with_group,
@@ -98,6 +99,14 @@ class TestExtraction:
         assert r"\citep[see][p.~3]{ New ,Other}" in new_text
         assert r"% \cite{Old}" in new_text
         assert r"escaped 50\% \cite{New}" in new_text
+
+    def test_rename_citation_keys_in_tex_is_simultaneous(self) -> None:
+        text = r"\cite{A,B}"
+
+        new_text, count = rename_citation_keys_in_tex(text, [("A", "B"), ("B", "C")])
+
+        assert count == 2
+        assert new_text == r"\cite{B,C}"
 
 
 class TestAnalysis:

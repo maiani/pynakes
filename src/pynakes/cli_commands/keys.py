@@ -28,7 +28,7 @@ from pynakes.io import save_plain_text
 from pynakes.usage import (
     extract_keys_from_tex,
     iter_tex_files,
-    rename_citation_key_in_tex,
+    rename_citation_keys_in_tex,
     tex_sources_from_metadata,
 )
 
@@ -68,7 +68,7 @@ def keys_check(
     strict: bool = typer.Option(False, "--strict", help="Exit 1 if duplicate keys are found"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Report duplicate citation keys (accepts multiple files for CI gating)."""
+    """Report duplicate citation keys in one or more .bib files."""
     _run_checks(files, "keys_check", _keys_check_one, json_output, strict)
 
 
@@ -76,22 +76,151 @@ def _rename_payload(renames: list[tuple[str, str]]) -> dict:
     return {"renames": [{"old": o, "new": n} for o, n in renames]}
 
 
+def _looks_like_bib_path(value: str) -> bool:
+    path = Path(value)
+    return path.suffix.lower() == ".bib" or path.is_file()
+
+
+def _resolve_generate_args(
+    first: str | None,
+    second: str | None,
+    all_entries: bool,
+    json_output: bool,
+) -> tuple[str, str | None]:
+    """Resolve ``keys generate``'s compatible file/key calling forms."""
+    if all_entries:
+        if second is not None:
+            _emit_error(
+                json_output,
+                "InvalidInput",
+                "Use either --all or one citation key, not both",
+            )
+        if first is not None and not _looks_like_bib_path(first):
+            _emit_error(
+                json_output,
+                "InvalidInput",
+                "Use either --all or one citation key, not both",
+            )
+        return _resolve_input_bib(first, json_output), None
+
+    if first is None:
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            "Provide a citation key, or pass --all to regenerate every key",
+        )
+
+    if second is None and not _looks_like_bib_path(first):
+        return _resolve_input_bib(None, json_output), first
+
+    if second is None:
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            "Provide a citation key with the file, or pass --all to regenerate every key",
+        )
+
+    first_is_file = _looks_like_bib_path(first or "")
+    second_is_file = _looks_like_bib_path(second)
+    if first_is_file and not second_is_file:
+        return _resolve_input_bib(first, json_output), second
+    if second_is_file and not first_is_file:
+        return _resolve_input_bib(second, json_output), first
+
+    _emit_error(
+        json_output,
+        "InvalidInput",
+        "When passing both a file and a citation key, exactly one positional argument must be a .bib file",
+    )
+
+
+def _no_tex_sources(json_output: bool) -> None:
+    _emit_error(
+        json_output,
+        "NoTeXSources",
+        "No .tex files found in the provided sources or the library's 'tex-sources' metadata",
+    )
+
+
+def _rewrite_tex_sources(
+    file: str,
+    coll: Bibliography,
+    params: RunParams,
+    renames: list[tuple[str, str]],
+    json_output: bool,
+    sources: list[str] | None = None,
+    *,
+    require_sources: bool,
+) -> tuple[list[dict], list[str], int]:
+    """Rewrite linked TeX citations for already-staged citation-key renames."""
+    if not renames:
+        return [], [], 0
+
+    resolved_sources = (
+        list(sources) if sources else tex_sources_from_metadata(coll.lib, Path(file).parent)
+    )
+    if not resolved_sources:
+        if require_sources:
+            _no_tex_sources(json_output)
+        return [], [], 0
+
+    tex_files = iter_tex_files(resolved_sources)
+    if not tex_files:
+        _no_tex_sources(json_output)
+
+    if not params.dry_run and coll.externally_changed():
+        if coll.path is None:
+            raise ValueError("key operation requires a bound .bib file")
+        raise ExternalModificationError(coll.path)
+
+    source_changes = []
+    source_diff_parts = []
+    total_source_occurrences = 0
+    for path in tex_files:
+        before = path.read_text(encoding="utf-8", errors="replace")
+        after, occurrences = rename_citation_keys_in_tex(before, renames)
+        modified = before != after
+        total_source_occurrences += occurrences
+        if modified:
+            source_diff_parts.append(generate_diff(before, after, path.name))
+            if not params.dry_run:
+                saved = save_plain_text(after, str(path), encoding="utf-8")
+                if not saved.success:
+                    raise OSError(saved.error or f"Could not write {path}")
+        source_changes.append(
+            {
+                "path": str(path),
+                "modified": modified,
+                "occurrences": occurrences,
+            }
+        )
+    return source_changes, source_diff_parts, total_source_occurrences
+
+
 def keys_generate(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
-    key: str | None = typer.Option(
+    file_or_key: str | None = typer.Argument(
         None,
-        "--key",
-        help="Regenerate only this citation key instead of every key",
+        help=(
+            "Path to the .bib file, or a citation key when the file is auto-detected "
+            "(also accepts KEY FILE)"
+        ),
+    ),
+    key_or_file: str | None = typer.Argument(
+        None,
+        help="Optional citation key or .bib file, allowing either FILE KEY or KEY FILE",
+    ),
+    all_entries: bool = typer.Option(
+        False,
+        "--all",
+        help="Regenerate every citation key instead of one selected key",
     ),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Regenerate citation keys from entry metadata (AuthorYearTitle)."""
-    file = _resolve_input_bib(file, json_output)
+    """Derive citation keys from entry metadata and update linked TeX citations."""
+    file, key = _resolve_generate_args(file_or_key, key_or_file, all_entries, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     coll = Bibliography.open(file)
     if key is None:
@@ -108,13 +237,31 @@ def keys_generate(
     else:
         human = [f"Citation key {key!r} already matches the preferred pattern."]
     human += [f"  {old} -> {new}" for old, new in renames]
+    source_changes, source_diff_parts, total_source_occurrences = _rewrite_tex_sources(
+        file,
+        coll,
+        params,
+        renames,
+        json_output,
+        require_sources=False,
+    )
+    if source_changes:
+        human.append(f"  TeX citations changed={total_source_occurrences}")
+    if params.diff:
+        bib_diff = coll.diff()
+        diff_text = "\n".join(part for part in [bib_diff, *source_diff_parts] if part)
+    else:
+        diff_text = None
     _finish_mod(
         file,
         "keys_generate",
         coll,
         params,
         human,
+        diff_text=diff_text,
         **({"key": key} if key is not None else {}),
+        source_occurrences=total_source_occurrences,
+        sources=source_changes,
         **_rename_payload(renames),
     )
 
@@ -196,7 +343,7 @@ def keys_rename(
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Rename one citation key in a .bib file and matching TeX citations."""
+    """Rename one citation key to an explicit value and update TeX citations."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     coll = Bibliography.open(file)
@@ -239,43 +386,15 @@ def keys_rename(
         return
 
     bib_changed = coll.rename_key(old, new)
-    resolved_sources = (
-        list(sources) if sources else tex_sources_from_metadata(coll.lib, Path(file).parent)
+    source_changes, source_diff_parts, total_source_occurrences = _rewrite_tex_sources(
+        file,
+        coll,
+        params,
+        [(old, new)],
+        json_output,
+        list(sources) if sources else None,
+        require_sources=True,
     )
-    tex_files = iter_tex_files(resolved_sources)
-    if not tex_files:
-        _emit_error(
-            json_output,
-            "NoTeXSources",
-            "No .tex files found in the provided sources or the library's 'tex-sources' metadata",
-        )
-        return
-    if not params.dry_run and coll.externally_changed():
-        if coll.path is None:
-            raise ValueError("rename requires a bound .bib file")
-        raise ExternalModificationError(coll.path)
-
-    source_changes = []
-    source_diff_parts = []
-    total_source_occurrences = 0
-    for path in tex_files:
-        before = path.read_text(encoding="utf-8", errors="replace")
-        after, occurrences = rename_citation_key_in_tex(before, old, new)
-        modified = before != after
-        total_source_occurrences += occurrences
-        if modified:
-            source_diff_parts.append(generate_diff(before, after, path.name))
-            if not params.dry_run:
-                saved = save_plain_text(after, str(path), encoding="utf-8")
-                if not saved.success:
-                    raise OSError(saved.error or f"Could not write {path}")
-        source_changes.append(
-            {
-                "path": str(path),
-                "modified": modified,
-                "occurrences": occurrences,
-            }
-        )
 
     human = [
         f"{_verb('rename', params)} citation key {old!r} to {new!r}.",

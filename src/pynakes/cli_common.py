@@ -2,6 +2,7 @@
 
 import functools
 import json as _json
+import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -355,7 +356,8 @@ def _metadata_cache_dir(file: str, cache_dir: str | None, online: bool) -> str |
         return cache_dir
     if not online:
         return None
-    return str(Path(file).resolve().parent / ".pynakes-cache")
+    file_path = Path(os.path.abspath(os.fspath(Path(file).expanduser())))
+    return str(file_path.parent / ".pynakes-cache")
 
 
 # --- read-only checks (single- or multi-file) ------------------------------

@@ -12,6 +12,7 @@ from typer.testing import CliRunner
 from pynakes import __version__
 from pynakes import importer as importer_ops
 from pynakes.cli import app
+from pynakes.cli_common import _metadata_cache_dir
 
 runner = CliRunner()
 
@@ -52,6 +53,19 @@ class TestTopLevelHelp:
         out = _plain_cli_output(result.output)
         # A flat command like `normalize` is not a group; it gets no subcommand list.
         assert "normalize →" not in out
+
+
+def test_default_metadata_cache_dir_anchors_symlinked_bib_at_link_path(tmp_path: Path) -> None:
+    real_dir = tmp_path / "real"
+    link_dir = tmp_path / "linked"
+    real_dir.mkdir()
+    link_dir.mkdir()
+    real_bib = real_dir / "refs.bib"
+    real_bib.write_text("@article{A, title = {T}}\n")
+    link_bib = link_dir / "refs.bib"
+    link_bib.symlink_to(real_bib)
+
+    assert _metadata_cache_dir(str(link_bib), None, True) == str(link_dir / ".pynakes-cache")
 
 
 class TestChangePlanEnvelope:
@@ -527,6 +541,40 @@ class TestFilesCommand:
         manifest = json.loads((files / ".pinax" / "manifest.json").read_text())
         assert "Ghost" not in manifest["files"]
         assert manifest["files"]["A"]["preprint_pdf"]["source"] == "manual"
+
+    def test_check_fix_backup_writes_manifest_bak(self, tmp_path: Path) -> None:
+        files = tmp_path / "refs.files"
+        files.mkdir()
+        (files / "A_preprint.pdf").write_bytes(b"pdf")
+        (files / ".pinax").mkdir()
+        manifest = files / ".pinax" / "manifest.json"
+        manifest.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "files": {
+                        "A": {
+                            "published_pdf": {
+                                "source": "manual",
+                                "added_date": "2026-06-27",
+                                "sha256": "0" * 64,
+                                "refetchable": False,
+                            }
+                        }
+                    },
+                }
+            )
+        )
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n@comment{pynakes-meta:\nfiles-dir:\n}\n")
+
+        result = runner.invoke(app, ["asset", "check", str(bib), "--fix", "--backup", "--json"])
+
+        assert result.exit_code == 0, result.output
+        backup = files / ".pinax" / "manifest.json.bak"
+        assert backup.exists()
+        assert "published_pdf" in backup.read_text()
+        assert "published_pdf" not in manifest.read_text()
 
 
 ARXIV_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
@@ -1021,6 +1069,14 @@ class TestGroupsCommand:
 
 
 class TestKeysCommand:
+    def test_generate_help_uses_all_not_key_option(self) -> None:
+        result = runner.invoke(app, ["keys", "generate", "--help"])
+
+        assert result.exit_code == 0, result.output
+        out = _plain_cli_output(result.output)
+        assert "--all" in out
+        assert "--key" not in out
+
     def test_generate_single_key_uses_preferred_pattern(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text(
@@ -1029,13 +1085,193 @@ class TestKeysCommand:
             "@article{Keep,\n  author = {Jane Doe},\n  year = {2023},\n  title = {Other}\n}\n"
         )
 
-        result = runner.invoke(app, ["keys", "generate", str(bib), "--key", "Old", "--json"])
+        result = runner.invoke(app, ["keys", "generate", str(bib), "Old", "--json"])
 
         assert result.exit_code == 0, result.output
         assert json.loads(result.output)["renames"] == [{"old": "Old", "new": "Smith24"}]
         text = bib.read_text()
         assert "@article{Smith24," in text
         assert "@article{Keep," in text
+
+    def test_generate_single_key_accepts_key_before_file(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Archive.Ref.1,\n"
+            "  author = {Ada Lovelace},\n"
+            "  year = {1843},\n"
+            "  title = {Notes on Computation}\n"
+            "}\n"
+        )
+        (tmp_path / "other.bib").write_text("@article{Other,\n  title = {Other}\n}\n")
+
+        result = runner.invoke(app, ["keys", "generate", "Archive.Ref.1", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["renames"] == [
+            {"old": "Archive.Ref.1", "new": "Lovelace1843Notes"}
+        ]
+        assert "@article{Lovelace1843Notes," in bib.read_text()
+
+    def test_generate_single_key_accepts_file_before_positional_key(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Old,\n"
+            "  author = {Grace Hopper},\n"
+            "  year = {1952},\n"
+            "  title = {Compiler Methods}\n"
+            "}\n"
+        )
+
+        result = runner.invoke(app, ["keys", "generate", str(bib), "Old", "--json"])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["renames"] == [{"old": "Old", "new": "Hopper1952Compiler"}]
+
+    def test_generate_single_key_updates_linked_tex_sources(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex;}\n"
+            "@article{Old,\n"
+            "  author = {Grace Hopper},\n"
+            "  year = {1952},\n"
+            "  title = {Compiler Methods}\n"
+            "}\n"
+        )
+        tex = tmp_path / "paper.tex"
+        tex.write_text(r"\cite{Old}" "\n" r"% \cite{Old}" "\n")
+
+        result = runner.invoke(app, ["keys", "generate", str(bib), "Old", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["renames"] == [{"old": "Old", "new": "Hopper1952Compiler"}]
+        assert data["source_occurrences"] == 1
+        assert data["sources"][0]["occurrences"] == 1
+        assert "@article{Hopper1952Compiler," in bib.read_text()
+        text = tex.read_text()
+        assert r"\cite{Hopper1952Compiler}" in text
+        assert r"% \cite{Old}" in text
+
+    def test_generate_single_key_updates_all_linked_tex_sources(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex, supplement.tex;}\n"
+            "@article{Old,\n"
+            "  author = {Grace Hopper},\n"
+            "  year = {1952},\n"
+            "  title = {Compiler Methods}\n"
+            "}\n"
+        )
+        paper = tmp_path / "paper.tex"
+        supplement = tmp_path / "supplement.tex"
+        paper.write_text(r"\cite{Old}" "\n")
+        supplement.write_text(r"\citep{Old}" "\n")
+
+        result = runner.invoke(app, ["keys", "generate", str(bib), "Old", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["source_occurrences"] == 2
+        assert {Path(source["path"]).name for source in data["sources"]} == {
+            "paper.tex",
+            "supplement.tex",
+        }
+        assert paper.read_text() == r"\cite{Hopper1952Compiler}" "\n"
+        assert supplement.read_text() == r"\citep{Hopper1952Compiler}" "\n"
+
+    def test_generate_single_key_merges_jabref_and_pynakes_tex_sources(
+        self, tmp_path: Path
+    ) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{jabref-meta: tex-sources:paper.tex;}\n"
+            "@comment{pynakes-meta:\ntex-sources: supplement.tex\n}\n"
+            "@article{Old,\n"
+            "  author = {Grace Hopper},\n"
+            "  year = {1952},\n"
+            "  title = {Compiler Methods}\n"
+            "}\n"
+        )
+        paper = tmp_path / "paper.tex"
+        supplement = tmp_path / "supplement.tex"
+        paper.write_text(r"\cite{Old}" "\n")
+        supplement.write_text(r"\citep{Old}" "\n")
+
+        result = runner.invoke(app, ["keys", "generate", str(bib), "Old", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["source_occurrences"] == 2
+        assert paper.read_text() == r"\cite{Hopper1952Compiler}" "\n"
+        assert supplement.read_text() == r"\citep{Hopper1952Compiler}" "\n"
+
+    def test_generate_single_key_updates_linked_tex_sources_dry_run_diff(
+        self, tmp_path: Path
+    ) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex;}\n"
+            "@article{Old,\n"
+            "  author = {Grace Hopper},\n"
+            "  year = {1952},\n"
+            "  title = {Compiler Methods}\n"
+            "}\n"
+        )
+        tex = tmp_path / "paper.tex"
+        tex.write_text(r"\cite{Old}" "\n")
+        original_bib = bib.read_text()
+        original_tex = tex.read_text()
+
+        result = runner.invoke(
+            app, ["keys", "generate", str(bib), "Old", "--dry-run", "--diff", "--json"]
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["source_occurrences"] == 1
+        assert "@article{Hopper1952Compiler," in data["diff"]
+        assert r"\cite{Hopper1952Compiler}" in data["diff"]
+        assert bib.read_text() == original_bib
+        assert tex.read_text() == original_tex
+
+    def test_generate_all_updates_linked_tex_sources_simultaneously(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex;}\n"
+            "@article{A,\n"
+            "  author = {Alice Beta},\n"
+            "  year = {2020},\n"
+            "  title = {Target}\n"
+            "}\n"
+            "@article{Beta2020Target,\n"
+            "  author = {Carol Clark},\n"
+            "  year = {2021},\n"
+            "  title = {Other}\n"
+            "}\n"
+        )
+        tex = tmp_path / "paper.tex"
+        tex.write_text(r"\cite{A,Beta2020Target}" "\n")
+
+        result = runner.invoke(app, ["keys", "generate", str(bib), "--all", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["renames"] == [
+            {"old": "A", "new": "Beta2020Target"},
+            {"old": "Beta2020Target", "new": "Clark2021Other"},
+        ]
+        assert data["source_occurrences"] == 2
+        assert tex.read_text() == r"\cite{Beta2020Target,Clark2021Other}" "\n"
+
+    def test_generate_requires_key_or_all(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+
+        result = runner.invoke(app, ["keys", "generate", str(bib), "--json"])
+
+        assert result.exit_code == 1, result.output
+        data = json.loads(result.output)
+        assert data["error"] == "InvalidInput"
+        assert "--all" in data["message"]
 
     def test_check_reports_duplicates(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "duplicate_entries.bib")
@@ -1137,9 +1373,7 @@ class TestKeysCommand:
             "@comment{pynakes-meta:\nfiles-dir:\n}\n"
         )
 
-        result = runner.invoke(
-            app, ["keys", "generate", str(bib), "--key", "Old", "--dry-run", "--json"]
-        )
+        result = runner.invoke(app, ["keys", "generate", str(bib), "Old", "--dry-run", "--json"])
 
         assert result.exit_code == 0, result.output
         assert (files / "Old_preprint.pdf").read_bytes() == b"pdf"
@@ -1987,6 +2221,27 @@ class TestErrorHandling:
         assert data["error"] == "UsageError"  # missing FILE, not a clobber
         assert existing.read_text() == "@article{Keep,\n  title = {Original}\n}\n"
 
+    def test_shell_completion_does_not_emit_missing_bib_error(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        (tmp_path / "a.bib").write_text("@article{A,\n  title = {T}\n}\n")
+        (tmp_path / "b.bib").write_text("@article{B,\n  title = {U}\n}\n")
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(
+            app,
+            [],
+            env={
+                "COMP_WORDS": "pynakes keys generate A a",
+                "COMP_CWORD": "4",
+                "_PYNAKES_COMPLETE": "complete_bash",
+            },
+            prog_name="pynakes",
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "InvalidInput" not in result.output
+
 
 class TestCapabilities:
     def test_capabilities_json(self) -> None:
@@ -2091,12 +2346,14 @@ class TestSourcesCommand:
         bib = tmp_path / "refs.bib"
         bib.write_text("@article{A,\n  title = {T}\n}\n")
 
-        result = runner.invoke(app, ["tex", "add", "paper.tex", "--file", str(bib)])
+        result = runner.invoke(
+            app, ["tex", "add", "paper.tex", "supplement.tex", "--file", str(bib)]
+        )
         assert result.exit_code == 0, result.output
         assert "linked" in result.output.lower() or "link" in result.output.lower()
         text = bib.read_text()
         assert "tex-sources" in text
-        assert "paper.tex" in text
+        assert "tex-sources: paper.tex, supplement.tex" in text
 
     def test_add_dry_run(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -2135,6 +2392,23 @@ class TestSourcesCommand:
         data = json.loads(result.output)
         assert "paper.tex" in data["removed"]
         assert "tex-sources" not in bib.read_text()
+
+    def test_remove_canonicalizes_split_metadata_namespaces(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{jabref-meta: tex-sources:paper.tex;}\n"
+            "@comment{pynakes-meta:\ntex-sources: supplement.tex\n}\n"
+            "@article{A,\n  title = {T}\n}\n"
+        )
+
+        result = runner.invoke(app, ["tex", "remove", "paper.tex", "--file", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["removed"] == ["paper.tex"]
+        text = bib.read_text()
+        assert "@comment{jabref-meta: tex-sources" not in text
+        assert "tex-sources: supplement.tex" in text
 
     def test_remove_nonexistent_is_noop(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -2225,7 +2499,7 @@ class TestSourcesCommand:
 _MODIFYING_CASES = [
     (["groups", "add-entry"], ["Smith2020", "Fav"], "simple.bib"),
     (["keys", "repair"], [], "duplicate_entries.bib"),
-    (["keys", "generate"], [], "simple.bib"),
+    (["keys", "generate"], ["--all"], "simple.bib"),
     (["fields", "rename"], ["journal", "journaltitle"], "simple.bib"),
     (["fields", "move"], ["journal", "journaltitle"], "simple.bib"),
     (["fields", "append"], ["keywords", "test"], "simple.bib"),

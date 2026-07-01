@@ -16,6 +16,20 @@ def test_resolve_files_dir_uses_default_for_empty_value(tmp_path: Path) -> None:
     assert resolve_files_dir("", bib) == tmp_path / "refs.files"
 
 
+def test_resolve_files_dir_anchors_symlinked_bib_at_link_path(tmp_path: Path) -> None:
+    real_dir = tmp_path / "real"
+    link_dir = tmp_path / "linked"
+    real_dir.mkdir()
+    link_dir.mkdir()
+    real_bib = real_dir / "refs.bib"
+    real_bib.write_text("@article{A, title = {T}}\n")
+    link_bib = link_dir / "refs.bib"
+    link_bib.symlink_to(real_bib)
+
+    assert resolve_files_dir("", link_bib) == link_dir / "refs.files"
+    assert resolve_files_dir("materials", link_bib) == link_dir / "materials"
+
+
 def test_resolve_files_dir_accepts_relative_path_inside_bib_dir(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
 
@@ -248,6 +262,37 @@ def test_bibliography_open_exposes_filestore_when_files_dir_is_set(tmp_path: Pat
 
     assert coll.files is not None
     assert coll.files.root == tmp_path / "refs.files"
+
+
+def test_bibliography_fetch_materials_uses_symlinked_bib_directory(tmp_path: Path) -> None:
+    real_dir = tmp_path / "real"
+    link_dir = tmp_path / "linked"
+    real_dir.mkdir()
+    link_dir.mkdir()
+    real_bib = real_dir / "refs.bib"
+    real_bib.write_text(
+        "@misc{Noether1918,\n"
+        "  title = {A Generic Example},\n"
+        "  eprint = {2101.00001},\n"
+        "  archiveprefix = {arXiv}\n"
+        "}\n"
+        "@comment{pynakes-meta:\n"
+        "files-dir: refs.files\n"
+        "fetch-source: false\n"
+        "}\n"
+    )
+    link_bib = link_dir / "refs.bib"
+    link_bib.symlink_to(real_bib)
+    coll = Bibliography.open(link_bib)
+
+    report = coll.fetch_materials(
+        target="Noether1918",
+        pdf_fetcher=lambda arxiv_id: b"%PDF preprint",
+    )
+
+    assert report["failed"] == []
+    assert (link_dir / "refs.files" / "Noether1918_preprint.pdf").read_bytes() == b"%PDF preprint"
+    assert not (real_dir / "refs.files" / "Noether1918_preprint.pdf").exists()
 
 
 def test_bibliography_open_rejects_invalid_files_dir(tmp_path: Path) -> None:

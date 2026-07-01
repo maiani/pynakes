@@ -175,7 +175,7 @@ def _wire_completion(command, path=()) -> None:
             for param in sub.params:
                 if param.name == target:
                     param.shell_complete = _complete_fn
-                if param.name in ("file", "bib_file"):
+                if param.name in ("file", "bib_file", "file_or_key", "key_or_file"):
                     param.shell_complete = _bibfile_completer
         else:
             _wire_completion(sub, full)

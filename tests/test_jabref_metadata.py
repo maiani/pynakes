@@ -13,11 +13,13 @@ from pynakes.metadata import (
     MetadataUpdate,
     consolidate_metadata,
     default_namespace,
+    format_metadata_list,
     library_database_type,
     library_is_jabref_tracked,
     library_save_actions,
     library_save_order,
     metadata_category,
+    metadata_list_values,
     metadata_owner,
     parse_save_actions,
     parse_save_order,
@@ -30,6 +32,21 @@ from pynakes.usage import subset_library
 runner = CliRunner()
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def test_format_metadata_list_writes_comma_separated_values() -> None:
+    assert (
+        format_metadata_list([" paper.tex ", "", "supplement.tex"]) == "paper.tex, supplement.tex"
+    )
+
+
+def test_metadata_list_values_merges_namespaces_without_duplicates() -> None:
+    lib = parse_bib(
+        "@comment{jabref-meta: tex-sources:paper.tex;}\n"
+        "@comment{pynakes-meta:\ntex-sources: supplement.tex, paper.tex\n}\n"
+    )
+
+    assert metadata_list_values(lib, "tex-sources") == ("paper.tex", "supplement.tex")
 
 
 def test_metadata_category_covers_pinned_jabref_metadata_constants() -> None:

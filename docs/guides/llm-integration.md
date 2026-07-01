@@ -74,8 +74,9 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 
 - `pynakes groups add-entry <file> <key> <group>`
 - `pynakes groups remove-entry <file> <key> <group>`
-- `pynakes keys generate <file> [--key <old-key>]` — regenerate every key, or
-  only the selected key, using the preferred pattern (`AuthorYearTitle` by default)
+- `pynakes keys generate <old-key> <file>` — regenerate one key using the
+  preferred pattern (`AuthorYearTitle` by default); linked `tex-sources`
+  citations are updated when configured. Use `--all` to regenerate every key.
 - `pynakes keys repair <file>` — make duplicate keys unique
 - `pynakes keys rename <file> <old> <new> <tex-source>...` — rename one key in
   the `.bib` file and matching TeX citation commands
@@ -103,13 +104,19 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
   exposes one
 - `pynakes tex scan <bib-file> <source>... [--out ...] [--group ...] [--keyword ...]`
 
+Maintenance write (supports `--json`, but not `--dry-run` / `--diff`):
+
+- `pynakes asset check <file>... --fix [--backup]` — reconcile Pinax manifest
+  drift. `--backup` keeps the previous manifest as `manifest.json.bak`.
+
 Creating / projecting — **create** new files (support `--dry-run`, `--diff`,
 `--json`):
 
-- `pynakes init <file> [--type biblatex|bibtex] [--key-pattern ...] [--from <file>] [--force]`
+- `pynakes init <file> [--type biblatex|bibtex] [--key-pattern ...] [--from <file>] [--force] [--backup]`
   — create a new library seeded with a metadata profile (a sensible default, or
   one copied from `--from`). Refuses to overwrite an existing file without
-  `--force`; emits `FileExists` (exit `1`) otherwise.
+  `--force`; emits `FileExists` (exit `1`) otherwise. `--backup` keeps the
+  overwritten file as `<file>.bak`.
 - `pynakes corpus combine <file>... --out <file> [--dedupe]` — union several `.bib`
   files into one. `--dedupe` collapses identical same-key entries and reports a
   conflict (exit `2`) when same-key entries differ.
@@ -376,7 +383,7 @@ Each `entries` item is one of `added` / `removed` (with `key`), `renamed` (with
 compared best-effort.
 
 Command-specific keys are added alongside these (e.g. `renames` for
-`keys generate`/`repair`, `sources` for `keys rename`,
+`keys generate`/`repair`, `sources` for `keys generate`/`rename`,
 `report`/`tagged`/`exported` for `tex scan`,
 `operations` for `normalize`).
 

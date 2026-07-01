@@ -13,6 +13,7 @@ keeps JabRef's trailing semicolon when it was present; use
 """
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -33,15 +34,45 @@ def metadata_value(lib: BibFile, name: str) -> str | None:
     return None
 
 
-def metadata_list(value: str | None) -> tuple[str, ...]:
-    """Split a metadata list value on ``;`` and ``,``.
+def metadata_values(lib: BibFile, name: str) -> tuple[str, ...]:
+    """Return all metadata values for ``name`` across namespaces, in source order."""
+    lowered = name.lower()
+    return tuple(
+        strip_jabref_terminator(block.value)
+        for block in lib.metadata_blocks
+        if block.key.lower() == lowered
+    )
 
-    Returns an empty tuple when ``value`` is ``None`` or blank; each non-empty
-    token (after stripping whitespace) becomes one element.
+
+def metadata_list(value: str | None) -> tuple[str, ...]:
+    """Split a metadata list value.
+
+    Comma is the canonical write delimiter. Semicolon is accepted when reading
+    legacy list values. Returns an empty tuple when ``value`` is ``None`` or
+    blank; each non-empty token (after stripping whitespace) becomes one
+    element.
     """
     if not value:
         return ()
     return tuple(part.strip() for part in value.replace(";", ",").split(",") if part.strip())
+
+
+def format_metadata_list(values: Iterable[str]) -> str:
+    """Render a list-valued metadata setting in canonical comma-separated form."""
+    return ", ".join(value.strip() for value in values if value.strip())
+
+
+def metadata_list_values(lib: BibFile, name: str) -> tuple[str, ...]:
+    """Return a de-duplicated list metadata value merged across namespaces."""
+    seen: set[str] = set()
+    items: list[str] = []
+    for value in metadata_values(lib, name):
+        for item in metadata_list(value):
+            if item in seen:
+                continue
+            seen.add(item)
+            items.append(item)
+    return tuple(items)
 
 
 def metadata_bool(value: str | None, default: bool) -> bool:

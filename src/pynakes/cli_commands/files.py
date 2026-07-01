@@ -7,24 +7,25 @@ retaining the stable CLI contract.
 import typer
 
 from pynakes import files as files_ops
-from pynakes.cli_common import (
-    CheckOutcome,
-    _run_checks,
-    _safe,
-)
+from pynakes.cli_common import CheckOutcome, _run_checks, _safe
 from pynakes.engine import Bibliography
 from pynakes.filestore import FileStore
 
 # --- files -----------------------------------------------------------------
 
 
-def _files_check_one(file: str, root: list[str] | None, fix: bool = False) -> CheckOutcome:
+def _files_check_one(
+    file: str, root: list[str] | None, fix: bool = False, backup: bool = False
+) -> CheckOutcome:
     lib = Bibliography.open(file).lib
     report = files_ops.check_linked_files(lib, file, root)
     store = FileStore.from_metadata(lib, file)
     fixed: list[dict[str, str]] = []
     if store is not None and fix:
-        fixed = store.fix_drift(entry.key for entry in lib.entries.values() if entry.key.strip())
+        fixed = store.fix_drift(
+            (entry.key for entry in lib.entries.values() if entry.key.strip()),
+            backup=backup,
+        )
     pinax = store.scan_entries(lib.entries.values()) if store is not None else None
     result = {
         "status": "success",
@@ -87,13 +88,18 @@ def files_check(
         False, "--strict", help="Exit 1 if any linked file is missing or wrong-type"
     ),
     fix: bool = typer.Option(False, "--fix", help="Reconcile Pinax manifest drift"),
+    backup: bool = typer.Option(
+        False,
+        "--backup",
+        help="Also write manifest.json.bak before reconciling Pinax manifest drift",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Validate linked-file references (accepts multiple files for CI gating)."""
     _run_checks(
         files,
         "files_check",
-        lambda f: _files_check_one(f, root, fix),
+        lambda f: _files_check_one(f, root, fix, backup),
         json_output,
         strict,
     )

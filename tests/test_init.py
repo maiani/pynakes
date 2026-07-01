@@ -114,10 +114,10 @@ def test_init_refuses_existing_without_force(tmp_path: Path) -> None:
     assert "Keep2020" in out.read_text()
 
 
-def test_init_force_overwrites_and_backs_up(tmp_path: Path) -> None:
+def test_init_force_overwrites_and_backs_up_when_requested(tmp_path: Path) -> None:
     out = tmp_path / "refs.bib"
     out.write_text("@article{Old2020,\n  title = {Old}\n}\n")
-    result = runner.invoke(app, ["init", str(out), "--type", "bibtex", "--force"])
+    result = runner.invoke(app, ["init", str(out), "--type", "bibtex", "--force", "--backup"])
     assert result.exit_code == 0, result.output
     assert "Old2020" not in out.read_text()
     assert (tmp_path / "refs.bib.bak").read_text().strip().startswith("@article{Old2020")

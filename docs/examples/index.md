@@ -125,10 +125,11 @@ pynakes keys repair refs.bib --dry-run --diff
 pynakes keys repair refs.bib
 ```
 
-Regenerate keys from entry metadata:
+Regenerate a key from entry metadata, or regenerate the whole library explicitly:
 
 ```bash
-pynakes keys generate refs.bib --dry-run --diff
+pynakes keys generate OldKey2020 refs.bib --dry-run --diff
+pynakes keys generate refs.bib --all --dry-run --diff
 ```
 
 If JabRef citation-key metadata is present, `keys generate` uses it:
@@ -266,7 +267,7 @@ These settings act as **defaults** when you run operations — no flags needed:
 
 ```bash
 # Honors keypatterndefault from jabref-meta:
-pynakes keys generate refs.bib --dry-run --diff
+pynakes keys generate refs.bib --all --dry-run --diff
 
 # Honors journal-style/author-style/protected-terms from pynakes-meta:
 pynakes normalize refs.bib --dry-run --diff

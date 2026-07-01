@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import click
@@ -18,6 +19,11 @@ _NO_AUTODETECT_COMMANDS = {"init"}
 # Context-meta key recording whether the caller asked for JSON output, so the
 # group can honor the JSON contract when reframing a usage error.
 _JSON_META_KEY = "pynakes_json_output"
+
+
+def _is_shell_completion() -> bool:
+    """Whether Click/Typer is resolving shell completions for this process."""
+    return bool(os.environ.get("_PYNAKES_COMPLETE"))
 
 
 def _bib_candidates(directory: Path) -> list[Path]:
@@ -179,7 +185,12 @@ class AutoBibGroup(TyperGroup):
         if "--json" in args:
             ctx.meta[_JSON_META_KEY] = True
         json_output = ctx.meta.get(_JSON_META_KEY, False)
-        if len(args) >= 2 and "--help" not in args and "-h" not in args:
+        if (
+            len(args) >= 2
+            and "--help" not in args
+            and "-h" not in args
+            and not _is_shell_completion()
+        ):
             command = self.get_command(ctx, args[0])
             if (
                 command is not None

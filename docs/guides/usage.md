@@ -22,7 +22,7 @@ Create a new `.bib` library, seeded with a metadata profile. With no options it
 writes a sensible default — the BibLaTeX dialect and pynakes' default
 citation-key pattern (`[auth][year][veryshorttitle]`) — so the library works with
 `keys generate` and `normalize` out of the box. It refuses to overwrite an
-existing file unless `--force` (which leaves a `.bak`).
+existing file unless `--force`; pass `--backup` to keep a `.bak` copy.
 
 ```bash
 pynakes init refs.bib                          # default profile (biblatex)
@@ -106,8 +106,8 @@ Check, generate, rename, and repair citation keys.
 pynakes keys check refs.bib
 pynakes keys check refs.bib --json
 
-pynakes keys generate refs.bib --dry-run --diff
-pynakes keys generate refs.bib --key OldKey2020 --dry-run --diff
+pynakes keys generate OldKey2020 refs.bib --dry-run --diff
+pynakes keys generate refs.bib --all --dry-run --diff
 pynakes keys repair refs.bib --dry-run --diff
 pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/ --dry-run --diff
 ```
@@ -123,9 +123,10 @@ present:
 Unsupported JabRef key-pattern markers fail explicitly instead of silently
 generating incorrect keys.
 
-Use `keys generate --key OldKey2020` to apply that preferred pattern to just
-one entry. It changes only the `.bib` key; use `keys rename` when matching TeX
-citations must be rewritten too.
+Pass a citation key to apply that preferred pattern to just one entry, or
+`--all` to regenerate the whole library. Like `keys rename`, generated renames
+also rewrite matching TeX citations in linked `tex-sources` metadata when it is
+configured.
 
 `keys rename` updates the entry key in the `.bib` file and matching keys inside
 recognized TeX citation commands in the supplied `.tex` files/directories. It
@@ -146,11 +147,11 @@ pynakes metadata set refs.bib tex-sources "paper.tex, chapters_src/"
 ```
 
 Paths are stored relative to the `.bib` (so the library stays portable). With it
-set, `keys rename refs.bib Old New` updates the linked sources automatically, and
-`tex scan refs.bib` scans them when no paths are given. Explicit arguments still
-override the metadata. `keys repair` consults the list too, but only to **warn**
-when a de-duplicated key is still cited (the citation is ambiguous, so it is not
-rewritten).
+set, `keys rename refs.bib Old New` and generated `keys generate` renames update
+the linked sources automatically, and `tex scan refs.bib` scans them when no
+paths are given. Explicit arguments still override the metadata. `keys repair`
+consults the list too, but only to **warn** when a de-duplicated key is still
+cited (the citation is ambiguous, so it is not rewritten).
 
 ## metadata
 
@@ -285,6 +286,7 @@ Validate JabRef linked files stored in `file` fields.
 pynakes asset check refs.bib
 pynakes asset check refs.bib --json
 pynakes asset check refs.bib --root ~/papers --json
+pynakes asset check refs.bib --fix --backup
 ```
 
 The checker parses plain paths and JabRef descriptors such as:

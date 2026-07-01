@@ -7,6 +7,7 @@ writes. It does not fetch or parse remote content.
 
 import hashlib
 import json
+import os
 import shutil
 import tempfile
 import uuid
@@ -215,11 +216,13 @@ class FileStore:
             raise ValueError(f"Invalid Pinax manifest: {path}")
         return data
 
-    def write_manifest(self, manifest: dict[str, object]) -> None:
+    def write_manifest(self, manifest: dict[str, object], *, backup: bool = False) -> None:
         """Atomically write a provenance manifest."""
         manifest = _normalized_manifest(manifest)
         target = self.manifest_path
         target.parent.mkdir(parents=True, exist_ok=True)
+        if backup and target.exists():
+            shutil.copy2(target, Path(str(target) + ".bak"))
         text = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
         _atomic_write_bytes(target, text.encode("utf-8"), target.parent)
 
@@ -379,7 +382,7 @@ class FileStore:
         return transaction
 
     def fix_drift(
-        self, keys: Iterable[str], *, added_date: str | None = None
+        self, keys: Iterable[str], *, added_date: str | None = None, backup: bool = False
     ) -> list[dict[str, str]]:
         """Reconcile manifest drift against live material files."""
         key_list = _unique_keys(keys)
@@ -439,7 +442,7 @@ class FileStore:
             ):
                 del files[key]
 
-        self.write_manifest(manifest)
+        self.write_manifest(manifest, backup=backup)
         return fixed
 
     def rename_materials(self, old: str, new: str) -> PinaxRenameTransaction:
@@ -656,7 +659,9 @@ def resolve_files_dir(value: str, bib_path: str | Path) -> Path:
     """Resolve and validate a ``files-dir`` metadata value.
 
     Empty values use the default ``<bib-stem>.files`` directory. Non-empty values
-    must be relative to the bibliography directory and must not escape it.
+    must be relative to the bibliography directory and must not escape it. A
+    symlinked bibliography is anchored at the link path the user supplied, not
+    the link target.
     """
     bib = _absolute_bib_path(bib_path)
     base = bib.parent
@@ -666,7 +671,7 @@ def resolve_files_dir(value: str, bib_path: str | Path) -> Path:
     path = Path(raw).expanduser()
     if path.is_absolute():
         raise ValueError("files-dir must be a relative path inside the bibliography directory")
-    resolved = (base / path).resolve(strict=False)
+    resolved = Path(os.path.abspath(os.fspath(base / path)))
     if not resolved.is_relative_to(base):
         raise ValueError("files-dir must not escape the bibliography directory")
     return resolved
@@ -674,7 +679,7 @@ def resolve_files_dir(value: str, bib_path: str | Path) -> Path:
 
 def _absolute_bib_path(path: str | Path) -> Path:
     bib = Path(path).expanduser()
-    return bib if bib.is_absolute() else bib.resolve(strict=False)
+    return Path(os.path.abspath(os.fspath(bib)))
 
 
 def _normalized_manifest(manifest: dict[str, object]) -> dict[str, object]:

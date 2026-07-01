@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pynakes.editing import append_delimited_field, splice_into_text
+from pynakes.metadata import metadata_list_values
 from pynakes.model import BibFile
 
 __all__ = [
@@ -22,6 +23,7 @@ __all__ = [
     "collect_cited_keys",
     "iter_tex_files",
     "rename_citation_key_in_tex",
+    "rename_citation_keys_in_tex",
     "analyze_usage",
     "subset_library",
     "tag_with_group",
@@ -37,23 +39,16 @@ TEX_SOURCES_KEY = "tex-sources"
 def tex_sources_from_metadata(lib: BibFile, base_dir: str | Path) -> list[str]:
     """Resolve the ``tex-sources`` metadata list to paths under ``base_dir``.
 
-    The metadata value is a comma/semicolon-separated list of ``.tex`` files or
-    directories, stored relative to the library so it stays portable. Relative
+    The metadata value is a comma-separated list of ``.tex`` files or
+    directories, with semicolon-separated legacy values accepted while reading.
+    If both metadata namespaces contain ``tex-sources``, their lists are merged
+    rather than allowing the effective metadata view to hide one side. Relative
     entries are resolved against ``base_dir`` (normally the ``.bib``'s folder);
     absolute entries are used as-is. Returns ``[]`` when the key is unset.
     """
-    raw = next(
-        (value for key, value in lib.metadata.items() if key.lower() == TEX_SOURCES_KEY),
-        None,
-    )
-    if not raw:
-        return []
     base = Path(base_dir)
     resolved: list[str] = []
-    for part in re.split(r"[;,]", raw.rstrip(";")):
-        candidate = part.strip()
-        if not candidate:
-            continue
+    for candidate in metadata_list_values(lib, TEX_SOURCES_KEY):
         path = Path(candidate)
         resolved.append(str(path if path.is_absolute() else base / path))
     return resolved
@@ -226,6 +221,22 @@ def rename_citation_key_in_tex(text: str, old: str, new: str) -> tuple[str, int]
     return "".join(parts), count
 
 
+def rename_citation_keys_in_tex(text: str, renames: Iterable[tuple[str, str]]) -> tuple[str, int]:
+    """Rename citation keys inside TeX citation commands using one simultaneous map."""
+    mapping = {old: new for old, new in renames if old != new}
+    if not mapping:
+        return text, 0
+
+    parts: list[str] = []
+    count = 0
+    for line in text.splitlines(keepends=True):
+        body, comment = _split_tex_line_comment(line)
+        renamed_body, renamed_count = _rename_citation_keys_in_segment(body, mapping)
+        parts.append(renamed_body + comment)
+        count += renamed_count
+    return "".join(parts), count
+
+
 def _split_tex_line_comment(line: str) -> tuple[str, str]:
     i = 0
     while i < len(line):
@@ -244,7 +255,7 @@ def _rename_citation_key_in_segment(segment: str, old: str, new: str) -> tuple[s
     def replace(match: re.Match[str]) -> str:
         nonlocal count
         raw_keys = match.group(1)
-        renamed_keys, renamed_count = _rename_key_list(raw_keys, old, new)
+        renamed_keys, renamed_count = _rename_key_list(raw_keys, {old: new})
         count += renamed_count
         return (
             match.group(0)[: match.start(1) - match.start(0)]
@@ -255,7 +266,24 @@ def _rename_citation_key_in_segment(segment: str, old: str, new: str) -> tuple[s
     return _TEX_CITE_RE.sub(replace, segment), count
 
 
-def _rename_key_list(raw: str, old: str, new: str) -> tuple[str, int]:
+def _rename_citation_keys_in_segment(segment: str, mapping: dict[str, str]) -> tuple[str, int]:
+    count = 0
+
+    def replace(match: re.Match[str]) -> str:
+        nonlocal count
+        raw_keys = match.group(1)
+        renamed_keys, renamed_count = _rename_key_list(raw_keys, mapping)
+        count += renamed_count
+        return (
+            match.group(0)[: match.start(1) - match.start(0)]
+            + renamed_keys
+            + match.group(0)[match.end(1) - match.start(0) :]
+        )
+
+    return _TEX_CITE_RE.sub(replace, segment), count
+
+
+def _rename_key_list(raw: str, mapping: dict[str, str]) -> tuple[str, int]:
     pieces = re.split(r"(,)", raw)
     count = 0
     for index, piece in enumerate(pieces):
@@ -264,8 +292,8 @@ def _rename_key_list(raw: str, old: str, new: str) -> tuple[str, int]:
         leading = piece[: len(piece) - len(piece.lstrip())]
         trailing = piece[len(piece.rstrip()) :]
         key = piece.strip()
-        if key == old:
-            pieces[index] = f"{leading}{new}{trailing}"
+        if key in mapping:
+            pieces[index] = f"{leading}{mapping[key]}{trailing}"
             count += 1
     return "".join(pieces), count
 
