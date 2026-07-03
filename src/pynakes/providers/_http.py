@@ -10,9 +10,13 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request
 from urllib.request import urlopen as _default_urlopen
 
+import httpx
+
 from pynakes import __version__
 
 USER_AGENT = f"pynakes/{__version__} (mailto:unknown@example.invalid)"
+
+DownloadProgress = Callable[[int, int | None], None]
 
 
 class ProviderFetchError(Exception):
@@ -61,6 +65,7 @@ def fetch_bytes(
     error_class: type[Exception] = ProviderFetchError,
     label: str | None = None,
     opener: Callable[..., object] | None = None,
+    progress: DownloadProgress | None = None,
 ) -> bytes:
     """Fetch ``url`` and return raw response bytes.
 
@@ -73,17 +78,74 @@ def fetch_bytes(
     headers: dict[str, str] = {"User-Agent": USER_AGENT}
     if accept is not None:
         headers["Accept"] = accept
-    request = Request(url, headers=headers)
     display = label or url
-    open_url = opener or _default_urlopen
+    if opener is None:
+        return _fetch_bytes_httpx(
+            url,
+            headers=headers,
+            timeout=timeout,
+            error_class=error_class,
+            display=display,
+            progress=progress,
+        )
+
+    request = Request(url, headers=headers)
     try:
-        with open_url(request, timeout=timeout) as response:  # type: ignore[arg-type]
-            return response.read()
+        with opener(request, timeout=timeout) as response:  # type: ignore[arg-type]
+            data = response.read()
     except HTTPError as exc:
         raise error_class(f"Server returned HTTP {exc.code} for {display}") from exc
     except URLError as exc:
         reason = getattr(exc, "reason", exc)
         raise error_class(f"Network error fetching {display}: {reason}") from exc
+    except OSError as exc:
+        raise error_class(f"Network error fetching {display}: {exc}") from exc
+    if progress is not None:
+        progress(len(data), len(data))
+    return data
+
+
+def _fetch_bytes_httpx(
+    url: str,
+    *,
+    headers: dict[str, str],
+    timeout: float,
+    error_class: type[Exception],
+    display: str,
+    progress: DownloadProgress | None,
+) -> bytes:
+    try:
+        with httpx.Client(follow_redirects=True, timeout=timeout, headers=headers) as client:
+            with client.stream("GET", url) as response:
+                try:
+                    response.raise_for_status()
+                except httpx.HTTPStatusError as exc:
+                    raise error_class(
+                        f"Server returned HTTP {exc.response.status_code} for {display}"
+                    ) from exc
+                total = _content_length(response)
+                chunks: list[bytes] = []
+                for chunk in response.iter_bytes():
+                    if not chunk:
+                        continue
+                    chunks.append(chunk)
+                    if progress is not None:
+                        progress(len(chunk), total)
+                return b"".join(chunks)
+    except httpx.HTTPStatusError:
+        raise
+    except httpx.HTTPError as exc:
+        raise error_class(f"Network error fetching {display}: {exc}") from exc
+
+
+def _content_length(response: httpx.Response) -> int | None:
+    raw = response.headers.get("content-length")
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
 
 
 def fetch_text(

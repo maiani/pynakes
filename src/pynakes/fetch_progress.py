@@ -1,0 +1,34 @@
+"""Progress events for Pinax material fetching."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Literal
+
+FetchArtifact = Literal["preprint_pdf", "preprint_source", "published_pdf"]
+FetchProgressKind = Literal[
+    "entry",
+    "artifact_start",
+    "artifact_progress",
+    "artifact_done",
+    "skip",
+    "fail",
+]
+
+
+@dataclass(frozen=True)
+class FetchProgressEvent:
+    """One progress event emitted while fetching Pinax materials."""
+
+    kind: FetchProgressKind
+    key: str
+    artifact: FetchArtifact | None = None
+    entry_index: int | None = None
+    entry_total: int | None = None
+    advance: int = 0
+    total_bytes: int | None = None
+    message: str = ""
+
+
+FetchProgress = Callable[[FetchProgressEvent], None]

@@ -693,10 +693,12 @@ class TestImportCommand:
         bib = tmp_path / "refs.bib"
         bib.write_text("@comment{jabref-meta: databaseType:biblatex;}\n")
         monkeypatch.setattr(importer_ops, "fetch_arxiv_atom", lambda identifier: ARXIV_ATOM)
-        monkeypatch.setattr("pynakes.fetch.fetch_arxiv_pdf", lambda arxiv_id: b"%PDF fixture")
+        monkeypatch.setattr(
+            "pynakes.fetch.fetch_arxiv_pdf", lambda arxiv_id, **kwargs: b"%PDF fixture"
+        )
         monkeypatch.setattr(
             "pynakes.fetch.fetch_arxiv_source",
-            lambda arxiv_id: _tar_bytes({"paper.tex": b"\\title{A Deep Test}\n"}),
+            lambda arxiv_id, **kwargs: _tar_bytes({"paper.tex": b"\\title{A Deep Test}\n"}),
         )
 
         result = runner.invoke(
@@ -719,7 +721,9 @@ class TestImportCommand:
         bib = tmp_path / "refs.bib"
         bib.write_text("@comment{pynakes-meta:\nfetch-source: false\n}\n")
         monkeypatch.setattr(importer_ops, "fetch_arxiv_atom", lambda identifier: ARXIV_ATOM)
-        monkeypatch.setattr("pynakes.fetch.fetch_arxiv_pdf", lambda arxiv_id: b"%PDF fixture")
+        monkeypatch.setattr(
+            "pynakes.fetch.fetch_arxiv_pdf", lambda arxiv_id, **kwargs: b"%PDF fixture"
+        )
 
         def fail_source(arxiv_id: str) -> bytes:
             raise AssertionError("source fetcher should not run")
@@ -752,9 +756,12 @@ class TestImportCommand:
                     {"best_oa_location": {"pdf_url": "https://example.com/provider.pdf"}}
                 ).encode("utf-8")
                 return BytesIO(body)
-            return BytesIO(b"%PDF published")
+            raise AssertionError("unexpected urlopen call")
 
         monkeypatch.setattr("pynakes.fetch._default_urlopen", fake_urlopen)
+        monkeypatch.setattr(
+            "pynakes.fetch.fetch_published_pdf", lambda url, **kwargs: b"%PDF published"
+        )
 
         result = runner.invoke(
             app,
@@ -2641,9 +2648,12 @@ class TestAssetFetchPublished:
                     {"best_oa_location": {"pdf_url": "https://example.com/paper.pdf"}}
                 ).encode("utf-8")
                 return BytesIO(body)
-            return BytesIO(b"%PDF published")
+            raise AssertionError("unexpected urlopen call")
 
         monkeypatch.setattr("pynakes.fetch._default_urlopen", fake_urlopen)
+        monkeypatch.setattr(
+            "pynakes.fetch.fetch_published_pdf", lambda url, **kwargs: b"%PDF published"
+        )
         monkeypatch.chdir(tmp_path)
 
         result = runner.invoke(app, ["asset", "fetch", "--json"])

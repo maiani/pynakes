@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`asset fetch` now shows human progress for long downloads.** The CLI uses
+  Rich progress rendering for non-JSON `asset fetch` runs and keeps progress off
+  JSON stdout. Binary material downloads now stream through `httpx`, with byte
+  progress for arXiv PDFs/source archives and open-access published PDFs while
+  preserving the existing injectable fetch seams for tests and library callers.
+
 - **pynakes-native metadata by default; JabRef as opt-in interop.** A fresh
   `pynakes init` library now seeds native `dialect` and `key-pattern` keys in
   `pynakes-meta` and emits no `jabref-meta` at all; the new `init --jabref` flag

@@ -6,9 +6,8 @@ import json
 import tarfile
 from io import BytesIO
 from pathlib import Path
-from urllib.error import URLError
-from urllib.request import Request
 
+import httpx
 import pytest
 
 from pynakes.fetch import (
@@ -25,38 +24,43 @@ from pynakes.fetch import (
 from pynakes.filestore import FileStore
 
 
+def _mock_httpx_client(monkeypatch: pytest.MonkeyPatch, handler) -> None:
+    transport = httpx.MockTransport(handler)
+
+    class MockClient(httpx.Client):
+        def __init__(self, *args, **kwargs) -> None:
+            kwargs["transport"] = transport
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr("pynakes.providers._http.httpx.Client", MockClient)
+
+
 def test_fetch_arxiv_pdf_reads_bytes_with_user_agent(monkeypatch: pytest.MonkeyPatch) -> None:
-    seen: list[Request] = []
+    seen: list[httpx.Request] = []
+    progress: list[tuple[int, int | None]] = []
 
-    class Response:
-        def __enter__(self) -> "Response":
-            return self
-
-        def __exit__(self, *args: object) -> None:
-            return None
-
-        def read(self) -> bytes:
-            return b"%PDF fixture"
-
-    def fake_urlopen(request: Request, timeout: float) -> Response:
+    def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
-        assert timeout == 30.0
-        return Response()
+        return httpx.Response(200, content=b"%PDF fixture", headers={"content-length": "12"})
 
-    monkeypatch.setattr("pynakes.providers._http._default_urlopen", fake_urlopen)
-
-    data = fetch_arxiv_pdf("2101.00001v2")
+    _mock_httpx_client(monkeypatch, handler)
+    data = fetch_arxiv_pdf(
+        "2101.00001v2",
+        progress=lambda event: progress.append((event.advance, event.total_bytes)),
+        key="Noether1918",
+    )
 
     assert data == b"%PDF fixture"
-    assert seen[0].full_url == "https://arxiv.org/pdf/2101.00001"
-    assert seen[0].headers["User-agent"].startswith("pynakes/")
+    assert str(seen[0].url) == "https://arxiv.org/pdf/2101.00001"
+    assert seen[0].headers["user-agent"].startswith("pynakes/")
+    assert progress == [(12, 12)]
 
 
 def test_fetch_arxiv_pdf_wraps_url_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_urlopen(request: Request, timeout: float) -> None:
-        raise URLError("offline")
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("offline", request=request)
 
-    monkeypatch.setattr("pynakes.providers._http._default_urlopen", fake_urlopen)
+    _mock_httpx_client(monkeypatch, handler)
 
     with pytest.raises(ArxivFetchError, match="2101.00001"):
         fetch_arxiv_pdf("2101.00001")
@@ -266,21 +270,19 @@ def test_openalex_oa_pdf_url_does_not_cache_invalid_json(tmp_path: Path) -> None
     assert not list(cache_dir.rglob("*.json"))
 
 
-def test_fetch_published_pdf_reads_bytes(tmp_path: Path) -> None:
-    def fake_urlopen(request: object, timeout: float = 30.0) -> _FakeResponse:
-        target = request.full_url if hasattr(request, "full_url") else str(request)
-        assert "example.com/paper.pdf" in str(target)
-        return _FakeResponse(b"%PDF published")
+def test_fetch_published_pdf_reads_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert "example.com/paper.pdf" in str(request.url)
+        return httpx.Response(200, content=b"%PDF published")
 
-    data = fetch_published_pdf("https://example.com/paper.pdf", urlopen=fake_urlopen)
+    _mock_httpx_client(monkeypatch, handler)
+    data = fetch_published_pdf("https://example.com/paper.pdf")
     assert data == b"%PDF published"
 
 
 def test_fetch_published_pdf_wraps_errors(tmp_path: Path) -> None:
-    from urllib.error import URLError
-
     def fake_urlopen(request: object, timeout: float = 30.0) -> None:
-        raise URLError("offline")
+        raise OSError("offline")
 
     with pytest.raises(PublishedPdfFetchError, match="Failed to download"):
         fetch_published_pdf("https://example.com/paper.pdf", urlopen=fake_urlopen)

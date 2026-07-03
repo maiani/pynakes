@@ -1,7 +1,6 @@
 """Reference import tests (DOI and arXiv)."""
 
-from urllib.error import HTTPError, URLError
-
+import httpx
 import pytest
 
 from pynakes.bibtex_parser import parse_bib
@@ -46,6 +45,18 @@ ARXIV_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
   </entry>
 </feed>
 """
+
+
+def _mock_httpx_client(monkeypatch: pytest.MonkeyPatch, handler) -> None:
+    transport = httpx.MockTransport(handler)
+
+    class MockClient(httpx.Client):
+        def __init__(self, *args, **kwargs) -> None:
+            kwargs["transport"] = transport
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr("pynakes.providers._http.httpx.Client", MockClient)
+
 
 PROVIDER_BIBTEX = """@article{provider-key,
   author = {Jane Smith and John Doe},
@@ -218,19 +229,19 @@ def test_render_entry_roundtrips() -> None:
 
 
 def test_fetch_bibtex_for_doi_wraps_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _raise(*args, **kwargs):
-        raise HTTPError("https://doi.org/x", 404, "Not Found", {}, None)
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, request=request)
 
-    monkeypatch.setattr("pynakes.providers._http._default_urlopen", _raise)
+    _mock_httpx_client(monkeypatch, handler)
     with pytest.raises(DOIImportError, match="HTTP 404"):
         fetch_bibtex_for_doi("10.5555/missing")
 
 
 def test_fetch_bibtex_for_doi_wraps_url_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _raise(*args, **kwargs):
-        raise URLError("offline")
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("offline", request=request)
 
-    monkeypatch.setattr("pynakes.providers._http._default_urlopen", _raise)
+    _mock_httpx_client(monkeypatch, handler)
     with pytest.raises(DOIImportError, match="10.5555/missing"):
         fetch_bibtex_for_doi("10.5555/missing")
 

@@ -10,6 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from pynakes.fetch_progress import FetchProgress, FetchProgressEvent
 from pynakes.metadata import metadata_bool as _coerce_metadata_bool
 from pynakes.metadata import metadata_value
 from pynakes.model import BibEntry, BibFile, MetadataBlock
@@ -350,6 +351,7 @@ def run_fetch_loop(
     published_url_fetcher: Callable[[str], str | None] | None = None,
     published_pdf_fetcher: Callable[[str], bytes] | None = None,
     cache_dir: str | Path | None = None,
+    progress: FetchProgress | None = None,
 ) -> tuple[list[dict], list[dict], list[dict]]:
     """Iterate *entry_queue* and download materials into *store*.
 
@@ -371,12 +373,27 @@ def run_fetch_loop(
     skipped: list[dict] = []
     failed: list[dict] = []
 
-    for entry in entry_queue:
+    entry_total = len(entry_queue)
+    for index, entry in enumerate(entry_queue, start=1):
         if not entry.key.strip():
             skipped.append({"key": entry.key, "reason": "empty key"})
+            _emit_fetch_progress(
+                progress,
+                FetchProgressEvent(
+                    kind="skip",
+                    key=entry.key,
+                    entry_index=index,
+                    entry_total=entry_total,
+                    message="empty key",
+                ),
+            )
             continue
 
         key = entry.key
+        _emit_fetch_progress(
+            progress,
+            FetchProgressEvent(kind="entry", key=key, entry_index=index, entry_total=entry_total),
+        )
         arxiv_id = entry_arxiv_id(entry)
         doi = entry.fields.get("doi", "").strip()
         presence = store.presence_for(key)
@@ -399,10 +416,30 @@ def run_fetch_loop(
                 skipped.append({"key": key, "reason": "no DOI"})
             else:
                 skipped.append({"key": key, "reason": "materials already present"})
+            _emit_fetch_progress(
+                progress,
+                FetchProgressEvent(
+                    kind="skip",
+                    key=key,
+                    entry_index=index,
+                    entry_total=entry_total,
+                    message=skipped[-1]["reason"],
+                ),
+            )
             continue
 
         if dry_run:
             skipped.append({"key": key, "reason": "would fetch"})
+            _emit_fetch_progress(
+                progress,
+                FetchProgressEvent(
+                    kind="skip",
+                    key=key,
+                    entry_index=index,
+                    entry_total=entry_total,
+                    message="would fetch",
+                ),
+            )
             continue
 
         # --- Fetch arXiv preprint materials ---
@@ -416,6 +453,7 @@ def run_fetch_loop(
                     source=can_fetch_source,
                     pdf_fetcher=pdf_fetcher,
                     source_fetcher=source_fetcher,
+                    progress=progress,
                 )
                 if result.pdf_path is not None or result.source_path is not None:
                     fetched.append(result.to_dict())
@@ -425,6 +463,16 @@ def run_fetch_loop(
                     )
             except ArxivFetchError as exc:
                 failed.append({"key": key, "error": str(exc)})
+                _emit_fetch_progress(
+                    progress,
+                    FetchProgressEvent(
+                        kind="fail",
+                        key=key,
+                        entry_index=index,
+                        entry_total=entry_total,
+                        message=str(exc),
+                    ),
+                )
 
         # --- Fetch published PDF ---
         if can_fetch_published:
@@ -436,12 +484,38 @@ def run_fetch_loop(
                     url_resolver=published_url_fetcher,
                     pdf_fetcher=published_pdf_fetcher,
                     cache_dir=cache_dir,
+                    progress=progress,
                 )
                 if pub_result.pdf_path is not None:
                     fetched.append(pub_result.to_dict())
                 else:
                     skipped.append({"key": key, "reason": "no open-access copy found"})
+                    _emit_fetch_progress(
+                        progress,
+                        FetchProgressEvent(
+                            kind="skip",
+                            key=key,
+                            entry_index=index,
+                            entry_total=entry_total,
+                            message="no open-access copy found",
+                        ),
+                    )
             except PublishedPdfFetchError as exc:
                 failed.append({"key": key, "error": str(exc)})
+                _emit_fetch_progress(
+                    progress,
+                    FetchProgressEvent(
+                        kind="fail",
+                        key=key,
+                        entry_index=index,
+                        entry_total=entry_total,
+                        message=str(exc),
+                    ),
+                )
 
     return fetched, skipped, failed
+
+
+def _emit_fetch_progress(progress: FetchProgress | None, event: FetchProgressEvent) -> None:
+    if progress is not None:
+        progress(event)

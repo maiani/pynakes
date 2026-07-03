@@ -24,6 +24,7 @@ from pynakes import keys as key_ops
 from pynakes import metadata as metadata_ops
 from pynakes import normalize as normalize_ops
 from pynakes._engine_helpers import build_fetch_queue, metadata_bool, run_fetch_loop
+from pynakes.fetch_progress import FetchProgress
 from pynakes.filestore import FILES_DIR_KEY, resolve_files_dir
 from pynakes.lint import LintIssue
 from pynakes.lint import lint as lint_lib
@@ -516,6 +517,7 @@ class BibliographyOperations:
         published_url_fetcher: Callable[[str], str | None] | None = None,
         published_pdf_fetcher: Callable[[str], bytes] | None = None,
         cache_dir: str | Path | None = None,
+        progress: FetchProgress | None = None,
     ) -> dict:
         """Download arXiv materials and/or open-access published PDFs for entries.
 
@@ -527,6 +529,7 @@ class BibliographyOperations:
             published_url_fetcher: Injectable OA PDF URL resolver for testing.
             published_pdf_fetcher: Injectable published PDF bytes fetcher.
             cache_dir: Optional provider-response cache directory.
+            progress: Optional callback receiving fetch progress events.
 
         Returns:
             A dict with ``fetched``, ``skipped``, ``failed`` lists, plus
@@ -559,6 +562,7 @@ class BibliographyOperations:
             published_url_fetcher=published_url_fetcher,
             published_pdf_fetcher=published_pdf_fetcher,
             cache_dir=cache_dir,
+            progress=progress,
         )
 
         return {

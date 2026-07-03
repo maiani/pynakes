@@ -89,7 +89,8 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 - `pynakes ref import <identifier> [file] [--key ...] [--key-source generated|provider] [--allow-duplicate] [--fetch] [--cache-dir DIR]` — `<identifier>` is a DOI, DOI URL, arXiv id, or arXiv URL
 - `pynakes asset fetch [key] [file] [--cache-dir DIR]` — download configured
   Pinax materials: arXiv PDF/source and, when `fetch-published: true`,
-  open-access published PDFs for DOI-backed entries
+  open-access published PDFs for DOI-backed entries. Human runs render download
+  progress on stderr; `--json` stdout remains machine-readable JSON only.
 - `pynakes metadata set <file> <key> <value> [--allow-unknown]`
 - `pynakes metadata adopt-jabref <file>` — start maintaining a JabRef metadata
   projection for a pynakes-native library (mirrors JabRef-native settings into

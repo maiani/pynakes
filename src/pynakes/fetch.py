@@ -14,14 +14,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path, PurePosixPath
-from urllib.error import HTTPError, URLError
-from urllib.request import Request
 from urllib.request import urlopen as _default_urlopen
 
 from pynakes._identifiers import normalize_arxiv, normalize_doi
+from pynakes.fetch_progress import FetchArtifact, FetchProgress, FetchProgressEvent
 from pynakes.filestore import FileStore
 from pynakes.providers import arxiv, openalex
-from pynakes.providers._http import USER_AGENT, ProviderFetchError
+from pynakes.providers._http import ProviderFetchError, fetch_bytes
 
 FetchArxivBytes = Callable[[str], bytes]
 FetchPublishedPdfUrl = Callable[[str], str | None]
@@ -90,26 +89,44 @@ class PublishedDownloadResult:
         }
 
 
-def fetch_arxiv_pdf(identifier: str, timeout: float = 30.0) -> bytes:
+def fetch_arxiv_pdf(
+    identifier: str,
+    timeout: float = 30.0,
+    progress: FetchProgress | None = None,
+    key: str = "",
+) -> bytes:
     """Fetch arXiv PDF bytes for ``identifier``.
 
     Thin wrapper over :func:`pynakes.providers.arxiv.fetch_pdf` translating
     provider errors into :class:`ArxivFetchError`.
     """
     try:
-        return arxiv.fetch_pdf(identifier, timeout=timeout)
+        return arxiv.fetch_pdf(
+            identifier,
+            timeout=timeout,
+            progress=_byte_progress(progress, key, "preprint_pdf"),
+        )
     except (ProviderFetchError, ValueError) as exc:
         raise ArxivFetchError(str(exc)) from exc
 
 
-def fetch_arxiv_source(identifier: str, timeout: float = 30.0) -> bytes:
+def fetch_arxiv_source(
+    identifier: str,
+    timeout: float = 30.0,
+    progress: FetchProgress | None = None,
+    key: str = "",
+) -> bytes:
     """Fetch arXiv source archive bytes for ``identifier``.
 
     Thin wrapper over :func:`pynakes.providers.arxiv.fetch_source` translating
     provider errors into :class:`ArxivFetchError`.
     """
     try:
-        return arxiv.fetch_source(identifier, timeout=timeout)
+        return arxiv.fetch_source(
+            identifier,
+            timeout=timeout,
+            progress=_byte_progress(progress, key, "preprint_source"),
+        )
     except (ProviderFetchError, ValueError) as exc:
         raise ArxivFetchError(str(exc)) from exc
 
@@ -124,6 +141,7 @@ def download_arxiv_materials(
     pdf_fetcher: FetchArxivBytes | None = None,
     source_fetcher: FetchArxivBytes | None = None,
     fetched_date: str | None = None,
+    progress: FetchProgress | None = None,
 ) -> ArxivDownloadResult:
     """Download selected arXiv materials and install them in ``store``.
 
@@ -137,7 +155,11 @@ def download_arxiv_materials(
     source_unavailable = False
 
     if pdf:
-        pdf_bytes = (pdf_fetcher or fetch_arxiv_pdf)(arxiv_id)
+        _emit_progress(progress, "artifact_start", key, "preprint_pdf")
+        if pdf_fetcher is None:
+            pdf_bytes = fetch_arxiv_pdf(arxiv_id, progress=progress, key=key)
+        else:
+            pdf_bytes = pdf_fetcher(arxiv_id)
         pdf_path = store.write_preprint_pdf(key, pdf_bytes)
         store.record_artifact(
             key,
@@ -146,9 +168,14 @@ def download_arxiv_materials(
             fetched_date=fetched_date,
             refetchable=True,
         )
+        _emit_progress(progress, "artifact_done", key, "preprint_pdf", total_bytes=len(pdf_bytes))
 
     if source:
-        source_bytes = (source_fetcher or fetch_arxiv_source)(arxiv_id)
+        _emit_progress(progress, "artifact_start", key, "preprint_source")
+        if source_fetcher is None:
+            source_bytes = fetch_arxiv_source(arxiv_id, progress=progress, key=key)
+        else:
+            source_bytes = source_fetcher(arxiv_id)
         store.ensure_root()
         try:
             with tempfile.TemporaryDirectory(prefix=f".{key}_preprint.", dir=store.root) as tmp:
@@ -160,6 +187,14 @@ def download_arxiv_materials(
             # PDF-only deposit: nothing to extract. Not a corrupt-archive failure,
             # so don't discard a PDF fetched above — report it as unavailable.
             source_unavailable = True
+            _emit_progress(
+                progress,
+                "artifact_done",
+                key,
+                "preprint_source",
+                total_bytes=len(source_bytes),
+                message="no arXiv source archive (PDF-only submission)",
+            )
         else:
             store.record_artifact(
                 key,
@@ -167,6 +202,9 @@ def download_arxiv_materials(
                 source=arxiv.source_url(arxiv_id),
                 fetched_date=fetched_date,
                 refetchable=True,
+            )
+            _emit_progress(
+                progress, "artifact_done", key, "preprint_source", total_bytes=len(source_bytes)
             )
 
     return ArxivDownloadResult(
@@ -200,19 +238,29 @@ def openalex_oa_pdf_url(
         raise PublishedPdfFetchError(str(exc)) from exc
 
 
-def fetch_published_pdf(url: str, *, urlopen: Callable[..., object] | None = None) -> bytes:
+def fetch_published_pdf(
+    url: str,
+    *,
+    urlopen: Callable[..., object] | None = None,
+    progress: FetchProgress | None = None,
+    key: str = "",
+) -> bytes:
     """Fetch the bytes of an open-access published PDF from ``url``.
 
     ``urlopen`` is injectable for testing (same signature as
     ``urllib.request.urlopen``).
     """
-    opener = urlopen or _default_urlopen
-    return _fetch_published_bytes(
-        url,
-        opener=opener,
-        timeout=30.0,
-        error_prefix=f"Failed to download published PDF from {url}",
-    )
+    try:
+        return fetch_bytes(
+            url,
+            timeout=30.0,
+            error_class=PublishedPdfFetchError,
+            label=url,
+            opener=urlopen,
+            progress=_byte_progress(progress, key, "published_pdf"),
+        )
+    except PublishedPdfFetchError as exc:
+        raise PublishedPdfFetchError(f"Failed to download published PDF from {url}: {exc}") from exc
 
 
 def download_published_material(
@@ -224,6 +272,7 @@ def download_published_material(
     pdf_fetcher: Callable[[str], bytes] | None = None,
     cache_dir: str | Path | None = None,
     fetched_date: str | None = None,
+    progress: FetchProgress | None = None,
 ) -> PublishedDownloadResult:
     """Resolve an OA PDF URL for *doi* and download it into *store*.
 
@@ -245,8 +294,11 @@ def download_published_material(
     if pdf_url is None:
         return PublishedDownloadResult(key=key, doi=normalized)
 
-    fetcher = pdf_fetcher or fetch_published_pdf
-    data = fetcher(pdf_url)
+    _emit_progress(progress, "artifact_start", key, "published_pdf")
+    if pdf_fetcher is None:
+        data = fetch_published_pdf(pdf_url, progress=progress, key=key)
+    else:
+        data = pdf_fetcher(pdf_url)
     pdf_path = store.write_published_pdf(key, data)
     store.record_artifact(
         key,
@@ -255,6 +307,7 @@ def download_published_material(
         fetched_date=fetched_date,
         refetchable=True,
     )
+    _emit_progress(progress, "artifact_done", key, "published_pdf", total_bytes=len(data))
     return PublishedDownloadResult(key=key, doi=normalized, pdf_path=pdf_path)
 
 
@@ -293,19 +346,48 @@ def _normalize_or_raise(identifier: str) -> str:
     return normalized
 
 
-def _fetch_published_bytes(
-    url: str,
+def _byte_progress(
+    progress: FetchProgress | None,
+    key: str,
+    artifact: FetchArtifact,
+):
+    if progress is None:
+        return None
+
+    def callback(advance: int, total: int | None) -> None:
+        progress(
+            FetchProgressEvent(
+                kind="artifact_progress",
+                key=key,
+                artifact=artifact,
+                advance=advance,
+                total_bytes=total,
+            )
+        )
+
+    return callback
+
+
+def _emit_progress(
+    progress: FetchProgress | None,
+    kind: str,
+    key: str,
+    artifact: FetchArtifact,
     *,
-    opener: Callable[..., object],
-    timeout: float,
-    error_prefix: str,
-) -> bytes:
-    try:
-        request = Request(url, headers={"User-Agent": USER_AGENT})
-        with opener(request, timeout=timeout) as response:  # type: ignore[arg-type]
-            return response.read()
-    except (HTTPError, URLError, OSError) as exc:
-        raise PublishedPdfFetchError(f"{error_prefix}: {exc}") from exc
+    total_bytes: int | None = None,
+    message: str = "",
+) -> None:
+    if progress is None:
+        return
+    progress(
+        FetchProgressEvent(
+            kind=kind,  # type: ignore[arg-type]
+            key=key,
+            artifact=artifact,
+            total_bytes=total_bytes,
+            message=message,
+        )
+    )
 
 
 def _validate_tar_member(member: tarfile.TarInfo, root: Path) -> None:

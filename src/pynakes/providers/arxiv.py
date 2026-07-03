@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from urllib.parse import quote
 
 from pynakes._identifiers import normalize_arxiv
-from pynakes.providers._http import ProviderFetchError, fetch_bytes, fetch_text
+from pynakes.providers._http import DownloadProgress, ProviderFetchError, fetch_bytes, fetch_text
 
 BASE_URL = "https://arxiv.org"
 EXPORT_API = "https://export.arxiv.org/api/query"
@@ -108,16 +108,24 @@ def fetch_record(identifier: str, fetcher: FetchArxivAtom | None = None) -> Arxi
     return parse_atom(fetcher(normalized), normalized)
 
 
-def fetch_pdf(identifier: str, timeout: float = 30.0) -> bytes:
+def fetch_pdf(
+    identifier: str, timeout: float = 30.0, progress: DownloadProgress | None = None
+) -> bytes:
     """Fetch arXiv PDF bytes for ``identifier``."""
     arxiv_id = _normalize_or_raise(identifier)
-    return fetch_bytes(pdf_url(arxiv_id), timeout=timeout, label=f"{arxiv_id} PDF")
+    return fetch_bytes(
+        pdf_url(arxiv_id), timeout=timeout, label=f"{arxiv_id} PDF", progress=progress
+    )
 
 
-def fetch_source(identifier: str, timeout: float = 30.0) -> bytes:
+def fetch_source(
+    identifier: str, timeout: float = 30.0, progress: DownloadProgress | None = None
+) -> bytes:
     """Fetch arXiv source archive bytes for ``identifier``."""
     arxiv_id = _normalize_or_raise(identifier)
-    return fetch_bytes(source_url(arxiv_id), timeout=timeout, label=f"{arxiv_id} source")
+    return fetch_bytes(
+        source_url(arxiv_id), timeout=timeout, label=f"{arxiv_id} source", progress=progress
+    )
 
 
 def _xml_text(element: ET.Element, path: str) -> str:
