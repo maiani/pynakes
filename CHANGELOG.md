@@ -39,6 +39,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`metadata set` now validates known-key values and refuses invalid input.**
+  `dialect`/`databaseType` must be `bibtex` or `biblatex`; `fetch-preprint`,
+  `fetch-source`, and `fetch-published` must be a recognised boolean spelling;
+  and known pynakes keys reject empty values. Validation is in
+  `validate_metadata_value` (`src/pynakes/metadata/schema.py`) and applies
+  uniformly across both `jabref-meta` and `pynakes-meta` namespaces. Unknown
+  keys (including JabRef-only keys whose grammar pynakes does not define) pass
+  through without validation.
+
 - **CrossRef fallback for published-PDF URL resolution.** When OpenAlex has no
   direct `pdf_url` for an OA paper, `asset fetch` now falls back to CrossRef's
   `similarity-checking` links (e.g. `harvest.aps.org` URLs that serve the actual

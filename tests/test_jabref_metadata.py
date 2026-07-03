@@ -528,6 +528,57 @@ def test_set_metadata_refuses_duplicate_blocks() -> None:
         raise AssertionError("expected DuplicateMetadataError")
 
 
+def test_set_metadata_refuses_invalid_dialect() -> None:
+    lib = parse_bib("")
+    try:
+        set_metadata(lib, "dialect", "nonsense")
+    except ValueError as exc:
+        assert "Invalid dialect" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for invalid dialect")
+
+    try:
+        set_metadata(lib, "databaseType", "nonsense")
+    except ValueError as exc:
+        assert "Invalid dialect" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for invalid databaseType")
+
+
+def test_set_metadata_refuses_invalid_fetch_boolean() -> None:
+    lib = parse_bib("")
+    try:
+        set_metadata(lib, "fetch-preprint", "maybe")
+    except ValueError as exc:
+        assert "Invalid boolean value" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for invalid fetch boolean")
+
+
+def test_set_metadata_refuses_empty_value_for_known_key() -> None:
+    lib = parse_bib("")
+    try:
+        set_metadata(lib, "key-pattern", "")
+    except ValueError as exc:
+        assert "must not be empty" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for empty key-pattern")
+
+
+def test_set_metadata_accepts_empty_value_for_unknown_key() -> None:
+    lib = parse_bib("")
+    # Unknown keys are not value-validated.
+    set_metadata(lib, "some-unknown-key", "")
+    set_metadata(lib, "some-unknown-key", "anything")
+
+
+def test_set_metadata_accepts_jabref_only_key_with_any_value() -> None:
+    lib = parse_bib("")
+    # JabRef-only keys whose value grammar pynakes does not define pass through.
+    set_metadata(lib, "saveOrderConfig", "specified;author;false;")
+    set_metadata(lib, "grouping", "whatever")
+
+
 def test_remove_metadata_pynakes_key_rewrites_block_in_place() -> None:
     lib = parse_bib("@comment{pynakes-meta:\ndatabaseType: biblatex;\nfiles-dir: refs.files;\n}\n")
 

@@ -11,6 +11,7 @@ policy, not schema, and belongs on the JabRef side instead.
 
 from typing import Literal
 
+from pynakes._text_utils import strip_jabref_terminator
 from pynakes.metadata.core import metadata_list, metadata_value
 from pynakes.model import BibFile
 
@@ -71,6 +72,53 @@ PYNAKES_PREFIX_KEYS: dict[str, MetadataCategory] = {
     # Per-entry-type key patterns, aliasing JabRef's ``keypattern_<type>``.
     "key-pattern-": CATEGORY_CITATION_KEY,
 }
+
+
+_VALID_DIALECTS = {"bibtex", "biblatex"}
+
+
+def validate_metadata_value(key: str, value: str) -> None:
+    """Validate a metadata value for a known key, raising ``ValueError`` if invalid.
+
+    Applies to any metadata key whose value format pynakes understands:
+    ``dialect``/``databaseType`` must be ``bibtex`` or ``biblatex``, the ``fetch-*``
+    booleans must be a recognised truthy/falsy spelling, and all other known keys
+    must have a non-empty value. Unknown-key values (including JabRef-only keys
+    whose grammar pynakes does not define) are accepted without validation.
+    """
+    normalized_key = key.strip().lower()
+    stripped = strip_jabref_terminator(value)
+
+    # Dialect must be bibtex or biblatex (both the native and JabRef key).
+    if normalized_key in {"dialect", "databasetype"}:
+        if stripped.lower() not in _VALID_DIALECTS:
+            raise ValueError(f"Invalid dialect {stripped!r}; expected 'bibtex' or 'biblatex'")
+        return
+
+    # Fetch booleans must be a recognised truthy/falsy spelling.
+    if normalized_key in {"fetch-preprint", "fetch-source", "fetch-published"}:
+        if stripped.lower() not in {
+            "1",
+            "true",
+            "yes",
+            "on",
+            "enabled",
+            "0",
+            "false",
+            "no",
+            "off",
+            "disabled",
+        }:
+            raise ValueError(
+                f"Invalid boolean value {stripped!r} for {key!r}; "
+                f"expected one of: 1/true/yes/on/enabled, 0/false/no/off/disabled"
+            )
+        return
+
+    # Remaining known pynakes keys: refuse empty values.
+    category = metadata_category(key)
+    if category != "unknown" and not stripped:
+        raise ValueError(f"Value for {key!r} must not be empty")
 
 
 def metadata_category(key: str) -> MetadataCategory:

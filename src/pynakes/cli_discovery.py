@@ -9,6 +9,9 @@ import click
 from typer._click.exceptions import UsageError as TyperUsageError
 from typer.core import TyperGroup
 
+from click.shell_completion import CompletionItem
+from typer.models import ArgumentInfo, OptionInfo
+
 from pynakes.cli_common import _emit_error, bib_candidates, missing_bib_message
 
 _BIB_ARGUMENT_NAMES = {"file", "bib_file", "files"}
@@ -145,6 +148,134 @@ class AutoBibGroup(TyperGroup):
         finally:
             for command, original in saved:
                 command.short_help = original
+
+    @staticmethod
+    def _is_typer_option(param: click.Parameter) -> bool:
+        """Return whether *param* is an option-like parameter (Typer or Click)."""
+        return param.param_type_name == "option"
+
+    @staticmethod
+    def _is_typer_argument(param: click.Parameter) -> bool:
+        """Return whether *param* is an argument-like parameter (Typer or Click)."""
+        return param.param_type_name == "argument"
+
+    @staticmethod
+    def _incomplete_typer_option(
+        ctx: click.Context, args: list[str], param: click.Parameter
+    ) -> bool:
+        """Whether *param* (an option) is waiting for a value from the incomplete arg."""
+        if not AutoBibGroup._is_typer_option(param):
+            return False
+        if getattr(param, "is_flag", False) or getattr(param, "count", False):
+            return False
+        depth = getattr(param, "nargs", 1)
+        for index, arg in enumerate(reversed(args)):
+            if index + 1 > depth:
+                break
+            if arg and arg[0] in ctx._opt_prefixes:
+                return arg in param.opts
+        return False
+
+    @staticmethod
+    def _incomplete_typer_argument(
+        ctx: click.Context, param: click.Parameter
+    ) -> bool:
+        """Whether *param* (an argument) can still accept a value."""
+        if not AutoBibGroup._is_typer_argument(param):
+            return False
+        nargs = getattr(param, "nargs", 1)
+        value = ctx.params.get(param.name)
+        return (
+            nargs == -1
+            or ctx.get_parameter_source(param.name) is not click.ParameterSource.COMMANDLINE
+            or (
+                nargs > 1
+                and isinstance(value, (tuple, list))
+                and len(value) < nargs
+            )
+        )
+
+    @staticmethod
+    def _resolve_incomplete_typer(
+        ctx: click.Context, args: list[str], incomplete: str
+    ) -> tuple[click.Command | click.Parameter, str]:
+        """Resolve the param or command to complete, mirroring Click's ``_resolve_incomplete``."""
+        if incomplete == "=":
+            incomplete = ""
+        elif "=" in incomplete and incomplete[0] in ctx._opt_prefixes:
+            name, _, incomplete = incomplete.partition("=")
+            args.append(name)
+
+        if "--" not in args and incomplete and incomplete[0] in ctx._opt_prefixes:
+            return ctx.command, incomplete
+
+        params = ctx.command.get_params(ctx)
+
+        for param in params:
+            if AutoBibGroup._incomplete_typer_option(ctx, args, param):
+                return param, incomplete
+
+        for param in params:
+            if AutoBibGroup._incomplete_typer_argument(ctx, param):
+                return param, incomplete
+
+        return ctx.command, incomplete
+
+    def shell_complete(self, ctx: click.Context, incomplete: str) -> list[CompletionItem]:
+        """Override Click's command-name-only completion to handle Typer sub-groups.
+
+        Click's ``_resolve_context`` uses ``isinstance(command, Group)`` to
+        descend into sub-groups, and ``_resolve_incomplete`` checks
+        ``isinstance(param, Argument/Option)`` to resolve the target param.
+        Since Typer subclasses ``click.Command`` and ``click.Parameter``
+        (not ``Group``/``Argument``/``Option``), those checks always fail.
+        This override walks the Typer command tree directly and provides its
+        own parameter-resolution logic that accepts Typer-style params.
+        """
+        args = [*ctx._protected_args, *ctx.args]
+
+        # Walk the Typer command tree to find the target command.
+        current: click.Command = self
+        while args:
+            name = args[0]
+            cmd = current.commands.get(name) if hasattr(current, "commands") else None
+            if cmd is None:
+                break
+            if len(args) > 1 or incomplete not in current.commands:
+                args.pop(0)
+                current = cmd
+                continue
+            break
+
+        # Suggest option names when the incomplete value looks like an option.
+        if incomplete.startswith("-"):
+            results: list[CompletionItem] = []
+            for param in current.get_params(ctx):
+                if not AutoBibGroup._is_typer_option(param) or getattr(param, "hidden", False):
+                    continue
+                for opt in [*param.opts, *param.secondary_opts]:
+                    if opt.startswith(incomplete):
+                        results.append(CompletionItem(opt, help=param.help))
+            return results
+
+        # Suggest subcommand names when the current command is a group.
+        subcommands = getattr(current, "commands", None)
+        if subcommands:
+            return [
+                CompletionItem(name, help=cmd.get_short_help_str())
+                for name, cmd in subcommands.items()
+                if not getattr(cmd, "hidden", False) and incomplete.lower() in name.lower()
+            ]
+
+        # Leaf command: create a resilient context and resolve the incomplete param.
+        try:
+            with current.make_context(
+                current.name or "", list(args), parent=ctx.parent, resilient_parsing=True
+            ) as sub_ctx:
+                obj, inc = AutoBibGroup._resolve_incomplete_typer(sub_ctx, list(args), incomplete)
+                return obj.shell_complete(sub_ctx, inc)  # type: ignore[no-any-return]
+        except Exception:
+            return []
 
     def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
         # ``ctx.meta`` is shared across the context tree, so recording the JSON

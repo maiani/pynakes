@@ -33,7 +33,7 @@ from pynakes.cli_commands import (
     tex,
     used,
 )
-from pynakes.cli_common import _bibfile_completer
+from pynakes.cli_common import _bibfile_completer, _metadata_key_completer
 from pynakes.cli_common import _citekey_completer as _complete_fn
 from pynakes.cli_discovery import AutoBibGroup
 
@@ -166,16 +166,30 @@ _CITEKEY_ARGS: dict[tuple[str, ...], str] = {
     ("groups", "remove-entry"): "key",
 }
 
+_METADATA_KEY_ARGS: dict[tuple[str, ...], str] = {
+    ("metadata", "set"): "key",
+}
+
 
 def _wire_completion(command, path=()) -> None:
     for name, sub in command.commands.items():
         full = (*path, name)
         if not hasattr(sub, "commands"):
             target = _CITEKEY_ARGS.get(full)
+            meta_target = _METADATA_KEY_ARGS.get(full)
             for param in sub.params:
                 if param.name == target:
                     param.shell_complete = _complete_fn
-                if param.name in ("file", "bib_file", "file_or_key", "key_or_file"):
+                if param.name == meta_target:
+                    param.shell_complete = _metadata_key_completer
+                if param.name in ("file", "bib_file"):
+                    if target is not None:
+                        param.shell_complete = _complete_fn
+                    elif meta_target is not None:
+                        param.shell_complete = _metadata_key_completer
+                    else:
+                        param.shell_complete = _bibfile_completer
+                if param.name in ("file_or_key", "key_or_file"):
                     param.shell_complete = _bibfile_completer
         else:
             _wire_completion(sub, full)

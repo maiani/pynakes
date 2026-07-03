@@ -1,5 +1,7 @@
 """Tests for the pynakes canonical metadata schema and its JabRef fallback accessors."""
 
+import pytest
+
 import pynakes.metadata as metadata_pkg
 from pynakes.bibtex_parser import parse_bib
 from pynakes.engine import Bibliography
@@ -247,6 +249,99 @@ def test_aliased_drift_warns_when_dialect_disagrees() -> None:
     )
     warnings = metadata_pkg.aliased_drift_warnings(lib)
     assert any("drift" in w and "dialect" in w for w in warnings)
+
+
+# --- validate_metadata_value ------------------------------------------------
+
+
+def test_validate_dialect_accepts_bibtex() -> None:
+    metadata_pkg.validate_metadata_value("dialect", "bibtex")
+
+
+def test_validate_dialect_accepts_biblatex() -> None:
+    metadata_pkg.validate_metadata_value("dialect", "biblatex")
+
+
+def test_validate_dialect_accepts_database_type() -> None:
+    metadata_pkg.validate_metadata_value("databaseType", "biblatex")
+
+
+def test_validate_dialect_rejects_nonsense() -> None:
+    with pytest.raises(ValueError, match="Invalid dialect"):
+        metadata_pkg.validate_metadata_value("dialect", "nonsense")
+
+
+def test_validate_dialect_rejects_empty() -> None:
+    with pytest.raises(ValueError, match="Invalid dialect"):
+        metadata_pkg.validate_metadata_value("dialect", "")
+
+
+def test_validate_fetch_boolean_accepts_truthy() -> None:
+    for val in ("1", "true", "yes", "on", "enabled"):
+        metadata_pkg.validate_metadata_value("fetch-preprint", val)
+        metadata_pkg.validate_metadata_value("fetch-source", val)
+        metadata_pkg.validate_metadata_value("fetch-published", val)
+
+
+def test_validate_fetch_boolean_accepts_falsy() -> None:
+    for val in ("0", "false", "no", "off", "disabled"):
+        metadata_pkg.validate_metadata_value("fetch-preprint", val)
+        metadata_pkg.validate_metadata_value("fetch-source", val)
+        metadata_pkg.validate_metadata_value("fetch-published", val)
+
+
+def test_validate_fetch_boolean_rejects_invalid() -> None:
+    with pytest.raises(ValueError, match="Invalid boolean value"):
+        metadata_pkg.validate_metadata_value("fetch-preprint", "maybe")
+
+
+def test_validate_known_key_rejects_empty_value() -> None:
+    with pytest.raises(ValueError, match="must not be empty"):
+        metadata_pkg.validate_metadata_value("sort-order", "")
+    with pytest.raises(ValueError, match="must not be empty"):
+        metadata_pkg.validate_metadata_value("key-pattern", "")
+    with pytest.raises(ValueError, match="must not be empty"):
+        metadata_pkg.validate_metadata_value("tex-sources", "")
+    with pytest.raises(ValueError, match="must not be empty"):
+        metadata_pkg.validate_metadata_value("protected-terms", "")
+    with pytest.raises(ValueError, match="must not be empty"):
+        metadata_pkg.validate_metadata_value("lint-required-fields", "")
+
+
+def test_validate_known_prefix_key_rejects_empty_value() -> None:
+    with pytest.raises(ValueError, match="must not be empty"):
+        metadata_pkg.validate_metadata_value("key-pattern-article", "")
+    with pytest.raises(ValueError, match="must not be empty"):
+        metadata_pkg.validate_metadata_value("normalize-title-case", "")
+    with pytest.raises(ValueError, match="must not be empty"):
+        metadata_pkg.validate_metadata_value("lint-required-fields-article", "")
+
+
+def test_validate_unknown_key_skips_validation() -> None:
+    metadata_pkg.validate_metadata_value("some-unknown-key", "")
+    metadata_pkg.validate_metadata_value("some-unknown-key", "anything")
+
+
+def test_validate_accepts_non_empty_known_values() -> None:
+    metadata_pkg.validate_metadata_value("sort-order", "year:desc")
+    metadata_pkg.validate_metadata_value("key-pattern", "[auth][year]")
+    metadata_pkg.validate_metadata_value("tex-sources", "paper.tex")
+    metadata_pkg.validate_metadata_value("protected-terms", "pH,NaCl")
+    metadata_pkg.validate_metadata_value("files-dir", "refs.files")
+    metadata_pkg.validate_metadata_value("journal-table", "J. Phys.: A, J. Chem.")
+    metadata_pkg.validate_metadata_value("normalize-dois", "true")
+
+
+def test_validate_dialect_handles_trailing_semicolon() -> None:
+    metadata_pkg.validate_metadata_value("databaseType", "biblatex;")
+
+
+def test_validate_dialect_handles_case_insensitive() -> None:
+    metadata_pkg.validate_metadata_value("dialect", "BibTeX")
+    metadata_pkg.validate_metadata_value("dialect", "BIBLATEX")
+
+
+# --- drift warnings --------------------------------------------------------
 
 
 def test_aliased_drift_silent_when_consistent() -> None:

@@ -371,6 +371,32 @@ def _finish_create(
     _emit(params.json_output, payload, human, diff_text, params.diff)
 
 
+def _metadata_key_completer(ctx, incomplete):
+    """Shell-completion callback yielding known metadata keys.
+
+    Intended for use as ``param.shell_complete`` on the ``key`` argument of
+    ``metadata set``. Suggests all keys known to either JabRef or pynakes.
+    """
+    from pynakes.metadata.jabref import JABREF_EXACT_KEYS, JABREF_PREFIX_KEYS
+    from pynakes.metadata.schema import PYNAKES_EXACT_KEYS, PYNAKES_PREFIX_KEYS
+
+    incomplete_lower = incomplete.lower()
+    items: list[CompletionItem] = []
+    for key in JABREF_EXACT_KEYS:
+        if incomplete_lower in key.lower():
+            items.append(CompletionItem(key))
+    for key in PYNAKES_EXACT_KEYS:
+        if incomplete_lower in key.lower():
+            items.append(CompletionItem(key))
+    for prefix in JABREF_PREFIX_KEYS:
+        if incomplete_lower in prefix.lower():
+            items.append(CompletionItem(prefix))
+    for prefix in PYNAKES_PREFIX_KEYS:
+        if incomplete_lower in prefix.lower():
+            items.append(CompletionItem(prefix))
+    return items
+
+
 def _metadata_cache_dir(file: str, cache_dir: str | None, online: bool) -> str | None:
     if cache_dir is not None:
         return cache_dir

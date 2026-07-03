@@ -87,6 +87,7 @@ from pynakes.metadata.schema import (
     native_key_pattern,
     native_sort_order,
     parse_sort_order_value,
+    validate_metadata_value,
 )
 
 
@@ -166,6 +167,7 @@ __all__ = [
     "native_key_pattern",
     "native_sort_order",
     "parse_metadata_comment",
+    "validate_metadata_value",
     "parse_save_actions",
     "parse_save_order",
     "parse_sort_order_value",

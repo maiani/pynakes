@@ -472,6 +472,9 @@ def set_metadata(
     ``pynakes-meta`` accepts any key, since it is pynakes' own namespace. If
     multiple existing blocks in the target namespace match the key, the update
     is refused because choosing one would be ambiguous.
+
+    Raises ``ValueError`` when ``value`` is not valid for the given key (e.g. a
+    ``dialect`` that is not ``"bibtex"`` or ``"biblatex"``).
     """
     key = key.strip()
     if not key:
@@ -487,6 +490,8 @@ def set_metadata(
             f"Unknown JabRef metadata key {key!r}; pass --allow-unknown to write it to "
             "jabref-meta, or write it to pynakes-meta instead"
         )
+
+    pynakes_schema.validate_metadata_value(key, value)
 
     return core.set_in_namespace(lib, key, value, namespace, classify=metadata_category)
 

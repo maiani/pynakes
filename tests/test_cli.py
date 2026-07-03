@@ -820,7 +820,12 @@ class TestImportCommand:
             url = request.full_url if hasattr(request, "full_url") else str(request)
             if "openalex.org" in str(url):
                 body = json.dumps(
-                    {"best_oa_location": {"host_type": "publisher", "pdf_url": "https://example.com/provider.pdf"}}
+                    {
+                        "best_oa_location": {
+                            "host_type": "publisher",
+                            "pdf_url": "https://example.com/provider.pdf",
+                        }
+                    }
                 ).encode("utf-8")
                 return BytesIO(body)
             raise AssertionError("unexpected urlopen call")
@@ -1165,6 +1170,21 @@ class TestMetadataCommand:
         data = json.loads(result.output)
         assert data["file"] == "refs.bib"
         assert data["effective"]["dialect"] == "biblatex;"
+
+    def test_set_key_completion_does_not_error(self) -> None:
+        result = runner.invoke(
+            app,
+            [],
+            env={
+                "COMP_WORDS": "pynakes metadata set sort",
+                "COMP_CWORD": "3",
+                "_PYNAKES_COMPLETE": "complete_bash",
+            },
+            prog_name="pynakes",
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "InvalidInput" not in result.output
 
 
 class TestKeysCommand:
@@ -2283,7 +2303,7 @@ class TestConvertCommand:
 
         assert result.exit_code == 0, result.output
         assert "key,type,author,title,year" in result.output
-        assert "A,article,\"Doe, J\",T,2020" in result.output
+        assert 'A,article,"Doe, J",T,2020' in result.output
         assert bib.read_text().startswith("@article{A,")
 
     def test_convert_export_to_csv_file(self, tmp_path: Path) -> None:
@@ -2302,7 +2322,7 @@ class TestConvertCommand:
         assert (data["to"], data["written"], data["entry_count"]) == ("csv", True, 1)
         csv_text = out.read_text()
         assert "key,type,author,title,year" in csv_text
-        assert "A,article,\"Doe, J\",T,2020" in csv_text
+        assert 'A,article,"Doe, J",T,2020' in csv_text
 
     def test_convert_import_from_ris(self, tmp_path: Path) -> None:
         ris = tmp_path / "in.ris"
@@ -2330,9 +2350,7 @@ class TestConvertCommand:
         src = tmp_path / "in.csv"
         src.write_text("key,title\nA,T\n")
 
-        result = runner.invoke(
-            app, ["convert", str(src), "--from", "csv", "--json"]
-        )
+        result = runner.invoke(app, ["convert", str(src), "--from", "csv", "--json"])
 
         assert result.exit_code == 1, result.output
         assert json.loads(result.output)["error"] == "UnknownConvertSource"
@@ -2838,7 +2856,12 @@ class TestAssetFetchPublished:
             url = request.full_url if hasattr(request, "full_url") else str(request)
             if "openalex.org" in str(url):
                 body = json.dumps(
-                    {"best_oa_location": {"host_type": "publisher", "pdf_url": "https://example.com/paper.pdf"}}
+                    {
+                        "best_oa_location": {
+                            "host_type": "publisher",
+                            "pdf_url": "https://example.com/paper.pdf",
+                        }
+                    }
                 ).encode("utf-8")
                 return BytesIO(body)
             raise AssertionError("unexpected urlopen call")
@@ -2857,7 +2880,9 @@ class TestAssetFetchPublished:
         assert len(data["fetched"]) == 1
         assert data["fetched"][0]["key"] == "Einstein1905"
         assert data["fetched"][0]["pdf_path"] is not None
-        assert (tmp_path / "refs.files" / "Einstein1905.published.pdf").read_bytes() == (b"%PDF published")
+        assert (tmp_path / "refs.files" / "Einstein1905.published.pdf").read_bytes() == (
+            b"%PDF published"
+        )
         assert len(list((tmp_path / ".pynakes-cache" / "openalex").glob("*.json"))) == 1
 
     def test_fetch_published_reports_malformed_doi_per_entry(
