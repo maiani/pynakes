@@ -133,9 +133,9 @@ sidecar directory (`{bibname}.files/`) that stores downloaded materials
 {bibname}.bib               # BibTeX library (pynakes-managed)
 {bibname}.files/            # Pinax files-dir (auto-generated)
   .pinax/manifest.json    # Integrity manifest (SHA-256, fetch dates, sources)
-  {{Key}}_preprint.pdf      # Preprint PDF for entry {{Key}}
-  {{Key}}_preprint/         # Preprint source bundle (LaTeX + figures)
-  {{Key}}.pdf               # Published PDF (when available)
+  {{Key}}.preprint.pdf      # Preprint PDF for entry {{Key}}
+  {{Key}}.source/           # Preprint source bundle (LaTeX + figures)
+  {{Key}}.published.pdf     # Published PDF (when available)
 ```
 
 The `files-dir` path is set in the `pynakes-meta` block inside the `.bib`
@@ -147,7 +147,7 @@ file (key: `files-dir`). Fetch behaviour is configured by:
 ## Agent rules
 
 1. **Prefer source over PDF** — when an entry has a Pinax source directory
-   (`{{Key}}_preprint/`), read the `.tex` files there rather than the `.pdf`.
+   (`{{Key}}.source/`), read the `.tex` files there rather than the `.pdf`.
    The source contains semantically meaningful content (equations, citations,
    structured sections) that PDF reading tools cannot reliably extract.
 

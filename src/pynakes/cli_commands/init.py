@@ -23,6 +23,7 @@ from pynakes.cli_common import (
     _emit_error,
     _finish_create,
     _finish_mod,
+    _resolve_input_bib,
     _safe,
     _verb,
 )
@@ -119,7 +120,9 @@ def _convert_to_pinax(
 
 
 def init(
-    file: str = typer.Argument(..., help="Path to the .bib library to create or convert"),
+    file: str | None = typer.Argument(
+        None, help="Path to the .bib library (default: auto-detect single .bib in cwd with --pinax)"
+    ),
     type_: str | None = typer.Option(
         None, "--type", help="Library dialect: biblatex or bibtex (sets the native 'dialect' key)"
     ),
@@ -169,6 +172,17 @@ def init(
     alongside ``--pinax``).
     """
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+
+    if file is None:
+        if pinax:
+            file = _resolve_input_bib(None, params.json_output)
+        else:
+            _emit_error(
+                params.json_output,
+                "InvalidInput",
+                "file argument is required to create a new library; "
+                "only --pinax supports auto-detection",
+            )
 
     if type_ is not None and type_ not in {"biblatex", "bibtex"}:
         _emit_error(

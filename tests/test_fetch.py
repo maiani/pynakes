@@ -14,6 +14,7 @@ from pynakes.fetch import (
     ArxivFetchError,
     ArxivSourceUnavailableError,
     PublishedPdfFetchError,
+    crossref_oa_pdf_url,
     download_arxiv_materials,
     download_published_material,
     extract_arxiv_source,
@@ -91,15 +92,15 @@ def test_download_arxiv_materials_writes_pdf_and_source(tmp_path: Path) -> None:
     assert result.to_dict() == {
         "key": "Noether1918",
         "arxiv_id": "2101.00001",
-        "pdf_path": str(tmp_path / "refs.files" / "Noether1918_preprint.pdf"),
-        "source_path": str(tmp_path / "refs.files" / "Noether1918_preprint"),
+        "pdf_path": str(tmp_path / "refs.files" / "Noether1918.preprint.pdf"),
+        "source_path": str(tmp_path / "refs.files" / "Noether1918.source"),
     }
-    assert (tmp_path / "refs.files" / "Noether1918_preprint.pdf").read_bytes() == (b"%PDF preprint")
-    assert (tmp_path / "refs.files" / "Noether1918_preprint" / "paper.tex").read_bytes() == (
+    assert (tmp_path / "refs.files" / "Noether1918.preprint.pdf").read_bytes() == (b"%PDF preprint")
+    assert (tmp_path / "refs.files" / "Noether1918.source" / "paper.tex").read_bytes() == (
         b"\\title{Fixture}\n"
     )
     assert (
-        tmp_path / "refs.files" / "Noether1918_preprint" / "src" / "notes.txt"
+        tmp_path / "refs.files" / "Noether1918.source" / "src" / "notes.txt"
     ).read_bytes() == (b"notes\n")
     manifest = json.loads((tmp_path / "refs.files" / ".pinax" / "manifest.json").read_text())
     row = manifest["files"]["Noether1918"]
@@ -147,11 +148,11 @@ def test_download_arxiv_materials_pdf_only_source_keeps_pdf(tmp_path: Path) -> N
         fetched_date="2026-06-27",
     )
 
-    assert result.pdf_path == tmp_path / "refs.files" / "Noether1918_preprint.pdf"
+    assert result.pdf_path == tmp_path / "refs.files" / "Noether1918.preprint.pdf"
     assert result.source_path is None
     assert result.source_unavailable is True
-    assert (tmp_path / "refs.files" / "Noether1918_preprint.pdf").read_bytes() == b"%PDF preprint"
-    assert not (tmp_path / "refs.files" / "Noether1918_preprint").exists()
+    assert (tmp_path / "refs.files" / "Noether1918.preprint.pdf").read_bytes() == b"%PDF preprint"
+    assert not (tmp_path / "refs.files" / "Noether1918.source").exists()
 
     manifest = json.loads((tmp_path / "refs.files" / ".pinax" / "manifest.json").read_text())
     row = manifest["files"]["Noether1918"]
@@ -161,7 +162,7 @@ def test_download_arxiv_materials_pdf_only_source_keeps_pdf(tmp_path: Path) -> N
 
 def test_failed_source_download_leaves_existing_source_tree(tmp_path: Path) -> None:
     root = tmp_path / "refs.files"
-    existing = root / "Noether1918_preprint"
+    existing = root / "Noether1918.source"
     existing.mkdir(parents=True)
     (existing / "old.tex").write_text("old\n")
     store = FileStore(root=root, bib_path=tmp_path / "refs.bib")
@@ -203,6 +204,7 @@ class _FakeResponse:
 _OPENALEX_WITH_OA = json.dumps(
     {
         "best_oa_location": {
+            "host_type": "publisher",
             "pdf_url": "https://example.com/paper.pdf",
         }
     }
@@ -270,6 +272,82 @@ def test_openalex_oa_pdf_url_does_not_cache_invalid_json(tmp_path: Path) -> None
     assert not list(cache_dir.rglob("*.json"))
 
 
+_CROSSREF_WITH_PDF = json.dumps(
+    {
+        "status": "ok",
+        "message": {
+            "link": [
+                {
+                    "URL": "https://www.nature.com/articles/s41586-023-06747-5.pdf",
+                    "content-type": "application/pdf",
+                    "content-version": "vor",
+                    "intended-application": "text-mining",
+                }
+            ]
+        },
+    }
+).encode("utf-8")
+
+_CROSSREF_WITH_SIMILARITY = json.dumps(
+    {
+        "status": "ok",
+        "message": {
+            "link": [
+                {
+                    "URL": "http://harvest.aps.org/v2/journals/articles/10.1103/f6nc-vsnx/fulltext",
+                    "content-type": "unspecified",
+                    "content-version": "vor",
+                    "intended-application": "similarity-checking",
+                }
+            ]
+        },
+    }
+).encode("utf-8")
+
+_CROSSREF_WITHOUT_PDF = json.dumps(
+    {
+        "status": "ok",
+        "message": {
+            "link": [],
+        },
+    }
+).encode("utf-8")
+
+
+def test_crossref_oa_pdf_url_resolves_pdf_link(tmp_path: Path) -> None:
+    def fake_urlopen(request: object, timeout: float = 30.0) -> _FakeResponse:
+        target = request.full_url if hasattr(request, "full_url") else str(request)
+        assert "api.crossref.org/works/" in str(target)
+        return _FakeResponse(_CROSSREF_WITH_PDF)
+
+    url = crossref_oa_pdf_url("10.1038/s41586-023-06747-5", urlopen=fake_urlopen)
+    assert url == "https://www.nature.com/articles/s41586-023-06747-5.pdf"
+
+
+def test_crossref_oa_pdf_url_falls_back_to_similarity_checking(tmp_path: Path) -> None:
+    def fake_urlopen(request: object, timeout: float = 30.0) -> _FakeResponse:
+        return _FakeResponse(_CROSSREF_WITH_SIMILARITY)
+
+    url = crossref_oa_pdf_url("10.1103/f6nc-vsnx", urlopen=fake_urlopen)
+    assert url == "http://harvest.aps.org/v2/journals/articles/10.1103/f6nc-vsnx/fulltext"
+
+
+def test_crossref_oa_pdf_url_returns_none_when_no_links(tmp_path: Path) -> None:
+    def fake_urlopen(request: object, timeout: float = 30.0) -> _FakeResponse:
+        return _FakeResponse(_CROSSREF_WITHOUT_PDF)
+
+    url = crossref_oa_pdf_url("10.1103/PhysRevLett.100.123456", urlopen=fake_urlopen)
+    assert url is None
+
+
+def test_crossref_oa_pdf_url_returns_none_when_no_work(tmp_path: Path) -> None:
+    def fake_urlopen(request: object, timeout: float = 30.0) -> _FakeResponse:
+        return _FakeResponse(b"{}")
+
+    url = crossref_oa_pdf_url("10.1103/PhysRevLett.100.123456", urlopen=fake_urlopen)
+    assert url is None
+
+
 def test_fetch_published_pdf_reads_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert "example.com/paper.pdf" in str(request.url)
@@ -306,9 +384,9 @@ def test_download_published_material_writes_pdf_and_manifest(tmp_path: Path) -> 
         fetched_date="2026-06-27",
     )
 
-    assert result.pdf_path == tmp_path / "refs.files" / "Noether1918.pdf"
+    assert result.pdf_path == tmp_path / "refs.files" / "Noether1918.published.pdf"
     assert result.doi == "10.1103/PhysRevLett.100.123456"
-    assert (tmp_path / "refs.files" / "Noether1918.pdf").read_bytes() == b"%PDF published"
+    assert (tmp_path / "refs.files" / "Noether1918.published.pdf").read_bytes() == b"%PDF published"
 
     manifest = json.loads((tmp_path / "refs.files" / ".pinax" / "manifest.json").read_text())
     row = manifest["files"]["Noether1918"]
@@ -333,7 +411,7 @@ def test_download_published_material_returns_none_when_no_oa(tmp_path: Path) -> 
     )
 
     assert result.pdf_path is None
-    assert not (tmp_path / "refs.files" / "Noether1918.pdf").exists()
+    assert not (tmp_path / "refs.files" / "Noether1918.published.pdf").exists()
 
 
 def test_download_published_material_wraps_malformed_doi(tmp_path: Path) -> None:

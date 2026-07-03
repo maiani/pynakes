@@ -111,28 +111,33 @@ from the citation key:
 ```text
 refs.bib
 refs.files/                       ← files-dir, declared in pynakes-meta
-  alvarez2019.pdf                 ← published PDF (version of record):  <citekey>.pdf
-  alvarez2019_preprint.pdf        ← arXiv PDF:  <citekey>_preprint.pdf
-  alvarez2019_preprint/           ← arXiv source bundle:  <citekey>_preprint/
+  alvarez2019.published.pdf       ← published PDF (version of record):  <citekey>.published.pdf
+  alvarez2019.preprint.pdf        ← arXiv PDF:  <citekey>.preprint.pdf
+  alvarez2019.source/             ← arXiv source bundle:  <citekey>.source/
     main.tex
     figures/
-  bohr1913_preprint.pdf           ← arXiv-only paper: just a preprint, no published <citekey>.pdf
-  curie1898.pdf                   ← published-only paper (no arXiv)
+  bohr1913.preprint.pdf           ← arXiv-only paper: just a preprint, no published <citekey>.published.pdf
+  curie1898.published.pdf         ← published-only paper (no arXiv)
+  darwin1859.supplement.pdf       ← supplementary material: <citekey>.supplement.pdf
+  darwin1859.erratum.pdf          ← corrected version: <citekey>.erratum.pdf
   .pinax/
     manifest.json                 ← provenance sidecar (see Provenance manifest)
 ```
 
 Two version classes share each citation key. The **published** version of record
-is unsuffixed; the **preprint** (arXiv) carries an always-on `_preprint` label, on
-both the PDF and the source folder. The filename alone tells you the version — no
-manifest lookup — and nothing is renamed when a published version later appears:
-you just add `<citekey>.pdf` beside the existing `_preprint` files.
+carries a `.published` label; the **preprint** (arXiv) carries a `.preprint` label
+on the PDF and a `.source` label on the source folder. The filename alone tells
+you the version — no manifest lookup — and nothing is renamed when a published
+version later appears: you just add `<citekey>.published.pdf` beside the existing
+`.preprint` and `.source` files.
 
 | Shape | Path | Meaning |
 | --- | --- | --- |
-| **Published PDF** | `<files-dir>/<citekey>.pdf` | The version of record — present when available (often only if open-access). |
-| **Preprint PDF** | `<files-dir>/<citekey>_preprint.pdf` | The arXiv PDF. |
-| **Preprint source** | `<files-dir>/<citekey>_preprint/` | The arXiv source tree. **Read-only** in v1 — fetched, not authored. |
+| **Published PDF** | `<files-dir>/<citekey>.published.pdf` | The version of record — present when available (often only if open-access). |
+| **Preprint PDF** | `<files-dir>/<citekey>.preprint.pdf` | The arXiv PDF. |
+| **Preprint source** | `<files-dir>/<citekey>.source/` | The arXiv source tree. **Read-only** in v1 — fetched, not authored. |
+| **Supplement PDF** | `<files-dir>/<citekey>.supplement.pdf` | Supplementary material (data, extended proofs, etc.). |
+| **Erratum PDF** | `<files-dir>/<citekey>.erratum.pdf` | Corrected / revised version. |
 
 The filename is *derived* from the citation key, never stored. pynakes discovers
 materials by scanning `files-dir` against the keys it already knows; there is no
@@ -192,7 +197,7 @@ These extend — never weaken — the guiding principles in
 3. **Presence is the filesystem; the manifest is provenance-only and
    rebuildable** for everything except precious files.
 4. **Source bundles are read-only fetched material** in v1. The
-   `<citekey>_preprint/` tree is content pynakes downloaded, not a directory it
+   `<citekey>.source/` tree is content pynakes downloaded, not a directory it
    authors into.
 5. **Material mutations are coordinated, never guessed.** As `editing.py` is the
    only boundary for `.bib` text, all material moves/downloads go through the
@@ -224,7 +229,7 @@ only when — a `files-dir` is set:
 | Declare the files-dir | `init --pinax`, or `metadata set files-dir` | The only step that "creates" a pinax. |
 | See what materials exist | `inspect [--json]` | The report gains per-entry presence and local paths — the [agent surface](#agent-surface). |
 | Validate materials | `asset check [--fix]` | Reports missing/orphan/drift between references and `files-dir`; reconciles with `--fix`. |
-| Rename / regenerate keys | `keys rename`, `keys generate`, `keys repair` | Every material sharing the key — `<citekey>.pdf`, `<citekey>_preprint.pdf`, `<citekey>_preprint/` — moves with it (see [Coordinated edits](#coordinated-edits-and-atomicity)). |
+| Rename / regenerate keys | `keys rename`, `keys generate`, `keys repair` | Every material sharing the key — `<citekey>.published.pdf`, `<citekey>.preprint.pdf`, `<citekey>.source/` — moves with it (see [Coordinated edits](#coordinated-edits-and-atomicity)). |
 | Download missing materials | `asset fetch` (the one new download verb) | See [Fetch](#fetch-the-first-slice). |
 | Combine / split | `corpus combine`, `corpus split` | Produce pinakes; each output entry's materials are copied into the output's files-dir. Non-destructive — inputs untouched. |
 
@@ -262,11 +267,11 @@ Given an arXiv entry, it downloads the PDF and the source bundle into the right
 place:
 
 ```text
-pynakes asset fetch alvarez2019 refs.bib  →  refs.files/alvarez2019_preprint.pdf
-                                             refs.files/alvarez2019_preprint/
+pynakes asset fetch alvarez2019 refs.bib  →  refs.files/alvarez2019.preprint.pdf
+                                             refs.files/alvarez2019.source/
 ```
 
-(arXiv yields the preprint; a published `<citekey>.pdf` lands only when an
+(arXiv yields the preprint; a published `<citekey>.published.pdf` lands only when an
 open-access published PDF is found — see [Preprint and published
 versions](#preprint-and-published-versions).)
 
@@ -276,21 +281,32 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
   suite never touches it (fetchers are injectable, as in `importer.py`).
 - **Sources.** arXiv first — an entry's arXiv id (via `importer.entry_arxiv_id`)
   yields the preprint PDF at `arxiv.org/pdf/<id>` and the source tarball at
-  `arxiv.org/e-print/<id>`, stored as the `_preprint` artifacts. An open-access
-  published PDF (resolved from the entry's DOI) lands as the unsuffixed
-  `<citekey>.pdf`. Both come behind the same opt-in.
+  `arxiv.org/e-print/<id>`, stored as the `.preprint` and `.source` artifacts.
+  An open-access published PDF (resolved from the entry's DOI) lands as
+  `<citekey>.published.pdf`. Both come behind the same opt-in.
+- **Published-PDF resolution chain.** The published-PDF URL is resolved through
+  a three-step pipeline: **(1)** OpenAlex — looks up `best_oa_location` and
+  accepts only publisher-hosted URLs (rejecting arXiv or repository mirrors);
+  **(2)** bundled publisher overrides — when OpenAlex has a publisher landing
+  page but no direct `pdf_url`, publisher-specific URL-construction rules in
+  `src/pynakes/providers/pdf_overrides.json` try to derive the PDF URL from
+  the landing page URL or DOI prefix (covering APS, Nature, Science, PNAS,
+  Wiley, and more); **(3)** CrossRef — falls back to CrossRef's
+  `similarity-checking` links (e.g. `harvest.aps.org` URLs that serve the
+  actual PDF). A step silently returns `None` when it does not know the paper;
+  the chain stops at the first hit.
 - **Zero-config.** If the `.bib` is not yet a pinax, `asset fetch` records the default
   `files-dir` (`<stem>.files`) and creates it — one command bootstraps the corpus.
 - **Atomic writes.** A download lands in a temporary name inside `files-dir` and
   is atomically renamed into place; a partial download never leaves a half-file
   under a citation key. Source tarballs extract safely (no path traversal, no
-  symlinks) into `<citekey>_preprint/`.
+  symlinks) into `<citekey>.source/`.
 - **Bytes only, never extraction.** `asset fetch` retrieves and stores files. It does
   **not** parse PDF content — that is [deferred](#deliberately-deferred).
 - **Graceful gaps.** `asset fetch` stores only what exists and never errors on a gap.
   An entry with no arXiv id and no resolvable open-access DOI simply has nothing
   to fetch — it lands in `skipped` with a reason, not `failed`. A PDF-only e-print
-  (no source tree) skips the source step, so no empty `<citekey>_preprint/` is
+  (no source tree) skips the source step, so no empty `<citekey>.source/` is
   created. `failed` is reserved for an actual download or I/O error.
 - **Envelope.** `asset fetch` extends the standard JSON envelope with `fetched` /
   `skipped` / `failed` lists; `modified` reflects whether the `.bib` changed (e.g.
@@ -317,24 +333,28 @@ metadata (`doi`, `journal`, …) and the arXiv `eprint` on the *same* entry, and
 `dedupe` / `verify --published` push toward that. So the key addresses the work,
 and the two version classes hang off it by name:
 
-- `<citekey>.pdf` — the **published** version of record (unsuffixed).
-- `<citekey>_preprint.pdf` and `<citekey>_preprint/` — the **arXiv** PDF and source.
+- `<citekey>.published.pdf` — the **published** version of record.
+- `<citekey>.preprint.pdf` and `<citekey>.source/` — the **arXiv** PDF and source.
 
 The three `fetch-*` keys select what `asset fetch` downloads: `fetch-preprint` the arXiv
-PDF, `fetch-source` the arXiv source tree, `fetch-published` the unsuffixed
-published PDF — set in metadata, not per invocation. Because
+PDF, `fetch-source` the arXiv source tree, `fetch-published` the `.published.pdf`
+PDF — set in metadata, not per invocation. Because
 published PDFs are usually paywalled, the preprint is what reliably arrives; the
-published `<citekey>.pdf` shows up only when it is open-access.
+published `<citekey>.published.pdf` shows up only when it is open-access.
+The resolution chain handles the gap: OpenAlex's `best_oa_location` is filtered
+to publisher-hosted URLs only, and when no direct `pdf_url` is available,
+[publisher-specific overrides](#published-pdf-resolution-chain) or CrossRef
+are tried as fallbacks.
 
-**Two roles come apart, and a boolean picks the canonical.** The unsuffixed
-`<citekey>.pdf` is the *version of record* (what you cite). The **canonical**
+**Two roles come apart, and a boolean picks the canonical.** `<citekey>.published.pdf`
+is the *version of record* (what you cite). The **canonical**
 artifact (what you read and work from) is chosen by a simple per-entry boolean,
 `preprint_canonical` (default `false`):
 
-- `false` → canonical is the published `<citekey>.pdf` (falling back to the
+- `false` → canonical is `<citekey>.published.pdf` (falling back to the
   preprint if there is no published PDF).
-- `true` → canonical is `<citekey>_preprint.pdf` together with its
-  `<citekey>_preprint/` source.
+- `true` → canonical is `<citekey>.preprint.pdf` together with its
+  `<citekey>.source/` archive.
 
 Set `preprint_canonical: true` when the arXiv version is the one to trust — most
 often because the authors revised it *after* publication, and because it carries
@@ -398,7 +418,7 @@ a preprint exists, backfills the arXiv id.
   entry, which *is* its provenance.
 
 Once `eprint` is present, the existing `fetch-source` machinery downloads the
-`<citekey>_preprint/` tree unchanged; `preprint_canonical: true` then lets you
+`<citekey>.source/` tree unchanged; `preprint_canonical: true` then lets you
 read the arXiv source while still citing the version of record. This is distinct
 from [step 9](#implementation-steps) (open-access *published PDF* bytes): this
 step recovers the *identifier linkage*, and is useful to any library, pinax or
@@ -456,7 +476,7 @@ records **provenance only**:
 - `preprint_canonical` (per entry, default `false`) marks the preprint as the
   canonical content to read; `canonical_*` resolves from it. `false` → the
   published `<citekey>.pdf` (or the preprint if there is no published PDF);
-  `true` → the `_preprint` artifacts. See [Preprint and published
+   `true` → the `.preprint` / `.source` artifacts. See [Preprint and published
   versions](#preprint-and-published-versions).
 - Each artifact records when it was obtained — `fetched_date` (downloaded by
   `asset fetch`) or `added_date` (manually placed) — as provenance. It is not a
@@ -470,11 +490,11 @@ pinax annotates every entry with what is available locally:
 ```json
 {
   "key": "alvarez2019",
-  "published_pdf": "refs.files/alvarez2019.pdf",
-  "preprint_pdf": "refs.files/alvarez2019_preprint.pdf",
-  "preprint_source": "refs.files/alvarez2019_preprint/",
-  "canonical_pdf": "refs.files/alvarez2019_preprint.pdf",
-  "canonical_source": "refs.files/alvarez2019_preprint/",
+  "published_pdf": "refs.files/alvarez2019.published.pdf",
+  "preprint_pdf": "refs.files/alvarez2019.preprint.pdf",
+  "preprint_source": "refs.files/alvarez2019.source/",
+  "canonical_pdf": "refs.files/alvarez2019.preprint.pdf",
+  "canonical_source": "refs.files/alvarez2019.source/",
   "refetchable": true
 }
 ```
@@ -532,7 +552,7 @@ checklist.
 
 1. **`files-dir` + `FileStore` foundation (offline).** Recognize the `files-dir`
    `pynakes-meta` key; add `filestore.py` with the deterministic version-class
-   paths (`<citekey>.pdf`, `<citekey>_preprint.pdf`, `<citekey>_preprint/`),
+    paths (`<citekey>.published.pdf`, `<citekey>.preprint.pdf`, `<citekey>.source/`),
    directory scan, and presence checks; expose `Bibliography.files`
    (`FileStore | None`). No network.
 2. **arXiv download core.** Add `fetch.py`: injectable `fetch_arxiv_pdf` /

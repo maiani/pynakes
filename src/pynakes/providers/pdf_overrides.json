@@ -1,0 +1,106 @@
+{
+  "rules": [
+    {
+      "description": "American Physical Society (APS): /abstract/ → /pdf/",
+      "url_contains": "journals.aps.org/",
+      "from": "/abstract/",
+      "to": "/pdf/"
+    },
+    {
+      "description": "APS DOI prefix → harvest PDF URL",
+      "doi_prefix": "10.1103/",
+      "doi_to_url": "http://harvest.aps.org/v2/journals/articles/{doi}/fulltext"
+    },
+    {
+      "description": "AIP Publishing: /article-abstract/ → /article/pdf/",
+      "url_contains": "pubs.aip.org/",
+      "from": "/article-abstract/",
+      "to": "/article/pdf/"
+    },
+    {
+      "description": "IOPscience: /article/ → /pdf/",
+      "url_contains": "iopscience.iop.org/",
+      "from": "/article/",
+      "to": "/pdf/"
+    },
+    {
+      "description": "Proceedings of the National Academy of Sciences (PNAS): /doi/ → /doi/pdf/",
+      "url_contains": "pnas.org/doi/",
+      "from": "/doi/",
+      "to": "/doi/pdf/"
+    },
+    {
+      "description": "Science (AAAS): /doi/ → /doi/pdf/",
+      "url_contains": "science.org/doi/",
+      "from": "/doi/",
+      "to": "/doi/pdf/"
+    },
+    {
+      "description": "Nature: append .pdf to article URL",
+      "url_contains": "nature.com/articles/",
+      "append": ".pdf"
+    },
+    {
+      "description": "Royal Society of Chemistry (RSC): /articlelanding/ → /articlepdf/",
+      "url_contains": "pubs.rsc.org/",
+      "from": "/articlelanding/",
+      "to": "/articlepdf/"
+    },
+    {
+      "description": "Wiley Online Library: /doi/ → /doi/pdfdirect/",
+      "url_contains": "onlinelibrary.wiley.com/doi/",
+      "from": "/doi/",
+      "to": "/doi/pdfdirect/"
+    },
+    {
+      "description": "Taylor & Francis: /doi/full/ → /doi/pdf/",
+      "url_contains": "tandfonline.com/doi/full/",
+      "from": "/doi/full/",
+      "to": "/doi/pdf/"
+    },
+    {
+      "description": "Taylor & Francis: /doi/abs/ → /doi/pdf/",
+      "url_contains": "tandfonline.com/doi/abs/",
+      "from": "/doi/abs/",
+      "to": "/doi/pdf/"
+    },
+    {
+      "description": "Oxford University Press (OUP): append .pdf to article URL",
+      "url_contains": "academic.oup.com/",
+      "append": ".pdf"
+    },
+    {
+      "description": "MDPI: append /pdf to URL",
+      "url_contains": "mdpi.com/",
+      "append": "/pdf"
+    },
+    {
+      "description": "Springer: /article/ → /content/pdf/",
+      "url_contains": "link.springer.com/article/",
+      "from": "/article/",
+      "to": "/content/pdf/"
+    },
+    {
+      "description": "Cambridge University Press: append /article.pdf to URL",
+      "url_contains": "cambridge.org/core/",
+      "append": "/article.pdf"
+    },
+    {
+      "description": "Portland Press: /view/ → /view/pdf/",
+      "url_contains": "portlandpress.com/",
+      "from": "/view/",
+      "to": "/view/pdf/"
+    },
+    {
+      "description": "PLOS: /article?id= → /article/file?type=printable&id=",
+      "url_contains": "journals.plos.org/",
+      "from": "/article?id=",
+      "to": "/article/file?type=printable&id="
+    },
+    {
+      "description": "Elsevier ScienceDirect: /pii/ → /pii/.../pdf",
+      "url_contains": "sciencedirect.com/science/article/pii/",
+      "append": "/pdf"
+    }
+  ]
+}

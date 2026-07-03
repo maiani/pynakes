@@ -21,11 +21,21 @@ from pynakes.metadata import metadata_value
 from pynakes.model import BibEntry, BibFile
 
 FILES_DIR_KEY = "files-dir"
-PREPRINT_SUFFIX = "_preprint"
+PUBLISHED_SUFFIX = ".published"
+PREPRINT_SUFFIX = ".preprint"
+SOURCE_SUFFIX = ".source"
+SUPPLEMENT_SUFFIX = ".supplement"
+ERRATUM_SUFFIX = ".erratum"
 MANIFEST_DIR = ".pinax"
 MANIFEST_FILE = "manifest.json"
 MANIFEST_VERSION = 1
-ARTIFACT_KINDS = ("published_pdf", "preprint_pdf", "preprint_source")
+ARTIFACT_KINDS = (
+    "published_pdf",
+    "preprint_pdf",
+    "preprint_source",
+    "supplement_pdf",
+    "erratum_pdf",
+)
 _FILESYSTEM_ERRORS = (OSError, shutil.Error)
 
 
@@ -37,6 +47,8 @@ class MaterialPaths:
     published_pdf: Path
     preprint_pdf: Path
     preprint_source: Path
+    supplement_pdf: Path
+    erratum_pdf: Path
 
     def to_dict(self) -> dict[str, str]:
         return {
@@ -44,6 +56,8 @@ class MaterialPaths:
             "published_pdf": str(self.published_pdf),
             "preprint_pdf": str(self.preprint_pdf),
             "preprint_source": str(self.preprint_source),
+            "supplement_pdf": str(self.supplement_pdf),
+            "erratum_pdf": str(self.erratum_pdf),
         }
 
 
@@ -56,10 +70,18 @@ class MaterialPresence:
     published_pdf: bool
     preprint_pdf: bool
     preprint_source: bool
+    supplement_pdf: bool
+    erratum_pdf: bool
 
     @property
     def any_present(self) -> bool:
-        return self.published_pdf or self.preprint_pdf or self.preprint_source
+        return (
+            self.published_pdf
+            or self.preprint_pdf
+            or self.preprint_source
+            or self.supplement_pdf
+            or self.erratum_pdf
+        )
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -68,6 +90,8 @@ class MaterialPresence:
             "published_pdf": self.published_pdf,
             "preprint_pdf": self.preprint_pdf,
             "preprint_source": self.preprint_source,
+            "supplement_pdf": self.supplement_pdf,
+            "erratum_pdf": self.erratum_pdf,
             "any_present": self.any_present,
         }
 
@@ -147,9 +171,11 @@ class FileStore:
         key = _validate_key(key)
         return MaterialPaths(
             key=key,
-            published_pdf=self.root / f"{key}.pdf",
+            published_pdf=self.root / f"{key}{PUBLISHED_SUFFIX}.pdf",
             preprint_pdf=self.root / f"{key}{PREPRINT_SUFFIX}.pdf",
-            preprint_source=self.root / f"{key}{PREPRINT_SUFFIX}",
+            preprint_source=self.root / f"{key}{SOURCE_SUFFIX}",
+            supplement_pdf=self.root / f"{key}{SUPPLEMENT_SUFFIX}.pdf",
+            erratum_pdf=self.root / f"{key}{ERRATUM_SUFFIX}.pdf",
         )
 
     def presence_for(self, key: str) -> MaterialPresence:
@@ -161,6 +187,8 @@ class FileStore:
             published_pdf=paths.published_pdf.is_file(),
             preprint_pdf=paths.preprint_pdf.is_file(),
             preprint_source=paths.preprint_source.is_dir(),
+            supplement_pdf=paths.supplement_pdf.is_file(),
+            erratum_pdf=paths.erratum_pdf.is_file(),
         )
 
     def ensure_root(self) -> Path:
@@ -191,6 +219,20 @@ class FileStore:
         self.ensure_root()
         _atomic_replace_dir(source, target, self.root)
         return target
+
+    def write_supplement_pdf(self, key: str, data: bytes) -> Path:
+        """Atomically write the supplementary-material PDF for ``key``."""
+        path = self.paths_for(key).supplement_pdf
+        self.ensure_root()
+        _atomic_write_bytes(path, data, self.root)
+        return path
+
+    def write_erratum_pdf(self, key: str, data: bytes) -> Path:
+        """Atomically write the erratum/corrected PDF for ``key``."""
+        path = self.paths_for(key).erratum_pdf
+        self.ensure_root()
+        _atomic_write_bytes(path, data, self.root)
+        return path
 
     @property
     def manifest_path(self) -> Path:
@@ -272,6 +314,8 @@ class FileStore:
         published_pdf = presence.paths.published_pdf if presence.published_pdf else None
         preprint_pdf = presence.paths.preprint_pdf if presence.preprint_pdf else None
         preprint_source = presence.paths.preprint_source if presence.preprint_source else None
+        supplement_pdf = presence.paths.supplement_pdf if presence.supplement_pdf else None
+        erratum_pdf = presence.paths.erratum_pdf if presence.erratum_pdf else None
 
         canonical_pdf: Path | None
         canonical_source: Path | None = None
@@ -287,6 +331,8 @@ class FileStore:
             "published_pdf": _path_or_none(published_pdf),
             "preprint_pdf": _path_or_none(preprint_pdf),
             "preprint_source": _path_or_none(preprint_source),
+            "supplement_pdf": _path_or_none(supplement_pdf),
+            "erratum_pdf": _path_or_none(erratum_pdf),
             "canonical_pdf": _path_or_none(canonical_pdf),
             "canonical_source": _path_or_none(canonical_source),
             "preprint_canonical": preprint_canonical,
@@ -482,7 +528,7 @@ class FileStore:
             return []
         paths = self.paths_for(key)
         removed: list[str] = []
-        for path in [paths.published_pdf, paths.preprint_pdf]:
+        for path in [paths.published_pdf, paths.preprint_pdf, paths.supplement_pdf, paths.erratum_pdf]:
             if path.exists():
                 removed.append(str(path.relative_to(self.root)))
         if paths.preprint_source.is_dir():
@@ -500,7 +546,7 @@ class FileStore:
             return []
         paths = self.paths_for(key)
         removed: list[str] = []
-        for path in [paths.published_pdf, paths.preprint_pdf]:
+        for path in [paths.published_pdf, paths.preprint_pdf, paths.supplement_pdf, paths.erratum_pdf]:
             if path.exists():
                 path.unlink()
                 removed.append(str(path.relative_to(self.root)))
@@ -790,14 +836,20 @@ def _unique_keys(keys: Iterable[str]) -> list[str]:
 
 def _classify_material_path(path: Path) -> tuple[str, str] | None:
     name = path.name
-    if path.is_dir() and name.endswith(PREPRINT_SUFFIX):
-        return name[: -len(PREPRINT_SUFFIX)], "preprint_source"
+    if path.is_dir() and name.endswith(SOURCE_SUFFIX):
+        return name[: -len(SOURCE_SUFFIX)], "preprint_source"
     if not path.is_file() or path.suffix != ".pdf":
         return None
     stem = path.stem
     if stem.endswith(PREPRINT_SUFFIX):
         return stem[: -len(PREPRINT_SUFFIX)], "preprint_pdf"
-    return stem, "published_pdf"
+    if stem.endswith(PUBLISHED_SUFFIX):
+        return stem[: -len(PUBLISHED_SUFFIX)], "published_pdf"
+    if stem.endswith(SUPPLEMENT_SUFFIX):
+        return stem[: -len(SUPPLEMENT_SUFFIX)], "supplement_pdf"
+    if stem.endswith(ERRATUM_SUFFIX):
+        return stem[: -len(ERRATUM_SUFFIX)], "erratum_pdf"
+    return None
 
 
 def _atomic_write_bytes(path: Path, data: bytes, root: Path) -> None:

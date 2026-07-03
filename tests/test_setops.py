@@ -143,7 +143,7 @@ def test_cli_combine_copies_pinax_materials_and_manifest(tmp_path: Path) -> None
     )
     source_files = tmp_path / "source.files"
     source_files.mkdir()
-    (source_files / "Smith2020_preprint.pdf").write_bytes(b"pdf")
+    (source_files / "Smith2020.preprint.pdf").write_bytes(b"pdf")
     (source_files / ".pinax").mkdir()
     (source_files / ".pinax" / "manifest.json").write_text(
         json.dumps(
@@ -171,7 +171,7 @@ def test_cli_combine_copies_pinax_materials_and_manifest(tmp_path: Path) -> None
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["pinax_materials"][0]["kind"] == "preprint_pdf"
-    assert (tmp_path / "all.files" / "Smith2020_preprint.pdf").read_bytes() == b"pdf"
+    assert (tmp_path / "all.files" / "Smith2020.preprint.pdf").read_bytes() == b"pdf"
     combined = parse_bib(Path(out).read_text())
     assert combined.pynakes_metadata["files-dir"] == "all.files"
     manifest = json.loads((tmp_path / "all.files" / ".pinax" / "manifest.json").read_text())
@@ -228,7 +228,7 @@ def test_cli_split_copies_pinax_materials_to_matching_output(tmp_path: Path) -> 
     )
     source_files = tmp_path / "source.files"
     source_files.mkdir()
-    (source_files / "Smith2020_preprint.pdf").write_bytes(b"pdf")
+    (source_files / "Smith2020.preprint.pdf").write_bytes(b"pdf")
     ml = str(tmp_path / "ml.bib")
     rest = str(tmp_path / "rest.bib")
 
@@ -240,8 +240,8 @@ def test_cli_split_copies_pinax_materials_to_matching_output(tmp_path: Path) -> 
     assert result.exit_code == 0, result.output
     outputs = {item["file"]: item for item in json.loads(result.output)["outputs"]}
     assert outputs[ml]["pinax_materials"][0]["kind"] == "preprint_pdf"
-    assert (tmp_path / "ml.files" / "Smith2020_preprint.pdf").read_bytes() == b"pdf"
-    assert not (tmp_path / "rest.files" / "Smith2020_preprint.pdf").exists()
+    assert (tmp_path / "ml.files" / "Smith2020.preprint.pdf").read_bytes() == b"pdf"
+    assert not (tmp_path / "rest.files" / "Smith2020.preprint.pdf").exists()
     assert parse_bib(Path(ml).read_text()).pynakes_metadata["files-dir"] == "ml.files"
 
 

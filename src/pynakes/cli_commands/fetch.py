@@ -139,12 +139,19 @@ def fetch(
 
     warnings = fetch_report_lines(report)
 
+    if coll.files is not None:
+        files_dir = str(coll.files.root)
+        warnings.append(f"Files stored in {files_dir}")
+    else:
+        files_dir = None
+
     _finish_mod(
         file,
         "fetch",
         coll,
         params,
         warnings,
+        files_dir=files_dir,
         fetch_preprint=report["fetch_preprint"],
         fetch_source=report["fetch_source"],
         fetch_published=report["fetch_published"],

@@ -90,3 +90,36 @@ def test_fetch_semantic_scholar_paper_reads_deterministic_cache(tmp_path: Path) 
     paper = semantic_scholar.fetch_paper_by_doi("10.5555/published-first", cache_dir=tmp_path)
 
     assert paper == SEMANTIC_SCHOLAR_PAPER
+
+
+def test_publisher_pdf_url_abstract_to_pdf() -> None:
+    from pynakes.providers.pdf_overrides import publisher_pdf_url
+
+    url = publisher_pdf_url(
+        "https://journals.aps.org/prb/abstract/10.1103/PhysRevB.111.224421"
+    )
+    assert url == "https://journals.aps.org/prb/pdf/10.1103/PhysRevB.111.224421"
+
+
+def test_publisher_pdf_url_no_match_returns_none() -> None:
+    from pynakes.providers.pdf_overrides import publisher_pdf_url
+
+    url = publisher_pdf_url("https://example.com/some/article")
+    assert url is None
+
+
+def test_publisher_pdf_url_doi_prefix_aps() -> None:
+    from pynakes.providers.pdf_overrides import publisher_pdf_url
+
+    url = publisher_pdf_url(
+        "https://doi.org/10.1103/f6nc-vsnx",
+        doi="10.1103/f6nc-vsnx",
+    )
+    assert url == "http://harvest.aps.org/v2/journals/articles/10.1103/f6nc-vsnx/fulltext"
+
+
+def test_publisher_pdf_url_doi_prefix_no_doi_skips_doi_rules() -> None:
+    from pynakes.providers.pdf_overrides import publisher_pdf_url
+
+    url = publisher_pdf_url("https://doi.org/10.1103/f6nc-vsnx")
+    assert url is None

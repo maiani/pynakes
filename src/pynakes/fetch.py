@@ -19,7 +19,7 @@ from urllib.request import urlopen as _default_urlopen
 from pynakes._identifiers import normalize_arxiv, normalize_doi
 from pynakes.fetch_progress import FetchArtifact, FetchProgress, FetchProgressEvent
 from pynakes.filestore import FileStore
-from pynakes.providers import arxiv, openalex
+from pynakes.providers import arxiv, crossref, openalex
 from pynakes.providers._http import ProviderFetchError, fetch_bytes
 
 FetchArxivBytes = Callable[[str], bytes]
@@ -178,7 +178,7 @@ def download_arxiv_materials(
             source_bytes = source_fetcher(arxiv_id)
         store.ensure_root()
         try:
-            with tempfile.TemporaryDirectory(prefix=f".{key}_preprint.", dir=store.root) as tmp:
+            with tempfile.TemporaryDirectory(prefix=f".{key}.source.", dir=store.root) as tmp:
                 extracted = Path(tmp) / "source"
                 extracted.mkdir()
                 extract_arxiv_source(source_bytes, extracted)
@@ -238,6 +238,22 @@ def openalex_oa_pdf_url(
         raise PublishedPdfFetchError(str(exc)) from exc
 
 
+def crossref_oa_pdf_url(
+    doi: str,
+    *,
+    urlopen: Callable[..., object] | None = None,
+    cache_dir: str | Path | None = None,
+) -> str | None:
+    """Resolve a DOI to an open-access PDF URL via CrossRef.
+
+    Used as a fallback when ``openalex_oa_pdf_url`` returns ``None``.
+    """
+    try:
+        return crossref.oa_pdf_url_for_doi(doi, cache_dir=cache_dir, urlopen=urlopen)
+    except (ProviderFetchError, ValueError) as exc:
+        raise PublishedPdfFetchError(str(exc)) from exc
+
+
 def fetch_published_pdf(
     url: str,
     *,
@@ -288,7 +304,10 @@ def download_published_material(
     except ValueError as exc:
         raise PublishedPdfFetchError(str(exc)) from exc
     resolver = url_resolver or (
-        lambda d: openalex_oa_pdf_url(d, urlopen=_default_urlopen, cache_dir=cache_dir)
+        lambda d: (
+            openalex_oa_pdf_url(d, urlopen=_default_urlopen, cache_dir=cache_dir)
+            or crossref_oa_pdf_url(d, urlopen=_default_urlopen, cache_dir=cache_dir)
+        )
     )
     pdf_url = resolver(normalized)
     if pdf_url is None:

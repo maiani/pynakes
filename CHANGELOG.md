@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **OpenAlex published-PDF resolution now filters out repository-hosted URLs.**
+  `best_oa_location` entries from arXiv, PMC, or institutional repositories are
+  no longer misidentified as the published version of record. The check uses
+  `host_type` when present, falling back to `source.type`, so that
+  subscription-journal papers with an arXiv preprint no longer silently download
+  the same arXiv PDF as both `.preprint.pdf` and `.published.pdf`. (`oa_pdf_url_from_work` in `src/pynakes/providers/openalex.py`)
 - Braced field values containing literal percent signs, such as `100% yield`,
   now parse and round-trip instead of being mistaken for line comments that
   corrupt the surrounding entry structure.
@@ -33,6 +39,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CrossRef fallback for published-PDF URL resolution.** When OpenAlex has no
+  direct `pdf_url` for an OA paper, `asset fetch` now falls back to CrossRef's
+  `similarity-checking` links (e.g. `harvest.aps.org` URLs that serve the actual
+  PDF). A new `crossref` provider module
+  (`src/pynakes/providers/crossref.py`) handles the resolution, wired into
+  `download_published_material` as a secondary resolver.
+- **Publisher-specific PDF URL overrides.** A bundled JSON file
+  (`src/pynakes/providers/pdf_overrides.json`) contains URL-construction rules
+  for major publishers (APS, Nature, Science, PNAS, Wiley, IOP, Taylor & Francis,
+  OUP, Cambridge, Springer, MDPI, RSC, PLOS, AIP, Elsevier, Portland Press).
+  When OpenAlex identifies a publisher landing page but provides no `pdf_url`,
+  the overrides construct the PDF URL from the landing page URL or DOI prefix.
+  Users can extend the file locally.
+- **`asset fetch` reports the `files-dir` path.** Non-JSON output now prints
+  `Files stored in <path>` so users know exactly where downloaded materials
+  landed. JSON output includes a `files_dir` key.
+- **`pynakes init --pinax` auto-detects a lone `.bib` in the current directory.**
+  When `--pinax` is set and no file argument is given, `init` now scans for a
+  single `.bib` file in the working directory, matching the auto-detection
+  behaviour of other single-library commands.
 - **`asset fetch` now shows human progress for long downloads.** The CLI uses
   Rich progress rendering for non-JSON `asset fetch` runs and keeps progress off
   JSON stdout. Binary material downloads now stream through `httpx`, with byte
@@ -77,6 +103,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   metadata when a link is present. The update is dialect-aware (`eprinttype` for
   BibLaTeX, `archiveprefix` for BibTeX), uses deterministic provider-response
   caching, and remains testable without network through injectable fetchers.
+
+- **Pinax filenames now use dot-separated descriptive suffixes.** Published
+  PDFs are `<citekey>.published.pdf`, preprint PDFs are `<citekey>.preprint.pdf`,
+  and preprint source directories are `<citekey>.source/` (replacing the old
+  `<citekey>.pdf`, `<citekey>_preprint.pdf`, and `<citekey>_preprint/`
+  convention). New artifact kinds `.supplement.pdf` and `.erratum.pdf` are
+  recognized alongside the existing kinds. The filenames are self-documenting,
+  glob-friendly (`ls <citekey>.*` catches all materials), and extensible.
 
 - **CSV export via `pynakes convert refs.bib --to csv --out refs.csv`.**
   CSV is useful for review, spreadsheets, audits, and quick sharing, but is

@@ -8,6 +8,7 @@ from urllib.parse import quote
 
 from pynakes._identifiers import arxiv_id_from_text, normalize_doi
 from pynakes.providers._http import fetch_json, iter_strings
+from pynakes.providers.pdf_overrides import publisher_pdf_url
 
 API_URL = "https://api.openalex.org/works/doi:"
 
@@ -54,16 +55,59 @@ def arxiv_id_from_work(work: dict) -> str | None:
     return None
 
 
+def _is_publisher_location(location: dict) -> bool:
+    """Return True if *location* is hosted by a publisher (not a repository).
+
+    Checks ``host_type`` when present, falling back to ``source.type``.
+    """
+    host_type = location.get("host_type")
+    if host_type is not None:
+        return host_type == "publisher"
+    src = location.get("source")
+    if isinstance(src, dict):
+        return src.get("type") == "journal"
+    return False
+
+
 def oa_pdf_url_from_work(work: dict) -> str | None:
-    """Return OpenAlex's best open-access PDF URL for a work, if any."""
+    """Return OpenAlex's best publisher-hosted OA PDF URL for a work, if any.
+
+    Only returns URLs from publisher-hosted locations (not from arXiv, PMC,
+    or institutional repositories) so that repository mirrors of the same
+    paper do not get misidentified as the published version of record.
+
+    When a publisher landing page exists but no direct ``pdf_url`` is
+    available (e.g. APS papers served via ``/pdf/`` rather than ``/abstract/``),
+    the function falls back to :func:`publisher_pdf_url` which applies
+    publisher-specific URL construction rules.
+    """
     best_oa = work.get("best_oa_location")
     if not isinstance(best_oa, dict):
         return None
+    if not _is_publisher_location(best_oa):
+        return None
 
     pdf_url = best_oa.get("pdf_url")
-    if not isinstance(pdf_url, str) or not pdf_url.strip():
+    if isinstance(pdf_url, str) and pdf_url.strip():
+        return pdf_url.strip()
+
+    landing = best_oa.get("landing_page_url")
+    raw_doi = work.get("doi")
+    doi = _extract_doi(raw_doi)
+
+    if landing and isinstance(landing, str) and landing.strip():
+        return publisher_pdf_url(landing.strip(), doi=doi)
+    return None
+
+
+def _extract_doi(raw: object) -> str | None:
+    """Extract a bare DOI string from an OpenAlex ``doi`` field (which is a URL)."""
+    if not isinstance(raw, str) or not raw.strip():
         return None
-    return pdf_url.strip()
+    for prefix in ("https://doi.org/", "http://doi.org/"):
+        if raw.startswith(prefix):
+            return raw[len(prefix):]
+    return raw.strip()
 
 
 def _locations(work: dict) -> list[dict]:

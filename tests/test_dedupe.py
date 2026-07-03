@@ -194,7 +194,7 @@ def test_dedupe_merge_moves_pinax_materials_to_surviving_key(tmp_path: Path) -> 
     )
     files = tmp_path / "refs.files"
     files.mkdir()
-    (files / "Duplicate_preprint.pdf").write_bytes(b"pdf")
+    (files / "Duplicate.preprint.pdf").write_bytes(b"pdf")
     (files / ".pinax").mkdir()
     (files / ".pinax" / "manifest.json").write_text(
         json.dumps(
@@ -221,8 +221,8 @@ def test_dedupe_merge_moves_pinax_materials_to_surviving_key(tmp_path: Path) -> 
     assert result.exit_code == 0, result.output
     assert data["pinax_materials"][0]["source_key"] == "Duplicate"
     assert data["pinax_materials"][0]["target_key"] == "Survivor"
-    assert not (files / "Duplicate_preprint.pdf").exists()
-    assert (files / "Survivor_preprint.pdf").read_bytes() == b"pdf"
+    assert not (files / "Duplicate.preprint.pdf").exists()
+    assert (files / "Survivor.preprint.pdf").read_bytes() == b"pdf"
     manifest = json.loads((files / ".pinax" / "manifest.json").read_text())
     assert "Duplicate" not in manifest["files"]
     assert manifest["files"]["Survivor"]["preprint_pdf"]["refetchable"] is True
@@ -237,7 +237,7 @@ def test_dedupe_merge_pinax_materials_respects_dry_run(tmp_path: Path) -> None:
     )
     files = tmp_path / "refs.files"
     files.mkdir()
-    (files / "Duplicate_preprint.pdf").write_bytes(b"pdf")
+    (files / "Duplicate.preprint.pdf").write_bytes(b"pdf")
 
     result = runner.invoke(app, ["dedupe", "merge", str(bib), "--dry-run", "--json"])
     data = json.loads(result.output)
@@ -245,8 +245,8 @@ def test_dedupe_merge_pinax_materials_respects_dry_run(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert data["dry_run"] is True
     assert data["pinax_materials"][0]["kind"] == "preprint_pdf"
-    assert (files / "Duplicate_preprint.pdf").read_bytes() == b"pdf"
-    assert not (files / "Survivor_preprint.pdf").exists()
+    assert (files / "Duplicate.preprint.pdf").read_bytes() == b"pdf"
+    assert not (files / "Survivor.preprint.pdf").exists()
 
 
 def test_dedupe_merge_pinax_material_conflict_exit_2(tmp_path: Path) -> None:
@@ -258,8 +258,8 @@ def test_dedupe_merge_pinax_material_conflict_exit_2(tmp_path: Path) -> None:
     )
     files = tmp_path / "refs.files"
     files.mkdir()
-    (files / "Survivor_preprint.pdf").write_bytes(b"target")
-    (files / "Duplicate_preprint.pdf").write_bytes(b"source")
+    (files / "Survivor.preprint.pdf").write_bytes(b"target")
+    (files / "Duplicate.preprint.pdf").write_bytes(b"source")
 
     result = runner.invoke(app, ["dedupe", "merge", str(bib), "--json"])
     data = json.loads(result.output)
@@ -269,7 +269,7 @@ def test_dedupe_merge_pinax_material_conflict_exit_2(tmp_path: Path) -> None:
     assert data["error"] == "DedupeConflict"
     assert data["conflicts"][0]["field"] == "pinax_materials"
     assert "@article{Duplicate," in bib.read_text()
-    assert (files / "Duplicate_preprint.pdf").read_bytes() == b"source"
+    assert (files / "Duplicate.preprint.pdf").read_bytes() == b"source"
 
 
 def test_dedupe_merge_cli_conflict_exit_2(tmp_path: Path) -> None:

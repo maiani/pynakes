@@ -320,7 +320,7 @@ class TestInspectAndLint:
     def test_inspect_json_annotates_pinax_materials(self, tmp_path: Path) -> None:
         files = tmp_path / "refs.files"
         files.mkdir()
-        (files / "A_preprint.pdf").write_bytes(b"pdf")
+        (files / "A.preprint.pdf").write_bytes(b"pdf")
         bib = tmp_path / "refs.bib"
         bib.write_text(
             "@article{A,\n"
@@ -338,8 +338,8 @@ class TestInspectAndLint:
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         entry = data["entries"][0]
-        assert entry["preprint_pdf"] == str(files / "A_preprint.pdf")
-        assert entry["canonical_pdf"] == str(files / "A_preprint.pdf")
+        assert entry["preprint_pdf"] == str(files / "A.preprint.pdf")
+        assert entry["canonical_pdf"] == str(files / "A.preprint.pdf")
         assert entry["refetchable"] is True
 
     def test_inspect_human_does_not_run_lint(self, tmp_path: Path) -> None:
@@ -536,7 +536,7 @@ class TestFilesCommand:
     def test_check_json_reports_pinax_orphans_and_drift(self, tmp_path: Path) -> None:
         files = tmp_path / "refs.files"
         files.mkdir()
-        (files / "Ghost.pdf").write_bytes(b"pdf")
+        (files / "Ghost.published.pdf").write_bytes(b"pdf")
         (files / ".pinax").mkdir()
         (files / ".pinax" / "manifest.json").write_text(
             json.dumps(
@@ -572,7 +572,7 @@ class TestFilesCommand:
     def test_check_fix_reconciles_pinax_manifest_drift(self, tmp_path: Path) -> None:
         files = tmp_path / "refs.files"
         files.mkdir()
-        (files / "A_preprint.pdf").write_bytes(b"pdf")
+        (files / "A.preprint.pdf").write_bytes(b"pdf")
         (files / ".pinax").mkdir()
         (files / ".pinax" / "manifest.json").write_text(
             json.dumps(
@@ -612,7 +612,7 @@ class TestFilesCommand:
     def test_check_fix_backup_writes_manifest_bak(self, tmp_path: Path) -> None:
         files = tmp_path / "refs.files"
         files.mkdir()
-        (files / "A_preprint.pdf").write_bytes(b"pdf")
+        (files / "A.preprint.pdf").write_bytes(b"pdf")
         (files / ".pinax").mkdir()
         manifest = files / ".pinax" / "manifest.json"
         manifest.write_text(
@@ -778,8 +778,8 @@ class TestImportCommand:
         assert data["fetch"]["fetched"][0]["key"] == key
         assert data["fetch"]["fetch_preprint"] is True
         assert data["fetch"]["fetch_source"] is True
-        assert (tmp_path / "refs.files" / f"{key}_preprint.pdf").read_bytes() == b"%PDF fixture"
-        assert (tmp_path / "refs.files" / f"{key}_preprint" / "paper.tex").read_text() == (
+        assert (tmp_path / "refs.files" / f"{key}.preprint.pdf").read_bytes() == b"%PDF fixture"
+        assert (tmp_path / "refs.files" / f"{key}.source" / "paper.tex").read_text() == (
             "\\title{A Deep Test}\n"
         )
         assert "files-dir: refs.files" in bib.read_text()
@@ -806,9 +806,9 @@ class TestImportCommand:
         key = data["key"]
         fetched = data["fetch"]["fetched"][0]
         assert data["fetch"]["fetch_source"] is False
-        assert fetched["pdf_path"] == str(tmp_path / "refs.files" / f"{key}_preprint.pdf")
+        assert fetched["pdf_path"] == str(tmp_path / "refs.files" / f"{key}.preprint.pdf")
         assert fetched["source_path"] is None
-        assert not (tmp_path / "refs.files" / f"{key}_preprint").exists()
+        assert not (tmp_path / "refs.files" / f"{key}.source").exists()
 
     def test_import_fetch_reuses_published_fetch_path(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
@@ -820,7 +820,7 @@ class TestImportCommand:
             url = request.full_url if hasattr(request, "full_url") else str(request)
             if "openalex.org" in str(url):
                 body = json.dumps(
-                    {"best_oa_location": {"pdf_url": "https://example.com/provider.pdf"}}
+                    {"best_oa_location": {"host_type": "publisher", "pdf_url": "https://example.com/provider.pdf"}}
                 ).encode("utf-8")
                 return BytesIO(body)
             raise AssertionError("unexpected urlopen call")
@@ -853,11 +853,11 @@ class TestImportCommand:
                 "key": key,
                 "doi": "10.5555/provider",
                 "arxiv_id": None,
-                "pdf_path": str(tmp_path / "refs.files" / f"{key}.pdf"),
+                "pdf_path": str(tmp_path / "refs.files" / f"{key}.published.pdf"),
                 "source_path": None,
             }
         ]
-        assert (tmp_path / "refs.files" / f"{key}.pdf").read_bytes() == b"%PDF published"
+        assert (tmp_path / "refs.files" / f"{key}.published.pdf").read_bytes() == b"%PDF published"
         assert len(list((cache / "openalex").glob("*.json"))) == 1
 
     def test_add_uses_jabref_key_pattern_metadata(self, tmp_path: Path, monkeypatch) -> None:
@@ -1463,7 +1463,7 @@ class TestKeysCommand:
     def test_rename_moves_pinax_materials_on_commit(self, tmp_path: Path) -> None:
         files = tmp_path / "refs.files"
         files.mkdir()
-        (files / "Smith2020_preprint.pdf").write_bytes(b"pdf")
+        (files / "Smith2020.preprint.pdf").write_bytes(b"pdf")
         bib = tmp_path / "refs.bib"
         bib.write_text(
             "@article{Smith2020,\n  title = {T}\n}\n@comment{pynakes-meta:\nfiles-dir:\n}\n"
@@ -1476,13 +1476,13 @@ class TestKeysCommand:
         )
 
         assert result.exit_code == 0, result.output
-        assert not (files / "Smith2020_preprint.pdf").exists()
-        assert (files / "Smith2020ML_preprint.pdf").read_bytes() == b"pdf"
+        assert not (files / "Smith2020.preprint.pdf").exists()
+        assert (files / "Smith2020ML.preprint.pdf").read_bytes() == b"pdf"
 
     def test_generate_pinax_material_move_respects_dry_run(self, tmp_path: Path) -> None:
         files = tmp_path / "refs.files"
         files.mkdir()
-        (files / "Old_preprint.pdf").write_bytes(b"pdf")
+        (files / "Old.preprint.pdf").write_bytes(b"pdf")
         bib = tmp_path / "refs.bib"
         bib.write_text(
             "@article{Old,\n  author = {Jane Smith},\n  title = {A Test},\n  year = {2020}\n}\n"
@@ -1492,8 +1492,8 @@ class TestKeysCommand:
         result = runner.invoke(app, ["keys", "generate", str(bib), "Old", "--dry-run", "--json"])
 
         assert result.exit_code == 0, result.output
-        assert (files / "Old_preprint.pdf").read_bytes() == b"pdf"
-        assert not (files / "Smith2020Test_preprint.pdf").exists()
+        assert (files / "Old.preprint.pdf").read_bytes() == b"pdf"
+        assert not (files / "Smith2020Test.preprint.pdf").exists()
 
     def test_rename_falls_back_to_tex_sources_metadata(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -2444,7 +2444,7 @@ class TestErrorHandling:
 
         assert result.exit_code == 1, result.output
         data = json.loads(result.output)
-        assert data["error"] == "UsageError"  # missing FILE, not a clobber
+        assert data["error"] == "InvalidInput"  # missing FILE, not a clobber
         assert existing.read_text() == "@article{Keep,\n  title = {Original}\n}\n"
 
     def test_shell_completion_does_not_emit_missing_bib_error(
@@ -2838,7 +2838,7 @@ class TestAssetFetchPublished:
             url = request.full_url if hasattr(request, "full_url") else str(request)
             if "openalex.org" in str(url):
                 body = json.dumps(
-                    {"best_oa_location": {"pdf_url": "https://example.com/paper.pdf"}}
+                    {"best_oa_location": {"host_type": "publisher", "pdf_url": "https://example.com/paper.pdf"}}
                 ).encode("utf-8")
                 return BytesIO(body)
             raise AssertionError("unexpected urlopen call")
@@ -2857,7 +2857,7 @@ class TestAssetFetchPublished:
         assert len(data["fetched"]) == 1
         assert data["fetched"][0]["key"] == "Einstein1905"
         assert data["fetched"][0]["pdf_path"] is not None
-        assert (tmp_path / "refs.files" / "Einstein1905.pdf").read_bytes() == (b"%PDF published")
+        assert (tmp_path / "refs.files" / "Einstein1905.published.pdf").read_bytes() == (b"%PDF published")
         assert len(list((tmp_path / ".pynakes-cache" / "openalex").glob("*.json"))) == 1
 
     def test_fetch_published_reports_malformed_doi_per_entry(

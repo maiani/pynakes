@@ -54,6 +54,7 @@ preview/diff → commit. Full JabRef metadata parity, including round-trip
 Opt in by setting a `files-dir` in the library metadata. Now every citation key can carry materials:
 
 - **arXiv download** — PDFs and source bundles, automatically fetched, verified, and extracted with provenance tracking (source hash, download timestamp)
+- **Open-access published PDFs** — resolved from DOI via OpenAlex, CrossRef, and publisher-specific URL overrides; `.published.pdf` lands only for genuinely OA papers, never misidentified repository mirrors
 - **`asset fetch`** — download configured materials for all entries or one key
 - **`asset check`** — validate presence, detect orphans, verify checksums, optionally fix (`--fix`)
 - **`ref remove`** — removes both the entry and its materials 

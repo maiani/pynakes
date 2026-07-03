@@ -77,7 +77,7 @@ pynakes = "pynakes.cli:app"
 where = ["src"]
 
 [tool.setuptools.package-data]
-pynakes = ["py.typed"]
+pynakes = ["py.typed", "providers/pdf_overrides.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

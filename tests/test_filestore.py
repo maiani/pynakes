@@ -65,9 +65,9 @@ def test_paths_for_key_are_deterministic(tmp_path: Path) -> None:
 
     paths = store.paths_for("Bohr1913")
 
-    assert paths.published_pdf == tmp_path / "refs.files" / "Bohr1913.pdf"
-    assert paths.preprint_pdf == tmp_path / "refs.files" / "Bohr1913_preprint.pdf"
-    assert paths.preprint_source == tmp_path / "refs.files" / "Bohr1913_preprint"
+    assert paths.published_pdf == tmp_path / "refs.files" / "Bohr1913.published.pdf"
+    assert paths.preprint_pdf == tmp_path / "refs.files" / "Bohr1913.preprint.pdf"
+    assert paths.preprint_source == tmp_path / "refs.files" / "Bohr1913.source"
 
 
 def test_paths_for_key_rejects_path_like_keys(tmp_path: Path) -> None:
@@ -80,9 +80,9 @@ def test_paths_for_key_rejects_path_like_keys(tmp_path: Path) -> None:
 def test_presence_for_key_reads_live_filesystem(tmp_path: Path) -> None:
     root = tmp_path / "refs.files"
     root.mkdir()
-    (root / "A.pdf").write_text("published")
-    (root / "A_preprint.pdf").write_text("preprint")
-    (root / "A_preprint").mkdir()
+    (root / "A.published.pdf").write_text("published")
+    (root / "A.preprint.pdf").write_text("preprint")
+    (root / "A.source").mkdir()
     store = FileStore(root=root, bib_path=tmp_path / "refs.bib")
 
     presence = store.presence_for("A")
@@ -96,10 +96,10 @@ def test_presence_for_key_reads_live_filesystem(tmp_path: Path) -> None:
 def test_scan_reports_entries_and_material_shaped_orphans(tmp_path: Path) -> None:
     root = tmp_path / "refs.files"
     root.mkdir()
-    (root / "A.pdf").write_text("known")
-    (root / "Ghost.pdf").write_text("orphan")
-    (root / "Ghost_preprint.pdf").write_text("orphan preprint")
-    (root / "Ghost_preprint").mkdir()
+    (root / "A.published.pdf").write_text("known")
+    (root / "Ghost.published.pdf").write_text("orphan")
+    (root / "Ghost.preprint.pdf").write_text("orphan preprint")
+    (root / "Ghost.source").mkdir()
     (root / "notes.txt").write_text("ignored")
     (root / ".pinax").mkdir()
     store = FileStore(root=root, bib_path=tmp_path / "refs.bib")
@@ -109,16 +109,16 @@ def test_scan_reports_entries_and_material_shaped_orphans(tmp_path: Path) -> Non
     assert len(scan.entries) == 1
     assert scan.entries[0].published_pdf is True
     assert [(item.key, item.kind) for item in scan.orphans] == [
+        ("Ghost", "preprint_pdf"),
         ("Ghost", "published_pdf"),
         ("Ghost", "preprint_source"),
-        ("Ghost", "preprint_pdf"),
     ]
 
 
 def test_manifest_records_canonical_annotation_and_drift(tmp_path: Path) -> None:
     root = tmp_path / "refs.files"
     root.mkdir()
-    (root / "A_preprint.pdf").write_bytes(b"preprint")
+    (root / "A.preprint.pdf").write_bytes(b"preprint")
     store = FileStore(root=root, bib_path=tmp_path / "refs.bib")
 
     store.record_artifact(
@@ -131,11 +131,11 @@ def test_manifest_records_canonical_annotation_and_drift(tmp_path: Path) -> None
     store.set_preprint_canonical("A", True)
 
     annotation = store.annotation_for("A")
-    assert annotation["canonical_pdf"] == str(root / "A_preprint.pdf")
+    assert annotation["canonical_pdf"] == str(root / "A.preprint.pdf")
     assert annotation["preprint_canonical"] is True
     assert annotation["refetchable"] is True
 
-    (root / "A_preprint.pdf").unlink()
+    (root / "A.preprint.pdf").unlink()
     scan = store.scan(["A"])
     assert scan.drift == [{"key": "A", "kind": "preprint_pdf", "reason": "manifest without file"}]
 
@@ -143,9 +143,9 @@ def test_manifest_records_canonical_annotation_and_drift(tmp_path: Path) -> None
 def test_copy_materials_copies_files_and_manifest_row(tmp_path: Path) -> None:
     source_root = tmp_path / "source.files"
     source_root.mkdir()
-    (source_root / "A_preprint.pdf").write_bytes(b"preprint")
-    (source_root / "A_preprint").mkdir()
-    (source_root / "A_preprint" / "paper.tex").write_text("\\title{A}\n")
+    (source_root / "A.preprint.pdf").write_bytes(b"preprint")
+    (source_root / "A.source").mkdir()
+    (source_root / "A.source" / "paper.tex").write_text("\\title{A}\n")
     source = FileStore(root=source_root, bib_path=tmp_path / "source.bib")
     source.record_artifact(
         "A",
@@ -160,8 +160,8 @@ def test_copy_materials_copies_files_and_manifest_row(tmp_path: Path) -> None:
     copied = target.copy_materials_from(source, "A")
 
     assert {item["kind"] for item in copied} == {"preprint_pdf", "preprint_source"}
-    assert (tmp_path / "target.files" / "A_preprint.pdf").read_bytes() == b"preprint"
-    assert (tmp_path / "target.files" / "A_preprint" / "paper.tex").read_text() == "\\title{A}\n"
+    assert (tmp_path / "target.files" / "A.preprint.pdf").read_bytes() == b"preprint"
+    assert (tmp_path / "target.files" / "A.source" / "paper.tex").read_text() == "\\title{A}\n"
     manifest = json.loads((tmp_path / "target.files" / ".pinax" / "manifest.json").read_text())
     assert manifest["files"]["A"]["preprint_canonical"] is True
 
@@ -169,7 +169,7 @@ def test_copy_materials_copies_files_and_manifest_row(tmp_path: Path) -> None:
 def test_rename_materials_moves_paths_and_manifest_with_rollback(tmp_path: Path) -> None:
     root = tmp_path / "refs.files"
     root.mkdir()
-    (root / "Old_preprint.pdf").write_bytes(b"pdf")
+    (root / "Old.preprint.pdf").write_bytes(b"pdf")
     store = FileStore(root=root, bib_path=tmp_path / "refs.bib")
     store.record_artifact(
         "Old",
@@ -181,16 +181,16 @@ def test_rename_materials_moves_paths_and_manifest_with_rollback(tmp_path: Path)
 
     transaction = store.rename_materials("Old", "New")
 
-    assert not (root / "Old_preprint.pdf").exists()
-    assert (root / "New_preprint.pdf").read_bytes() == b"pdf"
+    assert not (root / "Old.preprint.pdf").exists()
+    assert (root / "New.preprint.pdf").read_bytes() == b"pdf"
     manifest = json.loads((root / ".pinax" / "manifest.json").read_text())
     assert "New" in manifest["files"]
     assert "Old" not in manifest["files"]
 
     transaction.rollback()
 
-    assert (root / "Old_preprint.pdf").read_bytes() == b"pdf"
-    assert not (root / "New_preprint.pdf").exists()
+    assert (root / "Old.preprint.pdf").read_bytes() == b"pdf"
+    assert not (root / "New.preprint.pdf").exists()
     manifest = json.loads((root / ".pinax" / "manifest.json").read_text())
     assert "Old" in manifest["files"]
 
@@ -198,8 +198,8 @@ def test_rename_materials_moves_paths_and_manifest_with_rollback(tmp_path: Path)
 def test_merge_materials_moves_missing_kinds_and_manifest_row(tmp_path: Path) -> None:
     root = tmp_path / "refs.files"
     root.mkdir()
-    (root / "Survivor.pdf").write_bytes(b"published")
-    (root / "Duplicate_preprint.pdf").write_bytes(b"preprint")
+    (root / "Survivor.published.pdf").write_bytes(b"published")
+    (root / "Duplicate.preprint.pdf").write_bytes(b"preprint")
     store = FileStore(root=root, bib_path=tmp_path / "refs.bib")
     store.record_artifact(
         "Duplicate",
@@ -217,20 +217,20 @@ def test_merge_materials_moves_missing_kinds_and_manifest_row(tmp_path: Path) ->
             "source_key": "Duplicate",
             "target_key": "Survivor",
             "kind": "preprint_pdf",
-            "source_path": str(root / "Duplicate_preprint.pdf"),
-            "target_path": str(root / "Survivor_preprint.pdf"),
+            "source_path": str(root / "Duplicate.preprint.pdf"),
+            "target_path": str(root / "Survivor.preprint.pdf"),
         }
     ]
-    assert not (root / "Duplicate_preprint.pdf").exists()
-    assert (root / "Survivor_preprint.pdf").read_bytes() == b"preprint"
+    assert not (root / "Duplicate.preprint.pdf").exists()
+    assert (root / "Survivor.preprint.pdf").read_bytes() == b"preprint"
     manifest = json.loads((root / ".pinax" / "manifest.json").read_text())
     assert "Duplicate" not in manifest["files"]
     assert manifest["files"]["Survivor"]["preprint_pdf"]["refetchable"] is True
 
     transaction.rollback()
 
-    assert (root / "Duplicate_preprint.pdf").read_bytes() == b"preprint"
-    assert not (root / "Survivor_preprint.pdf").exists()
+    assert (root / "Duplicate.preprint.pdf").read_bytes() == b"preprint"
+    assert not (root / "Survivor.preprint.pdf").exists()
     manifest = json.loads((root / ".pinax" / "manifest.json").read_text())
     assert "Duplicate" in manifest["files"]
 
@@ -238,8 +238,8 @@ def test_merge_materials_moves_missing_kinds_and_manifest_row(tmp_path: Path) ->
 def test_merge_materials_rejects_existing_target_kind(tmp_path: Path) -> None:
     root = tmp_path / "refs.files"
     root.mkdir()
-    (root / "Survivor_preprint.pdf").write_bytes(b"target")
-    (root / "Duplicate_preprint.pdf").write_bytes(b"source")
+    (root / "Survivor.preprint.pdf").write_bytes(b"target")
+    (root / "Duplicate.preprint.pdf").write_bytes(b"source")
     store = FileStore(root=root, bib_path=tmp_path / "refs.bib")
 
     with pytest.raises(ValueError, match="target exists"):
@@ -291,8 +291,8 @@ def test_bibliography_fetch_materials_uses_symlinked_bib_directory(tmp_path: Pat
     )
 
     assert report["failed"] == []
-    assert (link_dir / "refs.files" / "Noether1918_preprint.pdf").read_bytes() == b"%PDF preprint"
-    assert not (real_dir / "refs.files" / "Noether1918_preprint.pdf").exists()
+    assert (link_dir / "refs.files" / "Noether1918.preprint.pdf").read_bytes() == b"%PDF preprint"
+    assert not (real_dir / "refs.files" / "Noether1918.preprint.pdf").exists()
 
 
 def test_bibliography_open_rejects_invalid_files_dir(tmp_path: Path) -> None:
@@ -318,5 +318,5 @@ def test_bibliography_set_metadata_validates_files_dir(tmp_path: Path) -> None:
 def test_write_published_pdf_writes_atomically(tmp_path: Path) -> None:
     store = FileStore(root=tmp_path / "refs.files", bib_path=tmp_path / "refs.bib")
     path = store.write_published_pdf("Einstein1905", b"%PDF version of record")
-    assert path == tmp_path / "refs.files" / "Einstein1905.pdf"
+    assert path == tmp_path / "refs.files" / "Einstein1905.published.pdf"
     assert path.read_bytes() == b"%PDF version of record"
