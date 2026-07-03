@@ -136,6 +136,35 @@ def test_import_assigns_unique_keys() -> None:
     assert len(set(keys)) == 2  # no collision
 
 
+def test_csv_export_shape() -> None:
+    csv_text = export_library(parse_bib(_SRC), "csv")
+    lines = csv_text.strip().splitlines()
+    header = lines[0].split(",")
+    assert header[0] == "key"
+    assert "author" in header
+    assert "title" in header
+    assert "year" in header
+    article = next(line for line in lines if line.startswith("Smith2020,"))
+    assert "Smith, John and Doe, Jane" in article
+    assert "A Study" in article
+    assert "Journal of Examples" in article
+    chapter = next(line for line in lines if line.startswith("Roe2019,"))
+    assert "Big Book" in chapter
+
+
+def test_csv_export_default_columns() -> None:
+    csv_text = export_library(parse_bib(_SRC), "csv")
+    header = csv_text.strip().splitlines()[0]
+    cols = header.split(",")
+    expected = [
+        "key", "type", "author", "title", "year", "date",
+        "journal", "journaltitle", "booktitle", "doi", "url",
+        "eprint", "archiveprefix", "volume", "number", "pages",
+        "publisher", "keywords",
+    ]
+    assert cols == expected
+
+
 def test_empty_input_is_tolerated() -> None:
     assert list(import_library("", "csl-json").entries.values()) == []
     assert list(import_library("", "ris").entries.values()) == []
@@ -144,4 +173,5 @@ def test_empty_input_is_tolerated() -> None:
     assert export_library(parse_bib(""), "ris") == ""
     assert export_library(parse_bib(""), "csl-json") == "[]"
     assert export_library(parse_bib(""), "endnote") == ""
+    assert export_library(parse_bib(""), "csv") == "key,type,author,title,year,date,journal,journaltitle,booktitle,doi,url,eprint,archiveprefix,volume,number,pages,publisher,keywords\n"
     assert ET.fromstring(export_library(parse_bib(""), "mods")).tag.endswith("modsCollection")

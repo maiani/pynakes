@@ -3,7 +3,7 @@
 ``convert`` is the single format-conversion command. With a dialect target
 (``bibtex``/``biblatex``) it edits the ``.bib`` in place, surgically, with the
 usual diff/commit workflow. With an interchange format it reads the library and
-*exports* it (``--to csl-json``/``ris``/``mods``/``endnote``) or reads a foreign
+*exports* it (``--to csl-json``/``ris``/``mods``/``endnote``/``csv``) or reads a foreign
 file and *imports* it to BibTeX (``--from csl-json``/``ris``/``mods``/``endnote``).
 """
 
@@ -24,7 +24,7 @@ from pynakes.cli_common import (
     _verb,
 )
 from pynakes.engine import Bibliography
-from pynakes.interchange import FORMATS, export_library, import_library
+from pynakes.interchange import EXPORT_FORMATS, IMPORT_FORMATS, export_library, import_library
 from pynakes.io import save_plain_text
 
 _DIALECTS = ("biblatex", "bibtex")
@@ -73,14 +73,14 @@ def convert(
         _convert_dialect(file, to, params)
         return
 
-    if to in FORMATS:
+    if to in EXPORT_FORMATS:
         _convert_export(file, to, out, params)
         return
 
     _emit_error(
         json_output,
         "UnknownConvertTarget",
-        f"Unknown target {to!r}; choose biblatex, bibtex, {', or '.join(FORMATS)}",
+        f"Unknown target {to!r}; choose biblatex, bibtex, {', or '.join(EXPORT_FORMATS)}",
     )
 
 
@@ -121,11 +121,11 @@ def _convert_import(
     out: str | None,
     params: RunParams,
 ) -> None:
-    if from_format not in FORMATS:
+    if from_format not in IMPORT_FORMATS:
         _emit_error(
             params.json_output,
             "UnknownConvertSource",
-            f"Unknown --from format {from_format!r}; choose {' or '.join(FORMATS)}",
+            f"Unknown --from format {from_format!r}; choose {' or '.join(IMPORT_FORMATS)}",
         )
     if to is not None and to not in _DIALECTS:
         _emit_error(

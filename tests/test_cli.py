@@ -2273,6 +2273,37 @@ class TestConvertCommand:
         assert (data["to"], data["written"], data["entry_count"]) == ("mods", True, 1)
         assert "<modsCollection" in out.read_text()
 
+    def test_convert_export_to_csv_stdout(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{A, author = {Doe, J}, title = {T}, journal = {J}, year = {2020}}\n"
+        )
+
+        result = runner.invoke(app, ["convert", str(bib), "--to", "csv"])
+
+        assert result.exit_code == 0, result.output
+        assert "key,type,author,title,year" in result.output
+        assert "A,article,\"Doe, J\",T,2020" in result.output
+        assert bib.read_text().startswith("@article{A,")
+
+    def test_convert_export_to_csv_file(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{A, author = {Doe, J}, title = {T}, journal = {J}, year = {2020}}\n"
+        )
+        out = tmp_path / "refs.csv"
+
+        result = runner.invoke(
+            app, ["convert", str(bib), "--to", "csv", "--out", str(out), "--json"]
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert (data["to"], data["written"], data["entry_count"]) == ("csv", True, 1)
+        csv_text = out.read_text()
+        assert "key,type,author,title,year" in csv_text
+        assert "A,article,\"Doe, J\",T,2020" in csv_text
+
     def test_convert_import_from_ris(self, tmp_path: Path) -> None:
         ris = tmp_path / "in.ris"
         ris.write_text("TY  - JOUR\nAU  - Doe, Jane\nTI  - A Study\nPY  - 2021\nER  - \n")
@@ -2294,6 +2325,17 @@ class TestConvertCommand:
         assert "@article{" in result.output
         assert "author = {Doe, Jane}" in result.output
         assert "title = {A Study}" in result.output
+
+    def test_convert_import_from_csv_rejected(self, tmp_path: Path) -> None:
+        src = tmp_path / "in.csv"
+        src.write_text("key,title\nA,T\n")
+
+        result = runner.invoke(
+            app, ["convert", str(src), "--from", "csv", "--json"]
+        )
+
+        assert result.exit_code == 1, result.output
+        assert json.loads(result.output)["error"] == "UnknownConvertSource"
 
     def test_convert_import_foreign_to_foreign_rejected(self, tmp_path: Path) -> None:
         src = tmp_path / "in.ris"

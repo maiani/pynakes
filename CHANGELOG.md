@@ -78,6 +78,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   BibLaTeX, `archiveprefix` for BibTeX), uses deterministic provider-response
   caching, and remains testable without network through injectable fetchers.
 
+- **CSV export via `pynakes convert refs.bib --to csv --out refs.csv`.**
+  CSV is useful for review, spreadsheets, audits, and quick sharing, but is
+  export-only (no `--from csv`) because repeated authors, braced
+  capitalization, string macros, linked files, comments, and metadata do not
+  round-trip cleanly. Default columns: key, type, author, title, year, date,
+  journal, journaltitle, booktitle, doi, url, eprint, archiveprefix, volume,
+  number, pages, publisher, keywords. Field values are stored/resolved strings;
+  authors are not split during export. The `FORMATS` tuple in
+  `pynakes.interchange` is now split into `EXPORT_FORMATS` and `IMPORT_FORMATS`
+  to keep CSV out of the import set.
+
 - **Agent beta eval has a broader task catalog.** The manual beta-test
   supervisor now chooses from concrete discovery, dry-run/diff, metadata,
   Pinax, structured-error, online provider, cache, and DOI → arXiv → Pinax

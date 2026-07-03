@@ -253,6 +253,7 @@ def get_capabilities() -> dict:
             "export_ris",
             "export_mods",
             "export_endnote",
+            "export_csv",
             "import_csl_json",
             "import_ris",
             "import_mods",
@@ -300,7 +301,7 @@ def get_capabilities() -> dict:
             "normalize": "Normalize entries (titles, authors, journals, DOIs, "
             "identifier case, ordering) per the library's configured settings",
             "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "
-            "formats (export/import CSL-JSON, RIS, MODS, and EndNote)",
+            "formats (export/import CSL-JSON, RIS, MODS, EndNote, and export CSV)",
             "search": "Search entries by free text, phrases, or field-scoped terms",
             "asset": "Fetch and validate Pinax materials — arXiv PDF/source, "
             "open-access published PDF download, and linked-file checks (fetch, check)",
