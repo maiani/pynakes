@@ -21,6 +21,7 @@ from pynakes.cli_common import (
     _run_checks,
     _safe,
     _verb,
+    bib_file_argument,
 )
 from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography, ExternalModificationError
@@ -278,7 +279,7 @@ def keys_generate(
 
 
 def keys_repair(
-    file: str = typer.Argument(..., help="Path to the .bib file"),
+    file: str | None = bib_file_argument(),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
@@ -286,6 +287,7 @@ def keys_repair(
 ) -> None:
     """Rename duplicate citation keys so every key is unique."""
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
     renames = coll.repair_keys()
     human = [f"{_verb('repair', params)} {len(renames)} duplicate key(s)."]
@@ -339,9 +341,7 @@ def _repaired_citation_warnings(lib, file: str, renames: list[tuple[str, str]]) 
 
 
 def keys_rename(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     old: str = typer.Argument(..., help="Existing citation key"),
     new: str = typer.Argument(..., help="New citation key"),
     sources: list[str] | None = typer.Argument(

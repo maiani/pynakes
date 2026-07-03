@@ -212,6 +212,38 @@ class TestInspectAndLint:
         assert result.exit_code == 0, result.output
         assert json.loads(result.output)["file"] == "refs.bib"
 
+    def test_lint_discovers_lone_bib_file_without_options(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@book{Knuth1984,\n"
+            "  author = {Donald E. Knuth},\n"
+            "  title = {The TeXbook},\n"
+            "  publisher = {Addison-Wesley},\n"
+            "  year = {1984}\n"
+            "}\n"
+        )
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["lint"])
+
+        assert result.exit_code == 0, result.output
+        assert "refs.bib: no issues found." in result.output
+
+    def test_variadic_nested_check_discovers_lone_bib_file(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n")
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["keys", "check", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["file"] == "refs.bib"
+
     def test_nested_command_discovers_lone_bib_file(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text("@article{A,\n  title = {T}\n}\n")
@@ -380,6 +412,18 @@ class TestSearchCommand:
         assert data["count"] == 1
         assert data["matches"][0]["key"] == "Alpha2024"
         assert data["matches"][0]["matched_fields"] == ["title"]
+
+    def test_search_auto_discovers_lone_bib_file(self, tmp_path: Path, monkeypatch) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@misc{Alpha,\n  title = {Plain Widget Note}\n}\n")
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["search", "widget", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["file"] == "refs.bib"
+        assert data["matches"][0]["key"] == "Alpha"
 
     def test_search_supports_field_terms_and_where_filter(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -1054,6 +1098,17 @@ class TestGroupsCommand:
         groups = json.loads(result.output)["groups"]
         assert "Machine Learning" in groups
 
+    def test_list_auto_discovers_lone_bib_file(self, tmp_path: Path, monkeypatch) -> None:
+        _copy(tmp_path, "jabref_groups.bib")
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["groups", "list", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["file"] == "refs.bib"
+        assert "Machine Learning" in data["groups"]
+
     def test_add_entry_dry_run_does_not_write(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
         original = bib.read_text()
@@ -1073,6 +1128,20 @@ class TestGroupsCommand:
         bib = _copy(tmp_path, "simple.bib")
         result = runner.invoke(app, ["groups", "add-entry", str(bib), "Nope", "Fav"])
         assert result.exit_code == 1
+
+
+class TestMetadataCommand:
+    def test_list_auto_discovers_lone_bib_file(self, tmp_path: Path, monkeypatch) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@comment{pynakes-meta: dialect:biblatex;}\n@article{A,\n  title = {T}\n}\n")
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["metadata", "list", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["file"] == "refs.bib"
+        assert data["effective"]["dialect"] == "biblatex;"
 
 
 class TestKeysCommand:
@@ -1308,6 +1377,18 @@ class TestKeysCommand:
         from pynakes.bibtex_parser import parse_bib
 
         assert parse_bib(bib.read_text()).entries.duplicate_keys() == {}
+
+    def test_repair_auto_discovers_lone_bib_file(self, tmp_path: Path, monkeypatch) -> None:
+        bib = _copy(tmp_path, "duplicate_entries.bib")
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["keys", "repair", "--dry-run", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["file"] == "refs.bib"
+        assert data["renames"]
+        assert bib.exists()
 
     def test_rename_updates_bib_and_tex_dry_run(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")

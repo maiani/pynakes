@@ -15,14 +15,13 @@ from pynakes.cli_common import (
     _resolve_input_bib,
     _safe,
     _verb,
+    bib_file_argument,
 )
 from pynakes.engine import Bibliography
 
 
 def remove(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     citekeys: list[str] = typer.Argument(..., help="One or more citation keys to remove"),
     keep_files: bool = typer.Option(
         False, "--keep-files", help="Keep Pinax materials on disk (default: remove them)"

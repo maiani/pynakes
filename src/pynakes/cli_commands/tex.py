@@ -17,6 +17,7 @@ from pynakes.cli_common import (
     _resolve_input_bib,
     _safe,
     _verb,
+    bib_file_option,
 )
 from pynakes.engine import Bibliography
 from pynakes.metadata import format_metadata_list, metadata_list_values
@@ -40,12 +41,7 @@ def _clear_stored_sources(coll: Bibliography) -> None:
     coll.remove_metadata(TEX_SOURCES_KEY, namespace="jabref")
 
 
-_FILE_OPTION = typer.Option(
-    None,
-    "--file",
-    "-f",
-    help="Path to the .bib file (default: auto-detect single .bib in cwd)",
-)
+_FILE_OPTION = bib_file_option()
 
 
 def tex_list(

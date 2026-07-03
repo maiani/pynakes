@@ -12,6 +12,7 @@ from pynakes.cli_common import (
     _resolve_input_bib,
     _safe,
     _verb,
+    bib_file_argument,
 )
 from pynakes.engine import Bibliography
 
@@ -35,9 +36,7 @@ def _parse_field_assignments(assignments: list[str]) -> dict[str, str]:
 
 def add(
     key: str = typer.Argument(..., help="Citation key for the new entry"),
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     entry_type: str = typer.Option("article", "--type", help="BibTeX/BibLaTeX entry type"),
     field: list[str] = typer.Option(
         [], "--field", "-f", help="Field assignment, repeatable: name=value"

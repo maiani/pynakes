@@ -4,7 +4,7 @@ This module keeps command callbacks separate from application assembly while
 retaining the stable CLI contract.
 """
 
-import json as _json
+import json
 
 import typer
 
@@ -18,6 +18,7 @@ from pynakes.cli_common import (
     _resolve_input_bib,
     _safe,
     _verb,
+    bib_file_argument,
 )
 from pynakes.engine import Bibliography
 from pynakes.io import load_bib
@@ -26,9 +27,7 @@ from pynakes.io import load_bib
 
 
 def groups_list(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """List all groups and their members."""
@@ -39,7 +38,7 @@ def groups_list(
 
     if json_output:
         typer.echo(
-            _json.dumps(
+            json.dumps(
                 {"status": "success", "action": "groups_list", "file": file, "groups": members},
                 indent=2,
             )
@@ -80,9 +79,7 @@ def _group_mod_entry(
 
 
 def groups_add_entry(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     key: str = typer.Argument(..., help="Citation key to add"),
     group: str = typer.Argument(..., help="Group name"),
     backup: bool = _BACKUP_OPTION,
@@ -97,9 +94,7 @@ def groups_add_entry(
 
 
 def groups_remove_entry(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     key: str = typer.Argument(..., help="Citation key to remove"),
     group: str = typer.Argument(..., help="Group name"),
     backup: bool = _BACKUP_OPTION,

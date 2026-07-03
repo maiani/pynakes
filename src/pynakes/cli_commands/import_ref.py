@@ -1,6 +1,6 @@
 """CLI command registration for ``pynakes ref import``."""
 
-import json as _json
+import json
 
 import typer
 
@@ -16,15 +16,14 @@ from pynakes.cli_common import (
     _resolve_input_bib,
     _safe,
     _verb,
+    bib_file_argument,
 )
 from pynakes.engine import Bibliography
 
 
 def import_reference(
     identifier: str = typer.Argument(..., help="DOI, DOI URL, arXiv id, or arXiv URL to import"),
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     key: str | None = typer.Option(None, "--key", help="Citation key to use"),
     key_source: str = typer.Option(
         "generated",
@@ -77,7 +76,7 @@ def import_reference(
     except importer_ops.DuplicateReferenceError as exc:
         if json_output:
             typer.echo(
-                _json.dumps(
+                json.dumps(
                     {
                         "status": "conflict",
                         "error": "DuplicateReference",

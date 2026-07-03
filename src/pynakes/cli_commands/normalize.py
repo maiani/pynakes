@@ -15,6 +15,7 @@ from pynakes.cli_common import (
     _resolve_input_bib,
     _safe,
     _verb,
+    bib_file_argument,
 )
 from pynakes.engine import Bibliography
 
@@ -33,9 +34,7 @@ def _optional_bool(value: str) -> bool | None:
 
 
 def normalize(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     title_protection: str = typer.Option(
         "metadata",
         "--title-protection",

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Bare variadic check commands such as `pynakes lint`, `pynakes keys check`,
+  `pynakes asset check`, `pynakes dedupe check`, and `pynakes verify` now
+  auto-detect the lone local `.bib` file just like their `--json` forms and
+  single-file commands.
+- `pynakes keys repair` now also auto-detects the lone local `.bib` file when
+  its file argument is omitted, matching the rest of the single-library
+  modifying commands.
 - **`keys rename` and `keys generate` now respect `--backup` for `.tex` files.**
   Previously the `.tex` source rewrite always created a `.bak` (via
   `save_plain_text`'s default) regardless of the `--backup` flag; now `.tex`

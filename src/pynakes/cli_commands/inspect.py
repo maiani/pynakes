@@ -4,7 +4,7 @@ This module keeps command callbacks separate from application assembly while
 retaining the stable CLI contract.
 """
 
-import json as _json
+import json
 
 import typer
 
@@ -13,6 +13,7 @@ from pynakes.cli_common import (
     _entries,
     _resolve_input_bib,
     _safe,
+    bib_file_argument,
 )
 from pynakes.engine import Bibliography
 from pynakes.filestore import FileStore
@@ -21,9 +22,7 @@ from pynakes.filestore import FileStore
 
 
 def inspect(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     resolved: bool = typer.Option(
         False,
         "--resolved",
@@ -84,7 +83,7 @@ def inspect(
                 "files_dir": str(store.root),
                 "manifest": str(store.manifest_path),
             }
-        typer.echo(_json.dumps(result, indent=2))
+        typer.echo(json.dumps(result, indent=2))
         return
 
     le = "CRLF" if lib.line_ending == "\r\n" else "LF"

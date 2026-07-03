@@ -17,6 +17,7 @@ from pynakes.cli_common import (
     _run_checks,
     _safe,
     _verb,
+    bib_file_argument,
 )
 from pynakes.engine import Bibliography
 
@@ -104,9 +105,7 @@ def verify(
 
 
 def enrich(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     online: bool = typer.Option(
         False,
         "--online",

@@ -1,12 +1,12 @@
 """CLI command registration for bibliography search."""
 
-import json as _json
+import json
 
 import typer
 
 from pynakes import fields as fields_ops
 from pynakes import search as search_ops
-from pynakes.cli_common import _entries, _resolve_input_bib, _safe
+from pynakes.cli_common import _entries, _resolve_input_bib, _safe, bib_file_argument
 from pynakes.engine import Bibliography
 
 
@@ -15,9 +15,7 @@ def search(
         ...,
         help='Search query: words/phrases, optionally scoped as field:term or field:"phrase"',
     ),
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     field: list[str] | None = typer.Option(
         None,
         "--field",
@@ -43,7 +41,7 @@ def search(
 
     if json_output:
         typer.echo(
-            _json.dumps(
+            json.dumps(
                 {
                     "status": "success",
                     "action": "search",

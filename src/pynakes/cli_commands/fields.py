@@ -15,6 +15,7 @@ from pynakes.cli_common import (
     _resolve_input_bib,
     _safe,
     _verb,
+    bib_file_argument,
 )
 from pynakes.engine import Bibliography
 
@@ -50,9 +51,7 @@ def _run_field_op(
 
 
 def fields_rename(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     old: str = typer.Argument(..., help="Existing field name"),
     new: str = typer.Argument(..., help="New field name"),
     where: str | None = typer.Option(None, "--where", help="Filter expression"),
@@ -76,9 +75,7 @@ def fields_rename(
 
 
 def fields_move(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     old: str = typer.Argument(..., help="Existing field name"),
     new: str = typer.Argument(..., help="Target field name"),
     where: str | None = typer.Option(None, "--where", help="Filter expression"),
@@ -102,9 +99,7 @@ def fields_move(
 
 
 def fields_append(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     field: str = typer.Argument(..., help="Field name"),
     value: str = typer.Argument(..., help="Value to append"),
     where: str | None = typer.Option(None, "--where", help="Filter expression"),
@@ -128,9 +123,7 @@ def fields_append(
 
 
 def fields_clear(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     field: str = typer.Argument(..., help="Field name to remove"),
     where: str | None = typer.Option(None, "--where", help="Filter expression"),
     backup: bool = _BACKUP_OPTION,
@@ -153,9 +146,7 @@ def fields_clear(
 
 
 def fields_protect_title(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     field: str = typer.Option("title", "--field", help="Title-like field to protect"),
     term: list[str] | None = typer.Option(
         None, "--term", help="Additional exact term to brace-protect"

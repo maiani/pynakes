@@ -4,7 +4,7 @@ This module keeps command callbacks separate from application assembly while
 retaining the stable CLI contract.
 """
 
-import json as _json
+import json
 
 import typer
 
@@ -19,7 +19,7 @@ def capabilities(
     """Show tool capabilities."""
     caps = get_capabilities()
     if json_output:
-        typer.echo(_json.dumps(caps, indent=2))
+        typer.echo(json.dumps(caps, indent=2))
         return
     typer.echo(f"{caps['tool']} v{caps['version']}")
     descriptions = caps["commands"]

@@ -45,15 +45,15 @@ pynakes capabilities --json
 
 Read-only:
 
-- `pynakes inspect <file> [--json]`
+- `pynakes inspect [file] [--json]`
 - `pynakes search <query> [file] [--field ...] [--where ...] [--json]`
-- `pynakes lint <file>... [--strict] [--json]`
-- `pynakes groups list <file> [--json]`
-- `pynakes keys check <file>... [--strict] [--json]`
-- `pynakes metadata list <file> [--json]`
-- `pynakes asset check <file>... [--root ...] [--strict] [--json]`
-- `pynakes dedupe check <file>... [--strict] [--json]`
-- `pynakes verify <file>... [--online] [--published] [--strict] [--json]` —
+- `pynakes lint [file...] [--strict] [--json]`
+- `pynakes groups list [file] [--json]`
+- `pynakes keys check [file...] [--strict] [--json]`
+- `pynakes metadata list [file] [--json]`
+- `pynakes asset check [file...] [--root ...] [--strict] [--json]`
+- `pynakes dedupe check [file...] [--strict] [--json]`
+- `pynakes verify [file...] [--online] [--published] [--strict] [--json]` —
   `--published` also reports preprint/published identity links, including
   DOI-backed entries that can be linked to arXiv through provider metadata
 - `pynakes capabilities [--json]`
@@ -72,42 +72,42 @@ citation usage check.
 
 Modifying (all support `--dry-run`, `--diff`, `--json`):
 
-- `pynakes groups add-entry <file> <key> <group>`
-- `pynakes groups remove-entry <file> <key> <group>`
-- `pynakes keys generate <old-key> <file>` — regenerate one key using the
+- `pynakes groups add-entry [file] <key> <group>`
+- `pynakes groups remove-entry [file] <key> <group>`
+- `pynakes keys generate <old-key> [file]` — regenerate one key using the
   preferred pattern (`AuthorYearTitle` by default); linked `tex-sources`
   citations are updated when configured. Use `--all` to regenerate every key.
-- `pynakes keys repair <file>` — make duplicate keys unique
-- `pynakes keys rename <file> <old> <new> <tex-source>...` — rename one key in
+- `pynakes keys repair [file]` — make duplicate keys unique
+- `pynakes keys rename [file] <old> <new> <tex-source>...` — rename one key in
   the `.bib` file and matching TeX citation commands
-- `pynakes fields rename <file> <old> <new> [--where ...]`
-- `pynakes fields move <file> <old> <new> [--where ...]`
-- `pynakes fields append <file> <field> <value> [--where ...]`
-- `pynakes fields clear <file> <field> [--where ...]`
-- `pynakes fields protect-title <file> [--field ...] [--term ...] [--where ...]`
+- `pynakes fields rename [file] <old> <new> [--where ...]`
+- `pynakes fields move [file] <old> <new> [--where ...]`
+- `pynakes fields append [file] <field> <value> [--where ...]`
+- `pynakes fields clear [file] <field> [--where ...]`
+- `pynakes fields protect-title [file] [--field ...] [--term ...] [--where ...]`
 - `pynakes ref add <key> [file] --field name=value ... [--type ...]` — add a manually specified entry
 - `pynakes ref import <identifier> [file] [--key ...] [--key-source generated|provider] [--allow-duplicate] [--fetch] [--cache-dir DIR]` — `<identifier>` is a DOI, DOI URL, arXiv id, or arXiv URL
 - `pynakes asset fetch [key] [file] [--cache-dir DIR]` — download configured
   Pinax materials: arXiv PDF/source and, when `fetch-published: true`,
   open-access published PDFs for DOI-backed entries. Human runs render download
   progress on stderr; `--json` stdout remains machine-readable JSON only.
-- `pynakes metadata set <file> <key> <value> [--allow-unknown]`
-- `pynakes metadata adopt-jabref <file>` — start maintaining a JabRef metadata
+- `pynakes metadata set [file] <key> <value> [--allow-unknown]`
+- `pynakes metadata adopt-jabref [file]` — start maintaining a JabRef metadata
   projection for a pynakes-native library (mirrors JabRef-native settings into
   `jabref-meta` and keeps them in sync from then on)
-- `pynakes normalize <file>` — includes journal abbreviation/expansion when
+- `pynakes normalize [file]` — includes journal abbreviation/expansion when
   `--journal-style abbreviated|full` or matching metadata is set
-- `pynakes convert <file> --to biblatex|bibtex`
-- `pynakes dedupe merge <file>` — conservatively merge duplicate-work clusters
-- `pynakes enrich <file> [--online] [--published]` — conservatively fill missing
+- `pynakes convert [file] --to biblatex|bibtex`
+- `pynakes dedupe merge [file]` — conservatively merge duplicate-work clusters
+- `pynakes enrich [file] [--online] [--published]` — conservatively fill missing
   metadata; `--published` also promotes preprints to their published version and
   backfills arXiv ids for DOI-backed entries when OpenAlex or Semantic Scholar
   exposes one
-- `pynakes tex scan <bib-file> <source>... [--out ...] [--group ...] [--keyword ...]`
+- `pynakes tex scan [bib-file] [source...] [--out ...] [--group ...] [--keyword ...]`
 
 Maintenance write (supports `--json`, but not `--dry-run` / `--diff`):
 
-- `pynakes asset check <file>... --fix [--backup]` — reconcile Pinax manifest
+- `pynakes asset check [file...] --fix [--backup]` — reconcile Pinax manifest
   drift. `--backup` keeps the previous manifest as `manifest.json.bak`.
 
 Creating / projecting — **create** new files (support `--dry-run`, `--diff`,
@@ -130,7 +130,7 @@ Creating / projecting — **create** new files (support `--dry-run`, `--diff`,
 
 Transactional:
 
-- `pynakes corpus batch <file> --ops '<json>' | --ops-file <path>` — apply a sequence
+- `pynakes corpus batch [file] --ops '<json>' | --ops-file <path>` — apply a sequence
   of operations to one file atomically (one preview, one commit; nothing is
   written if any operation fails). The operation vocabulary (op name → required/
   optional params) is in `capabilities` under `batch_operations`. Example:

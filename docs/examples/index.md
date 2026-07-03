@@ -121,6 +121,7 @@ pynakes fields protect-title refs.bib \
 
 ```bash
 pynakes keys check refs.bib --json
+pynakes keys repair --dry-run --diff
 pynakes keys repair refs.bib --dry-run --diff
 pynakes keys repair refs.bib
 ```

@@ -42,6 +42,7 @@ settings on top of the default (or copied) profile.
 Inspect a `.bib` file.
 
 ```bash
+pynakes inspect                           # auto-detects one .bib file
 pynakes inspect refs.bib
 pynakes inspect refs.bib --json
 ```
@@ -55,6 +56,7 @@ validation findings.
 Validate entries.
 
 ```bash
+pynakes lint                         # auto-detects one .bib file
 pynakes lint refs.bib
 pynakes lint refs.bib --json
 pynakes lint refs.bib chapters/*.bib --strict   # multi-file CI gate
@@ -78,19 +80,22 @@ casing (`month = Jan` → `month = jan`), while preserving literals such as
 `month = {June}` and declared custom strings.
 
 `lint` (along with `keys check`, `asset check`, `dedupe check`, and `verify`)
-accepts multiple files and supports `--strict`, which exits `1` for errors or
-profile deviations so it can gate a build. See [Library Profile](library-profile.md)
-for the complete schema and [Git Workflows](git-workflows.md) for pre-commit
-and CI recipes.
+accepts multiple files, or auto-detects a single `.bib` in the current directory
+when no file is given. These checks support `--strict`, which exits `1` for
+errors or profile deviations so it can gate a build. See
+[Library Profile](library-profile.md) for the complete schema and
+[Git Workflows](git-workflows.md) for pre-commit and CI recipes.
 
 ## groups
 
 Manage JabRef-style `groups` fields.
 
 ```bash
+pynakes groups list                       # auto-detects one .bib file
 pynakes groups list refs.bib
 pynakes groups list refs.bib --json
 
+pynakes groups add-entry KEY "GroupName" --dry-run --diff  # auto-detects one .bib file
 pynakes groups add-entry refs.bib KEY "GroupName" --dry-run --diff
 pynakes groups add-entry refs.bib KEY "GroupName"
 
@@ -108,6 +113,7 @@ pynakes keys check refs.bib --json
 
 pynakes keys generate OldKey2020 refs.bib --dry-run --diff
 pynakes keys generate refs.bib --all --dry-run --diff
+pynakes keys repair --dry-run --diff              # auto-detects one .bib file
 pynakes keys repair refs.bib --dry-run --diff
 pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/ --dry-run --diff
 ```
@@ -172,6 +178,7 @@ that terminator stripped. The exact source comment remains available as the
 block's raw text in the Python model.
 
 ```bash
+pynakes metadata list                     # auto-detects one .bib file
 pynakes metadata list refs.bib
 pynakes metadata list refs.bib --json
 ```
@@ -483,6 +490,7 @@ pynakes capabilities --json
 Search entries without modifying the library.
 
 ```bash
+pynakes search learning                   # auto-detects one .bib file
 pynakes search learning refs.bib
 pynakes search 'title:"natural language" type:article' refs.bib --json
 pynakes search widgets refs.bib --field title --where 'year = 2024' --json
@@ -513,6 +521,7 @@ passed. Online provider responses are cached beside the `.bib` file by default,
 or in `--cache-dir` when supplied.
 
 ```bash
+pynakes verify --online --strict --json        # auto-detects one .bib file
 pynakes verify refs.bib --online --strict --json
 pynakes verify refs.bib --online --published --json
 pynakes enrich refs.bib --online --dry-run --diff

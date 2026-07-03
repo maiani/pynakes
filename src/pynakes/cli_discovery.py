@@ -6,8 +6,10 @@ import os
 from pathlib import Path
 
 import click
-import typer._click.exceptions as _typer_exc
+from typer._click.exceptions import UsageError as TyperUsageError
 from typer.core import TyperGroup
+
+from pynakes.cli_common import _emit_error, bib_candidates, missing_bib_message
 
 _BIB_ARGUMENT_NAMES = {"file", "bib_file", "files"}
 
@@ -26,30 +28,6 @@ def _is_shell_completion() -> bool:
     return bool(os.environ.get("_PYNAKES_COMPLETE"))
 
 
-def _bib_candidates(directory: Path) -> list[Path]:
-    """Return the regular ``.bib`` files in *directory*, name-sorted."""
-    return sorted(
-        (path for path in directory.iterdir() if path.is_file() and path.suffix.lower() == ".bib"),
-        key=lambda path: path.name.casefold(),
-    )
-
-
-def _single_bib_file(directory: Path) -> Path | None:
-    """Return the only regular ``.bib`` file in *directory*, if there is one."""
-    candidates = _bib_candidates(directory)
-    return candidates[0] if len(candidates) == 1 else None
-
-
-def _emit_cli_error(json_output: bool, error: str, message: str) -> None:
-    """Emit a structured (or plain) error and exit 1, via the shared helper.
-
-    Imported lazily to avoid a circular import with :mod:`pynakes.cli_common`.
-    """
-    from pynakes.cli_common import _emit_error
-
-    _emit_error(json_output, error, message)
-
-
 def _report_missing_bib(json_output: bool, candidates: list[Path]) -> None:
     """Report the real cause when a leading ``.bib`` was omitted and undetectable.
 
@@ -58,18 +36,7 @@ def _report_missing_bib(json_output: bool, candidates: list[Path]) -> None:
     here (a multi-positional command whose parsing would otherwise report a
     misleading "Missing argument") or in the handler. Never returns.
     """
-    if not candidates:
-        _emit_cli_error(
-            json_output,
-            "InvalidInput",
-            "No *.bib file found in current directory; specify one as an argument",
-        )
-    names = "  ".join(path.name for path in candidates)
-    _emit_cli_error(
-        json_output,
-        "InvalidInput",
-        f"Multiple *.bib files found; specify one as an argument:\n{names}",
-    )
+    _emit_error(json_output, "InvalidInput", missing_bib_message(candidates))
 
 
 def _positional_tokens(command: click.Command, tokens: list[str]) -> list[str]:
@@ -185,12 +152,7 @@ class AutoBibGroup(TyperGroup):
         if "--json" in args:
             ctx.meta[_JSON_META_KEY] = True
         json_output = ctx.meta.get(_JSON_META_KEY, False)
-        if (
-            len(args) >= 2
-            and "--help" not in args
-            and "-h" not in args
-            and not _is_shell_completion()
-        ):
+        if args and "--help" not in args and "-h" not in args and not _is_shell_completion():
             command = self.get_command(ctx, args[0])
             if (
                 command is not None
@@ -198,7 +160,7 @@ class AutoBibGroup(TyperGroup):
                 and command.name not in _NO_AUTODETECT_COMMANDS
             ):
                 if _should_insert_bib(command, args[1:]):
-                    candidates = _bib_candidates(Path.cwd())
+                    candidates = bib_candidates(Path.cwd())
                     if len(candidates) == 1:
                         args.insert(1, candidates[0].name)
                     else:
@@ -218,9 +180,9 @@ class AutoBibGroup(TyperGroup):
         json_output = "--json" in (args or [])
         try:
             return super().main(args=args, prog_name=prog_name, **extra)
-        except (click.UsageError, _typer_exc.UsageError) as exc:
+        except (click.UsageError, TyperUsageError) as exc:
             if json_output:
-                _emit_cli_error(True, "UsageError", exc.format_message())
+                _emit_error(True, "UsageError", exc.format_message())
             raise
 
     def invoke(self, ctx: click.Context):
@@ -229,7 +191,7 @@ class AutoBibGroup(TyperGroup):
         as the test runner)."""
         try:
             return super().invoke(ctx)
-        except (click.UsageError, _typer_exc.UsageError) as exc:
+        except (click.UsageError, TyperUsageError) as exc:
             if not ctx.meta.get(_JSON_META_KEY, False):
                 raise  # Humans keep Click's usage text and exit code 2.
-            _emit_cli_error(True, "UsageError", exc.format_message())
+            _emit_error(True, "UsageError", exc.format_message())

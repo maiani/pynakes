@@ -4,7 +4,7 @@ This module keeps command callbacks separate from application assembly while
 retaining the stable CLI contract.
 """
 
-import json as _json
+import json
 
 import typer
 
@@ -18,6 +18,7 @@ from pynakes.cli_common import (
     _resolve_input_bib,
     _safe,
     _verb,
+    bib_file_argument,
 )
 from pynakes.engine import Bibliography
 
@@ -25,9 +26,7 @@ from pynakes.engine import Bibliography
 
 
 def metadata_list(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """List top-level metadata blocks (both jabref-meta and pynakes-meta)."""
@@ -38,7 +37,7 @@ def metadata_list(
 
     if json_output:
         typer.echo(
-            _json.dumps(
+            json.dumps(
                 {
                     "status": "success",
                     "action": "metadata_list",
@@ -73,9 +72,7 @@ def metadata_list(
 
 
 def metadata_set(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     key: str = typer.Argument(..., help="Metadata key"),
     value: str = typer.Argument(..., help="Metadata value"),
     namespace: str | None = typer.Option(
@@ -143,9 +140,7 @@ def metadata_set(
 
 
 def metadata_adopt_jabref(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),

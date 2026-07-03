@@ -26,6 +26,7 @@ from pynakes.cli_common import (
     _metadata_cache_dir,
     _resolve_input_bib,
     _safe,
+    bib_file_argument,
 )
 from pynakes.engine import Bibliography
 from pynakes.fetch_progress import FetchArtifact, FetchProgressEvent
@@ -107,9 +108,7 @@ def fetch(
     target: str | None = typer.Argument(
         None, help="Citation key to fetch (default: all entries with configured missing materials)"
     ),
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show what would be fetched without downloading"

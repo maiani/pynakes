@@ -1,7 +1,7 @@
 """Shared CLI output, error handling, and check orchestration."""
 
 import functools
-import json as _json
+import json
 import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -9,38 +9,64 @@ from pathlib import Path
 from typing import TypeVar
 
 import typer
+from click.shell_completion import CompletionItem
 
-from pynakes.bibtex_parser import ParseError
+from pynakes.bibtex_parser import ParseError, parse_bib
+from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography, ExternalModificationError
+from pynakes.io import save_text
 
 _F = TypeVar("_F", bound=Callable)
 
 # --- shared helpers --------------------------------------------------------
 
+BIB_FILE_HELP = "Path to the .bib file (default: auto-detect single .bib in cwd)"
 
-def _resolve_input_bib(file: str | None, json_output: bool, *, label: str = ".bib") -> str:
+
+def bib_file_argument(help: str = BIB_FILE_HELP):
+    """Return the standard optional ``.bib`` positional argument."""
+    return typer.Argument(None, help=help)
+
+
+def bib_file_option(help: str = BIB_FILE_HELP):
+    """Return the standard optional ``--file`` option for commands with other positionals."""
+    return typer.Option(None, "--file", "-f", help=help)
+
+
+def bib_candidates(directory: Path) -> list[Path]:
+    """Return the regular ``.bib`` files in *directory*, name-sorted."""
+    return sorted(
+        (path for path in directory.iterdir() if path.is_file() and path.suffix.lower() == ".bib"),
+        key=lambda path: path.name.casefold(),
+    )
+
+
+def single_bib_file(directory: Path) -> Path | None:
+    """Return the only regular ``.bib`` file in *directory*, if there is one."""
+    candidates = bib_candidates(directory)
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def missing_bib_message(candidates: list[Path]) -> str:
+    """Return the standard omitted-library error message for *candidates*."""
+    if not candidates:
+        return "No *.bib file found in current directory; specify one as an argument"
+    names = "  ".join(path.name for path in candidates)
+    return f"Multiple *.bib files found; specify one as an argument:\n{names}"
+
+
+def _resolve_input_bib(file: str | None, json_output: bool) -> str:
     """Return the input ``file`` path, auto-detecting when ``None``.
 
-    When ``file`` is ``None``, scans the current directory for files matching
-    ``*{label}``. If exactly one is found, returns it. If none or multiple
+    When ``file`` is ``None``, scans the current directory for regular
+    ``*.bib`` files. If exactly one is found, returns it. If none or multiple
     are found, emits an error (never returns).
     """
     if file is not None:
         return file
-    candidates = sorted(Path(".").glob(f"*{label}"))
-    if not candidates:
-        _emit_error(
-            json_output,
-            "InvalidInput",
-            f"No *{label} file found in current directory; specify one as an argument",
-        )
-    if len(candidates) > 1:
-        names = "  ".join(c.name for c in candidates)
-        _emit_error(
-            json_output,
-            "InvalidInput",
-            f"Multiple *{label} files found; specify one as an argument:\n{names}",
-        )
+    candidates = bib_candidates(Path("."))
+    if len(candidates) != 1:
+        _emit_error(json_output, "InvalidInput", missing_bib_message(candidates))
     return str(candidates[0])
 
 
@@ -54,7 +80,7 @@ def _emit(
     if json_output:
         if show_diff and diff_text:
             result["diff"] = diff_text
-        typer.echo(_json.dumps(result, indent=2))
+        typer.echo(json.dumps(result, indent=2))
         return
     for line in human:
         typer.echo(line)
@@ -97,7 +123,7 @@ def _verb(action: str, params: RunParams, past: str | None = None) -> str:
 def _emit_error(json_output: bool, error: str, message: str, code: int = 1, **extra) -> None:
     if json_output:
         typer.echo(
-            _json.dumps({"status": "error", "error": error, "message": message, **extra}, indent=2)
+            json.dumps({"status": "error", "error": error, "message": message, **extra}, indent=2)
         )
     else:
         typer.echo(f"{error}: {message}")
@@ -107,7 +133,7 @@ def _emit_error(json_output: bool, error: str, message: str, code: int = 1, **ex
 def _emit_conflict(json_output: bool, error: str, message: str, **extra) -> None:
     if json_output:
         typer.echo(
-            _json.dumps(
+            json.dumps(
                 {"status": "conflict", "error": error, "message": message, **extra}, indent=2
             )
         )
@@ -206,19 +232,13 @@ def _citekey_completer(ctx, incomplete):
     Click/ShellComplete calls this with ``(ctx, incomplete)`` — see
     ``ShellComplete.get_completions``.
     """
-    from click.shell_completion import CompletionItem
-
-    from pynakes.cli_discovery import _single_bib_file as _find_bib
-
     file = ctx.params.get("file") or ctx.params.get("bib_file")
     if file is None:
-        candidate = _find_bib(Path.cwd())
+        candidate = single_bib_file(Path.cwd())
         if candidate is None:
             return []
         file = str(candidate)
     try:
-        from pynakes.bibtex_parser import parse_bib
-
         lib = parse_bib(Path(file).read_text(encoding="utf-8"))
         return [
             CompletionItem(key)
@@ -237,19 +257,13 @@ def _bibfile_completer(ctx, incomplete):
     filling in the file argument).  Otherwise it falls back to suggesting
     ``.bib`` filenames.
     """
-    from click.shell_completion import CompletionItem
-
-    from pynakes.cli_discovery import _single_bib_file as _find_bib
-
-    candidate = _find_bib(Path.cwd())
+    candidate = single_bib_file(Path.cwd())
     if candidate is not None:
         name = candidate.name
         items: list[CompletionItem] = []
         if incomplete.lower() in name.lower():
             items.append(CompletionItem(name))
         try:
-            from pynakes.bibtex_parser import parse_bib
-
             lib = parse_bib(candidate.read_text(encoding="utf-8"))
         except Exception:
             return items
@@ -260,8 +274,8 @@ def _bibfile_completer(ctx, incomplete):
     try:
         return [
             CompletionItem(p.name)
-            for p in sorted(Path(".").iterdir(), key=lambda x: x.name.casefold())
-            if p.is_file() and p.suffix.lower() == ".bib" and incomplete.lower() in p.name.lower()
+            for p in bib_candidates(Path("."))
+            if incomplete.lower() in p.name.lower()
         ]
     except Exception:
         return []
@@ -328,9 +342,6 @@ def _finish_create(
     this envelope: ``status, action, file, dry_run, written, warnings``, plus
     command-specific keys, and an optional ``diff`` when ``--diff`` is set.
     """
-    from pynakes.diff import generate_diff
-    from pynakes.io import save_text
-
     diff_text = generate_diff(previous_content, content, path) if params.diff else ""
     written = False
     if not params.dry_run:
@@ -389,7 +400,7 @@ def _run_single_check(
     """Run a read-only check over a single file."""
     outcome = check_one(file)
     if json_output:
-        typer.echo(_json.dumps(outcome.result, indent=2))
+        typer.echo(json.dumps(outcome.result, indent=2))
     else:
         for line in outcome.human:
             typer.echo(line)
@@ -446,7 +457,7 @@ def _run_multi_checks(
         "summary": {"files": len(files), "failed_files": failed_files, **totals},
     }
     if json_output:
-        typer.echo(_json.dumps(aggregate, indent=2))
+        typer.echo(json.dumps(aggregate, indent=2))
     else:
         typer.echo(
             f"{len(files)} file(s) checked; {failed_files} with findings, {error_files} unreadable."

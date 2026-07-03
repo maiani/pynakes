@@ -7,7 +7,7 @@ usual diff/commit workflow. With an interchange format it reads the library and
 file and *imports* it to BibTeX (``--from csl-json``/``ris``/``mods``/``endnote``).
 """
 
-import json as _json
+import json
 from pathlib import Path
 
 import typer
@@ -168,7 +168,7 @@ def _emit_conversion(
             "written": written,
             "content": None if out else content,
         }
-        typer.echo(_json.dumps(result, indent=2))
+        typer.echo(json.dumps(result, indent=2))
         return
 
     if out:

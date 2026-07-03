@@ -4,7 +4,7 @@ Applies a JSON list of operations to one `.bib` file in memory, previews a singl
 combined diff/plan, and commits them atomically (all-or-nothing).
 """
 
-import json as _json
+import json
 
 import typer
 
@@ -18,15 +18,14 @@ from pynakes.cli_common import (
     _resolve_input_bib,
     _safe,
     _verb,
+    bib_file_argument,
 )
 from pynakes.engine import Bibliography
 from pynakes.metadata import DuplicateMetadataError
 
 
 def batch(
-    file: str | None = typer.Argument(
-        None, help="Path to the .bib file (default: auto-detect single .bib in cwd)"
-    ),
+    file: str | None = bib_file_argument(),
     ops: str = typer.Option(None, "--ops", help="JSON array of operations (or use --ops-file)"),
     ops_file: str = typer.Option(
         None, "--ops-file", help="Path to a JSON file with the operations array"
@@ -50,8 +49,8 @@ def batch(
         with open(ops_file, encoding="utf-8") as handle:
             raw = handle.read()
     try:
-        operations = _json.loads(raw)
-    except _json.JSONDecodeError as exc:
+        operations = json.loads(raw)
+    except json.JSONDecodeError as exc:
         _emit_error(json_output, "InvalidInput", f"operations are not valid JSON: {exc}")
         return
 
