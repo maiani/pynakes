@@ -104,7 +104,7 @@ By default, imported entries use generated keys. If the library stores a
 `keypatterndefault`/`keypattern_<entrytype>` as a fallback), that pattern is used.
 `--fetch` also downloads configured Pinax materials for the new entry: arXiv
 preprint artifacts when an arXiv id is present, and published PDFs when
-`fetch-published: true` can resolve an open-access DOI copy.
+`fetch-policy` can resolve an open-access DOI copy.
 
 ## 8. Organize with Groups
 

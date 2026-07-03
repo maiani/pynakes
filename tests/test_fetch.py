@@ -99,9 +99,9 @@ def test_download_arxiv_materials_writes_pdf_and_source(tmp_path: Path) -> None:
     assert (tmp_path / "refs.files" / "Noether1918.source" / "paper.tex").read_bytes() == (
         b"\\title{Fixture}\n"
     )
-    assert (
-        tmp_path / "refs.files" / "Noether1918.source" / "src" / "notes.txt"
-    ).read_bytes() == (b"notes\n")
+    assert (tmp_path / "refs.files" / "Noether1918.source" / "src" / "notes.txt").read_bytes() == (
+        b"notes\n"
+    )
     manifest = json.loads((tmp_path / "refs.files" / ".pinax" / "manifest.json").read_text())
     row = manifest["files"]["Noether1918"]
     assert row["preprint_canonical"] is False
@@ -412,6 +412,28 @@ def test_download_published_material_returns_none_when_no_oa(tmp_path: Path) -> 
 
     assert result.pdf_path is None
     assert not (tmp_path / "refs.files" / "Noether1918.published.pdf").exists()
+
+
+def test_download_published_material_gracefully_skips_html_content(tmp_path: Path) -> None:
+    store = FileStore(root=tmp_path / "refs.files", bib_path=tmp_path / "refs.bib")
+
+    def url_resolver(doi: str) -> str | None:
+        return "https://example.com/paper.pdf"
+
+    def pdf_fetcher(url: str) -> bytes:
+        return b"<!DOCTYPE html><html><body>Not a PDF</body></html>"
+
+    result = download_published_material(
+        store,
+        "Kane1998",
+        "10.1038/30156",
+        url_resolver=url_resolver,
+        pdf_fetcher=pdf_fetcher,
+    )
+
+    assert result.pdf_path is None
+    assert result.doi == "10.1038/30156"
+    assert not (tmp_path / "refs.files" / "Kane1998.published.pdf").exists()
 
 
 def test_download_published_material_wraps_malformed_doi(tmp_path: Path) -> None:

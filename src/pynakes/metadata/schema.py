@@ -54,9 +54,7 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     "journal-table": CATEGORY_NORMALIZATION,
     "ltwa-table": CATEGORY_NORMALIZATION,
     "files-dir": CATEGORY_PINAX,
-    "fetch-preprint": CATEGORY_PINAX,
-    "fetch-source": CATEGORY_PINAX,
-    "fetch-published": CATEGORY_PINAX,
+    "fetch-policy": CATEGORY_PINAX,
     # Linked LaTeX sources that cite this library; consulted by the citation-key
     # commands so .tex edits stay consistent without re-specifying the files.
     "tex-sources": CATEGORY_USAGE,
@@ -75,6 +73,7 @@ PYNAKES_PREFIX_KEYS: dict[str, MetadataCategory] = {
 
 
 _VALID_DIALECTS = {"bibtex", "biblatex"}
+VALID_FETCH_POLICIES = {"preprint", "published", "source", "bestpdf"}
 
 
 def validate_metadata_value(key: str, value: str) -> None:
@@ -95,23 +94,14 @@ def validate_metadata_value(key: str, value: str) -> None:
             raise ValueError(f"Invalid dialect {stripped!r}; expected 'bibtex' or 'biblatex'")
         return
 
-    # Fetch booleans must be a recognised truthy/falsy spelling.
-    if normalized_key in {"fetch-preprint", "fetch-source", "fetch-published"}:
-        if stripped.lower() not in {
-            "1",
-            "true",
-            "yes",
-            "on",
-            "enabled",
-            "0",
-            "false",
-            "no",
-            "off",
-            "disabled",
-        }:
+    # Fetch policy must be a comma-separated list of recognised values.
+    if normalized_key in {"fetch-policy", "fetch-policy"}:
+        values = [v.strip().lower() for v in stripped.replace(";", ",").split(",") if v.strip()]
+        invalid = [v for v in values if v not in VALID_FETCH_POLICIES]
+        if invalid:
             raise ValueError(
-                f"Invalid boolean value {stripped!r} for {key!r}; "
-                f"expected one of: 1/true/yes/on/enabled, 0/false/no/off/disabled"
+                f"Invalid fetch-policy value(s) {invalid!r}; "
+                f"expected one or more of: {', '.join(sorted(VALID_FETCH_POLICIES))}"
             )
         return
 

@@ -54,9 +54,9 @@ ONLINE_CATALOG = [
     "metadata against the arXiv URL/eprint fields.",
     "Use `ref import --fetch` with an arXiv identifier to create a Pinax entry and fetch "
     "preprint PDF/source materials in one workflow.",
-    "Create or inspect a Pinax files-dir, enable fetch-preprint and fetch-source metadata, "
+    "Create or inspect a Pinax files-dir, set fetch-policy metadata, "
     "then fetch arXiv materials and inspect the manifest.",
-    "Enable fetch-published for a DOI-backed entry and run `asset fetch`, distinguishing "
+    "Configure fetch-policy for a DOI-backed entry and run `asset fetch`, distinguishing "
     "product issues from OpenAlex/provider failures.",
     "Start from a DOI-backed paper, use online published enrichment to backfill its arXiv id, "
     "then build a Pinax and fetch the arXiv PDF/source materials.",

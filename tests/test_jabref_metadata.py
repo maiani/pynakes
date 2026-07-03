@@ -545,14 +545,14 @@ def test_set_metadata_refuses_invalid_dialect() -> None:
         raise AssertionError("expected ValueError for invalid databaseType")
 
 
-def test_set_metadata_refuses_invalid_fetch_boolean() -> None:
+def test_set_metadata_refuses_invalid_fetch_policy() -> None:
     lib = parse_bib("")
     try:
-        set_metadata(lib, "fetch-preprint", "maybe")
+        set_metadata(lib, "fetch-policy", "maybe")
     except ValueError as exc:
-        assert "Invalid boolean value" in str(exc)
+        assert "Invalid fetch-policy" in str(exc)
     else:
-        raise AssertionError("expected ValueError for invalid fetch boolean")
+        raise AssertionError("expected ValueError for invalid fetch-policy")
 
 
 def test_set_metadata_refuses_empty_value_for_known_key() -> None:

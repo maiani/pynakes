@@ -7,8 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Replaced three boolean fetch-* keys with a single `fetch-policy` key.** The
+  old `fetch-preprint`, `fetch-source`, and `fetch-published` booleans are
+  replaced by a single comma-separated list: `preprint`, `published`, `source`,
+  and/or `bestpdf`. The `bestpdf` policy (the new default) tries the published
+  PDF first and falls back to the preprint when no open-access copy is
+  available. The default behaviour of `asset fetch` with no metadata set is now
+  `bestpdf`. (`parse_fetch_policy` in `src/pynakes/metadata/core.py`,
+  `_engine_helpers.py`)
+
+- **Published-PDF download pre-validates URLs with a HEAD request.** Before
+  downloading the full body, `download_published_material` now sends a HEAD
+  request to verify the URL serves `application/pdf`. Publisher landing pages
+  that CrossRef or OpenAlex mislabel as PDF are rejected early, avoiding
+  unnecessary downloads. (`_url_serves_pdf` in `src/pynakes/fetch.py:282`)
+
 ### Fixed
 
+- **Published-PDF download gracefully skips non-PDF responses instead of saving
+  them.** Some publisher URLs return an HTML landing page instead of a PDF. The
+  `download_published_material` function now checks that the response starts
+  with `%PDF` and returns a "no OA copy" result (``pdf_path=None``) when it does
+  not, preventing an HTML file from being saved as `.published.pdf`.
+  (`src/pynakes/fetch.py:358`)
 - **OpenAlex published-PDF resolution now filters out repository-hosted URLs.**
   `best_oa_location` entries from arXiv, PMC, or institutional repositories are
   no longer misidentified as the published version of record. The check uses

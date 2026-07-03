@@ -278,7 +278,7 @@ def test_bibliography_fetch_materials_uses_symlinked_bib_directory(tmp_path: Pat
         "}\n"
         "@comment{pynakes-meta:\n"
         "files-dir: refs.files\n"
-        "fetch-source: false\n"
+        "fetch-policy: preprint\n"
         "}\n"
     )
     link_bib = link_dir / "refs.bib"

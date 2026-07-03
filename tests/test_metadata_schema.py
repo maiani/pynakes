@@ -276,23 +276,20 @@ def test_validate_dialect_rejects_empty() -> None:
         metadata_pkg.validate_metadata_value("dialect", "")
 
 
-def test_validate_fetch_boolean_accepts_truthy() -> None:
-    for val in ("1", "true", "yes", "on", "enabled"):
-        metadata_pkg.validate_metadata_value("fetch-preprint", val)
-        metadata_pkg.validate_metadata_value("fetch-source", val)
-        metadata_pkg.validate_metadata_value("fetch-published", val)
+def test_validate_fetch_policy_accepts_valid() -> None:
+    for val in ("preprint", "published", "source", "bestpdf"):
+        metadata_pkg.validate_metadata_value("fetch-policy", val)
 
 
-def test_validate_fetch_boolean_accepts_falsy() -> None:
-    for val in ("0", "false", "no", "off", "disabled"):
-        metadata_pkg.validate_metadata_value("fetch-preprint", val)
-        metadata_pkg.validate_metadata_value("fetch-source", val)
-        metadata_pkg.validate_metadata_value("fetch-published", val)
+def test_validate_fetch_policy_accepts_comma_separated() -> None:
+    metadata_pkg.validate_metadata_value("fetch-policy", "preprint, published")
+    metadata_pkg.validate_metadata_value("fetch-policy", "bestpdf, source")
+    metadata_pkg.validate_metadata_value("fetch-policy", "preprint,published,source")
 
 
-def test_validate_fetch_boolean_rejects_invalid() -> None:
-    with pytest.raises(ValueError, match="Invalid boolean value"):
-        metadata_pkg.validate_metadata_value("fetch-preprint", "maybe")
+def test_validate_fetch_policy_rejects_invalid() -> None:
+    with pytest.raises(ValueError, match="Invalid fetch-policy"):
+        metadata_pkg.validate_metadata_value("fetch-policy", "maybe")
 
 
 def test_validate_known_key_rejects_empty_value() -> None:

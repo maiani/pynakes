@@ -776,17 +776,16 @@ class TestImportCommand:
         data = json.loads(result.output)
         key = data["key"]
         assert data["fetch"]["fetched"][0]["key"] == key
-        assert data["fetch"]["fetch_preprint"] is True
-        assert data["fetch"]["fetch_source"] is True
+        assert data["fetch"]["fetch_policy"] == {
+            "preprint": False, "published": False, "source": False, "bestpdf": True
+        }
         assert (tmp_path / "refs.files" / f"{key}.preprint.pdf").read_bytes() == b"%PDF fixture"
-        assert (tmp_path / "refs.files" / f"{key}.source" / "paper.tex").read_text() == (
-            "\\title{A Deep Test}\n"
-        )
+        assert not (tmp_path / "refs.files" / f"{key}.source").exists()
         assert "files-dir: refs.files" in bib.read_text()
 
     def test_add_fetch_honors_fetch_source_metadata(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
-        bib.write_text("@comment{pynakes-meta:\nfetch-source: false\n}\n")
+        bib.write_text("@comment{pynakes-meta:\nfetch-policy: preprint\n}\n")
         monkeypatch.setattr(importer_ops, "fetch_arxiv_atom", lambda identifier: ARXIV_ATOM)
         monkeypatch.setattr(
             "pynakes.fetch.fetch_arxiv_pdf", lambda arxiv_id, **kwargs: b"%PDF fixture"
@@ -805,7 +804,9 @@ class TestImportCommand:
         data = json.loads(result.output)
         key = data["key"]
         fetched = data["fetch"]["fetched"][0]
-        assert data["fetch"]["fetch_source"] is False
+        assert data["fetch"]["fetch_policy"] == {
+            "preprint": True, "published": False, "source": False, "bestpdf": False
+        }
         assert fetched["pdf_path"] == str(tmp_path / "refs.files" / f"{key}.preprint.pdf")
         assert fetched["source_path"] is None
         assert not (tmp_path / "refs.files" / f"{key}.source").exists()
@@ -813,7 +814,7 @@ class TestImportCommand:
     def test_import_fetch_reuses_published_fetch_path(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
         cache = tmp_path / "provider-cache"
-        bib.write_text("@comment{pynakes-meta:\nfetch-published: true\n}\n")
+        bib.write_text("@comment{pynakes-meta:\nfetch-policy: published\n}\n")
         monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
         def fake_urlopen(request: object, timeout: float = 30.0) -> BytesIO:
@@ -834,6 +835,7 @@ class TestImportCommand:
         monkeypatch.setattr(
             "pynakes.fetch.fetch_published_pdf", lambda url, **kwargs: b"%PDF published"
         )
+        monkeypatch.setattr("pynakes.fetch._url_serves_pdf", lambda url: True)
 
         result = runner.invoke(
             app,
@@ -852,7 +854,9 @@ class TestImportCommand:
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         key = data["key"]
-        assert data["fetch"]["fetch_published"] is True
+        assert data["fetch"]["fetch_policy"] == {
+            "preprint": False, "published": True, "source": False, "bestpdf": False
+        }
         assert data["fetch"]["fetched"] == [
             {
                 "key": key,
@@ -2837,7 +2841,7 @@ class TestDryRunDiffJsonIntegration:
 
 
 class TestAssetFetchPublished:
-    """`asset fetch` with `fetch-published` metadata."""
+    """`asset fetch` with `fetch-policy` metadata."""
 
     def test_fetch_published_downloads_oa_pdf(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
@@ -2848,7 +2852,7 @@ class TestAssetFetchPublished:
             "}\n"
             "@comment{pynakes-meta:\n"
             "files-dir: refs.files\n"
-            "fetch-published: true\n"
+            "fetch-policy: published\n"
             "}\n"
         )
 
@@ -2870,13 +2874,16 @@ class TestAssetFetchPublished:
         monkeypatch.setattr(
             "pynakes.fetch.fetch_published_pdf", lambda url, **kwargs: b"%PDF published"
         )
+        monkeypatch.setattr("pynakes.fetch._url_serves_pdf", lambda url: True)
         monkeypatch.chdir(tmp_path)
 
         result = runner.invoke(app, ["asset", "fetch", "--json"])
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
-        assert data["fetch_published"] is True
+        assert data["fetch_policy"] == {
+            "preprint": False, "published": True, "source": False, "bestpdf": False
+        }
         assert len(data["fetched"]) == 1
         assert data["fetched"][0]["key"] == "Einstein1905"
         assert data["fetched"][0]["pdf_path"] is not None
@@ -2896,7 +2903,7 @@ class TestAssetFetchPublished:
             "}\n"
             "@comment{pynakes-meta:\n"
             "files-dir: refs.files\n"
-            "fetch-published: true\n"
+            "fetch-policy: published\n"
             "}\n"
         )
 
@@ -2925,7 +2932,7 @@ class TestAssetFetchPublished:
             "}\n"
             "@comment{pynakes-meta:\n"
             "files-dir: refs.files\n"
-            "fetch-published: true\n"
+            "fetch-policy: published\n"
             "}\n"
         )
 
@@ -2952,7 +2959,7 @@ class TestAssetFetchPublished:
             "}\n"
             "@comment{pynakes-meta:\n"
             "files-dir: refs.files\n"
-            "fetch-published: false\n"
+            "fetch-policy: source\n"
             "}\n"
         )
 
@@ -2966,7 +2973,9 @@ class TestAssetFetchPublished:
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
-        assert data["fetch_published"] is False
+        assert data["fetch_policy"] == {
+            "preprint": False, "published": False, "source": True, "bestpdf": False
+        }
         assert len(data["fetched"]) == 0
         assert len(data["skipped"]) == 1
         assert data["skipped"][0]["reason"] == "no arXiv id"

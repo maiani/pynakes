@@ -102,6 +102,44 @@ def metadata_bool(value: str | None, default: bool) -> bool:
     return default
 
 
+@dataclass(frozen=True)
+class FetchPolicy:
+    """Parsed ``fetch-policy`` metadata value.
+
+    ``bestpdf`` means fetch the published PDF if open-access is available,
+    otherwise fall back to the preprint PDF.
+    """
+
+    preprint: bool = False
+    published: bool = False
+    source: bool = False
+    bestpdf: bool = False
+
+
+_VALID_FETCH_POLICY_VALUES = {"preprint", "published", "source", "bestpdf"}
+
+_DEFAULT_FETCH_POLICY = FetchPolicy(bestpdf=True)
+
+
+def parse_fetch_policy(value: str | None) -> FetchPolicy:
+    """Parse a ``fetch-policy`` metadata string into a :class:`FetchPolicy`.
+
+    Comma-separated values. When ``value`` is ``None`` or empty, returns the
+    default policy ``FetchPolicy(bestpdf=True)`` — fetch the best available PDF.
+    """
+    if not value:
+        return _DEFAULT_FETCH_POLICY
+    items = [v.strip().lower() for v in value.replace(";", ",").split(",") if v.strip()]
+    if not items:
+        return _DEFAULT_FETCH_POLICY
+    return FetchPolicy(
+        preprint="preprint" in items,
+        published="published" in items,
+        source="source" in items,
+        bestpdf="bestpdf" in items,
+    )
+
+
 class DuplicateMetadataError(Exception):
     """Raised when a metadata update would be ambiguous."""
 

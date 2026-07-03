@@ -140,9 +140,9 @@ sidecar directory (`{bibname}.files/`) that stores downloaded materials
 
 The `files-dir` path is set in the `pynakes-meta` block inside the `.bib`
 file (key: `files-dir`). Fetch behaviour is configured by:
-- `fetch-preprint`: download preprint PDF when available (default: `true`)
-- `fetch-published`: download published version when available (default: `false`)
-- `fetch-source`: download preprint LaTeX source when available (default: `true`)
+- `fetch-policy`: comma-separated list of ``preprint``, ``published``, ``source``,
+  and/or ``bestpdf`` (default: ``bestpdf``, which tries published first then
+  falls back to preprint when no open-access copy exists)
 
 ## Agent rules
 

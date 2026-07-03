@@ -16,14 +16,17 @@ from io import BytesIO
 from pathlib import Path, PurePosixPath
 from urllib.request import urlopen as _default_urlopen
 
+import httpx
+
 from pynakes._identifiers import normalize_arxiv, normalize_doi
 from pynakes.fetch_progress import FetchArtifact, FetchProgress, FetchProgressEvent
 from pynakes.filestore import FileStore
 from pynakes.providers import arxiv, crossref, openalex
-from pynakes.providers._http import ProviderFetchError, fetch_bytes
+from pynakes.providers._http import USER_AGENT, ProviderFetchError, fetch_bytes
 
 FetchArxivBytes = Callable[[str], bytes]
 FetchPublishedPdfUrl = Callable[[str], str | None]
+UrlPdfValidator = Callable[[str], bool]
 
 
 class ArxivFetchError(Exception):
@@ -279,6 +282,38 @@ def fetch_published_pdf(
         raise PublishedPdfFetchError(f"Failed to download published PDF from {url}: {exc}") from exc
 
 
+def _describe_content(data: bytes) -> str:
+    """Return a short description of ``data`` for error messages."""
+    if not data:
+        return "empty response"
+    if data.startswith(b"<") or data.startswith(b"<!") or data.startswith(b"<?"):
+        return f"HTML ({len(data)} bytes)"
+    return f"{len(data)} bytes"
+
+
+def _url_serves_pdf(url: str, *, timeout: float = 8.0) -> bool:
+    """Return ``True`` when *url* serves content that starts with ``%PDF``.
+
+    Uses a streaming GET and reads only the first few bytes to check the magic
+    bytes, so the full body is never downloaded for validation. Follows
+    redirects. Returns ``False`` on any error or when the content does not
+    start with ``%PDF``.
+    """
+    headers = {"User-Agent": USER_AGENT}
+    try:
+        with httpx.Client(follow_redirects=True, timeout=timeout, headers=headers) as client:
+            with client.stream("GET", url) as response:
+                response.raise_for_status()
+                header = b""
+                for chunk in response.iter_bytes():
+                    header += chunk
+                    if len(header) >= 256:
+                        break
+                return header.startswith(b"%PDF")
+    except httpx.HTTPError:
+        return False
+
+
 def download_published_material(
     store: FileStore,
     key: str,
@@ -286,6 +321,7 @@ def download_published_material(
     *,
     url_resolver: FetchPublishedPdfUrl | None = None,
     pdf_fetcher: Callable[[str], bytes] | None = None,
+    url_validator: UrlPdfValidator | None = None,
     cache_dir: str | Path | None = None,
     fetched_date: str | None = None,
     progress: FetchProgress | None = None,
@@ -295,6 +331,11 @@ def download_published_material(
     ``url_resolver`` receives the normalized DOI and returns an OA PDF URL
     (or ``None`` when no OA copy exists). ``pdf_fetcher`` receives the resolved
     URL and returns bytes. Both are injectable for testing.
+
+    ``url_validator`` receives the resolved PDF URL and returns ``True``
+    when the URL appears to serve PDF content. By default a streaming GET
+    checks the first 256 bytes for ``%PDF`` magic bytes. Pass ``lambda _: True``
+    to skip validation.
 
     Returns a ``PublishedDownloadResult`` with ``pdf_path`` set when the
     download succeeded, or ``None`` when no OA copy was found.
@@ -314,10 +355,19 @@ def download_published_material(
         return PublishedDownloadResult(key=key, doi=normalized)
 
     _emit_progress(progress, "artifact_start", key, "published_pdf")
-    if pdf_fetcher is None:
-        data = fetch_published_pdf(pdf_url, progress=progress, key=key)
-    else:
+    if pdf_fetcher is not None:
         data = pdf_fetcher(pdf_url)
+    else:
+        validate_url = url_validator or _url_serves_pdf
+        if not validate_url(pdf_url):
+            _emit_progress(progress, "artifact_skip", key, "published_pdf",
+                           message="URL does not serve PDF content")
+            return PublishedDownloadResult(key=key, doi=normalized)
+        data = fetch_published_pdf(pdf_url, progress=progress, key=key)
+    if not data.startswith(b"%PDF"):
+        _emit_progress(progress, "artifact_skip", key, "published_pdf",
+                       message=f"URL returned {_describe_content(data)}, not a PDF")
+        return PublishedDownloadResult(key=key, doi=normalized)
     pdf_path = store.write_published_pdf(key, data)
     store.record_artifact(
         key,

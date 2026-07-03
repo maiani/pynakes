@@ -23,7 +23,7 @@ from pynakes import journals as journal_ops
 from pynakes import keys as key_ops
 from pynakes import metadata as metadata_ops
 from pynakes import normalize as normalize_ops
-from pynakes._engine_helpers import build_fetch_queue, metadata_bool, run_fetch_loop
+from pynakes._engine_helpers import build_fetch_queue, metadata_fetch_policy, run_fetch_loop
 from pynakes.fetch_progress import FetchProgress
 from pynakes.filestore import FILES_DIR_KEY, resolve_files_dir
 from pynakes.lint import LintIssue
@@ -533,8 +533,7 @@ class BibliographyOperations:
 
         Returns:
             A dict with ``fetched``, ``skipped``, ``failed`` lists, plus
-            ``fetch_preprint``, ``fetch_source``, and ``fetch_published``
-            settings from metadata.
+            ``fetch_policy`` dict reflecting the resolved fetch-policy.
         """
         store = self.files
         if store is None:
@@ -545,17 +544,13 @@ class BibliographyOperations:
 
         store.ensure_root()
 
-        fetch_preprint = metadata_bool(self.lib, "fetch-preprint", True)
-        fetch_source = metadata_bool(self.lib, "fetch-source", True)
-        fetch_published = metadata_bool(self.lib, "fetch-published", False)
+        policy = metadata_fetch_policy(self.lib)
 
         entry_queue = build_fetch_queue(self.lib, target)
         fetched, skipped, failed = run_fetch_loop(
             entry_queue,
             store,
-            fetch_preprint,
-            fetch_source,
-            fetch_published,
+            policy,
             dry_run,
             pdf_fetcher=pdf_fetcher,
             source_fetcher=source_fetcher,
@@ -566,9 +561,12 @@ class BibliographyOperations:
         )
 
         return {
-            "fetch_preprint": fetch_preprint,
-            "fetch_source": fetch_source,
-            "fetch_published": fetch_published,
+            "fetch_policy": {
+                "preprint": policy.preprint,
+                "published": policy.published,
+                "source": policy.source,
+                "bestpdf": policy.bestpdf,
+            },
             "fetched": fetched,
             "skipped": skipped,
             "failed": failed,

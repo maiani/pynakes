@@ -89,9 +89,7 @@ def _convert_to_pinax(
 
     if not _has_pinax_metadata(coll):
         coll.set_metadata("files-dir", f"{stem}.files")
-        coll.set_metadata("fetch-preprint", "true")
-        coll.set_metadata("fetch-source", "true")
-        coll.set_metadata("fetch-published", "false")
+        coll.set_metadata("fetch-policy", "bestpdf")
     else:
         warnings.append("files-dir already set; pinax metadata unchanged")
 
@@ -140,9 +138,7 @@ def init(
     from_: str | None = typer.Option(
         None, "--from", help="Copy the metadata profile from an existing .bib library"
     ),
-    pinax: bool = typer.Option(
-        False, "--pinax", help="Seed pinax mode (files-dir, fetch-preprint, fetch-source)"
-    ),
+    pinax: bool = typer.Option(False, "--pinax", help="Seed pinax mode (files-dir, fetch-policy)"),
     agent_guide: bool = typer.Option(
         False,
         "--agent-guide",
@@ -222,9 +218,7 @@ def init(
     if pinax:
         stem = Path(file).stem
         overrides.append(("files-dir", f"{stem}.files", "pynakes"))
-        overrides.append(("fetch-preprint", "true", "pynakes"))
-        overrides.append(("fetch-source", "true", "pynakes"))
-        overrides.append(("fetch-published", "false", "pynakes"))
+        overrides.append(("fetch-policy", "bestpdf", "pynakes"))
     entries = apply_overrides(entries, overrides)
 
     # With --jabref, project the native dialect/key-pattern into their JabRef

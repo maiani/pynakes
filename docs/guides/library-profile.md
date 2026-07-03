@@ -58,9 +58,7 @@ The older one-comment-per-key and `key:value;` layouts are still read;
 | `lint-required-fields-<entrytype>` | Extra fields required on one entry type | `lint` |
 | `tex-sources` | List of TeX files or directories, relative to the `.bib` file | `keys`, `tex scan` |
 | `files-dir` | Path to the Pinax materials directory, relative to the `.bib` file | `fetch`, `files`, engine |
-| `fetch-preprint` | Boolean; download the arXiv preprint PDF (default `true`) | `fetch` |
-| `fetch-source` | Boolean; download the arXiv LaTeX source (default `true`) | `fetch` |
-| `fetch-published` | Boolean; download the published-version PDF (default `false`) | `fetch` |
+| `fetch-policy` | Comma-separated list of: `preprint`, `published`, `source`, `bestpdf` (default `bestpdf`) | `fetch` |
 
 `lint-required-fields` values are additive to pynakes' built-in requirements,
 which follow the library's `dialect` (`bibtex` or `biblatex`, aliasing JabRef's

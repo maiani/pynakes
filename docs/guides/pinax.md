@@ -313,16 +313,14 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
   a `files-dir` was recorded), not the downloads themselves.
 
 What `asset fetch` downloads is **governed by metadata**, not a per-invocation flag —
-what a pinax fetches is part of its configuration. Three per-pinax policy keys,
-one per artifact, select it (and they never trigger network access on their own
-during offline operations):
+what a pinax fetches is part of its configuration. A single `fetch-policy` key,
+a comma-separated list of artifact names, selects what to download (it never triggers
+network access on its own during offline operations):
 
 ```bibtex
 @comment{pynakes-meta:
 files-dir: refs.files
-fetch-preprint: true
-fetch-source: true
-fetch-published: false
+fetch-policy: bestpdf
 }
 ```
 
@@ -336,9 +334,11 @@ and the two version classes hang off it by name:
 - `<citekey>.published.pdf` — the **published** version of record.
 - `<citekey>.preprint.pdf` and `<citekey>.source/` — the **arXiv** PDF and source.
 
-The three `fetch-*` keys select what `asset fetch` downloads: `fetch-preprint` the arXiv
-PDF, `fetch-source` the arXiv source tree, `fetch-published` the `.published.pdf`
-PDF — set in metadata, not per invocation. Because
+The `fetch-policy` key selects what `asset fetch` downloads: `preprint` the arXiv
+PDF, `source` the arXiv source tree, `published` the `.published.pdf`
+PDF — set in metadata, not per invocation. The `bestpdf` policy (the default)
+tries the published PDF first and falls back to the preprint when no open-access
+copy is available. Because
 published PDFs are usually paywalled, the preprint is what reliably arrives; the
 published `<citekey>.published.pdf` shows up only when it is open-access.
 The resolution chain handles the gap: OpenAlex's `best_oa_location` is filtered
@@ -560,9 +560,9 @@ checklist.
    `FileStore` atomic writers for the preprint PDF and the extracted source.
    Unit-tested with fixtures, no real network. *(Implemented.)*
 3. **The `asset fetch` command.** `pynakes asset fetch [target] [file]
-   [--dry-run] [--cache-dir DIR] [--json]`, with what-to-download governed by
-   the `fetch-preprint` / `fetch-source` / `fetch-published` metadata keys;
-   `Bibliography.ensure_files_dir` + `fetch_materials`; the zero-config default
+    [--dry-run] [--cache-dir DIR] [--json]`, with what-to-download governed by
+    the `fetch-policy` metadata key;
+    `Bibliography.ensure_files_dir` + `fetch_materials`; the zero-config default
    `files-dir`; the JSON envelope; registration in `cli.py` and
    `capabilities.py`. *(The first end-to-end useful slice — "given an arXiv
    entry, download the PDF and source into the right place.")*
@@ -605,8 +605,8 @@ Settled in discussion:
 
 - **`asset fetch` is a top-level command** (like `add` / `normalize`), not a new
   namespace.
-- **What to fetch is metadata-driven** — the `fetch-preprint` / `fetch-source` /
-  `fetch-published` keys, not a per-invocation flag.
+- **What to fetch is metadata-driven** — the `fetch-policy` key, not a
+   per-invocation flag.
 - **`add --fetch` is a convenience trigger** — it imports the reference, then
   runs the same metadata-driven fetch policy for the new key.
 - **Canonical is a per-entry `preprint_canonical` boolean**, default `false`.
@@ -622,10 +622,8 @@ Settled in discussion:
 
 Still open:
 
-1. **Default fetch-policy values** — sensible defaults for `fetch-preprint` /
-   `fetch-source` / `fetch-published`, and whether `fetch-published` should mean
-   "fetch when an open-access copy is resolvable." Leaning: preprint PDF + source
-   on, published attempted when an OA copy is found.
+1. **Default fetch-policy** — `bestpdf` (try published, fall back to preprint).
+   Whether `source` should be fetched by default alongside `bestpdf`.
 2. **Command-surface migration** — how `asset check` reports both legacy JabRef
    `file` fields and Pinax `files-dir` materials without confusing plain `.bib`
    users. Leaning: file-awareness is gated on `files-dir`, so a plain `.bib` sees

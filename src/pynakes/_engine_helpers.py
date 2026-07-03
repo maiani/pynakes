@@ -11,8 +11,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pynakes.fetch_progress import FetchProgress, FetchProgressEvent
+from pynakes.metadata import FetchPolicy, metadata_value
 from pynakes.metadata import metadata_bool as _coerce_metadata_bool
-from pynakes.metadata import metadata_value
+from pynakes.metadata import parse_fetch_policy as _parse_fetch_policy
 from pynakes.model import BibEntry, BibFile, MetadataBlock
 
 
@@ -62,6 +63,14 @@ def metadata_bool(lib: BibFile, name: str, default: bool) -> bool:
     :mod:`pynakes.metadata`, so the truthy/falsy spellings stay defined once.
     """
     return _coerce_metadata_bool(metadata_value(lib, name), default)
+
+
+def metadata_fetch_policy(lib: BibFile) -> FetchPolicy:
+    """Return the parsed ``fetch-policy`` for *lib*, or the default ``bestpdf``.
+
+    A thin ``lib``-aware wrapper over :func:`pynakes.metadata.parse_fetch_policy`.
+    """
+    return _parse_fetch_policy(metadata_value(lib, "fetch-policy"))
 
 
 def read_text(path: Path, encoding: str) -> str:
@@ -345,9 +354,7 @@ def build_fetch_queue(lib: BibFile, target: str | None) -> list[BibEntry]:
 def run_fetch_loop(
     entry_queue: list[BibEntry],
     store: "object",  # FileStore — typed as object to avoid import
-    fetch_preprint: bool,
-    fetch_source: bool,
-    fetch_published: bool,
+    policy: FetchPolicy,
     dry_run: bool,
     pdf_fetcher: Callable[[str], bytes] | None = None,
     source_fetcher: Callable[[str], bytes] | None = None,
@@ -360,7 +367,10 @@ def run_fetch_loop(
 
     For entries with an arXiv id, downloads the preprint PDF and/or source
     bundle. For entries with a DOI, downloads the open-access published PDF
-    when ``fetch_published`` is true.
+    as directed by *policy*.
+
+    ``policy.bestpdf`` means "try published PDF first, fall back to preprint
+    PDF when no open-access copy is available".
 
     Returns ``(fetched, skipped, failed)`` lists.
     """
@@ -401,16 +411,24 @@ def run_fetch_loop(
         doi = entry.fields.get("doi", "").strip()
         presence = store.presence_for(key)
 
-        can_fetch_preprint = arxiv_id is not None and fetch_preprint and not presence.preprint_pdf
-        can_fetch_source = arxiv_id is not None and fetch_source and not presence.preprint_source
-        can_fetch_published = fetch_published and bool(doi) and not presence.published_pdf
+        can_fetch_preprint = bool(arxiv_id) and policy.preprint and not presence.preprint_pdf
+        can_fetch_source = bool(arxiv_id) and policy.source and not presence.preprint_source
+        can_fetch_published = bool(doi) and policy.published and not presence.published_pdf
+
+        # bestpdf: fetch published if OA, otherwise fall back to preprint.
+        if policy.bestpdf and not policy.preprint and not policy.published:
+            can_fetch_published = bool(doi) and not presence.published_pdf
+            can_fetch_preprint = (
+                bool(arxiv_id) and not presence.preprint_pdf and not can_fetch_published
+            )
 
         anything_to_fetch = can_fetch_preprint or can_fetch_source or can_fetch_published
 
         if not anything_to_fetch:
-            needs_arxiv = fetch_preprint or fetch_source
-            missing_arxiv = needs_arxiv and arxiv_id is None
-            missing_doi = fetch_published and not doi
+            wants_arxiv = policy.preprint or policy.source or policy.bestpdf
+            wants_doi = policy.published or policy.bestpdf
+            missing_arxiv = wants_arxiv and arxiv_id is None
+            missing_doi = wants_doi and not doi
             if missing_arxiv and missing_doi:
                 skipped.append({"key": key, "reason": "no arXiv id and no DOI"})
             elif missing_arxiv:
@@ -445,14 +463,25 @@ def run_fetch_loop(
             )
             continue
 
+        # --- Determine fetch order for bestpdf ---
+        fetch_published_now = can_fetch_published
+        fetch_preprint_now = can_fetch_preprint
+
+        if policy.bestpdf:
+            # Published PDF is preferred over preprint.
+            if can_fetch_published:
+                fetch_preprint_now = False
+            elif can_fetch_preprint:
+                fetch_published_now = False
+
         # --- Fetch arXiv preprint materials ---
-        if can_fetch_preprint or can_fetch_source:
+        if fetch_preprint_now or can_fetch_source:
             try:
                 result = download_arxiv_materials(
                     store,
                     key,
                     arxiv_id,
-                    pdf=can_fetch_preprint,
+                    pdf=fetch_preprint_now,
                     source=can_fetch_source,
                     pdf_fetcher=pdf_fetcher,
                     source_fetcher=source_fetcher,
@@ -478,7 +507,7 @@ def run_fetch_loop(
                 )
 
         # --- Fetch published PDF ---
-        if can_fetch_published:
+        if fetch_published_now:
             try:
                 pub_result = download_published_material(
                     store,
@@ -491,6 +520,33 @@ def run_fetch_loop(
                 )
                 if pub_result.pdf_path is not None:
                     fetched.append(pub_result.to_dict())
+                    # bestpdf: published succeeded, so we're done (skip preprint).
+                elif policy.bestpdf and not presence.preprint_pdf and arxiv_id is not None:
+                    # bestpdf fallback: try preprint PDF now
+                    try:
+                        result = download_arxiv_materials(
+                            store,
+                            key,
+                            arxiv_id,
+                            pdf=True,
+                            source=False,
+                            pdf_fetcher=pdf_fetcher,
+                            progress=progress,
+                        )
+                        if result.pdf_path is not None:
+                            fetched.append(result.to_dict())
+                    except ArxivFetchError as exc:
+                        failed.append({"key": key, "error": str(exc)})
+                        _emit_fetch_progress(
+                            progress,
+                            FetchProgressEvent(
+                                kind="fail",
+                                key=key,
+                                entry_index=index,
+                                entry_total=entry_total,
+                                message=str(exc),
+                            ),
+                        )
                 else:
                     skipped.append({"key": key, "reason": "no open-access copy found"})
                     _emit_fetch_progress(

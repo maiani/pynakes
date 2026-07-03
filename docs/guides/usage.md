@@ -287,7 +287,7 @@ DOIs are fetched through DOI-resolver content negotiation; arXiv ids are fetched
 from the arXiv Atom API. By default `ref import` imports metadata only; `--fetch`
 also downloads configured Pinax materials for the new entry: arXiv preprint
 PDF/source when an arXiv id is present, and an open-access published PDF when
-the entry has a DOI and `fetch-published: true`. Existing matching DOI/arXiv
+the entry has a DOI and a suitable `fetch-policy`. Existing matching DOI/arXiv
 references are detected before importing. arXiv entries are written as `@online`
 in BibLaTeX libraries and `@misc` in BibTeX ones, following the library's
 `databaseType` metadata (defaulting to BibTeX when unset).
