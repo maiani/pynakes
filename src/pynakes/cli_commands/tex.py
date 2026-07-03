@@ -13,6 +13,7 @@ import typer
 from pynakes.cli_common import (
     RunParams,
     _emit,
+    _emit_error,
     _finish_mod,
     _resolve_input_bib,
     _safe,
@@ -42,6 +43,44 @@ def _clear_stored_sources(coll: Bibliography) -> None:
 
 
 _FILE_OPTION = bib_file_option()
+
+
+def _is_bib_path_arg(value: str) -> bool:
+    """Return whether a variadic tex argument explicitly names a bibliography."""
+    return Path(value).suffix.lower() == ".bib"
+
+
+def _resolve_tex_args(
+    paths: list[str],
+    file: str | None,
+    json_output: bool,
+) -> tuple[str, list[str]]:
+    """Resolve a bibliography supplied via ``--file`` or one positional ``.bib``."""
+    positional_bibs = [path for path in paths if _is_bib_path_arg(path)]
+
+    if file is not None:
+        if positional_bibs:
+            _emit_error(
+                json_output,
+                "InvalidInput",
+                "Pass the .bib file either with --file or as one positional argument, not both",
+            )
+        return _resolve_input_bib(file, json_output), paths
+
+    if len(positional_bibs) > 1:
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            "Pass exactly one positional .bib file to select the library",
+        )
+
+    if positional_bibs:
+        source_paths = [path for path in paths if not _is_bib_path_arg(path)]
+        if not source_paths:
+            _emit_error(json_output, "InvalidInput", "Provide at least one TeX source path")
+        return _resolve_input_bib(positional_bibs[0], json_output), source_paths
+
+    return _resolve_input_bib(None, json_output), paths
 
 
 def tex_list(
@@ -85,7 +124,7 @@ def tex_add(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Link one or more TeX source files or directories to this library."""
-    file = _resolve_input_bib(file, json_output)
+    file, paths = _resolve_tex_args(paths, file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     coll = Bibliography.open(file)
     current = _parse_stored_sources(coll.lib)
@@ -141,7 +180,7 @@ def tex_remove(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Unlink one or more TeX source files or directories from this library."""
-    file = _resolve_input_bib(file, json_output)
+    file, paths = _resolve_tex_args(paths, file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     coll = Bibliography.open(file)
     current = _parse_stored_sources(coll.lib)

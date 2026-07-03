@@ -23,6 +23,11 @@ _F = TypeVar("_F", bound=Callable)
 BIB_FILE_HELP = "Path to the .bib file (default: auto-detect single .bib in cwd)"
 
 
+def is_auxiliary_bib_file(path: Path) -> bool:
+    """Return whether *path* is a generated auxiliary bibliography."""
+    return path.name.lower().endswith("notes.bib")
+
+
 def bib_file_argument(help: str = BIB_FILE_HELP):
     """Return the standard optional ``.bib`` positional argument."""
     return typer.Argument(None, help=help)
@@ -34,9 +39,13 @@ def bib_file_option(help: str = BIB_FILE_HELP):
 
 
 def bib_candidates(directory: Path) -> list[Path]:
-    """Return the regular ``.bib`` files in *directory*, name-sorted."""
+    """Return regular user-library ``.bib`` files in *directory*, name-sorted."""
     return sorted(
-        (path for path in directory.iterdir() if path.is_file() and path.suffix.lower() == ".bib"),
+        (
+            path
+            for path in directory.iterdir()
+            if path.is_file() and path.suffix.lower() == ".bib" and not is_auxiliary_bib_file(path)
+        ),
         key=lambda path: path.name.casefold(),
     )
 

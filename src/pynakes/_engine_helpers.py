@@ -123,14 +123,17 @@ def _trailing_metadata_start(text: str, blocks: list[MetadataBlock]) -> int | No
 
 
 def insert_metadata_comment(original_text: str, comment: str, line_ending: str) -> str:
-    """Append a new metadata comment at the file end (the canonical position).
+    """Insert a new metadata comment at its namespace's canonical position.
 
-    JabRef writes its ``@Comment{...-meta: ...}`` blocks at the bottom of the
-    file, so a newly-created block is appended there — separated from the
-    preceding content by one blank line — rather than prepended.
+    pynakes-native metadata belongs at the top of the file. JabRef writes its
+    ``@Comment{jabref-meta: ...}`` blocks at the bottom, so newly-created
+    JabRef projection blocks are appended there.
     """
     if not original_text:
         return comment + line_ending
+    if "pynakes-meta:" in comment:
+        body = original_text.lstrip("\r\n")
+        return comment + line_ending + line_ending + body
     body = original_text.rstrip("\r\n")
     return body + line_ending + line_ending + comment + line_ending
 

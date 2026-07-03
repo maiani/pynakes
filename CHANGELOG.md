@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Braced field values containing literal percent signs, such as `100% yield`,
+  now parse and round-trip instead of being mistaken for line comments that
+  corrupt the surrounding entry structure.
+- Metadata formatting now keeps `pynakes-meta` at the top of the file while
+  preserving JabRef's canonical trailing `jabref-meta` section at the bottom.
+- `pynakes tex add` and `pynakes tex remove` now accept one positional `.bib`
+  file anywhere in their source-path arguments, so explicitly naming the
+  library works even when the current directory contains multiple `.bib` files.
+- Single-library auto-discovery now ignores RevTeX-generated `*Notes.bib`
+  auxiliary files. Explicitly naming such a file still works.
 - Bare variadic check commands such as `pynakes lint`, `pynakes keys check`,
   `pynakes asset check`, `pynakes dedupe check`, and `pynakes verify` now
   auto-detect the lone local `.bib` file just like their `--json` forms and
@@ -416,10 +426,11 @@ with parser conformance later pinned for the public alpha to TeX Live 2026
 - **`fields rename|move|append|clear|protect-title`** — surgical field edits with
   optional `--where` predicate filtering.
 - **`groups list|add-entry|remove-entry`** — manage JabRef group membership.
-- **`files check`** — validate linked-file references.
+- **`asset check`** — validate linked-file references.
 - **`normalize`** — `saveActions`-driven formatter pipeline; DOI canonicalization;
   month macro normalization; author normalization; journal abbreviation/expansion
-  (`--journal-style abbreviated|full`). Consolidates JabRef metadata to file end.
+  (`--journal-style abbreviated|full`). Consolidates metadata with
+  `pynakes-meta` at the top and `jabref-meta` at the file end.
 - **`convert`** — BibTeX↔BibLaTeX dialect conversion; export to CSL-JSON, RIS,
   MODS, or EndNote tagged text (`--to csl-json|ris|mods|endnote`); import from
   those interchange formats (`--from csl-json|ris|mods|endnote`).

@@ -5,8 +5,8 @@ metadata profile. A fresh library is pynakes-native — the default profile seed
 the native ``dialect`` and ``key-pattern`` keys in ``pynakes-meta`` and no
 ``jabref-meta`` (the CLI's ``--jabref`` flag projects the JabRef equivalents on
 top). This module renders that seed file in the canonical layout (any
-``jabref-meta`` comments first, sorted by key, then one consolidated
-``pynakes-meta`` block) and extracts the copyable profile from an existing
+one consolidated ``pynakes-meta`` block first, then sorted ``jabref-meta``
+comments) and extracts the copyable profile from an existing
 library for ``init --from``.
 
 It is deterministic (sorted output, no timestamps) and produces no entries; the
@@ -195,8 +195,8 @@ def render_agents_md(bibname: str) -> str:
 def render_library(entries: list[ProfileEntry], line_ending: str = "\n") -> str:
     """Render a new ``.bib`` containing only ``entries`` as metadata (no entries).
 
-    Produces the canonical layout: each ``jabref-meta`` setting as its own
-    comment sorted by key, then a single consolidated ``pynakes-meta`` block.
+    Produces the canonical layout: a single consolidated ``pynakes-meta`` block,
+    then each ``jabref-meta`` setting as its own comment sorted by key.
     Returns ``""`` when there is no profile (a valid empty library).
     """
     jabref = [entry for entry in entries if entry.namespace == "jabref"]
@@ -205,6 +205,13 @@ def render_library(entries: list[ProfileEntry], line_ending: str = "\n") -> str:
         return ""
 
     parts: list[str] = []
+    if pynakes:
+        merged: dict[str, str] = {}
+        for entry in pynakes:
+            merged[entry.key] = entry.value
+        items = sorted(merged.items(), key=lambda kv: kv[0].lower())
+        parts.append(format_pynakes_meta_block(items, line_ending))
+
     for entry in sorted(jabref, key=lambda e: e.key.lower()):
         rendered = (
             _normalize_line_endings(entry.raw, line_ending)
@@ -212,12 +219,5 @@ def render_library(entries: list[ProfileEntry], line_ending: str = "\n") -> str:
             else format_metadata_comment(entry.key, entry.value, "jabref")
         )
         parts.append(rendered)
-
-    if pynakes:
-        merged: dict[str, str] = {}
-        for entry in pynakes:
-            merged[entry.key] = entry.value
-        items = sorted(merged.items(), key=lambda kv: kv[0].lower())
-        parts.append(format_pynakes_meta_block(items, line_ending))
 
     return (line_ending + line_ending).join(parts) + line_ending

@@ -81,8 +81,10 @@ casing (`month = Jan` → `month = jan`), while preserving literals such as
 
 `lint` (along with `keys check`, `asset check`, `dedupe check`, and `verify`)
 accepts multiple files, or auto-detects a single `.bib` in the current directory
-when no file is given. These checks support `--strict`, which exits `1` for
-errors or profile deviations so it can gate a build. See
+when no file is given. Auto-detection ignores RevTeX-generated `*Notes.bib`
+auxiliary files; pass one explicitly if you really want to inspect it. These
+checks support `--strict`, which exits `1` for errors or profile deviations so
+it can gate a build. See
 [Library Profile](library-profile.md) for the complete schema and
 [Git Workflows](git-workflows.md) for pre-commit and CI recipes.
 
@@ -170,6 +172,11 @@ pynakes recognizes **two** structurally identical top-level comment namespaces:
 `metadata list` shows both, tagged by namespace; reads (`lint`, `normalize`,
 key generation) use the **merged** view, where `pynakes-meta` overrides
 `jabref-meta` on a conflicting key.
+
+The canonical layout keeps pynakes-native settings in a consolidated
+`pynakes-meta` block at the top of the file, and keeps JabRef's own
+`jabref-meta` comments in their JabRef-compatible trailing section at the
+bottom.
 
 In JSON/API output, each metadata block exposes both forms of the value:
 `raw_value` is the parsed payload as stored in the comment, including JabRef's

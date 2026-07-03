@@ -83,7 +83,7 @@ def normalize(
     metadata_formatting: str = typer.Option(
         "metadata",
         "--metadata-formatting",
-        help="Consolidate jabref-meta to the file end, sorted (metadata, on, or off)",
+        help="Consolidate metadata layout: pynakes-meta top, jabref-meta bottom (metadata, on, or off)",
     ),
     sort_by: list[str] | None = typer.Option(
         None,

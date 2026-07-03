@@ -223,7 +223,7 @@ only when — a `files-dir` is set:
 | --- | --- | --- |
 | Declare the files-dir | `init --pinax`, or `metadata set files-dir` | The only step that "creates" a pinax. |
 | See what materials exist | `inspect [--json]` | The report gains per-entry presence and local paths — the [agent surface](#agent-surface). |
-| Validate materials | `files check [--fix]` | Reports missing/orphan/drift between references and `files-dir`; reconciles with `--fix`. |
+| Validate materials | `asset check [--fix]` | Reports missing/orphan/drift between references and `files-dir`; reconciles with `--fix`. |
 | Rename / regenerate keys | `keys rename`, `keys generate`, `keys repair` | Every material sharing the key — `<citekey>.pdf`, `<citekey>_preprint.pdf`, `<citekey>_preprint/` — moves with it (see [Coordinated edits](#coordinated-edits-and-atomicity)). |
 | Download missing materials | `asset fetch` (the one new download verb) | See [Fetch](#fetch-the-first-slice). |
 | Combine / split | `corpus combine`, `corpus split` | Produce pinakes; each output entry's materials are copied into the output's files-dir. Non-destructive — inputs untouched. |
@@ -411,7 +411,7 @@ mechanic, because a `.bib` text commit and a binary file move cannot be one
 atomic transaction.
 
 The rule: **filesystem first (it is reversible), then the `.bib` commit; roll
-back the moves if the commit fails.** `files check --fix` is the backstop: if a
+back the moves if the commit fails.** `asset check --fix` is the backstop: if a
 process dies mid-operation or a user renames a file by hand, the references and
 materials drift, and `asset check` reports the drift and reconciles it — never by
 guessing, always by reporting first. Accepting this reconcile step is the honest
@@ -560,7 +560,7 @@ checklist.
    discards a half-written output.) *(Implemented.)*
 7. **Coordinated key edits (own design pass).** `keys rename` / `generate` /
    `repair` move every `<citekey>*` material *in place* (filesystem first, then
-   commit, rollback on failure); `files check --fix` reconciles drift. The only
+   commit, rollback on failure); `asset check --fix` reconciles drift. The only
    in-place material operation, so the riskiest. *(Implemented.)*
 8. **`add --fetch` for arXiv Pinax materials.** One-step import-and-download for
    arXiv references, using the existing Pinax fetch policy for preprint

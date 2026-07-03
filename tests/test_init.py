@@ -29,12 +29,18 @@ TEMPLATE = (
 def test_render_library_canonical_layout() -> None:
     entries = apply_overrides(
         [],
-        [("keypatterndefault", "[auth][year]", "jabref"), ("databaseType", "biblatex", "jabref")],
+        [
+            ("keypatterndefault", "[auth][year]", "jabref"),
+            ("databaseType", "biblatex", "jabref"),
+            ("normalize-author-style", "jabref", "pynakes"),
+        ],
     )
     text = render_library(entries)
+    assert text.index("@comment{pynakes-meta:") < text.index("@comment{jabref-meta:")
     # jabref-meta comments, sorted by key (databaseType before keypatterndefault).
     assert text.index("databaseType") < text.index("keypatterndefault")
     lib = load_bib_from_text(text)
+    assert lib.metadata["normalize-author-style"] == "jabref"
     assert lib.metadata["databaseType"].rstrip(";") == "biblatex"
     assert lib.metadata["keypatterndefault"].rstrip(";") == "[auth][year]"
 

@@ -157,6 +157,21 @@ class TestBasicParsing:
         assert lib.entries["Commented"].fields["title"] == "A title"
         assert lib.entries["Commented"].fields["note"] == r"100\% complete"
 
+    def test_unescaped_percent_inside_braced_value_is_data(self) -> None:
+        text = (
+            "@article{PercentValue,\n"
+            "  author = {Ada Example},\n"
+            "  title = {A measurement with 100% yield},\n"
+            "  journal = {Journal of Examples},\n"
+            "  year = {1924}\n"
+            "}\n"
+        )
+
+        lib = parse_bib(text)
+
+        assert lib.entries["PercentValue"].fields["title"] == "A measurement with 100% yield"
+        assert write_bib(lib) == text
+
 
 class TestStringDefinitions:
     """Test parsing @string definitions."""

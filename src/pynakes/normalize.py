@@ -151,7 +151,7 @@ def _resolve_terms(lib: BibFile, option: list[str] | None) -> list[str]:
 
 
 def resolve_format_metadata(lib: BibFile, option: bool | None) -> bool:
-    """Resolve whether to consolidate metadata to the file end (default on).
+    """Resolve whether to consolidate metadata layout (default on).
 
     An explicit CLI value wins; otherwise a ``normalize-format-metadata``
     metadata key, else the default ``True``.

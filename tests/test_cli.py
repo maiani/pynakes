@@ -231,6 +231,29 @@ class TestInspectAndLint:
         assert result.exit_code == 0, result.output
         assert "refs.bib: no issues found." in result.output
 
+    def test_auto_discovery_ignores_revtex_notes_bib(self, tmp_path: Path, monkeypatch) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n")
+        (tmp_path / "refsNotes.bib").write_text("@article{N,\n  title = {Generated Notes}\n}\n")
+        (tmp_path / "refs_diffNotes.bib").write_text(
+            "@article{D,\n  title = {Generated Diff Notes}\n}\n"
+        )
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["inspect", "--json"])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["file"] == "refs.bib"
+
+    def test_explicit_revtex_notes_bib_is_still_allowed(self, tmp_path: Path) -> None:
+        notes = tmp_path / "refsNotes.bib"
+        notes.write_text("@article{N,\n  title = {Generated Notes}\n}\n")
+
+        result = runner.invoke(app, ["inspect", str(notes), "--json"])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["file"] == str(notes)
+
     def test_variadic_nested_check_discovers_lone_bib_file(
         self, tmp_path: Path, monkeypatch
     ) -> None:
@@ -1867,19 +1890,21 @@ class TestNormalizeCommand:
         assert backup.exists()
         assert backup.read_text() == original
 
-    def test_normalize_consolidates_metadata_to_end_by_default(self, tmp_path: Path) -> None:
+    def test_normalize_consolidates_metadata_by_namespace_position(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text(
             "@Comment{jabref-meta: databaseType:bibtex;}\n"
             "\n"
             "@article{A,\n  author = {Smith, John},\n  title = {T}\n}\n"
+            "\n"
+            "@comment{pynakes-meta: normalize-journal-style:none;}\n"
         )
 
         result = runner.invoke(app, ["normalize", str(bib)])
 
         assert result.exit_code == 0, result.output
         text = bib.read_text()
-        # Metadata now follows the entry instead of preceding it.
+        assert text.index("@comment{pynakes-meta:") < text.index("@article{A,")
         assert text.index("@article{A,") < text.index("@Comment{jabref-meta")
 
     def test_normalize_metadata_formatting_off_leaves_position(self, tmp_path: Path) -> None:
@@ -2514,6 +2539,31 @@ class TestSourcesCommand:
         assert "tex-sources" in text
         assert "tex-sources: paper.tex, supplement.tex" in text
 
+    @pytest.mark.parametrize(
+        "args",
+        [
+            ["refs.bib", "paper.tex", "supplement.tex"],
+            ["paper.tex", "supplement.tex", "refs.bib"],
+        ],
+    )
+    def test_add_accepts_one_positional_bib_with_multiple_local_bibs(
+        self, tmp_path: Path, monkeypatch, args: list[str]
+    ) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n")
+        other = tmp_path / "notes.bib"
+        other.write_text("@article{B,\n  title = {U}\n}\n")
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["tex", "add", *args, "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["file"] == "refs.bib"
+        assert data["added"] == ["paper.tex", "supplement.tex"]
+        assert "tex-sources: paper.tex, supplement.tex" in bib.read_text()
+        assert "tex-sources" not in other.read_text()
+
     def test_add_dry_run(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text("@article{A,\n  title = {T}\n}\n")
@@ -2551,6 +2601,26 @@ class TestSourcesCommand:
         data = json.loads(result.output)
         assert "paper.tex" in data["removed"]
         assert "tex-sources" not in bib.read_text()
+
+    def test_remove_accepts_one_positional_bib_with_multiple_local_bibs(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex;}\n@article{A,\n  title = {T}\n}\n"
+        )
+        other = tmp_path / "notes.bib"
+        other.write_text("@article{B,\n  title = {U}\n}\n")
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["tex", "remove", "paper.tex", "refs.bib", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["file"] == "refs.bib"
+        assert data["removed"] == ["paper.tex"]
+        assert "tex-sources" not in bib.read_text()
+        assert "tex-sources" not in other.read_text()
 
     def test_remove_canonicalizes_split_metadata_namespaces(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"

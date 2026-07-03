@@ -245,8 +245,8 @@ def _find_block_end(text: str, opener_index: int) -> int | None:
 
     BibTeX permits both ``{...}`` and ``(...)`` outer delimiters. Braces in a
     quoted value do not affect the enclosing block, while parentheses inside a
-    braced value are ordinary text. TeX comments are likewise ignored for
-    structural scanning.
+    braced value are ordinary text. TeX comments at field-list level are
+    likewise ignored for structural scanning.
     """
     opener = text[opener_index]
     if opener not in "{(":
@@ -263,7 +263,10 @@ def _find_block_end(text: str, opener_index: int) -> int | None:
             if char in "\r\n":
                 in_comment = False
             continue
-        if char == "%" and not in_quotes and not _is_escaped(text, index):
+        comment_allowed = (opener == "{" and brace_depth == 1) or (
+            opener == "(" and brace_depth == 0
+        )
+        if char == "%" and comment_allowed and not in_quotes and not _is_escaped(text, index):
             in_comment = True
             continue
 
@@ -309,7 +312,13 @@ def _split_top_level(text: str, separator: str) -> list[str]:
             if char in "\r\n":
                 in_comment = False
             continue
-        if char == "%" and not in_quotes and not _is_escaped(text, index):
+        if (
+            char == "%"
+            and brace_depth == 0
+            and paren_depth == 0
+            and not in_quotes
+            and not _is_escaped(text, index)
+        ):
             in_comment = True
             continue
         if char == '"' and brace_depth == 0 and not _is_escaped(text, index):
@@ -342,8 +351,10 @@ def _split_once_top_level(text: str, separator: str) -> tuple[str, str | None]:
 
 
 def _strip_tex_comments(text: str) -> str:
-    """Remove unescaped TeX comments while retaining line boundaries."""
+    """Remove top-level unescaped TeX comments while retaining line boundaries."""
     output: list[str] = []
+    brace_depth = 0
+    in_quotes = False
     in_comment = False
     for index, char in enumerate(text):
         if in_comment:
@@ -351,7 +362,16 @@ def _strip_tex_comments(text: str) -> str:
                 in_comment = False
                 output.append(char)
             continue
-        if char == "%" and not _is_escaped(text, index):
+        if char == '"' and brace_depth == 0 and not _is_escaped(text, index):
+            in_quotes = not in_quotes
+            output.append(char)
+            continue
+        if not in_quotes:
+            if char == "{":
+                brace_depth += 1
+            elif char == "}" and brace_depth:
+                brace_depth -= 1
+        if char == "%" and brace_depth == 0 and not in_quotes and not _is_escaped(text, index):
             in_comment = True
             continue
         output.append(char)

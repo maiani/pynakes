@@ -257,16 +257,16 @@ def format_pynakes_meta_block(items: list[tuple[str, str]], line_ending: str = "
 
 
 def consolidate_metadata(lib: BibFile, text: str, line_ending: str = "\n") -> str | None:
-    """Relocate every metadata comment into one canonical section at file end.
+    """Relocate metadata comments into their canonical namespace positions.
 
-    JabRef writes its ``@Comment{jabref-meta: ...}`` blocks contiguously at the
-    bottom of the file, sorted by key. A library that has been hand-edited (or
-    had entries appended after a JabRef save) ends up with metadata stranded in
-    the middle. This gathers all metadata and rewrites it as one sorted section
-    at the end: each ``jabref-meta`` key as its own comment, preserved verbatim
-    (including JabRef's multi-line ``grouping`` formatting), followed by a single
-    consolidated ``pynakes-meta`` block holding every pynakes key — since JabRef
-    ignores that namespace, pynakes packs it instead of repeating the prefix.
+    pynakes keeps its native ``pynakes-meta`` block at the top of the file,
+    where tool-facing settings are visible before the entries. JabRef writes its
+    ``@Comment{jabref-meta: ...}`` blocks contiguously at the bottom of the file,
+    sorted by key; pynakes preserves that convention for the compatibility
+    projection. A library that has been hand-edited can end up with metadata
+    stranded in the middle. This gathers all metadata and rewrites it as a
+    top consolidated ``pynakes-meta`` block, the bibliography body, then bottom
+    ``jabref-meta`` comments.
 
     Returns the rewritten text, or ``None`` when the file is already in this
     canonical layout (so callers can treat it as a no-op).
@@ -299,26 +299,26 @@ def consolidate_metadata(lib: BibFile, text: str, line_ending: str = "\n") -> st
     while triple in stripped:
         stripped = stripped.replace(triple, line_ending * 2)
 
-    # jabref-meta first, each comment verbatim and sorted by key (keeps JabRef's
-    # own keys grouped, stable for repeated keys like legacy groups)...
-    parts = [
-        block.raw for block in sorted(jabref_blocks, key=lambda b: (b.key.lower(), b.comment_index))
-    ]
-    # ...then a single consolidated pynakes-meta block (last value wins per key).
+    top_parts: list[str] = []
     if pynakes_blocks:
         merged: dict[str, str] = {}
         for block in pynakes_blocks:
             merged[block.key] = block.value
         items = sorted(merged.items(), key=lambda kv: kv[0].lower())
-        parts.append(format_pynakes_meta_block(items, line_ending))
+        top_parts.append(format_pynakes_meta_block(items, line_ending))
 
-    section = (line_ending + line_ending).join(parts)
+    bottom_parts = [
+        block.raw for block in sorted(jabref_blocks, key=lambda b: (b.key.lower(), b.comment_index))
+    ]
 
-    body = stripped.rstrip()
+    sections: list[str] = []
+    sections.extend(top_parts)
+    body = stripped.strip("\r\n")
     if body:
-        result = body + line_ending + line_ending + section + line_ending
-    else:
-        result = section + line_ending
+        sections.append(body)
+    sections.extend(bottom_parts)
+
+    result = (line_ending + line_ending).join(sections) + line_ending
 
     return result if result != text else None
 

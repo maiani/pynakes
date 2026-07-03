@@ -112,11 +112,13 @@ def test_default_namespace_is_file_context_aware() -> None:
     assert default_namespace("files-dir", tracked) == "pynakes"
 
 
-def test_consolidate_metadata_moves_stranded_blocks_to_end_sorted() -> None:
+def test_consolidate_metadata_splits_pynakes_top_and_jabref_bottom() -> None:
     text = (
         "@Comment{jabref-meta: saveOrderConfig:specified;year;false;}\n"
         "\n"
         "@article{A,\n  author = {Smith, John},\n  title = {T}\n}\n"
+        "\n"
+        "@comment{pynakes-meta: normalize-journal-style:abbreviated;}\n"
         "\n"
         "@Comment{jabref-meta: databaseType:bibtex;}\n"
         "\n"
@@ -127,7 +129,14 @@ def test_consolidate_metadata_moves_stranded_blocks_to_end_sorted() -> None:
     result = consolidate_metadata(lib, text)
 
     assert result is not None
-    # Both entries survive, in order, before the metadata section.
+    # pynakes-native metadata is at the top; entries survive in order; JabRef
+    # projection metadata stays at the bottom.
+    pynakes, a, b = (
+        result.index("@comment{pynakes-meta:"),
+        result.index("@article{A,"),
+        result.index("@article{B,"),
+    )
+    assert pynakes < a < b
     a, b = result.index("@article{A,"), result.index("@article{B,")
     first_meta = result.index("@Comment{jabref-meta")
     assert a < b < first_meta
@@ -141,6 +150,8 @@ def test_consolidate_metadata_moves_stranded_blocks_to_end_sorted() -> None:
 
 def test_consolidate_metadata_is_idempotent() -> None:
     text = (
+        "@comment{pynakes-meta:\nnormalize-journal-style: abbreviated\n}\n"
+        "\n"
         "@article{A,\n  author = {Smith, John},\n  title = {T}\n}\n"
         "\n"
         "@Comment{jabref-meta: databaseType:bibtex;}\n"
@@ -398,6 +409,8 @@ def test_consolidate_merges_separate_pynakes_comments_into_one_block() -> None:
     # jabref-meta stays its own comment; the two pynakes comments merge into one.
     assert result.count("@comment{pynakes-meta:") == 1
     assert result.count("@comment{jabref-meta:") == 1
+    assert result.index("@comment{pynakes-meta:") < result.index("@article{A,")
+    assert result.index("@article{A,") < result.index("@comment{jabref-meta:")
     # Legacy `key:value;` inputs are rewritten in the default `key: value` form.
     assert "normalize-journal-style: abbreviated" in result
     assert "protected-terms: GPU,API" in result
@@ -652,6 +665,17 @@ def test_metadata_set_unknown_key_goes_to_pynakes(tmp_path: Path) -> None:
     assert data["namespace"] == "pynakes"
     assert data["created"] is True
     assert "@comment{pynakes-meta:\nunknownThing: value\n}" in bib.read_text()
+
+
+def test_metadata_set_created_pynakes_block_goes_to_top(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{A,\n  title = {T}\n}\n")
+
+    result = runner.invoke(app, ["metadata", "set", str(bib), "unknownThing", "value", "--json"])
+
+    assert result.exit_code == 0, result.output
+    text = bib.read_text()
+    assert text.index("@comment{pynakes-meta:") < text.index("@article{A,")
 
 
 def test_metadata_set_unknown_key_into_jabref_errors(tmp_path: Path) -> None:
