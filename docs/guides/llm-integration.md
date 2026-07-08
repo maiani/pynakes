@@ -46,7 +46,7 @@ pynakes capabilities --json
 Read-only:
 
 - `pynakes inspect [file] [--json]`
-- `pynakes search <query> [file] [--field ...] [--where ...] [--json]`
+- `pynakes search <query> [file] [--field ...] [--where ...] [--no-rank] [--json]`
 - `pynakes lint [file...] [--strict] [--json]`
 - `pynakes groups list [file] [--json]`
 - `pynakes keys check [file...] [--strict] [--json]`
@@ -122,11 +122,19 @@ Creating / projecting — **create** new files (support `--dry-run`, `--diff`,
   files into one. `--dedupe` collapses identical same-key entries and reports a
   conflict (exit `2`) when same-key entries differ.
 - `pynakes corpus split <file>... --to <FILE>='<predicate>'... [--copy] [--tex ...]
-  [--aux ...] [--dedupe]` — combine inputs in memory and route entries into
-  several outputs. Each `--to` pairs an output file with a predicate: a
-  [`--where`](#the-where-filter) expression, or one of `*`, `used` / `unused`
-  (against `--tex`/`--aux`), or `group "Name"`. First match wins by default;
-  `--copy` routes an entry to every matching output.
+  [--aux ...] [--dedupe] [--minimal]` — combine inputs in memory and route
+  entries into several outputs. Each `--to` pairs an output file with a
+  predicate: a [`--where`](#the-where-filter) expression, or one of `*`, `used`
+  / `unused` (against `--tex`/`--aux`), or `group "Name"`. First match wins by
+  default; `--copy` routes an entry to every matching output. By default each
+  output also carries the source library's `jabref-meta`/`pynakes-meta` blocks
+  (groups, save-order config, Pinax fetch settings) and copies any linked
+  Pinax materials, since a bucket is usually still a working library; pass
+  `--minimal` when a bucket is a standalone snippet instead (e.g. one entry
+  pulled out to hand to a collaborator) — it drops those metadata blocks
+  entirely and skips materials copying. There is no dedicated single-entry
+  export command yet; `split` with one `--to key == "..."` rule and
+  `--minimal` is the way to pull one reference out cleanly.
 
 Transactional:
 
@@ -176,6 +184,16 @@ pynakes search widgets refs.bib --field title --where 'year = 2024' --json
 Search terms are whitespace-separated and ANDed. Quoted phrases stay together.
 `field:term` scopes a term to one field; `key:` and `type:` target citation keys
 and entry types. Plain terms search the key, type, and stored fields.
+
+Each match reports which field(s) it matched on — `matched_fields` in JSON, or
+a bracketed `[field, ...]` tag in human output — e.g. `key`, `type`, `title`,
+`author`, `groups`, `abstract`, or any other stored field name.
+
+By default, matches are ranked by relevance: the strongest matched field
+wins, in the order `key` > `title` > `author` > other stored fields >
+`groups`/`abstract` (weak signals, since a group or abstract mention doesn't
+mean the term is central to the entry). Ties keep file order. Pass `--no-rank`
+to get plain file order instead, e.g. when diffing output against a prior run.
 
 ## Recommended workflow
 
@@ -433,6 +451,7 @@ they produce. `corpus combine`:
   "inputs": ["1.bib", "2.bib"],
   "dry_run": false,
   "copy": false,
+  "minimal": false,
   "outputs": [
     {"file": "used.bib", "predicate": "used", "entries": 30, "written": true},
     {"file": "rest.bib", "predicate": "*", "entries": 12, "written": true}

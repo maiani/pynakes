@@ -78,3 +78,45 @@ def test_limit() -> None:
 def test_invalid_query_raises() -> None:
     with pytest.raises(ValueError):
         parse_search_query('"unterminated')
+
+
+_RANK_LIB = (
+    "@article{Alpha2024,\n"
+    "  title = {Small Libraries},\n"
+    "  groups = {widgets},\n"
+    "  year = {2024}\n"
+    "}\n\n"
+    "@book{Beta2023,\n"
+    "  title = {Widgets for Everyone},\n"
+    "  year = {2023}\n"
+    "}\n\n"
+    "@misc{widgets_2022,\n"
+    "  title = {An Unrelated Note},\n"
+    "  year = {2022}\n"
+    "}\n"
+)
+
+
+def test_rank_orders_by_match_strength_by_default() -> None:
+    lib = parse_bib(_RANK_LIB)
+
+    results = search_entries(lib, "widgets")
+
+    # key match (widgets_2022) > title match (Beta2023) > groups match (Alpha2024)
+    assert [result.key for result in results] == ["widgets_2022", "Beta2023", "Alpha2024"]
+
+
+def test_no_rank_keeps_file_order() -> None:
+    lib = parse_bib(_RANK_LIB)
+
+    results = search_entries(lib, "widgets", rank=False)
+
+    assert [result.key for result in results] == ["Alpha2024", "Beta2023", "widgets_2022"]
+
+
+def test_limit_applies_after_ranking() -> None:
+    lib = parse_bib(_RANK_LIB)
+
+    results = search_entries(lib, "widgets", limit=1)
+
+    assert [result.key for result in results] == ["widgets_2022"]

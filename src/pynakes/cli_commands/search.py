@@ -24,9 +24,22 @@ def search(
     where: str | None = typer.Option(None, "--where", help="Filter expression"),
     case_sensitive: bool = typer.Option(False, "--case-sensitive", help="Match case sensitively"),
     limit: int | None = typer.Option(None, "--limit", help="Maximum number of matches"),
+    no_rank: bool = typer.Option(
+        False,
+        "--no-rank",
+        help="Keep raw file order instead of ranking by match strength",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Search entries by free text, phrases, or field-scoped terms."""
+    """Search entries by free text, phrases, or field-scoped terms.
+
+    Each result is tagged with the field(s) that matched, e.g. \\[title] or
+    \\[title, groups]: ``key`` and ``type`` for the citation key and entry
+    type, or the matching stored field name (``title``, ``author``,
+    ``groups``, ``abstract``, ...). By default, results are ranked by match
+    strength — key > title > author > other fields > groups/abstract — with
+    ties kept in file order; pass ``--no-rank`` for plain file order.
+    """
     file = _resolve_input_bib(file, json_output)
     lib = Bibliography.open(file).lib
     where_filter = fields_ops.parse_query(where) if where is not None else None
@@ -37,6 +50,7 @@ def search(
         where=where_filter,
         case_sensitive=case_sensitive,
         limit=limit,
+        rank=not no_rank,
     )
 
     if json_output:
@@ -51,6 +65,7 @@ def search(
                     "fields": field or [],
                     "case_sensitive": case_sensitive,
                     "limit": limit,
+                    "ranked": not no_rank,
                     "count": len(results),
                     "matches": [result.to_dict() for result in results],
                 },

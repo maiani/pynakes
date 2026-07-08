@@ -480,6 +480,44 @@ class TestSearchCommand:
         assert "1 matching entry" in result.output
         assert "@misc{Alpha}" in result.output
 
+    def test_search_ranks_by_match_strength_by_default(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Alpha2024,\n"
+            "  title = {Small Libraries},\n"
+            "  groups = {widgets}\n"
+            "}\n\n"
+            "@misc{widgets_2022,\n"
+            "  title = {An Unrelated Note}\n"
+            "}\n"
+        )
+
+        result = runner.invoke(app, ["search", "widgets", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["ranked"] is True
+        assert [match["key"] for match in data["matches"]] == ["widgets_2022", "Alpha2024"]
+
+    def test_search_no_rank_keeps_file_order(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Alpha2024,\n"
+            "  title = {Small Libraries},\n"
+            "  groups = {widgets}\n"
+            "}\n\n"
+            "@misc{widgets_2022,\n"
+            "  title = {An Unrelated Note}\n"
+            "}\n"
+        )
+
+        result = runner.invoke(app, ["search", "widgets", str(bib), "--no-rank", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["ranked"] is False
+        assert [match["key"] for match in data["matches"]] == ["Alpha2024", "widgets_2022"]
+
     def test_search_invalid_query_is_structured(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text("@misc{Alpha,\n  title = {Plain Widget Note}\n}\n")
@@ -777,7 +815,10 @@ class TestImportCommand:
         key = data["key"]
         assert data["fetch"]["fetched"][0]["key"] == key
         assert data["fetch"]["fetch_policy"] == {
-            "preprint": False, "published": False, "source": False, "bestpdf": True
+            "preprint": False,
+            "published": False,
+            "source": False,
+            "bestpdf": True,
         }
         assert (tmp_path / "refs.files" / f"{key}.preprint.pdf").read_bytes() == b"%PDF fixture"
         assert not (tmp_path / "refs.files" / f"{key}.source").exists()
@@ -805,7 +846,10 @@ class TestImportCommand:
         key = data["key"]
         fetched = data["fetch"]["fetched"][0]
         assert data["fetch"]["fetch_policy"] == {
-            "preprint": True, "published": False, "source": False, "bestpdf": False
+            "preprint": True,
+            "published": False,
+            "source": False,
+            "bestpdf": False,
         }
         assert fetched["pdf_path"] == str(tmp_path / "refs.files" / f"{key}.preprint.pdf")
         assert fetched["source_path"] is None
@@ -855,7 +899,10 @@ class TestImportCommand:
         data = json.loads(result.output)
         key = data["key"]
         assert data["fetch"]["fetch_policy"] == {
-            "preprint": False, "published": True, "source": False, "bestpdf": False
+            "preprint": False,
+            "published": True,
+            "source": False,
+            "bestpdf": False,
         }
         assert data["fetch"]["fetched"] == [
             {
@@ -880,9 +927,9 @@ class TestImportCommand:
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
-        assert data["key"] == "Smith24Practical"
+        assert data["key"] == "smith24practical"
         assert data["key_source"] == "generated"
-        assert "@article{Smith24Practical," in bib.read_text()
+        assert "@article{smith24practical," in bib.read_text()
 
     def test_add_can_use_provider_key(self, tmp_path: Path, monkeypatch) -> None:
         bib = _copy(tmp_path, "simple.bib")
@@ -1211,9 +1258,9 @@ class TestKeysCommand:
         result = runner.invoke(app, ["keys", "generate", str(bib), "Old", "--json"])
 
         assert result.exit_code == 0, result.output
-        assert json.loads(result.output)["renames"] == [{"old": "Old", "new": "Smith24"}]
+        assert json.loads(result.output)["renames"] == [{"old": "Old", "new": "smith24"}]
         text = bib.read_text()
-        assert "@article{Smith24," in text
+        assert "@article{smith24," in text
         assert "@article{Keep," in text
 
     def test_generate_single_key_accepts_key_before_file(self, tmp_path: Path) -> None:
@@ -2882,7 +2929,10 @@ class TestAssetFetchPublished:
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         assert data["fetch_policy"] == {
-            "preprint": False, "published": True, "source": False, "bestpdf": False
+            "preprint": False,
+            "published": True,
+            "source": False,
+            "bestpdf": False,
         }
         assert len(data["fetched"]) == 1
         assert data["fetched"][0]["key"] == "Einstein1905"
@@ -2974,7 +3024,10 @@ class TestAssetFetchPublished:
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         assert data["fetch_policy"] == {
-            "preprint": False, "published": False, "source": True, "bestpdf": False
+            "preprint": False,
+            "published": False,
+            "source": True,
+            "bestpdf": False,
         }
         assert len(data["fetched"]) == 0
         assert len(data["skipped"]) == 1

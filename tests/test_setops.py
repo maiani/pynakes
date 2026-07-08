@@ -13,6 +13,7 @@ from pynakes.setops import (
     compile_predicate,
     merge_libraries,
     partition_library,
+    strip_metadata_blocks,
 )
 
 runner = CliRunner()
@@ -110,6 +111,29 @@ def test_partition_used_unused_split() -> None:
     result = partition_library(lib, rules, cited_keys={"Smith2020"})
     assert list(result.buckets["used.bib"].entries.keys()) == ["Smith2020"]
     assert list(result.buckets["unused.bib"].entries.keys()) == ["Jones2021"]
+
+
+def test_strip_metadata_blocks_drops_jabref_and_pynakes_meta() -> None:
+    lib = parse_bib(
+        A
+        + "@comment{pynakes-meta:\nfiles-dir: refs.files\n}\n\n"
+        + "@Comment{jabref-meta: databaseType:bibtex;}\n\n"
+        + "% a plain top-level comment, not metadata\n"
+    )
+    assert lib.pynakes_metadata_blocks and lib.jabref_metadata_blocks
+
+    stripped = strip_metadata_blocks(lib)
+
+    assert stripped is lib
+    assert lib.pynakes_metadata_blocks == []
+    assert lib.jabref_metadata_blocks == []
+    assert len(lib.raw_comments) == 1
+    assert "a plain top-level comment" in lib.raw_comments[0]
+    out = write_bib(lib)
+    assert "pynakes-meta" not in out
+    assert "jabref-meta" not in out
+    assert "a plain top-level comment" in out
+    assert "Smith2020" in out
 
 
 # --- CLI: merge ------------------------------------------------------------
@@ -243,6 +267,97 @@ def test_cli_split_copies_pinax_materials_to_matching_output(tmp_path: Path) -> 
     assert (tmp_path / "ml.files" / "Smith2020.preprint.pdf").read_bytes() == b"pdf"
     assert not (tmp_path / "rest.files" / "Smith2020.preprint.pdf").exists()
     assert parse_bib(Path(ml).read_text()).pynakes_metadata["files-dir"] == "ml.files"
+
+
+def test_cli_split_catch_all_bucket_with_no_materials_does_not_crash(tmp_path: Path) -> None:
+    # Regression: routing entries that have no actual linked files to a
+    # discard-style destination (e.g. one that can't hold a companion
+    # ``.files`` directory) must not fail just because the *source* library
+    # has Pinax materials configured for other entries.
+    source = tmp_path / "source.bib"
+    source.write_text(
+        "@article{Smith2020,\n  title = {Alpha},\n  groups = {ML}\n}\n"
+        "@article{Jones2021,\n  title = {Beta},\n  groups = {Bio}\n}\n"
+        "@comment{pynakes-meta:\nfiles-dir: source.files\n}\n"
+    )
+    (tmp_path / "source.files").mkdir()  # no material files inside
+    ml = str(tmp_path / "ml.bib")
+    unwritable_catch_all = str(tmp_path / "no-such-dir" / "discard.bib")
+
+    result = runner.invoke(
+        app,
+        [
+            "corpus",
+            "split",
+            str(source),
+            "--to",
+            f'{ml}=group "ML"',
+            "--to",
+            f"{unwritable_catch_all}=*",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert not (tmp_path / "no-such-dir").exists()
+
+
+def test_cli_split_minimal_drops_metadata_and_skips_materials(tmp_path: Path) -> None:
+    source = tmp_path / "source.bib"
+    source.write_text(
+        "@comment{pynakes-meta:\nfiles-dir: source.files\n}\n\n"
+        "@Comment{jabref-meta: databaseType:bibtex;}\n\n"
+        "@article{Smith2020,\n  title = {Alpha},\n  groups = {ML}\n}\n"
+        "@article{Jones2021,\n  title = {Beta},\n  groups = {Bio}\n}\n"
+    )
+    source_files = tmp_path / "source.files"
+    source_files.mkdir()
+    (source_files / "Smith2020.preprint.pdf").write_bytes(b"pdf")
+    ml = str(tmp_path / "ml.bib")
+    rest = str(tmp_path / "rest.bib")
+
+    result = runner.invoke(
+        app,
+        [
+            "corpus",
+            "split",
+            str(source),
+            "--to",
+            f'{ml}=group "ML"',
+            "--to",
+            f"{rest}=*",
+            "--minimal",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["minimal"] is True
+    outputs = {item["file"]: item for item in data["outputs"]}
+    assert outputs[ml]["pinax_materials"] == []
+    assert not (tmp_path / "ml.files").exists()
+    content = Path(ml).read_text()
+    assert "pynakes-meta" not in content
+    assert "jabref-meta" not in content
+    assert "Smith2020" in content
+
+
+def test_cli_split_without_minimal_keeps_metadata(tmp_path: Path) -> None:
+    source = tmp_path / "source.bib"
+    source.write_text(
+        "@Comment{jabref-meta: databaseType:bibtex;}\n\n"
+        "@article{Smith2020,\n  title = {Alpha},\n  groups = {ML}\n}\n"
+    )
+    ml = str(tmp_path / "ml.bib")
+
+    result = runner.invoke(
+        app, ["corpus", "split", str(source), "--to", f'{ml}=group "ML"', "--json"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["minimal"] is False
+    assert "jabref-meta" in Path(ml).read_text()
 
 
 def test_cli_split_used_unused_with_tex(tmp_path: Path) -> None:

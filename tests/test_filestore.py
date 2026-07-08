@@ -166,6 +166,22 @@ def test_copy_materials_copies_files_and_manifest_row(tmp_path: Path) -> None:
     assert manifest["files"]["A"]["preprint_canonical"] is True
 
 
+def test_copy_materials_skips_root_creation_when_entry_has_no_files(tmp_path: Path) -> None:
+    source_root = tmp_path / "source.files"
+    source_root.mkdir()
+    source = FileStore(root=source_root, bib_path=tmp_path / "source.bib")
+    # This target root is never created if nothing is copied to it, so it can
+    # point anywhere (e.g. a /dev/null-style discard bucket) without failing.
+    target_root = tmp_path / "no-such-parent" / "target.files"
+    target = FileStore(root=target_root, bib_path=tmp_path / "target.bib")
+
+    copied = target.copy_materials_from(source, "NoFiles")
+
+    assert copied == []
+    assert not target_root.exists()
+    assert not target_root.parent.exists()
+
+
 def test_rename_materials_moves_paths_and_manifest_with_rollback(tmp_path: Path) -> None:
     root = tmp_path / "refs.files"
     root.mkdir()

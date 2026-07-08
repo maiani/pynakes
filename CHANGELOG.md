@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`corpus split` gained a `--minimal` flag.** For a bucket meant as a
+  standalone snippet (e.g. one entry pulled out to hand to a collaborator)
+  rather than a working library, `--minimal` drops the source library's
+  `jabref-meta`/`pynakes-meta` blocks (groups, save-order config, Pinax fetch
+  settings) from that output and skips Pinax materials copying, instead of
+  carrying the whole library's config into a one-entry file.
+  (`strip_metadata_blocks` in `src/pynakes/setops.py`)
+
 ### Changed
+
+- **`search` results are ranked by match strength by default.** Matches are
+  ordered by their strongest matched field — `key` > `title` > `author` >
+  other stored fields > `groups`/`abstract` — with file order as a tiebreak,
+  instead of always following raw file order. Pass `--no-rank` to keep the old
+  file-order behaviour. The match-field tags shown in human output
+  (`[title]`, `[groups]`, ...) and returned as `matched_fields` in JSON are now
+  documented in `search --help` and
+  [docs/guides/llm-integration.md](docs/guides/llm-integration.md).
+  (`_rank_results` in `src/pynakes/search.py`)
 
 - **Replaced three boolean fetch-* keys with a single `fetch-policy` key.** The
   old `fetch-preprint`, `fetch-source`, and `fetch-published` booleans are
@@ -24,8 +44,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that CrossRef or OpenAlex mislabel as PDF are rejected early, avoiding
   unnecessary downloads. (`_url_serves_pdf` in `src/pynakes/fetch.py:282`)
 
+- **Citation-key pattern markers now respect JabRef casing conventions.**
+  In JabRef, the casing of a marker like ``[auth]`` vs ``[Auth]`` vs ``[AUTH]``
+  controls the casing of the generated text (lowercase, first-letter-capitalized,
+  or uppercase). Pynakes previously ignored marker casing, producing the same
+  output regardless. Added ``_apply_marker_casing`` in ``src/pynakes/keys.py``
+  that applies the correct case transformation based on the marker's original
+  (un-lowered) form, applied before any explicit ``:lower``/``:upper``/etc.
+  modifier. All-lowercase markers are the convention in existing patterns and
+  now produce lowercased output, which changes generated keys for any library
+  using a ``key-pattern`` or ``keypatterndefault`` setting.
+
 ### Fixed
 
+- **`corpus split` no longer crashes routing entries to a materials-less
+  destination.** `FileStore.copy_materials_from` used to create the target
+  `.files` directory unconditionally, even for an entry with no material
+  files to copy. Routing the "everything else" bucket of a `split` to a
+  discard-style destination that can't hold a companion directory (e.g. the
+  `/dev/null` idiom for "keep only the matched entries") crashed with a
+  permission/IO error the moment any entry from a Pinax-enabled input landed
+  in that bucket. The `.files` directory is now created lazily, only when a
+  file or directory is actually found to copy. (`copy_materials_from` in
+  `src/pynakes/filestore.py`)
 - **Published-PDF download gracefully skips non-PDF responses instead of saving
   them.** Some publisher URLs return an HTML landing page instead of a PDF. The
   `download_published_material` function now checks that the response starts

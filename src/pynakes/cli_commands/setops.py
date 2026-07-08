@@ -29,7 +29,7 @@ from pynakes.filestore import FILES_DIR_KEY, FileStore
 from pynakes.io import load_bib, save_text
 from pynakes.metadata import set_metadata
 from pynakes.model import BibFile
-from pynakes.setops import PartitionRule, merge_libraries, partition_library
+from pynakes.setops import PartitionRule, merge_libraries, partition_library, strip_metadata_blocks
 from pynakes.usage import collect_cited_keys
 
 
@@ -191,6 +191,12 @@ def split(
         "--copy",
         help="Send an entry to every matching bucket (default: first match only)",
     ),
+    minimal: bool = typer.Option(
+        False,
+        "--minimal",
+        help="Drop jabref-meta/pynakes-meta blocks and skip Pinax materials in "
+        "outputs, for standalone single-entry or few-entry snippets",
+    ),
     tex: list[str] | None = typer.Option(
         None, "--tex", help="TeX file(s)/dir(s) feeding the used/unused predicates"
     ),
@@ -205,7 +211,15 @@ def split(
     backup: bool = _BACKUP_OPTION,
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Combine inputs, then route entries into several outputs by predicate."""
+    """Combine inputs, then route entries into several outputs by predicate.
+
+    Each output carries the source library's jabref-meta/pynakes-meta blocks
+    (groups, save-order config, Pinax fetch settings) and copies any linked
+    Pinax materials, since a bucket is usually still a working library. Pass
+    ``--minimal`` for a bucket that's meant as a standalone snippet instead
+    (e.g. one entry pulled out to hand to a collaborator): it drops those
+    metadata blocks entirely and skips materials copying.
+    """
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     rules = _parse_rules(to)
 
@@ -243,9 +257,13 @@ def split(
     diff_chunks: list[str] = []
     for rule in rules:
         bucket = result.buckets[rule.label]
-        pinax_materials = _copy_pinax_materials(
-            bucket, rule.label, pinax_sources, dry_run=params.dry_run
-        )
+        if minimal:
+            strip_metadata_blocks(bucket)
+            pinax_materials: list[dict[str, str]] = []
+        else:
+            pinax_materials = _copy_pinax_materials(
+                bucket, rule.label, pinax_sources, dry_run=params.dry_run
+            )
         content = write_bib(bucket)
         count = result.counts[rule.label]
 
@@ -289,6 +307,7 @@ def split(
         "inputs": merged.inputs,
         "dry_run": params.dry_run,
         "copy": copy,
+        "minimal": minimal,
         "outputs": outputs,
         "unrouted": result.unrouted,
         "warnings": warnings,

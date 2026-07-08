@@ -340,11 +340,17 @@ class FileStore:
         }
 
     def copy_materials_from(self, source: "FileStore", key: str) -> list[dict[str, str]]:
-        """Copy one entry's material files and manifest row from ``source``."""
+        """Copy one entry's material files and manifest row from ``source``.
+
+        The root directory is created lazily, only once a matching file or
+        directory is actually found — an entry with no materials never
+        touches the target filesystem, so routing it at a destination that
+        can't hold a ``.files`` directory (e.g. a ``/dev/null`` discard
+        bucket) doesn't fail.
+        """
         copied: list[dict[str, str]] = []
         source_paths = source.paths_for(key)
         target_paths = self.paths_for(key)
-        self.ensure_root()
         for kind in ARTIFACT_KINDS:
             src = getattr(source_paths, kind)
             dst = getattr(target_paths, kind)
@@ -353,6 +359,7 @@ class FileStore:
                 shutil.copy2(src, dst)
                 copied.append({"key": key, "kind": kind, "path": str(dst)})
             elif src.is_dir():
+                dst.parent.mkdir(parents=True, exist_ok=True)
                 if dst.exists():
                     shutil.rmtree(dst)
                 shutil.copytree(src, dst)

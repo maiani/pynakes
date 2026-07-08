@@ -41,6 +41,37 @@ class SearchResult:
         }
 
 
+#: Relevance tiers for :func:`_rank_results`, strongest first. A result's rank
+#: is the best (lowest) tier among its ``matched_fields``; fields not listed
+#: fall in the middle tier, below ``author`` and above the weak free-text
+#: fields ``groups``/``abstract``.
+_STRONG_FIELD_TIERS = ("key", "title", "author")
+_WEAK_FIELDS = frozenset({"groups", "abstract"})
+_DEFAULT_TIER = len(_STRONG_FIELD_TIERS)
+_WEAK_TIER = _DEFAULT_TIER + 1
+
+
+def _field_tier(field: str) -> int:
+    if field in _STRONG_FIELD_TIERS:
+        return _STRONG_FIELD_TIERS.index(field)
+    if field in _WEAK_FIELDS:
+        return _WEAK_TIER
+    return _DEFAULT_TIER
+
+
+def _rank_results(results: list[SearchResult]) -> list[SearchResult]:
+    """Stably sort matches by relevance: strongest matched field first.
+
+    Ties (including whole-entry ties) keep their relative order, so this is a
+    pure reordering of ``results`` — a no-op when every match already has the
+    same best-matched-field tier.
+    """
+    return sorted(
+        results,
+        key=lambda result: min(_field_tier(field) for field in result.matched_fields),
+    )
+
+
 def parse_search_query(query: str) -> list[SearchTerm]:
     """Parse a free-text search query.
 
@@ -78,12 +109,19 @@ def search_entries(
     where: Callable[[BibEntry], bool] | None = None,
     case_sensitive: bool = False,
     limit: int | None = None,
+    rank: bool = True,
 ) -> list[SearchResult]:
     """Return entries whose searchable text matches all query terms.
 
     Free terms search the citation key, entry type, and stored fields. Fielded
     terms search only their target. ``fields`` restricts stored fields included
     in free-text search and output; ``key`` and ``type`` remain searchable.
+
+    By default (``rank=True``) matches are ordered by relevance — the
+    strongest matched field wins, in the order key > title > author > other
+    fields > groups/abstract — with ties broken by file order. Pass
+    ``rank=False`` to keep the raw file order instead (also lets ``limit``
+    short-circuit the scan once enough matches are found).
     """
     if limit is not None and limit < 0:
         raise ValueError("Search limit must be non-negative")
@@ -107,8 +145,13 @@ def search_entries(
                 fields=_output_fields(entry, field_filter),
             )
         )
-        if limit is not None and len(results) >= limit:
+        if limit is not None and not rank and len(results) >= limit:
             break
+
+    if rank:
+        results = _rank_results(results)
+        if limit is not None:
+            results = results[:limit]
 
     return results
 

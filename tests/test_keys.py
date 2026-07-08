@@ -66,7 +66,7 @@ class TestGenerateKey:
             "  title = {A Practical Test}\n"
             "}\n"
         )
-        assert generate_key(lib.entries["old"], lib) == "Smith24Practical"
+        assert generate_key(lib.entries["old"], lib) == "smith24practical"
 
     def test_jabref_entry_type_pattern_overrides_default(self) -> None:
         lib = parse_bib(
@@ -78,13 +78,13 @@ class TestGenerateKey:
             "  title = {A Practical Test}\n"
             "}\n"
         )
-        assert generate_key(lib.entries["old"], lib) == "Smith2024Practical"
+        assert generate_key(lib.entries["old"], lib) == "smith2024practical"
 
     def test_jabref_pattern_supports_literals_and_field_markers(self) -> None:
         e = _entry(
             author="John Smith", year="2024", title="A Practical Test", journal="Test Journal"
         )
-        assert generate_key_from_pattern(e, "[auth]-[YEAR]-[journal:abbr]") == "Smith-2024-TJ"
+        assert generate_key_from_pattern(e, "[auth]-[YEAR]-[journal:abbr]") == "smith-2024-tj"
 
     def test_unsupported_jabref_pattern_errors(self) -> None:
         e = _entry(author="John Smith", year="2024", title="A Practical Test")
@@ -101,12 +101,12 @@ class TestGenerateKey:
             year="2024",
             title="A Practical Study of Things",
         )
-        assert generate_key_from_pattern(e, "[auth3]") == "Smi"  # truncated last name
-        assert generate_key_from_pattern(e, "[authors]") == "SmithDoeRoe"
+        assert generate_key_from_pattern(e, "[auth3]") == "smi"  # truncated, lowercased last name
+        assert generate_key_from_pattern(e, "[authors]") == "smithdoeroe"
         assert generate_key_from_pattern(e, "[shortyear]") == "24"
-        assert generate_key_from_pattern(e, "[shorttitle]") == "PracticalStudyThings"
-        assert generate_key_from_pattern(e, "[camel2]") == "APractical"
-        assert generate_key_from_pattern(e, "[entrytype]") == "Article"
+        assert generate_key_from_pattern(e, "[shorttitle]") == "practicalstudythings"
+        assert generate_key_from_pattern(e, "[camel2]") == "apractical"
+        assert generate_key_from_pattern(e, "[entrytype]") == "article"
 
     def test_accented_author_names_fold_to_ascii(self) -> None:
         e = _entry(
@@ -116,9 +116,9 @@ class TestGenerateKey:
         )
         # The leading accented letter must fold to ASCII (Š → S), not be dropped.
         assert generate_key_from_pattern(e, "[auth]_[year]_[veryshorttitle]") == (
-            "Sexample_2020_Generic"
+            "sexample_2020_generic"
         )
-        assert generate_key_from_pattern(e, "[authors]") == "SexampleOfooBar"
+        assert generate_key_from_pattern(e, "[authors]") == "sexampleofoobar"
 
     def test_modifier_variants(self) -> None:
         e = _entry(
@@ -128,7 +128,7 @@ class TestGenerateKey:
         assert generate_key_from_pattern(e, "[auth:upper]") == "SMITH"
         assert generate_key_from_pattern(e, "[journal:abbr]") == "tj"
         assert generate_key_from_pattern(e, "[journal:capitalize]") == "TestJournal"
-        assert generate_key_from_pattern(e, "[auth:truncate3]") == "Smi"
+        assert generate_key_from_pattern(e, "[auth:truncate3]") == "smi"
 
     def test_unsupported_modifier_errors(self) -> None:
         e = _entry(author="John Smith", year="2024", title="A Study")
@@ -207,9 +207,9 @@ class TestRegenerate:
             "@article{keep,\n  author = {Jane Doe},\n  year = {2023},\n  title = {Other}\n}\n"
         )
 
-        assert regenerate_key(lib, "old") == ("old", "Smith24")
+        assert regenerate_key(lib, "old") == ("old", "smith24")
 
-        assert "Smith24" in lib.entries
+        assert "smith24" in lib.entries
         assert "keep" in lib.entries
 
     def test_regenerate_one_disambiguates_against_existing_keys(self) -> None:
@@ -257,7 +257,7 @@ class TestRegenerate:
             "  title = {Data}\n}\n"
         )
         renames = regenerate_keys(lib)
-        assert renames == [("old", "Smith24")]
+        assert renames == [("old", "smith24")]
 
     def test_regenerate_skips_xdata_entries(self) -> None:
         # @xdata entries are referenced by key from other entries via

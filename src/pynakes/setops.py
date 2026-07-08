@@ -88,6 +88,25 @@ def merge_libraries(named_libs: list[tuple[str, BibFile]], *, dedupe: bool = Fal
     )
 
 
+def strip_metadata_blocks(lib: BibFile) -> BibFile:
+    """Drop ``jabref-meta``/``pynakes-meta`` comment blocks from ``lib`` in place.
+
+    For a bucket meant as a standalone snippet (e.g. one entry pulled out via
+    ``split``), the source library's groups, save-order config, and Pinax
+    fetch settings are noise: they describe the whole original library, not
+    the bucket. Returns ``lib`` for chaining.
+    """
+    meta_indices = {
+        block.comment_index for block in (*lib.jabref_metadata_blocks, *lib.pynakes_metadata_blocks)
+    }
+    lib.raw_comments = [
+        comment for index, comment in enumerate(lib.raw_comments) if index not in meta_indices
+    ]
+    lib.jabref_metadata_blocks = []
+    lib.pynakes_metadata_blocks = []
+    return lib
+
+
 # --- predicates ------------------------------------------------------------
 
 

@@ -124,7 +124,7 @@ def test_prepare_imported_entry_uses_jabref_key_pattern_metadata() -> None:
         fetcher=lambda doi: PROVIDER_BIBTEX,
     )
 
-    assert entry.key == "Smith24Practical"
+    assert entry.key == "smith24practical"
 
 
 def test_prepare_imported_entry_can_use_provider_key() -> None:

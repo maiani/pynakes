@@ -85,6 +85,15 @@ _SEARCH_QUERY_GRAMMAR = {
         "title:learning type:article",
         'author:"Jane Example"',
     ],
+    "matched_fields": (
+        "Each result reports the field(s) it matched: key, type, or any stored "
+        "field name (title, author, groups, abstract, ...)."
+    ),
+    "ranking": (
+        "Results are ranked by relevance by default: key > title > author > "
+        "other fields > groups/abstract, ties kept in file order. --no-rank "
+        "restores plain file order."
+    ),
 }
 
 
