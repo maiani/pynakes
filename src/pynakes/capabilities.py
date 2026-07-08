@@ -243,6 +243,7 @@ def get_capabilities() -> dict:
             "inspect_library",
             "lint",
             "manage_groups",
+            "manage_group_tree",
             "manage_fields",
             "protect_title_capitalization",
             "generate_keys",
@@ -296,7 +297,9 @@ def get_capabilities() -> dict:
             "lint": "Validate entries and report issues",
             "ref": "Add, import (by DOI/arXiv/URL), and remove reference entries "
             "(add, import, remove)",
-            "groups": "Manage entry groups (list, add-entry, remove-entry)",
+            "groups": "Manage entry groups and group hierarchy "
+            "(list, add-entry, remove-entry, tree, add-group, remove-group, "
+            "rename-group, move-group)",
             "keys": "Generate, check, rename, and repair citation keys",
             "fields": "Edit fields (rename, move, append, clear, protect-title)",
             "dedupe": "Detect and conservatively merge duplicate works",

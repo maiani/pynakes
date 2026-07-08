@@ -47,7 +47,9 @@ def export_library(lib: BibFile, fmt: str) -> str:
         from pynakes.interchange.csv import export_csv
 
         return export_csv(lib)
-    raise ValueError(f"Unsupported export format {fmt!r}; choose one of {', '.join(EXPORT_FORMATS)}")
+    raise ValueError(
+        f"Unsupported export format {fmt!r}; choose one of {', '.join(EXPORT_FORMATS)}"
+    )
 
 
 def import_library(text: str, fmt: str) -> BibFile:
@@ -68,4 +70,6 @@ def import_library(text: str, fmt: str) -> BibFile:
         from pynakes.interchange.endnote import import_endnote
 
         return import_endnote(text)
-    raise ValueError(f"Unsupported import format {fmt!r}; choose one of {', '.join(IMPORT_FORMATS)}")
+    raise ValueError(
+        f"Unsupported import format {fmt!r}; choose one of {', '.join(IMPORT_FORMATS)}"
+    )

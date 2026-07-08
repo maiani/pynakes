@@ -535,7 +535,12 @@ class FileStore:
             return []
         paths = self.paths_for(key)
         removed: list[str] = []
-        for path in [paths.published_pdf, paths.preprint_pdf, paths.supplement_pdf, paths.erratum_pdf]:
+        for path in [
+            paths.published_pdf,
+            paths.preprint_pdf,
+            paths.supplement_pdf,
+            paths.erratum_pdf,
+        ]:
             if path.exists():
                 removed.append(str(path.relative_to(self.root)))
         if paths.preprint_source.is_dir():
@@ -553,7 +558,12 @@ class FileStore:
             return []
         paths = self.paths_for(key)
         removed: list[str] = []
-        for path in [paths.published_pdf, paths.preprint_pdf, paths.supplement_pdf, paths.erratum_pdf]:
+        for path in [
+            paths.published_pdf,
+            paths.preprint_pdf,
+            paths.supplement_pdf,
+            paths.erratum_pdf,
+        ]:
             if path.exists():
                 path.unlink()
                 removed.append(str(path.relative_to(self.root)))

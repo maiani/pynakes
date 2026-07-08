@@ -7,7 +7,9 @@ the native ``dialect`` and ``key-pattern`` keys in ``pynakes-meta`` and no
 top). This module renders that seed file in the canonical layout (any
 one consolidated ``pynakes-meta`` block first, then sorted ``jabref-meta``
 comments) and extracts the copyable profile from an existing
-library for ``init --from``.
+library for ``init --from``.  The native ``group-tree`` metadata key is
+copied as a reusable convention (unlike the legacy JabRef group metadata
+keys, which are library-specific content).
 
 It is deterministic (sorted output, no timestamps) and produces no entries; the
 CLI command writes the rendered text through the same atomic, re-parse-validated
@@ -23,17 +25,23 @@ from pynakes.metadata import format_metadata_comment, format_pynakes_meta_block
 from pynakes.model import BibFile
 
 # Metadata that is library-specific *content*, not a reusable maintenance
-# convention, so ``--from`` never copies it: the source library's own group
-# tree, its linked TeX sources, and per-file management bookkeeping.
+# convention, so ``--from`` never copies it: the source library's own linked
+# TeX sources, per-file management bookkeeping, and legacy JabRef group
+# metadata.  The native ``group-tree`` key *is* copied (it represents a
+# convention, not content), so a new library inherits the template's group
+# hierarchy.
 _PROFILE_SKIP_KEYS = {
     "tex-sources",
     "blgfilepath",
     "protectedflag",
     "versiondbstructure",
+    "grouping",
+    "groupstree",
+    "groups",
     "groupsversion",
     "groups-search-syntax-version",
 }
-_PROFILE_SKIP_CATEGORIES = {"groups", "selectors"}
+_PROFILE_SKIP_CATEGORIES = {"selectors"}
 
 # A sensible starting profile for a brand-new library, so `init` produces a
 # working library rather than an empty file: the modern BibLaTeX dialect and a
@@ -78,9 +86,10 @@ def default_profile() -> list[ProfileEntry]:
 def collect_profile(lib: BibFile) -> list[ProfileEntry]:
     """Extract the copyable maintenance profile from a template library.
 
-    Returns the library's metadata minus its group tree, TeX-source list, and
-    per-file management bookkeeping — i.e. the conventions worth carrying to a
-    fresh library, not that library's own content.
+    Returns the library's metadata minus its legacy JabRef group metadata,
+    TeX-source list, and per-file management bookkeeping — i.e. the conventions
+    worth carrying to a fresh library, not that library's own content.  The
+    native ``group-tree`` key *is* copied as a convention.
     """
     entries: list[ProfileEntry] = []
     for block in lib.jabref_metadata_blocks:

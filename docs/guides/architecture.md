@@ -236,7 +236,8 @@ the CLI.
 
 | Module | Concept it owns |
 | --- | --- |
-| groups.py | JabRef-compatible membership stored in an entry groups field. |
+| groups.py | JabRef-compatible flat membership stored in an entry groups field. |
+| group_tree.py | Hierarchical group model, native pipeline-delimited format, JabRef `grouping`/`groups:` projection, CRUD operations, and tree-aware entry queries. |
 | keys.py | Citation-key generation, validation, duplicate detection/repair, and key renames. |
 | fields.py | Generic field changes, simple predicates, and title capitalization protection. |
 | authors.py | BibTeX name-list splitting, last-name extraction, and conservative/JabRef-style normalization. |

@@ -95,9 +95,7 @@ def test_fetch_semantic_scholar_paper_reads_deterministic_cache(tmp_path: Path) 
 def test_publisher_pdf_url_abstract_to_pdf() -> None:
     from pynakes.providers.pdf_overrides import publisher_pdf_url
 
-    url = publisher_pdf_url(
-        "https://journals.aps.org/prb/abstract/10.1103/PhysRevB.111.224421"
-    )
+    url = publisher_pdf_url("https://journals.aps.org/prb/abstract/10.1103/PhysRevB.111.224421")
     assert url == "https://journals.aps.org/prb/pdf/10.1103/PhysRevB.111.224421"
 
 

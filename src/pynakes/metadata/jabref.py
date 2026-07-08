@@ -21,6 +21,8 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from pynakes._text_utils import strip_jabref_terminator
+from pynakes.group_tree import format_jabref_grouping as _format_jabref_grouping
+from pynakes.group_tree import parse_native as _parse_native_tree
 from pynakes.metadata import core
 from pynakes.metadata import schema as pynakes_schema
 from pynakes.metadata.core import MetadataUpdate, metadata_value
@@ -341,6 +343,7 @@ ALIASED_EXACT: dict[str, str] = {
     "dialect": "databaseType",
     "sort-order": "saveOrderConfig",
     "key-pattern": "keypatterndefault",
+    "group-tree": "grouping",
 }
 ALIASED_PREFIX: dict[str, str] = {
     "key-pattern-": "keypattern_",
@@ -377,6 +380,11 @@ def _jabref_value_for_native(native_key: str, native_value: str) -> str:
     """Translate a native value to its JabRef-encoded form for mirroring."""
     if native_key.lower() == "sort-order":
         return format_save_order(pynakes_schema.parse_sort_order_value(native_value))
+    if native_key.lower() == "group-tree":
+        nodes = _parse_native_tree(native_value)
+        if nodes:
+            return _format_jabref_grouping(nodes)
+        return ""
     # ``dialect`` and the ``key-pattern`` family share their value grammar with
     # their JabRef counterparts, so the value passes through unchanged.
     return native_value.strip()

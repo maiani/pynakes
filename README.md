@@ -75,6 +75,7 @@ For development (with test/lint tools):
 git clone https://github.com/maiani/pynakes.git
 cd pynakes
 pip install -e ".[dev]"
+pre-commit install  # enable ruff hooks on commit
 ```
 
 See the [Installation guide](docs/guides/installation.md) for shell completion and troubleshooting.

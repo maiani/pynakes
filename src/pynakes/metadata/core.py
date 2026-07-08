@@ -5,7 +5,8 @@ pynakes recognizes two structurally identical top-level comment namespaces:
 ``@comment{pynakes-meta: key:value;}`` (pynakes' superset, for settings JabRef
 cannot represent). This module knows how to parse, format, and surgically edit
 both — one comment per key for ``jabref-meta`` (JabRef's own convention), one
-consolidated multi-line comment for ``pynakes-meta`` — without knowing which
+consolidated multi-line comment for ``pynakes-meta`` (with continuation-line
+support: indented lines append to the previous block's value) — without knowing which
 keys belong to which *owner*. That classification (JabRef-native vs
 pynakes-owned, and the domain category) is injected by callers via an optional
 ``classify`` callback; :mod:`pynakes.metadata.schema` is the module that
@@ -242,12 +243,21 @@ def parse_metadata_comment(
         block = _make_metadata_block(body, namespace, raw_text, comment_index, classify)
         return [block] if block is not None else []
 
-    # pynakes-meta: one setting per line (values are single-line).
+    # pynakes-meta: one setting per line with continuation support.
+    # Lines starting with whitespace continue the previous block's value
+    # (appended with a newline separator).
     blocks: list[MetadataBlock] = []
     for line in body.splitlines():
-        block = _make_metadata_block(line.strip(), namespace, raw_text, comment_index, classify)
+        stripped = line.strip()
+        if not stripped:
+            continue
+        block = _make_metadata_block(stripped, namespace, raw_text, comment_index, classify)
         if block is not None:
             blocks.append(block)
+        elif blocks and (line[0] in (" ", "\t")):
+            # Continuation line: append to previous block's value
+            prev = blocks[-1]
+            prev.value = prev.value + "\n" + stripped
     return blocks
 
 
@@ -280,6 +290,8 @@ def format_pynakes_meta_block(items: list[tuple[str, str]], line_ending: str = "
 
     ``items`` is an ordered ``(key, value)`` list; each setting gets its own
     ``key: value`` line so a single-setting change is still a one-line diff.
+    Values containing ``\\n`` are split across continuation lines (indented with
+    two spaces) so the comment stays readable under line-length limits.
     JabRef ignores the ``pynakes-meta`` namespace, so pynakes uses this compact
     layout (no per-key prefix, no JabRef ``;`` terminator) rather than one comment
     per key. The reader (:func:`parse_metadata_comment`) still accepts the older
@@ -289,7 +301,13 @@ def format_pynakes_meta_block(items: list[tuple[str, str]], line_ending: str = "
     lines = [f"@comment{{{PYNAKES_PREFIX}"]
     for key, value in items:
         value = strip_jabref_terminator(value)
-        lines.append(f"{key.strip()}: {value}")
+        if "\n" in value:
+            first, *rest = value.split("\n")
+            lines.append(f"{key.strip()}: {first}")
+            for cont in rest:
+                lines.append(f"  {cont}")
+        else:
+            lines.append(f"{key.strip()}: {value}")
     lines.append("}")
     return line_ending.join(lines)
 

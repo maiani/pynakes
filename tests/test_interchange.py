@@ -157,10 +157,24 @@ def test_csv_export_default_columns() -> None:
     header = csv_text.strip().splitlines()[0]
     cols = header.split(",")
     expected = [
-        "key", "type", "author", "title", "year", "date",
-        "journal", "journaltitle", "booktitle", "doi", "url",
-        "eprint", "archiveprefix", "volume", "number", "pages",
-        "publisher", "keywords",
+        "key",
+        "type",
+        "author",
+        "title",
+        "year",
+        "date",
+        "journal",
+        "journaltitle",
+        "booktitle",
+        "doi",
+        "url",
+        "eprint",
+        "archiveprefix",
+        "volume",
+        "number",
+        "pages",
+        "publisher",
+        "keywords",
     ]
     assert cols == expected
 
@@ -173,5 +187,8 @@ def test_empty_input_is_tolerated() -> None:
     assert export_library(parse_bib(""), "ris") == ""
     assert export_library(parse_bib(""), "csl-json") == "[]"
     assert export_library(parse_bib(""), "endnote") == ""
-    assert export_library(parse_bib(""), "csv") == "key,type,author,title,year,date,journal,journaltitle,booktitle,doi,url,eprint,archiveprefix,volume,number,pages,publisher,keywords\n"
+    assert (
+        export_library(parse_bib(""), "csv")
+        == "key,type,author,title,year,date,journal,journaltitle,booktitle,doi,url,eprint,archiveprefix,volume,number,pages,publisher,keywords\n"
+    )
     assert ET.fromstring(export_library(parse_bib(""), "mods")).tag.endswith("modsCollection")

@@ -90,7 +90,9 @@ it can gate a build. See
 
 ## groups
 
-Manage JabRef-style `groups` fields.
+Manage JabRef-style `groups` fields and the hierarchical group tree.
+
+### Flat group membership
 
 ```bash
 pynakes groups list                       # auto-detects one .bib file
@@ -104,6 +106,36 @@ pynakes groups add-entry refs.bib KEY "GroupName"
 pynakes groups remove-entry refs.bib KEY "GroupName" --dry-run --diff
 pynakes groups remove-entry refs.bib KEY "GroupName"
 ```
+
+### Group tree (hierarchical groups)
+
+Group-tree metadata allows parent/child relationships among groups, stored
+in the `pynakes-meta` `group-tree` key. Trees with multiple nodes are split
+across continuation lines (one node per line) for readability. The tree is
+bidirectionally compatible with JabRef's `grouping` block and flat `groups:`
+metadata.
+
+```bash
+pynakes groups tree refs.bib              # display the group tree
+pynakes groups tree refs.bib --json
+
+pynakes groups add-group refs.bib "Machine Learning"                  # root node
+pynakes groups add-group refs.bib "Deep Learning" --parent "Machine Learning"
+pynakes groups add-group refs.bib "NLP" --parent "Machine Learning" --color "ff0000ff"
+
+pynakes groups rename-group refs.bib "NLP" "Natural Language Processing"
+
+pynakes groups move-group refs.bib "Deep Learning" "Machine Learning"
+pynakes groups move-group refs.bib "Deep Learning" ""   # move to root
+
+pynakes groups update-group refs.bib "Deep Learning" --color "00ff00ff" --context 2
+
+pynakes groups remove-group refs.bib "NLP"   # removes group + its children
+```
+
+`groups list` reports flat per-entry membership only; it does not currently
+expand tree descendants. See [Library Profile](library-profile.md#grouping)
+for the tree's node schema and native format.
 
 ## keys
 

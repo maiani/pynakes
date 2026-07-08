@@ -61,6 +61,8 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     # Lint profile settings. ``lint-required-fields`` applies to every entry;
     # the entry-type suffix form adds requirements for one type.
     "lint-required-fields": CATEGORY_LINT,
+    # Native group tree (hierarchy of StaticGroup nodes).
+    "group-tree": CATEGORY_GROUPS,
 }
 
 PYNAKES_PREFIX_KEYS: dict[str, MetadataCategory] = {

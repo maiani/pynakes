@@ -9,6 +9,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Native group-tree metadata with JabRef projection and CRUD CLI.** A new
+  `group_tree` module introduces a hierarchical group model stored under the
+  `group-tree` key in `pynakes-meta`. The format is a single-line pipe-delimited
+  list (`name|parent|context|color|expanded`). The tree is bidirectionally
+  projected to/from JabRef's `grouping` block and flat `groups:` format. CLI
+  commands (`tree`, `add-group`, `remove-group`, `rename-group`, `move-group`)
+  cover tree CRUD; `update_node`/`list_entries_in_group_tree` (with descendant
+  propagation and a `strict` exact-match mode) are available at the engine/
+  Python API level, not yet wired to a CLI command. `init --from` skips legacy
+  JabRef group keys but copies the native `group-tree` key.
+  (`src/pynakes/group_tree.py`,
+  `src/pynakes/metadata/jabref.py`,
+  `src/pynakes/metadata/schema.py`,
+  `src/pynakes/_engine_ops.py`,
+  `src/pynakes/cli_commands/groups.py`,
+  `src/pynakes/initialize.py`,
+  `src/pynakes/capabilities.py`,
+  `tests/test_group_tree.py`)
+
+- **Native `group-tree` metadata now uses continuation lines for large trees.**
+  Trees with more than one node are split across continuation lines (one node
+  per indented line) within the `pynakes-meta` comment block, instead of a
+  single long semicolon-delimited line. The single-line format is still
+  accepted on read. The continuation infrastructure in
+  `parse_metadata_comment` (lines starting with whitespace are appended to the
+  previous block's value) is general and available for any future key that
+  needs multiline values. (`core.py:parse_metadata_comment`,
+  `core.py:format_pynakes_meta_block`,    `group_tree.py:_write_tree`)
+
+- **Full JabRef group-type parity: KeywordGroup, SearchGroup, ExplicitGroup.**
+  `GroupNode` extended with `group_type`, `field`, `expression`,
+  `case_sensitive`, `separator`, `search_flags`, `entries`. The native
+  pipe-delimited format widened to 13 fields. `parse_jabref_grouping` and
+  `format_jabref_grouping` handle all four JabRef group types with correct
+  parameter layout. The `update-group` CLI command also added.
+  (`src/pynakes/group_tree.py`, `src/pynakes/cli_commands/groups.py`,
+  `tests/test_group_tree.py`)
+
+- **Dynamic group expression evaluation for KeywordGroup / SearchGroup.**
+  `KeywordGroup` (field + expression + separator + case-sensitivity) and
+  `SearchGroup` (expression across all fields + search-flags) are now evaluated
+  at query time. `list_entries_in_group_tree` returns computed members alongside
+  explicitly tagged ones; `resolve_effective_groups` includes dynamic groups an
+  entry matches. `entry_computed_groups()` provides a public lookup.
+  (`_matches_keyword_group`, `_matches_search_group`, `_group_entry_keys`,
+  `entry_computed_groups` in `src/pynakes/group_tree.py`)
+
+
 - **`corpus split` gained a `--minimal` flag.** For a bucket meant as a
   standalone snippet (e.g. one entry pulled out to hand to a collaborator)
   rather than a working library, `--minimal` drops the source library's

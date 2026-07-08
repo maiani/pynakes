@@ -106,7 +106,7 @@ def _extract_doi(raw: object) -> str | None:
         return None
     for prefix in ("https://doi.org/", "http://doi.org/"):
         if raw.startswith(prefix):
-            return raw[len(prefix):]
+            return raw[len(prefix) :]
     return raw.strip()
 
 

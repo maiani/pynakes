@@ -8,6 +8,7 @@ import json
 
 import typer
 
+from pynakes import group_tree as group_tree_ops
 from pynakes import groups as groups_ops
 from pynakes.cli_common import (
     _BACKUP_OPTION,
@@ -33,8 +34,12 @@ def groups_list(
     """List all groups and their members."""
     file = _resolve_input_bib(file, json_output)
     lib = load_bib(file)
-    names = groups_ops.list_groups(lib)
-    members = {g: groups_ops.list_entries_in_group(lib, g) for g in names}
+    tree = group_tree_ops.list_tree(lib)
+    if tree is not None:
+        names = [n.name for n in tree]
+    else:
+        names = groups_ops.list_groups(lib)
+    members = {g: group_tree_ops.list_entries_in_group_tree(lib, g) for g in names}
 
     if json_output:
         typer.echo(
@@ -50,6 +55,47 @@ def groups_list(
         return
     for name in names:
         typer.echo(f"{name} ({len(members[name])}): {', '.join(members[name])}")
+
+
+def groups_tree(
+    file: str | None = bib_file_argument(),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Show the group hierarchy tree."""
+    file = _resolve_input_bib(file, json_output)
+    lib = load_bib(file)
+    tree = group_tree_ops.list_tree(lib)
+
+    if json_output:
+        typer.echo(
+            json.dumps(
+                {
+                    "status": "success",
+                    "action": "groups_tree",
+                    "file": file,
+                    "tree": [n.__dict__ for n in tree] if tree else [],
+                },
+                indent=2,
+            )
+        )
+        return
+
+    if tree is None:
+        typer.echo(f"{file}: no group tree defined.")
+        return
+
+    def _show(nodes, prefix="", parent=""):
+        lines = []
+        for n in nodes:
+            if n.parent == parent:
+                color = f" [{n.color}]" if n.color else ""
+                expanded = "+" if n.expanded else "-"
+                lines.append(f"{prefix}{expanded} {n.name}{color}")
+                lines.extend(_show(nodes, prefix + "  ", n.name))
+        return lines
+
+    for line in _show(tree):
+        typer.echo(line)
 
 
 def _require_key(lib, key: str, json_output: bool) -> None:
@@ -108,8 +154,168 @@ def groups_remove_entry(
     _group_mod_entry(file, key, group, params, add=False)
 
 
+def _tree_mod(
+    file: str,
+    params: RunParams,
+    action: str,
+    msg: str,
+    **details,
+) -> None:
+    """Run a tree modification and finish."""
+    coll = Bibliography.open(file)
+    _finish_mod(file, action, coll, params, [msg], **details)
+
+
+def groups_add_group(
+    file: str | None = bib_file_argument(),
+    name: str = typer.Argument(..., help="Group name to add"),
+    parent: str = typer.Option("", "--parent", help="Parent group name"),
+    color: str = typer.Option("", "--color", help="Hex RGBA color (e.g. 8a8a8aff)"),
+    context: int = typer.Option(2, "--context", help="0=independent, 1=refining, 2=including"),
+    backup: bool = _BACKUP_OPTION,
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Add a group node to the hierarchy tree."""
+    file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    coll = Bibliography.open(file)
+    ok = coll.add_group_node(name, parent=parent, color=color, context=context)
+    if not ok:
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            f"Group {name!r} already exists in the tree",
+        )
+    action = "groups_add_group"
+    msg = f"{_verb('add', params)} group {name!r} (parent={parent!r})."
+    _finish_mod(file, action, coll, params, [msg], group=name, parent=parent)
+
+
+def groups_remove_group(
+    file: str | None = bib_file_argument(),
+    name: str = typer.Argument(..., help="Group name to remove"),
+    backup: bool = _BACKUP_OPTION,
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Remove a group node and all its descendants from the hierarchy."""
+    file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    coll = Bibliography.open(file)
+    count = coll.remove_group_node(name)
+    if not count:
+        _emit_error(
+            json_output,
+            "KeyNotFound",
+            f"Group {name!r} not found in the tree",
+        )
+    action = "groups_remove_group"
+    msg = f"{_verb('remove', params)} group {name!r} ({count} nodes removed)."
+    _finish_mod(file, action, coll, params, [msg], group=name, removed_count=count)
+
+
+def groups_rename_group(
+    file: str | None = bib_file_argument(),
+    old: str = typer.Argument(..., help="Current group name"),
+    new: str = typer.Argument(..., help="New group name"),
+    backup: bool = _BACKUP_OPTION,
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Rename a group node, updating parent references in child groups."""
+    file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    coll = Bibliography.open(file)
+    ok = coll.rename_group_node(old, new)
+    if not ok:
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            f"Group {old!r} not found or {new!r} already exists",
+        )
+    action = "groups_rename_group"
+    msg = f"{_verb('rename', params)} group {old!r} to {new!r}."
+    _finish_mod(file, action, coll, params, [msg], old=old, new=new)
+
+
+def groups_move_group(
+    file: str | None = bib_file_argument(),
+    name: str = typer.Argument(..., help="Group name to move"),
+    parent: str = typer.Option("", "--parent", help="New parent group name"),
+    backup: bool = _BACKUP_OPTION,
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Move a group node to a new parent (empty string for root-level)."""
+    file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    coll = Bibliography.open(file)
+    ok = coll.move_group_node(name, parent)
+    if not ok:
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            f"Group {name!r} not found or move would create a circular reference",
+        )
+    action = "groups_move_group"
+    msg = f"{_verb('move', params)} group {name!r} to parent {parent!r}."
+    _finish_mod(file, action, coll, params, [msg], group=name, parent=parent)
+
+
+def groups_update_group(
+    file: str | None = bib_file_argument(),
+    name: str = typer.Argument(..., help="Group name to update"),
+    parent: str = typer.Option("", "--parent", help="New parent group name"),
+    color: str = typer.Option("", "--color", help="Hex RGBA color (e.g. 8a8a8aff)"),
+    context: int = typer.Option(-1, "--context", help="0=independent, 1=refining, 2=including"),
+    expanded: bool = typer.Option(True, "--expanded/--collapsed", help="Expanded in the UI"),
+    description: str = typer.Option("", "--description", help="Group description"),
+    backup: bool = _BACKUP_OPTION,
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Update properties of a group node in the hierarchy."""
+    file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    coll = Bibliography.open(file)
+    kwargs: dict = {}
+    if parent:
+        kwargs["parent"] = parent
+    if color:
+        kwargs["color"] = color
+    if context >= 0:
+        kwargs["context"] = context
+    if not expanded:
+        kwargs["expanded"] = False
+    if description:
+        kwargs["description"] = description
+    ok = coll.update_group_node(name, **kwargs)
+    if not ok:
+        _emit_error(
+            json_output,
+            "KeyNotFound",
+            f"Group {name!r} not found in the tree",
+        )
+    action = "groups_update_group"
+    changed = ", ".join(f"{k}={v!r}" for k, v in kwargs.items())
+    msg = f"{_verb('update', params)} group {name!r} ({changed})."
+    _finish_mod(file, action, coll, params, [msg], group=name, **kwargs)
+
+
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
     app.command("list")(_safe(groups_list))
     app.command("add-entry")(_safe(groups_add_entry))
     app.command("remove-entry")(_safe(groups_remove_entry))
+    app.command("tree")(_safe(groups_tree))
+    app.command("add-group")(_safe(groups_add_group))
+    app.command("remove-group")(_safe(groups_remove_group))
+    app.command("rename-group")(_safe(groups_rename_group))
+    app.command("move-group")(_safe(groups_move_group))
+    app.command("update-group")(_safe(groups_update_group))

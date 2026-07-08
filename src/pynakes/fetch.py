@@ -360,13 +360,23 @@ def download_published_material(
     else:
         validate_url = url_validator or _url_serves_pdf
         if not validate_url(pdf_url):
-            _emit_progress(progress, "artifact_skip", key, "published_pdf",
-                           message="URL does not serve PDF content")
+            _emit_progress(
+                progress,
+                "artifact_skip",
+                key,
+                "published_pdf",
+                message="URL does not serve PDF content",
+            )
             return PublishedDownloadResult(key=key, doi=normalized)
         data = fetch_published_pdf(pdf_url, progress=progress, key=key)
     if not data.startswith(b"%PDF"):
-        _emit_progress(progress, "artifact_skip", key, "published_pdf",
-                       message=f"URL returned {_describe_content(data)}, not a PDF")
+        _emit_progress(
+            progress,
+            "artifact_skip",
+            key,
+            "published_pdf",
+            message=f"URL returned {_describe_content(data)}, not a PDF",
+        )
         return PublishedDownloadResult(key=key, doi=normalized)
     pdf_path = store.write_published_pdf(key, data)
     store.record_artifact(

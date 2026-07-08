@@ -1175,7 +1175,9 @@ class TestGroupsCommand:
         result = runner.invoke(app, ["groups", "list", str(bib), "--json"])
         assert result.exit_code == 0, result.output
         groups = json.loads(result.output)["groups"]
-        assert "Machine Learning" in groups
+        # With a tree present, the CLI returns tree node names (flat format
+        # uses escaped colons, so "Machine Learning:AI Papers" is one node).
+        assert "Machine Learning:AI Papers" in groups
 
     def test_list_auto_discovers_lone_bib_file(self, tmp_path: Path, monkeypatch) -> None:
         _copy(tmp_path, "jabref_groups.bib")
@@ -1186,7 +1188,7 @@ class TestGroupsCommand:
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         assert data["file"] == "refs.bib"
-        assert "Machine Learning" in data["groups"]
+        assert "Machine Learning:AI Papers" in data["groups"]
 
     def test_add_entry_dry_run_does_not_write(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")

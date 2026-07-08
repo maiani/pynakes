@@ -52,6 +52,7 @@ a time.
 
 ```bash
 pip install -e ".[dev]"      # or ".[dev,docs]" for the docs site
+pre-commit install           # enable ruff hooks on commit
 pytest                       # full suite (fast; deterministic)
 ruff check src tests         # lint
 ruff format --check src tests
@@ -97,7 +98,7 @@ tests pass:
   `metadata`, `journals`) plus top-level commands (`add`, `normalize`,
   `convert`, …); one operation module per concern, kept small and unit-testable
   independent of the CLI.
-- Try to limit file length preferably to ~500 lines, with a maximum limit of 800.
+- Try to limit file length preferably to ~500 lines, with a maximum limit of 1000.
 - Add tests and a `CHANGELOG.md` entry with each behavioral change.
 - Use generic, invented example references or alternatively old, famous, historical references to famous papers in various fields in  code, tests, comments, docstrings, and
   `CHANGELOG.md`. Never commit examples

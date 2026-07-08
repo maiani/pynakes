@@ -6,11 +6,9 @@ import os
 from pathlib import Path
 
 import click
+from click.shell_completion import CompletionItem
 from typer._click.exceptions import UsageError as TyperUsageError
 from typer.core import TyperGroup
-
-from click.shell_completion import CompletionItem
-from typer.models import ArgumentInfo, OptionInfo
 
 from pynakes.cli_common import _emit_error, bib_candidates, missing_bib_message
 
@@ -177,9 +175,7 @@ class AutoBibGroup(TyperGroup):
         return False
 
     @staticmethod
-    def _incomplete_typer_argument(
-        ctx: click.Context, param: click.Parameter
-    ) -> bool:
+    def _incomplete_typer_argument(ctx: click.Context, param: click.Parameter) -> bool:
         """Whether *param* (an argument) can still accept a value."""
         if not AutoBibGroup._is_typer_argument(param):
             return False
@@ -188,11 +184,7 @@ class AutoBibGroup(TyperGroup):
         return (
             nargs == -1
             or ctx.get_parameter_source(param.name) is not click.ParameterSource.COMMANDLINE
-            or (
-                nargs > 1
-                and isinstance(value, (tuple, list))
-                and len(value) < nargs
-            )
+            or (nargs > 1 and isinstance(value, (tuple, list)) and len(value) < nargs)
         )
 
     @staticmethod

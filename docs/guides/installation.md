@@ -34,57 +34,6 @@ Install with dev dependencies (`pytest`, `ruff`, `pre-commit`):
 pip install -e ".[dev]"
 ```
 
-## Verification
-
-Verify the installation by checking the help:
-
-```bash
-pynakes --help
-```
-
-You should see output like:
-
-```
-Usage: pynakes [OPTIONS] COMMAND [ARGS]...
-
- Agent-friendly BibTeX library management tool
-
-╭─ Options ──────────────────────────────────────────────────────────────────╮
-│ --version             -V        Show the pynakes version and exit.         │
-│ --install-completion            Install completion for the current shell.  │
-│ --show-completion               Show completion for the current shell.     │
-│ --help                          Show this message and exit.                │
-╰────────────────────────────────────────────────────────────────────────────╯
-╭─ Inspect & validate ───────────────────────────────────────────────────────╮
-│ inspect       Inspect a .bib file structure.                               │
-│ search        Search entries by free text, phrases, or field-scoped terms. │
-│ lint          Validate entries and report issues.                          │
-│ verify        Verify entries against authoritative metadata.               │
-│ capabilities  Show tool capabilities.                                      │
-╰────────────────────────────────────────────────────────────────────────────╯
-╭─ Edit references ──────────────────────────────────────────────────────────╮
-│ normalize     Normalize entries: titles, authors, journals, DOIs,          │
-│               identifier case, and ordering.                               │
-│ convert       Convert between BibTeX/BibLaTeX dialects and formats.         │
-│ enrich        Conservatively fill missing metadata.                        │
-│ ref           Manage individual reference entries → add, import, remove    │
-│ dedupe        Detect and merge duplicate works → check, merge              │
-│ fields        Edit entry fields → rename, move, append, clear, …           │
-│ keys          Work with citation keys → check, generate, repair, rename    │
-│ groups        Manage entry groups → list, add-entry, remove-entry          │
-│ metadata      Inspect and update library metadata → list, set, …           │
-│ tex           Manage linked TeX sources and scan them → list, add, scan, … │
-╰────────────────────────────────────────────────────────────────────────────╯
-╭─ Create ───────────────────────────────────────────────────────────────────╮
-│ init          Create or initialize a .bib library.                         │
-╰────────────────────────────────────────────────────────────────────────────╯
-╭─ Materials (pinax) ────────────────────────────────────────────────────────╮
-│ asset         Fetch and validate Pinax materials → fetch, check            │
-╰────────────────────────────────────────────────────────────────────────────╯
-╭─ Corpus (multiple files) ──────────────────────────────────────────────────╮
-│ corpus        Operate across multiple .bib files → combine, split, batch   │
-╰────────────────────────────────────────────────────────────────────────────╯
-```
 
 ## Development Checks
 

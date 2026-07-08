@@ -118,7 +118,9 @@ A: pynakes supports all standard BibTeX entry types:
 ### Q: Does pynakes support JabRef metadata?
 
 A: Yes. JabRef group metadata is preserved, and `groups` fields can be managed
-with `pynakes groups`. For citation-key patterns pynakes prefers its native
+with `pynakes groups`. A hierarchical group tree (native `group-tree` key,
+projected to/from JabRef's `grouping` block) supports parent/child groups and
+downward-membership propagation. For citation-key patterns pynakes prefers its native
 `key-pattern`/`key-pattern-<entrytype>` keys and falls back to JabRef's
 `keypatterndefault`/`keypattern_<entrytype>` for key generation and DOI imports.
 See the [JabRef compatibility guide](jabref-compatibility.md) for the full

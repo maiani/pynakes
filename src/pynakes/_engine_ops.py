@@ -16,6 +16,7 @@ from pynakes import convert as convert_ops
 from pynakes import dedupe as dedupe_ops
 from pynakes import fields as field_ops
 from pynakes import files as file_ops
+from pynakes import group_tree as group_tree_ops
 from pynakes import groups as group_ops
 from pynakes import importer as importer_ops
 from pynakes import integrity as integrity_ops
@@ -114,6 +115,59 @@ class BibliographyOperations:
         count = group_ops.remove_from_group(self.lib, key, group)
         self._mark(count)
         return count
+
+    def list_tree(self) -> list[group_tree_ops.GroupNode] | None:
+        """Return the group hierarchy tree, or ``None`` if none defined."""
+        return group_tree_ops.list_tree(self.lib)
+
+    def add_group_node(
+        self,
+        name: str,
+        *,
+        parent: str = "",
+        context: int = 2,
+        color: str = "",
+        expanded: bool = True,
+    ) -> bool:
+        """Add a group node to the tree."""
+        ok = group_tree_ops.add_node(
+            self.lib, name, parent=parent, context=context, color=color, expanded=expanded
+        )
+        if ok:
+            self._mark(True)
+        return ok
+
+    def remove_group_node(self, name: str) -> int:
+        """Remove a group node and its descendants from the tree."""
+        count = group_tree_ops.remove_node(self.lib, name)
+        if count:
+            self._mark(True)
+        return count
+
+    def rename_group_node(self, old_name: str, new_name: str) -> bool:
+        """Rename a group node, updating parent references in children."""
+        ok = group_tree_ops.rename_node(self.lib, old_name, new_name)
+        if ok:
+            self._mark(True)
+        return ok
+
+    def move_group_node(self, name: str, new_parent: str) -> bool:
+        """Move a group node to a new parent."""
+        ok = group_tree_ops.move_node(self.lib, name, new_parent)
+        if ok:
+            self._mark(True)
+        return ok
+
+    def update_group_node(self, name: str, **kwargs) -> bool:
+        """Update properties of a group node."""
+        ok = group_tree_ops.update_node(self.lib, name, **kwargs)
+        if ok:
+            self._mark(True)
+        return ok
+
+    def list_entries_in_group_tree(self, group: str, *, strict: bool = False) -> list[str]:
+        """Return entry keys in *group*, including descendants unless *strict*."""
+        return group_tree_ops.list_entries_in_group_tree(self.lib, group, strict=strict)
 
     # --- key operations --------------------------------------------------
 

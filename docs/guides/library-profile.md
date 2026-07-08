@@ -1,12 +1,19 @@
 # Library profile
 
 `@comment{pynakes-meta: ...}` and `@comment{jabref-meta: ...}` can record a
-library's maintenance preferences inside the `.bib` file. `pynakes-meta` is
-pynakes' own canonical schema; `jabref-meta` is a JabRef compatibility
-projection. pynakes merges both namespaces by key (case-insensitively); when
-both define the same key, `pynakes-meta` wins. `normalize` uses these
-preferences as its defaults and `lint` verifies the lintable subset without
-changing the file.
+library's maintenance preferences — and, for `group-tree`, actual library
+content — inside the `.bib` file. `pynakes-meta` is pynakes' own canonical
+schema; `jabref-meta` is a JabRef compatibility projection. pynakes merges both
+namespaces by key (case-insensitively); when both define the same key,
+`pynakes-meta` wins. `normalize` uses these preferences as its defaults and
+`lint` verifies the lintable subset without changing the file.
+
+This page is the complete reference: every `pynakes-meta` key pynakes
+understands, every `jabref-meta` key it recognizes (whether aliased to a native
+key, group storage, or preserved pass-through), and the group-hierarchy schema.
+For the *mechanics* of the two namespaces (routing, tracking, mirror-on-write,
+round-trip fidelity), see the [JabRef compatibility guide](jabref-compatibility.md);
+this page only lists *what* the keys are.
 
 A fresh `pynakes init` library is **pynakes-native**: its settings live in
 `pynakes-meta` and it carries no `jabref-meta` at all. Pass `init --jabref` (or
@@ -14,8 +21,7 @@ run `metadata adopt-jabref` later) to also emit the JabRef projection. On a
 JabRef-tracked file, changing an aliased native key (see below) is **mirrored**
 into its `jabref-meta` counterpart so JabRef never sees a stale value; if the
 two ever disagree, `metadata list` reports the drift (pynakes uses the native
-value). See the [JabRef compatibility guide](jabref-compatibility.md) for the
-full model.
+value).
 
 Boolean values accept `true`/`false`, `on`/`off`, `yes`/`no`,
 `enabled`/`disabled`, or `1`/`0`. List values are comma- or semicolon-separated.
@@ -38,27 +44,31 @@ The older one-comment-per-key and `key:value;` layouts are still read;
 
 ## `pynakes-meta` keys
 
-| Key | Values | Used by |
-| --- | --- | --- |
-| `dialect` | `bibtex` or `biblatex`; aliases JabRef's `databaseType` (read native-first) | engine, `lint`, importer |
-| `sort-order` | Sort criteria, same token grammar as `--sort-by` (e.g. `year:desc,author`); aliases JabRef's `saveOrderConfig` (read native-first) | `normalize` |
-| `key-pattern` | Default citation-key pattern (e.g. `[auth][year][veryshorttitle]`); aliases JabRef's `keypatterndefault` (read native-first) | `keys`, `lint` |
-| `key-pattern-<entrytype>` | Per-entry-type key pattern; aliases JabRef's `keypattern_<entrytype>` (read native-first) | `keys`, `lint` |
-| `normalize-protect-titles` | Boolean; default `true` for `normalize`; `lint` checks it when stored | `normalize`, `lint` |
-| `normalize-title-fields` | List; default `title,booktitle,maintitle,subtitle` | `normalize`, `lint` |
-| `protected-terms` | List of case-sensitive terms | `normalize`, `lint` |
-| `normalize-author-style` | `jabref`, `conservative`, or `none` | `normalize` |
-| `normalize-journal-style` | `abbreviated`, `full`, or `none` (default) | `normalize`, `lint` |
-| `journal-table` | CSV/TSV path with exact journal mappings | `normalize`, `lint` |
-| `ltwa-table` | CSV/TSV path with LTWA word mappings | `normalize`, `lint` |
-| `normalize-dois` | Boolean | `normalize` |
-| `normalize-identifier-case` | Boolean | `normalize` |
-| `normalize-format-metadata` | Boolean | `normalize` |
-| `lint-required-fields` | Fields required on every entry | `lint` |
-| `lint-required-fields-<entrytype>` | Extra fields required on one entry type | `lint` |
-| `tex-sources` | List of TeX files or directories, relative to the `.bib` file | `keys`, `tex scan` |
-| `files-dir` | Path to the Pinax materials directory, relative to the `.bib` file | `fetch`, `files`, engine |
-| `fetch-policy` | Comma-separated list of: `preprint`, `published`, `source`, `bestpdf` (default `bestpdf`) | `fetch` |
+Every category below matches `pynakes.metadata.schema.MetadataCategory`; use it
+to find the operation module that owns a key.
+
+| Key | Category | Values | Used by |
+| --- | --- | --- | --- |
+| `dialect` | library | `bibtex` or `biblatex`; aliases JabRef's `databaseType` (read native-first) | engine, `lint`, importer |
+| `sort-order` | save | Sort criteria, same token grammar as `--sort-by` (e.g. `year:desc,author`); aliases JabRef's `saveOrderConfig` (read native-first) | `normalize` |
+| `key-pattern` | citation-key | Default citation-key pattern (e.g. `[auth][year][veryshorttitle]`); aliases JabRef's `keypatterndefault` (read native-first) | `keys`, `lint` |
+| `key-pattern-<entrytype>` | citation-key | Per-entry-type key pattern; aliases JabRef's `keypattern_<entrytype>` (read native-first) | `keys`, `lint` |
+| `normalize-protect-titles` | normalization | Boolean; default `true` for `normalize`; `lint` checks it when stored | `normalize`, `lint` |
+| `normalize-title-fields` | normalization | List; default `title,booktitle,maintitle,subtitle` | `normalize`, `lint` |
+| `protected-terms` | normalization | List of case-sensitive terms | `normalize`, `lint` |
+| `normalize-author-style` | normalization | `jabref`, `conservative`, or `none` | `normalize` |
+| `normalize-journal-style` | normalization | `abbreviated`, `full`, or `none` (default) | `normalize`, `lint` |
+| `journal-table` | normalization | CSV/TSV path with exact journal mappings | `normalize`, `lint` |
+| `ltwa-table` | normalization | CSV/TSV path with LTWA word mappings | `normalize`, `lint` |
+| `normalize-dois` | normalization | Boolean | `normalize` |
+| `normalize-identifier-case` | normalization | Boolean | `normalize` |
+| `normalize-format-metadata` | normalization | Boolean | `normalize` |
+| `lint-required-fields` | lint | Fields required on every entry | `lint` |
+| `lint-required-fields-<entrytype>` | lint | Extra fields required on one entry type | `lint` |
+| `tex-sources` | usage | List of TeX files or directories, relative to the `.bib` file | `keys`, `tex scan` |
+| `group-tree` | groups | Pipe-delimited group hierarchy; aliases JabRef's `grouping` (read native-first) — see [Grouping](#grouping) | `groups tree`/`add-group`/`remove-group`/`rename-group`/`move-group`/`update-group` |
+| `files-dir` | pinax | Path to the Pinax materials directory, relative to the `.bib` file | `fetch`, `files`, engine |
+| `fetch-policy` | pinax | Comma-separated list of: `preprint`, `published`, `source`, `bestpdf` (default `bestpdf`) | `fetch` |
 
 `lint-required-fields` values are additive to pynakes' built-in requirements,
 which follow the library's `dialect` (`bibtex` or `biblatex`, aliasing JabRef's
@@ -76,7 +86,16 @@ lint-required-fields-article: pages
 }
 ```
 
-## JabRef keys consulted
+## JabRef keys pynakes recognizes
+
+pynakes classifies a `jabref-meta` key one of two ways: **aliased**, where a
+pynakes-native key covers the same concept and is read first; or
+**JabRef-only**, where pynakes has no native equivalent and either decodes the
+value directly or preserves it as an opaque pass-through. An unrecognized
+`jabref-meta` key is still parsed, preserved, and round-tripped byte-for-byte —
+it is simply reported as `unknown` category by `metadata list`.
+
+### Aliased (native-first, JabRef-second)
 
 These JabRef-native keys are read only as **fallbacks** when the pynakes-native
 key is absent (or, for `saveActions`, as a JabRef-only input with no native
@@ -87,14 +106,117 @@ equivalent). A pynakes-native library needs none of them.
 | `keypatterndefault` | `key-pattern` | Citation-key generation and `lint` key-pattern conformance |
 | `keypattern_<entrytype>` | `key-pattern-<entrytype>` | Per-entry-type key generation and `lint` conformance; overrides the default |
 | `databaseType` | `dialect` | engine, `lint`, importer |
-| `saveOrderConfig` | `sort-order` | `normalize` (only its `specified` form) |
+| `saveOrderConfig` | `sort-order` (only its `specified` form) | `normalize` |
+| `grouping` / `groupsTree` / `groups:N ...` (flat) | `group-tree` | `groups tree`/`add-group`/etc — see [Grouping](#grouping) |
 | `saveActions` | *(no native equivalent)* | `normalize` author, DOI, and field-formatter defaults |
 
-JabRef's other metadata is preserved and classified, but it is not part of the
-normalization/lint profile. See the [Usage guide](usage.md#metadata) for
-metadata inspection and safe updates, and the
-[JabRef compatibility guide](jabref-compatibility.md) for the native/JabRef
-alias model and the mirror-on-write behavior.
+### JabRef-only keys (category, no native equivalent)
+
+pynakes recognizes and classifies these; it never invents pynakes-native
+settings for them because they have no meaning outside JabRef, or the native
+schema does not yet cover them.
+
+| Key | Category | Notes |
+| --- | --- | --- |
+| `blgFilePath` | library | Path to the `.blg` BibTeX log JabRef associates with the file |
+| `protectedFlag` | library | JabRef's "protect this library from external changes" flag |
+| `versionDBStructure` | library | JabRef's internal database-structure version marker |
+| `fileDirectory` / `fileDirectory-<library>` (prefix `fileDirectory`) | files | Per-library linked-file search path(s) |
+| `fileDirectoryLatex` | files | Linked-file search path used when compiling with `\bibliography` |
+| `groupsVersion` | groups | Version marker JabRef writes alongside `grouping` |
+| `groups-search-syntax-version` | groups | Version marker for the search-group expression syntax |
+| `bibdesk static groups` | groups | BibDesk-compatibility static-group marker some libraries carry |
+| `selector_<field>` (prefix `selector_`) | selectors | JabRef's per-field autocomplete/selector value lists (e.g. `selector_publisher`) |
+
+## Grouping
+
+pynakes exposes a hierarchical group tree as the native `group-tree` key in
+`pynakes-meta`, distinct from the flat per-entry `groups` field (`@Article{...,
+groups = {Machine Learning; AI Papers}}`), which every entry already carries
+independently of any tree. The tree adds structure *on top of* that field:
+parent/child relationships, per-group color/expansion state, and (for JabRef
+interop) the aggregation semantics JabRef calls "group context".
+
+### Node schema
+
+Each node in the tree (`pynakes.group_tree.GroupNode`) has:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `name` | str | Group display name; matched against entries' `groups` field values |
+| `parent` | str | Parent node's `name`, or `""` for a root-level group |
+| `context` | `0`\|`1`\|`2` | Membership aggregation — see below (default `2`) |
+| `color` | str | Hex RGBA color (e.g. `8a8a8aff`), or `""` |
+| `expanded` | bool | UI expansion state JabRef persists (default `true`) |
+| `description` | str | Free-text note, or `""` |
+| `group_type` | str | `StaticGroup` (default), `KeywordGroup`, `SearchGroup`, or `ExplicitGroup` |
+| `field` | str | `KeywordGroup` only: the BibTeX field the expression matches against |
+| `expression` | str | `KeywordGroup`/`SearchGroup`: the match/search expression |
+| `case_sensitive` | bool | `KeywordGroup` only: whether `expression` matching is case-sensitive |
+| `separator` | str | `KeywordGroup` only: the field's value separator (e.g. for multi-keyword fields) |
+| `search_flags` | str | `SearchGroup` only: JabRef's search-flag string |
+| `entries` | tuple[str, ...] | `ExplicitGroup` only: inline citation keys that are members, independent of any `groups` field |
+
+`context` mirrors JabRef's own group-context flag:
+
+- `0` — independent: membership is exactly the entries tagged with this group.
+- `1` — refining: membership is the intersection with the parent group's
+  membership.
+- `2` — including (default): membership is the union with all subgroup
+  memberships, so tagging an entry in a subgroup also counts it in the parent.
+
+### Native format
+
+The `group-tree` value is a 13-field pipe-delimited node list:
+
+```
+group-tree: name|parent|context|color|expanded|description|group_type|field|expression|case_sensitive|separator|search_flags|entries
+```
+
+(`entries` is itself comma-joined citation keys.) Nodes are separated by `; `
+on a single line; a tree with more than one node is instead written across
+continuation lines (one node per line) inside the consolidated `pynakes-meta`
+comment, so a single-node edit stays a one-line diff:
+
+```bibtex
+@comment{pynakes-meta:
+group-tree: Machine Learning
+  Deep Learning|Machine Learning|2|ff0000ff
+}
+```
+
+Trailing fields may be omitted entirely once every field after them is a
+default value — a plain `StaticGroup` root node can be just its `name` (as
+`Machine Learning` is above), and `Deep Learning` stops right after `color`
+since its `expanded`/`description`/`group_type`/... all take their defaults.
+Literal `\`, `|`, and `;` in a name, color, or description are
+backslash-escaped (`\\`, `\|`, `\;`).
+
+### JabRef interop
+
+`library_group_tree()` reads, in order: the native `group-tree` key; then
+JabRef's modern `grouping` block (or the legacy `groupsTree` spelling); then
+JabRef's flat `groups:N name:context;` comments (one per group, depth encoded
+as `N`). Editing the tree through any `pynakes groups` tree command (`tree`,
+`add-group`, `remove-group`, `rename-group`, `move-group`, `update-group`)
+always writes the canonical native `group-tree` key; on a JabRef-tracked file
+it additionally projects the tree into `grouping` (plus a `groupsVersion`
+marker) so JabRef keeps reading the same hierarchy. All four JabRef group
+types round-trip through both the native format and `grouping` without loss of
+their type-specific parameters.
+
+**Limitation:** pynakes preserves and round-trips `KeywordGroup`/`SearchGroup`
+definitions faithfully, but it does not *evaluate* their expression itself —
+`groups list` and `list_entries_in_group_tree` only ever compute membership
+from entries' flat `groups` field. A `KeywordGroup`/`SearchGroup` node's
+dynamic membership is still something only JabRef computes when it opens the
+file; pynakes commands report it as having no explicit members until JabRef
+(or a future pynakes feature) evaluates the expression.
+
+`groups list`/`add-entry`/`remove-entry` (flat per-entry membership) are
+independent of the tree and never touch `grouping` — see the
+[Usage guide](usage.md#groups) for the full CLI surface, including the CRUD
+commands available on the tree.
 
 ## Lint conformance
 

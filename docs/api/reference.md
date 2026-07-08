@@ -33,6 +33,8 @@ with usage examples, see the [API overview](index.md).
 
 ::: pynakes.groups
 
+::: pynakes.group_tree
+
 ::: pynakes.journals
 
 ::: pynakes.keys

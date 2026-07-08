@@ -74,6 +74,12 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 
 - `pynakes groups add-entry [file] <key> <group>`
 - `pynakes groups remove-entry [file] <key> <group>`
+- `pynakes groups tree [file]` — display the hierarchical group tree
+- `pynakes groups add-group [file] <name> [--parent ...] [--color ...]`
+- `pynakes groups remove-group [file] <name>` — removes group and its children
+- `pynakes groups rename-group [file] <old> <new>`
+- `pynakes groups move-group [file] <name> <new-parent>` (empty string = root)
+- `pynakes groups update-group [file] <name> [--color ...] [--context ...] [--parent ...] [--expanded/--collapsed] [--description ...]`
 - `pynakes keys generate <old-key> [file]` — regenerate one key using the
   preferred pattern (`AuthorYearTitle` by default); linked `tex-sources`
   citations are updated when configured. Use `--all` to regenerate every key.
@@ -317,6 +323,29 @@ pynakes groups list refs.bib --json
 pynakes groups add-entry refs.bib Smith2020 "Machine Learning" --dry-run --diff --json
 pynakes groups add-entry refs.bib Smith2020 "Machine Learning" --json
 ```
+
+### Classify a newly imported entry into the best group
+
+pynakes has no built-in classifier — deliberately, to keep core operations
+offline and deterministic (see [Architecture](architecture.md)). "Automatic"
+grouping on import is instead a pattern for the calling agent: read the entry
+and the candidate groups, judge the best fit, then apply it with `add-entry`.
+
+```bash
+pynakes ref import 10.1145/3377811.3380368 refs.bib --json   # 1. import, note the new key
+pynakes inspect refs.bib --json                              # 2. read the new entry's fields
+pynakes groups tree refs.bib --json                          # 3. read group names + descriptions
+pynakes groups add-entry refs.bib <NewKey> "<Chosen Group>" --dry-run --diff --json
+pynakes groups add-entry refs.bib <NewKey> "<Chosen Group>" --json
+```
+
+`groups tree --json` returns each node's `name` and `description` (plus
+`parent`, for hierarchy) — set a descriptive `description` on your groups with
+`groups update-group refs.bib "<Name>" --description "..."` so an agent has
+enough signal to pick well. `groups add-entry` only writes to the flat
+`groups` field; it works the same whether or not a `group-tree` is defined.
+Run it with `--dry-run --diff` first to sanity-check the agent's pick before
+committing, like any other modifying command.
 
 ### Protect title capitalization
 
