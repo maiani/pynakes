@@ -143,12 +143,12 @@ See the [LLM Integration guide](docs/guides/llm-integration.md) for the full JSO
 
 ## Status
 
-v0.5 is the first public alpha release on PyPI. The single-file bibliography
+v0.5 will be the first public alpha release on PyPI. The single-file bibliography
 engine is feature-complete for this release: parser/writer with byte-for-byte
 round-trip fidelity, all maintenance operations, full JabRef metadata parity,
 and a self-describing agent surface (~1087 tests, ≥90% coverage). The Pinax
-corpus layer is fully implemented including arXiv download, open-access
-published-PDF import, and DOI↔arXiv backfill.
+corpus layer is fully implemented including arXiv download and open-access
+published-PDF import.
 
 Until v1.0, pynakes does **not** guarantee backward compatibility for the Python
 API, CLI syntax, or JSON envelopes. The project aims to keep automation

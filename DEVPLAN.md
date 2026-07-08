@@ -8,131 +8,121 @@ plan.
 This document is the **road to 1.0** and the major releases beyond it.
 Completed work is recorded in [CHANGELOG.md](CHANGELOG.md) and the git log.
 
-## Current state (v0.5 alpha)
+## Current state (v0.5 alpha — shipped)
 
-v0.5 is the first public alpha release. The single-file engine is
-feature-complete for this release; input conformance is verified against the TeX
-Live 2026 baseline (BibTeX 0.99d, BibLaTeX 3.21, Biber 2.21). Until v1.0,
-pynakes does **not** guarantee backward compatibility for the Python API, CLI
-syntax, or JSON envelopes.
+v0.5 is the first public alpha release. The single-file engine is feature-complete
+for this release; input conformance is verified against the TeX Live 2026 baseline
+(BibTeX 0.99d, BibLaTeX 3.21, Biber 2.21). Until v1.0, pynakes does **not**
+guarantee backward compatibility for the Python API, CLI syntax, or JSON envelopes.
 
+Key shipped capabilities:
 - **Parser/writer**: byte-for-byte round-trip fidelity; atomic, re-parse-validated
-  writes; surgical minimal-diff editing. Handles `{…}`/`(…)` entry forms, all
-  `@string`/`@preamble`/`@comment` constructs, Unicode, BibLaTeX inheritance
-  (`crossref`, `xdata`, `xref`, sets), and arbitrary entry types and custom fields.
+  writes; surgical minimal-diff editing. Handles all BibTeX/BibLaTeX constructs
+  including `crossref`/`xdata`/`xref`/sets inheritance.
 - **`engine.Bibliography`**: load → stage → preview/diff → commit lifecycle;
-  external-change detection; `reset()`/`reload()`.
-- **Operations**: `init`, `inspect`, `lint`, `groups`, `keys`
-  (generate/check/repair/rename + JabRef key patterns), `fields` (with `--where`),
-  `convert` (BibTeX↔BibLaTeX + CSL-JSON/RIS/MODS/EndNote), `asset check`, `normalize`
-  (authors, DOIs, months, journals, `saveActions` pipeline, `saveOrderConfig`
-  entry sorting), `ref add`/`ref import`
-  (DOI/arXiv/journal-URL), `search`, `tex scan`, `dedupe`, `verify`/`enrich`
-  (opt-in `--online`; `--published` folds in preprint promotion), `corpus combine`,
-  `corpus split`, `corpus batch`.
-- **Pinax corpus mode (steps 1–11)**: `FileStore`, arXiv download, `asset fetch`
-  command, agent surface, provenance manifest, pinax-aware `corpus combine`/`split`,
-  coordinated key edits, `ref import --fetch`, open-access published-PDF import,
-  dedupe material merge, DOI↔arXiv backfill.
-  See [Pinax implementation steps](#pinax-implementation-steps).
-- **JabRef v5.15 parity**: full `saveActions` formatter suite, complete metadata
-  vocabulary, JabRef key patterns, group management.
-- **Agent-native surface**: structured JSON envelope + exit codes (0/1/2),
-  `--dry-run`/`--diff`/`--json`, structured `plan` objects, self-describing
-  `capabilities`, multi-file `--strict` gate checks, `.pre-commit-hooks.yaml`.
+  external-change detection.
+- **Operations**: `init`, `inspect`, `lint`, `groups`, `keys`, `fields`,
+  `convert`, `normalize`, `ref add`/`ref import`, `search`, `tex scan`,
+  `dedupe`, `verify`/`enrich`, `asset check`/`fetch`, `remove`, `metadata
+  list`/`set`, `corpus combine`/`split`/`batch`.
+- **Pinax corpus mode**: `FileStore`, arXiv download, provenance manifest,
+  open-access PDFs, DOI→arXiv backfill, material merge on dedupe, coordinated
+  key edits, pinax-aware combine/split.
+- **JabRef v5.15 interop**: metadata vocabulary near-full (16 exact + 3 prefix
+  keys recognized; rare/missing keys preserved verbatim); `saveActions` formatter
+  suite partial (15 of ~24 formatters — missing `clear`, `escapeUnderscores`,
+  `escapeAmpersands`, `cleanup_url`, `remove_braces`, `short_doi`,
+  `unprotect_terms`, `minify_name_list`, and `normalize_names`/`clean_up_doi`
+  live off-registry); key patterns partial (10 common markers + 5 modifiers,
+  missing `authorLast`, `authorN`, `authIniN`, `authorIni`, `auth.easy` chain,
+  and formatters-as-modifiers); group management at full parity (all four group
+  types with native `group-tree` metadata and dynamic expression evaluation);
+  `saveOrderConfig` sort implemented but missing crossref-parent hoisting.
+- **Agent-native surface**: structured JSON envelope + exit codes, `--dry-run`/
+  `--diff`/`--json`, structured `plan` objects, `capabilities`, multi-file
+  `--strict` gates, `.pre-commit-hooks.yaml`, shell completion.
 - **Parser conformance**: versioned corpus pinned to TeX Live 2026; differential
   tests against BibTeX 0.99d and Biber 2.21; property-based tests (Hypothesis).
 - **Quality**: ~1087 tests, coverage ≥90%, `ruff` clean, docs site builds.
-- **Refactoring (post-v0.4 quality pass)**: ``engine.py`` split into ``_engine_helpers.py`` /
-  ``_engine_ops.py`` + mixin (~400 lines, within the 500-line convention); ``formatters.py`` split
-  into a ``formatters/`` package; ``_text_utils.py`` consolidates the 7+ brace/quote scanner copies
-  into one; interchange codec deduplication via ``assign_key`` / ``build_bibfile`` in
-  ``_shared.py``; CLI verb-string boilerplate consolidated via ``_verb`` helper; ``BibFile.derive()``
-  replaces the duplicated ``_with_entries`` / ``subset_library`` pattern; ``_metadata_value`` /
-  ``_metadata_list`` / ``_metadata_bool`` moved from ``lint.py`` / ``normalize.py`` into
-  ``metadata.py``; many bugs, type-safety issues, and invariant violations addressed.
+
+---
+
+## Remaining v0.5 polish (pre-ship)
+
+All of these block the v0.5.0 tag. They are small, well-scoped items that
+close gaps identified during pre-release review.
+
+- [ ] **Group tree CLI — `groups list-entries` with descendant propagation.**
+      The `list_entries_in_group_tree` API exists with a `descendants` parameter
+      but is not wired to a CLI command. Wire it as `groups list-entries <name>`
+      with descendant propagation as default (`--strict` opt-in for exact-match
+      only). Dynamic groups (KeywordGroup/SearchGroup) are evaluated at query
+      time.
+- [ ] **`metadata remove` command.** There is `metadata list` and `metadata set`
+      but no way to delete a metadata key from the CLI. Add `metadata remove <key>
+      [file]` to delete a single `pynakes-meta` or `jabref-meta` entry,
+      reporting which namespace it was removed from. Useful for cleaning up
+      orphaned keys without hand-editing the file.
+- [ ] **`init --json` (and all `init` calls from an agent) must never open an
+      editor.** Verify that `typer`/`click` editor launch is suppressed when
+      `--json` is active, and that `init` provides a non-interactive path for
+      every configurable option.
+- [ ] **`verify`/`enrich` help and docs clarify the split.** `verify` checks
+      entries against authoritative online sources without modifying the file.
+      `enrich` updates entries from those sources. Both accept `--published`
+      and `--online` but with different intent. Ensure `--help` and the LLM
+      integration guide make this distinction explicit.
+- [ ] **Final changelog and version bump.** Tag v0.5.0.
+- [ ] **JabRef parity audit correction.** The status reporting in DEVPLAN.md and
+      `capabilities` should reflect the actual state — `saveActions` formatters
+      at 15/24, key patterns at partial, groups at full — not claim "full
+      parity" where gaps exist.
+
+**Done when**: all items checked off; `pytest && ruff` green; CHANGELOG
+updated; version bumped to 0.5.0.
 
 ---
 
 ## Road to 1.0
 
-### v0.5 — First public alpha
+### v0.6 — Generalization and consolidation
 
-Release the feature-complete single-file engine publicly as an alpha, with the
-core Pinax layer implemented through arXiv PDF/source download. The pinned
-conformance baseline is TeX Live 2026. Backward compatibility remains
-explicitly unguaranteed until v1.0.
+Generalize import paths beyond DOI/arXiv and consolidate the engine's
+cross-cutting patterns.
 
-**Deferred Pinax steps**
-- [x] **9. Open-access published PDFs.** DOI → open-access resolver landing the
-      published version at `<citekey>.pdf`, when a resolvable open-access copy
-      exists.
-- [x] **10. Dedupe material merge.** `dedupe` merge reconciles Pinax materials
-      onto the surviving key.
+- **New import paths**: PubMed PMID/PMCID, ISBN, SSRN ID, NBER ID, generalized
+  journal-URL resolver table covering common publisher patterns.
+- **Generalized URL import**: `ref import <url>` auto-detects identifier type
+  from any supported publisher/catalog URL (DOI, arXiv, PubMed, SSRN, NBER,
+  ISBN, nature.com, journals.aps.org, plus the new Elsevier/Springer/Wiley/PLOS
+  patterns) and resolves it through the appropriate provider, normalizing the
+  result into a uniform metadata dict.
+- **Richer `search`**: fuzzy title matching, date-range filtering,
+  "entries missing field X" queries, search-result JSON with match
+  explanations — covers common agent facepalms without writing ad-hoc grep.
+- **Cross-cutting consolidation**: unify interface patterns, reduce duplication
+  across import, identity, and metadata pathways.
 
-**Agent polish**
-- [x] **Citekey shell completion.** Register Click shell-completion callbacks on
-      `remove`, `fetch`, `keys rename`, `groups add-entry`, `groups remove-entry`.
-      The `.bib`-file completer also shows citekeys alongside the filename when a
-      single `.bib` is auto-detectable. Usable via
-      `eval "$(pynakes --show-completion bash)"` / `zsh` / `fish`.
-- [x] **`remove` command.** `pynakes ref remove <bib> <citekey>... [--keep-files]
-      [--dry-run] [--diff] [--json] [--backup]`. Removes entries by citation key
-      through the standard lifecycle. In a pinax, removes the entry's materials
-      from `files-dir` by default (`--keep-files` opts out). Dry-run correctly
-      skips all filesystem side effects.
-- [x] **`--backup` flag on all write commands.** Added to `add`, `dedupe_merge`,
-      `fetch`, `fields`, `groups`, `keys`, `metadata/set`, `used`,
-      `integrity/enrich`. Also fixed `remove` which declared the param but didn't
-      wire it through.
-- [x] **Output emission consolidation.** Migrated `used`, `combine`, and `split`
-      from manual `typer.echo(_json.dumps(...))` to the canonical `_emit()` helper.
-- [x] **Optional `file` argument on all single-file commands.** Every command that
-      takes a `.bib` file argument now auto-detects a single `.bib` in the current
-      directory when omitted.
-
-**Conformance baseline**
-- [x] **Bump pinned TeX Live baseline to 2026.** Update the versioned conformance
-      corpus, differential test expectations, and CI configuration to match
-      TeX Live 2026 (BibTeX 0.99d, BibLaTeX 3.21, Biber 2.21).
-
-**Done when**: alpha scope implemented, tested, and documented;
-`pytest && ruff check src tests` passes; CHANGELOG updated; version bumped to
-0.5.0.
-
----
-
-### v0.6 — Cross-discipline import
-
-Broaden `add` beyond DOI and arXiv with dedicated import paths for:
-
-- **PubMed PMID / PMCID** — via NCBI E-utilities (`eutils.ncbi.nlm.nih.gov`).
-  Covers biomedicine and life sciences (~35M citations).
-- **ISBN** — for books, via Open Library or Google Books API. Covers humanities
-  and social sciences where books dominate.
-- **SSRN ID** — Social Science Research Network papers; the existing
-  `_preprint_identity` already recognizes `ssrn.com` URLs but there is no
-  import path.
-- **NBER ID** — National Bureau of Economic Research working papers (economics).
-- **Generalize journal URL resolver table** — the current
-  `_JOURNAL_URL_RESOLVERS` dict has only two entries (nature.com and
-  journals.aps.org). Add common publisher patterns (Elsevier, Springer, Wiley,
-  PLOS, PubMed Central URLs).
-- Many preprint servers (bioRxiv, medRxiv, ChemRxiv, PsyArXiv, etc.) use
-  dedicated DOI prefixes and already work through the DOI path — document this
-  and add test fixtures.
-
-**Done when**: all import paths implemented, tested, and documented; `pytest &&
-ruff` green; CHANGELOG updated; version bumped to 0.6.0.
+**Done when**: broader import paths and improved `search` implemented, tested,
+and documented; `pytest && ruff` green; CHANGELOG updated; version bumped to 0.6.0.
 
 ---
 
 ### v0.7 — Shared identity
 
-Promote the DOI / arXiv / OpenAlex / ORCID / title machinery (today spread
-across `dedupe`, `verify`, and `add`) into one explicit, tested primitive. It
-is the foundation everything else stands on: `Library` dedup, the `Catalogue`,
-and projection reconciliation all key off a single notion of "the same work".
+Promote the DOI / arXiv / OpenAlex / ORCID / title machinery (currently spread
+across `dedupe`, `verify`, and `add`) into one explicit, tested primitive. This
+is the foundation for dedup, the `Library`, Catalogue, and projection
+reconciliation — everything keys off a single notion of "the same work".
+
+**Must include**:
+- **Identity primitive**: a `Work` type that unifies identifier resolution
+  (DOI, arXiv, OpenAlex ID, ORCID) with metadata fingerprinting (title hashing,
+  author normalization) so any consumer answers "is this the same work?" through
+  one tested path.
+- **Refactor consumers**: `dedupe` uses the primitive for its similarity
+  heuristic; `verify`/`enrich` use it for online-lookup routing; `ref import`
+  uses it to reconcile metadata from multiple sources.
 
 **Done when**: identity primitive shipped with tests and docs; consumers in
 `dedupe`, `verify`, and `add` refactored to use it; `pytest && ruff` green;
@@ -140,21 +130,32 @@ CHANGELOG updated; version bumped to 0.7.0.
 
 ---
 
-### v0.8 — MCP server + Library + Catalogue
+### v0.8 — Multi-bib setup, Library, Catalogue, and MCP server
 
-- **MCP server.** A thin [Model Context Protocol](https://modelcontextprotocol.io)
-  companion on the pinned pynakes API, allowing agents to interrogate a personal
-  corpus. Manuscript-time edits still use the pynakes CLI directly; the MCP
-  server is a query-only layer over the `Library`/`Catalogue`.
-- **`Library` (corpus).** `Library.open(dir)`; `collections()`,
+- **`Library` (corpus)**: `Library.open(dir)`; `collections()`,
   `collection(path)`; cross-file `search`/`find_key`/dedup, reusing the identity
-  primitive from v0.7. A Library holds many pinakes.
-- **`Catalogue` (index).** A derived, rebuildable search index (e.g. SQLite FTS)
+  primitive from v0.7. A Library holds many `.bib` files (many pinakes).
+- **`Catalogue` (index)**: a derived, rebuildable search index (e.g. SQLite FTS)
   over the Library; strictly derived, never a competing source of truth.
+- **MCP server**: a thin [Model Context Protocol](https://modelcontextprotocol.io)
+  companion on the pinned pynakes API, allowing agents to interrogate a personal
+  corpus conversationally — "find papers by X on topic Y", "which entries are
+  missing PDFs", etc. Query-only layer over the `Library`/`Catalogue`.
+- **Agent surface polish**:
+  - **Plan-and-approve workflow**: allow composing multi-step operations
+    (e.g. "dedupe these → normalize → fetch PDFs") into a single structured
+    `plan` that the user approves once.
+  - **Post-hoc change summary**: every mutating command emits a human-readable
+    and machine-parseable summary alongside the diff — "3 keys renamed,
+    12 fields normalized, 2 entries enriched" — so an agent can report what
+    happened without re-parsing the diff.
+- **`Catalogue`-backed rich query CLI**: `search` gains full-text and
+  field-scoped queries against the index, not just raw entry iteration.
 
-**Done when**: MCP server published as a companion package (or optional extra),
-`Library` and `Catalogue` shipped with tests and docs; `pytest && ruff` green;
-CHANGELOG updated; version bumped to 0.8.0.
+**Done when**: `Library` and `Catalogue` shipped with tests and docs; MCP
+server published as a companion package; agent-plan and change-summary
+features shipped; `pytest && ruff` green; CHANGELOG updated; version bumped
+to 0.8.0.
 
 ---
 
@@ -176,7 +177,6 @@ CHANGELOG updated; version bumped to 0.8.0.
 
 - Stable API, semver promise.
 - All eight guiding principles intact; coverage ≥90%; `ruff` clean.
-- Launch posts, Zenodo DOI, JOSS submission after adoption.
 
 **Done when**: 1.0.0 is on PyPI.
 
@@ -195,30 +195,26 @@ Invariants from [docs/guides/architecture.md](docs/guides/architecture.md) and
 6. **The file is the single source of truth; preserve, don't impose.**
 7. **Determinism** — no time/randomness/ordering in core logic; network is
    opt-in and isolated.
-8. **Prefer a native JabRef setting over a pynakes one** — introduce a
-   `pynakes-meta` key only where JabRef has no equivalent.
 
-## What "pynakes 1.0" is
+**What "pynakes 1.0" is**
 
 **A polished, deterministic, single-file maintenance engine — agent-safe,
 losslessly JabRef-compatible — with a pinned public API, released on PyPI.** The
 unit of work is one `Bibliography` (one `.bib`). 1.0 means: it does single-file
 maintenance excellently, covers the JabRef bib-file feature set, promises API
-stability (semver), and is installable.
+stability (semver), and is installable. The multi-bib `Library`, `Catalogue`,
+and MCP server ship in v0.8 as optional companions — they extend reach without
+changing the core.
 
-**Explicitly *not* in 1.0** (deferred to [v2.0](#v20--beyond-10)): the
-multi-file `Library`/`Catalogue` corpus engine, the MCP server, projections as
-`Library` views, and first-class shared identity. Pinax was built in v0.5
-because it is an optional mode of one `Bibliography`; it does not change plain
-`.bib` behavior.
-
----
+**Beyond 1.0** (deferred to [v2.0](#v20--beyond-10)): projections as `Library`
+views with reconciliation, additional interchange formats,
+content-intelligence layers, and the Bimas GUI.
 
 ## v2.0 — Beyond 1.0
 
 These stay **in pynakes** — pure bib-file mechanisms, no application scope —
-but together they are the cross-file corpus layer a downstream application
-builds directly on.
+but together they are the cross-file corpus layer a downstream application builds
+directly on.
 
 - **Projections** — `combine` and `split` formalized as first-class **views of
   the `Library`**, with reconciliation.
@@ -234,94 +230,21 @@ builds directly on.
 
 ---
 
-## Pinax implementation steps
-
-The corpus layer (see [docs/guides/pinax.md](docs/guides/pinax.md)) ships as
-small, independently committable steps — each is code + tests + a `CHANGELOG.md`
-entry and ends green on `pytest && ruff check src tests`. Built one at a time,
-reviewed, then the next.
-
-- [x] **1. `files-dir` + `FileStore` foundation (offline).** Recognize the
-      `files-dir` `pynakes-meta` key; add `filestore.py` (deterministic
-      version-class paths `<citekey>.pdf` / `<citekey>_preprint.pdf` /
-      `<citekey>_preprint/`, directory scan, presence checks); expose
-      `Bibliography.files` (`FileStore | None`). No network.
-- [x] **2. arXiv download core.** Add `fetch.py` (injectable
-      `fetch_arxiv_pdf`/`fetch_arxiv_source`, URL builders, safe tar extraction)
-      and the `FileStore` atomic writers for the preprint PDF and extracted
-      source. Unit-tested with fixtures; no real network.
-- [x] **3. The top-level `fetch` command.** `pynakes asset fetch [target] [file]
-      [--dry-run] [--json]`, with what-to-download governed by the
-      `fetch-preprint`/`fetch-source`/`fetch-published` metadata keys;
-      `Bibliography.ensure_files_dir` + `fetch_materials`; zero-config default
-      `files-dir`; JSON envelope; registration in `cli.py` and `capabilities.py`.
-      *First end-to-end slice.*
-- [x] **4. Agent surface.** `inspect --json` reports per-entry `published_pdf` /
-      `preprint_pdf` / `preprint_source` / `canonical_pdf`; `files check` reports
-      presence/orphans/drift and enforces the unique-key precondition for
-      file-addressing operations.
-- [x] **5. `preprint_canonical` + provenance manifest (Tier 1).**
-      `.pinax/manifest.json` (`source`/`fetched_date`/`sha256`/`refetchable` per
-      artifact, per-entry `preprint_canonical` boolean, default `false`); `fetch`
-      writes it; `canonical_*` resolves from the boolean.
-- [x] **6. Pinax-aware `combine`/`split`.** Each output is a pinax; output
-      entries' materials and per-entry state are plainly copied into their
-      files-dir (no hardlinks); non-destructive — inputs untouched, delete the
-      source to reclaim disk after a split.
-- [x] **7. Coordinated key edits (own design pass).** `keys
-      rename`/`generate`/`repair` move every `<citekey>*` material *in place*
-      (filesystem first, then commit, rollback on failure); `files check --fix`
-      reconciles drift. The only in-place material op, so the riskiest.
-- [x] **8. `add --fetch` for arXiv Pinax materials.** One-step
-      import-and-download for arXiv references, using the existing Pinax fetch
-      policy for preprint PDF/source materials.
-- [x] **9. Open-access published PDFs.** DOI → open-access resolver landing the
-      published version at `<citekey>.pdf`, when a resolvable open-access copy
-      exists.
-- [x] **10. Dedupe material merge.** `dedupe` merge reconciles Pinax materials
-      onto the surviving key.
-- [x] **11. DOI → arXiv backfill.** Extend `enrich --published
-      --online` to reconcile identity both ways: when an entry has a publisher
-      DOI but no resolvable arXiv id, resolve the work via OpenAlex with a
-      Semantic Scholar fallback (injectable fetchers, deterministic cache) and
-      backfill `eprint` (+ `eprinttype`/`archiveprefix` per dialect) so a
-      published-first entry becomes a `fetch-source` target — the source is
-      only reachable through the arXiv id.
-      Lands in `integrity.py`; useful to any library, pinax or not. Spec:
-      [pinax.md](docs/guides/pinax.md) → "Recovering the arXiv source for
-      published papers".
-
-## Out of scope (for the deterministic core)
-
-A database of record, a cloud service, arbitrary shell execution, a GUI (the
-Bimas GUI ships in v2.0 as a separate application, not in the core), a
-reading/annotation experience, and browser/web capture pipelines. Likewise the
-derived-intelligence layers over material **contents** — full-text extraction,
-content search, RAG/embeddings, and rich agent notes/memory — stay *above or
-beside* the core (an opt-in extra such as `pynakes[…]`, or a separate tool),
-never on the deterministic write path.
-
-The line, restated: *attaching and resolving* a reference's materials by
-citation-key convention — the **Pinax** layer — is in scope; *organizing,
-reading, and indexing their contents* is not. See
-[docs/guides/pinax.md](docs/guides/pinax.md).
-
-The MCP server is part of v0.8: a thin companion on the pinned API, not in the
-core.
-
 ## Risks & mitigations
 
 - **`saveActions` format drift** → JabRef is reworking the format toward embedded
   JSON. Parse tolerantly (regex over `field[formatter]`), keep the pinned JabRef
   v5.15 baseline, and audit v6 only once a stable v6 release ships.
+- **`saveActions` formatter suite incomplete** → 9 of ~24 JabRef v5.15 formatters
+  are not yet implemented in `FIELD_FORMATTERS`. Key-pattern markers are also
+  partial (missing `authorLast`, `authorN`, `authIniN`, `authorIni`, `auth.easy`
+  chain, and formatters-as-modifiers). Gap tracked here; fill incrementally.
 - **`saveOrderConfig` sort parity (partial)** → `normalize` honors JabRef's
   order type and `field;descending` criteria, but does **not** yet replicate
   JabRef's rule of hoisting `crossref`-referencing entries ahead of their
   parents (a BibTeX 0.99 processing requirement). A library JabRef would save
   with parents reordered can therefore differ in entry order. Deferred until a
-  crossref-aware pass lands; track here rather than claiming full parity. The
-  `saveActions` formatter suite and metadata vocabulary remain at full v5.15
-  parity.
+  crossref-aware pass lands; track here rather than claiming full parity.
 - **Scope creep** → no application concerns enter the pynakes core. GUIs,
   content-intelligence, and MCP servers ship as optional companions or separate
   releases (v0.8, v2.0).
