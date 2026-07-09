@@ -296,7 +296,18 @@ def parse_native(value: str) -> list[GroupNode]:
 
 
 def _parse_jabref_params(body: str) -> list[str]:
-    """Split a JabRef group body on unescaped semicolons."""
+    """Split a JabRef group body on semicolons, handling both conventions.
+
+    JabRef uses ``;`` as the parameter delimiter, but some exporters and
+    older versions write ``\\;`` instead.  We detect the convention: if the
+    body contains backslash-escaped semicolons but no unescaped ``;`` apart
+    from a possible trailing group terminator, we split on ``\\;`` and
+    unescape each part.
+    """
+    unescaped_idx = _find_unescaped(body, ";")
+    if "\\;" in body and (unescaped_idx == -1 or unescaped_idx == len(body) - 1):
+        parts = body.split("\\;")
+        return [_unescape(p) for p in parts]
     return _split_escaped(body, ";")
 
 

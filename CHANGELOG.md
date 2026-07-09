@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`asset fetch` now accepts per-invocation policy flags.** `--preprint`,
+  `--published`, `--source`, and `--bestpdf` override the metadata
+  `fetch-policy` for a single invocation. When none are given, the metadata
+  setting is used as before. (`fetch_materials` in `_engine_ops.py`,
+  `fetch` in `cli_commands/fetch.py`)
+
+- **`normalize` adopts JabRef metadata as pynakes-native keys.** When a
+  JabRef aliased key (`databaseType`, `saveOrderConfig`, `keypatterndefault`,
+  `keypattern_<type>`, `grouping`) is present without its pynakes-native
+  equivalent (`dialect`, `sort-order`, `key-pattern`, `key-pattern-<type>`,
+  `group-tree`), normalize adds the native key with the translated value.
+  Existing native keys are never overwritten. (`_native_key_for_jabref`,
+  `_native_value_for_jabref` in `metadata/jabref.py`; `normalize_library`
+  in `normalize.py`)
+
+- **`normalize` regenerates citation keys when `normalize-keys: true` is
+  set.** A new `--keys on/off` CLI flag and `normalize-keys` metadata key
+  opt into regenerating every entry key from the configured pattern
+  (`key-pattern` / `keypatterndefault`). The bib entry and any Pinax material
+  files are renamed consistently. (`normalize_library` in `normalize.py`;
+  `normalize` command in `cli_commands/normalize.py`; `_engine_ops.py` wires
+  Pinax renames through `_stage_pinax_renames`)
+
+- **`parse_jabref_grouping` handles both separator conventions.** JabRef's
+  `grouping` metadata uses `;` as parameter delimiter, but some exporters
+  write `\;` instead. The parser now detects and handles both.
+  (`_parse_jabref_params` in `group_tree.py`)
+
 - **Native group-tree metadata with JabRef projection and CRUD CLI.** A new
   `group_tree` module introduces a hierarchical group model stored under the
   `group-tree` key in `pynakes-meta`. The format is a single-line pipe-delimited

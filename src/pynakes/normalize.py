@@ -17,9 +17,17 @@ from pynakes.editing import (
 )
 from pynakes.fields import TITLE_FIELDS
 from pynakes.formatters import FIELD_FORMATTERS
+from pynakes.keys import regenerate_keys as _regenerate_keys
 from pynakes.metadata import metadata_bool, metadata_list, metadata_value
-from pynakes.metadata.jabref import SAVE_ORDER_KEY_FIELDS, library_save_actions, library_sort_order
-from pynakes.model import BibFile
+from pynakes.metadata.jabref import (
+    SAVE_ORDER_KEY_FIELDS,
+    _native_key_for_jabref,
+    _native_value_for_jabref,
+    library_save_actions,
+    library_sort_order,
+    metadata_category,
+)
+from pynakes.model import BibFile, MetadataBlock
 
 # JabRef saveActions formatter keys mapped to pynakes normalization concerns.
 _DOI_FORMATTERS = ("clean_up_doi", "short_doi")
@@ -61,6 +69,7 @@ class NormalizeOptions:
     journal_table: str | None = None
     ltwa_table: str | None = None
     normalize_dois: bool | None = None
+    normalize_keys: bool | None = None
     identifier_case: bool | None = None
     format_metadata: bool | None = None
     # One-off sort override using JabRef field names; each token is
@@ -85,6 +94,8 @@ class NormalizeResult:
     save_action_fields: int = 0
     entry_types: int = 0
     field_names: int = 0
+    keys: int = 0
+    renamed_keys: list[tuple[str, str]] = field(default_factory=list)
     warnings: list[dict[str, str]] = field(default_factory=list)
 
     sort_entries_count: int = 0
@@ -102,6 +113,7 @@ class NormalizeResult:
             "save_action_fields": self.save_action_fields,
             "entry_types": self.entry_types,
             "field_names": self.field_names,
+            "keys": self.keys,
             "sorted_entries": self.sort_entries_count,
         }
 
@@ -218,6 +230,35 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
     opts = options or NormalizeOptions()
     result = NormalizeResult()
 
+    # Adopt JabRef metadata as pynakes-native when the native equivalent is
+    # absent. This ensures that a library created or maintained in JabRef gains
+    # the corresponding pynakes-native keys silently — no explicit migration
+    # step required. Synthetic blocks share the jabref block's raw/comment_index
+    # so the post-normalize consolidation step can find and reposition them.
+    for block in lib.metadata_blocks:
+        if block.namespace != "jabref":
+            continue
+        native_key = _native_key_for_jabref(block.key)
+        if native_key is None:
+            continue
+        if metadata_value(lib, native_key) is not None:
+            continue
+        native_value = _native_value_for_jabref(block.key, block.value)
+        if not native_value:
+            continue
+        lib.pynakes_metadata_blocks.append(
+            MetadataBlock(
+                key=native_key,
+                value=native_value,
+                raw=block.raw,
+                comment_index=block.comment_index,
+                known=True,
+                category=metadata_category(native_key),
+                namespace="pynakes",
+            )
+        )
+        result.warnings.append(f"Adopted JabRef {block.key} as pynakes-native {native_key}")
+
     # JabRef's own saveActions, when present, drive the *defaults* for the
     # functionalities JabRef can express (author-name normalization, DOI
     # cleanup) — per the principle of using a native JabRef setting where one
@@ -280,6 +321,16 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
         sort_entries(lib, criteria)
         result.sort_criteria = criteria
         result.sort_entries_count = len(lib.entries)
+
+    if _resolve_bool(lib, opts.normalize_keys, "keys", False):
+        renames = _regenerate_keys(lib)
+        result.keys = len(renames)
+        result.renamed_keys = renames
+        if renames:
+            details = "; ".join(f"{old} -> {new}" for old, new in renames[:5])
+            if len(renames) > 5:
+                details += f" (and {len(renames) - 5} more)"
+            result.warnings.append(f"Regenerated {len(renames)} key(s): {details}")
 
     return result
 

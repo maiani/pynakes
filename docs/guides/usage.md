@@ -374,6 +374,7 @@ pynakes normalize refs.bib --journal-style full
 pynakes normalize refs.bib --title-protection off
 pynakes normalize refs.bib --doi-normalization off
 pynakes normalize refs.bib --identifier-case off
+pynakes normalize refs.bib --keys on
 ```
 
 Journal source tables:
@@ -400,6 +401,7 @@ keep JabRef's `;` terminator):
 normalize-journal-style: none
 normalize-protect-titles: false
 normalize-identifier-case: false
+normalize-keys: true
 protected-terms: Proceedings,OpenAI
 }
 ```
@@ -412,6 +414,21 @@ JabRef `saveActions` enabled, `normalize` honors them — a `normalize_names`
 formatter on a name field drives author normalization and a
 `clean_up_doi`/`short_doi` formatter on `doi` drives DOI cleanup; their absence
 disables those steps. An explicit flag or a `pynakes-meta` key overrides.
+
+When `normalize` detects a JabRef aliased key whose pynakes-native equivalent
+is absent, it **adopts** the value as a native key — `databaseType` becomes
+`dialect`, `saveOrderConfig` becomes `sort-order`, `keypatterndefault` becomes
+`key-pattern`, `keypattern_<type>` becomes `key-pattern-<type>`,
+and `grouping` becomes `group-tree`.
+Existing native keys are never overwritten.
+
+To regenerate citation keys from the configured pattern, set
+`normalize-keys: true` in `pynakes-meta` or pass `--keys on`. The
+pattern is read from `key-pattern` (native) or
+`keypatterndefault`/`keypattern_<type>` (JabRef fallback). The
+bibliography entry is renamed in the `.bib` file and any Pinax
+material files on disk are renamed consistently. TeX source rewrites
+are handled separately.
 
 ```bibtex
 @comment{jabref-meta: saveActions:enabled;

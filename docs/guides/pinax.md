@@ -312,10 +312,11 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
   `skipped` / `failed` lists; `modified` reflects whether the `.bib` changed (e.g.
   a `files-dir` was recorded), not the downloads themselves.
 
-What `asset fetch` downloads is **governed by metadata**, not a per-invocation flag —
-what a pinax fetches is part of its configuration. A single `fetch-policy` key,
-a comma-separated list of artifact names, selects what to download (it never triggers
-network access on its own during offline operations):
+What `asset fetch` downloads is **governed by metadata** — a single `fetch-policy`
+key, a comma-separated list of artifact names, selects what to download (it never
+triggers network access on its own during offline operations). Per-invocation
+flags `--preprint`, `--published`, `--source`, and `--bestpdf` override the
+metadata policy for one call:
 
 ```bibtex
 @comment{pynakes-meta:
@@ -336,7 +337,8 @@ and the two version classes hang off it by name:
 
 The `fetch-policy` key selects what `asset fetch` downloads: `preprint` the arXiv
 PDF, `source` the arXiv source tree, `published` the `.published.pdf`
-PDF — set in metadata, not per invocation. The `bestpdf` policy (the default)
+PDF — set in metadata (or overridden per invocation with `--preprint`,
+`--published`, `--source`, or `--bestpdf`). The `bestpdf` policy (the default)
 tries the published PDF first and falls back to the preprint when no open-access
 copy is available. Because
 published PDFs are usually paywalled, the preprint is what reliably arrives; the

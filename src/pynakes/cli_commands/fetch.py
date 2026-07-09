@@ -30,6 +30,7 @@ from pynakes.cli_common import (
 )
 from pynakes.engine import Bibliography
 from pynakes.fetch_progress import FetchArtifact, FetchProgressEvent
+from pynakes.metadata import FetchPolicy
 
 _ARTIFACT_LABELS: dict[FetchArtifact, str] = {
     "preprint_pdf": "preprint PDF",
@@ -109,6 +110,20 @@ def fetch(
         None, help="Citation key to fetch (default: all entries with configured missing materials)"
     ),
     file: str | None = bib_file_argument(),
+    preprint: bool | None = typer.Option(
+        None, "--preprint", help="Fetch preprint PDF (overrides metadata fetch-policy)"
+    ),
+    published: bool | None = typer.Option(
+        None, "--published", help="Fetch published PDF (overrides metadata fetch-policy)"
+    ),
+    source: bool | None = typer.Option(
+        None, "--source", help="Fetch arXiv source archive (overrides metadata fetch-policy)"
+    ),
+    bestpdf: bool | None = typer.Option(
+        None,
+        "--bestpdf",
+        help="Best available PDF: published if OA, otherwise preprint (overrides metadata fetch-policy)",
+    ),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show what would be fetched without downloading"
@@ -128,13 +143,31 @@ def fetch(
     except ValueError as exc:
         _emit_error(json_output, "InvalidInput", str(exc))
 
+    flags = [preprint, published, source, bestpdf]
+    policy = (
+        FetchPolicy(
+            preprint=bool(preprint),
+            published=bool(published),
+            source=bool(source),
+            bestpdf=bool(bestpdf),
+        )
+        if any(f is not None for f in flags)
+        else None
+    )
+
     cache = _metadata_cache_dir(file, cache_dir, True)
     if params.json_output:
-        report = coll.fetch_materials(target=target, dry_run=params.dry_run, cache_dir=cache)
+        report = coll.fetch_materials(
+            target=target, policy=policy, dry_run=params.dry_run, cache_dir=cache
+        )
     else:
         with _RichFetchProgress() as progress:
             report = coll.fetch_materials(
-                target=target, dry_run=params.dry_run, cache_dir=cache, progress=progress
+                target=target,
+                policy=policy,
+                dry_run=params.dry_run,
+                cache_dir=cache,
+                progress=progress,
             )
 
     warnings = fetch_report_lines(report)

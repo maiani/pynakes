@@ -93,16 +93,20 @@ Modifying (all support `--dry-run`, `--diff`, `--json`):
 - `pynakes fields protect-title [file] [--field ...] [--term ...] [--where ...]`
 - `pynakes ref add <key> [file] --field name=value ... [--type ...]` — add a manually specified entry
 - `pynakes ref import <identifier> [file] [--key ...] [--key-source generated|provider] [--allow-duplicate] [--fetch] [--cache-dir DIR]` — `<identifier>` is a DOI, DOI URL, arXiv id, or arXiv URL
-- `pynakes asset fetch [key] [file] [--cache-dir DIR]` — download configured
+- `pynakes asset fetch [key] [file] [--preprint] [--published] [--source] [--bestpdf] [--cache-dir DIR]` — download configured
   Pinax materials: arXiv PDF/source and, with a suitable `fetch-policy`,
-  open-access published PDFs for DOI-backed entries. Human runs render download
-  progress on stderr; `--json` stdout remains machine-readable JSON only.
+  open-access published PDFs for DOI-backed entries. Per-invocation flags
+  override the metadata `fetch-policy`; pass none to use metadata. Human
+  runs render download progress on stderr; `--json` stdout remains
+  machine-readable JSON only.
 - `pynakes metadata set [file] <key> <value> [--allow-unknown]`
 - `pynakes metadata adopt-jabref [file]` — start maintaining a JabRef metadata
   projection for a pynakes-native library (mirrors JabRef-native settings into
   `jabref-meta` and keeps them in sync from then on)
-- `pynakes normalize [file]` — includes journal abbreviation/expansion when
-  `--journal-style abbreviated|full` or matching metadata is set
+- `pynakes normalize [file] [--keys on|off]` — includes journal abbreviation/expansion when
+  `--journal-style abbreviated|full` or matching metadata is set; `--keys on`
+  regenerates citation keys from the configured pattern (opt-in; Pinax material
+  files are renamed consistently)
 - `pynakes convert [file] --to biblatex|bibtex`
 - `pynakes dedupe merge [file]` — conservatively merge duplicate-work clusters
 - `pynakes enrich [file] [--online] [--published]` — conservatively fill missing

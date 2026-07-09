@@ -76,6 +76,7 @@ def test_normalize_library_runs_standard_pass() -> None:
         "save_action_fields": 0,
         "entry_types": 0,
         "field_names": 0,
+        "keys": 0,
         "sorted_entries": 0,
     }
 

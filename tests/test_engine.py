@@ -262,3 +262,50 @@ def test_unsnapshotted_raw_entry_counts_as_changed_for_full_rewrite() -> None:
 
     assert coll.changed_entries_count() == 1
     assert "@article{B," in coll.preview()
+
+
+def test_rename_citekey_updates_bib_and_tex(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@comment{pynakes-meta: tex-sources:paper.tex;}\n"
+        "@article{OldKey,\n"
+        "  author = {Alan Turing},\n"
+        "  title = {Computing Machinery and Intelligence},\n"
+        "  year = {1950}\n"
+        "}\n"
+    )
+    tex = tmp_path / "paper.tex"
+    tex.write_text(r"\cite{OldKey} and \citet{OldKey} and \cite{Other}" "\n")
+
+    coll = Bibliography.open(bib)
+    result = coll.rename_citekey("OldKey", "Turing1950Computing")
+
+    assert result["entry_renamed"] is True
+    assert result["tex_occurrences"] == 2
+    coll.commit()
+    assert "@article{Turing1950Computing," in bib.read_text()
+    assert "@article{OldKey," not in bib.read_text()
+    assert r"\cite{Turing1950Computing}" in tex.read_text()
+    assert r"\citet{Turing1950Computing}" in tex.read_text()
+    assert r"\cite{Other}" in tex.read_text()
+
+
+def test_rename_citekey_skips_tex_when_not_requested(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@comment{pynakes-meta: tex-sources:paper.tex;}\n"
+        "@article{OldKey,\n"
+        "  author = {Alan Turing},\n"
+        "  title = {Computing Machinery and Intelligence},\n"
+        "  year = {1950}\n"
+        "}\n"
+    )
+    tex = tmp_path / "paper.tex"
+    tex.write_text(r"\cite{OldKey}" "\n")
+
+    coll = Bibliography.open(bib)
+    result = coll.rename_citekey("OldKey", "Turing1950Computing", rewrite_tex=False)
+
+    assert result["entry_renamed"] is True
+    assert result["tex_occurrences"] == 0
+    assert r"\cite{OldKey}" in tex.read_text()

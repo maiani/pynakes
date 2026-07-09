@@ -22,7 +22,9 @@ from typing import Literal
 
 from pynakes._text_utils import strip_jabref_terminator
 from pynakes.group_tree import format_jabref_grouping as _format_jabref_grouping
+from pynakes.group_tree import parse_jabref_grouping as _parse_jabref_grouping
 from pynakes.group_tree import parse_native as _parse_native_tree
+from pynakes.group_tree import serialize_native as _serialize_native_tree
 from pynakes.metadata import core
 from pynakes.metadata import schema as pynakes_schema
 from pynakes.metadata.core import MetadataUpdate, metadata_value
@@ -374,6 +376,41 @@ def _jabref_key_for_native(native_key: str) -> str | None:
         if lowered.startswith(prefix):
             return jabref_prefix + lowered[len(prefix) :]
     return None
+
+
+def _native_key_for_jabref(jabref_key: str) -> str | None:
+    """Return the pynakes-native key mirroring ``jabref_key``, or ``None`` if unaliased."""
+    lowered = jabref_key.lower()
+    built = {v.lower(): k for k, v in ALIASED_EXACT.items()}
+    if lowered in built:
+        return built[lowered]
+    for native_prefix, jabref_prefix in ALIASED_PREFIX.items():
+        if lowered.startswith(jabref_prefix.lower()):
+            return native_prefix + lowered[len(jabref_prefix) :]
+    return None
+
+
+def _native_value_for_jabref(jabref_key: str, jabref_value: str) -> str:
+    """Translate a JabRef metadata value to its pynakes-native form.
+
+    For most aliased keys the value passes through unchanged; ``saveOrderConfig``
+    is parsed and re-serialised as the native ``sort-order`` grammar.
+    """
+    stripped = strip_jabref_terminator(jabref_value)
+    if jabref_key.lower() == "saveorderconfig":
+        parsed = parse_save_order(stripped)
+        if parsed is None or parsed.order_type != "specified":
+            return ""
+        items = [
+            f"{field}:{'desc' if descending else 'asc'}" for field, descending in parsed.criteria
+        ]
+        return ", ".join(items)
+    if jabref_key.lower() == "grouping":
+        nodes = _parse_jabref_grouping(stripped)
+        if nodes:
+            return _serialize_native_tree(nodes)
+        return ""
+    return stripped
 
 
 def _jabref_value_for_native(native_key: str, native_value: str) -> str:

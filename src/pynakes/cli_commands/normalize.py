@@ -75,6 +75,11 @@ def normalize(
         "--doi-normalization",
         help="metadata, on, or off",
     ),
+    key_normalization: str = typer.Option(
+        "metadata",
+        "--keys",
+        help="Regenerate citation keys from pattern (metadata, on, or off)",
+    ),
     identifier_case: str = typer.Option(
         "metadata",
         "--identifier-case",
@@ -115,6 +120,7 @@ def normalize(
             journal_table=journal_table,
             ltwa_table=ltwa_table,
             normalize_dois=_optional_bool(doi_normalization),
+            normalize_keys=_optional_bool(key_normalization),
             identifier_case=_optional_bool(identifier_case),
             format_metadata=_optional_bool(metadata_formatting),
             sort_by=sort_by,
@@ -137,7 +143,8 @@ def normalize(
         f"titles={sum(report.title_fields.values())}, "
         f"authors={report.authors}, journals={report.journals}, dois={report.dois}, "
         f"months={report.months}, "
-        f"entry_types={report.entry_types}, field_names={report.field_names}"
+        f"entry_types={report.entry_types}, field_names={report.field_names}, "
+        f"keys={report.keys}"
         f"{sort_detail}",
     ]
     if report.warnings:

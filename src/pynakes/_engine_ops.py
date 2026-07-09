@@ -27,9 +27,16 @@ from pynakes import normalize as normalize_ops
 from pynakes._engine_helpers import build_fetch_queue, metadata_fetch_policy, run_fetch_loop
 from pynakes.fetch_progress import FetchProgress
 from pynakes.filestore import FILES_DIR_KEY, resolve_files_dir
+from pynakes.io import save_plain_text
 from pynakes.lint import LintIssue
 from pynakes.lint import lint as lint_lib
+from pynakes.metadata import FetchPolicy
 from pynakes.model import BibEntry
+from pynakes.usage import (
+    iter_tex_files,
+    rename_citation_keys_in_tex,
+    tex_sources_from_metadata,
+)
 
 if TYPE_CHECKING:
     from pynakes.engine import QueryFilter
@@ -199,6 +206,51 @@ class BibliographyOperations:
         self._mark(count)
         return count
 
+    def _rewrite_tex_for_renames(self, renames: list[tuple[str, str]]) -> int:
+        """Rewrite linked TeX files, mapping citation keys per *renames*.
+
+        Returns total occurrence count across all rewritten files.
+        Skips silently when the library has no ``tex-sources`` metadata or
+        ``self.path`` is not set.
+        """
+        if self.path is None or not renames:
+            return 0
+        sources = tex_sources_from_metadata(self.lib, self.path.parent)
+        if not sources:
+            return 0
+        total = 0
+        for tex_path in iter_tex_files(sources):
+            before = tex_path.read_text(encoding="utf-8", errors="replace")
+            after, count = rename_citation_keys_in_tex(before, renames)
+            total += count
+            if count:
+                saved = save_plain_text(after, str(tex_path), encoding="utf-8")
+                if not saved.success:
+                    raise OSError(saved.error or f"Could not write {tex_path}")
+        return total
+
+    def rename_citekey(
+        self,
+        old: str,
+        new: str,
+        *,
+        rewrite_tex: bool = True,
+    ) -> dict:
+        """Rename a citation key consistently.
+
+        Updates the bib entry, Pinax material files, and (when
+        *rewrite_tex* is true) linked TeX source files.  Returns::
+
+            {"entry_renamed": bool, "tex_occurrences": int}
+        """
+        if self.path is None:
+            raise ValueError("rename_citekey requires a bound .bib file path")
+        entry_renamed = bool(self.rename_key(old, new))
+        tex_occurrences = (
+            self._rewrite_tex_for_renames([(old, new)]) if rewrite_tex and entry_renamed else 0
+        )
+        return {"entry_renamed": entry_renamed, "tex_occurrences": tex_occurrences}
+
     # --- field operations ------------------------------------------------
 
     def _where(self, where: str | QueryFilter) -> QueryFilter:
@@ -268,6 +320,9 @@ class BibliographyOperations:
             # every entry appear "missing" to _entry_edits(), which falls back
             # to write_bib() and preserves the new order.
             self._entry_snapshot = {}
+        if report.renamed_keys:
+            self._stage_pinax_renames(report.renamed_keys)
+            self._rewrite_tex_for_renames(report.renamed_keys)
         self._mark(
             bool(
                 report.authors
@@ -277,6 +332,7 @@ class BibliographyOperations:
                 or sum(report.title_fields.values())
                 or report.entry_types
                 or report.field_names
+                or report.keys
                 or report.sort_entries_count
                 or self._consolidate_metadata
             )
@@ -565,6 +621,7 @@ class BibliographyOperations:
         self,
         target: str | None = None,
         *,
+        policy: FetchPolicy | None = None,
         dry_run: bool = False,
         pdf_fetcher: Callable[[str], bytes] | None = None,
         source_fetcher: Callable[[str], bytes] | None = None,
@@ -577,6 +634,8 @@ class BibliographyOperations:
 
         Args:
             target: Optional single citation key to fetch. If None, fetch all.
+            policy: Optional explicit fetch policy. When provided, overrides the
+                library's metadata ``fetch-policy`` setting.
             dry_run: If True, report what would be fetched without downloading.
             pdf_fetcher: Injectable arXiv PDF fetcher for testing.
             source_fetcher: Injectable arXiv source fetcher for testing.
@@ -598,13 +657,16 @@ class BibliographyOperations:
 
         store.ensure_root()
 
-        policy = metadata_fetch_policy(self.lib)
+        if policy is not None:
+            resolved = policy
+        else:
+            resolved = metadata_fetch_policy(self.lib)
 
         entry_queue = build_fetch_queue(self.lib, target)
         fetched, skipped, failed = run_fetch_loop(
             entry_queue,
             store,
-            policy,
+            resolved,
             dry_run,
             pdf_fetcher=pdf_fetcher,
             source_fetcher=source_fetcher,
@@ -616,10 +678,10 @@ class BibliographyOperations:
 
         return {
             "fetch_policy": {
-                "preprint": policy.preprint,
-                "published": policy.published,
-                "source": policy.source,
-                "bestpdf": policy.bestpdf,
+                "preprint": resolved.preprint,
+                "published": resolved.published,
+                "source": resolved.source,
+                "bestpdf": resolved.bestpdf,
             },
             "fetched": fetched,
             "skipped": skipped,
