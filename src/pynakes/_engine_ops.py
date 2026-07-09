@@ -2,44 +2,33 @@
 
 All methods here delegate to the relevant operation modules and call
 ``self._mark()`` / ``self._stage_pinax_renames()`` to record staging state.
-They are split out to keep ``engine.py`` under the 600-line project limit.
 Do not import this module directly; use ``pynakes.engine``.
+
+Group-tree and key operations live in :mod:`pynakes._engine_groups` and
+:mod:`pynakes._engine_keys` respectively.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from pynakes import convert as convert_ops
 from pynakes import dedupe as dedupe_ops
 from pynakes import fields as field_ops
 from pynakes import files as file_ops
-from pynakes import group_tree as group_tree_ops
-from pynakes import groups as group_ops
 from pynakes import importer as importer_ops
 from pynakes import integrity as integrity_ops
 from pynakes import journals as journal_ops
-from pynakes import keys as key_ops
 from pynakes import metadata as metadata_ops
 from pynakes import normalize as normalize_ops
 from pynakes._engine_helpers import build_fetch_queue, metadata_fetch_policy, run_fetch_loop
 from pynakes.fetch_progress import FetchProgress
 from pynakes.filestore import FILES_DIR_KEY, resolve_files_dir
-from pynakes.io import save_plain_text
 from pynakes.lint import LintIssue
 from pynakes.lint import lint as lint_lib
 from pynakes.metadata import FetchPolicy
-from pynakes.model import BibEntry
-from pynakes.usage import (
-    iter_tex_files,
-    rename_citation_keys_in_tex,
-    tex_sources_from_metadata,
-)
-
-if TYPE_CHECKING:
-    from pynakes.engine import QueryFilter
+from pynakes.model import BibEntry, QueryFilter
 
 
 class BibliographyOperations:
@@ -57,14 +46,6 @@ class BibliographyOperations:
     def duplicate_keys(self) -> dict[str, int]:
         """Return duplicate citation-key counts."""
         return self.lib.entries.duplicate_keys()
-
-    def list_groups(self) -> list[str]:
-        """Return all group names in first-seen order."""
-        return group_ops.list_groups(self.lib)
-
-    def list_entries_in_group(self, group: str) -> list[str]:
-        """Return entry keys that belong to ``group``."""
-        return group_ops.list_entries_in_group(self.lib, group)
 
     def files_check(self, roots: list[str | Path] | None = None) -> file_ops.FileCheckReport:
         """Validate JabRef linked files for this bibliography."""
@@ -108,148 +89,6 @@ class BibliographyOperations:
     ) -> integrity_ops.PublishedReport:
         """Check preprint entries for published metadata without modifying."""
         return integrity_ops.check_published(self.lib, online=online, cache_dir=cache_dir)
-
-    # --- group operations -----------------------------------------------
-
-    def add_to_group(self, key: str, group: str) -> int:
-        """Add every entry with ``key`` to ``group``."""
-        count = group_ops.add_to_group(self.lib, key, group)
-        self._mark(count)
-        return count
-
-    def remove_from_group(self, key: str, group: str) -> int:
-        """Remove every entry with ``key`` from ``group``."""
-        count = group_ops.remove_from_group(self.lib, key, group)
-        self._mark(count)
-        return count
-
-    def list_tree(self) -> list[group_tree_ops.GroupNode] | None:
-        """Return the group hierarchy tree, or ``None`` if none defined."""
-        return group_tree_ops.list_tree(self.lib)
-
-    def add_group_node(
-        self,
-        name: str,
-        *,
-        parent: str = "",
-        context: int = 2,
-        color: str = "",
-        expanded: bool = True,
-    ) -> bool:
-        """Add a group node to the tree."""
-        ok = group_tree_ops.add_node(
-            self.lib, name, parent=parent, context=context, color=color, expanded=expanded
-        )
-        if ok:
-            self._mark(True)
-        return ok
-
-    def remove_group_node(self, name: str) -> int:
-        """Remove a group node and its descendants from the tree."""
-        count = group_tree_ops.remove_node(self.lib, name)
-        if count:
-            self._mark(True)
-        return count
-
-    def rename_group_node(self, old_name: str, new_name: str) -> bool:
-        """Rename a group node, updating parent references in children."""
-        ok = group_tree_ops.rename_node(self.lib, old_name, new_name)
-        if ok:
-            self._mark(True)
-        return ok
-
-    def move_group_node(self, name: str, new_parent: str) -> bool:
-        """Move a group node to a new parent."""
-        ok = group_tree_ops.move_node(self.lib, name, new_parent)
-        if ok:
-            self._mark(True)
-        return ok
-
-    def update_group_node(self, name: str, **kwargs) -> bool:
-        """Update properties of a group node."""
-        ok = group_tree_ops.update_node(self.lib, name, **kwargs)
-        if ok:
-            self._mark(True)
-        return ok
-
-    def list_entries_in_group_tree(self, group: str, *, strict: bool = False) -> list[str]:
-        """Return entry keys in *group*, including descendants unless *strict*."""
-        return group_tree_ops.list_entries_in_group_tree(self.lib, group, strict=strict)
-
-    # --- key operations --------------------------------------------------
-
-    def generate_keys(self) -> list[tuple[str, str]]:
-        """Regenerate all citation keys from entry metadata."""
-        renames = key_ops.regenerate_keys(self.lib)
-        self._stage_pinax_renames(renames)
-        self._mark(bool(renames))
-        return renames
-
-    def generate_key(self, key: str) -> tuple[str, str] | None:
-        """Regenerate one citation key from its entry metadata."""
-        rename = key_ops.regenerate_key(self.lib, key)
-        self._stage_pinax_renames([rename] if rename is not None else [])
-        self._mark(rename is not None)
-        return rename
-
-    def repair_keys(self) -> list[tuple[str, str]]:
-        """Repair duplicate citation keys."""
-        renames = key_ops.repair_duplicate_keys(self.lib)
-        self._stage_pinax_renames(renames)
-        self._mark(bool(renames))
-        return renames
-
-    def rename_key(self, old: str, new: str) -> int:
-        """Rename one unique citation key."""
-        count = key_ops.rename_key(self.lib, old, new)
-        self._stage_pinax_renames([(old, new)] if count else [])
-        self._mark(count)
-        return count
-
-    def _rewrite_tex_for_renames(self, renames: list[tuple[str, str]]) -> int:
-        """Rewrite linked TeX files, mapping citation keys per *renames*.
-
-        Returns total occurrence count across all rewritten files.
-        Skips silently when the library has no ``tex-sources`` metadata or
-        ``self.path`` is not set.
-        """
-        if self.path is None or not renames:
-            return 0
-        sources = tex_sources_from_metadata(self.lib, self.path.parent)
-        if not sources:
-            return 0
-        total = 0
-        for tex_path in iter_tex_files(sources):
-            before = tex_path.read_text(encoding="utf-8", errors="replace")
-            after, count = rename_citation_keys_in_tex(before, renames)
-            total += count
-            if count:
-                saved = save_plain_text(after, str(tex_path), encoding="utf-8")
-                if not saved.success:
-                    raise OSError(saved.error or f"Could not write {tex_path}")
-        return total
-
-    def rename_citekey(
-        self,
-        old: str,
-        new: str,
-        *,
-        rewrite_tex: bool = True,
-    ) -> dict:
-        """Rename a citation key consistently.
-
-        Updates the bib entry, Pinax material files, and (when
-        *rewrite_tex* is true) linked TeX source files.  Returns::
-
-            {"entry_renamed": bool, "tex_occurrences": int}
-        """
-        if self.path is None:
-            raise ValueError("rename_citekey requires a bound .bib file path")
-        entry_renamed = bool(self.rename_key(old, new))
-        tex_occurrences = (
-            self._rewrite_tex_for_renames([(old, new)]) if rewrite_tex and entry_renamed else 0
-        )
-        return {"entry_renamed": entry_renamed, "tex_occurrences": tex_occurrences}
 
     # --- field operations ------------------------------------------------
 

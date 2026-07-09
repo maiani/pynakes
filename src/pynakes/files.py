@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from pynakes._text_utils import _split_escaped
 from pynakes.model import BibEntry, BibFile
 
 FILE_FIELD = "file"
@@ -66,31 +67,6 @@ class FileCheckReport:
             "files": [item.to_dict() for item in self.files],
             "issues": [item.to_dict() for item in self.issues],
         }
-
-
-def _split_escaped(value: str, delimiter: str) -> list[str]:
-    """Split ``value`` on unescaped ``delimiter`` characters."""
-    parts: list[str] = []
-    current: list[str] = []
-    escaped = False
-
-    for char in value:
-        if escaped:
-            current.append(char)
-            escaped = False
-            continue
-        if char == "\\":
-            current.append(char)
-            escaped = True
-            continue
-        if char == delimiter:
-            parts.append("".join(current).strip())
-            current = []
-            continue
-        current.append(char)
-
-    parts.append("".join(current).strip())
-    return parts
 
 
 def _unescape_descriptor(value: str) -> str:

@@ -8,10 +8,11 @@ from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 
 from pynakes._identifiers import canonical_doi, normalize_arxiv
+from pynakes._text_utils import _normalize_text, entry_year
 from pynakes.authors import last_name, split_name_list
 from pynakes.editing import set_entry_field, set_entry_type
-from pynakes.importer import entry_arxiv_id, entry_year
-from pynakes.model import BibEntry, BibFile, _normalize_text
+from pynakes.importer import entry_arxiv_id
+from pynakes.model import BibEntry, BibFile
 
 
 @dataclass(frozen=True)

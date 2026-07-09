@@ -10,6 +10,7 @@ Generation is deterministic — the same entry always yields the same key.
 import re
 from collections.abc import Callable
 
+from pynakes._text_utils import entry_year
 from pynakes.authors import ascii_fold as _ascii_fold
 from pynakes.authors import last_name as _last_name
 from pynakes.authors import split_name_list as _split_name_list
@@ -74,9 +75,7 @@ def _first_author_last_name(entry: BibEntry) -> str:
 
 
 def _year(entry: BibEntry) -> str:
-    raw = entry.fields.get("year") or entry.fields.get("date") or ""
-    match = re.search(r"\d{4}", raw)
-    return match.group(0) if match else ""
+    return entry_year(entry)
 
 
 def _first_title_word(entry: BibEntry) -> str:

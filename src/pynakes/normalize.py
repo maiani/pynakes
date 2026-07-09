@@ -27,7 +27,7 @@ from pynakes.metadata.jabref import (
     library_sort_order,
     metadata_category,
 )
-from pynakes.model import BibFile, MetadataBlock
+from pynakes.model import BibEntry, BibFile, MetadataBlock
 
 # JabRef saveActions formatter keys mapped to pynakes normalization concerns.
 _DOI_FORMATTERS = ("clean_up_doi", "short_doi")
@@ -376,7 +376,7 @@ def sort_entries(lib: BibFile, criteria: list[tuple[str, bool]]) -> int:
     return len(lib.entries)
 
 
-def _entry_sort_key(entry, field_name: str) -> tuple:
+def _entry_sort_key(entry: BibEntry, field_name: str) -> tuple:
     """Compute a stable sort key for *entry* on *field_name* (JabRef field name).
 
     JabRef's ``citationkey`` (and the ``bibtexkey``/``key`` aliases) sorts by the

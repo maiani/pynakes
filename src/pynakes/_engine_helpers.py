@@ -6,7 +6,7 @@ public API; importers should use the re-exports in ``engine.py``.
 """
 
 import hashlib
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -158,7 +158,7 @@ def iter_changed_entries(
     entries: list[BibEntry],
     snapshot: dict[int, str | None],
     appended_ids: set[int],
-):
+) -> Generator[tuple[BibEntry, str | None, bool], None, None]:
     """Yield ``(entry, before, missing)`` for each non-appended entry.
 
     ``before`` is the snapshotted ``raw_content`` (may be ``None`` if the entry
@@ -348,7 +348,7 @@ def build_fetch_queue(lib: BibFile, target: str | None) -> list[BibEntry]:
         raise ValueError(
             f"Pinax material addressing requires unique citation keys: {'; '.join(parts)}"
         )
-    return list(lib.entries.values())
+    return lib.entries.values()
 
 
 def run_fetch_loop(

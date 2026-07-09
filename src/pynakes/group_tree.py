@@ -28,6 +28,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from pynakes._text_utils import _split_escaped
 from pynakes.editing import append_delimited_field, remove_entry_field, set_entry_field
 from pynakes.model import BibFile
 
@@ -206,27 +207,6 @@ def _find_unescaped(text: str, char: str) -> int:
             return i
         i += 1
     return -1
-
-
-def _split_escaped(text: str, sep: str) -> list[str]:
-    """Split *text* on *sep* that is not backslash-escaped."""
-    parts: list[str] = []
-    current: list[str] = []
-    i = 0
-    while i < len(text):
-        if text[i] == "\\" and i + 1 < len(text):
-            current.append(text[i])
-            current.append(text[i + 1])
-            i += 2
-        elif text[i] == sep:
-            parts.append("".join(current))
-            current = []
-            i += 1
-        else:
-            current.append(text[i])
-            i += 1
-    parts.append("".join(current))
-    return parts
 
 
 def parse_native(value: str) -> list[GroupNode]:

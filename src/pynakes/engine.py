@@ -11,11 +11,12 @@ Operation methods (field edits, key ops, normalization, import, …) live in
 from this module.
 """
 
-from collections.abc import Callable
+from collections.abc import Generator
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from pynakes import metadata as metadata_ops
+from pynakes._engine_groups import BibliographyGroups
 from pynakes._engine_helpers import (
     CommitResult,
     ExternalModificationError,
@@ -28,6 +29,7 @@ from pynakes._engine_helpers import (
     read_text,
     snapshot_entries,
 )
+from pynakes._engine_keys import BibliographyKeys
 from pynakes._engine_ops import BibliographyOperations
 from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
@@ -35,9 +37,7 @@ from pynakes.diff import generate_diff
 from pynakes.editing import splice_into_text
 from pynakes.filestore import FileStore, PinaxRenameTransaction
 from pynakes.io import load_bib, save_text
-from pynakes.model import BibEntry, BibFile, EntryStore
-
-QueryFilter = Callable[[BibEntry], bool] | None
+from pynakes.model import BibEntry, BibFile, EntryStore, QueryFilter
 
 # Re-export so ``from pynakes.engine import CommitResult, ExternalModificationError`` works.
 __all__ = [
@@ -50,7 +50,7 @@ __all__ = [
 
 
 @dataclass
-class Bibliography(BibliographyOperations):
+class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations):
     """One in-memory bibliography.
 
     A bibliography is a *derived editing buffer*, not a second source of truth. It
@@ -266,7 +266,9 @@ class Bibliography(BibliographyOperations):
         self._fingerprint = fingerprint
         self._clear_staged_edits()
 
-    def _iter_changed_entries(self):
+    def _iter_changed_entries(
+        self,
+    ) -> Generator[tuple[BibEntry, str | None, bool], None, None]:
         """Yield ``(entry, before, missing)`` for every non-appended entry.
 
         Delegates to the module-level :func:`~pynakes._engine_helpers.iter_changed_entries`
@@ -274,7 +276,7 @@ class Bibliography(BibliographyOperations):
         """
         appended_ids = {id(e) for e in self._appended_entries}
         yield from iter_changed_entries(
-            list(self.lib.entries.values()), self._entry_snapshot, appended_ids
+            self.lib.entries.values(), self._entry_snapshot, appended_ids
         )
 
     def _entry_edits(self) -> list[tuple[str, str]] | None:

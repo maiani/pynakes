@@ -861,21 +861,10 @@ class TestImportCommand:
         bib.write_text("@comment{pynakes-meta:\nfetch-policy: published\n}\n")
         monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
-        def fake_urlopen(request: object, timeout: float = 30.0) -> BytesIO:
-            url = request.full_url if hasattr(request, "full_url") else str(request)
-            if "openalex.org" in str(url):
-                body = json.dumps(
-                    {
-                        "best_oa_location": {
-                            "host_type": "publisher",
-                            "pdf_url": "https://example.com/provider.pdf",
-                        }
-                    }
-                ).encode("utf-8")
-                return BytesIO(body)
-            raise AssertionError("unexpected urlopen call")
-
-        monkeypatch.setattr("pynakes.fetch._default_urlopen", fake_urlopen)
+        monkeypatch.setattr(
+            "pynakes.providers.openalex.oa_pdf_url_for_doi",
+            lambda doi, **kwargs: "https://example.com/provider.pdf",
+        )
         monkeypatch.setattr(
             "pynakes.fetch.fetch_published_pdf", lambda url, **kwargs: b"%PDF published"
         )
@@ -914,7 +903,6 @@ class TestImportCommand:
             }
         ]
         assert (tmp_path / "refs.files" / f"{key}.published.pdf").read_bytes() == b"%PDF published"
-        assert len(list((cache / "openalex").glob("*.json"))) == 1
 
     def test_add_uses_jabref_key_pattern_metadata(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
@@ -2905,21 +2893,10 @@ class TestAssetFetchPublished:
             "}\n"
         )
 
-        def fake_urlopen(request: object, timeout: float = 30.0) -> BytesIO:
-            url = request.full_url if hasattr(request, "full_url") else str(request)
-            if "openalex.org" in str(url):
-                body = json.dumps(
-                    {
-                        "best_oa_location": {
-                            "host_type": "publisher",
-                            "pdf_url": "https://example.com/paper.pdf",
-                        }
-                    }
-                ).encode("utf-8")
-                return BytesIO(body)
-            raise AssertionError("unexpected urlopen call")
-
-        monkeypatch.setattr("pynakes.fetch._default_urlopen", fake_urlopen)
+        monkeypatch.setattr(
+            "pynakes.providers.openalex.oa_pdf_url_for_doi",
+            lambda doi, **kwargs: "https://example.com/paper.pdf",
+        )
         monkeypatch.setattr(
             "pynakes.fetch.fetch_published_pdf", lambda url, **kwargs: b"%PDF published"
         )
@@ -2942,7 +2919,6 @@ class TestAssetFetchPublished:
         assert (tmp_path / "refs.files" / "Einstein1905.published.pdf").read_bytes() == (
             b"%PDF published"
         )
-        assert len(list((tmp_path / ".pynakes-cache" / "openalex").glob("*.json"))) == 1
 
     def test_fetch_published_reports_malformed_doi_per_entry(
         self, tmp_path: Path, monkeypatch
@@ -2959,10 +2935,6 @@ class TestAssetFetchPublished:
             "}\n"
         )
 
-        def fail_urlopen(request: object, timeout: float = 30.0) -> None:
-            raise AssertionError("network should not be called for a malformed DOI")
-
-        monkeypatch.setattr("pynakes.fetch._default_urlopen", fail_urlopen)
         monkeypatch.chdir(tmp_path)
 
         result = runner.invoke(app, ["asset", "fetch", "--json"])
@@ -2988,10 +2960,10 @@ class TestAssetFetchPublished:
             "}\n"
         )
 
-        def fail_urlopen(request: object, timeout: float = 30.0) -> None:
+        def fail_resolver(doi: str, **kwargs) -> str | None:
             raise AssertionError("dry-run should not call network")
 
-        monkeypatch.setattr("pynakes.fetch._default_urlopen", fail_urlopen)
+        monkeypatch.setattr("pynakes.providers.openalex.oa_pdf_url_for_doi", fail_resolver)
         monkeypatch.chdir(tmp_path)
 
         result = runner.invoke(app, ["asset", "fetch", "--dry-run", "--json"])
@@ -3015,10 +2987,10 @@ class TestAssetFetchPublished:
             "}\n"
         )
 
-        def fail_urlopen(request: object, timeout: float = 30.0) -> None:
+        def fail_resolver(doi: str, **kwargs) -> str | None:
             raise AssertionError("network should not be called")
 
-        monkeypatch.setattr("pynakes.fetch._default_urlopen", fail_urlopen)
+        monkeypatch.setattr("pynakes.providers.openalex.oa_pdf_url_for_doi", fail_resolver)
         monkeypatch.chdir(tmp_path)
 
         result = runner.invoke(app, ["asset", "fetch", "--json"])

@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pynakes.editing import append_delimited_field, splice_into_text
+from pynakes.groups import GROUPS_DELIM as _GROUPS_DELIM
+from pynakes.groups import GROUPS_JOIN as _GROUPS_JOIN
 from pynakes.metadata import metadata_list_values
 from pynakes.model import BibFile
 
@@ -65,9 +67,6 @@ _TEX_CITE_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Field delimiters by JabRef convention.
-_GROUPS_DELIM = ";"
-_GROUPS_JOIN = "; "
 _KEYWORDS_DELIM = ","
 _KEYWORDS_JOIN = ", "
 

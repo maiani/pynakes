@@ -60,19 +60,6 @@ _JOURNAL_URL_RESOLVERS: list[tuple[re.Pattern[str], Callable[[re.Match[str]], st
 
 KEY_SOURCES = {"generated", "provider"}
 
-_YEAR_RE = re.compile(r"\d{4}")
-
-
-def entry_year(entry: "BibEntry") -> str:
-    """Return the four-digit year an entry carries, or an empty string.
-
-    Checks ``year`` then ``date``; the first four consecutive digits win.
-    """
-    raw = entry.fields.get("year") or entry.fields.get("date") or ""
-    match = _YEAR_RE.search(raw)
-    return match.group(0) if match else ""
-
-
 # Identifier types ``resolve_identifier`` can return. ``journal_url`` is reserved
 # for a future resolver and currently raises ``UnsupportedIdentifierError``.
 DOI = "doi"

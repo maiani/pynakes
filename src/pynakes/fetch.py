@@ -14,7 +14,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path, PurePosixPath
-from urllib.request import urlopen as _default_urlopen
 
 import httpx
 
@@ -346,8 +345,8 @@ def download_published_material(
         raise PublishedPdfFetchError(str(exc)) from exc
     resolver = url_resolver or (
         lambda d: (
-            openalex_oa_pdf_url(d, urlopen=_default_urlopen, cache_dir=cache_dir)
-            or crossref_oa_pdf_url(d, urlopen=_default_urlopen, cache_dir=cache_dir)
+            openalex_oa_pdf_url(d, cache_dir=cache_dir)
+            or crossref_oa_pdf_url(d, cache_dir=cache_dir)
         )
     )
     pdf_url = resolver(normalized)
@@ -429,7 +428,7 @@ def _byte_progress(
     progress: FetchProgress | None,
     key: str,
     artifact: FetchArtifact,
-):
+) -> Callable[[int, int | None], None] | None:
     if progress is None:
         return None
 

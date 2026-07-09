@@ -183,9 +183,5 @@ def save_plain_text(
     backup: bool = True,
     atomic: bool = True,
 ) -> SaveResult:
-    """Save arbitrary text — thin alias for ``save_text(..., validate=False)``.
-
-    .. deprecated::
-        Call :func:`save_text` directly with ``validate=False`` (the default).
-    """
+    """Save arbitrary text — thin alias for ``save_text(..., validate=False)``."""
     return save_text(content, file_path, encoding, backup, atomic, validate=False)

@@ -233,7 +233,7 @@ class LintIssue:
     key: str | None = None
     field: str | None = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         """Serialize the finding to a JSON-friendly dict for CLI output."""
         return {
             "type": self.type,

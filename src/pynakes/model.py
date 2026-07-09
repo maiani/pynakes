@@ -114,11 +114,6 @@ def _unwrap_delimited(value: str) -> str | None:
     return None
 
 
-def is_string_ref(value: str, strings: dict[str, str]) -> bool:
-    """Return True if *value* is a bare @string reference (not a literal)."""
-    return bool(_BARE_IDENTIFIER.fullmatch(value)) and value.lower() in _string_lookup(strings)
-
-
 def undefined_string_references(value: str, strings: dict[str, str]) -> list[str]:
     """Return undefined bare identifiers used by one BibTeX value expression.
 
@@ -269,7 +264,7 @@ class EntryStore:
 
     def values(self) -> list[BibEntry]:
         """Return all entries in order (duplicates included)."""
-        return list(self._entries)
+        return self._entries
 
     def items(self) -> list[tuple[str, BibEntry]]:
         """Return ``(key, entry)`` pairs in order (duplicates included)."""
@@ -358,17 +353,6 @@ class EntryStore:
         dupes = self.duplicate_keys()
         suffix = f", duplicates={dupes}" if dupes else ""
         return f"EntryStore({len(self._entries)} entries{suffix})"
-
-
-def _normalize_text(value: str) -> str:
-    """Lowercase, replace ``&`` with ``and``, strip non-alphanumeric, collapse whitespace.
-
-    Used as a normalisation key for fuzzy comparisons across dedupe, integrity,
-    and journal-title matching. Brace characters are removed first so LaTeX
-    protection does not affect equality.
-    """
-    lowered = value.replace("{", "").replace("}", "").replace("&", "and").lower()
-    return " ".join("".join(ch for ch in lowered if ch.isalnum() or ch.isspace()).split())
 
 
 def _metadata_blocks_to_dict(blocks: list[MetadataBlock]) -> dict[str, str]:
@@ -538,7 +522,7 @@ class BibFile:
             line_ending=self.line_ending,
         )
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         """Serialize the bib file to a JSON-friendly dict."""
         return {
             "entries": self.entries.to_dict(),
@@ -563,3 +547,6 @@ class BibFile:
             f"encoding={self.encoding!r}, "
             f"line_ending={self.line_ending!r})"
         )
+
+
+QueryFilter = Callable[[BibEntry], bool] | None

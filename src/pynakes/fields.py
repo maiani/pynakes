@@ -15,9 +15,7 @@ from pynakes.editing import (
     rename_entry_field,
     set_entry_field,
 )
-from pynakes.model import BibEntry, BibFile
-
-QueryFilter = Callable[[BibEntry], bool] | None
+from pynakes.model import BibEntry, BibFile, QueryFilter
 
 TITLE_FIELDS = ("title", "booktitle", "maintitle", "subtitle")
 

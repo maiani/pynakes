@@ -18,6 +18,7 @@ The two layers:
 import re
 from collections.abc import Callable, Iterable
 
+from pynakes._text_utils import _is_escaped
 from pynakes.model import BibEntry
 
 # Entry header: ``@type{ key ,`` / ``@type( key ,`` — groups the part before the key, the key, and
@@ -30,16 +31,6 @@ _HEADER_RE = re.compile(r"(@[A-Za-z][A-Za-z0-9_:-]*\s*[{(]\s*)([^,\s]*)(\s*,)")
 # the key, braces, or anything else.
 _TYPE_RE = re.compile(r"(@)([A-Za-z][A-Za-z0-9_:-]*)")
 _FIELD_NAME_RE = re.compile(r"([A-Za-z][A-Za-z0-9_:-]*)\s*=")
-
-
-def _is_escaped(text: str, index: int) -> bool:
-    """Return True if the character at *index* is preceded by an odd number of backslashes."""
-    backslashes = 0
-    index -= 1
-    while index >= 0 and text[index] == "\\":
-        backslashes += 1
-        index -= 1
-    return bool(backslashes % 2)
 
 
 # --- locating a field within raw entry text --------------------------------
@@ -190,7 +181,7 @@ def raw_field_value(raw: str, field_name: str) -> str | None:
     return raw[value_start:value_end].strip()
 
 
-def normalize_raw_field_names(raw: str) -> tuple[str, int]:
+def _normalize_raw_field_names(raw: str) -> tuple[str, int]:
     """Lowercase field names in raw entry text, preserving all other bytes."""
     replacements = [
         (start, end, raw[start:end].lower())
@@ -379,7 +370,7 @@ def normalize_entry_field_names(entry: BibEntry) -> int:
     when doing so cannot collapse two distinct field names.
     """
     if entry.raw_content:
-        updated, changed = normalize_raw_field_names(entry.raw_content)
+        updated, changed = _normalize_raw_field_names(entry.raw_content)
         if changed:
             entry.raw_content = updated
         return changed

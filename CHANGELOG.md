@@ -95,6 +95,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Consolidated duplicated escape-aware splitter into `_text_utils.py`.**
+  `_split_escaped` was defined in both `files.py` and `group_tree.py` with
+  slight behavioural differences; the shared flag-based implementation now
+  lives in `_text_utils.py` and both callers import it from there.
+
+- **Engine operation mixins split by domain.** The monolithic
+  `_engine_ops.py` (685 lines) was split into `_engine_groups.py` (91 lines,
+  group-tree operations) and `_engine_keys.py` (96 lines, key operations),
+  with `_engine_ops.py` trimmed to 528 lines. Each file delegates to its
+  matching domain module; `Bibliography` now inherits all three mixins.
+
+- **`_fetch_text` uses httpx by default instead of urllib.** The
+  `_default_urlopen` fallback was removed from `fetch.py`; when no custom
+  `opener` is provided, `_fetch_text` in `providers/_http.py` uses httpx.
+  The urllib path is kept only for backward-compatible custom opener injection.
+
+- **Removed redundant `list()` wrapping around `EntryStore.values()`.**
+  `.values()` already returns a `list[BibEntry]`; the extra `list(...)` was
+  a no-op copy in `engine.py`, `_engine_helpers.py`, and `bibtex_writer.py`.
+
+- **Added missing return type hints on public functions.** Type annotations
+  added for `bib_file_argument`, `bib_file_option`, `cli_discovery.invoke`,
+  `iter_changed_entries`, `_iter_changed_entries`, `_byte_progress`, and
+  `parse_metadata_comment`.
+
+- **`normalize_raw_field_names` made private.** Renamed to
+  `_normalize_raw_field_names` since it is only used internally by
+  `normalize_entry_field_names`.
+
+- **`QueryFilter` type alias centralized in `model.py`.**
+  `fields.py`, `engine.py`, and `_engine_ops.py` now import it from there.
+
+- **Group delimiter constants deduplicated.** `GROUPS_DELIM` and
+  `GROUPS_JOIN` are now exported from `groups.py`; `usage.py` imports
+  them instead of redefining them.
+
+- **`_first_author` / `_first_author_last_name` consolidated.**
+  `integrity.py` now calls `keys._first_author_last_name().lower()` instead
+  of maintaining its own `_first_author`.
+
+- **`_line_number` / `_line_end` moved to `_text_utils.py`.**
+  Previously defined in `bibtex_parser.py`; now shared from `_text_utils.py`.
+
+- **`_normalize_text` moved to `_text_utils.py`.**
+  Previously in `model.py`; now shared from `_text_utils.py`.
+
+- **`EntryStore.values()` no longer wraps in `list()`.** Avoids an O(n)
+  allocation on every call (77 call sites).
+
+- **`is_string_ref` removed from `model.py`.** Dead code — never called
+  anywhere in the codebase.
+
+- **Removed stale `..deprecated::` marker from `save_plain_text`.** The
+  deprecation notice was a copy-paste remnant from `save_text`.
+
 - **`search` results are ranked by match strength by default.** Matches are
   ordered by their strongest matched field — `key` > `title` > `author` >
   other stored fields > `groups`/`abstract` — with file order as a tiebreak,
@@ -132,6 +187,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   using a ``key-pattern`` or ``keypatterndefault`` setting.
 
 ### Fixed
+
+- **Undefined name `Request` in `providers/_http.py`.** The import was renamed
+  to `_UrllibRequest` during the httpx migration but one call site was missed.
+  (`_http.py:91`)
 
 - **`corpus split` no longer crashes routing entries to a materials-less
   destination.** `FileStore.copy_materials_from` used to create the target

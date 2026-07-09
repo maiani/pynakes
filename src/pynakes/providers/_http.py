@@ -7,8 +7,7 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.request import Request
-from urllib.request import urlopen as _default_urlopen
+from urllib.request import Request as _UrllibRequest
 
 import httpx
 
@@ -89,7 +88,7 @@ def fetch_bytes(
             progress=progress,
         )
 
-    request = Request(url, headers=headers)
+    request = _UrllibRequest(url, headers=headers)
     try:
         with opener(request, timeout=timeout) as response:  # type: ignore[arg-type]
             data = response.read()
@@ -209,17 +208,46 @@ def _fetch_text(
     opener: Callable[..., object] | None,
     timeout: float,
 ) -> str | None:
-    open_url = opener or _default_urlopen
-    request = Request(url, headers={"User-Agent": USER_AGENT})
+    if opener is None:
+        return _fetch_text_httpx(url, provider=provider, identifier=identifier, timeout=timeout)
+    request = _UrllibRequest(url, headers={"User-Agent": USER_AGENT})
     try:
-        with open_url(request, timeout=timeout) as response:  # type: ignore[arg-type]
+        with opener(request, timeout=timeout) as response:  # type: ignore[arg-type]
             return response.read().decode("utf-8", errors="replace")
     except HTTPError as exc:
         if exc.code == 404:
             return None
         raise ProviderFetchError(
-            f"{provider} lookup failed for DOI {identifier!r}: HTTP {exc.code}"
+            f"{provider} lookup failed for {identifier!r}: HTTP {exc.code}"
         ) from exc
+    except URLError as exc:
+        reason = getattr(exc, "reason", exc)
+        raise ProviderFetchError(f"{provider} lookup failed for {identifier!r}: {reason}") from exc
+
+
+def _fetch_text_httpx(
+    url: str,
+    *,
+    provider: str,
+    identifier: str,
+    timeout: float,
+) -> str | None:
+    headers = {"User-Agent": USER_AGENT}
+    try:
+        with httpx.Client(follow_redirects=True, timeout=timeout, headers=headers) as client:
+            response = client.get(url)
+            if response.status_code == 404:
+                return None
+            response.raise_for_status()
+            return response.text
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 404:
+            return None
+        raise ProviderFetchError(
+            f"{provider} lookup failed for {identifier!r}: HTTP {exc.response.status_code}"
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise ProviderFetchError(f"{provider} lookup failed for {identifier!r}: {exc}") from exc
     except URLError as exc:
         reason = getattr(exc, "reason", exc)
         raise ProviderFetchError(

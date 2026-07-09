@@ -308,7 +308,7 @@ class AutoBibGroup(TyperGroup):
                 _emit_error(True, "UsageError", exc.format_message())
             raise
 
-    def invoke(self, ctx: click.Context):
+    def invoke(self, ctx: click.Context) -> object:
         """Override :meth:`click.Group.invoke` to catch ``UsageError`` raised during
         subcommand argument parsing (visible in ``standalone_mode=False`` paths such
         as the test runner)."""

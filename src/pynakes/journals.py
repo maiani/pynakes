@@ -19,8 +19,9 @@ from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from pathlib import Path
 
+from pynakes._text_utils import _normalize_text
 from pynakes.editing import set_entry_field
-from pynakes.model import BibEntry, BibFile, _normalize_text
+from pynakes.model import BibEntry, BibFile
 
 JOURNAL_FIELDS = ("journal", "journaltitle")
 ISSN_FIELDS = ("issn", "eissn", "e-issn")

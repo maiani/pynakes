@@ -9,12 +9,12 @@ via the surgical raw-text editing in :mod:`pynakes.editing`.
 from pynakes.editing import append_delimited_field, remove_entry_field, set_entry_field
 from pynakes.model import BibEntry, BibFile
 
-_DELIM = ";"
-_JOIN = "; "
+GROUPS_DELIM = ";"
+GROUPS_JOIN = "; "
 
 
 def _parse_groups(value: str) -> list[str]:
-    return [g.strip() for g in value.split(_DELIM) if g.strip()]
+    return [g.strip() for g in value.split(GROUPS_DELIM) if g.strip()]
 
 
 def entry_groups(entry: BibEntry) -> list[str]:
@@ -48,7 +48,7 @@ def add_to_group(lib: BibFile, key: str, group: str) -> int:
     """
     count = 0
     for entry in lib.entries.get_all(key):
-        if append_delimited_field(entry, "groups", group, _DELIM, _JOIN):
+        if append_delimited_field(entry, "groups", group, GROUPS_DELIM, GROUPS_JOIN):
             count += 1
     return count
 
@@ -66,7 +66,7 @@ def remove_from_group(lib: BibFile, key: str, group: str) -> int:
             continue
         groups.remove(group)
         if groups:
-            set_entry_field(entry, "groups", _JOIN.join(groups))
+            set_entry_field(entry, "groups", GROUPS_JOIN.join(groups))
         else:
             remove_entry_field(entry, "groups")
         count += 1

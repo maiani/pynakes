@@ -5,8 +5,8 @@ without ``raw_content`` falls back to ``modified`` so the writer reconstructs it
 """
 
 from pynakes.editing import (
+    _normalize_raw_field_names,
     append_delimited_field,
-    normalize_raw_field_names,
     raw_field_names,
     remove_entry_field,
     remove_raw_field,
@@ -72,7 +72,7 @@ class TestRawFieldEdits:
 
     def test_normalize_field_names_touches_only_top_level_assignments(self) -> None:
         raw = '@Article{k,\n  TITLE = {Keep "FIELD =" verbatim},\n  DOI = {10.1/x}\n}'
-        normalized, changed = normalize_raw_field_names(raw)
+        normalized, changed = _normalize_raw_field_names(raw)
         assert changed == 2
         assert "  title =" in normalized
         assert "  doi =" in normalized

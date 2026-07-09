@@ -28,12 +28,12 @@ def is_auxiliary_bib_file(path: Path) -> bool:
     return path.name.lower().endswith("notes.bib")
 
 
-def bib_file_argument(help: str = BIB_FILE_HELP):
+def bib_file_argument(help: str = BIB_FILE_HELP) -> typer.Argument:
     """Return the standard optional ``.bib`` positional argument."""
     return typer.Argument(None, help=help)
 
 
-def bib_file_option(help: str = BIB_FILE_HELP):
+def bib_file_option(help: str = BIB_FILE_HELP) -> typer.Option:
     """Return the standard optional ``--file`` option for commands with other positionals."""
     return typer.Option(None, "--file", "-f", help=help)
 

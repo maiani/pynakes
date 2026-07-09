@@ -3,6 +3,7 @@
 import logging
 import re
 
+from pynakes._text_utils import _is_escaped, _line_end, _line_number
 from pynakes.metadata import parse_metadata_comment
 from pynakes.model import (
     BibEntry,
@@ -376,27 +377,3 @@ def _strip_tex_comments(text: str) -> str:
             continue
         output.append(char)
     return "".join(output)
-
-
-def _is_escaped(text: str, index: int) -> bool:
-    """Whether the character at *index* has an odd number of backslashes."""
-    backslashes = 0
-    index -= 1
-    while index >= 0 and text[index] == "\\":
-        backslashes += 1
-        index -= 1
-    return bool(backslashes % 2)
-
-
-def _line_end(text: str, start: int) -> int:
-    """Return the position just after the current physical line."""
-    newline = text.find("\n", start)
-    if newline != -1:
-        return newline + 1
-    carriage_return = text.find("\r", start)
-    return carriage_return + 1 if carriage_return != -1 else len(text)
-
-
-def _line_number(text: str, position: int) -> int:
-    """Return the one-based line number at *position* for any line ending."""
-    return len(text[:position].splitlines()) + 1

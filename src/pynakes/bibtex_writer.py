@@ -59,7 +59,7 @@ def _source_layout_matches(lib: BibFile) -> bool:
     ):
         return False
 
-    current = list(lib.entries.values())
+    current = lib.entries.values()
     if len(entries) != len(current):
         return False
     return all(a is b for a, b in zip(entries, current))

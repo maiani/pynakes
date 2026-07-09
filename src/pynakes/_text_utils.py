@@ -6,6 +6,24 @@ BibTeX values need to be split at their top level (outside any delimited
 group).
 """
 
+import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pynakes.model import BibEntry
+
+_YEAR_RE = re.compile(r"\d{4}")
+
+
+def entry_year(entry: "BibEntry") -> str:
+    """Return the four-digit year an entry carries, or an empty string.
+
+    Checks ``year`` then ``date``; the first four consecutive digits win.
+    """
+    raw = entry.fields.get("year") or entry.fields.get("date") or ""
+    match = _YEAR_RE.search(raw)
+    return match.group(0) if match else ""
+
 
 def _is_escaped(text: str, index: int) -> bool:
     """Return True when the character at *index* is preceded by an odd number of backslashes."""
@@ -82,6 +100,56 @@ def iter_toplevel_splits(
     if tail or not parts:
         parts.append(tail)
     return parts
+
+
+def _normalize_text(value: str) -> str:
+    """Lowercase, replace ``&`` with ``and``, strip non-alphanumeric, collapse whitespace.
+
+    Used as a normalisation key for fuzzy comparisons across dedupe, integrity,
+    and journal-title matching. Brace characters are removed first so LaTeX
+    protection does not affect equality.
+    """
+    lowered = value.replace("{", "").replace("}", "").replace("&", "and").lower()
+    return " ".join("".join(ch for ch in lowered if ch.isalnum() or ch.isspace()).split())
+
+
+def _split_escaped(value: str, delimiter: str) -> list[str]:
+    """Split ``value`` on unescaped ``delimiter`` characters."""
+    parts: list[str] = []
+    current: list[str] = []
+    escaped = False
+
+    for char in value:
+        if escaped:
+            current.append(char)
+            escaped = False
+            continue
+        if char == "\\":
+            current.append(char)
+            escaped = True
+            continue
+        if char == delimiter:
+            parts.append("".join(current).strip())
+            current = []
+            continue
+        current.append(char)
+
+    parts.append("".join(current).strip())
+    return parts
+
+
+def _line_end(text: str, start: int) -> int:
+    """Return the position just after the current physical line."""
+    newline = text.find("\n", start)
+    if newline != -1:
+        return newline + 1
+    carriage_return = text.find("\r", start)
+    return carriage_return + 1 if carriage_return != -1 else len(text)
+
+
+def _line_number(text: str, position: int) -> int:
+    """Return the one-based line number at *position* for any line ending."""
+    return len(text[:position].splitlines()) + 1
 
 
 def strip_jabref_terminator(value: str) -> str:

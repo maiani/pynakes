@@ -24,6 +24,7 @@ from pynakes.metadata.core import (
     PYNAKES_PREFIX,
     DuplicateMetadataError,
     FetchPolicy,
+    MetadataBlock,
     MetadataUpdate,
     consolidate_metadata,
     format_metadata_comment,
@@ -98,7 +99,7 @@ def parse_metadata_comment(
     *,
     raw: str | None = None,
     comment_index: int = -1,
-):
+) -> list[MetadataBlock]:
     """Parse a top-level metadata comment, classifying keys across both namespaces.
 
     Thin wrapper over :func:`pynakes.metadata.core.parse_metadata_comment` that

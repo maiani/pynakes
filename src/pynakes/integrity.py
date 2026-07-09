@@ -13,12 +13,13 @@ from pynakes._identifiers import (
     normalize_arxiv,
     normalize_doi,
 )
-from pynakes.authors import last_name, split_name_list
+from pynakes._text_utils import _normalize_text, entry_year
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.editing import set_entry_field, set_entry_type
-from pynakes.importer import entry_arxiv_id, entry_year
+from pynakes.importer import entry_arxiv_id
+from pynakes.keys import _first_author_last_name
 from pynakes.metadata import library_dialect
-from pynakes.model import BibEntry, BibFile, _normalize_text
+from pynakes.model import BibEntry, BibFile
 from pynakes.providers import arxiv as arxiv_provider
 from pynakes.providers import doi as doi_provider
 from pynakes.providers._http import ProviderFetchError, cache_path
@@ -665,9 +666,7 @@ def _similarity(left: str, right: str) -> float:
 
 
 def _first_author(entry: BibEntry) -> str:
-    raw = entry.fields.get("author") or entry.fields.get("editor") or ""
-    names = split_name_list(raw)
-    return last_name(names[0]).lower() if names else ""
+    return _first_author_last_name(entry).lower()
 
 
 def _journal(entry: BibEntry) -> str:
