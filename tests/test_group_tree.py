@@ -1,6 +1,13 @@
 """Tests for the group tree data model, native format, and CRUD operations."""
 
+import json
+from pathlib import Path
+
+from typer.testing import CliRunner
+
 from pynakes.bibtex_parser import parse_bib
+from pynakes.bibtex_writer import write_bib
+from pynakes.cli import app
 from pynakes.group_tree import (
     GroupNode,
     _ancestor_names,
@@ -970,6 +977,57 @@ def test_list_entries_in_group_tree_explicit_inline() -> None:
     assert "KeyA" in keys
     assert "KeyB" in keys
     assert "C" not in keys
+
+
+# ---------------------------------------------------------------------------
+# CLI: groups list-entries
+# ---------------------------------------------------------------------------
+
+
+def test_groups_list_entries_cli_includes_descendants(tmp_path: Path) -> None:
+    lib = _fresh_lib()
+    add_node(lib, "CS")
+    add_node(lib, "ML", parent="CS")
+    update_node(lib, "ML", group_type="ExplicitGroup", entries=("PaperA",))
+    lib.entries.add(BibEntry(key="PaperA", type="article", fields={}))
+    lib.entries.add(BibEntry(key="PaperB", type="article", fields={"groups": "CS"}))
+    text = write_bib(lib)
+    bib = tmp_path / "refs.bib"
+    bib.write_text(text)
+
+    result = CliRunner().invoke(app, ["groups", "list-entries", str(bib), "CS", "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["action"] == "groups_list_entries"
+    assert data["group"] == "CS"
+    assert data["strict"] is False
+    # Descendant propagation: PaperA (in child ML) and PaperB (in CS itself).
+    assert "PaperA" in data["entries"]
+    assert "PaperB" in data["entries"]
+
+
+def test_groups_list_entries_cli_strict_omits_descendants(tmp_path: Path) -> None:
+    lib = _fresh_lib()
+    add_node(lib, "CS")
+    add_node(lib, "ML", parent="CS")
+    update_node(lib, "ML", group_type="ExplicitGroup", entries=("PaperA",))
+    lib.entries.add(BibEntry(key="PaperA", type="article", fields={}))
+    lib.entries.add(BibEntry(key="PaperB", type="article", fields={"groups": "CS"}))
+    text = write_bib(lib)
+    bib = tmp_path / "refs.bib"
+    bib.write_text(text)
+
+    result = CliRunner().invoke(
+        app, ["groups", "list-entries", str(bib), "CS", "--strict", "--json"]
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["strict"] is True
+    # Strict mode: only PaperB (directly in CS), not PaperA (in ML).
+    assert "PaperA" not in data["entries"]
+    assert "PaperB" in data["entries"]
 
 
 # ---------------------------------------------------------------------------

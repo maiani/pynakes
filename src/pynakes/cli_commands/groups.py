@@ -308,9 +308,43 @@ def groups_update_group(
     _finish_mod(file, action, coll, params, [msg], group=name, **kwargs)
 
 
+def groups_list_entries(
+    file: str | None = bib_file_argument(),
+    name: str = typer.Argument(..., help="Group name"),
+    strict: bool = typer.Option(
+        False, "--strict", help="Exact group match only (default: include descendants)"
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """List entries belonging to a group (with descendant propagation by default)."""
+    file = _resolve_input_bib(file, json_output)
+    lib = load_bib(file)
+    entries = group_tree_ops.list_entries_in_group_tree(lib, name, strict=strict)
+
+    if json_output:
+        typer.echo(
+            json.dumps(
+                {
+                    "status": "success",
+                    "action": "groups_list_entries",
+                    "file": file,
+                    "group": name,
+                    "strict": strict,
+                    "entries": entries,
+                },
+                indent=2,
+            )
+        )
+        return
+
+    desc = " (strict)" if strict else " (with descendants)"
+    typer.echo(f"{name}{desc}: {', '.join(entries) if entries else '(no entries)'}")
+
+
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
     app.command("list")(_safe(groups_list))
+    app.command("list-entries")(_safe(groups_list_entries))
     app.command("add-entry")(_safe(groups_add_entry))
     app.command("remove-entry")(_safe(groups_remove_entry))
     app.command("tree")(_safe(groups_tree))

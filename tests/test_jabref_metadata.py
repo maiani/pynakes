@@ -837,3 +837,61 @@ def test_metadata_adopt_jabref_dry_run_does_not_write(tmp_path: Path) -> None:
     data = json.loads(result.output)
     assert data["dry_run"] is True
     assert bib.read_text() == original
+
+
+def test_metadata_remove_jabref_key(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@comment{jabref-meta: databaseType:biblatex;}\n"
+        "@comment{jabref-meta: protectedflag:true;}\n"
+    )
+
+    result = runner.invoke(app, ["metadata", "remove", str(bib), "databaseType", "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["key"] == "databaseType"
+    assert data["namespace"] == "jabref"
+    assert "databaseType" not in bib.read_text()
+    assert "protectedflag" in bib.read_text()
+
+
+def test_metadata_remove_pynakes_key(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@comment{pynakes-meta:\ndatabaseType: biblatex;\nfiles-dir: refs.files;\n}\n")
+
+    result = runner.invoke(app, ["metadata", "remove", str(bib), "databaseType", "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["key"] == "databaseType"
+    assert data["namespace"] == "pynakes"
+    text = bib.read_text()
+    assert "databaseType" not in text
+    assert "files-dir" in text
+
+
+def test_metadata_remove_absent_key_errors(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{A,\n  title = {T}\n}\n")
+
+    result = runner.invoke(app, ["metadata", "remove", str(bib), "nonexistent", "--json"])
+
+    assert result.exit_code == 1, result.output
+    assert json.loads(result.output)["error"] == "KeyNotFound"
+
+
+def test_metadata_remove_dry_run_does_not_write(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    original = "@comment{jabref-meta: databaseType:biblatex;}\n"
+    bib.write_text(original)
+
+    result = runner.invoke(
+        app, ["metadata", "remove", str(bib), "databaseType", "--dry-run", "--diff", "--json"]
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["dry_run"] is True
+    assert "databaseType" in data["diff"]
+    assert bib.read_text() == original

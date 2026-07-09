@@ -52,21 +52,20 @@ Key shipped capabilities:
 All of these block the v0.5.0 tag. They are small, well-scoped items that
 close gaps identified during pre-release review.
 
-- [ ] **Group tree CLI — `groups list-entries` with descendant propagation.**
-      The `list_entries_in_group_tree` API exists with a `descendants` parameter
-      but is not wired to a CLI command. Wire it as `groups list-entries <name>`
-      with descendant propagation as default (`--strict` opt-in for exact-match
-      only). Dynamic groups (KeywordGroup/SearchGroup) are evaluated at query
-      time.
-- [ ] **`metadata remove` command.** There is `metadata list` and `metadata set`
-      but no way to delete a metadata key from the CLI. Add `metadata remove <key>
-      [file]` to delete a single `pynakes-meta` or `jabref-meta` entry,
-      reporting which namespace it was removed from. Useful for cleaning up
-      orphaned keys without hand-editing the file.
-- [ ] **`init --json` (and all `init` calls from an agent) must never open an
-      editor.** Verify that `typer`/`click` editor launch is suppressed when
-      `--json` is active, and that `init` provides a non-interactive path for
-      every configurable option.
+- [x] **Group tree CLI — `groups list-entries` with descendant propagation.**
+      Wired as `groups list-entries <name>` with descendant propagation as
+      default (`--strict` opt-in for exact-match only). Dynamic groups
+      (KeywordGroup/SearchGroup) are evaluated at query time.
+      (`cli_commands/groups.py`)
+- [x] **`metadata remove` command.** `metadata remove <key> [file]` deletes a
+      single `pynakes-meta` or `jabref-meta` entry, auto-detecting the target
+      namespace or accepting an explicit `--namespace`. Reports which namespace
+      the key was removed from.
+      (`cli_commands/metadata.py`)
+- [x] **`init --json` is fully non-interactive.** The `--json` flag is marked
+      `is_eager=True` to ensure error output is always JSON when requested.
+      All configurable options have a non-interactive CLI path.
+      (`cli_commands/init.py`)
 - [ ] **`verify`/`enrich` help and docs clarify the split.** `verify` checks
       entries against authoritative online sources without modifying the file.
       `enrich` updates entries from those sources. Both accept `--published`

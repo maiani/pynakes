@@ -152,7 +152,9 @@ def init(
         False, "--dry-run", help="Show what would be written without creating the file"
     ),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff of the new file"),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit machine-readable JSON", is_eager=True
+    ),
 ) -> None:
     """Create or initialize a .bib library.
 

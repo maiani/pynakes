@@ -186,6 +186,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now produce lowercased output, which changes generated keys for any library
   using a ``key-pattern`` or ``keypatterndefault`` setting.
 
+- **`groups list-entries <name>` CLI command for group-tree entry queries.**
+  The existing `list_entries_in_group_tree` Python API is now wired to the CLI
+  as `groups list-entries <name>`. Descendant propagation is the default
+  behaviour; pass `--strict` for exact-match-only (JabRef-compatible mode).
+  Dynamic groups (KeywordGroup/SearchGroup) are evaluated at query time.
+  (`cli_commands/groups.py`, `tests/test_group_tree.py`)
+
+- **`metadata remove <key>` CLI command.** `metadata remove <key> [file]`
+  deletes a single `pynakes-meta` or `jabref-meta` entry, auto-detecting the
+  target namespace or accepting an explicit `--namespace`. Reports which
+  namespace the key was removed from. When a key exists in both namespaces,
+  the operation is refused unless `--namespace` disambiguates.
+  (`cli_commands/metadata.py`)
+
+- **`init --json` is fully non-interactive.** The `--json` flag is marked
+  `is_eager=True` so it is parsed first, ensuring error output is always JSON
+  when requested. All configurable options have a non-interactive CLI path.
+  (`cli_commands/init.py`)
+
 ### Fixed
 
 - **Undefined name `Request` in `providers/_http.py`.** The import was renamed

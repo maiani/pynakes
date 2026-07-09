@@ -182,8 +182,76 @@ def metadata_adopt_jabref(
     )
 
 
+def metadata_remove(
+    file: str | None = bib_file_argument(),
+    key: str = typer.Argument(..., help="Metadata key to remove"),
+    namespace: str | None = typer.Option(
+        None,
+        "--namespace",
+        help="Target comment: jabref or pynakes. Default: auto-detect namespace from the key",
+    ),
+    backup: bool = _BACKUP_OPTION,
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Remove one metadata block (jabref-meta or pynakes-meta).
+
+    Reports which namespace the key was removed from. When the key exists in
+    both namespaces, the operation is refused as ambiguous (use --namespace).
+    """
+    file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    if namespace is not None and namespace not in {"jabref", "pynakes"}:
+        _emit_error(
+            json_output,
+            "InvalidNamespace",
+            f"Invalid namespace {namespace!r}; expected jabref or pynakes",
+        )
+    coll = Bibliography.open(file)
+    try:
+        update = coll.remove_metadata(key, namespace=namespace)
+    except metadata_ops.DuplicateMetadataError as exc:
+        _emit_conflict(
+            json_output,
+            "DuplicateMetadata",
+            str(exc),
+            key=exc.key,
+            count=exc.count,
+            options=[
+                {
+                    "id": "specify_namespace",
+                    "description": "Pass --namespace jabref or --namespace pynakes to disambiguate",
+                }
+            ],
+        )
+
+    if update is None:
+        ns_detail = f" in {namespace}-meta" if namespace else ""
+        _emit_error(
+            json_output,
+            "KeyNotFound",
+            f"Metadata key {key!r} not found{ns_detail}",
+        )
+
+    removed_from = f"{update.namespace}-meta"
+    summary = [f"{_verb('remove', params, 'Removed')} {key!r} from {removed_from}."]
+
+    _finish_mod(
+        file,
+        "metadata_remove",
+        coll,
+        params,
+        summary,
+        modified_entries=0,
+        key=update.key,
+        namespace=update.namespace,
+    )
+
+
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
     app.command("list")(_safe(metadata_list))
     app.command("set")(_safe(metadata_set))
+    app.command("remove")(_safe(metadata_remove))
     app.command("adopt-jabref")(_safe(metadata_adopt_jabref))
