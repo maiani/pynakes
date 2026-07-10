@@ -72,10 +72,12 @@ close gaps identified during pre-release review.
       and `--online` but with different intent. Ensure `--help` and the LLM
       integration guide make this distinction explicit.
 - [ ] **Final changelog and version bump.** Tag v0.5.0.
-- [ ] **JabRef parity audit correction.** The status reporting in DEVPLAN.md and
-      `capabilities` should reflect the actual state — `saveActions` formatters
-      at 15/24, key patterns at partial, groups at full — not claim "full
-      parity" where gaps exist.
+- [x] **JabRef parity audit correction.** README.md's "full JabRef metadata
+      parity" replaced with "broad JabRef metadata interop" and a component
+      breakdown. DEVPLAN.md and `capabilities.py` already reflected the actual
+      state accurately (no "full parity" overclaim). Groups continue to be
+      described at full parity (accurate — all four group types with native
+      metadata and dynamic evaluation).
 
 **Done when**: all items checked off; `pytest && ruff` green; CHANGELOG
 updated; version bumped to 0.5.0.

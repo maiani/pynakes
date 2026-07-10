@@ -16,7 +16,7 @@ from pathlib import Path
 
 import typer
 
-from pynakes._text_utils import strip_jabref_terminator
+from pynakes._text_utils import strip_meta_terminator
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     RunParams,
@@ -242,7 +242,7 @@ def init(
     effective = next(
         (e.value for e in entries if e.key.lower() in {"dialect", "databasetype"}), None
     )
-    effective_type = strip_jabref_terminator(effective).lower() if effective else None
+    effective_type = strip_meta_terminator(effective).lower() if effective else None
 
     detail = f" [{effective_type}]" if effective_type else ""
     human = [f"{_verb('create', params)} {file}{detail} with {len(keys)} metadata key(s)."]

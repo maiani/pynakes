@@ -237,18 +237,18 @@ the CLI.
 | Module | Concept it owns |
 | --- | --- |
 | groups.py | JabRef-compatible flat membership stored in an entry groups field. |
-| group_tree.py | Hierarchical group model, native pipeline-delimited format, JabRef `grouping`/`groups:` projection, CRUD operations, and tree-aware entry queries. |
+| group_tree.py | Hierarchical group model, native pipe-delimited format, CRUD operations, and tree-aware entry queries. JabRef group parsers/serializers live in `metadata/jabref.py`. |
 | keys.py | Citation-key generation, validation, duplicate detection/repair, and key renames. |
 | fields.py | Generic field changes, simple predicates, and title capitalization protection. |
 | authors.py | BibTeX name-list splitting, last-name extraction, and conservative/JabRef-style normalization. |
 | importer.py | Reference import: identifier resolution (DOI/arXiv), DOI canonicalization, arXiv normalization/Atom parsing, and entry preparation. It is the DOI and arXiv identifier authority. |
 | filestore.py | Pinax material paths, presence scanning, orphan/drift detection and repair, provenance manifests, material copying, and atomic writes inside a configured `files-dir`. |
 | fetch.py | arXiv material URL construction, injectable PDF/source byte fetchers, safe source archive extraction, and FileStore installation. |
-| metadata/ (core.py, schema.py, jabref.py) | Structured top-level metadata, layered by dependency direction: `core` is the namespace-neutral comment engine (parse/format/set/remove/consolidate); `schema` is pynakes' own canonical key registry and native reads, JabRef-unaware; `jabref` is the compatibility adapter — JabRef's key tables and value grammars, owner/namespace arbitration, and fallback-aware accessors (`library_dialect`, `library_sort_order`). Domain code depends on `schema`'s concepts through `jabref`'s accessors, never on JabRef's literal keys. See the [JabRef compatibility guide](jabref-compatibility.md). |
+| metadata/ (core.py, schema.py, jabref.py) | Structured top-level metadata, layered by dependency direction: `core` is the namespace-neutral comment engine (parse/format/set/remove/consolidate); `schema` is pynakes' own canonical key registry and native reads, JabRef-unaware; `jabref` is the compatibility adapter — JabRef's key tables and value grammars, the JabRef group parsers/serializers (`parse_jabref_grouping`, `format_jabref_grouping`, `parse_jabref_groups_lines`), owner/namespace arbitration, and fallback-aware accessors (`library_dialect`, `library_sort_order`). Domain code depends on `schema`'s concepts through `jabref`'s accessors, never on JabRef's literal keys. See the [JabRef compatibility guide](jabref-compatibility.md). |
 | journals.py | Exact title/ISSN mapping plus LTWA-style journal abbreviation/expansion. |
 | normalize.py | Policy orchestration over title, author, journal, and DOI operations. |
 | convert.py | Conservative BibTeX/BibLaTeX convention conversion. |
-| files.py | Parsing and resolution/validation of JabRef linked-file descriptors. |
+| files.py | Parsing and resolution/validation of BibLaTeX linked-file descriptors. |
 | usage.py | LaTeX/AUX citation extraction, library-usage analysis, tagging, and subset projection. |
 | lint.py | Local structural/semantic findings such as missing required fields, malformed DOI, groups, and duplicate keys. BibLaTeX required-field rules cite the official CTAN BibLaTeX manual, section 2.1 entry types and aliases, as their source of truth. |
 | dedupe.py | Duplicate-work clustering and conflict-first merge planning. |

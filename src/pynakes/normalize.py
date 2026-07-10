@@ -21,11 +21,11 @@ from pynakes.keys import regenerate_keys as _regenerate_keys
 from pynakes.metadata import metadata_bool, metadata_list, metadata_value
 from pynakes.metadata.jabref import (
     SAVE_ORDER_KEY_FIELDS,
-    _native_key_for_jabref,
-    _native_value_for_jabref,
     library_save_actions,
     library_sort_order,
     metadata_category,
+    native_key_for_jabref,
+    native_value_for_jabref,
 )
 from pynakes.model import BibEntry, BibFile, MetadataBlock
 
@@ -238,12 +238,12 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
     for block in lib.metadata_blocks:
         if block.namespace != "jabref":
             continue
-        native_key = _native_key_for_jabref(block.key)
+        native_key = native_key_for_jabref(block.key)
         if native_key is None:
             continue
         if metadata_value(lib, native_key) is not None:
             continue
-        native_value = _native_value_for_jabref(block.key, block.value)
+        native_value = native_value_for_jabref(block.key, block.value)
         if not native_value:
             continue
         lib.pynakes_metadata_blocks.append(

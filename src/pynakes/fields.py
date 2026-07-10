@@ -26,25 +26,52 @@ def _selected(lib: BibFile, where: QueryFilter) -> Iterator[BibEntry]:
             yield entry
 
 
+def _resolve_field_name(entry: BibEntry, name: str) -> str:
+    """Return ``name`` as it actually appears in ``entry.fields``, if present.
+
+    BibTeX field names are case-insensitive, so a caller-supplied name (e.g.
+    copied verbatim from a lint warning) may not match a stored key by-exact
+    (a parsed entry's ``fields`` keys are always lowercase; hand-built ones may
+    keep other casing). Falls back to ``name`` unchanged when no field of that
+    name — in any case — exists on ``entry``.
+    """
+    if name in entry.fields:
+        return name
+    lowered = name.lower()
+    for key in entry.fields:
+        if key.lower() == lowered:
+            return key
+    return name
+
+
 def rename_field(lib: BibFile, old: str, new: str, where: QueryFilter = None) -> int:
     """Rename field ``old`` to ``new`` on matching entries.
 
-    Returns the number of entries changed. Entries already using ``new`` (and
-    lacking ``old``) are left untouched. Modifies ``lib`` in place.
+    ``old`` is matched case-insensitively against each entry's stored field
+    names. Returns the number of entries changed. Entries already using
+    ``new`` (and lacking ``old``) are left untouched. Modifies ``lib`` in place.
     """
-    return sum(rename_entry_field(e, old, new) for e in _selected(lib, where))
+    count = 0
+    for entry in _selected(lib, where):
+        if rename_entry_field(entry, _resolve_field_name(entry, old), new):
+            count += 1
+    return count
 
 
 def move_field(lib: BibFile, old: str, new: str, where: QueryFilter = None) -> int:
     """Move field ``old`` to ``new``, but only where ``new`` is not already set.
 
-    Unlike :func:`rename_field`, this never clobbers an existing target field;
-    entries that already have ``new`` are skipped. Returns the number changed.
+    Both ``old`` and ``new`` are matched case-insensitively against each
+    entry's stored field names. Unlike :func:`rename_field`, this never
+    clobbers an existing target field; entries that already have ``new`` are
+    skipped. Returns the number changed.
     """
     count = 0
     for entry in _selected(lib, where):
-        if old in entry.fields and new not in entry.fields:
-            if rename_entry_field(entry, old, new):
+        actual_old = _resolve_field_name(entry, old)
+        actual_new = _resolve_field_name(entry, new)
+        if actual_old in entry.fields and actual_new not in entry.fields:
+            if rename_entry_field(entry, actual_old, new):
                 count += 1
     return count
 
@@ -59,15 +86,30 @@ def append_field(
 ) -> int:
     """Append ``value`` to a delimited ``field`` on matching entries.
 
-    The field is created if absent; duplicate values are not re-added. Returns
-    the number of entries changed. Modifies ``lib`` in place.
+    ``field`` is matched case-insensitively against each entry's stored field
+    names, so an existing mixed-case field is updated in place rather than
+    duplicated. The field is created (using ``field`` as given) if absent;
+    duplicate values are not re-added. Returns the number of entries changed.
+    Modifies ``lib`` in place.
     """
-    return sum(append_delimited_field(e, field, value, delim, join) for e in _selected(lib, where))
+    count = 0
+    for entry in _selected(lib, where):
+        actual_field = _resolve_field_name(entry, field)
+        if append_delimited_field(entry, actual_field, value, delim, join):
+            count += 1
+    return count
 
 
 def clear_field(lib: BibFile, field: str, where: QueryFilter = None) -> int:
-    """Remove ``field`` from matching entries. Returns the number changed."""
-    return sum(remove_entry_field(e, field) for e in _selected(lib, where))
+    """Remove ``field`` from matching entries, matched case-insensitively.
+
+    Returns the number changed.
+    """
+    count = 0
+    for entry in _selected(lib, where):
+        if remove_entry_field(entry, _resolve_field_name(entry, field)):
+            count += 1
+    return count
 
 
 # --- title capitalization protection ---------------------------------------

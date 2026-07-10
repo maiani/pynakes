@@ -5,7 +5,7 @@ from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 
 from pynakes._calendar import MONTH_ABBR_TO_NAME as COMMON_STRINGS
-from pynakes._text_utils import iter_toplevel_splits, strip_jabref_terminator
+from pynakes._text_utils import iter_toplevel_splits, strip_meta_terminator
 from pynakes.inheritance import Lookup, resolve_entry_fields
 
 # A bare BibTeX string reference: an identifier with no surrounding braces or
@@ -165,7 +165,7 @@ class MetadataBlock:
         this convenience view strips the terminator JabRef appends to
         ``jabref-meta`` values.
         """
-        return strip_jabref_terminator(self.value)
+        return strip_meta_terminator(self.value)
 
     def to_dict(self) -> dict[str, object]:
         """Serialize the block to a JSON-friendly dict."""

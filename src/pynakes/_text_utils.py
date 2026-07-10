@@ -152,12 +152,12 @@ def _line_number(text: str, position: int) -> int:
     return len(text[:position].splitlines()) + 1
 
 
-def strip_jabref_terminator(value: str) -> str:
-    """Return *value* without surrounding whitespace or JabRef's trailing ``;``.
+def strip_meta_terminator(value: str) -> str:
+    """Return *value* without surrounding whitespace or a trailing ``;``.
 
-    JabRef terminates each ``jabref-meta`` value with a semicolon; this strips
-    that terminator (and surrounding whitespace) so callers compare and store
-    the bare payload. Centralizes an idiom shared by the metadata, key-pattern,
-    model, and filestore layers.
+    Both ``jabref-meta`` and ``pynakes-meta`` values may carry a trailing
+    semicolon terminator; this strips it (and surrounding whitespace) so
+    callers compare and store the bare payload.  Centralizes an idiom shared
+    by the metadata, key-pattern, model, and filestore layers.
     """
     return value.strip().rstrip(";").strip()

@@ -39,6 +39,15 @@ class TestRename:
         assert "date" in lib.entries["B"].fields
         assert "year" in lib.entries["A"].fields
 
+    def test_rename_matches_old_name_case_insensitively(self) -> None:
+        # A field name typed with different casing than the stored key (e.g.
+        # copied verbatim from a lint warning) must still be found.
+        lib = parse_bib(_LIB)
+        count = rename_field(lib, "Journal", "eprint")
+        assert count == 1
+        assert lib.entries["A"].fields["eprint"] == "Nature"
+        assert "journal" not in lib.entries["A"].fields
+
 
 class TestMove:
     def test_move_skips_entries_with_existing_target(self) -> None:
@@ -50,6 +59,16 @@ class TestMove:
         assert count == 1  # only B moved; A already has journaltitle
         assert lib.entries["A"].fields["journal"] == "N"
         assert lib.entries["B"].fields["journaltitle"] == "M"
+
+    def test_move_matches_names_case_insensitively(self) -> None:
+        lib = parse_bib(
+            "@article{A,\n  journal = {N},\n  journaltitle = {Existing}\n}\n\n"
+            "@article{B,\n  journal = {M}\n}\n"
+        )
+        count = move_field(lib, "Journal", "JournalTitle")
+        assert count == 1  # only B moved; A's existing journaltitle is respected
+        assert lib.entries["A"].fields["journal"] == "N"
+        assert lib.entries["B"].fields["JournalTitle"] == "M"
 
 
 class TestAppend:
@@ -65,6 +84,13 @@ class TestAppend:
         append_field(lib, "keywords", "physics", where=parse_query("title contains DNA"))
         assert lib.entries["B"].fields["keywords"] == "physics"
 
+    def test_append_matches_existing_field_case_insensitively(self) -> None:
+        lib = parse_bib(_LIB)
+        only_a = parse_query("type = article")
+        count = append_field(lib, "Keywords", "ai", where=only_a)
+        assert count == 1
+        assert lib.entries["A"].fields["keywords"] == "ml, ai"
+
 
 class TestClear:
     def test_clear_removes_field(self) -> None:
@@ -73,6 +99,12 @@ class TestClear:
         assert count == 1
         assert "keywords" not in lib.entries["A"].fields
         assert "keywords = {ml}" not in write_bib(lib)
+
+    def test_clear_matches_field_name_case_insensitively(self) -> None:
+        lib = parse_bib(_LIB)
+        count = clear_field(lib, "Keywords")
+        assert count == 1
+        assert "keywords" not in lib.entries["A"].fields
 
 
 class TestTitleCapitalizationProtection:

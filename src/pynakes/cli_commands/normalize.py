@@ -93,10 +93,10 @@ def normalize(
     sort_by: list[str] | None = typer.Option(
         None,
         "--sort-by",
-        help="Sort entries by a JabRef field name; repeat for secondary keys "
+        help="Sort entries by a BibTeX field name; repeat for secondary keys "
         '(e.g. --sort-by author --sort-by year:desc). Use "citationkey" (or "key") '
         'for the citation key and append ":desc" for descending. "original" keeps '
-        "the current order. Omit to follow the file's JabRef saveOrderConfig.",
+        "the current order. Omit to follow the file's configured sort order.",
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),

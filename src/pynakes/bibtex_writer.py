@@ -70,7 +70,7 @@ def _canonical_layout(lib: BibFile) -> list:
 
     Blocks are emitted as comments, ``@string`` declarations, ``@preamble``,
     then entries — each separated from the previous by a blank line, matching
-    the conventional JabRef arrangement.
+    the conventional BibTeX arrangement.
     """
     le = lib.line_ending
     segments: list[tuple[str, str, object]] = []

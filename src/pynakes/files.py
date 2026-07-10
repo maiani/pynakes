@@ -1,4 +1,4 @@
-"""JabRef linked-file field parsing and validation."""
+"""BibLaTeX linked-file field parsing and validation."""
 
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,7 +12,7 @@ DIRECTORY_KINDS = {"directory", "folder", "dir"}
 
 @dataclass
 class LinkedFile:
-    """One attachment parsed from a JabRef ``file`` field."""
+    """One attachment parsed from a BibLaTeX ``file`` field."""
 
     entry_key: str
     index: int
@@ -70,7 +70,7 @@ class FileCheckReport:
 
 
 def _unescape_descriptor(value: str) -> str:
-    """Unescape JabRef descriptor delimiters while leaving other escapes intact."""
+    """Unescape file descriptor delimiters while leaving other escapes intact."""
     return value.replace("\\;", ";").replace("\\:", ":")
 
 
@@ -79,7 +79,7 @@ def _looks_like_windows_drive(parts: list[str]) -> bool:
 
 
 def parse_file_field(entry: BibEntry) -> list[LinkedFile]:
-    """Parse the JabRef ``file`` field for one entry."""
+    """Parse the BibLaTeX ``file`` field for one entry."""
     value = entry.fields.get(FILE_FIELD)
     if not value:
         return []

@@ -45,8 +45,10 @@ then:
 - **Remove** entries with a single command
 
 All through the standardized lifecycle: load → stage →
-preview/diff → commit. Full JabRef metadata parity, including round-trip
-`saveActions` and group definitions. Every modifying command supports
+preview/diff → commit. Broad JabRef metadata interop — round-trip
+`saveActions` (15/24 formatters), group definitions (full parity with all
+four group types), save-order configuration, and key patterns (partial —
+10 common markers + 5 modifiers). Every modifying command supports
 `--dry-run --diff` before writing, and writes atomically with an optional `.bak` backup.
 
 ### 2. Pinax — the corpus layer
@@ -145,8 +147,8 @@ See the [LLM Integration guide](docs/guides/llm-integration.md) for the full JSO
 
 v0.5 will be the first public alpha release on PyPI. The single-file bibliography
 engine is feature-complete for this release: parser/writer with byte-for-byte
-round-trip fidelity, all maintenance operations, full JabRef metadata parity,
-and a self-describing agent surface (~1087 tests, ≥90% coverage). The Pinax
+round-trip fidelity, all maintenance operations, broad JabRef metadata interop,
+and a self-describing agent surface (~1220 tests, ≥90% coverage). The Pinax
 corpus layer is fully implemented including arXiv download and open-access
 published-PDF import.
 

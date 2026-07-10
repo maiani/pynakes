@@ -277,8 +277,8 @@ def get_capabilities() -> dict:
             "remove_entries",
             "combine_libraries",
             "partition_library",
-            "inspect_jabref_metadata",
-            "update_jabref_metadata",
+            "inspect_metadata",
+            "update_metadata",
             "validate_linked_files",
             "pinax_filestore",
             "pinax_arxiv_download_core",
@@ -298,8 +298,8 @@ def get_capabilities() -> dict:
             "ref": "Add, import (by DOI/arXiv/URL), and remove reference entries "
             "(add, import, remove)",
             "groups": "Manage entry groups and group hierarchy "
-            "(list, add-entry, remove-entry, tree, add-group, remove-group, "
-            "rename-group, move-group)",
+            "(list, list-entries, add-entry, remove-entry, tree, add-group, "
+            "remove-group, rename-group, move-group, update-group)",
             "keys": "Generate, check, rename, and repair citation keys",
             "fields": "Edit fields (rename, move, append, clear, protect-title)",
             "dedupe": "Detect and conservatively merge duplicate works",
@@ -309,7 +309,8 @@ def get_capabilities() -> dict:
             "(--published also promotes preprints and backfills arXiv ids)",
             "tex": "Manage linked TeX sources and scan them for citations "
             "(list, add, remove, clear, scan)",
-            "metadata": "Inspect and update top-level library metadata",
+            "metadata": "Inspect and update top-level library metadata "
+            "(list, set, remove, adopt-jabref)",
             "normalize": "Normalize entries (titles, authors, journals, DOIs, "
             "identifier case, ordering) per the library's configured settings",
             "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "

@@ -11,7 +11,7 @@ policy, not schema, and belongs on the JabRef side instead.
 
 from typing import Literal
 
-from pynakes._text_utils import strip_jabref_terminator
+from pynakes._text_utils import strip_meta_terminator
 from pynakes.metadata.core import metadata_list, metadata_value
 from pynakes.model import BibFile
 
@@ -88,7 +88,7 @@ def validate_metadata_value(key: str, value: str) -> None:
     whose grammar pynakes does not define) are accepted without validation.
     """
     normalized_key = key.strip().lower()
-    stripped = strip_jabref_terminator(value)
+    stripped = strip_meta_terminator(value)
 
     # Dialect must be bibtex or biblatex (both the native and JabRef key).
     if normalized_key in {"dialect", "databasetype"}:

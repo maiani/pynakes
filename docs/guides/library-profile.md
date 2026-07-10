@@ -47,28 +47,28 @@ The older one-comment-per-key and `key:value;` layouts are still read;
 Every category below matches `pynakes.metadata.schema.MetadataCategory`; use it
 to find the operation module that owns a key.
 
-| Key | Category | Values | Used by |
-| --- | --- | --- | --- |
-| `dialect` | library | `bibtex` or `biblatex`; aliases JabRef's `databaseType` (read native-first) | engine, `lint`, importer |
-| `sort-order` | save | Sort criteria, same token grammar as `--sort-by` (e.g. `year:desc,author`); aliases JabRef's `saveOrderConfig` (read native-first) | `normalize` |
-| `key-pattern` | citation-key | Default citation-key pattern (e.g. `[auth][year][veryshorttitle]`); aliases JabRef's `keypatterndefault` (read native-first) | `keys`, `lint` |
-| `key-pattern-<entrytype>` | citation-key | Per-entry-type key pattern; aliases JabRef's `keypattern_<entrytype>` (read native-first) | `keys`, `lint` |
-| `normalize-protect-titles` | normalization | Boolean; default `true` for `normalize`; `lint` checks it when stored | `normalize`, `lint` |
-| `normalize-title-fields` | normalization | List; default `title,booktitle,maintitle,subtitle` | `normalize`, `lint` |
-| `protected-terms` | normalization | List of case-sensitive terms | `normalize`, `lint` |
-| `normalize-author-style` | normalization | `jabref`, `conservative`, or `none` | `normalize` |
-| `normalize-journal-style` | normalization | `abbreviated`, `full`, or `none` (default) | `normalize`, `lint` |
-| `journal-table` | normalization | CSV/TSV path with exact journal mappings | `normalize`, `lint` |
-| `ltwa-table` | normalization | CSV/TSV path with LTWA word mappings | `normalize`, `lint` |
-| `normalize-dois` | normalization | Boolean | `normalize` |
-| `normalize-identifier-case` | normalization | Boolean | `normalize` |
-| `normalize-format-metadata` | normalization | Boolean | `normalize` |
-| `lint-required-fields` | lint | Fields required on every entry | `lint` |
-| `lint-required-fields-<entrytype>` | lint | Extra fields required on one entry type | `lint` |
-| `tex-sources` | usage | List of TeX files or directories, relative to the `.bib` file | `keys`, `tex scan` |
-| `group-tree` | groups | Pipe-delimited group hierarchy; aliases JabRef's `grouping` (read native-first) — see [Grouping](#grouping) | `groups tree`/`add-group`/`remove-group`/`rename-group`/`move-group`/`update-group` |
-| `files-dir` | pinax | Path to the Pinax materials directory, relative to the `.bib` file | `fetch`, `files`, engine |
-| `fetch-policy` | pinax | Comma-separated list of: `preprint`, `published`, `source`, `bestpdf` (default `bestpdf`) | `fetch` |
+| Key | Category | Values | Used by | Jabref equivalent |
+| --- | --- | --- | --- | --- |
+| `dialect` | library | `bibtex` or `biblatex`; aliases JabRef's `databaseType` (read native-first) | engine, `lint`, importer | `databaseType` |
+| `sort-order` | save | Sort criteria, same token grammar as `--sort-by` (e.g. `year:desc,author`); aliases JabRef's `saveOrderConfig` (read native-first) | `normalize` | `saveOrderConfig` |
+| `key-pattern` | citation-key | Default citation-key pattern (e.g. `[auth][year][veryshorttitle]`); aliases JabRef's `keypatterndefault` (read native-first) | `keys`, `lint` | `keypatterndefault` |
+| `key-pattern-<entrytype>` | citation-key | Per-entry-type key pattern; aliases JabRef's `keypattern_<entrytype>` (read native-first) | `keys`, `lint` | `keypattern_<entrytype>` |
+| `normalize-protect-titles` | normalization | Boolean; default `true` for `normalize`; `lint` checks it when stored | `normalize`, `lint` | — |
+| `normalize-title-fields` | normalization | List; default `title,booktitle,maintitle,subtitle` | `normalize`, `lint` | — |
+| `protected-terms` | normalization | List of case-sensitive terms | `normalize`, `lint` | — |
+| `normalize-author-style` | normalization | `jabref`, `conservative`, or `none` | `normalize` | — |
+| `normalize-journal-style` | normalization | `abbreviated`, `full`, or `none` (default) | `normalize`, `lint` | — |
+| `journal-table` | normalization | CSV/TSV path with exact journal mappings | `normalize`, `lint` | — |
+| `ltwa-table` | normalization | CSV/TSV path with LTWA word mappings | `normalize`, `lint` | — |
+| `normalize-dois` | normalization | Boolean | `normalize` | — |
+| `normalize-identifier-case` | normalization | Boolean | `normalize` | — |
+| `normalize-format-metadata` | normalization | Boolean | `normalize` | — |
+| `lint-required-fields` | lint | Fields required on every entry | `lint` | — |
+| `lint-required-fields-<entrytype>` | lint | Extra fields required on one entry type | `lint` | — |
+| `tex-sources` | usage | List of TeX files or directories, relative to the `.bib` file | `keys`, `tex scan` | — |
+| `group-tree` | groups | Pipe-delimited group hierarchy; aliases JabRef's `grouping` (read native-first) — see [Grouping](#grouping) | `groups tree`/`add-group`/`remove-group`/`rename-group`/`move-group`/`update-group` | `grouping` / `groupsTree` / `groups:N...` |
+| `files-dir` | pinax | Path to the Pinax materials directory, relative to the `.bib` file | `fetch`, `files`, engine | — |
+| `fetch-policy` | pinax | Comma-separated list of: `preprint`, `published`, `source`, `bestpdf` (default `bestpdf`) | `fetch` | — |
 
 `lint-required-fields` values are additive to pynakes' built-in requirements,
 which follow the library's `dialect` (`bibtex` or `biblatex`, aliasing JabRef's

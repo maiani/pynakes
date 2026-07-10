@@ -17,7 +17,7 @@ reusable independent of pynakes' specific vocabulary.
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
-from pynakes._text_utils import strip_jabref_terminator
+from pynakes._text_utils import strip_meta_terminator
 from pynakes.model import BibFile, MetadataBlock
 
 Classifier = Callable[[str], str]
@@ -41,7 +41,7 @@ def metadata_value(lib: BibFile, name: str) -> str | None:
     lowered = {key.lower(): value for key, value in lib.metadata.items()}
     value = lowered.get(name.lower())
     if value is not None:
-        return strip_jabref_terminator(value)
+        return strip_meta_terminator(value)
     return None
 
 
@@ -49,7 +49,7 @@ def metadata_values(lib: BibFile, name: str) -> tuple[str, ...]:
     """Return all metadata values for ``name`` across namespaces, in source order."""
     lowered = name.lower()
     return tuple(
-        strip_jabref_terminator(block.value)
+        strip_meta_terminator(block.value)
         for block in lib.metadata_blocks
         if block.key.lower() == lowered
     )
@@ -300,7 +300,7 @@ def format_pynakes_meta_block(items: list[tuple[str, str]], line_ending: str = "
     """
     lines = [f"@comment{{{PYNAKES_PREFIX}"]
     for key, value in items:
-        value = strip_jabref_terminator(value)
+        value = strip_meta_terminator(value)
         if "\n" in value:
             first, *rest = value.split("\n")
             lines.append(f"{key.strip()}: {first}")

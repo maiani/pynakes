@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
-from pynakes._text_utils import strip_jabref_terminator
+from pynakes._text_utils import strip_meta_terminator
 from pynakes.metadata import metadata_value
 from pynakes.model import BibEntry, BibFile
 
@@ -723,7 +723,7 @@ def resolve_files_dir(value: str, bib_path: str | Path) -> Path:
     """
     bib = _absolute_bib_path(bib_path)
     base = bib.parent
-    raw = strip_jabref_terminator(value)
+    raw = strip_meta_terminator(value)
     if not raw:
         return base / f"{bib.stem}.files"
     path = Path(raw).expanduser()

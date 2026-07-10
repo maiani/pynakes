@@ -20,8 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `keypattern_<type>`, `grouping`) is present without its pynakes-native
   equivalent (`dialect`, `sort-order`, `key-pattern`, `key-pattern-<type>`,
   `group-tree`), normalize adds the native key with the translated value.
-  Existing native keys are never overwritten. (`_native_key_for_jabref`,
-  `_native_value_for_jabref` in `metadata/jabref.py`; `normalize_library`
+  Existing native keys are never overwritten. (`native_key_for_jabref`,
+  `native_value_for_jabref` in `metadata/jabref.py`; `normalize_library`
   in `normalize.py`)
 
 - **`normalize` regenerates citation keys when `normalize-keys: true` is
@@ -93,7 +93,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   carrying the whole library's config into a one-entry file.
   (`strip_metadata_blocks` in `src/pynakes/setops.py`)
 
+### Fixed
+
+- **`fields rename`/`move`/`append`/`clear` now match field names
+  case-insensitively.** Since a parsed entry's ``fields`` keys are always
+  lowercase, supplying the source spelling of a mixed-case field name (e.g.
+  ``ArXiv``, as shown verbatim by `lint`'s `noncanonical_field_name_case`
+  warning) silently matched nothing: the command reported success with zero
+  entries changed. The four operations now resolve the caller-supplied name
+  against each entry's actual field names before editing.
+  (`_resolve_field_name` in `src/pynakes/fields.py`)
+
 ### Changed
+
+- **Separated pynakes identity from JabRef.** JabRef-specific knowledge is now
+  concentrated in `metadata/jabref.py`: the JabRef group parsers/serializers
+  (`parse_jabref_grouping`, `format_jabref_grouping`, `parse_jabref_groups_lines`,
+  `jabref_grouping_tree`, `jabref_flat_tree`) moved there from `group_tree.py`.
+  `strip_jabref_terminator` renamed to `strip_meta_terminator` (it strips a
+  generic trailing `;`, not JabRef-specific). `_native_key_for_jabref` /
+  `_native_value_for_jabref` promoted to public API (`native_key_for_jabref` /
+  `native_value_for_jabref`). `files.py` relabelled as BibLaTeX (the `file`
+  field is standard BibLaTeX, not JabRef). Capability names
+  `inspect_jabref_metadata` / `update_jabref_metadata` renamed to
+  `inspect_metadata` / `update_metadata`. `group_tree.py` retains backward-
+  compatible re-exports for existing callers. (`metadata/jabref.py`,
+  `group_tree.py`, `_text_utils.py`, `files.py`, `bibtex_writer.py`,
+  `normalize.py`, `metadata/__init__.py`, `capabilities.py`,
+  `cli_commands/normalize.py`)
 
 - **Consolidated duplicated escape-aware splitter into `_text_utils.py`.**
   `_split_escaped` was defined in both `files.py` and `group_tree.py` with
