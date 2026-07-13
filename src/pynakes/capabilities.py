@@ -317,7 +317,8 @@ def get_capabilities() -> dict:
             "formats (export/import CSL-JSON, RIS, MODS, EndNote, and export CSV)",
             "search": "Search entries by free text, phrases, or field-scoped terms",
             "asset": "Fetch and validate Pinax materials — arXiv PDF/source, "
-            "open-access published PDF download, and linked-file checks (fetch, check)",
+            "open or institutionally entitled published/supplement PDF download, "
+            "and linked-file checks (fetch, check)",
             "corpus": "Operate across multiple .bib files (combine, split, batch)",
             "capabilities": "Show this capability description",
         },

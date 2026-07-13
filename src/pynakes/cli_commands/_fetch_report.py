@@ -20,7 +20,9 @@ def fetch_report_lines(
 
 def _fetched_line(item: dict) -> str:
     parts = []
-    if item["pdf_path"]:
+    if item.get("artifact") == "supplement_pdf" and item["pdf_path"]:
+        parts.append("supplement PDF")
+    elif item["pdf_path"]:
         parts.append("PDF")
     if item["source_path"]:
         parts.append("source")

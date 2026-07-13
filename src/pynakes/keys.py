@@ -15,6 +15,7 @@ from pynakes.authors import ascii_fold as _ascii_fold
 from pynakes.authors import last_name as _last_name
 from pynakes.authors import split_name_list as _split_name_list
 from pynakes.editing import rename_entry_key
+from pynakes.formatters import latex_to_plain_text
 from pynakes.metadata import library_key_pattern
 from pynakes.model import BibEntry, BibFile
 
@@ -85,7 +86,7 @@ def _first_title_word(entry: BibEntry) -> str:
 
 
 def _words(value: str) -> list[str]:
-    return re.findall(r"[A-Za-z0-9]+", value.replace("{", "").replace("}", ""))
+    return re.findall(r"[A-Za-z0-9]+", latex_to_plain_text(value))
 
 
 def _capitalize_word(word: str) -> str:

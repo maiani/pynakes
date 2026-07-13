@@ -284,6 +284,7 @@ class FileStore:
         refetchable: bool,
         fetched_date: str | None = None,
         added_date: str | None = None,
+        access: str | None = None,
     ) -> None:
         """Record provenance for one material artifact."""
         if kind not in ARTIFACT_KINDS:
@@ -300,6 +301,8 @@ class FileStore:
             record["fetched_date"] = fetched_date
         if added_date is not None:
             record["added_date"] = added_date
+        if access is not None:
+            record["access"] = access
         manifest = self.read_manifest()
         row = _manifest_row(manifest, key, create=True)
         row.setdefault("preprint_canonical", False)

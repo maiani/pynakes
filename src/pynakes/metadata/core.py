@@ -114,10 +114,11 @@ class FetchPolicy:
     preprint: bool = False
     published: bool = False
     source: bool = False
+    supplement: bool = False
     bestpdf: bool = False
 
 
-_VALID_FETCH_POLICY_VALUES = {"preprint", "published", "source", "bestpdf"}
+_VALID_FETCH_POLICY_VALUES = {"preprint", "published", "source", "supplement", "bestpdf"}
 
 _DEFAULT_FETCH_POLICY = FetchPolicy(bestpdf=True)
 
@@ -137,6 +138,7 @@ def parse_fetch_policy(value: str | None) -> FetchPolicy:
         preprint="preprint" in items,
         published="published" in items,
         source="source" in items,
+        supplement="supplement" in items,
         bestpdf="bestpdf" in items,
     )
 

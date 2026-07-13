@@ -3,6 +3,7 @@
 Downloads arXiv materials (PDF and source) for entries into the Pinax files-dir.
 """
 
+from enum import Enum
 from types import TracebackType
 
 import typer
@@ -36,7 +37,15 @@ _ARTIFACT_LABELS: dict[FetchArtifact, str] = {
     "preprint_pdf": "preprint PDF",
     "preprint_source": "preprint source",
     "published_pdf": "published PDF",
+    "supplement_pdf": "supplement PDF",
 }
+
+
+class FetchAccess(str, Enum):
+    """Access context used for publisher-hosted materials."""
+
+    OPEN = "open"
+    INSTITUTIONAL = "institutional"
 
 
 class _RichFetchProgress:
@@ -89,7 +98,7 @@ class _RichFetchProgress:
             if event.total_bytes is not None:
                 update["total"] = event.total_bytes
             self._progress.update(task_id, **update)
-        elif event.kind in {"artifact_done", "fail"}:
+        elif event.kind in {"artifact_done", "artifact_skip", "fail"}:
             task_id = self._tasks.pop(ident, None)
             if task_id is not None:
                 if event.total_bytes is not None:
@@ -119,6 +128,9 @@ def fetch(
     source: bool | None = typer.Option(
         None, "--source", help="Fetch arXiv source archive (overrides metadata fetch-policy)"
     ),
+    supplement: bool | None = typer.Option(
+        None, "--supplement", help="Fetch one unambiguous supplementary PDF"
+    ),
     bestpdf: bool | None = typer.Option(
         None,
         "--bestpdf",
@@ -132,9 +144,14 @@ def fetch(
     cache_dir: str | None = typer.Option(
         None, "--cache-dir", help="Directory for deterministic provider-response cache"
     ),
+    access: FetchAccess = typer.Option(
+        FetchAccess.OPEN,
+        "--access",
+        help="Publisher access context: open or institutional (uses existing network access)",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Download materials (arXiv PDF/source and/or open-access published PDFs)."""
+    """Download Pinax materials, optionally using existing institutional network access."""
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     file = _resolve_input_bib(file, json_output)
 
@@ -143,12 +160,13 @@ def fetch(
     except ValueError as exc:
         _emit_error(json_output, "InvalidInput", str(exc))
 
-    flags = [preprint, published, source, bestpdf]
+    flags = [preprint, published, source, supplement, bestpdf]
     policy = (
         FetchPolicy(
             preprint=bool(preprint),
             published=bool(published),
             source=bool(source),
+            supplement=bool(supplement),
             bestpdf=bool(bestpdf),
         )
         if any(f is not None for f in flags)
@@ -158,7 +176,11 @@ def fetch(
     cache = _metadata_cache_dir(file, cache_dir, True)
     if params.json_output:
         report = coll.fetch_materials(
-            target=target, policy=policy, dry_run=params.dry_run, cache_dir=cache
+            target=target,
+            policy=policy,
+            dry_run=params.dry_run,
+            cache_dir=cache,
+            access=access.value,
         )
     else:
         with _RichFetchProgress() as progress:
@@ -168,6 +190,7 @@ def fetch(
                 dry_run=params.dry_run,
                 cache_dir=cache,
                 progress=progress,
+                access=access.value,
             )
 
     warnings = fetch_report_lines(report)
@@ -185,6 +208,7 @@ def fetch(
         params,
         warnings,
         files_dir=files_dir,
+        access=report["access"],
         fetch_policy=report["fetch_policy"],
         fetched=report["fetched"],
         skipped=report["skipped"],

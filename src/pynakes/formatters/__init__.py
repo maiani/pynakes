@@ -33,6 +33,7 @@ from pynakes.formatters._latex import (
     html_to_latex,
     html_to_unicode,
     latex_cleanup,
+    latex_to_plain_text,
     latex_to_unicode,
     unicode_to_latex,
 )
@@ -57,6 +58,7 @@ __all__ = [
     "html_to_latex",
     "html_to_unicode",
     "latex_cleanup",
+    "latex_to_plain_text",
     "latex_to_unicode",
     "unicode_to_latex",
     # pages

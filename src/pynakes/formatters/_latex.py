@@ -48,6 +48,66 @@ _LATEX_COMMANDS = {
     "i": "ı",
     "L": "Ł",
 }
+
+_GREEK_COMMAND_NAMES = {
+    "alpha": "Alpha",
+    "beta": "Beta",
+    "gamma": "Gamma",
+    "delta": "Delta",
+    "epsilon": "Epsilon",
+    "zeta": "Zeta",
+    "eta": "Eta",
+    "theta": "Theta",
+    "iota": "Iota",
+    "kappa": "Kappa",
+    "lambda": "Lambda",
+    "mu": "Mu",
+    "nu": "Nu",
+    "xi": "Xi",
+    "pi": "Pi",
+    "rho": "Rho",
+    "sigma": "Sigma",
+    "tau": "Tau",
+    "upsilon": "Upsilon",
+    "phi": "Phi",
+    "chi": "Chi",
+    "psi": "Psi",
+    "omega": "Omega",
+}
+
+_GREEK_VARIANTS = {
+    "varepsilon": "epsilon",
+    "vartheta": "theta",
+    "varpi": "pi",
+    "varrho": "rho",
+    "varsigma": "sigma",
+    "varphi": "phi",
+}
+
+_TRANSPARENT_TEXT_COMMANDS = {
+    "ensuremath",
+    "mathbb",
+    "mathbf",
+    "mathcal",
+    "mathfrak",
+    "mathit",
+    "mathrm",
+    "mathsf",
+    "mathtt",
+    "operatorname",
+    "text",
+    "textbf",
+    "textit",
+    "textrm",
+    "textsf",
+    "texttt",
+}
+
+_TRANSPARENT_TEXT_COMMAND_RE = re.compile(
+    rf"\\(?:{'|'.join(sorted(_TRANSPARENT_TEXT_COMMANDS, key=len, reverse=True))})\b\s*"
+)
+_GREEK_VARIANT_RE = re.compile(rf"\\({'|'.join(_GREEK_VARIANTS)})\b")
+_REMAINING_COMMAND_RE = re.compile(r"\\([A-Za-z]+)")
 _ACCENT_COMMANDS = {
     '"': "\N{COMBINING DIAERESIS}",
     "'": "\N{COMBINING ACUTE ACCENT}",
@@ -316,6 +376,43 @@ def latex_to_unicode(value: str) -> str:
         return unicodedata.normalize("NFC", _latex_to_unicode(value))
     except _LatexParseError:
         return value
+
+
+def latex_to_plain_text(value: str) -> str:
+    r"""Return readable text for LaTeX-rich values without markup.
+
+    Greek math commands are written as conventional names (``\phi`` becomes
+    ``Phi``), glyph variants collapse to their base name, and transparent
+    formatting commands retain their arguments. Unknown command names remain
+    as words so this conversion is conservative rather than destructive.
+    """
+    prepared = _GREEK_VARIANT_RE.sub(
+        lambda match: rf"\{_GREEK_VARIANTS[match.group(1)]}",
+        value,
+    )
+    prepared = _TRANSPARENT_TEXT_COMMAND_RE.sub("", prepared)
+    prepared = _REMAINING_COMMAND_RE.sub(_plain_command, prepared)
+    plain = latex_to_unicode(prepared)
+
+    unicode_names = {
+        symbol: _GREEK_COMMAND_NAMES[command.lower()]
+        for command, symbol in _LATEX_COMMANDS.items()
+        if command.lower() in _GREEK_COMMAND_NAMES
+    }
+    for symbol, name in unicode_names.items():
+        plain = plain.replace(symbol, f" {name} ")
+    plain = _REMAINING_COMMAND_RE.sub(r" \1 ", plain)
+    return re.sub(r"[$\\{}_^~]", " ", plain)
+
+
+def _plain_command(match: re.Match[str]) -> str:
+    """Keep convertible commands for the parser and spell unknown ones as words."""
+    command = match.group(1)
+    if command in _LATEX_COMMANDS or command in _ACCENT_COMMANDS:
+        return match.group(0)
+    if command == "textsuperscript":
+        return match.group(0)
+    return f" {command} "
 
 
 def unicode_to_latex(value: str) -> str:

@@ -6,12 +6,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 
-FetchArtifact = Literal["preprint_pdf", "preprint_source", "published_pdf"]
+FetchArtifact = Literal["preprint_pdf", "preprint_source", "published_pdf", "supplement_pdf"]
 FetchProgressKind = Literal[
     "entry",
     "artifact_start",
     "artifact_progress",
     "artifact_done",
+    "artifact_skip",
     "skip",
     "fail",
 ]

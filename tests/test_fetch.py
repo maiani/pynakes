@@ -17,6 +17,7 @@ from pynakes.fetch import (
     crossref_oa_pdf_url,
     download_arxiv_materials,
     download_published_material,
+    download_supplement_material,
     extract_arxiv_source,
     fetch_arxiv_pdf,
     fetch_published_pdf,
@@ -441,6 +442,109 @@ def test_download_published_material_wraps_malformed_doi(tmp_path: Path) -> None
 
     with pytest.raises(PublishedPdfFetchError, match="Malformed DOI"):
         download_published_material(store, "Noether1918", "not-a-doi")
+
+
+def test_download_published_material_uses_institutional_fallback(tmp_path: Path) -> None:
+    store = FileStore(root=tmp_path / "refs.files", bib_path=tmp_path / "refs.bib")
+
+    result = download_published_material(
+        store,
+        "Noether1918",
+        "10.5555/entitled",
+        url_resolver=lambda doi: None,
+        institutional_url_resolver=lambda doi: "https://publisher.example/article.pdf",
+        pdf_fetcher=lambda url: b"%PDF institutionally entitled",
+        access="institutional",
+        fetched_date="2026-07-13",
+    )
+
+    assert result.access == "institutional"
+    assert result.pdf_path == tmp_path / "refs.files" / "Noether1918.published.pdf"
+    manifest = json.loads((tmp_path / "refs.files" / ".pinax" / "manifest.json").read_text())
+    record = manifest["files"]["Noether1918"]["published_pdf"]
+    assert record["access"] == "institutional"
+    assert "cookie" not in record
+
+
+def test_download_published_material_reports_authentication_html(tmp_path: Path) -> None:
+    store = FileStore(root=tmp_path / "refs.files", bib_path=tmp_path / "refs.bib")
+
+    result = download_published_material(
+        store,
+        "Noether1918",
+        "10.5555/entitled",
+        url_resolver=lambda doi: None,
+        institutional_url_resolver=lambda doi: "https://publisher.example/article.pdf",
+        pdf_fetcher=lambda url: b"<!doctype html><html>Sign in</html>",
+        access="institutional",
+    )
+
+    assert result.pdf_path is None
+    assert result.reason is not None
+    assert "authentication required" in result.reason
+
+
+def test_download_published_material_reports_rejected_institutional_access(
+    tmp_path: Path,
+) -> None:
+    store = FileStore(root=tmp_path / "refs.files", bib_path=tmp_path / "refs.bib")
+
+    def rejected(url: str) -> bytes:
+        raise PublishedPdfFetchError("Server returned HTTP 403 for publisher PDF")
+
+    result = download_published_material(
+        store,
+        "Noether1918",
+        "10.5555/entitled",
+        url_resolver=lambda doi: None,
+        institutional_url_resolver=lambda doi: "https://publisher.example/article.pdf",
+        pdf_fetcher=rejected,
+        access="institutional",
+    )
+
+    assert result.pdf_path is None
+    assert result.reason == "institutional access was not accepted by the publisher"
+
+
+def test_download_supplement_material_writes_one_pdf(tmp_path: Path) -> None:
+    store = FileStore(root=tmp_path / "refs.files", bib_path=tmp_path / "refs.bib")
+
+    result = download_supplement_material(
+        store,
+        "Noether1918",
+        "10.5555/entitled",
+        url_resolver=lambda doi: ("https://publisher.example/supplement.pdf",),
+        pdf_fetcher=lambda url: b"%PDF supplement",
+        access="institutional",
+        fetched_date="2026-07-13",
+    )
+
+    assert result.pdf_path == tmp_path / "refs.files" / "Noether1918.supplement.pdf"
+    assert result.access == "institutional"
+    manifest = json.loads((tmp_path / "refs.files" / ".pinax" / "manifest.json").read_text())
+    assert manifest["files"]["Noether1918"]["supplement_pdf"]["access"] == "institutional"
+
+
+def test_download_supplement_material_does_not_choose_between_multiple_files(
+    tmp_path: Path,
+) -> None:
+    store = FileStore(root=tmp_path / "refs.files", bib_path=tmp_path / "refs.bib")
+
+    result = download_supplement_material(
+        store,
+        "Noether1918",
+        "10.5555/entitled",
+        url_resolver=lambda doi: (
+            "https://publisher.example/supplement-a.pdf",
+            "https://publisher.example/supplement-b.pdf",
+        ),
+    )
+
+    assert result.pdf_path is None
+    assert result.candidates == 2
+    assert result.reason is not None
+    assert "multiple supplementary files" in result.reason
+    assert not (tmp_path / "refs.files" / "Noether1918.supplement.pdf").exists()
 
 
 def _tar_bytes(files: dict[str, bytes], *, symlinks: dict[str, str] | None = None) -> bytes:

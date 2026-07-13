@@ -9,7 +9,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/maiani/pynakes/ci.yml?branch=main)](https://github.com/maiani/pynakes/actions)
 [![License](https://img.shields.io/pypi/l/pynakes.svg)](https://github.com/maiani/pynakes/blob/main/LICENSE)
 
-**Clean, complete, addressable. With or without the papers.** `pynakes` is a Python CLI that makes small, explicit, reviewable changes to `.bib`
+`pynakes` is a Python CLI that makes small, explicit, reviewable changes to `.bib`
 files — minimal diffs, dry-run previews, atomic writes, and structured JSON. Deterministic enough to hand to a script, a CI pipeline, or an LLM agent.
 
 Works on Python 3.11+, Linux, macOS, and Windows, with minimal dependencies.

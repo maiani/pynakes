@@ -465,11 +465,15 @@ class BibliographyOperations:
         pdf_fetcher: Callable[[str], bytes] | None = None,
         source_fetcher: Callable[[str], bytes] | None = None,
         published_url_fetcher: Callable[[str], str | None] | None = None,
+        institutional_url_fetcher: Callable[[str], str | None] | None = None,
         published_pdf_fetcher: Callable[[str], bytes] | None = None,
+        supplement_url_fetcher: Callable[[str], tuple[str, ...]] | None = None,
+        supplement_pdf_fetcher: Callable[[str], bytes] | None = None,
         cache_dir: str | Path | None = None,
         progress: FetchProgress | None = None,
+        access: str = "open",
     ) -> dict:
-        """Download arXiv materials and/or open-access published PDFs for entries.
+        """Download selected arXiv, published, and supplementary materials for entries.
 
         Args:
             target: Optional single citation key to fetch. If None, fetch all.
@@ -479,14 +483,20 @@ class BibliographyOperations:
             pdf_fetcher: Injectable arXiv PDF fetcher for testing.
             source_fetcher: Injectable arXiv source fetcher for testing.
             published_url_fetcher: Injectable OA PDF URL resolver for testing.
+            institutional_url_fetcher: Injectable publisher PDF URL resolver.
             published_pdf_fetcher: Injectable published PDF bytes fetcher.
+            supplement_url_fetcher: Injectable supplement URL resolver.
+            supplement_pdf_fetcher: Injectable supplement PDF bytes fetcher.
             cache_dir: Optional provider-response cache directory.
             progress: Optional callback receiving fetch progress events.
+            access: Published-material access mode: ``open`` or ``institutional``.
 
         Returns:
             A dict with ``fetched``, ``skipped``, ``failed`` lists, plus
             ``fetch_policy`` dict reflecting the resolved fetch-policy.
         """
+        if access not in {"open", "institutional"}:
+            raise ValueError(f"Unknown fetch access mode: {access!r}")
         store = self.files
         if store is None:
             self.ensure_files_dir()
@@ -510,9 +520,13 @@ class BibliographyOperations:
             pdf_fetcher=pdf_fetcher,
             source_fetcher=source_fetcher,
             published_url_fetcher=published_url_fetcher,
+            institutional_url_fetcher=institutional_url_fetcher,
             published_pdf_fetcher=published_pdf_fetcher,
+            supplement_url_fetcher=supplement_url_fetcher,
+            supplement_pdf_fetcher=supplement_pdf_fetcher,
             cache_dir=cache_dir,
             progress=progress,
+            access=access,
         )
 
         return {
@@ -520,8 +534,10 @@ class BibliographyOperations:
                 "preprint": resolved.preprint,
                 "published": resolved.published,
                 "source": resolved.source,
+                "supplement": resolved.supplement,
                 "bestpdf": resolved.bestpdf,
             },
+            "access": access,
             "fetched": fetched,
             "skipped": skipped,
             "failed": failed,

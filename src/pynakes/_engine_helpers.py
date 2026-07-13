@@ -359,15 +359,19 @@ def run_fetch_loop(
     pdf_fetcher: Callable[[str], bytes] | None = None,
     source_fetcher: Callable[[str], bytes] | None = None,
     published_url_fetcher: Callable[[str], str | None] | None = None,
+    institutional_url_fetcher: Callable[[str], str | None] | None = None,
     published_pdf_fetcher: Callable[[str], bytes] | None = None,
+    supplement_url_fetcher: Callable[[str], tuple[str, ...]] | None = None,
+    supplement_pdf_fetcher: Callable[[str], bytes] | None = None,
     cache_dir: str | Path | None = None,
     progress: FetchProgress | None = None,
+    access: str = "open",
 ) -> tuple[list[dict], list[dict], list[dict]]:
     """Iterate *entry_queue* and download materials into *store*.
 
     For entries with an arXiv id, downloads the preprint PDF and/or source
-    bundle. For entries with a DOI, downloads the open-access published PDF
-    as directed by *policy*.
+    bundle. For entries with a DOI, downloads the selected published and
+    supplementary PDFs as directed by *policy* and *access*.
 
     ``policy.bestpdf`` means "try published PDF first, fall back to preprint
     PDF when no open-access copy is available".
@@ -377,8 +381,10 @@ def run_fetch_loop(
     from pynakes.fetch import (
         ArxivFetchError,
         PublishedPdfFetchError,
+        SupplementPdfFetchError,
         download_arxiv_materials,
         download_published_material,
+        download_supplement_material,
     )
     from pynakes.importer import entry_arxiv_id
 
@@ -414,6 +420,7 @@ def run_fetch_loop(
         can_fetch_preprint = bool(arxiv_id) and policy.preprint and not presence.preprint_pdf
         can_fetch_source = bool(arxiv_id) and policy.source and not presence.preprint_source
         can_fetch_published = bool(doi) and policy.published and not presence.published_pdf
+        can_fetch_supplement = bool(doi) and policy.supplement and not presence.supplement_pdf
 
         # bestpdf: fetch published if OA, otherwise fall back to preprint.
         if policy.bestpdf and not policy.preprint and not policy.published:
@@ -422,11 +429,13 @@ def run_fetch_loop(
                 bool(arxiv_id) and not presence.preprint_pdf and not can_fetch_published
             )
 
-        anything_to_fetch = can_fetch_preprint or can_fetch_source or can_fetch_published
+        anything_to_fetch = (
+            can_fetch_preprint or can_fetch_source or can_fetch_published or can_fetch_supplement
+        )
 
         if not anything_to_fetch:
             wants_arxiv = policy.preprint or policy.source or policy.bestpdf
-            wants_doi = policy.published or policy.bestpdf
+            wants_doi = policy.published or policy.supplement or policy.bestpdf
             missing_arxiv = wants_arxiv and arxiv_id is None
             missing_doi = wants_doi and not doi
             if missing_arxiv and missing_doi:
@@ -514,9 +523,11 @@ def run_fetch_loop(
                     key,
                     doi,
                     url_resolver=published_url_fetcher,
+                    institutional_url_resolver=institutional_url_fetcher,
                     pdf_fetcher=published_pdf_fetcher,
                     cache_dir=cache_dir,
                     progress=progress,
+                    access=access,  # type: ignore[arg-type]
                 )
                 if pub_result.pdf_path is not None:
                     fetched.append(pub_result.to_dict())
@@ -548,7 +559,9 @@ def run_fetch_loop(
                             ),
                         )
                 else:
-                    skipped.append({"key": key, "reason": "no open-access copy found"})
+                    skipped.append(
+                        {"key": key, "artifact": "published_pdf", "reason": pub_result.reason}
+                    )
                     _emit_fetch_progress(
                         progress,
                         FetchProgressEvent(
@@ -556,11 +569,50 @@ def run_fetch_loop(
                             key=key,
                             entry_index=index,
                             entry_total=entry_total,
-                            message="no open-access copy found",
+                            message=pub_result.reason or "published PDF unavailable",
                         ),
                     )
             except PublishedPdfFetchError as exc:
                 failed.append({"key": key, "error": str(exc)})
+                _emit_fetch_progress(
+                    progress,
+                    FetchProgressEvent(
+                        kind="fail",
+                        key=key,
+                        entry_index=index,
+                        entry_total=entry_total,
+                        message=str(exc),
+                    ),
+                )
+
+        # --- Fetch supplementary PDF ---
+        if can_fetch_supplement:
+            try:
+                supplement_result = download_supplement_material(
+                    store,
+                    key,
+                    doi,
+                    url_resolver=supplement_url_fetcher,
+                    pdf_fetcher=supplement_pdf_fetcher,
+                    progress=progress,
+                    access=access,  # type: ignore[arg-type]
+                )
+                if supplement_result.pdf_path is not None:
+                    fetched.append(supplement_result.to_dict())
+                else:
+                    skipped.append(supplement_result.to_dict())
+                    _emit_fetch_progress(
+                        progress,
+                        FetchProgressEvent(
+                            kind="skip",
+                            key=key,
+                            entry_index=index,
+                            entry_total=entry_total,
+                            message=supplement_result.reason or "supplement unavailable",
+                        ),
+                    )
+            except SupplementPdfFetchError as exc:
+                failed.append({"key": key, "artifact": "supplement_pdf", "error": str(exc)})
                 _emit_fetch_progress(
                     progress,
                     FetchProgressEvent(

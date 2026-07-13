@@ -3,7 +3,10 @@
 import json
 from pathlib import Path
 
-from pynakes.providers import arxiv, identity, openalex, semantic_scholar
+import httpx
+import pytest
+
+from pynakes.providers import arxiv, identity, openalex, publisher, semantic_scholar
 from pynakes.providers._http import ProviderFetchError, cache_path
 
 OPENALEX_WORK = {
@@ -121,3 +124,35 @@ def test_publisher_pdf_url_doi_prefix_no_doi_skips_doi_rules() -> None:
 
     url = publisher_pdf_url("https://doi.org/10.1103/f6nc-vsnx")
     assert url is None
+
+
+def test_discover_publisher_artifacts_reads_pdf_meta_and_supplement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url) == "https://doi.org/10.5555/entitled"
+        return httpx.Response(
+            200,
+            request=request,
+            headers={"content-type": "text/html"},
+            content=(
+                b'<meta name="citation_pdf_url" content="/article/main.pdf">'
+                b'<a href="files/supporting-information.pdf">Supporting information</a>'
+            ),
+        )
+
+    transport = httpx.MockTransport(handler)
+
+    class MockClient(httpx.Client):
+        def __init__(self, *args, **kwargs) -> None:
+            kwargs["transport"] = transport
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr("pynakes.providers.publisher.httpx.Client", MockClient)
+
+    artifacts = publisher.discover_artifacts_for_doi("10.5555/entitled")
+
+    assert artifacts.published_pdf_url == "https://doi.org/article/main.pdf"
+    assert artifacts.supplement_pdf_urls == (
+        "https://doi.org/10.5555/files/supporting-information.pdf",
+    )

@@ -43,6 +43,29 @@ class TestGenerateKey:
         e = _entry(author="{World Bank}", year="2021", title="{GDP} Report")
         assert generate_key(e) == "WorldBank2021GDP"
 
+    @pytest.mark.parametrize("command", (r"\phi", r"\varphi", r"\Phi"))
+    def test_converts_leading_tex_math_to_conventional_title_word(self, command: str) -> None:
+        e = _entry(
+            author="John Smith",
+            year="2025",
+            title=rf"${command}$-junction effect",
+        )
+
+        assert generate_key(e) == "Smith2025Phi"
+        assert generate_key_from_pattern(e, "[auth]_[year]_[veryshorttitle]") == ("smith_2025_phi")
+
+    def test_tex_math_wrappers_do_not_become_title_words(self) -> None:
+        e = _entry(
+            author="John Smith",
+            year="2025",
+            title=r"{\ensuremath{\phi}}-junction effect",
+        )
+
+        assert generate_key_from_pattern(e, "[auth]_[year]_[Veryshorttitle]") == ("smith_2025_Phi")
+        assert generate_key_from_pattern(e, "[auth]_[year]_[title]") == (
+            "smith_2025_phijunctioneffect"
+        )
+
     def test_falls_back_to_editor_then_anon(self) -> None:
         assert (
             generate_key(_entry(editor="Ann Lee", year="2020", title="Reader")) == "Lee2020Reader"

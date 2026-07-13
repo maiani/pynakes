@@ -277,7 +277,7 @@ def test_validate_dialect_rejects_empty() -> None:
 
 
 def test_validate_fetch_policy_accepts_valid() -> None:
-    for val in ("preprint", "published", "source", "bestpdf"):
+    for val in ("preprint", "published", "source", "supplement", "bestpdf"):
         metadata_pkg.validate_metadata_value("fetch-policy", val)
 
 
@@ -285,6 +285,15 @@ def test_validate_fetch_policy_accepts_comma_separated() -> None:
     metadata_pkg.validate_metadata_value("fetch-policy", "preprint, published")
     metadata_pkg.validate_metadata_value("fetch-policy", "bestpdf, source")
     metadata_pkg.validate_metadata_value("fetch-policy", "preprint,published,source")
+    metadata_pkg.validate_metadata_value("fetch-policy", "published,supplement")
+
+
+def test_parse_fetch_policy_selects_supplement() -> None:
+    policy = metadata_pkg.parse_fetch_policy("published, supplement")
+
+    assert policy.published is True
+    assert policy.supplement is True
+    assert policy.preprint is False
 
 
 def test_validate_fetch_policy_rejects_invalid() -> None:

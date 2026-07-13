@@ -9,8 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Institutionally entitled published PDFs and supplementary PDFs.**
+  `asset fetch --published --access institutional` follows the DOI to a
+  publisher landing page and uses access already supplied by the current
+  university network, VPN, or proxy; it does not import browser sessions or
+  handle credentials. `--supplement` (also a `supplement` fetch-policy value)
+  downloads one unambiguous supplementary PDF and reports multiple candidates
+  without choosing or overwriting. Downloads validate PDF magic bytes, classify
+  authentication HTML as a skip, and record the access context in Pinax
+  provenance. (`providers/publisher.py`, `fetch.py`, `_engine_helpers.py`,
+  `cli_commands/fetch.py`)
+
 - **`asset fetch` now accepts per-invocation policy flags.** `--preprint`,
-  `--published`, `--source`, and `--bestpdf` override the metadata
+  `--published`, `--source`, `--supplement`, and `--bestpdf` override the metadata
   `fetch-policy` for a single invocation. When none are given, the metadata
   setting is used as before. (`fetch_materials` in `_engine_ops.py`,
   `fetch` in `cli_commands/fetch.py`)
@@ -94,6 +105,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`strip_metadata_blocks` in `src/pynakes/setops.py`)
 
 ### Fixed
+
+- **Citation-key title markers convert leading TeX math to conventional text.**
+  Common Greek commands such as `\phi`, `\varphi`, and `\Phi` now contribute
+  `Phi` to `title` / `veryshorttitle` key markers; math delimiters and transparent
+  wrappers such as `\ensuremath{...}` no longer leak into generated keys.
+  (`keys.py`)
 
 - **`fields rename`/`move`/`append`/`clear` now match field names
   case-insensitively.** Since a parsed entry's ``fields`` keys are always

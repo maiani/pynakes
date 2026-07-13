@@ -75,7 +75,7 @@ PYNAKES_PREFIX_KEYS: dict[str, MetadataCategory] = {
 
 
 _VALID_DIALECTS = {"bibtex", "biblatex"}
-VALID_FETCH_POLICIES = {"preprint", "published", "source", "bestpdf"}
+VALID_FETCH_POLICIES = {"preprint", "published", "source", "supplement", "bestpdf"}
 
 
 def validate_metadata_value(key: str, value: str) -> None:

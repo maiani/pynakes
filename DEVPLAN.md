@@ -8,12 +8,13 @@ plan.
 This document is the **road to 1.0** and the major releases beyond it.
 Completed work is recorded in [CHANGELOG.md](CHANGELOG.md) and the git log.
 
-## Current state (v0.5 alpha — shipped)
+## Current state (v0.5 alpha — pre-release)
 
-v0.5 is the first public alpha release. The single-file engine is feature-complete
-for this release; input conformance is verified against the TeX Live 2026 baseline
-(BibTeX 0.99d, BibLaTeX 3.21, Biber 2.21). Until v1.0, pynakes does **not**
-guarantee backward compatibility for the Python API, CLI syntax, or JSON envelopes.
+v0.5 is the first public alpha release. The single-file engine has broad coverage,
+but v0.5 is not feature-complete until the bibliography-formatting gate below is
+closed. Input conformance is verified against the TeX Live 2026 baseline (BibTeX
+0.99d, BibLaTeX 3.21, Biber 2.21). Until v1.0, pynakes does **not** guarantee
+backward compatibility for the Python API, CLI syntax, or JSON envelopes.
 
 Key shipped capabilities:
 - **Parser/writer**: byte-for-byte round-trip fidelity; atomic, re-parse-validated
@@ -43,14 +44,55 @@ Key shipped capabilities:
   `--strict` gates, `.pre-commit-hooks.yaml`, shell completion.
 - **Parser conformance**: versioned corpus pinned to TeX Live 2026; differential
   tests against BibTeX 0.99d and Biber 2.21; property-based tests (Hypothesis).
-- **Quality**: ~1087 tests, coverage ≥90%, `ruff` clean, docs site builds.
+- **Quality**: ~1227 tests, coverage ≥90%, `ruff` clean, docs site builds.
 
 ---
 
-## Remaining v0.5 polish (pre-ship)
+## Remaining v0.5 work (pre-ship)
 
-All of these block the v0.5.0 tag. They are small, well-scoped items that
-close gaps identified during pre-release review.
+All of these block the v0.5.0 tag.
+
+- [ ] **Complete bibliography formatting.** pynakes must be sufficient as the
+      final formatting and maintenance tool for a `.bib` file; requiring a
+      second formatter such as tex-fmt is not acceptable for v0.5. This is an
+      explicit, parser-aware formatting path, separate from the default
+      preservation behavior.
+  - [ ] Add canonical layout formatting to the existing `normalize` surface,
+        provisionally `normalize --layout canonical`. The default remains
+        `--layout preserve`, so ordinary commands retain byte-for-byte
+        round-trip fidelity and surgical diffs.
+  - [ ] Canonical layout controls indentation width, spaces versus tabs, line
+        width or no wrapping, one field per line, spacing around `=`, trailing
+        commas, blank lines between entries, and deterministic entry/field
+        layout. Field ordering and alignment are configurable rather than
+        silently imposed by ordinary normalization.
+  - [ ] Wrapping is BibTeX/BibLaTeX- and TeX-aware: it must not change brace
+        grouping, capitalization protection, macros, quoted/braced atoms,
+        concatenation with `#`, names, URLs, or field meaning.
+  - [ ] Canonical formatting preserves and deterministically places comments,
+        `@string`, `@preamble`, duplicate citation keys, unknown entry/field
+        types, BibLaTeX constructs, and pynakes/JabRef metadata. It must not
+        rebuild solely from a lossy field dictionary.
+  - [ ] Provide formatter workflow parity needed by editors and CI: check-only
+        mode with a meaningful exit status, stdout/print mode, stdin support,
+        recursive or explicit multi-file operation, dry-run, unified diff,
+        JSON reporting, and atomic writes with backups.
+  - [ ] Formatting is deterministic and idempotent: a second run produces no
+        changes. Parse -> format -> parse must preserve the bibliography's
+        semantics under both BibTeX and Biber validation.
+  - [ ] Add golden tests derived from upstream tex-fmt `.bib` fixtures for
+        operational/layout parity, while improving on tex-fmt with semantic
+        parsing. Cover malformed-input failures without tracebacks and protect
+        every existing round-trip/minimal-diff invariant in preserve mode.
+  - [ ] Document the deliberate boundary: canonical layout is an explicitly
+        requested whole-file rewrite; all other modifying operations continue
+        to use surgical edits and preserve unrelated source text.
+- [ ] **Finish JabRef bibliography-formatting parity.** Implement and test all
+      remaining v5.15 `saveActions` field formatters, formatter ordering and
+      formatter-as-modifier behavior, remaining key-pattern markers/modifiers,
+      and crossref-parent hoisting for `saveOrderConfig`. Use upstream JabRef
+      implementations, tests, and golden vectors as the behavioral oracle;
+      unsupported future formatter names still produce structured warnings.
 
 - [x] **Group tree CLI — `groups list-entries` with descendant propagation.**
       Wired as `groups list-entries <name>` with descendant propagation as
@@ -66,7 +108,7 @@ close gaps identified during pre-release review.
       `is_eager=True` to ensure error output is always JSON when requested.
       All configurable options have a non-interactive CLI path.
       (`cli_commands/init.py`)
-- [ ] **`verify`/`enrich` help and docs clarify the split.** `verify` checks
+- [x] **`verify`/`enrich` help and docs clarify the split.** `verify` checks
       entries against authoritative online sources without modifying the file.
       `enrich` updates entries from those sources. Both accept `--published`
       and `--online` but with different intent. Ensure `--help` and the LLM
@@ -79,8 +121,10 @@ close gaps identified during pre-release review.
       described at full parity (accurate — all four group types with native
       metadata and dynamic evaluation).
 
-**Done when**: all items checked off; `pytest && ruff` green; CHANGELOG
-updated; version bumped to 0.5.0.
+**Done when**: all items checked off; preserve mode remains byte-for-byte and
+minimal-diff; canonical formatting is idempotent and BibTeX/Biber-equivalent;
+the complete CLI/JSON/check workflow is documented; `pytest && ruff` green;
+CHANGELOG updated; version bumped to 0.5.0.
 
 ---
 
@@ -188,12 +232,14 @@ to 0.8.0.
 Invariants from [docs/guides/architecture.md](docs/guides/architecture.md) and
 [CLAUDE.md](CLAUDE.md):
 
-1. **Round-trip fidelity** — unmodified entries write back byte-for-byte.
+1. **Round-trip fidelity** — unmodified entries write back byte-for-byte unless
+   the user explicitly requests canonical whole-file layout formatting.
 2. **Edits go through `editing.py`** — surgical, minimal-diff.
 3. **Operations mutate in place and return a count/report.**
 4. **Stable JSON envelope + exit-code contract.**
 5. **Duplicate keys tolerated, not an error.**
-6. **The file is the single source of truth; preserve, don't impose.**
+6. **The file is the single source of truth; preserve by default, and impose a
+   canonical layout only when explicitly requested.**
 7. **Determinism** — no time/randomness/ordering in core logic; network is
    opt-in and isolated.
 
@@ -239,13 +285,15 @@ directly on.
 - **`saveActions` formatter suite incomplete** → 9 of ~24 JabRef v5.15 formatters
   are not yet implemented in `FIELD_FORMATTERS`. Key-pattern markers are also
   partial (missing `authorLast`, `authorN`, `authIniN`, `authorIni`, `auth.easy`
-  chain, and formatters-as-modifiers). Gap tracked here; fill incrementally.
+  chain, and formatters-as-modifiers). This is a v0.5 release blocker; close it
+  against upstream implementations, tests, and golden vectors.
 - **`saveOrderConfig` sort parity (partial)** → `normalize` honors JabRef's
   order type and `field;descending` criteria, but does **not** yet replicate
   JabRef's rule of hoisting `crossref`-referencing entries ahead of their
   parents (a BibTeX 0.99 processing requirement). A library JabRef would save
   with parents reordered can therefore differ in entry order. Deferred until a
-  crossref-aware pass lands; track here rather than claiming full parity.
+  crossref-aware pass lands. This is a v0.5 release blocker; track it honestly
+  rather than claiming full parity.
 - **Scope creep** → no application concerns enter the pynakes core. GUIs,
   content-intelligence, and MCP servers ship as optional companions or separate
   releases (v0.8, v2.0).

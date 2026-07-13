@@ -90,7 +90,7 @@ def verify(
     strict: bool = typer.Option(False, "--strict", help="Exit 1 if warnings or errors are found"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Verify entries against authoritative metadata (accepts multiple files).
+    """Verify entries against authoritative metadata (read-only, does not modify the file).
 
     Checks DOI-backed entries against provider metadata; with ``--published`` it
     also reports preprints that now have a published version available.
@@ -125,7 +125,7 @@ def enrich(
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Conservatively fill missing metadata.
+    """Conservatively fill missing metadata (modifies the file).
 
     Fills missing DOI/date/identifier fields; with ``--published`` it also
     promotes preprints to their published version (writing the published

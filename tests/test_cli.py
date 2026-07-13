@@ -818,6 +818,7 @@ class TestImportCommand:
             "preprint": False,
             "published": False,
             "source": False,
+            "supplement": False,
             "bestpdf": True,
         }
         assert (tmp_path / "refs.files" / f"{key}.preprint.pdf").read_bytes() == b"%PDF fixture"
@@ -849,6 +850,7 @@ class TestImportCommand:
             "preprint": True,
             "published": False,
             "source": False,
+            "supplement": False,
             "bestpdf": False,
         }
         assert fetched["pdf_path"] == str(tmp_path / "refs.files" / f"{key}.preprint.pdf")
@@ -891,6 +893,7 @@ class TestImportCommand:
             "preprint": False,
             "published": True,
             "source": False,
+            "supplement": False,
             "bestpdf": False,
         }
         assert data["fetch"]["fetched"] == [
@@ -2911,6 +2914,7 @@ class TestAssetFetchPublished:
             "preprint": False,
             "published": True,
             "source": False,
+            "supplement": False,
             "bestpdf": False,
         }
         assert len(data["fetched"]) == 1
@@ -3001,8 +3005,42 @@ class TestAssetFetchPublished:
             "preprint": False,
             "published": False,
             "source": True,
+            "supplement": False,
             "bestpdf": False,
         }
         assert len(data["fetched"]) == 0
         assert len(data["skipped"]) == 1
         assert data["skipped"][0]["reason"] == "no arXiv id"
+
+    def test_fetch_supplement_with_institutional_access(self, tmp_path: Path, monkeypatch) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Noether1918,\n"
+            "  title = {Invariant Variational Problems},\n"
+            "  doi = {10.5555/entitled}\n"
+            "}\n"
+            "@comment{pynakes-meta:\n"
+            "files-dir: refs.files\n"
+            "}\n"
+        )
+        monkeypatch.setattr(
+            "pynakes.fetch.publisher_supplement_pdf_urls",
+            lambda doi: ("https://publisher.example/supporting-information.pdf",),
+        )
+        monkeypatch.setattr("pynakes.fetch.fetch_bytes", lambda url, **kwargs: b"%PDF supplement")
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(
+            app,
+            ["asset", "fetch", "--supplement", "--access", "institutional", "--json"],
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["access"] == "institutional"
+        assert data["fetch_policy"]["supplement"] is True
+        assert data["fetched"][0]["artifact"] == "supplement_pdf"
+        assert data["fetched"][0]["access"] == "institutional"
+        assert (tmp_path / "refs.files" / "Noether1918.supplement.pdf").read_bytes() == (
+            b"%PDF supplement"
+        )

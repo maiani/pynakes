@@ -145,12 +145,13 @@ sidecar directory (`{bibname}.files/`) that stores downloaded materials
   {{Key}}.preprint.pdf      # Preprint PDF for entry {{Key}}
   {{Key}}.source/           # Preprint source bundle (LaTeX + figures)
   {{Key}}.published.pdf     # Published PDF (when available)
+  {{Key}}.supplement.pdf    # One unambiguous supplementary PDF
 ```
 
 The `files-dir` path is set in the `pynakes-meta` block inside the `.bib`
 file (key: `files-dir`). Fetch behaviour is configured by:
 - `fetch-policy`: comma-separated list of ``preprint``, ``published``, ``source``,
-  and/or ``bestpdf`` (default: ``bestpdf``, which tries published first then
+  ``supplement``, and/or ``bestpdf`` (default: ``bestpdf``, which tries published first then
   falls back to preprint when no open-access copy exists)
 
 ## Agent rules
