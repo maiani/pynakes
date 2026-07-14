@@ -33,6 +33,7 @@ from pynakes._engine_keys import BibliographyKeys
 from pynakes._engine_ops import BibliographyOperations
 from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
+from pynakes.canonical import CanonicalLayout, write_bib_canonical
 from pynakes.diff import generate_diff
 from pynakes.editing import splice_into_text
 from pynakes.filestore import FileStore, PinaxRenameTransaction
@@ -76,6 +77,7 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
     _consolidate_metadata: bool = False
     _pinax_renames: list[tuple[str, str]] = field(default_factory=list)
     _pinax_material_merges: list[tuple[str, str]] = field(default_factory=list)
+    _format_layout: CanonicalLayout | None = None
 
     @classmethod
     def open(cls, path: str | Path) -> "Bibliography":
@@ -233,6 +235,7 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
         self._pinax_renames.clear()
         self._pinax_material_merges.clear()
         self._consolidate_metadata = False
+        self._format_layout = None
         self._dirty = False
 
     def reset(self) -> None:
@@ -294,6 +297,13 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
         return edits
 
     def _render_text(self) -> str:
+        if self._format_layout is not None:
+            text = write_bib_canonical(self.lib, self._format_layout)
+            if self._consolidate_metadata:
+                text = (
+                    metadata_ops.consolidate_metadata(self.lib, text, self.lib.line_ending) or text
+                )
+            return text
         text = self._render_entry_text()
         if self._consolidate_metadata:
             text = metadata_ops.consolidate_metadata(self.lib, text, self.lib.line_ending) or text

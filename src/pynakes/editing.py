@@ -314,6 +314,7 @@ def set_entry_field(entry: BibEntry, name: str, value: str) -> bool:
     if entry.fields.get(name) == value:
         return False
     entry.fields[name] = value
+    entry.field_expressions[name] = "{" + value + "}"
     _apply(entry, lambda raw: set_raw_field(raw, name, value))
     return True
 
@@ -337,6 +338,7 @@ def set_entry_field_expression(
             if original == expression and entry.fields.get(name) == semantic_value:
                 return False
             entry.fields[name] = semantic_value
+            entry.field_expressions[name] = expression
             entry.raw_content = set_raw_field_expression(entry.raw_content, name, expression)
             return True
     return set_entry_field(entry, name, semantic_value)
@@ -347,6 +349,7 @@ def remove_entry_field(entry: BibEntry, name: str) -> bool:
     if name not in entry.fields:
         return False
     del entry.fields[name]
+    entry.field_expressions.pop(name, None)
     _apply(entry, lambda raw: remove_raw_field(raw, name))
     return True
 
@@ -357,6 +360,9 @@ def rename_entry_field(entry: BibEntry, old: str, new: str) -> bool:
         return False
     # Rebuild the dict so the renamed field keeps its original position.
     entry.fields = {(new if k == old else k): v for k, v in entry.fields.items()}
+    entry.field_expressions = {
+        (new if k == old else k): v for k, v in entry.field_expressions.items()
+    }
     _apply(entry, lambda raw: rename_raw_field(raw, old, new))
     return True
 

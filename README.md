@@ -9,8 +9,13 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/maiani/pynakes/ci.yml?branch=main)](https://github.com/maiani/pynakes/actions)
 [![License](https://img.shields.io/pypi/l/pynakes.svg)](https://github.com/maiani/pynakes/blob/main/LICENSE)
 
-`pynakes` is a Python CLI that makes small, explicit, reviewable changes to `.bib`
-files — minimal diffs, dry-run previews, atomic writes, and structured JSON. Deterministic enough to hand to a script, a CI pipeline, or an LLM agent.
+> [!WARNING]
+> `pynakes` is alpha-quality software. Interfaces and behavior may change between releases.
+
+`pynakes` is a deterministic bibliography maintenance engine built for  reliable agentic workflows, CI, and human use. Agents decide what should change; pynakes inspects, validates, previews, and applies those changes safely and reproducibly.
+
+The Python CLI makes small, explicit, reviewable changes to `.bib` files —
+minimal diffs, dry-run previews, atomic writes, and structured JSON.
 
 Works on Python 3.11+, Linux, macOS, and Windows, with minimal dependencies.
 
@@ -23,7 +28,7 @@ A `.bib` file is the index card; a **pinax** is the card together with the shelf
 
 - **Reviewable by design.** Every modifying command previews as a unified diff (`--dry-run --diff`) before anything is written, then writes atomically with a `.bak` backup. Ambiguous cases — conflicting merges, duplicate DOIs — are reported with exit code `2` rather than guessed.
 - **Round-trip fidelity.** An entry you don't touch is written back byte-for-byte. pynakes never normalizes whitespace, reorders fields, or re-quotes values behind your back — so diffs stay tiny and reviewable.
-- **Built for agents and CI.** Stable JSON output and exit codes, machine-readable `capabilities`, and `--strict` / pre-commit gates that lint a bibliography like source code.
+- **A deterministic execution layer for agents and CI.** Stable JSON output and exit codes, machine-readable `capabilities`, structured change plans, and `--strict` / pre-commit gates let an agent exercise judgment without directly rewriting bibliography text.
 - **Deterministic and offline by default.** No hidden time, randomness, or ordering; network access is explicit (`ref import`, `asset fetch`, or `--online`) and confined to the few commands that need it.
 - **Losslessly interoperable.** Reads and writes the BibTeX/BibLaTeX toolchain's files unchanged, and round-trips JabRef's own metadata and `saveActions` — adding the `pynakes-meta` namespace only where no existing equivalent exists.
 
@@ -36,9 +41,10 @@ then:
 - **Inspect** — entry count, encoding, duplicates, JabRef metadata
 - **Lint** — validate required fields, DOI shape, key conflicts (CI-gate multiple files)
 - **Normalize** — authors, DOIs, months, journals, `saveActions` pipeline
+- **Format** — deterministic layout-only rewrites with explicit layout flags
 - **Import** by DOI or arXiv identifier, with configurable key generation, or add a manual entry
 - **Dedupe & merge** — detect and resolve duplicates, with conflict reporting
-- **Edit fields** — rename, move, append, clear, protect title capitalization
+- **Bulk-edit fields** — set, rename, move, append, clear, or protect fields on matching references
 - **Manage groups and keys** — list, rename, repair, generate from patterns
 - **Convert** between BibTeX/BibLaTeX dialects and CSL-JSON, RIS, MODS, EndNote
 - **Track citation usage** — find cited, unused, and missing keys in `.tex` sources
@@ -94,6 +100,8 @@ pynakes lint mylib.bib --json
 pynakes ref import 10.5555/example mylib.bib
 pynakes ref import arXiv:2301.00001 mylib.bib
 pynakes ref add Manual2026 mylib.bib --field title="Manual Reference" --field year=2026
+pynakes ref show Manual2026 mylib.bib
+pynakes ref edit Manual2026 mylib.bib --field year=2027 --clear-field note
 
 # Preview the normalization pass before committing
 pynakes normalize mylib.bib --dry-run --diff
@@ -135,7 +143,9 @@ Every modifying command:
 
 ## For scripted and LLM-assisted workflows
 
-`pynakes` is designed to be safe for automation:
+In an agentic workflow, the agent supplies judgment and pynakes supplies the
+deterministic execution layer. The same interface is safe for ordinary scripts
+and CI:
 
 - `--json` returns machine-readable results with status, warnings, and errors
 - `pynakes capabilities --json` describes supported operations for an agent

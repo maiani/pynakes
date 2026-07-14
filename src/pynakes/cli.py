@@ -15,9 +15,11 @@ from pynakes.cli_commands import (
     capabilities,
     convert,
     dedupe,
+    edit,
     fetch,
     fields,
     files,
+    format,
     groups,
     import_ref,
     init,
@@ -30,6 +32,7 @@ from pynakes.cli_commands import (
     remove,
     search,
     setops,
+    show,
     tex,
     used,
 )
@@ -45,7 +48,7 @@ app = typer.Typer(
 ref_app = typer.Typer(help="Manage individual reference entries", cls=AutoBibGroup)
 groups_app = typer.Typer(help="Manage entry groups", cls=AutoBibGroup)
 keys_app = typer.Typer(help="Work with citation keys", cls=AutoBibGroup)
-fields_app = typer.Typer(help="Edit entry fields", cls=AutoBibGroup)
+fields_app = typer.Typer(help="Bulk-edit fields across matching references", cls=AutoBibGroup)
 dedupe_app = typer.Typer(help="Detect and merge duplicate works", cls=AutoBibGroup)
 metadata_app = typer.Typer(help="Inspect and update library metadata", cls=AutoBibGroup)
 tex_app = typer.Typer(
@@ -86,13 +89,16 @@ groups.register(groups_app)
 keys.register(keys_app)
 fields.register(fields_app)
 normalize.register(app)
+format.register(app)
 convert.register(app)
 capabilities.register(app)
 search.register(app)
 
-# ref: per-entry lifecycle (add, import, remove)
+# ref: per-entry lifecycle
 add.register(ref_app)
 import_ref.register(ref_app)
+show.register(ref_app)
+edit.register(ref_app)
 remove.register(ref_app)
 
 # tex: linked TeX sources (add/list/remove/clear) + scan (formerly `used`)

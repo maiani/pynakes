@@ -11,6 +11,7 @@ from pynakes.fields import (
     parse_query,
     protect_title_capitalization,
     rename_field,
+    set_field,
 )
 
 _LIB = (
@@ -47,6 +48,16 @@ class TestRename:
         assert count == 1
         assert lib.entries["A"].fields["eprint"] == "Nature"
         assert "journal" not in lib.entries["A"].fields
+
+
+class TestSet:
+    def test_set_replaces_or_creates_on_matching_entries(self) -> None:
+        lib = parse_bib(_LIB)
+        count = set_field(lib, "Year", "2025", where=parse_query("type = article"))
+        assert count == 1
+        assert lib.entries["A"].fields["year"] == "2025"
+        assert lib.entries["B"].fields["year"] == "2021"
+        assert "year = {2025}" in write_bib(lib)
 
 
 class TestMove:

@@ -140,17 +140,27 @@ def _reconstruct_entry(entry: BibEntry, line_ending: str = "\n") -> str:
     Returns:
         Formatted BibTeX entry
     """
+    fields = [(name, _quote_field_value(value)) for name, value in entry.fields.items()]
+    return render_entry(entry, fields, line_ending=line_ending, trailing_comma=False)
+
+
+def render_entry(
+    entry: BibEntry,
+    fields: list[tuple[str, str]],
+    *,
+    line_ending: str = "\n",
+    indent: str = "  ",
+    tabular: bool = False,
+    trailing_comma: bool = True,
+) -> str:
+    """Render one entry from already-delimited field expressions."""
     lines = [f"@{entry.type}{{{entry.key},"]
-
-    field_items = list(entry.fields.items())
-    for i, (field_name, field_value) in enumerate(field_items):
-        quoted_value = _quote_field_value(field_value)
-        # Add comma after every field except the last
-        comma = "," if i < len(field_items) - 1 else ""
-        lines.append(f"  {field_name} = {quoted_value}{comma}")
-
+    width = max((len(name) for name, _ in fields), default=0) if tabular else 0
+    for index, (name, expression) in enumerate(fields):
+        pad = " " * (width - len(name)) if width else ""
+        comma = "," if trailing_comma or index < len(fields) - 1 else ""
+        lines.append(f"{indent}{name}{pad} = {expression}{comma}")
     lines.append("}")
-
     return line_ending.join(lines)
 
 

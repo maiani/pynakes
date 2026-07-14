@@ -23,6 +23,8 @@ from pynakes import journals as journal_ops
 from pynakes import metadata as metadata_ops
 from pynakes import normalize as normalize_ops
 from pynakes._engine_helpers import build_fetch_queue, metadata_fetch_policy, run_fetch_loop
+from pynakes.canonical import CanonicalLayout
+from pynakes.editing import set_entry_type
 from pynakes.fetch_progress import FetchProgress
 from pynakes.filestore import FILES_DIR_KEY, resolve_files_dir
 from pynakes.lint import LintIssue
@@ -103,6 +105,54 @@ class BibliographyOperations:
         self._mark(count)
         return count
 
+    def set_field(self, field: str, value: str, where: str | QueryFilter = None) -> int:
+        """Set or replace a field on matching entries."""
+        count = field_ops.set_field(self.lib, field, value, self._where(where))
+        self._mark(count)
+        return count
+
+    def edit_entry(
+        self,
+        key: str,
+        *,
+        fields: dict[str, str] | None = None,
+        clear_fields: list[str] | None = None,
+        entry_type: str | None = None,
+    ) -> dict[str, object]:
+        """Patch the unique entry named ``key`` through surgical edit operations.
+
+        Raises ``KeyError`` when absent and ``ValueError`` when the key is
+        duplicated; callers must not guess which physical duplicate to edit.
+        """
+        matches = self.lib.entries.get_all(key)
+        if not matches:
+            raise KeyError(key)
+        if len(matches) != 1:
+            raise ValueError(f"Citation key {key!r} is duplicated; repair duplicates first")
+        entry = matches[0]
+
+        def selected(candidate: BibEntry) -> bool:
+            return candidate is entry
+
+        set_count = 0
+        for name, value in (fields or {}).items():
+            set_count += self.set_field(name, value, selected)
+        clear_count = 0
+        for name in clear_fields or []:
+            clear_count += self.clear_field(name, selected)
+        type_changed = False
+        if entry_type is not None:
+            normalized_type = entry_type.strip()
+            if not normalized_type:
+                raise ValueError("Entry type must not be empty")
+            type_changed = set_entry_type(entry, normalized_type)
+            self._mark(type_changed)
+        return {
+            "fields_set": set_count,
+            "fields_cleared": clear_count,
+            "entry_type_changed": type_changed,
+        }
+
     def move_field(self, old: str, new: str, where: str | QueryFilter = None) -> int:
         """Move a field on matching entries."""
         count = field_ops.move_field(self.lib, old, new, self._where(where))
@@ -144,6 +194,13 @@ class BibliographyOperations:
 
     # --- format/metadata operations -------------------------------------
 
+    def format(self, layout: CanonicalLayout | None = None) -> int:
+        """Stage a layout-only canonical rewrite and return the entry count."""
+        self._format_layout = layout or CanonicalLayout()
+        self._entry_snapshot = {}
+        self._mark(True)
+        return len(self.lib.entries)
+
     def normalize(
         self,
         options: normalize_ops.NormalizeOptions | None = None,
@@ -174,6 +231,7 @@ class BibliographyOperations:
                 or report.keys
                 or report.sort_entries_count
                 or self._consolidate_metadata
+                or self._format_layout is not None
             )
         )
         return report

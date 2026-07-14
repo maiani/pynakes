@@ -7,6 +7,12 @@ reference manager curated.**
 It is a deterministic engine, not an application. These are the design beliefs
 that shape it.
 
+That engine is designed to sit beneath agentic bibliography workflows. The
+agent supplies interpretation and judgment; pynakes supplies bounded
+operations, inspection, validation, previews, conflict handling, and atomic
+writes. This separation makes an agent's actions reproducible and reviewable,
+while keeping the same engine directly useful to humans, scripts, and CI.
+
 ## Bibfiles in plain text, in git
 
 A bibliography you keep for years cannot depend on any app, vendor, format, or

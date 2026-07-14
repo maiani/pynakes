@@ -9,6 +9,9 @@ usage see the [Usage guide](usage.md); for direct Python use see the
 pynakes is a headless maintenance engine for BibTeX, BibLaTeX, and
 JabRef-compatible .bib files. It makes small, reviewable changes without
 discarding information a reference manager or a human placed in the file.
+It is also the deterministic execution layer beneath agentic bibliography
+workflows: an agent decides what should change, while pynakes exposes bounded
+operations that inspect, validate, preview, and apply the change.
 
 1. **Preserve before normalizing.** Unknown fields, duplicate citation keys,
    comments, JabRef metadata, line endings, and source encodings remain data,

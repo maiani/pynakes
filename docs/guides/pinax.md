@@ -284,6 +284,8 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
   `arxiv.org/e-print/<id>`, stored as the `.preprint` and `.source` artifacts.
   An open-access published PDF (resolved from the entry's DOI) lands as
   `<citekey>.published.pdf`. Both come behind the same opt-in.
+<a id="published-pdf-resolution-chain"></a>
+
 - **Published-PDF resolution chain.** The published-PDF URL is resolved through
   a three-step pipeline: **(1)** OpenAlex — looks up `best_oa_location` and
   accepts only publisher-hosted URLs (rejecting arXiv or repository mirrors);

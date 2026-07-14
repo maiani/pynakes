@@ -109,14 +109,12 @@ class TestGenerateKey:
         )
         assert generate_key_from_pattern(e, "[auth]-[YEAR]-[journal:abbr]") == "smith-2024-tj"
 
-    def test_unsupported_jabref_pattern_errors(self) -> None:
+    @pytest.mark.parametrize("marker", ["unknownSpecial", "auth.ini", "auth.easy", "author2"])
+    def test_unsupported_jabref_pattern_errors(self, marker: str) -> None:
         e = _entry(author="John Smith", year="2024", title="A Practical Test")
-        try:
-            generate_key_from_pattern(e, "[auth][unknownSpecial]")
-        except UnsupportedCitationKeyPatternError as exc:
-            assert "unknownSpecial" in str(exc)
-        else:
-            raise AssertionError("expected unsupported pattern error")
+        with pytest.raises(UnsupportedCitationKeyPatternError, match="Unsupported") as exc_info:
+            generate_key_from_pattern(e, f"[auth][{marker}]")
+        assert marker in str(exc_info.value)
 
     def test_marker_variants(self) -> None:
         e = _entry(
@@ -130,6 +128,11 @@ class TestGenerateKey:
         assert generate_key_from_pattern(e, "[shorttitle]") == "practicalstudythings"
         assert generate_key_from_pattern(e, "[camel2]") == "apractical"
         assert generate_key_from_pattern(e, "[entrytype]") == "article"
+        assert generate_key_from_pattern(e, "[authorlast]") == "roe"
+        assert generate_key_from_pattern(e, "[Authorlast]") == "Roe"
+        assert generate_key_from_pattern(e, "[authIni4]") == "SmDR"
+        assert generate_key_from_pattern(e, "[authorIni]") == "SmithDR"
+        assert generate_key_from_pattern(e, "[authors2]") == "smithdoeetal"
 
     def test_accented_author_names_fold_to_ascii(self) -> None:
         e = _entry(

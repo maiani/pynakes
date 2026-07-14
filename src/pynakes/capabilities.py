@@ -34,6 +34,7 @@ _ERROR_CODES = {
             "NoSources": "tex scan: no sources given and no 'tex-sources' metadata to use.",
             "InvalidNamespace": "metadata set: namespace was not 'jabref' or 'pynakes'.",
             "InvalidNormalizeOption": "normalize: an option value was not allowed.",
+            "RecursiveFormatError": "format --recursive: one or more files failed.",
             "KeyNotFound": "A referenced citation key is not in the library (remove, keys rename, etc.).",
             "InvalidIdentifier": "import: an identifier value was malformed.",
             "UnsupportedIdentifier": "import: the identifier was not a DOI, arXiv id/URL, or supported journal URL.",
@@ -49,6 +50,7 @@ _ERROR_CODES = {
             "DedupeConflict": "dedupe merge: a cluster has irreconcilable field values.",
             "DuplicateReference": "import: the DOI/arXiv reference is already present.",
             "CitationKeyConflict": "import: the chosen citation key already exists.",
+            "DuplicateCitationKey": "ref show/edit: the citation key identifies multiple entries.",
         },
     },
 }
@@ -106,6 +108,7 @@ COMMAND_GROUPS: dict[str, list[str]] = {
     "Inspect & validate": ["inspect", "search", "lint", "verify", "capabilities"],
     "Edit references": [
         "ref",
+        "format",
         "normalize",
         "convert",
         "enrich",
@@ -295,13 +298,14 @@ def get_capabilities() -> dict:
             "init": "Create a new .bib library, optionally seeded with a metadata profile (--pinax for pinax mode)",
             "inspect": "Inspect a .bib file structure",
             "lint": "Validate entries and report issues",
-            "ref": "Add, import (by DOI/arXiv/URL), and remove reference entries "
-            "(add, import, remove)",
+            "ref": "Create, show, edit, import, and remove individual references "
+            "(add, show, edit, import, remove)",
             "groups": "Manage entry groups and group hierarchy "
             "(list, list-entries, add-entry, remove-entry, tree, add-group, "
             "remove-group, rename-group, move-group, update-group)",
             "keys": "Generate, check, rename, and repair citation keys",
-            "fields": "Edit fields (rename, move, append, clear, protect-title)",
+            "fields": "Bulk-edit fields across matching references "
+            "(set, rename, move, append, clear, protect-title)",
             "dedupe": "Detect and conservatively merge duplicate works",
             "verify": "Verify entries against authoritative metadata "
             "(--published also reports published/preprint identity links)",
@@ -313,6 +317,7 @@ def get_capabilities() -> dict:
             "(list, set, remove, adopt-jabref)",
             "normalize": "Normalize entries (titles, authors, journals, DOIs, "
             "identifier case, ordering) per the library's configured settings",
+            "format": "Rewrite bibliography layout only with explicit layout flags",
             "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "
             "formats (export/import CSL-JSON, RIS, MODS, EndNote, and export CSV)",
             "search": "Search entries by free text, phrases, or field-scoped terms",

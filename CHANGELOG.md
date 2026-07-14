@@ -9,6 +9,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Complete individual-reference CRUD and explicit bulk field editing.**
+  `ref show` reads one unique citation key and `ref edit` transactionally sets
+  or clears several fields and/or changes its entry type. Duplicate citation
+  keys return a conflict rather than selecting an occurrence. `fields set`
+  adds exact bulk replacement alongside the existing query-driven field
+  operations, whose help now identifies them as bulk edits across matching
+  references. Citation-key changes remain under `keys rename` so linked TeX
+  sources and Pinax materials stay coordinated.
+
+- **Canonical layout formatting for `.bib` files.** The new top-level `format`
+  command performs a deterministic, idempotent, layout-only whole-file rewrite
+  with canonical field ordering, indentation, trailing commas, and blank lines
+  between entries. It preserves source value expressions, including bare
+  macros, quoted/braced atoms, and `#` concatenation, and retains trailing
+  source text. Layout is configurable through explicit command flags. Ordinary operations retain
+  byte-for-byte preservation and surgical diffs.
+  (`canonical.py`, `cli_commands/format.py`, `_engine_ops.py`)
+
+- **`format --check` and `--stdout` modes.** `--check` exits with status 1
+  when the file needs canonical formatting (useful for CI gates). `--stdout`
+  prints canonical output without writing (useful for editor integration).
+  A dirty check remains `status: success` with `modified: true` in JSON, so it
+  is distinguishable from parse or I/O errors.
+
+- **`format --recursive` and stdin operation.** Recursive discovery uses one
+  `*.bib` traversal, excludes hidden directories and auxiliary files, applies
+  the same layout controls to every file, and exits nonzero on any per-file failure.
+  `format - --stdout` reads from stdin; stdin without `--stdout` is rejected.
+
+- **Eight additional JabRef v5.15 `saveActions` field formatters.** `clear`,
+  `escape_underscores`, `escape_ampersands`, `cleanup_url`, `remove_braces`,
+  `unprotect_terms`, `minify_name_list`, and `clean_up_doi`
+  are now registered in `FIELD_FORMATTERS` and applied where configured.
+  JabRef's network-backed `short_doi` is deliberately unsupported and produces
+  the existing structured `unsupported_save_action_formatter` warning.
+  (`formatters/_extra.py`, `formatters/_registry.py`)
+
+- **JabRef citation-key pattern markers `authorlast`, `authIniN`, `authorIni`,
+  and `authorsN`.** Their behavior follows JabRef's documented multi-author
+  semantics; fabricated `auth.ini` / `auth.easy` and non-JabRef `authorN` are
+  rejected instead of silently producing incompatible keys. (`keys.py`)
+
+- **BibTeX-compatible crossref ordering for `saveOrderConfig` sort.** After sorting
+  entries, crossref parents are placed after every child that references them,
+  as required by BibTeX 0.99. The reorder is
+  stable across multiple parents and chains, leaves malformed crossref cycles
+  idempotent, resolves duplicate parent keys to the first occurrence, and uses
+  the public duplicate-safe entry store API.
+  (`_sink_crossref_parents` in `normalize.py`)
+
+- **Canonical formatting preserves retained source constructs.** Duplicate
+  `@string` declarations, malformed-but-round-trippable blocks, and non-block
+  source text are retained instead of being collapsed or silently discarded.
+
+- **`cleanup_url` leaves non-URL values unchanged.** Wrapper and punctuation
+  cleanup now runs only when the value begins with a URL scheme.
+
 - **Institutionally entitled published PDFs and supplementary PDFs.**
   `asset fetch --published --access institutional` follows the DOI to a
   publisher landing page and uses access already supplied by the current
@@ -487,7 +544,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are unchanged.
 
 - **`pynakes --help` now lists each sub-app's subcommands inline** (e.g.
-  `ref → add, import, remove`), colored for clarity, so the grouped surface stays
+  `ref → add, import, show, edit, remove`), colored for clarity, so the grouped surface stays
   discoverable at a glance.
 
 ### Added

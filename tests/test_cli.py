@@ -43,7 +43,7 @@ class TestTopLevelHelp:
         out = _plain_cli_output(result.output)
         # The group name sits in its own table column; the description column
         # ends with "→ <subcommands>".
-        assert "→ add, import, remove" in out
+        assert "→ add, import, show, edit, remove" in out
         assert "→ fetch, check" in out
         assert "→ combine, split, batch" in out
         assert "→ list, add, remove, clear, scan" in out
@@ -53,6 +53,99 @@ class TestTopLevelHelp:
         out = _plain_cli_output(result.output)
         # A flat command like `normalize` is not a group; it gets no subcommand list.
         assert "normalize →" not in out
+
+
+class TestFormatCommand:
+    def test_help_exposes_layout_role_and_controls(self) -> None:
+        result = runner.invoke(app, ["format", "--help"])
+        assert result.exit_code == 0, result.output
+        output = _plain_cli_output(result.output)
+        assert "Rewrite layout only" in output
+        assert "--indent" in output
+        assert "--sort-fields" in output
+        assert "--settings" not in output
+
+        normalize_help = _plain_cli_output(runner.invoke(app, ["normalize", "--help"]).output)
+        assert "--layout" not in normalize_help
+        assert "--check" not in normalize_help
+
+    def test_stdin_stdout_bypasses_lone_bib_autodiscovery(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        Path("local.bib").write_text("@article{Local, title={Local}}\n")
+        result = runner.invoke(
+            app,
+            ["format", "-", "--stdout"],
+            input='@article{Pipe, month = jan, title="Quoted"}\n',
+        )
+        assert result.exit_code == 0, result.output
+        assert "@article{Pipe," in result.output
+        assert "month = jan," in result.output
+        assert 'title = "Quoted",' in result.output
+
+    def test_stdin_without_stdout_is_structured_error(self) -> None:
+        result = runner.invoke(app, ["format", "-", "--json"], input="@article{A}\n")
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert payload["status"] == "error"
+        assert payload["error"] == "InvalidInput"
+
+    def test_check_envelope_distinguishes_dirty_from_error(self, tmp_path: Path) -> None:
+        path = tmp_path / "refs.bib"
+        path.write_text("@article{A,title={T}}\n")
+        result = runner.invoke(app, ["format", str(path), "--check", "--json"])
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert payload["status"] == "success"
+        assert payload["modified"] is True
+        assert {"action", "file", "dry_run", "modified_entries", "warnings"} <= payload.keys()
+
+        runner.invoke(app, ["format", str(path)])
+        clean = runner.invoke(app, ["format", str(path), "--check", "--json"])
+        assert clean.exit_code == 0, clean.output
+        assert json.loads(clean.output)["modified"] is False
+
+    def test_check_ignores_content_normalization_deviations(self, tmp_path: Path) -> None:
+        path = tmp_path / "refs.bib"
+        path.write_text(
+            "@article{A,\n  author = {John Smith},\n  doi = {https://doi.org/10.1000/ABC},\n}\n"
+        )
+        result = runner.invoke(app, ["format", str(path), "--check", "--json"])
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["modified"] is False
+
+    def test_flags_configure_layout(self, tmp_path: Path) -> None:
+        path = tmp_path / "refs.bib"
+        path.write_text("@article{A, year={2020}, title={T}}\n")
+        result = runner.invoke(
+            app,
+            ["format", str(path), "--indent", "\t", "--preserve-field-order"],
+        )
+        assert result.exit_code == 0, result.output
+        output = path.read_text()
+        assert "\tyear = {2020}," in output
+        assert output.index("year") < output.index("title")
+
+    def test_recursive_applies_flags_skips_hidden_and_exits_on_error(self, tmp_path: Path) -> None:
+        nested = tmp_path / "nested"
+        hidden = tmp_path / ".hidden"
+        nested.mkdir()
+        hidden.mkdir()
+        (tmp_path / "one.bib").write_text("@article{A,title={A}}\n")
+        (nested / "two.bib").write_text("@article{B,title={B}}\n")
+        hidden_path = hidden / "ignored.bib"
+        hidden_path.write_text("@article{H,title={H}}\n")
+        result = runner.invoke(app, ["format", str(tmp_path), "--recursive", "--indent", "\t"])
+        assert result.exit_code == 0, result.output
+        assert "\ttitle" in (tmp_path / "one.bib").read_text()
+        assert "\ttitle" in (nested / "two.bib").read_text()
+        assert hidden_path.read_text() == "@article{H,title={H}}\n"
+
+        (nested / "broken.bib").write_text("@article{")
+        failed = runner.invoke(app, ["format", str(tmp_path), "--recursive", "--json"])
+        assert failed.exit_code == 1
+        assert json.loads(failed.output)["status"] == "error"
 
 
 def test_default_metadata_cache_dir_anchors_symlinked_bib_at_link_path(tmp_path: Path) -> None:
@@ -1150,6 +1243,67 @@ class TestAddCommand:
         assert json.loads(result.output)["error"] == "InvalidInput"
 
 
+class TestReferenceCrud:
+    def test_show_one_reference_json(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(app, ["ref", "show", "Smith2020", str(bib), "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["action"] == "ref_show"
+        assert data["key"] == "Smith2020"
+        assert data["entry_type"] == "article"
+        assert data["fields"]["title"] == "A Comprehensive Study on Machine Learning"
+
+    def test_edit_patches_fields_and_type_in_one_transaction(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(
+            app,
+            [
+                "ref",
+                "edit",
+                "Smith2020",
+                str(bib),
+                "--field",
+                "title=Replacement Title",
+                "--field",
+                "year=2025",
+                "--clear-field",
+                "doi",
+                "--type",
+                "online",
+                "--json",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["action"] == "ref_edit"
+        assert data["modified_entries"] == 1
+        text = bib.read_text()
+        assert "@online{Smith2020," in text
+        assert "title = {Replacement Title}" in text
+        assert "year = {2025}" in text
+        assert "doi =" not in text.split("@article{Jones2021", 1)[0]
+
+    def test_edit_requires_changes(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(app, ["ref", "edit", "Smith2020", str(bib), "--json"])
+        assert result.exit_code == 1
+        assert json.loads(result.output)["error"] == "InvalidInput"
+
+    @pytest.mark.parametrize("command", ["show", "edit"])
+    def test_duplicate_key_is_a_conflict(self, tmp_path: Path, command: str) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A, title={One}}\n@article{A, title={Two}}\n")
+        args = ["ref", command, "A", str(bib), "--json"]
+        if command == "edit":
+            args.extend(["--field", "year=2025"])
+        result = runner.invoke(app, args)
+        assert result.exit_code == 2, result.output
+        data = json.loads(result.output)
+        assert data["error"] == "DuplicateCitationKey"
+        assert data["options"]
+
+
 def _tar_bytes(files: dict[str, bytes]) -> bytes:
     buffer = BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
@@ -1621,6 +1775,27 @@ class TestKeysCommand:
 
 
 class TestFieldsCommand:
+    def test_set_replaces_field_on_matching_references(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(
+            app,
+            [
+                "fields",
+                "set",
+                str(bib),
+                "year",
+                "2025",
+                "--where",
+                'key = "Smith2020"',
+                "--json",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["action"] == "fields_set"
+        assert data["modified_entries"] == 1
+        assert bib.read_text().count("year = {2025}") == 1
+
     def test_rename_with_diff(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
         result = runner.invoke(

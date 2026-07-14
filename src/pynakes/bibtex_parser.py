@@ -148,6 +148,7 @@ def parse_bib(text: str) -> BibFile:
 
     resolved_strings = resolve_string_definitions(strings)
     for entry in entries.values():
+        entry.field_expressions = dict(entry.fields)
         entry.fields = {
             name: resolve_field_value(value, resolved_strings)
             for name, value in entry.fields.items()
@@ -177,7 +178,13 @@ def _parse_entry(entry_type: str, body: str, raw_content: str) -> BibEntry:
     key_part, fields_part = _split_once_top_level(_strip_tex_comments(body), ",")
     key = key_part.strip()
     fields = _parse_fields(fields_part) if fields_part is not None else {}
-    return BibEntry(key=key, type=entry_type, fields=fields, raw_content=raw_content)
+    return BibEntry(
+        key=key,
+        type=entry_type,
+        fields=fields,
+        field_expressions=dict(fields),
+        raw_content=raw_content,
+    )
 
 
 def _parse_fields(content: str) -> dict[str, str]:

@@ -135,7 +135,8 @@ def _split_top_level(value: str, sep: str) -> list[str]:
     return iter_toplevel_splits(value, separators=sep)
 
 
-def _is_fully_braced(value: str) -> bool:
+def is_fully_braced(value: str) -> bool:
+    """Return whether *value* is enclosed by one balanced outer brace pair."""
     if not (value.startswith("{") and value.endswith("}")):
         return False
     depth = 0
@@ -168,7 +169,7 @@ def _normalize_conservative_name(name: str) -> str:
 
 def _normalize_jabref_name(name: str) -> str:
     collapsed = _normalize_name(name)
-    if collapsed == "others" or _is_fully_braced(collapsed):
+    if collapsed == "others" or is_fully_braced(collapsed):
         return collapsed
 
     comma_parts = _split_top_level(collapsed, ",")

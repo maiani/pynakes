@@ -1,4 +1,4 @@
-"""Field-level operations: rename, move, append, and clear.
+"""Bulk field-level operations over matching bibliography entries.
 
 Each operation walks the library and edits matching entries surgically (only
 the touched field changes in a diff). A ``where`` filter — a predicate over a
@@ -54,6 +54,21 @@ def rename_field(lib: BibFile, old: str, new: str, where: QueryFilter = None) ->
     count = 0
     for entry in _selected(lib, where):
         if rename_entry_field(entry, _resolve_field_name(entry, old), new):
+            count += 1
+    return count
+
+
+def set_field(lib: BibFile, field: str, value: str, where: QueryFilter = None) -> int:
+    """Set or replace ``field`` on matching entries.
+
+    ``field`` is matched case-insensitively against stored field names, avoiding
+    a duplicate field with different casing. Returns the number of entries
+    changed and modifies ``lib`` in place.
+    """
+    count = 0
+    for entry in _selected(lib, where):
+        actual_field = _resolve_field_name(entry, field)
+        if set_entry_field(entry, actual_field, value):
             count += 1
     return count
 

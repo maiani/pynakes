@@ -197,6 +197,10 @@ class BibEntry:
     key: str
     type: str
     fields: dict[str, str]
+    # Source expressions as written (including braces/quotes, bare macros, and
+    # ``#`` concatenation). Parsed entries populate this alongside the semantic
+    # ``fields`` view so layout-only formatting never has to reconstruct syntax.
+    field_expressions: dict[str, str] = field(default_factory=dict)
     raw_content: str | None = None
     raw_comments: list[str] = field(default_factory=list)
     modified: bool = False
@@ -315,6 +319,20 @@ class EntryStore:
         """
         self._entries.sort(key=key, reverse=reverse)
 
+    def set_order(self, entries: Iterable[BibEntry]) -> None:
+        """Replace the order with exactly *entries*, preserving object identity.
+
+        The supplied sequence must contain every current entry exactly once.
+        This validation keeps duplicate-key libraries safe while giving
+        operations a public alternative to mutating the backing list.
+        """
+        ordered = list(entries)
+        if len(ordered) != len(self._entries) or {id(e) for e in ordered} != {
+            id(e) for e in self._entries
+        }:
+            raise ValueError("new entry order must contain every existing entry exactly once")
+        self._entries = ordered
+
     def get_all(self, key: str) -> list[BibEntry]:
         """Return every entry with the given citation key, in order."""
         return [entry for entry in self._entries if entry.key == key]
@@ -345,9 +363,17 @@ class EntryStore:
         Duplicate keys collapse to the last occurrence; use this for display
         and structured output, not as a lossless representation.
         """
-        from dataclasses import asdict
-
-        return {entry.key: asdict(entry) for entry in self._entries}
+        return {
+            entry.key: {
+                "key": entry.key,
+                "type": entry.type,
+                "fields": dict(entry.fields),
+                "raw_content": entry.raw_content,
+                "raw_comments": list(entry.raw_comments),
+                "modified": entry.modified,
+            }
+            for entry in self._entries
+        }
 
     def __repr__(self) -> str:
         dupes = self.duplicate_keys()

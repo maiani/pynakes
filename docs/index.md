@@ -1,8 +1,10 @@
 # pynakes
 
-Small, reviewable, deterministic edits to your `.bib` library — for researchers,
-scripts, CI, and LLM agents. Reads and writes BibTeX, BibLaTeX, and
-JabRef-compatible files without disturbing what it does not change.
+The deterministic bibliography maintenance engine beneath reliable agentic
+workflows, CI, and human use. Agents decide what should change; pynakes
+inspects, validates, previews, and applies those changes safely and
+reproducibly. It reads and writes BibTeX, BibLaTeX, and JabRef-compatible files
+without disturbing what it does not change.
 
 > **Status — v0.5 public alpha.** The single-file bibliography engine is
 > feature-complete for this release, with Pinax material handling implemented
@@ -13,8 +15,8 @@ JabRef-compatible files without disturbing what it does not change.
 
 ## Overview
 
-`pynakes` is designed for researchers, scripts, and LLM-assisted workflows that
-need reviewable changes to `.bib` files:
+`pynakes` is the execution layer, not the agent: it turns decisions made by a
+researcher, script, or LLM into reviewable changes to `.bib` files:
 
 - **Safe previews**: modifying commands support `--dry-run` and `--diff`
 - **Structured output**: commands support `--json` where useful

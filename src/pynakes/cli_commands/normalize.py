@@ -108,22 +108,31 @@ def normalize(
     Each step follows the library's configured settings (its normalization
     metadata) unless overridden by a flag.
     """
-    file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+
+    if file == "-":
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            "normalize requires a file; stdin is supported by format --stdout",
+        )
+
+    file = _resolve_input_bib(file, json_output)
+
     try:
-        options = normalize_ops.NormalizeOptions(
-            protect_titles=_optional_bool(title_protection),
-            title_fields=title_field,
-            protected_terms=term,
-            author_style=author_style,
-            journal_style=journal_style,
-            journal_table=journal_table,
-            ltwa_table=ltwa_table,
-            normalize_dois=_optional_bool(doi_normalization),
-            normalize_keys=_optional_bool(key_normalization),
-            identifier_case=_optional_bool(identifier_case),
-            format_metadata=_optional_bool(metadata_formatting),
-            sort_by=sort_by,
+        options = _build_normalize_options(
+            title_protection,
+            title_field,
+            term,
+            author_style,
+            journal_style,
+            journal_table,
+            ltwa_table,
+            doi_normalization,
+            key_normalization,
+            identifier_case,
+            metadata_formatting,
+            sort_by,
         )
         coll = Bibliography.open(file)
         report = coll.normalize(options)
@@ -158,6 +167,37 @@ def normalize(
         human,
         warnings=report.warnings,
         operations=report.operations,
+    )
+
+
+def _build_normalize_options(
+    title_protection: str,
+    title_field: list[str] | None,
+    term: list[str] | None,
+    author_style: str,
+    journal_style: str,
+    journal_table: str | None,
+    ltwa_table: str | None,
+    doi_normalization: str,
+    key_normalization: str,
+    identifier_case: str,
+    metadata_formatting: str,
+    sort_by: list[str] | None,
+) -> normalize_ops.NormalizeOptions:
+    """Build NormalizeOptions from CLI arguments."""
+    return normalize_ops.NormalizeOptions(
+        protect_titles=_optional_bool(title_protection),
+        title_fields=title_field,
+        protected_terms=term,
+        author_style=author_style,
+        journal_style=journal_style,
+        journal_table=journal_table,
+        ltwa_table=ltwa_table,
+        normalize_dois=_optional_bool(doi_normalization),
+        normalize_keys=_optional_bool(key_normalization),
+        identifier_case=_optional_bool(identifier_case),
+        format_metadata=_optional_bool(metadata_formatting),
+        sort_by=sort_by,
     )
 
 

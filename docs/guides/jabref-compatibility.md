@@ -99,8 +99,7 @@ library into JabRef tracking: it relocates any JabRef-native keys stranded in
 `pynakes-meta` and anchors a `databaseType` block, so the library works in
 JabRef and future JabRef-native keys route to `jabref-meta` from then on.
 Running it again once tracked is a no-op. See the
-[LLM integration guide](llm-integration.md#inspect-or-update-jabref-metadata)
-for the CLI contract.
+[metadata usage guide](usage.md#metadata) for the CLI workflow.
 
 ## Round-trip fidelity and the JabRef grammars understood
 

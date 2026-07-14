@@ -29,6 +29,16 @@ from pynakes.formatters._date import (
     normalize_date,
     normalize_month,
 )
+from pynakes.formatters._extra import (
+    clean_up_doi,
+    cleanup_url,
+    clear,
+    escape_ampersands,
+    escape_underscores,
+    minify_name_list,
+    remove_braces,
+    unprotect_terms,
+)
 from pynakes.formatters._latex import (
     html_to_latex,
     html_to_unicode,
@@ -54,6 +64,15 @@ __all__ = [
     "month_number_str",
     "normalize_date",
     "normalize_month",
+    # extra
+    "cleanup_url",
+    "clear",
+    "clean_up_doi",
+    "escape_ampersands",
+    "escape_underscores",
+    "minify_name_list",
+    "remove_braces",
+    "unprotect_terms",
     # latex / html
     "html_to_latex",
     "html_to_unicode",

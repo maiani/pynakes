@@ -205,10 +205,10 @@ pynakes recognizes **two** structurally identical top-level comment namespaces:
 key generation) use the **merged** view, where `pynakes-meta` overrides
 `jabref-meta` on a conflicting key.
 
-The canonical layout keeps pynakes-native settings in a consolidated
-`pynakes-meta` block at the top of the file, and keeps JabRef's own
-`jabref-meta` comments in their JabRef-compatible trailing section at the
-bottom.
+The `format` command deterministically places top-level comments before string
+declarations, preambles, and entries: `pynakes-meta` first, then `jabref-meta`,
+then other comments. It does not consolidate or change metadata values;
+metadata consolidation remains a `normalize` concern.
 
 In JSON/API output, each metadata block exposes both forms of the value:
 `raw_value` is the parsed payload as stored in the comment, including JabRef's
@@ -250,9 +250,12 @@ code `2` if duplicate blocks in the target namespace make an update ambiguous.
 
 ## fields
 
-Edit fields surgically while preserving entry formatting.
+Bulk-edit one field operation across all references matching `--where`, while
+preserving entry formatting. Use `ref edit` when patching one reference across
+several fields.
 
 ```bash
+pynakes fields set refs.bib journal "Physical Review B" --where 'journal = "Phys. Rev. B"'
 pynakes fields rename refs.bib journal journaltitle --dry-run --diff
 pynakes fields move refs.bib journal journaltitle --dry-run --diff
 pynakes fields append refs.bib keywords "AI" --dry-run --diff
@@ -292,6 +295,24 @@ pynakes ref add Manual2026 --field title="Manual Reference"  # auto-detects one 
 `--field` is repeatable and uses `name=value` syntax. `--type` defaults to
 `article`. Existing citation keys are rejected unless `--allow-duplicate` is
 passed.
+
+## show and edit
+
+Read or transactionally patch one uniquely identified reference:
+
+```bash
+pynakes ref show Manual2026 refs.bib
+pynakes ref show Manual2026 refs.bib --resolved --json
+pynakes ref edit Manual2026 refs.bib \
+  --field title="Revised title" --field year=2027 \
+  --clear-field note --type book --dry-run --diff
+```
+
+`ref edit` applies all requested field and type changes in one commit. It does
+not rename the citation key: use `keys rename` for that coordinated operation,
+which can also update linked TeX sources and Pinax materials. `ref show` and
+`ref edit` return a conflict when the key is duplicated rather than guessing
+which physical entry was intended.
 
 ## import
 
@@ -412,8 +433,11 @@ pynakes also reads the older one-comment-per-key and `key:value;` layouts, and
 Where JabRef already has a setting, pynakes uses **that**: if the library has
 JabRef `saveActions` enabled, `normalize` honors them — a `normalize_names`
 formatter on a name field drives author normalization and a
-`clean_up_doi`/`short_doi` formatter on `doi` drives DOI cleanup; their absence
+`clean_up_doi` formatter on `doi` drives DOI cleanup; its absence
 disables those steps. An explicit flag or a `pynakes-meta` key overrides.
+JabRef's `short_doi` action is not run: it requires the shortdoi.org network
+service, outside pynakes' deterministic offline normalization boundary, and is
+reported as an unsupported formatter warning.
 
 When `normalize` detects a JabRef aliased key whose pynakes-native equivalent
 is absent, it **adopts** the value as a native key — `databaseType` becomes

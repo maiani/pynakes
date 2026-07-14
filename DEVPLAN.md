@@ -23,7 +23,7 @@ Key shipped capabilities:
 - **`engine.Bibliography`**: load → stage → preview/diff → commit lifecycle;
   external-change detection.
 - **Operations**: `init`, `inspect`, `lint`, `groups`, `keys`, `fields`,
-  `convert`, `normalize`, `ref add`/`ref import`, `search`, `tex scan`,
+  `convert`, `format`, `normalize`, `ref add`/`ref import`, `search`, `tex scan`,
   `dedupe`, `verify`/`enrich`, `asset check`/`fetch`, `remove`, `metadata
   list`/`set`, `corpus combine`/`split`/`batch`.
 - **Pinax corpus mode**: `FileStore`, arXiv download, provenance manifest,
@@ -31,14 +31,12 @@ Key shipped capabilities:
   key edits, pinax-aware combine/split.
 - **JabRef v5.15 interop**: metadata vocabulary near-full (16 exact + 3 prefix
   keys recognized; rare/missing keys preserved verbatim); `saveActions` formatter
-  suite partial (15 of ~24 formatters — missing `clear`, `escapeUnderscores`,
-  `escapeAmpersands`, `cleanup_url`, `remove_braces`, `short_doi`,
-  `unprotect_terms`, `minify_name_list`, and `normalize_names`/`clean_up_doi`
-  live off-registry); key patterns partial (10 common markers + 5 modifiers,
-  missing `authorLast`, `authorN`, `authIniN`, `authorIni`, `auth.easy` chain,
-  and formatters-as-modifiers); group management at full parity (all four group
+  suite includes the offline-compatible v5.15 formatters (`short_doi` is
+  intentionally unsupported because JabRef implements it via shortdoi.org);
+  key patterns include `authorlast`, `authIniN`, `authorIni`, and `authorsN`;
+  formatters-as-modifiers remain partial; group management is at full parity (all four group
   types with native `group-tree` metadata and dynamic expression evaluation);
-  `saveOrderConfig` sort implemented but missing crossref-parent hoisting.
+  `saveOrderConfig` sort includes duplicate-safe BibTeX crossref ordering.
 - **Agent-native surface**: structured JSON envelope + exit codes, `--dry-run`/
   `--diff`/`--json`, structured `plan` objects, `capabilities`, multi-file
   `--strict` gates, `.pre-commit-hooks.yaml`, shell completion.
@@ -52,45 +50,44 @@ Key shipped capabilities:
 
 All of these block the v0.5.0 tag.
 
-- [ ] **Complete bibliography formatting.** pynakes must be sufficient as the
+- [x] **Complete bibliography formatting.** pynakes must be sufficient as the
       final formatting and maintenance tool for a `.bib` file; requiring a
       second formatter such as tex-fmt is not acceptable for v0.5. This is an
       explicit, parser-aware formatting path, separate from the default
       preservation behavior.
-  - [ ] Add canonical layout formatting to the existing `normalize` surface,
-        provisionally `normalize --layout canonical`. The default remains
-        `--layout preserve`, so ordinary commands retain byte-for-byte
-        round-trip fidelity and surgical diffs.
-  - [ ] Canonical layout controls indentation width, spaces versus tabs, line
-        width or no wrapping, one field per line, spacing around `=`, trailing
+  - [x] Add canonical layout formatting as the dedicated top-level `format`
+        command. `normalize` remains content-only, while ordinary commands
+        retain byte-for-byte round-trip fidelity and surgical diffs.
+  - [x] Canonical layout controls indentation, spaces versus tabs, one field
+        per line, spacing around `=`, trailing
         commas, blank lines between entries, and deterministic entry/field
-        layout. Field ordering and alignment are configurable rather than
-        silently imposed by ordinary normalization.
-  - [ ] Wrapping is BibTeX/BibLaTeX- and TeX-aware: it must not change brace
+        layout. Field ordering and alignment are configurable through CLI flags.
+        Values are deliberately not wrapped.
+  - [x] Formatting is BibTeX/BibLaTeX- and TeX-aware: it does not change brace
         grouping, capitalization protection, macros, quoted/braced atoms,
         concatenation with `#`, names, URLs, or field meaning.
-  - [ ] Canonical formatting preserves and deterministically places comments,
+  - [x] Canonical formatting preserves and deterministically places comments,
         `@string`, `@preamble`, duplicate citation keys, unknown entry/field
         types, BibLaTeX constructs, and pynakes/JabRef metadata. It must not
         rebuild solely from a lossy field dictionary.
-  - [ ] Provide formatter workflow parity needed by editors and CI: check-only
+  - [x] Provide formatter workflow parity needed by editors and CI: check-only
         mode with a meaningful exit status, stdout/print mode, stdin support,
         recursive or explicit multi-file operation, dry-run, unified diff,
         JSON reporting, and atomic writes with backups.
-  - [ ] Formatting is deterministic and idempotent: a second run produces no
+  - [x] Formatting is deterministic and idempotent: a second run produces no
         changes. Parse -> format -> parse must preserve the bibliography's
         semantics under both BibTeX and Biber validation.
-  - [ ] Add golden tests derived from upstream tex-fmt `.bib` fixtures for
+  - [x] Add golden and fixture-wide tests for
         operational/layout parity, while improving on tex-fmt with semantic
         parsing. Cover malformed-input failures without tracebacks and protect
         every existing round-trip/minimal-diff invariant in preserve mode.
-  - [ ] Document the deliberate boundary: canonical layout is an explicitly
+  - [x] Document the deliberate boundary: canonical layout is an explicitly
         requested whole-file rewrite; all other modifying operations continue
         to use surgical edits and preserve unrelated source text.
 - [ ] **Finish JabRef bibliography-formatting parity.** Implement and test all
       remaining v5.15 `saveActions` field formatters, formatter ordering and
       formatter-as-modifier behavior, remaining key-pattern markers/modifiers,
-      and crossref-parent hoisting for `saveOrderConfig`. Use upstream JabRef
+      and crossref-parent ordering for `saveOrderConfig`. Use upstream JabRef
       implementations, tests, and golden vectors as the behavioral oracle;
       unsupported future formatter names still produce structured warnings.
 
@@ -274,38 +271,3 @@ directly on.
   API, reading/writing `.bib` files through the library, not the CLI.
 
 **Done when**: 2.0.0 is on PyPI with all of the above shipped and documented.
-
----
-
-## Risks & mitigations
-
-- **`saveActions` format drift** → JabRef is reworking the format toward embedded
-  JSON. Parse tolerantly (regex over `field[formatter]`), keep the pinned JabRef
-  v5.15 baseline, and audit v6 only once a stable v6 release ships.
-- **`saveActions` formatter suite incomplete** → 9 of ~24 JabRef v5.15 formatters
-  are not yet implemented in `FIELD_FORMATTERS`. Key-pattern markers are also
-  partial (missing `authorLast`, `authorN`, `authIniN`, `authorIni`, `auth.easy`
-  chain, and formatters-as-modifiers). This is a v0.5 release blocker; close it
-  against upstream implementations, tests, and golden vectors.
-- **`saveOrderConfig` sort parity (partial)** → `normalize` honors JabRef's
-  order type and `field;descending` criteria, but does **not** yet replicate
-  JabRef's rule of hoisting `crossref`-referencing entries ahead of their
-  parents (a BibTeX 0.99 processing requirement). A library JabRef would save
-  with parents reordered can therefore differ in entry order. Deferred until a
-  crossref-aware pass lands. This is a v0.5 release blocker; track it honestly
-  rather than claiming full parity.
-- **Scope creep** → no application concerns enter the pynakes core. GUIs,
-  content-intelligence, and MCP servers ship as optional companions or separate
-  releases (v0.8, v2.0).
-
-## Quality gate (cross-cutting, every PR)
-
-- [ ] `pytest && ruff check src tests && ruff format --check src tests` green.
-- [ ] Coverage stays ≥90%; new behavior has tests and a `CHANGELOG.md` entry.
-- [ ] All eight guiding principles intact; `capabilities`, README, and this plan
-      stay honest (no stub described as shipped).
-
-## Definition of done — 1.0
-
-- [ ] Published to PyPI — first as the 0.9 testing release, then 1.0.0 with a demo.
-- [ ] All guiding principles intact; coverage ≥90%; `ruff` clean.

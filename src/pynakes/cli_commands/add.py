@@ -1,9 +1,8 @@
 """CLI command registration for ``pynakes ref add``."""
 
-import re
-
 import typer
 
+from pynakes.cli_commands._reference import parse_field_assignments
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     RunParams,
@@ -15,23 +14,6 @@ from pynakes.cli_common import (
     bib_file_argument,
 )
 from pynakes.engine import Bibliography
-
-_FIELD_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_:-]*$")
-
-
-def _parse_field_assignments(assignments: list[str]) -> dict[str, str]:
-    fields: dict[str, str] = {}
-    for assignment in assignments:
-        if "=" not in assignment:
-            raise ValueError(f"Field assignment must use name=value syntax: {assignment!r}")
-        name, value = assignment.split("=", 1)
-        name = name.strip()
-        if not _FIELD_NAME_RE.fullmatch(name):
-            raise ValueError(f"Invalid field name: {name!r}")
-        if name.lower() in {"key", "type"}:
-            raise ValueError(f"{name!r} is not a field; use the citation key or --type")
-        fields[name] = value.strip()
-    return fields
 
 
 def add(
@@ -53,7 +35,7 @@ def add(
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     file = _resolve_input_bib(file, json_output)
     try:
-        fields = _parse_field_assignments(field)
+        fields = parse_field_assignments(field)
         coll = Bibliography.open(file)
         entry = coll.add_entry(
             entry_type,

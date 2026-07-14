@@ -60,7 +60,7 @@ def fields_rename(
     diff: bool = typer.Option(False, "--diff"),
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Rename a field across entries."""
+    """Rename a field across matching references."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     flt = _build_filter(where)
@@ -74,6 +74,30 @@ def fields_rename(
     )
 
 
+def fields_set(
+    file: str | None = bib_file_argument(),
+    field: str = typer.Argument(..., help="Field name"),
+    value: str = typer.Argument(..., help="Replacement value"),
+    where: str | None = typer.Option(None, "--where", help="Filter matching references"),
+    backup: bool = _BACKUP_OPTION,
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    diff: bool = typer.Option(False, "--diff"),
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
+    """Set or replace a field on matching references."""
+    file = _resolve_input_bib(file, json_output)
+    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    flt = _build_filter(where)
+    _run_field_op(
+        file,
+        "fields_set",
+        lambda coll: coll.set_field(field, value, flt),
+        params,
+        {"field": field, "value": value, "where": where},
+        f"{_verb('set', params, 'Set')} field {field!r}",
+    )
+
+
 def fields_move(
     file: str | None = bib_file_argument(),
     old: str = typer.Argument(..., help="Existing field name"),
@@ -84,7 +108,7 @@ def fields_move(
     diff: bool = typer.Option(False, "--diff"),
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Move a field to a new name, skipping entries that already have the target."""
+    """Move a field on matching references, without replacing the target."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     flt = _build_filter(where)
@@ -108,7 +132,7 @@ def fields_append(
     diff: bool = typer.Option(False, "--diff"),
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Append a value to a (comma-delimited) field across entries."""
+    """Append a value to a delimited field on matching references."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     flt = _build_filter(where)
@@ -131,7 +155,7 @@ def fields_clear(
     diff: bool = typer.Option(False, "--diff"),
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Remove a field from entries."""
+    """Remove a field from matching references."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     flt = _build_filter(where)
@@ -174,6 +198,7 @@ def fields_protect_title(
 
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
+    app.command("set")(_safe(fields_set))
     app.command("rename")(_safe(fields_rename))
     app.command("move")(_safe(fields_move))
     app.command("append")(_safe(fields_append))

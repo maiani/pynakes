@@ -75,6 +75,35 @@ def _first_author_last_name(entry: BibEntry) -> str:
     return names[0] if names else "Anon"
 
 
+def _last_author_last_name(entry: BibEntry) -> str:
+    """Return the last name of the last author/editor."""
+    names = _author_last_names(entry)
+    return names[-1] if names else "Anon"
+
+
+def _author_ini(entry: BibEntry) -> str:
+    """JabRef ``authorIni``: five first-author chars plus later initials."""
+    names = _author_last_names(entry)
+    if not names:
+        return "Anon"
+    return names[0][:5] + "".join(name[:1] for name in names[1:])
+
+
+def _auth_ini_n(entry: BibEntry, count: int) -> str:
+    """JabRef ``authIniN``: distribute at most N leading surname characters."""
+    names = _author_last_names(entry)
+    if not names or count <= 0:
+        return ""
+    width, remainder = divmod(count, len(names))
+    return "".join(name[: width + (index < remainder)] for index, name in enumerate(names))
+
+
+def _authors_n(entry: BibEntry, count: int) -> str:
+    """JabRef ``authorsN``: up to N surnames, with EtAl when truncated."""
+    names = _author_last_names(entry)
+    return "".join(names[:count]) + ("EtAl" if len(names) > count else "")
+
+
 def _year(entry: BibEntry) -> str:
     return entry_year(entry)
 
@@ -104,6 +133,8 @@ def _significant_title_words(entry: BibEntry) -> list[str]:
 _MARKER_HANDLERS: dict[str, Callable[[BibEntry], str]] = {
     "auth": _first_author_last_name,
     "authors": lambda e: "".join(_author_last_names(e)),
+    "authorini": _author_ini,
+    "authorlast": _last_author_last_name,
     "year": _year,
     "shortyear": lambda e: _year(e)[-2:],
     "veryshorttitle": lambda e: (
@@ -141,6 +172,10 @@ def _resolve_marker(entry: BibEntry, marker: str) -> str:
             value = handler(entry)
         elif lower_base.startswith("auth") and lower_base[4:].isdigit():
             value = _first_author_last_name(entry)[: int(lower_base[4:])]
+        elif lower_base.startswith("authini") and lower_base[7:].isdigit():
+            value = _auth_ini_n(entry, int(lower_base[7:]))
+        elif lower_base.startswith("authors") and lower_base[7:].isdigit():
+            value = _authors_n(entry, int(lower_base[7:]))
         elif lower_base.startswith("camel") and lower_base[5:].isdigit():
             count = int(lower_base[5:])
             value = "".join(

@@ -2,8 +2,9 @@
 
 from pynakes.authors import normalize_authors, normalize_name_list
 from pynakes.bibtex_parser import parse_bib
+from pynakes.bibtex_writer import write_bib
 from pynakes.journals import normalize_journals
-from pynakes.normalize import NormalizeOptions, normalize_library
+from pynakes.normalize import NormalizeOptions, normalize_library, sort_entries
 
 
 def test_author_list_conservative_style_normalizes_separators_and_others() -> None:
@@ -340,3 +341,63 @@ def test_normalize_library_author_style_conservative_override() -> None:
 def test_bibtex_and_biblatex_author_styles_alias_jabref() -> None:
     assert normalize_name_list("Jane Smith", "bibtex") == "Smith, Jane"
     assert normalize_name_list("Jane Smith", "biblatex") == "Smith, Jane"
+
+
+def test_crossref_parent_sinking_handles_multiple_parents_and_is_idempotent() -> None:
+    lib = parse_bib(
+        "@proceedings{P2}\n"
+        "@proceedings{P1}\n"
+        "@inproceedings{child1, crossref={P1}}\n"
+        "@inproceedings{child2, crossref={P2}}\n"
+    )
+    sort_entries(lib, [("title", False)])
+    assert lib.entries.keys() == ["child2", "P2", "child1", "P1"]
+    sort_entries(lib, [("title", False)])
+    assert lib.entries.keys() == ["child2", "P2", "child1", "P1"]
+
+
+def test_crossref_parent_sinking_resolves_first_duplicate_and_parent_chains() -> None:
+    lib = parse_bib(
+        "@proceedings{grand}\n"
+        "@proceedings{parent, crossref={grand}}\n"
+        "@proceedings{parent}\n"
+        "@inproceedings{child, crossref={parent}}\n"
+    )
+    first_parent = lib.entries.get_all("parent")[0]
+    duplicate_parent = lib.entries.get_all("parent")[1]
+    sort_entries(lib, [("title", False)])
+    assert lib.entries.values() == [
+        lib.entries["child"],
+        first_parent,
+        lib.entries["grand"],
+        duplicate_parent,
+    ]
+
+
+def test_crossref_parent_already_after_child_preserves_source_bytes() -> None:
+    source = "@inproceedings{C, crossref={P}}\n\n@proceedings{P}\n"
+    lib = parse_bib(source)
+    sort_entries(lib, [("title", False)])
+    assert write_bib(lib) == source
+
+
+def test_crossref_cycles_retain_stable_order_and_are_idempotent() -> None:
+    lib = parse_bib(
+        "@article{A, crossref={B}}\n@article{B, crossref={C}}\n@article{C, crossref={A}}\n"
+    )
+    sort_entries(lib, [("title", False)])
+    assert lib.entries.keys() == ["A", "B", "C"]
+    sort_entries(lib, [("title", False)])
+    assert lib.entries.keys() == ["A", "B", "C"]
+
+
+def test_saveactions_malformed_doi_warns_and_short_doi_is_unsupported() -> None:
+    lib = parse_bib(
+        "@comment{jabref-meta: saveActions:enabled;\n"
+        "doi[clean_up_doi,short_doi]\n;}\n"
+        "@article{A, doi={not-a-doi}}\n"
+    )
+    report = normalize_library(lib)
+    warning_types = [warning["type"] for warning in report.warnings if isinstance(warning, dict)]
+    assert "invalid_doi" in warning_types
+    assert "unsupported_save_action_formatter" in warning_types

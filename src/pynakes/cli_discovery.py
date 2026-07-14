@@ -62,7 +62,7 @@ def _positional_tokens(command: click.Command, tokens: list[str]) -> list[str]:
             if not has_value and not option.is_flag:
                 index += option.nargs
             continue
-        if token.startswith("-"):
+        if token.startswith("-") and token != "-":
             # Leave unknown options for Click to report, but do not mistake
             # them for a library argument while deciding whether to insert one.
             index += 1
@@ -79,9 +79,15 @@ def _should_insert_bib(command: click.Command, tokens: list[str]) -> bool:
         return False
 
     positional = _positional_tokens(command, tokens)
+    if "--recursive" in tokens:
+        # Recursive commands intentionally accept an omitted target or a
+        # directory; neither should collapse to the lone local bibliography.
+        return False
     if not positional:
         return True
 
+    if positional[0] == "-":
+        return False
     first = Path(positional[0])
     if first.suffix.lower() == ".bib" or first.is_file():
         return False

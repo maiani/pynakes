@@ -478,3 +478,130 @@ def test_normalize_skips_formatters_without_saveactions() -> None:
     lib = parse_bib(text)
     normalize_library(lib)
     assert lib.entries["A"].fields["pages"] == "1 - 2"
+
+
+# ---------------------------------------------------------------------------
+# Extra formatters (JabRef v5.15 completeness)
+# ---------------------------------------------------------------------------
+
+CLEAR_VECTORS = [
+    ("any value", ""),
+    ("", ""),
+    ("{braced}", ""),
+]
+
+
+@pytest.mark.parametrize("input_val,expected", CLEAR_VECTORS)
+def test_clear(input_val: str, expected: str) -> None:
+    from pynakes.formatters import clear
+
+    assert clear(input_val) == expected
+
+
+ESCAPE_UNDERSCORES_VECTORS = [
+    ("hello_world", r"hello\_world"),
+    ("a_b_c", r"a\_b\_c"),
+    ("a", "a"),
+]
+
+
+@pytest.mark.parametrize("input_val,expected", ESCAPE_UNDERSCORES_VECTORS)
+def test_escape_underscores(input_val: str, expected: str) -> None:
+    from pynakes.formatters import escape_underscores
+
+    assert escape_underscores(input_val) == expected
+
+
+ESCAPE_AMPERSANDS_VECTORS = [
+    ("A & B", r"A \& B"),
+    (r"already escaped \&", r"already escaped \&"),
+    ("no ampersands", "no ampersands"),
+]
+
+
+@pytest.mark.parametrize("input_val,expected", ESCAPE_AMPERSANDS_VECTORS)
+def test_escape_ampersands(input_val: str, expected: str) -> None:
+    from pynakes.formatters import escape_ampersands
+
+    assert escape_ampersands(input_val) == expected
+
+
+CLEANUP_URL_VECTORS = [
+    ("  https://example.com/path  ", "https://example.com/path"),
+    ("<https://example.com/path>", "https://example.com/path"),
+    ("{https://example.com/path}", "https://example.com/path"),
+    ("https://example.com/path.", "https://example.com/path"),
+    ("HTTPS://EXAMPLE.COM/path", "https://EXAMPLE.COM/path"),
+    ("not a url.", "not a url."),
+    ("{not a url.}", "{not a url.}"),
+]
+
+
+@pytest.mark.parametrize("input_val,expected", CLEANUP_URL_VECTORS)
+def test_cleanup_url(input_val: str, expected: str) -> None:
+    from pynakes.formatters import cleanup_url
+
+    assert cleanup_url(input_val) == expected
+
+
+REMOVE_BRACES_VECTORS = [
+    ("{hello}", "hello"),
+    ("{{nested}}", "{nested}"),
+    ("no braces", "no braces"),
+    ("{unbalanced", "{unbalanced"),
+]
+
+
+@pytest.mark.parametrize("input_val,expected", REMOVE_BRACES_VECTORS)
+def test_remove_braces(input_val: str, expected: str) -> None:
+    from pynakes.formatters import remove_braces
+
+    assert remove_braces(input_val) == expected
+
+
+UNPROTECT_TERMS_VECTORS = [
+    ("{protected} word", "protected word"),
+    ("word {protected}", "word protected"),
+    ("{a} and {b}", "a and b"),
+    ("no braces", "no braces"),
+]
+
+
+@pytest.mark.parametrize("input_val,expected", UNPROTECT_TERMS_VECTORS)
+def test_unprotect_terms(input_val: str, expected: str) -> None:
+    from pynakes.formatters import unprotect_terms
+
+    assert unprotect_terms(input_val) == expected
+
+
+MINIFY_NAME_LIST_VECTORS = [
+    ("Smith  and  Jones", "Smith and Jones"),
+    ("and Smith", "Smith"),
+    ("Smith and ", "Smith"),
+    ("Smith and Jones and Lee", "Smith and Jones and Lee"),
+    ("Smith and and and Jones", "Smith and Jones"),
+    ("{Barnes and Noble} and Smith", "{Barnes and Noble} and Smith"),
+]
+
+
+@pytest.mark.parametrize("input_val,expected", MINIFY_NAME_LIST_VECTORS)
+def test_minify_name_list(input_val: str, expected: str) -> None:
+    from pynakes.formatters import minify_name_list
+
+    assert minify_name_list(input_val) == expected
+
+
+def test_new_formatters_registered() -> None:
+    """All new formatters are registered in FIELD_FORMATTERS."""
+    expected = [
+        "cleanup_url",
+        "clear",
+        "clean_up_doi",
+        "escape_ampersands",
+        "escape_underscores",
+        "minify_name_list",
+        "remove_braces",
+        "unprotect_terms",
+    ]
+    for name in expected:
+        assert name in FIELD_FORMATTERS, f"{name!r} not in FIELD_FORMATTERS"
