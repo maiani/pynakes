@@ -253,13 +253,16 @@ def parse_metadata_comment(
         stripped = line.strip()
         if not stripped:
             continue
+        if blocks and line[0] in (" ", "\t"):
+            # Indentation unambiguously marks a continuation. Check this before
+            # parsing ``key:value`` so values such as group-tree nodes whose
+            # names contain colons are not split into fake metadata settings.
+            prev = blocks[-1]
+            prev.value = prev.value + "\n" + stripped
+            continue
         block = _make_metadata_block(stripped, namespace, raw_text, comment_index, classify)
         if block is not None:
             blocks.append(block)
-        elif blocks and (line[0] in (" ", "\t")):
-            # Continuation line: append to previous block's value
-            prev = blocks[-1]
-            prev.value = prev.value + "\n" + stripped
     return blocks
 
 

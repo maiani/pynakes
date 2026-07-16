@@ -185,6 +185,27 @@ def test_enrich_published_cli_uses_arxiv_metadata(monkeypatch, tmp_path: Path) -
     assert bib.read_text() == original
 
 
+def test_check_published_promotes_preprint_with_existing_published_metadata() -> None:
+    lib = parse_bib(
+        "@misc{Preprint,\n"
+        "  title = {A Published Preprint},\n"
+        "  eprint = {2301.00001},\n"
+        "  archivePrefix = {arXiv},\n"
+        "  doi = {10.5555/published},\n"
+        "  journal = {Journal of Published Tests}\n"
+        "}\n"
+    )
+
+    report = integrity.check_published(lib, apply=True)
+    entry = lib.entries["Preprint"]
+
+    assert report.published == 1
+    assert [(update.field, update.value) for update in report.updates] == [("type", "article")]
+    assert entry.type == "article"
+    assert entry.fields["eprint"] == "2301.00001"
+    assert entry.fields["archiveprefix"] == "arXiv"
+
+
 def test_check_published_backfills_arxiv_for_bibtex_doi_entry() -> None:
     lib = parse_bib(
         "@article{PublishedFirst,\n"

@@ -63,6 +63,7 @@ class TestFormatCommand:
         assert "Rewrite layout only" in output
         assert "--indent" in output
         assert "--sort-fields" in output
+        assert "pynakes' preferred field order" in output
         assert "--settings" not in output
 
         normalize_help = _plain_cli_output(runner.invoke(app, ["normalize", "--help"]).output)
@@ -159,6 +160,24 @@ def test_default_metadata_cache_dir_anchors_symlinked_bib_at_link_path(tmp_path:
     link_bib.symlink_to(real_bib)
 
     assert _metadata_cache_dir(str(link_bib), None, True) == str(link_dir / ".pynakes-cache")
+
+
+def test_verb_past_tense_handles_verbs_not_ending_in_e() -> None:
+    from pynakes.cli_common import RunParams, _verb
+
+    params = RunParams(dry_run=False, diff=False, json_output=False, backup=False)
+    # Trailing "e" takes "d"; otherwise "ed" is appended (the former "add" →
+    # "Addd" / "convert" → "Convertd" bug).
+    assert _verb("rename", params) == "Renamed"
+    assert _verb("add", params) == "Added"
+    assert _verb("convert", params) == "Converted"
+    assert _verb("repair", params) == "Repaired"
+    assert _verb("link", params) == "Linked"
+    # Explicit past wins for irregular/doubled forms; dry-run reads as "Would …".
+    assert _verb("tag", params, "Tagged") == "Tagged"
+    assert _verb("add", RunParams(dry_run=True, diff=False, json_output=False, backup=False)) == (
+        "Would add"
+    )
 
 
 class TestChangePlanEnvelope:
@@ -1242,6 +1261,47 @@ class TestAddCommand:
         assert result.exit_code == 1, result.output
         assert json.loads(result.output)["error"] == "InvalidInput"
 
+    def test_add_stub_entry_warns_about_missing_required_fields(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("")
+
+        result = runner.invoke(app, ["ref", "add", "Stub2026", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["warnings"], "expected a missing-required-field warning"
+        warning = data["warnings"][0]
+        assert "Stub2026" in warning
+        assert "author" in warning and "title" in warning
+        # The entry is still created.
+        assert "@article{Stub2026," in bib.read_text()
+
+    def test_add_complete_entry_has_no_warning(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("")
+
+        result = runner.invoke(
+            app,
+            [
+                "ref",
+                "add",
+                "Curie1911",
+                str(bib),
+                "--field",
+                "author=Marie Curie",
+                "--field",
+                "title=Radioactive Substances",
+                "--field",
+                "journal=Le Radium",
+                "--field",
+                "year=1911",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["warnings"] == []
+
 
 class TestReferenceCrud:
     def test_show_one_reference_json(self, tmp_path: Path) -> None:
@@ -1289,6 +1349,29 @@ class TestReferenceCrud:
         result = runner.invoke(app, ["ref", "edit", "Smith2020", str(bib), "--json"])
         assert result.exit_code == 1
         assert json.loads(result.output)["error"] == "InvalidInput"
+
+    def test_remove_deletes_entry_without_doubling_blank_lines(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{A,\n  title = {One}\n}\n\n"
+            "@article{B,\n  title = {Two}\n}\n\n"
+            "@article{C,\n  title = {Three}\n}\n"
+        )
+
+        result = runner.invoke(app, ["ref", "remove", str(bib), "B", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["removed_keys"] == ["B"]
+        assert bib.read_text() == (
+            "@article{A,\n  title = {One}\n}\n\n@article{C,\n  title = {Three}\n}\n"
+        )
+
+    def test_remove_does_not_back_up_by_default(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(app, ["ref", "remove", str(bib), "Smith2020", "--json"])
+        assert result.exit_code == 0, result.output
+        assert not Path(f"{bib}.bak").exists()
 
     @pytest.mark.parametrize("command", ["show", "edit"])
     def test_duplicate_key_is_a_conflict(self, tmp_path: Path, command: str) -> None:

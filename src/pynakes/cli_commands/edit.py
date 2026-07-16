@@ -2,7 +2,12 @@
 
 import typer
 
-from pynakes.cli_commands._reference import parse_field_assignments, unique_entry
+from pynakes.cli_commands._reference import (
+    parse_field_assignments,
+    prompt_entry_type,
+    prompt_required_fields,
+    unique_entry,
+)
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     RunParams,
@@ -11,6 +16,7 @@ from pynakes.cli_common import (
     _resolve_input_bib,
     _safe,
     bib_file_argument,
+    stdin_is_interactive,
 )
 from pynakes.engine import Bibliography
 
@@ -28,9 +34,29 @@ def edit(
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Patch fields or type on one uniquely identified reference."""
-    if not field and not clear_field and entry_type is None:
-        _emit_error(json_output, "InvalidInput", "ref edit requires a change option")
+    """Patch fields or type on one uniquely identified reference.
+
+    Supplying no change options (``--field`` / ``--clear-field`` / ``--type``)
+    starts an interactive prompt for the type and required fields, using the
+    current values as defaults. That path needs an interactive terminal: with
+    ``--json`` or headless stdin it errors instead.
+    """
+    interactive = not field and not clear_field and entry_type is None
+    if interactive:
+        if json_output:
+            _emit_error(
+                json_output,
+                "InvalidInput",
+                "No change options given; pass --field/--clear-field/--type — "
+                "prompting is unavailable with --json",
+            )
+        if not stdin_is_interactive():
+            _emit_error(
+                json_output,
+                "InvalidInput",
+                "No change options given and stdin is not an interactive terminal; "
+                "pass --field/--clear-field/--type to edit non-interactively",
+            )
     fields = parse_field_assignments(field)
     overlap = {name.lower() for name in fields} & {name.lower() for name in clear_field}
     if overlap:
@@ -42,7 +68,18 @@ def edit(
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     coll = Bibliography.open(file)
-    unique_entry(coll, key, json_output, action="ref_edit")
+    entry = unique_entry(coll, key, json_output, action="ref_edit")
+    if interactive:
+        selected_type = entry_type or prompt_entry_type(entry.type)
+        fields = prompt_required_fields(
+            coll,
+            selected_type,
+            fields,
+            existing=entry,
+            clear_fields=clear_field,
+        )
+        if entry_type is None and selected_type != entry.type:
+            entry_type = selected_type
     operations = coll.edit_entry(
         key,
         fields=fields,

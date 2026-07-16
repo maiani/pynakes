@@ -76,24 +76,40 @@ class CodexProvider:
 
     name = "codex"
 
-    def __init__(self, *, timeout: int = 900) -> None:
+    def __init__(
+        self,
+        *,
+        timeout: int = 900,
+        model: str | None = None,
+        reasoning_effort: str | None = None,
+    ) -> None:
         self.timeout = timeout
+        self.model = model
+        self.reasoning_effort = reasoning_effort
 
     def run(self, *, role: str, prompt: str, cwd: Path, env: dict[str, str]) -> AgentResponse:
         last_message = cwd / f".{role}-last-message.json"
         cmd = [
             "codex",
             "exec",
-            "--cd",
-            str(cwd),
-            "--sandbox",
-            "workspace-write",
-            "--ephemeral",
-            "--json",
-            "--output-last-message",
-            str(last_message),
-            "-",
         ]
+        if self.model:
+            cmd.extend(["--model", self.model])
+        if self.reasoning_effort:
+            cmd.extend(["--config", f'model_reasoning_effort="{self.reasoning_effort}"'])
+        cmd.extend(
+            [
+                "--cd",
+                str(cwd),
+                "--sandbox",
+                "workspace-write",
+                "--ephemeral",
+                "--json",
+                "--output-last-message",
+                str(last_message),
+                "-",
+            ]
+        )
         proc = subprocess.run(
             cmd,
             input=prompt,
@@ -113,9 +129,19 @@ class CodexProvider:
         )
 
 
-def provider_from_name(name: str, *, timeout: int = 900) -> AgentProvider:
+def provider_from_name(
+    name: str,
+    *,
+    timeout: int = 900,
+    model: str | None = None,
+    reasoning_effort: str | None = None,
+) -> AgentProvider:
     if name == "fake":
         return FakeProvider()
     if name == "codex":
-        return CodexProvider(timeout=timeout)
+        return CodexProvider(
+            timeout=timeout,
+            model=model,
+            reasoning_effort=reasoning_effort,
+        )
     raise ValueError(f"unknown provider: {name}")

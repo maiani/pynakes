@@ -17,6 +17,7 @@ import pytest
 from pynakes.bibtex_parser import parse_bib
 from pynakes.canonical import CanonicalLayout, format_entry, write_bib_canonical
 from pynakes.engine import Bibliography
+from pynakes.group_tree import library_group_tree
 from pynakes.model import BibEntry, BibFile
 from pynakes.normalize import NormalizeOptions
 
@@ -231,18 +232,68 @@ class TestWriteBibCanonical:
         assert "between-entry source text" in result
         assert write_bib_canonical(parse_bib(result)) == result
 
-    def test_pynakes_meta_first(self) -> None:
-        lib = BibFile(
-            entries=[BibEntry(key="Test", type="article", fields={})],
-            raw_comments=[
-                "@comment{jabref-meta: databaseType:bibtex;}",
-                "@comment{pynakes-meta: dialect: biblatex}",
-            ],
+    def test_pynakes_meta_first_and_jabref_meta_last(self) -> None:
+        source = (
+            "@comment{jabref-meta: databaseType:bibtex;}\n"
+            "@article{Test, title={A Test}}\n"
+            "@comment{pynakes-meta: dialect: biblatex}\n"
+            "trailing source text\n"
         )
-        result = write_bib_canonical(lib)
+        result = write_bib_canonical(parse_bib(source))
         pynakes_idx = result.find("pynakes-meta")
+        entry_idx = result.find("@article{Test")
+        trailing_idx = result.find("trailing source text")
         jabref_idx = result.find("jabref-meta")
-        assert pynakes_idx < jabref_idx
+        assert pynakes_idx < entry_idx < trailing_idx < jabref_idx
+        assert result.rstrip().endswith("@comment{jabref-meta: databaseType:bibtex;}")
+        assert write_bib_canonical(parse_bib(result)) == result
+
+    def test_multiline_group_tree_with_colon_remains_one_metadata_value(self) -> None:
+        source = (
+            "@comment{pynakes-meta:\n"
+            "group-tree: Papers\n"
+            "  Machine Learning: AI|Papers\n"
+            "}\n"
+            "@article{Test, title={A Test}}\n"
+        )
+
+        result = write_bib_canonical(parse_bib(source))
+        reparsed = parse_bib(result)
+        tree = library_group_tree(reparsed)
+
+        assert len(reparsed.pynakes_metadata_blocks) == 1
+        assert reparsed.pynakes_metadata_blocks[0].key == "group-tree"
+        assert tree is not None
+        assert [(node.name, node.parent) for node in tree] == [
+            ("Papers", ""),
+            ("Machine Learning: AI", "Papers"),
+        ]
+        assert "  Machine Learning: AI|Papers" in result
+        assert write_bib_canonical(reparsed) == result
+
+    def test_multiline_jabref_grouping_remains_one_trailing_comment(self) -> None:
+        source = (
+            "@comment{jabref-meta: grouping:\n"
+            "0 AllEntriesGroup:;\n"
+            "1 StaticGroup:Papers;0;1;;;;\n"
+            "2 StaticGroup:Machine Learning\\:AI;1;1;;;;\n"
+            "}\n"
+            "@article{Test, title={A Test}}\n"
+        )
+
+        result = write_bib_canonical(parse_bib(source))
+        reparsed = parse_bib(result)
+        tree = library_group_tree(reparsed)
+
+        assert len(reparsed.jabref_metadata_blocks) == 1
+        assert reparsed.jabref_metadata_blocks[0].key == "grouping"
+        assert tree is not None
+        assert [(node.name, node.parent) for node in tree] == [
+            ("Papers", ""),
+            ("Machine Learning:AI", "Papers"),
+        ]
+        assert result.index("@article{Test") < result.index("jabref-meta: grouping")
+        assert write_bib_canonical(reparsed) == result
 
     def test_deterministic_output(self) -> None:
         lib = BibFile(

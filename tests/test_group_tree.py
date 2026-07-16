@@ -175,6 +175,19 @@ def test_parse_metadata_comment_with_continuation_lines() -> None:
     assert blocks[0].value == "A||2||1|\nB|A|2||1|\nC|A|2||1|"
 
 
+def test_parse_metadata_comment_treats_indented_colon_as_continuation() -> None:
+    """A colon in an indented group name does not start a metadata key."""
+    from pynakes.metadata import parse_metadata_comment
+
+    comment = """pynakes-meta: group-tree: Papers
+  Machine Learning: AI|Papers"""
+    blocks = parse_metadata_comment(comment)
+
+    assert len(blocks) == 1
+    assert blocks[0].key == "group-tree"
+    assert blocks[0].value == "Papers\nMachine Learning: AI|Papers"
+
+
 def test_parse_metadata_comment_non_continuation_lines() -> None:
     """A line without colon and without leading whitespace is not a continuation."""
     from pynakes.metadata import parse_metadata_comment

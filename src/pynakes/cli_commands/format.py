@@ -158,7 +158,9 @@ def format_bibliography(
         None, "--blank-lines/--no-blank-lines", help="Blank line between entries"
     ),
     sort_fields: bool | None = typer.Option(
-        None, "--sort-fields/--preserve-field-order", help="Use canonical field order"
+        None,
+        "--sort-fields/--preserve-field-order",
+        help="Use pynakes' preferred field order",
     ),
     check: bool = typer.Option(False, "--check", help="Exit 1 when layout changes are needed"),
     to_stdout: bool = typer.Option(

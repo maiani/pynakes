@@ -80,6 +80,8 @@ class EvalConfig:
     include_online: bool = False
     strict: bool = False
     timeout: int = 900
+    model: str | None = None
+    reasoning_effort: str | None = None
 
 
 @dataclass(frozen=True)
@@ -180,6 +182,8 @@ def _write_markdown_summary(
         "# pynakes Agent Beta-Test Summary",
         "",
         f"- Provider: `{config.provider_name}`",
+        f"- Model: `{config.model or 'provider default'}`",
+        f"- Reasoning effort: `{config.reasoning_effort or 'provider default'}`",
         f"- Seed: `{config.seed}`",
         f"- Include online: `{config.include_online}`",
         f"- Lab: `{lab.root}`",
@@ -215,7 +219,12 @@ def run_eval(
     out = config.out
     out.mkdir(parents=True, exist_ok=True)
     lab = create_lab_workspace(root, seed=config.seed, lab_root=lab_root)
-    provider = provider or provider_from_name(config.provider_name, timeout=config.timeout)
+    provider = provider or provider_from_name(
+        config.provider_name,
+        timeout=config.timeout,
+        model=config.model,
+        reasoning_effort=config.reasoning_effort,
+    )
 
     supervisor_response = provider.run(
         role="supervisor", prompt=_supervisor_prompt(config, lab), cwd=lab.root, env=lab.env
@@ -276,6 +285,12 @@ def _parse_args(argv: list[str]) -> EvalConfig:
     parser.add_argument("--include-online", action="store_true")
     parser.add_argument("--strict", action="store_true")
     parser.add_argument("--timeout", type=int, default=900)
+    parser.add_argument("--model", help="Codex model override (for example, gpt-5.6-luna)")
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=["low", "medium", "high", "xhigh"],
+        help="Codex reasoning-effort override",
+    )
     args = parser.parse_args(argv)
     return EvalConfig(
         provider_name=args.provider,
@@ -285,6 +300,8 @@ def _parse_args(argv: list[str]) -> EvalConfig:
         include_online=args.include_online,
         strict=args.strict,
         timeout=args.timeout,
+        model=args.model,
+        reasoning_effort=args.reasoning_effort,
     )
 
 

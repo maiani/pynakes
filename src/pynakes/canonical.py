@@ -25,8 +25,12 @@ from pynakes.model import BibEntry, BibFile
 # Layout configuration
 # ---------------------------------------------------------------------------
 
-# Canonical field ordering per entry type.  Fields not in the table are
-# appended after the known fields in their original insertion order.
+# Pynakes' preferred field ordering per entry type. BibTeX and BibLaTeX do not
+# assign semantic meaning to field order; this is a deterministic readability
+# convention, not an external standard. It keeps inheritance links first (see
+# ``_STRUCTURAL_FIELDS``), then identifies the work and its publication context,
+# then places identifiers/access fields and annotations toward the end. Fields
+# absent from the table retain their original relative order after known fields.
 _FIELD_ORDER: dict[str, list[str]] = {
     "article": [
         "author",
@@ -201,12 +205,13 @@ _DEFAULT_LAYOUT = CanonicalLayout()
 
 
 def _sorted_fields(entry: BibEntry, layout: CanonicalLayout) -> list[tuple[str, str]]:
-    """Return *entry*'s fields in canonical order.
+    """Return *entry*'s fields in pynakes' preferred order.
 
-    Known fields for the entry type come first in the canonical order; any
-    remaining fields follow in their original dict-insertion order.  Structural
-    fields (``crossref``, ``xdata``, ``xref``) are always emitted first so
-    inheritance relationships are visible.
+    This order is a deterministic readability convention, not a requirement of
+    BibTeX, BibLaTeX, or JabRef. Known fields for the entry type come first in
+    the preferred order; any remaining fields follow in their original
+    dict-insertion order. Structural fields (``crossref``, ``xdata``, ``xref``)
+    are always emitted first so inheritance relationships are visible.
     """
     if not layout.sort_fields:
         return list(entry.fields.items())
@@ -291,14 +296,15 @@ def write_bib_canonical(
 
     Deterministic ordering:
         1. ``pynakes-meta`` comment blocks (consolidated)
-        2. ``jabref-meta`` comment blocks (one per key)
-        3. Other ``@comment`` blocks
-        4. ``@string`` declarations (alphabetical by key)
-        5. ``@preamble`` blocks
-        6. ``@entry`` blocks (in their original order)
+        2. Other ``@comment`` blocks
+        3. ``@string`` declarations (alphabetical by key)
+        4. ``@preamble`` blocks
+        5. ``@entry`` blocks (in their original order)
+        6. ``jabref-meta`` comment blocks (one per key)
 
-    Within each entry, fields follow the canonical field-order table.  The
-    output is idempotent: formatting twice gives the same result.
+    Within each entry, fields follow pynakes' preferred field-order table. This
+    is a readability convention, not a BibTeX/BibLaTeX requirement. The output
+    is idempotent: formatting twice gives the same result.
     """
     if layout is None:
         layout = _DEFAULT_LAYOUT
@@ -306,13 +312,40 @@ def write_bib_canonical(
     le = lib.line_ending
     parts: list[str] = []
 
+    def is_jabref_layout_segment(segment: tuple[str, str, object]) -> bool:
+        _gap, kind, ref = segment
+        if kind != "comment" or not isinstance(ref, int):
+            return False
+        try:
+            comment = lib.raw_comments[ref]
+        except IndexError:
+            return False
+        return comment.strip().lower().startswith("@comment{jabref-meta:")
+
+    # A previous canonical pass places JabRef comments last. Any retained text
+    # immediately before that trailing metadata section is represented by the
+    # parser as a layout gap, rather than ``source_trailing``. Keep that text at
+    # the end of the bibliography body so another pass is idempotent.
+    trailing_jabref_start = len(lib.source_layout)
+    while trailing_jabref_start and is_jabref_layout_segment(
+        lib.source_layout[trailing_jabref_start - 1]
+    ):
+        trailing_jabref_start -= 1
+    has_trailing_jabref_section = trailing_jabref_start < len(lib.source_layout)
+    pre_jabref_source: list[str] = []
+
     # Preserve non-whitespace source text that is not a parsed top-level block.
     # Canonical formatting owns surrounding whitespace and block placement, but
     # it must never silently discard text the round-trip parser retained.
     raw_source: list[str] = []
-    for gap, kind, ref in lib.source_layout:
+    for index, (gap, kind, ref) in enumerate(lib.source_layout):
         if gap.strip():
-            raw_source.append(gap.strip("\r\n"))
+            target = (
+                pre_jabref_source
+                if has_trailing_jabref_section and index >= trailing_jabref_start
+                else raw_source
+            )
+            target.append(gap.strip("\r\n"))
         if kind == "raw":
             raw_source.append(str(ref).strip("\r\n"))
     for fragment in raw_source:
@@ -333,11 +366,10 @@ def write_bib_canonical(
         else:
             plain_comments.append(comment)
 
-    # Emit pynakes-meta first (consolidated), then jabref-meta, then plain.
+    # Emit pynakes-native metadata first, followed by ordinary comments.
+    # JabRef metadata is emitted after the bibliography body below, matching
+    # JabRef's trailing metadata convention.
     for comment in pynakes_comments:
-        parts.append(comment)
-        parts.append(le * 2)
-    for comment in jabref_comments:
         parts.append(comment)
         parts.append(le * 2)
     for comment in plain_comments:
@@ -380,11 +412,20 @@ def write_bib_canonical(
             parts.append(le)
 
     text = "".join(parts)
+    trailing_source = [*pre_jabref_source]
     trailing = lib.source_trailing.lstrip("\r\n")
     if trailing.strip():
+        trailing_source.append(trailing)
+    for fragment in trailing_source:
         if text:
             text = text.rstrip("\r\n") + le * 2
-        text += trailing
+        text += fragment
+
+    for comment in jabref_comments:
+        if text:
+            text = text.rstrip("\r\n") + le * 2
+        text += comment.strip("\r\n")
+
     if text and not text.endswith(le):
         text += le
     return text

@@ -22,7 +22,12 @@ from pynakes import integrity as integrity_ops
 from pynakes import journals as journal_ops
 from pynakes import metadata as metadata_ops
 from pynakes import normalize as normalize_ops
-from pynakes._engine_helpers import build_fetch_queue, metadata_fetch_policy, run_fetch_loop
+from pynakes._engine_helpers import (
+    build_fetch_queue,
+    entry_removal_text,
+    metadata_fetch_policy,
+    run_fetch_loop,
+)
 from pynakes.canonical import CanonicalLayout
 from pynakes.editing import set_entry_type
 from pynakes.fetch_progress import FetchProgress
@@ -418,7 +423,10 @@ class BibliographyOperations:
         report = dedupe_ops.merge_duplicates(self.lib, clusters)
         for entry in report.removed_entries:
             if entry.raw_content:
-                self._text_replacements.append((entry.raw_content, ""))
+                span = (
+                    entry_removal_text(self._pristine_text, entry.raw_content) or entry.raw_content
+                )
+                self._text_replacements.append((span, ""))
         self._removed_entries.extend(report.removed_entries)
         report.pinax_materials = pinax_materials
         self._stage_pinax_material_merges(pinax_merges)
@@ -464,7 +472,10 @@ class BibliographyOperations:
         entries = self.lib.entries.get_all(key)
         for entry in entries:
             if entry.raw_content:
-                self._text_replacements.append((entry.raw_content, ""))
+                span = (
+                    entry_removal_text(self._pristine_text, entry.raw_content) or entry.raw_content
+                )
+                self._text_replacements.append((span, ""))
             self.lib.entries.remove(entry)
             self._removed_entries.append(entry)
         self._mark(len(entries))

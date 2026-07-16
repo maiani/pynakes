@@ -114,7 +114,6 @@ in the `pynakes-meta` `group-tree` key. Trees with multiple nodes are split
 across continuation lines (one node per line) for readability. The tree is
 bidirectionally compatible with JabRef's `grouping` block and flat `groups:`
 metadata.
-
 ```bash
 pynakes groups tree refs.bib              # display the group tree
 pynakes groups tree refs.bib --json
@@ -290,11 +289,20 @@ Add a manually specified reference entry:
 pynakes ref add Manual2026 refs.bib --field title="Manual Reference" --field year=2026
 pynakes ref add Manual2026 refs.bib --type book --field author="Ada Lovelace"
 pynakes ref add Manual2026 --field title="Manual Reference"  # auto-detects one .bib file
+pynakes ref add  # interactive; auto-detects one .bib file
+pynakes ref add --file refs.bib  # interactive with an explicit library
 ```
 
 `--field` is repeatable and uses `name=value` syntax. `--type` defaults to
 `article`. Existing citation keys are rejected unless `--allow-duplicate` is
-passed.
+passed. With no citation-key argument, `ref add` starts interactive mode and
+first asks for the key. Leave it blank to generate the key from the collected
+metadata and the library's configured key pattern. It then asks for the entry
+type and only the required fields not already supplied with `--type` or
+`--field`. The prompts follow the library's BibTeX or BibLaTeX required-field
+rules. Supply the key (and `--field`) to add non-interactively; interactive
+mode requires a terminal and errors under `--json` or headless stdin. Use
+`--file` when an interactive run cannot auto-detect the library.
 
 ## show and edit
 
@@ -306,13 +314,18 @@ pynakes ref show Manual2026 refs.bib --resolved --json
 pynakes ref edit Manual2026 refs.bib \
   --field title="Revised title" --field year=2027 \
   --clear-field note --type book --dry-run --diff
+pynakes ref edit Manual2026 refs.bib  # interactive when no change options are supplied
 ```
 
 `ref edit` applies all requested field and type changes in one commit. It does
 not rename the citation key: use `keys rename` for that coordinated operation,
 which can also update linked TeX sources and Pinax materials. `ref show` and
 `ref edit` return a conflict when the key is duplicated rather than guessing
-which physical entry was intended.
+which physical entry was intended. With no change options, `ref edit` starts
+interactive mode automatically and presents the current type and required
+fields as defaults; pressing Enter preserves each value. Interactive mode
+requires a terminal: supplying no change options under `--json` or headless
+stdin is an error rather than a prompt.
 
 ## import
 
@@ -368,6 +381,36 @@ Relative paths are resolved against the `.bib` file directory, repeated
 `--root` directories, and JabRef `fileDirectory*` metadata. It reports `ok`,
 `missing`, `wrong_type`, and `unresolved` statuses. This command is read-only;
 repair is planned separately.
+
+## format
+
+Rewrite the whole-file layout deterministically without changing bibliographic
+values or conventions:
+
+```bash
+pynakes format refs.bib --dry-run --diff
+pynakes format refs.bib
+pynakes format refs.bib --check
+pynakes format refs.bib --preserve-field-order
+```
+
+By default, fields use **pynakes' preferred order**. This is not prescribed by
+BibTeX, BibLaTeX, or JabRef; field order has no bibliographic meaning. It is a
+readability convention chosen to make entries predictable and easy to scan:
+
+1. Inheritance fields (`crossref`, `xdata`, and `xref`) come first so structural
+   relationships are immediately visible.
+2. Entry-type fields identifying the work and its publication context follow,
+   such as author, title, journal or book title, year, volume, and pages.
+3. Identifiers and access fields, then annotations such as notes and abstracts,
+   generally come last.
+4. Unknown and custom fields retain their relative source order after the known
+   fields, avoiding an arbitrary alphabetical reshuffle.
+
+Use `--preserve-field-order` when the library already has a preferred ordering.
+The other layout controls configure indentation, `=` alignment, trailing
+commas, and blank lines. Unlike ordinary surgical commands, `format` is an
+explicit whole-file rewrite.
 
 ## normalize
 

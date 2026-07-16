@@ -108,18 +108,23 @@ _BIBLATEX_ALIAS_REQUIRED: RequiredRules = {
 _DOI_EXPECTED = {"article", "inproceedings"}
 
 
-def _required_for_entry_type(entry_type: str, dialect: str) -> list[tuple[str, ...]]:
+def required_field_rules(entry_type: str, dialect: str) -> tuple[tuple[str, ...], ...]:
     """Return built-in required fields for ``entry_type`` in ``dialect``.
+
+    Each returned tuple contains interchangeable field names, any one of which
+    satisfies that requirement. The immutable result is also used by
+    interactive entry editing so prompting and lint validation share one source
+    of truth.
 
     For BibLaTeX, derived from the official BibLaTeX manual on CTAN, section 2.1:
     https://mirrors.ctan.org/macros/latex/contrib/biblatex/doc/biblatex.pdf
     """
     etype = entry_type.lower()
     if dialect != "biblatex":
-        return _BIBTEX_REQUIRED.get(etype, [])
+        return tuple(_BIBTEX_REQUIRED.get(etype, []))
     if etype in _BIBLATEX_ALIAS_REQUIRED:
-        return _BIBLATEX_ALIAS_REQUIRED[etype]
-    return _BIBLATEX_REQUIRED.get(_BIBLATEX_REQUIREMENT_ALIASES.get(etype, etype), [])
+        return tuple(_BIBLATEX_ALIAS_REQUIRED[etype])
+    return tuple(_BIBLATEX_REQUIRED.get(_BIBLATEX_REQUIREMENT_ALIASES.get(etype, etype), []))
 
 
 # Fields excluded from the cross-entry consistency check: structural/reference
@@ -327,9 +332,7 @@ def _lint_field_consistency(lib: BibFile, *, dialect: str = "bibtex") -> list[Li
         if total < 3:
             continue
         required = {
-            name
-            for alternatives in _required_for_entry_type(etype, dialect)
-            for name in alternatives
+            name for alternatives in required_field_rules(etype, dialect) for name in alternatives
         }
         resolved = [lib.resolved_fields(entry) for entry in entries]
 
@@ -488,7 +491,7 @@ def _lint_required_fields(entry: BibEntry, fields: dict[str, str], dialect: str)
             key=entry.key,
             field=alternatives[0],
         )
-        for alternatives in _required_for_entry_type(etype, dialect)
+        for alternatives in required_field_rules(etype, dialect)
         if not any(fields.get(name, "").strip() for name in alternatives)
     ]
 

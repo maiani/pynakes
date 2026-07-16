@@ -323,17 +323,18 @@ def check_published(
         existing_doi = entry.fields.get("doi", "").strip()
         existing_journal = _journal(entry)
         if existing_doi and existing_journal:
-            report.candidates.append(
-                PublishedCandidate(
-                    entry.key,
-                    source,
-                    identifier,
-                    "published_present",
-                    doi=existing_doi,
-                    journal=existing_journal,
-                    message="Entry already has DOI and journal metadata",
-                )
+            candidate = PublishedCandidate(
+                entry.key,
+                source,
+                identifier,
+                "published_present",
+                doi=existing_doi,
+                journal=existing_journal,
+                message="Entry already has DOI and journal metadata",
             )
+            report.candidates.append(candidate)
+            if apply:
+                _apply_published_candidate(entry, candidate, report)
             continue
         if not online:
             report.candidates.append(

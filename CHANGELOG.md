@@ -5,760 +5,206 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - Unreleased
+
+First public alpha (in preparation). Adds the optional **Pinax** corpus layer
+(a `.bib` plus the materials it points to, addressed by citation key),
+pynakes-native metadata with JabRef as opt-in interop, a canonical `format`
+command, a native hierarchical group tree, and a resource-oriented command
+tree. This remains an alpha: backward compatibility for the Python API, CLI
+syntax, and JSON envelopes is not guaranteed until v1.0.
 
 ### Added
 
-- **Complete individual-reference CRUD and explicit bulk field editing.**
-  `ref show` reads one unique citation key and `ref edit` transactionally sets
-  or clears several fields and/or changes its entry type. Duplicate citation
-  keys return a conflict rather than selecting an occurrence. `fields set`
-  adds exact bulk replacement alongside the existing query-driven field
-  operations, whose help now identifies them as bulk edits across matching
-  references. Citation-key changes remain under `keys rename` so linked TeX
-  sources and Pinax materials stay coordinated.
+New commands and command families:
 
-- **Canonical layout formatting for `.bib` files.** The new top-level `format`
-  command performs a deterministic, idempotent, layout-only whole-file rewrite
-  with canonical field ordering, indentation, trailing commas, and blank lines
-  between entries. It preserves source value expressions, including bare
-  macros, quoted/braced atoms, and `#` concatenation, and retains trailing
-  source text. Layout is configurable through explicit command flags. Ordinary operations retain
-  byte-for-byte preservation and surgical diffs.
-  (`canonical.py`, `cli_commands/format.py`, `_engine_ops.py`)
-
-- **`format --check` and `--stdout` modes.** `--check` exits with status 1
-  when the file needs canonical formatting (useful for CI gates). `--stdout`
-  prints canonical output without writing (useful for editor integration).
-  A dirty check remains `status: success` with `modified: true` in JSON, so it
-  is distinguishable from parse or I/O errors.
-
-- **`format --recursive` and stdin operation.** Recursive discovery uses one
-  `*.bib` traversal, excludes hidden directories and auxiliary files, applies
-  the same layout controls to every file, and exits nonzero on any per-file failure.
-  `format - --stdout` reads from stdin; stdin without `--stdout` is rejected.
-
-- **Eight additional JabRef v5.15 `saveActions` field formatters.** `clear`,
-  `escape_underscores`, `escape_ampersands`, `cleanup_url`, `remove_braces`,
-  `unprotect_terms`, `minify_name_list`, and `clean_up_doi`
-  are now registered in `FIELD_FORMATTERS` and applied where configured.
-  JabRef's network-backed `short_doi` is deliberately unsupported and produces
-  the existing structured `unsupported_save_action_formatter` warning.
-  (`formatters/_extra.py`, `formatters/_registry.py`)
-
-- **JabRef citation-key pattern markers `authorlast`, `authIniN`, `authorIni`,
-  and `authorsN`.** Their behavior follows JabRef's documented multi-author
-  semantics; fabricated `auth.ini` / `auth.easy` and non-JabRef `authorN` are
-  rejected instead of silently producing incompatible keys. (`keys.py`)
-
-- **BibTeX-compatible crossref ordering for `saveOrderConfig` sort.** After sorting
-  entries, crossref parents are placed after every child that references them,
-  as required by BibTeX 0.99. The reorder is
-  stable across multiple parents and chains, leaves malformed crossref cycles
-  idempotent, resolves duplicate parent keys to the first occurrence, and uses
-  the public duplicate-safe entry store API.
-  (`_sink_crossref_parents` in `normalize.py`)
-
-- **Canonical formatting preserves retained source constructs.** Duplicate
-  `@string` declarations, malformed-but-round-trippable blocks, and non-block
-  source text are retained instead of being collapsed or silently discarded.
-
-- **`cleanup_url` leaves non-URL values unchanged.** Wrapper and punctuation
-  cleanup now runs only when the value begins with a URL scheme.
-
-- **Institutionally entitled published PDFs and supplementary PDFs.**
-  `asset fetch --published --access institutional` follows the DOI to a
-  publisher landing page and uses access already supplied by the current
-  university network, VPN, or proxy; it does not import browser sessions or
-  handle credentials. `--supplement` (also a `supplement` fetch-policy value)
-  downloads one unambiguous supplementary PDF and reports multiple candidates
-  without choosing or overwriting. Downloads validate PDF magic bytes, classify
-  authentication HTML as a skip, and record the access context in Pinax
-  provenance. (`providers/publisher.py`, `fetch.py`, `_engine_helpers.py`,
-  `cli_commands/fetch.py`)
-
-- **`asset fetch` now accepts per-invocation policy flags.** `--preprint`,
-  `--published`, `--source`, `--supplement`, and `--bestpdf` override the metadata
-  `fetch-policy` for a single invocation. When none are given, the metadata
-  setting is used as before. (`fetch_materials` in `_engine_ops.py`,
-  `fetch` in `cli_commands/fetch.py`)
-
-- **`normalize` adopts JabRef metadata as pynakes-native keys.** When a
-  JabRef aliased key (`databaseType`, `saveOrderConfig`, `keypatterndefault`,
-  `keypattern_<type>`, `grouping`) is present without its pynakes-native
-  equivalent (`dialect`, `sort-order`, `key-pattern`, `key-pattern-<type>`,
-  `group-tree`), normalize adds the native key with the translated value.
-  Existing native keys are never overwritten. (`native_key_for_jabref`,
-  `native_value_for_jabref` in `metadata/jabref.py`; `normalize_library`
-  in `normalize.py`)
-
-- **`normalize` regenerates citation keys when `normalize-keys: true` is
-  set.** A new `--keys on/off` CLI flag and `normalize-keys` metadata key
-  opt into regenerating every entry key from the configured pattern
-  (`key-pattern` / `keypatterndefault`). The bib entry and any Pinax material
-  files are renamed consistently. (`normalize_library` in `normalize.py`;
-  `normalize` command in `cli_commands/normalize.py`; `_engine_ops.py` wires
-  Pinax renames through `_stage_pinax_renames`)
-
-- **`parse_jabref_grouping` handles both separator conventions.** JabRef's
-  `grouping` metadata uses `;` as parameter delimiter, but some exporters
-  write `\;` instead. The parser now detects and handles both.
-  (`_parse_jabref_params` in `group_tree.py`)
-
-- **Native group-tree metadata with JabRef projection and CRUD CLI.** A new
-  `group_tree` module introduces a hierarchical group model stored under the
-  `group-tree` key in `pynakes-meta`. The format is a single-line pipe-delimited
-  list (`name|parent|context|color|expanded`). The tree is bidirectionally
-  projected to/from JabRef's `grouping` block and flat `groups:` format. CLI
-  commands (`tree`, `add-group`, `remove-group`, `rename-group`, `move-group`)
-  cover tree CRUD; `update_node`/`list_entries_in_group_tree` (with descendant
-  propagation and a `strict` exact-match mode) are available at the engine/
-  Python API level, not yet wired to a CLI command. `init --from` skips legacy
-  JabRef group keys but copies the native `group-tree` key.
-  (`src/pynakes/group_tree.py`,
-  `src/pynakes/metadata/jabref.py`,
-  `src/pynakes/metadata/schema.py`,
-  `src/pynakes/_engine_ops.py`,
-  `src/pynakes/cli_commands/groups.py`,
-  `src/pynakes/initialize.py`,
-  `src/pynakes/capabilities.py`,
-  `tests/test_group_tree.py`)
-
-- **Native `group-tree` metadata now uses continuation lines for large trees.**
-  Trees with more than one node are split across continuation lines (one node
-  per indented line) within the `pynakes-meta` comment block, instead of a
-  single long semicolon-delimited line. The single-line format is still
-  accepted on read. The continuation infrastructure in
-  `parse_metadata_comment` (lines starting with whitespace are appended to the
-  previous block's value) is general and available for any future key that
-  needs multiline values. (`core.py:parse_metadata_comment`,
-  `core.py:format_pynakes_meta_block`,    `group_tree.py:_write_tree`)
-
-- **Full JabRef group-type parity: KeywordGroup, SearchGroup, ExplicitGroup.**
-  `GroupNode` extended with `group_type`, `field`, `expression`,
-  `case_sensitive`, `separator`, `search_flags`, `entries`. The native
-  pipe-delimited format widened to 13 fields. `parse_jabref_grouping` and
-  `format_jabref_grouping` handle all four JabRef group types with correct
-  parameter layout. The `update-group` CLI command also added.
-  (`src/pynakes/group_tree.py`, `src/pynakes/cli_commands/groups.py`,
-  `tests/test_group_tree.py`)
-
-- **Dynamic group expression evaluation for KeywordGroup / SearchGroup.**
-  `KeywordGroup` (field + expression + separator + case-sensitivity) and
-  `SearchGroup` (expression across all fields + search-flags) are now evaluated
-  at query time. `list_entries_in_group_tree` returns computed members alongside
-  explicitly tagged ones; `resolve_effective_groups` includes dynamic groups an
-  entry matches. `entry_computed_groups()` provides a public lookup.
-  (`_matches_keyword_group`, `_matches_search_group`, `_group_entry_keys`,
-  `entry_computed_groups` in `src/pynakes/group_tree.py`)
-
-
-- **`corpus split` gained a `--minimal` flag.** For a bucket meant as a
-  standalone snippet (e.g. one entry pulled out to hand to a collaborator)
-  rather than a working library, `--minimal` drops the source library's
-  `jabref-meta`/`pynakes-meta` blocks (groups, save-order config, Pinax fetch
-  settings) from that output and skips Pinax materials copying, instead of
-  carrying the whole library's config into a one-entry file.
-  (`strip_metadata_blocks` in `src/pynakes/setops.py`)
-
-### Fixed
-
-- **Citation-key title markers convert leading TeX math to conventional text.**
-  Common Greek commands such as `\phi`, `\varphi`, and `\Phi` now contribute
-  `Phi` to `title` / `veryshorttitle` key markers; math delimiters and transparent
-  wrappers such as `\ensuremath{...}` no longer leak into generated keys.
-  (`keys.py`)
-
-- **`fields rename`/`move`/`append`/`clear` now match field names
-  case-insensitively.** Since a parsed entry's ``fields`` keys are always
-  lowercase, supplying the source spelling of a mixed-case field name (e.g.
-  ``ArXiv``, as shown verbatim by `lint`'s `noncanonical_field_name_case`
-  warning) silently matched nothing: the command reported success with zero
-  entries changed. The four operations now resolve the caller-supplied name
-  against each entry's actual field names before editing.
-  (`_resolve_field_name` in `src/pynakes/fields.py`)
-
-### Changed
-
-- **Separated pynakes identity from JabRef.** JabRef-specific knowledge is now
-  concentrated in `metadata/jabref.py`: the JabRef group parsers/serializers
-  (`parse_jabref_grouping`, `format_jabref_grouping`, `parse_jabref_groups_lines`,
-  `jabref_grouping_tree`, `jabref_flat_tree`) moved there from `group_tree.py`.
-  `strip_jabref_terminator` renamed to `strip_meta_terminator` (it strips a
-  generic trailing `;`, not JabRef-specific). `_native_key_for_jabref` /
-  `_native_value_for_jabref` promoted to public API (`native_key_for_jabref` /
-  `native_value_for_jabref`). `files.py` relabelled as BibLaTeX (the `file`
-  field is standard BibLaTeX, not JabRef). Capability names
-  `inspect_jabref_metadata` / `update_jabref_metadata` renamed to
-  `inspect_metadata` / `update_metadata`. `group_tree.py` retains backward-
-  compatible re-exports for existing callers. (`metadata/jabref.py`,
-  `group_tree.py`, `_text_utils.py`, `files.py`, `bibtex_writer.py`,
-  `normalize.py`, `metadata/__init__.py`, `capabilities.py`,
-  `cli_commands/normalize.py`)
-
-- **Consolidated duplicated escape-aware splitter into `_text_utils.py`.**
-  `_split_escaped` was defined in both `files.py` and `group_tree.py` with
-  slight behavioural differences; the shared flag-based implementation now
-  lives in `_text_utils.py` and both callers import it from there.
-
-- **Engine operation mixins split by domain.** The monolithic
-  `_engine_ops.py` (685 lines) was split into `_engine_groups.py` (91 lines,
-  group-tree operations) and `_engine_keys.py` (96 lines, key operations),
-  with `_engine_ops.py` trimmed to 528 lines. Each file delegates to its
-  matching domain module; `Bibliography` now inherits all three mixins.
-
-- **`_fetch_text` uses httpx by default instead of urllib.** The
-  `_default_urlopen` fallback was removed from `fetch.py`; when no custom
-  `opener` is provided, `_fetch_text` in `providers/_http.py` uses httpx.
-  The urllib path is kept only for backward-compatible custom opener injection.
-
-- **Removed redundant `list()` wrapping around `EntryStore.values()`.**
-  `.values()` already returns a `list[BibEntry]`; the extra `list(...)` was
-  a no-op copy in `engine.py`, `_engine_helpers.py`, and `bibtex_writer.py`.
-
-- **Added missing return type hints on public functions.** Type annotations
-  added for `bib_file_argument`, `bib_file_option`, `cli_discovery.invoke`,
-  `iter_changed_entries`, `_iter_changed_entries`, `_byte_progress`, and
-  `parse_metadata_comment`.
-
-- **`normalize_raw_field_names` made private.** Renamed to
-  `_normalize_raw_field_names` since it is only used internally by
-  `normalize_entry_field_names`.
-
-- **`QueryFilter` type alias centralized in `model.py`.**
-  `fields.py`, `engine.py`, and `_engine_ops.py` now import it from there.
-
-- **Group delimiter constants deduplicated.** `GROUPS_DELIM` and
-  `GROUPS_JOIN` are now exported from `groups.py`; `usage.py` imports
-  them instead of redefining them.
-
-- **`_first_author` / `_first_author_last_name` consolidated.**
-  `integrity.py` now calls `keys._first_author_last_name().lower()` instead
-  of maintaining its own `_first_author`.
-
-- **`_line_number` / `_line_end` moved to `_text_utils.py`.**
-  Previously defined in `bibtex_parser.py`; now shared from `_text_utils.py`.
-
-- **`_normalize_text` moved to `_text_utils.py`.**
-  Previously in `model.py`; now shared from `_text_utils.py`.
-
-- **`EntryStore.values()` no longer wraps in `list()`.** Avoids an O(n)
-  allocation on every call (77 call sites).
-
-- **`is_string_ref` removed from `model.py`.** Dead code — never called
-  anywhere in the codebase.
-
-- **Removed stale `..deprecated::` marker from `save_plain_text`.** The
-  deprecation notice was a copy-paste remnant from `save_text`.
-
-- **`search` results are ranked by match strength by default.** Matches are
-  ordered by their strongest matched field — `key` > `title` > `author` >
-  other stored fields > `groups`/`abstract` — with file order as a tiebreak,
-  instead of always following raw file order. Pass `--no-rank` to keep the old
-  file-order behaviour. The match-field tags shown in human output
-  (`[title]`, `[groups]`, ...) and returned as `matched_fields` in JSON are now
-  documented in `search --help` and
-  [docs/guides/llm-integration.md](docs/guides/llm-integration.md).
-  (`_rank_results` in `src/pynakes/search.py`)
-
-- **Replaced three boolean fetch-* keys with a single `fetch-policy` key.** The
-  old `fetch-preprint`, `fetch-source`, and `fetch-published` booleans are
-  replaced by a single comma-separated list: `preprint`, `published`, `source`,
-  and/or `bestpdf`. The `bestpdf` policy (the new default) tries the published
-  PDF first and falls back to the preprint when no open-access copy is
-  available. The default behaviour of `asset fetch` with no metadata set is now
-  `bestpdf`. (`parse_fetch_policy` in `src/pynakes/metadata/core.py`,
-  `_engine_helpers.py`)
-
-- **Published-PDF download pre-validates URLs with a HEAD request.** Before
-  downloading the full body, `download_published_material` now sends a HEAD
-  request to verify the URL serves `application/pdf`. Publisher landing pages
-  that CrossRef or OpenAlex mislabel as PDF are rejected early, avoiding
-  unnecessary downloads. (`_url_serves_pdf` in `src/pynakes/fetch.py:282`)
-
-- **Citation-key pattern markers now respect JabRef casing conventions.**
-  In JabRef, the casing of a marker like ``[auth]`` vs ``[Auth]`` vs ``[AUTH]``
-  controls the casing of the generated text (lowercase, first-letter-capitalized,
-  or uppercase). Pynakes previously ignored marker casing, producing the same
-  output regardless. Added ``_apply_marker_casing`` in ``src/pynakes/keys.py``
-  that applies the correct case transformation based on the marker's original
-  (un-lowered) form, applied before any explicit ``:lower``/``:upper``/etc.
-  modifier. All-lowercase markers are the convention in existing patterns and
-  now produce lowercased output, which changes generated keys for any library
-  using a ``key-pattern`` or ``keypatterndefault`` setting.
-
-- **`groups list-entries <name>` CLI command for group-tree entry queries.**
-  The existing `list_entries_in_group_tree` Python API is now wired to the CLI
-  as `groups list-entries <name>`. Descendant propagation is the default
-  behaviour; pass `--strict` for exact-match-only (JabRef-compatible mode).
-  Dynamic groups (KeywordGroup/SearchGroup) are evaluated at query time.
-  (`cli_commands/groups.py`, `tests/test_group_tree.py`)
-
-- **`metadata remove <key>` CLI command.** `metadata remove <key> [file]`
-  deletes a single `pynakes-meta` or `jabref-meta` entry, auto-detecting the
-  target namespace or accepting an explicit `--namespace`. Reports which
-  namespace the key was removed from. When a key exists in both namespaces,
-  the operation is refused unless `--namespace` disambiguates.
-  (`cli_commands/metadata.py`)
-
-- **`init --json` is fully non-interactive.** The `--json` flag is marked
-  `is_eager=True` so it is parsed first, ensuring error output is always JSON
-  when requested. All configurable options have a non-interactive CLI path.
-  (`cli_commands/init.py`)
-
-### Fixed
-
-- **Undefined name `Request` in `providers/_http.py`.** The import was renamed
-  to `_UrllibRequest` during the httpx migration but one call site was missed.
-  (`_http.py:91`)
-
-- **`corpus split` no longer crashes routing entries to a materials-less
-  destination.** `FileStore.copy_materials_from` used to create the target
-  `.files` directory unconditionally, even for an entry with no material
-  files to copy. Routing the "everything else" bucket of a `split` to a
-  discard-style destination that can't hold a companion directory (e.g. the
-  `/dev/null` idiom for "keep only the matched entries") crashed with a
-  permission/IO error the moment any entry from a Pinax-enabled input landed
-  in that bucket. The `.files` directory is now created lazily, only when a
-  file or directory is actually found to copy. (`copy_materials_from` in
-  `src/pynakes/filestore.py`)
-- **Published-PDF download gracefully skips non-PDF responses instead of saving
-  them.** Some publisher URLs return an HTML landing page instead of a PDF. The
-  `download_published_material` function now checks that the response starts
-  with `%PDF` and returns a "no OA copy" result (``pdf_path=None``) when it does
-  not, preventing an HTML file from being saved as `.published.pdf`.
-  (`src/pynakes/fetch.py:358`)
-- **OpenAlex published-PDF resolution now filters out repository-hosted URLs.**
-  `best_oa_location` entries from arXiv, PMC, or institutional repositories are
-  no longer misidentified as the published version of record. The check uses
-  `host_type` when present, falling back to `source.type`, so that
-  subscription-journal papers with an arXiv preprint no longer silently download
-  the same arXiv PDF as both `.preprint.pdf` and `.published.pdf`. (`oa_pdf_url_from_work` in `src/pynakes/providers/openalex.py`)
-- Braced field values containing literal percent signs, such as `100% yield`,
-  now parse and round-trip instead of being mistaken for line comments that
-  corrupt the surrounding entry structure.
-- Metadata formatting now keeps `pynakes-meta` at the top of the file while
-  preserving JabRef's canonical trailing `jabref-meta` section at the bottom.
-- `pynakes tex add` and `pynakes tex remove` now accept one positional `.bib`
-  file anywhere in their source-path arguments, so explicitly naming the
-  library works even when the current directory contains multiple `.bib` files.
-- Single-library auto-discovery now ignores RevTeX-generated `*Notes.bib`
-  auxiliary files. Explicitly naming such a file still works.
-- Bare variadic check commands such as `pynakes lint`, `pynakes keys check`,
-  `pynakes asset check`, `pynakes dedupe check`, and `pynakes verify` now
-  auto-detect the lone local `.bib` file just like their `--json` forms and
-  single-file commands.
-- `pynakes keys repair` now also auto-detects the lone local `.bib` file when
-  its file argument is omitted, matching the rest of the single-library
-  modifying commands.
-- **`keys rename` and `keys generate` now respect `--backup` for `.tex` files.**
-  Previously the `.tex` source rewrite always created a `.bak` (via
-  `save_plain_text`'s default) regardless of the `--backup` flag; now `.tex`
-  backup is controlled by `--backup` like the `.bib` side.
-
-### Added
-
-- **`metadata set` now validates known-key values and refuses invalid input.**
-  `dialect`/`databaseType` must be `bibtex` or `biblatex`; `fetch-preprint`,
-  `fetch-source`, and `fetch-published` must be a recognised boolean spelling;
-  and known pynakes keys reject empty values. Validation is in
-  `validate_metadata_value` (`src/pynakes/metadata/schema.py`) and applies
-  uniformly across both `jabref-meta` and `pynakes-meta` namespaces. Unknown
-  keys (including JabRef-only keys whose grammar pynakes does not define) pass
-  through without validation.
-
-- **CrossRef fallback for published-PDF URL resolution.** When OpenAlex has no
-  direct `pdf_url` for an OA paper, `asset fetch` now falls back to CrossRef's
-  `similarity-checking` links (e.g. `harvest.aps.org` URLs that serve the actual
-  PDF). A new `crossref` provider module
-  (`src/pynakes/providers/crossref.py`) handles the resolution, wired into
-  `download_published_material` as a secondary resolver.
-- **Publisher-specific PDF URL overrides.** A bundled JSON file
-  (`src/pynakes/providers/pdf_overrides.json`) contains URL-construction rules
-  for major publishers (APS, Nature, Science, PNAS, Wiley, IOP, Taylor & Francis,
-  OUP, Cambridge, Springer, MDPI, RSC, PLOS, AIP, Elsevier, Portland Press).
-  When OpenAlex identifies a publisher landing page but provides no `pdf_url`,
-  the overrides construct the PDF URL from the landing page URL or DOI prefix.
-  Users can extend the file locally.
-- **`asset fetch` reports the `files-dir` path.** Non-JSON output now prints
-  `Files stored in <path>` so users know exactly where downloaded materials
-  landed. JSON output includes a `files_dir` key.
-- **`pynakes init --pinax` auto-detects a lone `.bib` in the current directory.**
-  When `--pinax` is set and no file argument is given, `init` now scans for a
-  single `.bib` file in the working directory, matching the auto-detection
-  behaviour of other single-library commands.
-- **`asset fetch` now shows human progress for long downloads.** The CLI uses
-  Rich progress rendering for non-JSON `asset fetch` runs and keeps progress off
-  JSON stdout. Binary material downloads now stream through `httpx`, with byte
-  progress for arXiv PDFs/source archives and open-access published PDFs while
-  preserving the existing injectable fetch seams for tests and library callers.
-
-- **pynakes-native metadata by default; JabRef as opt-in interop.** A fresh
-  `pynakes init` library now seeds native `dialect` and `key-pattern` keys in
-  `pynakes-meta` and emits no `jabref-meta` at all; the new `init --jabref` flag
-  (or `metadata adopt-jabref`) opts into the JabRef projection. Adds native
-  `key-pattern`/`key-pattern-<entrytype>` keys aliasing JabRef's
-  `keypatterndefault`/`keypattern_<entrytype>` (read native-first via
-  `library_key_pattern`). On a JabRef-tracked file, changing an aliased native
-  key (`dialect`, `sort-order`, `key-pattern`) is **mirrored** into its
-  `jabref-meta` counterpart so JabRef never sees a stale value (reported in
-  `metadata set`'s `mirrored` field); `metadata list` now warns when an aliased
-  pair disagrees. `saveActions`-absorb and a symmetric "go-native" strip are
-  noted as not-yet-implemented.
-
-- **Canonical metadata schema with a JabRef compatibility adapter.** Split
-  `metadata.py` into a `pynakes.metadata` package (`core`, `schema`, `jabref`)
-  so domain code (`normalize`, `lint`, `integrity`, the engine) reads pynakes'
-  own concepts through fallback-aware accessors instead of JabRef's literal
-  keys. Adds native `dialect` and `sort-order` `pynakes-meta` keys, aliasing
-  JabRef's `databaseType`/`saveOrderConfig` (read native-first, JabRef second);
-  `library_dialect` replaces `library_database_type` (kept as a back-compat
-  alias). Documents the boundary in a new
-  [JabRef compatibility guide](docs/guides/jabref-compatibility.md). Purely
-  additive/internal: existing `.bib` files, the CLI/JSON contract, and
-  `jabref-meta` behavior are unchanged.
-
-- **Step 9: Open-access published PDFs.** `asset fetch` now resolves DOIs to
-  open-access published PDFs via OpenAlex and downloads them as `<citekey>.pdf`
-  when `fetch-published: true` is set in `pynakes-meta`. New injection points
-  `published_url_fetcher` / `published_pdf_fetcher` make it testable without
-  network. Requires `fetch-published: true` (default `false`). Includes
-  deterministic on-disk caching of OpenAlex responses. (#9)
-
-- **Step 11: DOI → arXiv backfill.** `enrich --published --online` now resolves
-  DOI-backed published entries through OpenAlex, falling back to Semantic
-  Scholar when OpenAlex lacks an arXiv location, and backfills arXiv `eprint`
-  metadata when a link is present. The update is dialect-aware (`eprinttype` for
-  BibLaTeX, `archiveprefix` for BibTeX), uses deterministic provider-response
-  caching, and remains testable without network through injectable fetchers.
-
-- **Pinax filenames now use dot-separated descriptive suffixes.** Published
-  PDFs are `<citekey>.published.pdf`, preprint PDFs are `<citekey>.preprint.pdf`,
-  and preprint source directories are `<citekey>.source/` (replacing the old
-  `<citekey>.pdf`, `<citekey>_preprint.pdf`, and `<citekey>_preprint/`
-  convention). New artifact kinds `.supplement.pdf` and `.erratum.pdf` are
-  recognized alongside the existing kinds. The filenames are self-documenting,
-  glob-friendly (`ls <citekey>.*` catches all materials), and extensible.
-
-- **CSV export via `pynakes convert refs.bib --to csv --out refs.csv`.**
-  CSV is useful for review, spreadsheets, audits, and quick sharing, but is
-  export-only (no `--from csv`) because repeated authors, braced
-  capitalization, string macros, linked files, comments, and metadata do not
-  round-trip cleanly. Default columns: key, type, author, title, year, date,
-  journal, journaltitle, booktitle, doi, url, eprint, archiveprefix, volume,
-  number, pages, publisher, keywords. Field values are stored/resolved strings;
-  authors are not split during export. The `FORMATS` tuple in
-  `pynakes.interchange` is now split into `EXPORT_FORMATS` and `IMPORT_FORMATS`
-  to keep CSV out of the import set.
-
-- **Agent beta eval has a broader task catalog.** The manual beta-test
-  supervisor now chooses from concrete discovery, dry-run/diff, metadata,
-  Pinax, structured-error, online provider, cache, and DOI → arXiv → Pinax
-  source-recovery workflows instead of a thin generic prompt list.
-
-### Fixed
-
-- `normalize --dry-run --diff --json` now keeps valid BibTeX when normalizing a
-  final braced field such as a DOI with no trailing comma, and its structured
-  `plan` reports modified entries even when the bibliography already contains
-  duplicate citation keys.
-- `keys check --json` now includes duplicate-key findings in an `issues` array
-  with `severity: error`, matching the severity-bearing shape agents already
-  get from `lint --json` while preserving the existing duplicate summary fields.
-- `verify --online --json` now reports provider/network failures as
-  `provider_error` issues instead of folding them into `doi_unresolved`, so
-  automated users can distinguish external lookup failures from DOI metadata
-  problems without parsing the message text.
-- `keys generate` now treats single-key regeneration as the default:
-  `keys generate KEY FILE` derives the new key from entry metadata, while
-  whole-library regeneration is explicit via `--all`. The old `--key` selector
-  was removed. Shell completion no longer leaks an `InvalidInput` traceback
-  while completing the key-first form in a directory with multiple `.bib` files.
-  Generated renames now also update matching citations in linked `tex-sources`
-  TeX files, making `generate` an automated metadata-derived `rename`.
-- List-valued metadata now has a shared convention: commands write comma-separated
-  values, while readers still accept legacy semicolon-separated values. Linked
-  `tex-sources` values are merged across JabRef and pynakes metadata namespaces
-  when read, and `tex add/remove/clear` canonicalize the setting back into
-  `pynakes-meta` so stale namespace differences do not hide linked files.
-- `--backup` is now exposed on the remaining write-capable surfaces:
-  `init --force --backup` backs up an overwritten `.bib`, and
-  `asset check --fix --backup` backs up the Pinax manifest before reconciling
+- **`format`** — deterministic, idempotent, layout-only whole-file rewrite with
+  pynakes' preferred field ordering, indentation, trailing commas, and blank
+  lines between entries. Preserves value expressions (bare macros,
+  quoted/braced atoms, `#` concatenation) and retained source text;
+  `--preserve-field-order` keeps custom fields in source order. `--check` exits
+  1 when a file needs formatting (CI gate), `--stdout` prints without writing,
+  `--recursive` walks a tree, and `format - --stdout` reads stdin.
+- **`ref` family** — `ref add`, `ref import`, `ref show`, `ref edit`,
+  `ref remove`. `ref import <identifier>` resolves DOI/arXiv metadata (with
+  `--fetch` to also pull Pinax materials); `ref add` creates a manual entry.
+  `ref show` / `ref edit` read and transactionally patch a single unique key
+  (duplicate keys return a conflict rather than guessing). An under-specified
+  invocation — `ref add` without a key, `ref edit` without change options —
+  prompts interactively for the type and required fields (unsupplied ones only)
+  using the library's lint rules. Interactive mode requires a terminal and
+  errors under `--json` or headless stdin.
+- **`tex` family** — manage the TeX sources that cite the library (the
+  `tex-sources` metadata key): `list`, `add`, `remove`, `clear`, and `scan`
+  (report/tag cited entries; formerly the `used` command).
+- **`asset` family** — `asset fetch` downloads Pinax materials; `asset check`
+  validates linked files and Pinax manifest state, with `--fix` to reconcile
   drift.
+- **`corpus` family** — `corpus combine` / `split` / `batch`. `corpus split
+  --minimal` emits a standalone one-entry snippet without the source library's
+  metadata blocks or materials.
+- **`groups list-entries <name>`** — query group-tree membership (descendant
+  propagation by default, `--strict` for JabRef exact-match).
+- **`metadata remove <key>`** deletes a single metadata key (auto-detecting the
+  namespace, or `--namespace` to disambiguate); **`metadata adopt-jabref`** opts
+  a native library into JabRef projection.
 
-- Pinax `files-dir` resolution now anchors a symlinked `.bib` at the link path
-  passed to `pynakes`, so `asset fetch` stores materials next to the linked
-  bibliography instead of next to the link target.
+Pinax corpus layer (opt-in materials on disk, addressed by citation key):
 
-- **PDF-only arXiv e-prints no longer count as a source-fetch failure.** When the
-  e-print endpoint returns a PDF instead of a TeX/source archive (a PDF-only
-  submission), `asset fetch` now records the entry under `skipped` with reason
-  `no arXiv source archive (PDF-only submission)` instead of `failed`, matching
-  the documented "graceful gaps" contract. A PDF fetched in the same call is
-  preserved (it was previously discarded when the source step raised). A genuinely
-  corrupt archive still lands in `failed`. New `ArxivSourceUnavailableError`
-  (subclass of `ArxivFetchError`) distinguishes the two cases.
+- Offline `FileStore` foundation: `files-dir` metadata, deterministic material
+  paths, presence scans, orphan/drift detection, provenance manifests, and
+  Pinax-aware `corpus combine` / `split`.
+- arXiv preprint download (PDF plus safe source-archive extraction) and
+  open-access published-PDF download via OpenAlex, with a CrossRef fallback and
+  bundled URL-construction overrides for major publishers.
+- Institutionally entitled published PDFs (`asset fetch --published --access
+  institutional`, using access already provided by your network, VPN, or proxy)
+  and supplementary PDFs (`--supplement`). Downloads validate PDF magic bytes,
+  treat authentication HTML as a skip, and record access context in provenance.
+- A single `fetch-policy` metadata key (`preprint`, `published`, `source`,
+  `bestpdf`; default `bestpdf`) replaces the old boolean flags, with
+  per-invocation overrides `--preprint` / `--published` / `--source` /
+  `--supplement` / `--bestpdf`.
+- Self-documenting dot-separated material filenames: `<key>.published.pdf`,
+  `<key>.preprint.pdf`, `<key>.source/`, plus recognized `.supplement.pdf` and
+  `.erratum.pdf`.
+- `dedupe merge` reconciles duplicate keys' materials onto the surviving key,
+  preserving provenance rows and respecting `--dry-run`.
+- `asset fetch` streams downloads with human progress (kept off JSON stdout) and
+  reports the `files-dir` path; `ref add --fetch` and `ref import --fetch`
+  import-then-fetch.
 
-- **Usage errors under Typer 0.26+ now produce structured JSON with `--json`.**
-  Typer 0.26 vendors its own exception hierarchy (`typer._click.exceptions`
-  separate from `click.exceptions`).  `AutoBibGroup.invoke` and
-  `AutoBibGroup.main` now catch both `click.UsageError` and
-  `typer._click.exceptions.UsageError` so that missing-argument errors are
-  still reframed as `{"status":"error",...}` under `--json` (exit 1) on newer
-  Typer versions.
+Metadata and groups:
 
-### Changed
+- **pynakes-native metadata by default.** A fresh `init` seeds native `dialect`
+  and `key-pattern` keys in `pynakes-meta` and emits no `jabref-meta`; `--jabref`
+  (or `metadata adopt-jabref`) opts into a JabRef projection, after which aliased
+  native keys are mirrored into their `jabref-meta` counterparts so JabRef never
+  sees a stale value. Introduces a canonical metadata schema
+  (`core` / `schema` / `jabref`) read through fallback-aware accessors, and
+  `metadata set` value validation for known keys.
+- **Native hierarchical group tree.** A `group-tree` key in `pynakes-meta`
+  stores a hierarchy with full JabRef group-type parity (Explicit, Keyword,
+  Search), bidirectionally projected to and from JabRef's `grouping` block and
+  the flat `groups:` format. Keyword and Search groups are evaluated dynamically
+  at query time. CRUD via `groups tree` / `add-group` / `remove-group` /
+  `rename-group` / `move-group` / `update-group`; large trees are written across
+  continuation lines.
 
-- **`pynakes init` is now pynakes-native by default.** Previously a new library
-  was seeded with JabRef-native `databaseType`/`keypatterndefault` blocks in
-  `jabref-meta`, making every fresh file JabRef-tracked from birth. It now seeds
-  the native `dialect`/`key-pattern` keys in `pynakes-meta` and emits no
-  `jabref-meta` unless `--jabref` is passed. `--type`/`--key-pattern` now set the
-  native keys. Existing files are unaffected; the `metadata` JSON contract is
-  unchanged.
+Normalize, keys, and formatting:
 
-- **Provider transport consolidated into `providers/`.** External-service
-  transport and response parsing now live with their provider client: byte
-  fetching is a single `providers/_http.fetch_bytes` (replacing the duplicate
-  `importer._fetch_url`); DOI content negotiation is `providers/doi.fetch_bibtex`;
-  arXiv Atom fetch/parse, the `ArxivRecord` type, and PDF/source downloads are in
-  `providers/arxiv`; and OpenAlex gains `oa_pdf_url_for_doi`. `integrity` now uses
-  the shared `providers/_http.cache_path` instead of a private copy. `importer`,
-  `fetch`, and `integrity` keep their public functions as thin wrappers that
-  delegate to providers and translate `ProviderFetchError` into domain errors;
-  the CLI, JSON envelope, exit codes, and behavior are unchanged.
+- **Entry sorting in `normalize`** compatible with JabRef's `saveOrderConfig`,
+  with a repeatable `--sort-by` override (e.g. `--sort-by author --sort-by
+  year:desc`) and BibTeX-compatible crossref-parent ordering.
+- **`normalize` adopts JabRef metadata as native keys** and can regenerate every
+  citation key when `normalize-keys: true` / `--keys on` is set, renaming any
+  Pinax materials to match.
+- **Eight more JabRef v5.15 `saveActions` formatters**, plus additional
+  JabRef-compatible citation-key markers (`authorlast`, `authIniN`, `authorIni`,
+  `authorsN`); marker casing (`[auth]` / `[Auth]` / `[AUTH]`) now controls the
+  output case.
+- **CSV export** via `convert --to csv` (export-only; CSV does not round-trip).
 
-- **Command tree reorganized into resource sub-apps.** Commands are now grouped
-  by the resource they act on, following one rule: whole-library transforms stay
-  flat (`normalize`, `convert`, `dedupe`, `lint`, `verify`, `enrich`, `search`,
-  `inspect`), while operations on a many-of-a-kind resource live under a noun.
-  Renamed paths:
-  - `add` / `import` / `remove` → `ref add` / `ref import` / `ref remove`
-  - `sources` (linked TeX files) → `tex`; `used` → `tex scan`
-  - `fetch` → `asset fetch`; `files check` → `asset check`
-  - `combine` / `split` / `batch` → `corpus combine` / `corpus split` / `corpus batch`
+Interop, CLI, and API:
 
-  The renamed `tex`/`asset` nouns also encode direction — TeX sources cite *into*
-  the library, Pinax materials are what entries point *out* to — retiring the
-  overloaded "source" term. The JSON envelope, exit codes, and per-command flags
-  are unchanged.
-
-- **`pynakes --help` now lists each sub-app's subcommands inline** (e.g.
-  `ref → add, import, show, edit, remove`), colored for clarity, so the grouped surface stays
-  discoverable at a glance.
-
-### Added
-
-- **`tex` command family.** `pynakes tex` manages the list of TeX source files
-  that cite the library (stored as the `tex-sources` metadata key). Subcommands:
-  `list` (show linked sources), `add` (link one or more paths), `remove` (unlink
-  paths), `clear` (unlink all), and `scan` (report/tag entries cited in those
-  sources). More discoverable than the generic `metadata set tex-sources` — path
-  arguments are positional, the bib file is specified via `--file` or
-  auto-detected.
-
-- **`ref import` and manual `ref add`.** DOI/arXiv metadata resolution lives
-  under `pynakes ref import <identifier> [file]`, while `pynakes ref add <key>
-  [file] --field name=value ...` creates a manually specified entry.
-  `ref import --fetch` keeps the import-then-fetch Pinax workflow.
-
-- **Dedupe material merge for Pinax libraries.** `pynakes dedupe merge` now
-  reconciles duplicate keys' Pinax materials onto the surviving citation key,
-  preserving moved provenance manifest rows and respecting `--dry-run`. It
-  reports a dedupe conflict instead of overwriting an existing survivor material
-  kind or ambiguous manifest state.
-
-- **Manual agent beta-test evaluation harness.** Added an opt-in real-agent
-  runner under `tests/agent_eval` that has a supervisor generate task scenarios
-  and a fresh beta-tester agent drive `pynakes` from the published CLI/docs
-  surface. Normal pytest uses a deterministic fake provider; real `codex` runs
-  are manual via `PYNAKES_RUN_AGENT_EVAL=1` and can include online DOI/arXiv
-  workflows with `--include-online`.
-
-- **`--help` and `capabilities` group commands by nature.** The top-level
-  `pynakes --help` now organizes commands into panels — *Inspect & validate*,
-  *Edit references*, *Materials (pinax)*, *Corpus (multiple files)*, *Create* —
-  instead of one flat list. `capabilities` gains a `command_groups` field
-  mirroring the same grouping. The taxonomy lives in one place
-  (`capabilities.COMMAND_GROUPS`), shared by both surfaces.
-
-- **`metadata adopt-jabref` — opt-in JabRef metadata tracking.** pynakes-native
-  libraries now keep their settings in `pynakes-meta` by default; `jabref-meta`
-  is no longer injected into a file that never had it. Run `adopt-jabref` to
-  establish a JabRef projection: it relocates any JabRef-native keys stranded in
-  `pynakes-meta` into `jabref-meta` and anchors a `databaseType` block, so the
-  file works in JabRef without losing its pynakes settings. From then on the
-  library is *JabRef-tracked* and JabRef-native keys are written to `jabref-meta`
-  automatically. Running it again once tracked is a no-op. The JSON envelope
-  reports `moved_keys`, `database_type_added`, and `was_tracked`.
-
-- **Entry sorting in `normalize`, compatible with JabRef's `saveOrderConfig`.**
-  When a library carries JabRef's `@Comment{jabref-meta: saveOrderConfig:...}`
-  with order type `specified`, `normalize` now reorders entries to match it —
-  the same multi-criterion `field;descending` model JabRef writes from its
-  "Save sort order" settings (order types `original`/`table` keep the current
-  order). A new repeatable `--sort-by` option overrides it for one run:
-  `--sort-by author --sort-by year:desc` sorts by author ascending then year
-  descending; `citationkey` (or `key`) sorts by citation key; `year` sorts
-  numerically; `--sort-by original` keeps the current order. Reported in the
-  JSON envelope as `operations.sorted_entries`.
+- Resource-grouped `--help` panels and a matching `capabilities.command_groups`
+  field.
+- Citekey and `.bib`-file shell completion.
+- Optional `file` argument with single-`.bib` auto-detection on every
+  single-file command.
+- `--backup` on all write commands, opt-in and off by default (writes are
+  already atomic and re-parse-validated).
+- `BibEntry.resolve()` / `BibFile.resolve()` shorthands for the read-only
+  BibLaTeX inheritance view.
 
 ### Changed
 
-- **Metadata namespace routing is now file-context-aware (interop, not parity).**
-  `set_metadata` previously routed every JabRef-native key (e.g. `databaseType`)
-  into `jabref-meta` by owner, regardless of the file. It now routes a
-  JabRef-native key to `jabref-meta` only when the file is already JabRef-tracked
-  (carries `jabref-meta` blocks); otherwise it — like every pynakes-owned key —
-  stays in `pynakes-meta`. An existing JabRef library keeps its convention
-  unchanged; a pynakes-native file stays free of `jabref-meta` until you run
-  `metadata adopt-jabref`. New `library_is_jabref_tracked()` and `remove_metadata()`
-  helpers support this.
+- **Command tree reorganized into resource sub-apps.** Whole-library transforms
+  stay flat (`normalize`, `convert`, `dedupe`, `lint`, `verify`, `enrich`,
+  `search`, `inspect`); operations on a resource move under a noun:
+  `add` / `import` / `remove` → `ref …`, `sources` / `used` → `tex …` /
+  `tex scan`, `fetch` / `files check` → `asset fetch` / `asset check`,
+  `combine` / `split` / `batch` → `corpus …`. The JSON envelope, exit codes, and
+  per-command flags are unchanged.
+- **`init` is pynakes-native by default** — native keys in `pynakes-meta`, no
+  `jabref-meta` unless `--jabref`. `init` is also excluded from library
+  auto-detection so omitting its path can't clobber an existing local `.bib`.
+- **Metadata namespace routing is file-context-aware.** A JabRef-native key is
+  written to `jabref-meta` only when the file is already JabRef-tracked;
+  otherwise it stays in `pynakes-meta`.
+- **`ref add` / `ref edit` interactivity is driven by the invocation, not a
+  flag.** The `--interactive` / `-i` flag is removed: interactive mode triggers
+  when the invocation is under-specified (`ref add` without a key, `ref edit`
+  without change options). It now requires a terminal — under `--json` or
+  headless stdin it errors with `InvalidInput` instead of blocking on a prompt.
+- **`ref add` warns when the new entry is missing required fields.** A
+  non-interactive `ref add KEY` still creates a bare stub, but now reports a
+  warning (in the human output and the JSON `warnings` array) naming the
+  required fields absent for the entry type, using the same rules as lint and
+  interactive prompting.
+- **`search` ranks results by match strength by default** (`key` > `title` >
+  `author` > other fields > `groups` / `abstract`, file order as tiebreak);
+  `--no-rank` restores raw file order.
+- **Published-PDF resolution filters repository-hosted URLs** — arXiv, PMC, and
+  institutional repositories are no longer misidentified as the version of
+  record — and pre-validates candidate URLs with a HEAD request.
+- **`enrich --published` promotes already-linked preprints** — an arXiv entry
+  with both DOI and journal metadata becomes `@article` while keeping its
+  `eprint` and related preprint fields.
+- Provider transport consolidated under `providers/`, and `_fetch_text` uses
+  httpx by default.
+- Parser-conformance baseline pinned to TeX Live 2026 (BibTeX 0.99d, BibLaTeX
+  3.21, Biber 2.21); `combine --dedupe` treats differing raw spelling as a
+  conflict even when parsed fields match; required-field linting is
+  dialect-aware.
 
 ### Fixed
 
-- **Usage errors no longer break the JSON contract.** When the library
-  argument was omitted and could not be auto-detected (no local `.bib`, or more
-  than one), commands with additional positionals (e.g. `ref remove`, `fields
-  rename`, `groups add-entry`) leaked a raw Click "Missing argument" usage error
-  to stderr with exit code 2, bypassing the `--json` envelope. Such commands now
-  report the real cause (`InvalidInput`: "No/Multiple *.bib files found") and any
-  residual usage error is reframed as a structured `{"status":"error",...}`
-  envelope with exit code 1 under `--json`. Without `--json`, humans still get
-  Click's usage text and exit code 2. Relatedly, `init` is now excluded from
-  library auto-detection: it creates a library, so omitting its path no longer
-  substitutes (and risks clobbering) an existing local `.bib` — it reports the
-  missing argument instead.
+- **`ref remove` no longer doubles the blank line** where an entry was deleted;
+  the removal now consumes one adjacent separator when another block follows.
+- **`fields rename` / `move` / `append` / `clear` match field names
+  case-insensitively**, so a mixed-case name (e.g. `ArXiv`) no longer silently
+  matches nothing.
+- **Human-readable past-tense verbs for commands not ending in `e`.** Success
+  lines read "Added", "Converted", "Repaired", "Linked" instead of "Addd",
+  "Convertd", "Repaird", "Linkd".
+- **Braced field values with a literal `%`** (e.g. `100% yield`) now parse and
+  round-trip instead of being mistaken for line comments.
+- **Metadata and `format` placement.** `pynakes-meta` stays at the top and
+  `jabref-meta` at the file end; multiline group trees and colon-bearing group
+  names survive `format` and reparsing; canonical formatting is idempotent and
+  preserves retained source constructs (duplicate `@string`,
+  malformed-but-round-trippable blocks, non-block text).
+- **Citation-key title markers convert leading TeX math to text** — `\phi`,
+  `\varphi`, `\Phi` contribute `Phi`; math delimiters and wrappers like
+  `\ensuremath{...}` no longer leak into generated keys.
+- **Usage errors keep the JSON contract.** Omitting a `.bib` that can't be
+  auto-detected on a multi-positional command (`ref remove`, `fields rename`, …)
+  now reports `InvalidInput` — or a reframed `{"status":"error",…}` (exit 1) —
+  under `--json`, instead of a raw Click usage error. Without `--json`, humans
+  still get Click's usage text and exit code 2.
+- **Structured error reporting.** `keys check --json` includes duplicate-key
+  findings with `severity`; `verify --online` reports `provider_error`
+  separately from `doi_unresolved`; DOI errors name the provider; duplicate-key
+  reports include entry indices; duplicate-key parser logging is lowered to
+  `INFO` so it no longer appears alongside JSON on stderr.
+- **arXiv and publisher fetch edge cases.** PDF-only arXiv submissions land in
+  `skipped` (not `failed`) while preserving a PDF fetched in the same call;
+  non-PDF publisher responses are skipped instead of saved as `.pdf`;
+  `corpus split` no longer crashes routing an entry to a materials-less
+  destination; a symlinked `.bib` anchors `files-dir` at the link path.
+- Single-library auto-detection ignores RevTeX `*Notes.bib` auxiliaries; bare
+  check commands and `keys repair` auto-detect the lone local `.bib`.
+- `normalize --dry-run --diff --json` keeps valid BibTeX for a final braced
+  field with no trailing comma and reports modified entries even when duplicate
+  keys are present.
+- `keys generate KEY FILE` regenerates a single key by default (`--all` for the
+  whole library) and updates matching citations in linked TeX sources.
+- List-valued metadata uses a shared convention — writers emit comma-separated
+  values, readers still accept legacy semicolons — and `tex-sources` is merged
+  across the JabRef and pynakes namespaces.
 - Declare Click as a direct runtime dependency for CLI discovery and shell
-  completion support, fixing clean CI installs with newer Typer releases.
-
-### Fixed (agent beta eval issues)
-
-- **Agent beta eval accepts nondeterministic task labels.** The supervisor can
-  now emit task kinds such as `check`, `repair`, `import`, or `online` without
-  the harness rejecting the run before the beta tester starts. The schema still
-  validates task shape and online/offline gating.
-- **Online command docs match the current CLI.** The LLM integration guide and
-  generated Pinax agent rules now describe `ref import`, `asset fetch`,
-  `verify --online`, and `enrich --online` as the network-backed paths, while
-  `ref add` is documented as manual local entry creation. The guide also includes
-  a concise `.bib` plus TeX citation validation recipe using `tex scan`.
-- **Import dry-run failures now say no file was written.** When
-  `import --dry-run --json` fails during DOI/arXiv lookup, the error response
-  includes `dry_run: true`, `modified: false`, and a no-write message so agents
-  can distinguish provider failure from an applied change.
-- **Search argument order in docs now matches the live CLI.** The synopsis and
-  examples in `docs/guides/llm-integration.md` and `docs/guides/usage.md` had
-  `pynakes search <file> <query>` but the CLI expects `pynakes search <query>
-  [file]`. Docs have been updated to match the CLI.
-- **Duplicate-key log noise in JSON mode.** The parser emitted duplicate-key
-  diagnostics at `WARNING` level, appearing on stderr alongside JSON output.
-  Lowered to `INFO` level so it no longer shows in normal terminal output.
-  Duplicate keys remain structurally available via `lint`, `inspect`, and
-  `keys check`.
-- **Verify/enrich DOI error messages now name the provider.** When a DOI lookup
-  fails, the error now explicitly reads `via doi.org content negotiation` so
-  users can tell where the lookup went and whether a retry might help.
-- **Verify reports "all lookups failed" when nothing was verified.** Both human
-  and JSON output now include an explicit note when `checked=0` and errors are
-  present, rather than silently reporting "verified 0 DOI-backed entries".
-- **Duplicate-key reports include entry indices.** Added
-  `EntryStore.duplicate_key_instances()` returning `{key: [indices]}`. Lint,
-  `inspect`, `keys check`, and Pinax error messages now show entry position
-  (e.g. `#0, #3`) so users can identify which physical entry a message refers to.
-
-## [0.5.0] - 2026-06-28
-
-### Added
-
-- **`remove` command** (`pynakes remove <bib> <citekey>...`). Removes entries
-  by citation key through the standard lifecycle. In a pinax, removes the
-  entry's materials from `files-dir` by default (`--keep-files` opts out).
-  Dry-run correctly skips all filesystem side effects.
-- **Citekey shell completion.** Register Click shell-completion callbacks on
-  `remove`, `fetch`, `keys rename`, `groups add-entry`, and `groups
-  remove-entry`. The `.bib`-file completer also shows citekeys alongside the
-  filename when a single `.bib` is auto-detectable. Usable via
-  `eval "$(pynakes --show-completion bash)"` / `zsh` / `fish`.
-- **`--backup` flag on all write commands.** Added to `add`, `dedupe_merge`,
-  `fetch`, all `fields` subcommands, `groups`, `keys`, `metadata set`, `used`,
-  and `integrity enrich`. The `remove` command had its declared `--backup`
-  param wired through (was silently ignored).
-- **Optional `file` argument on all single-file commands.** Every command that
-  takes a `.bib` file argument now auto-detects a single `.bib` in the current
-  directory when omitted — matching the behavior previously available only on
-  `add`, `convert`, `fetch`, `inspect`, `enrich`, `normalize`, `remove`, and
-  `search`.
-- **Output emission consolidation.** Migrated `used`, `combine`, and `split`
-  from manual `typer.echo(_json.dumps(...))` to the canonical `_emit()` helper.
-
-- Add `BibEntry.resolve(lookup)` and `BibFile.resolve(entry)` as ergonomic
-  shorthands for the existing read-only BibLaTeX inheritance view.
-- Add the offline Pinax `FileStore` foundation: recognized `files-dir` metadata,
-  deterministic material paths, presence scans, orphan detection, and
-  `Bibliography.files`.
-- Add the Pinax arXiv download core with injectable PDF/source fetchers, safe
-  source archive extraction, and atomic preprint material writes.
-- Complete the core Pinax layer: `inspect --json` material annotations,
-  `files check` Pinax presence/orphan/drift reporting plus `--fix`, provenance
-  manifests with canonical preprint selection, Pinax-aware `combine`/`split`,
-  and coordinated material moves for key edits.
-- Add `pynakes add --fetch`, which imports a reference and then downloads the
-  new entry's configured Pinax arXiv materials.
-
-### Changed
-
-- Move the documented parser-conformance baseline for the v0.5 alpha to TeX
-  Live 2026 (BibTeX 0.99d, BibLaTeX 3.21, Biber 2.21).
-- Treat differing raw BibTeX spelling as a `combine --dedupe` conflict even
-  when parsed fields match, preserving round-trip intent.
-- Derive subset, split, and merge output libraries through `BibFile.derive()`,
-  preserving library-level raw string declarations consistently.
-- Make required-field linting dialect-aware: BibTeX keeps the traditional rule
-  set, while BibLaTeX libraries use the default BibLaTeX data-model entry types
-  and aliases.
-- Fall back to a full rewrite when an engine operation edits an unsnapshotted
-  raw entry, avoiding an empty staged diff.
-- Remove the unused per-entry `BibEntry.jabref_metadata` field; JabRef and
-  pynakes metadata remain library-level state on `BibFile`.
-- Derive `BibFile.jabref_metadata`, `BibFile.pynakes_metadata`, and
-  `BibFile.metadata` from metadata blocks instead of storing separate mutable
-  dicts.
-- Make lint profile and DOI checks read inherited field views consistently, and
-  align source-tree fallback version reporting.
-
-### Fixed
-
-- `remove --dry-run` no longer removes Pinax materials from disk; it only
-  previews what would be removed (regression introduced in the initial `remove`
-  implementation).
-- Tighten broad exception handling in DOI metadata fetching, file writes, and
-  Pinax filesystem rollback paths.
-- Fix small reviewer-flagged edge cases in lint field-view handling, search
-  field filters, title-protection heuristics, `html_to_latex`, and batch
-  operation dispatch.
-
-### Internal
-
-- Consolidate duplicated utilities: `_metadata_value`, `_metadata_list`, and
-  `_metadata_bool` moved from `lint.py` and `normalize.py` into `metadata.py`
-  as public helpers; callers import from there.
-- Fix `save_text` backup-rename ordering: the original file is now only renamed
-  to `.bak` after the temp file has been written and validated, so a crash or
-  validation failure can never lose the original.
-- Merge `save_plain_text` into `save_text` as a `validate=False` default;
-  `save_plain_text` is kept as a thin alias pending removal.
-
-### Documentation
-
-- Mark v0.5 as a public alpha and document that backward compatibility is not
-  guaranteed for the Python API, CLI syntax, or JSON envelopes until v1.0.
-- Document the optional Pinax corpus mode while preserving the plain `.bib`
-  maintenance engine as the base identity.
-- Clarify that `MetadataBlock.normalized_value` is a display/semantic view,
-  while `MetadataBlock.value` and `raw` preserve the parsed/source forms.
-- Document that parsed `BibEntry.fields` are semantic values after BibTeX string
-  interpolation, with original expressions preserved in `raw_content`.
+  completion, fixing clean CI installs with newer Typer releases.
 
 ## [0.4.0] - 2026-06-26
 Complete single-file BibTeX/BibLaTeX maintenance engine

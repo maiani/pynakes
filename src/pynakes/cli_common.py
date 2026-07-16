@@ -3,6 +3,7 @@
 import functools
 import json
 import os
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -120,13 +121,31 @@ class RunParams:
 def _verb(action: str, params: RunParams, past: str | None = None) -> str:
     """Return ``"Would <action>"`` in dry-run mode, or the past-tense form otherwise.
 
-    For regular verbs the past tense is derived automatically (e.g. ``"rename"``
-    → ``"Renamed"``). Pass ``past`` explicitly for irregular or special forms
-    (e.g. ``past="Wrote"`` for ``"write"``).
+    For regular verbs the past tense is derived automatically: a trailing ``e``
+    takes ``d`` (``"rename"`` → ``"Renamed"``), otherwise ``ed`` is appended
+    (``"add"`` → ``"Added"``, ``"convert"`` → ``"Converted"``). Pass ``past``
+    explicitly for irregular forms or ones needing a doubled final consonant
+    (e.g. ``past="Wrote"`` for ``"write"``, ``past="Tagged"`` for ``"tag"``).
     """
     if params.dry_run:
         return f"Would {action}"
-    return past if past is not None else f"{action.capitalize()}d"
+    if past is not None:
+        return past
+    stem = action.capitalize()
+    return f"{stem}d" if action.endswith("e") else f"{stem}ed"
+
+
+def stdin_is_interactive() -> bool:
+    """Return whether standard input is an interactive terminal.
+
+    Commands that fall back to prompting (``ref add`` / ``ref edit`` with an
+    under-specified invocation) use this to refuse rather than block or abort
+    when run headless — piped, redirected, or driven by an agent.
+    """
+    try:
+        return sys.stdin.isatty()
+    except (AttributeError, ValueError):
+        return False
 
 
 def _emit_error(json_output: bool, error: str, message: str, code: int = 1, **extra) -> None:

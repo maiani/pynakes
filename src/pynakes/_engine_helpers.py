@@ -112,6 +112,28 @@ def append_entry_text(
     return original_text + line_ending + line_ending + entry_text + line_ending
 
 
+def entry_removal_text(pristine_text: str, raw_content: str) -> str | None:
+    """Return the span to blank out when deleting *raw_content* from *pristine_text*.
+
+    Removing only the entry's own ``raw_content`` leaves the blank-line gap
+    that preceded it *and* the one that followed it back to back, doubling
+    the separator. When another block follows, the span is extended over
+    that trailing gap so exactly one blank-line separator remains (the one
+    that preceded the removed entry). At end of file there is no trailing
+    gap to fold away, so the entry text alone is returned unchanged.
+    """
+    start = pristine_text.find(raw_content)
+    if start == -1:
+        return None
+    end = start + len(raw_content)
+    tail = end
+    while tail < len(pristine_text) and pristine_text[tail] in " \t\r\n":
+        tail += 1
+    if tail < len(pristine_text):
+        end = tail
+    return pristine_text[start:end]
+
+
 def _trailing_metadata_start(text: str, blocks: list[MetadataBlock]) -> int | None:
     """Find the start of a metadata-only section at the end of *text*.
 

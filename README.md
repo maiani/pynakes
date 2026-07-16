@@ -100,8 +100,10 @@ pynakes lint mylib.bib --json
 pynakes ref import 10.5555/example mylib.bib
 pynakes ref import arXiv:2301.00001 mylib.bib
 pynakes ref add Manual2026 mylib.bib --field title="Manual Reference" --field year=2026
+pynakes ref add  # interactive
 pynakes ref show Manual2026 mylib.bib
 pynakes ref edit Manual2026 mylib.bib --field year=2027 --clear-field note
+pynakes ref edit Manual2026 mylib.bib  # interactive
 
 # Preview the normalization pass before committing
 pynakes normalize mylib.bib --dry-run --diff

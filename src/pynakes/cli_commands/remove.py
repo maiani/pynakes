@@ -8,6 +8,7 @@ opts out).
 import typer
 
 from pynakes.cli_common import (
+    _BACKUP_OPTION,
     RunParams,
     _emit_error,
     _entries,
@@ -29,9 +30,7 @@ def remove(
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
-    backup: bool = typer.Option(
-        True, "--backup/--no-backup", help="Back up the file before writing"
-    ),
+    backup: bool = _BACKUP_OPTION,
 ) -> None:
     """Remove entries by citation key."""
     file = _resolve_input_bib(file, json_output)

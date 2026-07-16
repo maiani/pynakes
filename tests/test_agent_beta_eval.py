@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from tests.agent_eval.providers import FakeProvider
-from tests.agent_eval.runner import EvalConfig, HarnessError, run_eval
+from tests.agent_eval.runner import EvalConfig, HarnessError, _parse_args, run_eval
 
 
 def test_fake_provider_smoke_and_malformed_payloads(tmp_path: Path) -> None:
@@ -32,6 +32,21 @@ def test_fake_provider_smoke_and_malformed_payloads(tmp_path: Path) -> None:
     bad_report = FakeProvider(report_payload={"summary": "missing lists"})
     with pytest.raises(HarnessError, match="malformed beta report"):
         run_eval(config, provider=bad_report, lab_root=tmp_path / "bad-report")
+
+
+def test_runner_accepts_codex_model_and_reasoning_overrides() -> None:
+    config = _parse_args(
+        [
+            "--provider",
+            "codex",
+            "--model",
+            "gpt-5.6-luna",
+            "--reasoning-effort",
+            "low",
+        ]
+    )
+    assert config.model == "gpt-5.6-luna"
+    assert config.reasoning_effort == "low"
 
 
 @pytest.mark.agent_eval
