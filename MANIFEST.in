@@ -1,3 +1,4 @@
-# Tests are exercised from the repository in CI; keep the published source
-# distribution self-contained and avoid shipping only part of that test environment.
-prune tests
+# Ship the complete test environment with the source distribution so downstream
+# packagers can validate the archive without checking out the repository.
+include .pre-commit-hooks.yaml
+recursive-include tests *.py *.bib *.json *.tex *.aux

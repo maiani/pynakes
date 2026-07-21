@@ -153,6 +153,8 @@ Interop, CLI, and API:
   `eprint` and related preprint fields.
 - Provider transport consolidated under `providers/`, and `_fetch_text` uses
   httpx by default.
+- The source distribution now includes the complete test suite, conformance
+  corpus, fixtures, and opt-in agent-evaluation harness for downstream testing.
 - Parser-conformance baseline pinned to TeX Live 2026 (BibTeX 0.99d, BibLaTeX
   3.21, Biber 2.21); `combine --dedupe` treats differing raw spelling as a
   conflict even when parsed fields match; required-field linting is
