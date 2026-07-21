@@ -7,7 +7,7 @@
 [![PyPI](https://img.shields.io/pypi/v/pynakes.svg)](https://pypi.org/project/pynakes/)
 [![Python](https://img.shields.io/pypi/pyversions/pynakes.svg)](https://pypi.org/project/pynakes/)
 [![CI](https://img.shields.io/github/actions/workflow/status/maiani/pynakes/ci.yml?branch=main)](https://github.com/maiani/pynakes/actions)
-[![License](https://img.shields.io/pypi/l/pynakes.svg)](https://github.com/maiani/pynakes/blob/main/LICENSE)
+[![License](https://img.shields.io/github/license/maiani/pynakes)](https://github.com/maiani/pynakes/blob/main/LICENSE)
 
 > [!WARNING]
 > `pynakes` is alpha-quality software. Interfaces and behavior may change between releases.
@@ -15,7 +15,8 @@
 `pynakes` is a deterministic bibliography maintenance engine built for reliable agentic workflows, CI, and human use. Agents decide what should change; pynakes inspects, validates, previews, and applies those changes safely and reproducibly.
 
 The Python CLI makes small, explicit, reviewable changes to `.bib` files —
-minimal diffs, dry-run previews, atomic writes, and structured JSON.
+minimal diffs, dry-run previews, and atomic writes — and reports every change
+as structured JSON.
 
 Requires Python 3.11+ and is packaged as an OS-independent CLI and library.
 
@@ -193,7 +194,4 @@ MIT — see [LICENSE](LICENSE).
 
 ## Contributing
 
-Contributions are welcome. Open an issue to discuss the feature or bug, add
-tests for behavioral changes, and run the test suite plus both Ruff checks
-before opening a PR. See [AGENTS.md](AGENTS.md) for the complete development
-and verification conventions.
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
