@@ -13,7 +13,7 @@ import httpx
 
 from pynakes import __version__
 
-USER_AGENT = f"pynakes/{__version__} (mailto:unknown@example.invalid)"
+USER_AGENT = f"pynakes/{__version__} (+https://github.com/maiani/pynakes)"
 
 DownloadProgress = Callable[[int, int | None], None]
 

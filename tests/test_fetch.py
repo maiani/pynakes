@@ -10,6 +10,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+from pynakes.cli_commands.fetch import _RichFetchProgress
 from pynakes.fetch import (
     ArxivFetchError,
     ArxivSourceUnavailableError,
@@ -23,6 +24,7 @@ from pynakes.fetch import (
     fetch_published_pdf,
     openalex_oa_pdf_url,
 )
+from pynakes.fetch_progress import FetchProgressEvent
 from pynakes.filestore import FileStore
 
 
@@ -35,6 +37,69 @@ def _mock_httpx_client(monkeypatch: pytest.MonkeyPatch, handler) -> None:
             super().__init__(*args, **kwargs)
 
     monkeypatch.setattr("pynakes.providers._http.httpx.Client", MockClient)
+
+
+def test_rich_fetch_progress_tracks_artifact_lifecycle() -> None:
+    class FakeProgress:
+        def __init__(self) -> None:
+            self.next_id = 0
+            self.updated: list[tuple[object, dict[str, object]]] = []
+            self.removed: list[object] = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def add_task(self, description: str, *, total: int | None):
+            self.next_id += 1
+            return self.next_id
+
+        def update(self, task_id: object, **kwargs: object) -> None:
+            self.updated.append((task_id, kwargs))
+
+        def remove_task(self, task_id: object) -> None:
+            self.removed.append(task_id)
+
+    progress = _RichFetchProgress()
+    fake = FakeProgress()
+    progress._progress = fake  # type: ignore[assignment]
+
+    assert progress.__enter__() is progress
+    progress(
+        FetchProgressEvent(
+            kind="artifact_start", key="Noether1918", artifact="preprint_pdf", total_bytes=12
+        )
+    )
+    progress(
+        FetchProgressEvent(
+            kind="artifact_progress",
+            key="Noether1918",
+            artifact="preprint_pdf",
+            advance=5,
+            total_bytes=12,
+        )
+    )
+    progress(
+        FetchProgressEvent(
+            kind="artifact_progress", key="Missing", artifact="preprint_pdf", advance=1
+        )
+    )
+    progress(
+        FetchProgressEvent(
+            kind="artifact_done", key="Noether1918", artifact="preprint_pdf", total_bytes=12
+        )
+    )
+    progress(
+        FetchProgressEvent(kind="artifact_start", key="Noether1918", artifact="preprint_source")
+    )
+    progress(FetchProgressEvent(kind="fail", key="Noether1918"))
+    progress(FetchProgressEvent(kind="start", key="Noether1918"))
+    assert progress.__exit__(None, None, None) is False
+
+    assert fake.updated[0][1] == {"advance": 5, "total": 12}
+    assert fake.removed == [1, 2]
 
 
 def test_fetch_arxiv_pdf_reads_bytes_with_user_agent(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -143,3 +143,34 @@ def test_cli_batch_requires_exactly_one_source(tmp_path: Path) -> None:
     result = runner.invoke(app, ["corpus", "batch", str(bib), "--json"])
     assert result.exit_code == 1, result.output
     assert json.loads(result.output)["status"] == "error"
+
+
+def test_cli_batch_reads_ops_file_and_reports_human_result(tmp_path: Path) -> None:
+    bib = tmp_path / "r.bib"
+    bib.write_text(SRC)
+    ops_file = tmp_path / "ops.json"
+    ops_file.write_text(json.dumps([{"op": "fields.append", "field": "keywords", "value": "ml"}]))
+
+    result = runner.invoke(app, ["corpus", "batch", str(bib), "--ops-file", str(ops_file)])
+
+    assert result.exit_code == 0, result.output
+    assert "Applied 1 operation" in result.output
+    assert "keywords = {ml}" in bib.read_text()
+
+
+def test_cli_batch_rejects_two_sources_and_bad_json(tmp_path: Path) -> None:
+    bib = tmp_path / "r.bib"
+    bib.write_text(SRC)
+    ops_file = tmp_path / "ops.json"
+    ops_file.write_text("[]")
+
+    both = runner.invoke(
+        app,
+        ["corpus", "batch", str(bib), "--ops", "[]", "--ops-file", str(ops_file), "--json"],
+    )
+    assert both.exit_code == 1, both.output
+    assert json.loads(both.output)["error"] == "InvalidInput"
+
+    malformed = runner.invoke(app, ["corpus", "batch", str(bib), "--ops", "not-json", "--json"])
+    assert malformed.exit_code == 1, malformed.output
+    assert "not valid JSON" in json.loads(malformed.output)["message"]

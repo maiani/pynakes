@@ -1373,6 +1373,39 @@ class TestReferenceCrud:
         assert result.exit_code == 0, result.output
         assert not Path(f"{bib}.bak").exists()
 
+    def test_remove_reports_pinax_material_policy(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Noether1918, title = {Invariant Variational Problems}}\n"
+            "@article{Einstein1905, title = {On the Electrodynamics of Moving Bodies}}\n"
+            "@comment{pynakes-meta:\nfiles-dir: refs.files\n}\n"
+        )
+        files = tmp_path / "refs.files"
+        files.mkdir()
+        noether_pdf = files / "Noether1918.preprint.pdf"
+        einstein_pdf = files / "Einstein1905.preprint.pdf"
+        noether_pdf.write_bytes(b"%PDF fixture")
+        einstein_pdf.write_bytes(b"%PDF fixture")
+
+        preview = runner.invoke(
+            app, ["ref", "remove", str(bib), "Noether1918", "--dry-run", "--json"]
+        )
+        assert preview.exit_code == 0, preview.output
+        assert json.loads(preview.output)["material_removals"] == {
+            "Noether1918": ["Noether1918.preprint.pdf"]
+        }
+        assert noether_pdf.exists()
+
+        removed = runner.invoke(app, ["ref", "remove", str(bib), "Noether1918"])
+        assert removed.exit_code == 0, removed.output
+        assert "Removed Pinax materials" in removed.output
+        assert not noether_pdf.exists()
+
+        kept = runner.invoke(app, ["ref", "remove", str(bib), "Einstein1905", "--keep-files"])
+        assert kept.exit_code == 0, kept.output
+        assert "Kept Pinax materials" in kept.output
+        assert einstein_pdf.exists()
+
     @pytest.mark.parametrize("command", ["show", "edit"])
     def test_duplicate_key_is_a_conflict(self, tmp_path: Path, command: str) -> None:
         bib = tmp_path / "refs.bib"

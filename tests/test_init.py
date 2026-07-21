@@ -193,6 +193,47 @@ def test_init_pinax_creates_files_dir_beside_target(tmp_path: Path) -> None:
     assert load_bib(str(out)).metadata["files-dir"].strip() == "refs.files"
 
 
+def test_init_new_pinax_writes_agent_guide(tmp_path: Path) -> None:
+    out = tmp_path / "library.bib"
+
+    result = runner.invoke(app, ["init", str(out), "--pinax", "--agent-guide", "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["pinax"] is True
+    assert data["agent_guide"] == str(tmp_path / "AGENTS.md")
+    assert (tmp_path / "library.files").is_dir()
+    assert "library.bib" in (tmp_path / "AGENTS.md").read_text()
+
+
+def test_init_converts_existing_library_to_pinax_idempotently(tmp_path: Path) -> None:
+    out = tmp_path / "library.bib"
+    out.write_text("@article{Noether1918,\n  title = {Invariant Variational Problems}\n}\n")
+
+    first = runner.invoke(app, ["init", str(out), "--pinax", "--agent-guide", "--json"])
+    assert first.exit_code == 0, first.output
+    first_data = json.loads(first.output)
+    assert first_data["modified"] is True
+    assert (tmp_path / "library.files").is_dir()
+    assert (tmp_path / "AGENTS.md").exists()
+    metadata = load_bib(str(out)).metadata
+    assert metadata["files-dir"] == "library.files"
+    assert metadata["fetch-policy"] == "bestpdf"
+
+    second = runner.invoke(app, ["init", str(out), "--pinax", "--json"])
+    assert second.exit_code == 0, second.output
+    second_data = json.loads(second.output)
+    assert second_data["modified"] is False
+    assert any("files-dir already set" in warning for warning in second_data["warnings"])
+
+
+def test_init_without_target_is_structured_error() -> None:
+    result = runner.invoke(app, ["init", "--json"])
+
+    assert result.exit_code == 1, result.output
+    assert json.loads(result.output)["error"] == "InvalidInput"
+
+
 # --- helpers ---------------------------------------------------------------
 
 

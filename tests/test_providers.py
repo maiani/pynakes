@@ -73,6 +73,58 @@ def test_resolve_arxiv_id_for_doi_uses_fallback_after_openalex_error() -> None:
     assert resolved == "2402.00002"
 
 
+def test_resolve_arxiv_id_for_doi_combines_provider_failures() -> None:
+    def fail_openalex(doi: str) -> dict | None:
+        raise ProviderFetchError("OpenAlex unavailable")
+
+    def fail_semantic_scholar(doi: str) -> dict | None:
+        raise ProviderFetchError("Semantic Scholar unavailable")
+
+    with pytest.raises(
+        ProviderFetchError, match="OpenAlex unavailable; Semantic Scholar unavailable"
+    ):
+        identity.resolve_arxiv_id_for_doi(
+            "10.5555/published-first",
+            openalex_fetcher=fail_openalex,
+            semantic_scholar_fetcher=fail_semantic_scholar,
+        )
+
+
+def test_resolve_arxiv_id_for_doi_propagates_fallback_failure() -> None:
+    def fail_semantic_scholar(doi: str) -> dict | None:
+        raise ProviderFetchError("Semantic Scholar unavailable")
+
+    with pytest.raises(ProviderFetchError, match="Semantic Scholar unavailable"):
+        identity.resolve_arxiv_id_for_doi(
+            "10.5555/published-first",
+            openalex_fetcher=lambda doi: None,
+            semantic_scholar_fetcher=fail_semantic_scholar,
+        )
+
+
+def test_resolve_arxiv_id_for_doi_preserves_openalex_failure_when_fallback_is_empty() -> None:
+    def fail_openalex(doi: str) -> dict | None:
+        raise ProviderFetchError("OpenAlex unavailable")
+
+    with pytest.raises(ProviderFetchError, match="OpenAlex unavailable"):
+        identity.resolve_arxiv_id_for_doi(
+            "10.5555/published-first",
+            openalex_fetcher=fail_openalex,
+            semantic_scholar_fetcher=lambda doi: None,
+        )
+
+
+def test_resolve_arxiv_id_for_doi_returns_none_when_providers_have_no_match() -> None:
+    assert (
+        identity.resolve_arxiv_id_for_doi(
+            "10.5555/published-first",
+            openalex_fetcher=lambda doi: None,
+            semantic_scholar_fetcher=lambda doi: None,
+        )
+        is None
+    )
+
+
 def test_fetch_openalex_work_reads_deterministic_cache(tmp_path: Path) -> None:
     path = cache_path(tmp_path, "openalex", "10.5555/published-first", ".json")
     assert path is not None

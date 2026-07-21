@@ -382,9 +382,7 @@ def test_ordinals_to_superscript_parity(expected: str, value: str) -> None:
 
 # --- units_to_latex --------------------------------------------------------
 #
-# This is intentionally xfail until its formatter is implemented. The vectors
-# are JabRef v5.15's complete test corpus, so an implementation cannot claim
-# parity without converting the exact unit spacing and non-breaking hyphen form.
+# These vectors cover JabRef v5.15's unit spacing and non-breaking hyphen form.
 
 UNITS_TO_LATEX_VECTORS = [
     (r"1~{A}", "1 A"),
@@ -397,6 +395,21 @@ UNITS_TO_LATEX_VECTORS = [
 def test_units_to_latex_parity(expected: str, value: str) -> None:
     formatter = FIELD_FORMATTERS["units_to_latex"]
     assert formatter(value) == expected
+
+
+def test_formatters_registry_supports_lookup_extension_and_discovery() -> None:
+    from pynakes.formatters._registry import FormattersRegistry
+
+    registry = FormattersRegistry({"identity": lambda value: value})
+    assert registry.get("identity") is not None
+    assert registry.get("missing") is None
+    assert "identity" in registry
+    registry.register("upper", str.upper)
+    assert registry.get("upper")("abc") == "ABC"  # type: ignore[misc]
+    assert registry.names() == ["identity", "upper"]
+
+    defaults = FormattersRegistry()
+    assert "units_to_latex" in defaults
 
 
 # --- normalize_names -------------------------------------------------------

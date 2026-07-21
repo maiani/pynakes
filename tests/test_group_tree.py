@@ -1089,6 +1089,94 @@ def test_groups_remove_group_cli_persists(tmp_path: Path) -> None:
     assert {n.name for n in tree} == {"Keep"}
 
 
+def test_groups_cli_human_views_and_tree_lifecycle(tmp_path: Path) -> None:
+    """Exercise the human-facing group views and all tree mutation commands."""
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{Noether1918,\n  title = {Invariant Variational Problems}\n}\n")
+    runner = CliRunner()
+
+    empty = runner.invoke(app, ["groups", "tree", str(bib)])
+    assert empty.exit_code == 0, empty.output
+    assert "no group tree defined" in empty.output
+
+    add_root = runner.invoke(
+        app,
+        ["groups", "add-group", str(bib), "Physics", "--color", "8a8a8aff"],
+    )
+    assert add_root.exit_code == 0, add_root.output
+    add_child = runner.invoke(
+        app,
+        ["groups", "add-group", str(bib), "Symmetry", "--parent", "Physics"],
+    )
+    assert add_child.exit_code == 0, add_child.output
+
+    shown = runner.invoke(app, ["groups", "tree", str(bib)])
+    assert shown.exit_code == 0, shown.output
+    assert "+ Physics [8a8a8aff]" in shown.output
+    assert "  + Symmetry" in shown.output
+
+    listed = runner.invoke(app, ["groups", "list", str(bib)])
+    assert listed.exit_code == 0, listed.output
+    assert "Physics (0)" in listed.output
+
+    updated = runner.invoke(
+        app,
+        [
+            "groups",
+            "update-group",
+            str(bib),
+            "Symmetry",
+            "--description",
+            "Symmetry papers",
+            "--color",
+            "ff0000ff",
+            "--context",
+            "1",
+            "--collapsed",
+        ],
+    )
+    assert updated.exit_code == 0, updated.output
+    renamed = runner.invoke(app, ["groups", "rename-group", str(bib), "Symmetry", "Field Theory"])
+    assert renamed.exit_code == 0, renamed.output
+    moved = runner.invoke(app, ["groups", "move-group", str(bib), "Field Theory", "--parent", ""])
+    assert moved.exit_code == 0, moved.output
+
+    add_entry = runner.invoke(app, ["groups", "add-entry", str(bib), "Noether1918", "Field Theory"])
+    assert add_entry.exit_code == 0, add_entry.output
+    entries = runner.invoke(app, ["groups", "list-entries", str(bib), "Field Theory"])
+    assert entries.exit_code == 0, entries.output
+    assert "Noether1918" in entries.output
+    remove_entry = runner.invoke(
+        app, ["groups", "remove-entry", str(bib), "Noether1918", "Field Theory"]
+    )
+    assert remove_entry.exit_code == 0, remove_entry.output
+
+    removed = runner.invoke(app, ["groups", "remove-group", str(bib), "Field Theory"])
+    assert removed.exit_code == 0, removed.output
+
+
+def test_groups_cli_structured_errors(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{Noether1918,\n  title = {Invariant Variational Problems}\n}\n")
+    runner = CliRunner()
+
+    for args, error in (
+        (["add-entry", str(bib), "Missing", "Physics"], "KeyNotFound"),
+        (["add-group", str(bib), "Physics"], None),
+        (["add-group", str(bib), "Physics"], "InvalidInput"),
+        (["remove-group", str(bib), "Missing"], "KeyNotFound"),
+        (["rename-group", str(bib), "Missing", "Other"], "InvalidInput"),
+        (["move-group", str(bib), "Missing"], "InvalidInput"),
+        (["update-group", str(bib), "Missing"], "KeyNotFound"),
+    ):
+        result = runner.invoke(app, ["groups", *args, "--json"])
+        if error is None:
+            assert result.exit_code == 0, result.output
+        else:
+            assert result.exit_code == 1, result.output
+            assert json.loads(result.output)["error"] == error
+
+
 # ---------------------------------------------------------------------------
 # Regression: `groups add-entry` keeps the group-tree in sync
 # ---------------------------------------------------------------------------

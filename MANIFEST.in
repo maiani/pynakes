@@ -1,0 +1,3 @@
+# Tests are exercised from the repository in CI; keep the published source
+# distribution self-contained and avoid shipping only part of that test environment.
+prune tests

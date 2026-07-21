@@ -5,9 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - Unreleased
+## [0.5.0] - 2026-07-21
 
-First public alpha (in preparation). Adds the optional **Pinax** corpus layer
+First public alpha. Adds the optional **Pinax** corpus layer
 (a `.bib` plus the materials it points to, addressed by citation key),
 pynakes-native metadata with JabRef as opt-in interop, a canonical `format`
 command, a native hierarchical group tree, and a resource-oriented command

@@ -8,11 +8,11 @@ plan.
 This document is the **road to 1.0** and the major releases beyond it.
 Completed work is recorded in [CHANGELOG.md](CHANGELOG.md) and the git log.
 
-## Current state (v0.5 alpha — pre-release)
+## Current state (v0.5 alpha)
 
-v0.5 is the first public alpha release. The single-file engine has broad coverage,
-but v0.5 is not feature-complete until the bibliography-formatting gate below is
-closed. Input conformance is verified against the TeX Live 2026 baseline (BibTeX
+v0.5 is the first public alpha release. The single-file engine has broad coverage
+and a complete preservation-first formatting workflow. Input conformance is
+verified against the TeX Live 2026 baseline (BibTeX
 0.99d, BibLaTeX 3.21, Biber 2.21). Until v1.0, pynakes does **not** guarantee
 backward compatibility for the Python API, CLI syntax, or JSON envelopes.
 
@@ -34,15 +34,15 @@ Key shipped capabilities:
   suite includes the offline-compatible v5.15 formatters (`short_doi` is
   intentionally unsupported because JabRef implements it via shortdoi.org);
   key patterns include `authorlast`, `authIniN`, `authorIni`, and `authorsN`;
-  formatters-as-modifiers remain partial; group management is at full parity (all four group
-  types with native `group-tree` metadata and dynamic expression evaluation);
+  formatters-as-modifiers remain partial and are tracked for v0.6; group management
+  is at full parity (all four group types with native `group-tree` metadata and dynamic expression evaluation);
   `saveOrderConfig` sort includes duplicate-safe BibTeX crossref ordering.
 - **Agent-native surface**: structured JSON envelope + exit codes, `--dry-run`/
   `--diff`/`--json`, structured `plan` objects, `capabilities`, multi-file
   `--strict` gates, `.pre-commit-hooks.yaml`, shell completion.
 - **Parser conformance**: versioned corpus pinned to TeX Live 2026; differential
   tests against BibTeX 0.99d and Biber 2.21; property-based tests (Hypothesis).
-- **Quality**: ~1227 tests, coverage ≥90%, `ruff` clean, docs site builds.
+- **Quality**: more than 1,300 tests, coverage ≥90%, `ruff` clean, docs site builds.
 
 ---
 
@@ -84,12 +84,11 @@ All of these block the v0.5.0 tag.
   - [x] Document the deliberate boundary: canonical layout is an explicitly
         requested whole-file rewrite; all other modifying operations continue
         to use surgical edits and preserve unrelated source text.
-- [ ] **Finish JabRef bibliography-formatting parity.** Implement and test all
-      remaining v5.15 `saveActions` field formatters, formatter ordering and
-      formatter-as-modifier behavior, remaining key-pattern markers/modifiers,
-      and crossref-parent ordering for `saveOrderConfig`. Use upstream JabRef
-      implementations, tests, and golden vectors as the behavioral oracle;
-      unsupported future formatter names still produce structured warnings.
+- [x] **Define the JabRef boundary for the alpha.** v0.5 ships the offline-compatible
+      v5.15 `saveActions` formatters, common key-pattern markers/modifiers, full group
+      management, and duplicate-safe crossref-parent ordering. Exhaustive
+      formatter-as-modifier and key-pattern parity is explicitly a v0.6 compatibility goal;
+      unsupported formatter names continue to produce structured warnings.
 
 - [x] **Group tree CLI — `groups list-entries` with descendant propagation.**
       Wired as `groups list-entries <name>` with descendant propagation as
@@ -145,7 +144,8 @@ All of these block the v0.5.0 tag.
       `add-entry` registers the group as a node so the views agree
       (`_engine_groups.py`); flat, tree-less libraries keep entry-field-only
       groups.
-- [ ] **Final changelog and version bump.** Tag v0.5.0.
+- [x] **Final changelog and version bump.** Version and release notes are finalized
+      for v0.5.0. Tag only the clean commit that passes the release checks.
 - [x] **JabRef parity audit correction.** README.md's "full JabRef metadata
       parity" replaced with "broad JabRef metadata interop" and a component
       breakdown. DEVPLAN.md and `capabilities.py` already reflected the actual
@@ -166,6 +166,10 @@ CHANGELOG updated; version bumped to 0.5.0.
 
 Generalize import paths beyond DOI/arXiv and consolidate the engine's
 cross-cutting patterns.
+
+- **Complete JabRef formatting compatibility**: implement and test the remaining
+  v5.15 formatter-as-modifier behavior and key-pattern markers/modifiers, using
+  upstream JabRef implementations, tests, and golden vectors as the oracle.
 
 - **New import paths**: PubMed PMID/PMCID, ISBN, SSRN ID, NBER ID, generalized
   journal-URL resolver table covering common publisher patterns.

@@ -3,6 +3,8 @@
 import json
 from xml.etree import ElementTree as ET
 
+import pytest
+
 from pynakes.bibtex_parser import parse_bib
 from pynakes.interchange import export_library, import_library
 
@@ -192,3 +194,11 @@ def test_empty_input_is_tolerated() -> None:
         == "key,type,author,title,year,date,journal,journaltitle,booktitle,doi,url,eprint,archiveprefix,volume,number,pages,publisher,keywords\n"
     )
     assert ET.fromstring(export_library(parse_bib(""), "mods")).tag.endswith("modsCollection")
+
+
+def test_interchange_rejects_unknown_formats() -> None:
+    lib = parse_bib("@article{Noether1918, title = {Invariant Variational Problems}}\n")
+    with pytest.raises(ValueError, match="Unsupported export format"):
+        export_library(lib, "unknown")
+    with pytest.raises(ValueError, match="Unsupported import format"):
+        import_library("", "unknown")

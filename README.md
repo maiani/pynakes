@@ -12,7 +12,7 @@
 > [!WARNING]
 > `pynakes` is alpha-quality software. Interfaces and behavior may change between releases.
 
-`pynakes` is a deterministic bibliography maintenance engine built for  reliable agentic workflows, CI, and human use. Agents decide what should change; pynakes inspects, validates, previews, and applies those changes safely and reproducibly.
+`pynakes` is a deterministic bibliography maintenance engine built for reliable agentic workflows, CI, and human use. Agents decide what should change; pynakes inspects, validates, previews, and applies those changes safely and reproducibly.
 
 The Python CLI makes small, explicit, reviewable changes to `.bib` files —
 minimal diffs, dry-run previews, atomic writes, and structured JSON.
@@ -69,7 +69,7 @@ Opt in by setting a `files-dir` in the library metadata. Now every citation key 
 - **Coordinated key edits** — renaming a key moves its materials
 - **`corpus combine`/`corpus split`** — materials follow their entries
 
-The `.bib` stays the source of truth; Pinax just keeps the shelf tidy. 
+The `.bib` stays the source of truth; Pinax just keeps the shelf tidy.
 
 ## Installation
 
@@ -157,10 +157,11 @@ See the [LLM Integration guide](docs/guides/llm-integration.md) for the full JSO
 
 ## Status
 
-v0.5 will be the first public alpha release on PyPI. The single-file bibliography
-engine is feature-complete for this release: parser/writer with byte-for-byte
-round-trip fidelity, all maintenance operations, broad JabRef metadata interop,
-and a self-describing agent surface (~1220 tests, ≥90% coverage). The Pinax
+v0.5 is the first public alpha release. The single-file bibliography engine is
+feature-complete for this release: parser/writer with byte-for-byte round-trip
+fidelity, all maintenance operations, broad JabRef metadata interop, and a
+self-describing agent surface (more than 1,300 tests with a CI-enforced 90%
+coverage floor). The Pinax
 corpus layer is fully implemented including arXiv download and open-access
 published-PDF import.
 
