@@ -39,11 +39,6 @@ cross-cutting patterns.
   metadata keys to their current spelling, validate enum *values* (catch typo'd
   policy tokens), flag `[pynakes:unknown:*]` keys, and collapse duplicate
   metadata blocks — today metadata drift passes silently.
-- **`init --from` / `metadata adopt-profile`**: `init --from other.bib` on an
-  existing pinax file should merge in the missing maintenance-profile keys
-  (dialect, key-pattern, normalize-keys, sort-order) rather than no-op;
-  alternatively add `metadata adopt-profile --from other.bib` for coherent
-  multi-library setups.
 - **Quieter `lint` consistency heuristic**: scope the "missing field X vs peers"
   check within entry-type *and* identity class (preprint/published/book/code),
   or gate it behind `lint --consistency`, so healthy libraries don't bury real
@@ -127,22 +122,6 @@ CHANGELOG updated; version bumped to 0.7.0.
 (`corpus pick`/`search`/`dedupe`) shipped with tests and docs; MCP server
 published as a companion package; agent-plan and change-summary features
 shipped; `pytest && ruff` green; CHANGELOG updated; version bumped to 0.8.0.
-
----
-
-### v0.9 — Testing release
-
-- **First stable pre-release**: bump to **0.9.0**, sync `capabilities.VERSION`,
-  `twine upload`, tag `v0.9.0`, point the pre-commit hook `rev:` in docs at it.
-  Gather feedback before committing to the 1.0 API.
-- A 30-second demo (asciinema/GIF): "messy `.bib` → clean `.bib` with a
-  reviewable diff", and an agent cleaning a bibliography via pynakes.
-- Lead the README/launch with the agent-tool + reviewable-diff story.
-- Zenodo DOI and JOSS submission deferred to after traction.
-
-**Done when**: 0.9.0 is on PyPI with a demo and the launch posts are out.
-
----
 
 ### v1.0 — Launch
 

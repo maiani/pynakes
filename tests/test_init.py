@@ -227,6 +227,47 @@ def test_init_converts_existing_library_to_pinax_idempotently(tmp_path: Path) ->
     assert any("files-dir already set" in warning for warning in second_data["warnings"])
 
 
+def test_init_pinax_from_merges_missing_profile_keys(tmp_path: Path) -> None:
+    template = tmp_path / "template.bib"
+    template.write_text(TEMPLATE)
+    out = tmp_path / "library.bib"
+    out.write_text(
+        "@comment{pynakes-meta:\n"
+        "dialect: bibtex\n"
+        "}\n\n"
+        "@article{Noether1918,\n  title = {Invariant Variational Problems}\n}\n"
+    )
+
+    result = runner.invoke(app, ["init", str(out), "--pinax", "--from", str(template), "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["from"] == str(template)
+    assert set(data["merged_keys"]) == {"keypatterndefault", "normalize-author-style"}
+    assert any("Merged 2 profile key(s)" in warning for warning in data["warnings"])
+
+    meta = load_bib(str(out)).metadata
+    # Pre-existing dialect is untouched, not clobbered by the template's databaseType.
+    assert meta["dialect"].rstrip(";") == "bibtex"
+    assert meta["keypatterndefault"].rstrip(";") == "[auth][year]"
+    assert meta["normalize-author-style"] == "jabref"
+    assert "groupstree" not in meta and "tex-sources" not in meta
+
+
+def test_init_pinax_from_no_missing_keys_is_reported(tmp_path: Path) -> None:
+    template = tmp_path / "template.bib"
+    template.write_text(TEMPLATE)
+    out = tmp_path / "library.bib"
+    result = runner.invoke(app, ["init", str(out), "--pinax", "--from", str(template), "--json"])
+    assert result.exit_code == 0, result.output
+
+    second = runner.invoke(app, ["init", str(out), "--pinax", "--from", str(template), "--json"])
+    assert second.exit_code == 0, second.output
+    data = json.loads(second.output)
+    assert data["merged_keys"] == []
+    assert any("No missing profile keys to merge" in warning for warning in data["warnings"])
+
+
 def test_init_without_target_is_structured_error() -> None:
     result = runner.invoke(app, ["init", "--json"])
 

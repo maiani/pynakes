@@ -21,7 +21,11 @@ that tells LLM agents how to work with a Pinax bibliography.
 
 from dataclasses import dataclass
 
-from pynakes.metadata import format_metadata_comment, format_pynakes_meta_block
+from pynakes.metadata import (
+    format_metadata_comment,
+    format_pynakes_meta_block,
+    native_key_for_jabref,
+)
 from pynakes.model import BibFile
 
 # Metadata that is library-specific *content*, not a reusable maintenance
@@ -101,6 +105,33 @@ def collect_profile(lib: BibFile) -> list[ProfileEntry]:
             continue
         entries.append(ProfileEntry(block.key, block.value, "pynakes"))
     return entries
+
+
+def _native_key_form(key: str) -> str:
+    """Return the canonical native form of ``key``, aliasing JabRef equivalents."""
+    native = native_key_for_jabref(key)
+    return native if native is not None else key.lower()
+
+
+def missing_profile_entries(lib: BibFile, entries: list[ProfileEntry]) -> list[ProfileEntry]:
+    """Return the subset of ``entries`` whose concept ``lib`` doesn't already set.
+
+    Used by ``init --from`` on an already-initialized library (``--pinax`` onto
+    an existing file) to merge in only the maintenance-profile settings the
+    library is missing, rather than clobbering its existing conventions.
+    Aliasing-aware: a native ``dialect`` key counts as already set even when
+    the template only supplies the JabRef ``databaseType`` equivalent, and
+    vice versa.
+    """
+    existing = {_native_key_form(key) for key in lib.metadata}
+    missing: list[ProfileEntry] = []
+    for entry in entries:
+        native = _native_key_form(entry.key)
+        if native in existing:
+            continue
+        missing.append(entry)
+        existing.add(native)
+    return missing
 
 
 def apply_overrides(

@@ -8,8 +8,11 @@ single-file modify envelope.
 
 When ``--pinax`` is passed with an existing ``.bib`` file, the file is converted
 to a Pinax by adding the ``files-dir`` and fetch-policy metadata (no ``--force``
-needed — the conversion is additive). ``--agent-guide`` writes an ``AGENTS.md``
-template for LLM agents.
+needed — the conversion is additive). Combined with ``--from``, it also merges
+in any maintenance-profile keys (``dialect``, ``key-pattern``, ``normalize-keys``,
+``sort-order``, ...) the template has and this library lacks, rather than
+leaving ``--from`` a no-op. ``--agent-guide`` writes an ``AGENTS.md`` template
+for LLM agents.
 """
 
 from pathlib import Path
@@ -34,6 +37,7 @@ from pynakes.initialize import (
     apply_overrides,
     collect_profile,
     default_profile,
+    missing_profile_entries,
     render_agents_md,
     render_library,
 )
@@ -82,8 +86,14 @@ def _convert_to_pinax(
     *,
     params: RunParams,
     agent_guide: bool,
+    from_: str | None = None,
 ) -> None:
-    """Add Pinax metadata to an existing bibliography and optionally write AGENTS.md."""
+    """Add Pinax metadata to an existing bibliography and optionally write AGENTS.md.
+
+    With ``from_``, also merges in the maintenance-profile keys the template
+    library has and this one lacks (e.g. ``dialect``, ``key-pattern``,
+    ``normalize-keys``, ``sort-order``) rather than leaving ``--from`` a no-op.
+    """
     stem = Path(file).stem
     warnings: list[str] = []
 
@@ -92,6 +102,17 @@ def _convert_to_pinax(
         coll.set_metadata("fetch-policy", "bestpdf")
     else:
         warnings.append("files-dir already set; pinax metadata unchanged")
+
+    if from_ is not None:
+        template_entries = collect_profile(Bibliography.open(from_).lib)
+        missing = missing_profile_entries(coll.lib, template_entries)
+        for entry in missing:
+            coll.set_metadata(entry.key, entry.value, namespace=entry.namespace)
+        if missing:
+            keys = ", ".join(sorted(entry.key for entry in missing))
+            warnings.append(f"Merged {len(missing)} profile key(s) from {from_}: {keys}")
+        else:
+            warnings.append(f"No missing profile keys to merge from {from_}")
 
     store = coll.files
     if store is not None and not params.dry_run:
@@ -102,7 +123,13 @@ def _convert_to_pinax(
 
     agents_path = _write_agents_guide(file, dry_run=params.dry_run) if agent_guide else None
 
-    extra = {"pinax": True, "files_dir": f"{stem}.files", "agent_guide": agents_path}
+    extra = {
+        "pinax": True,
+        "files_dir": f"{stem}.files",
+        "agent_guide": agents_path,
+        "from": from_,
+        "merged_keys": [entry.key for entry in missing] if from_ is not None else [],
+    }
     if agents_path:
         warnings.append(f"Wrote agent guide to {agents_path}.")
 
@@ -166,7 +193,9 @@ def init(
     JabRef-tracked; ``--from`` replaces the defaults with another library's
     maintenance profile (its conventions, not its group tree or TeX-source
     list). ``--pinax`` seeds pinax mode and, when the file already exists,
-    converts it in place. ``--agent-guide`` writes AGENTS.md (only meaningful
+    converts it in place; combined with ``--from`` on an existing file, it
+    merges in the template's missing profile keys instead of replacing
+    anything already set. ``--agent-guide`` writes AGENTS.md (only meaningful
     alongside ``--pinax``).
     """
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
@@ -194,7 +223,7 @@ def init(
     # Pinax conversion: additive metadata update on an existing file.
     if pinax and exists:
         coll = Bibliography.open(file)
-        _convert_to_pinax(coll, file, params=params, agent_guide=agent_guide)
+        _convert_to_pinax(coll, file, params=params, agent_guide=agent_guide, from_=from_)
         return
 
     # New file creation: refuse overwrite unless --force.

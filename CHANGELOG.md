@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-07-21
+
+### Added
+
+- Publish to PyPI via trusted publishing (OIDC) on tagged releases, alongside
+  the existing GitHub Release attachment.
+
+### Fixed
+
+- **`init --pinax --from other.bib`** on an already-initialized library no
+  longer silently ignores `--from`: it now merges in the template's
+  maintenance-profile keys (`dialect`, `key-pattern`, `normalize-keys`,
+  `sort-order`, etc.) that this library doesn't already have, aliasing-aware
+  (a native `dialect` counts as set even if the template only supplies JabRef's
+  `databaseType`). Keys the library already has are left untouched.
+
 ## [0.5.0] - 2026-07-21
 
 First public alpha. Adds the optional **Pinax** corpus layer
