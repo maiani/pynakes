@@ -1,209 +1,290 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg
-  xmlns="http://www.w3.org/2000/svg"
-  viewBox="0 0 256 256"
-  role="img"
-  aria-labelledby="title desc"
->
-  <title id="title">pynakes icon</title>
-  <desc id="desc">A parchment scroll showing a small BibTeX-style diff, backed by a visible Python snake.</desc>
-
-  <defs>
-    <linearGradient id="bg" x1="28" y1="20" x2="228" y2="236" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#172033"/>
-      <stop offset="1" stop-color="#020617"/>
+   version="1.1"
+   viewBox="0 0 256 256"
+   id="svg26"
+   sodipodi:docname="pynakes-app-icon-dark-inkscape.svg"
+   inkscape:version="1.4.4 (1:1.4.4+202605061436+dcaf3e7d9e)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <sodipodi:namedview
+     id="namedview26"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="0.78613281"
+     inkscape:cx="-139.28944"
+     inkscape:cy="201.61988"
+     inkscape:window-width="1920"
+     inkscape:window-height="1014"
+     inkscape:window-x="0"
+     inkscape:window-y="29"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g22" />
+  <title
+     id="title">Pynakes app icon</title>
+  <desc
+     id="desc">A parchment catalogue with an at sign and three list lines on a dark navy rounded square.</desc>
+  <defs
+     id="defs13">
+    <linearGradient
+       id="navy"
+       x1="28"
+       y1="20"
+       x2="226"
+       y2="240"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0"
+         stop-color="#17324b"
+         id="stop1" />
+      <stop
+         offset="0.5"
+         stop-color="#10253a"
+         id="stop2" />
+      <stop
+         offset="1"
+         stop-color="#0b1b2b"
+         id="stop3" />
     </linearGradient>
-
-    <linearGradient id="snakeGrad" x1="28" y1="40" x2="230" y2="220" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#38BDF8"/>
-      <stop offset="0.42" stop-color="#22C55E"/>
-      <stop offset="1" stop-color="#15803D"/>
+    <linearGradient
+       id="paper"
+       x1="60"
+       y1="40"
+       x2="174"
+       y2="218"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0"
+         stop-color="#fffaf0"
+         id="stop4" />
+      <stop
+         offset="0.62"
+         stop-color="#fbf5e8"
+         id="stop5" />
+      <stop
+         offset="1"
+         stop-color="#f0dfbd"
+         id="stop6" />
     </linearGradient>
-
-    <linearGradient id="scrollGrad" x1="68" y1="54" x2="188" y2="202" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#FFF7D6"/>
-      <stop offset="1" stop-color="#E4C879"/>
+    <linearGradient
+       id="roll"
+       x1="181"
+       y1="38"
+       x2="211"
+       y2="82"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(1,0,0,0.91718426,0,2.9813665)">
+      <stop
+         offset="0"
+         stop-color="#fff7e5"
+         id="stop7" />
+      <stop
+         offset="0.5"
+         stop-color="#e5c693"
+         id="stop8" />
+      <stop
+         offset="1"
+         stop-color="#c49653"
+         id="stop9" />
     </linearGradient>
-
-    <linearGradient id="cylinderGrad" x1="68" y1="42" x2="188" y2="214" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#D8B76C"/>
-      <stop offset="0.5" stop-color="#B8893E"/>
-      <stop offset="1" stop-color="#7A4E20"/>
+    <linearGradient
+       id="fold"
+       x1="160"
+       y1="185"
+       x2="190"
+       y2="220"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0"
+         stop-color="#f5e5bd"
+         id="stop10" />
+      <stop
+         offset="0.55"
+         stop-color="#dfbd79"
+         id="stop11" />
+      <stop
+         offset="1"
+         stop-color="#c8954f"
+         id="stop12" />
     </linearGradient>
-
-    <filter id="shadow" x="-24%" y="-24%" width="148%" height="156%">
-      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000000" flood-opacity="0.30"/>
+    <filter
+       id="shadow"
+       x="-0.071428571"
+       y="-0.065217391"
+       width="1.1428571"
+       height="1.1576087"
+       color-interpolation-filters="sRGB">
+      <feGaussianBlur
+         in="SourceAlpha"
+         stdDeviation="5"
+         result="blur"
+         id="feGaussianBlur12" />
+      <feOffset
+         in="blur"
+         dx="0"
+         dy="5"
+         result="offsetBlur"
+         id="feOffset12" />
+      <feFlood
+         flood-color="#020914"
+         flood-opacity="0.25"
+         result="shadowColor"
+         id="feFlood12" />
+      <feComposite
+         in="shadowColor"
+         in2="offsetBlur"
+         operator="in"
+         result="shadow"
+         id="feComposite12" />
+      <feMerge
+         id="feMerge13">
+        <feMergeNode
+           in="shadow"
+           id="feMergeNode12" />
+        <feMergeNode
+           in="SourceGraphic"
+           id="feMergeNode13" />
+      </feMerge>
     </filter>
-
-    <clipPath id="scrollClip">
+    <clipPath
+       id="paperClip">
       <path
-        d="M76 58
-           H180
-           C190 58 196 66 194 78
-           C191 94 191 162 194 178
-           C196 190 190 198 180 198
-           H76
-           C66 198 60 190 62 178
-           C65 162 65 94 62 78
-           C60 66 66 58 76 58Z"
-      />
+         d="M65 36H188V196C184 201 179 204 171 204C171 211 165 216 156 220H65C52.3 220 44 211.7 44 199V57C44 44.3 52.3 36 65 36Z"
+         id="path13" />
     </clipPath>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#paper"
+       id="linearGradient28"
+       x1="186.83051"
+       y1="58.819439"
+       x2="205.72501"
+       y2="58.819439"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(1.2096291,0,0,1.1510637,-41.448198,-9.1039372)" />
   </defs>
-
-  <rect width="256" height="256" rx="48" fill="url(#bg)"/>
-
-  <g>
+  <!-- Dark app tile -->
+  <rect
+     x="8"
+     y="8"
+     width="240"
+     height="240"
+     rx="48"
+     fill="url(#navy)"
+     id="rect13" />
+  <g
+     filter="url(#shadow)"
+     id="g22"
+     transform="translate(0.07950311,-0.03975155)">
+    <!-- Upper roll sits behind the sheet -->
     <path
-      d="M216 67
-         C174 36 103 44 65 91
-         C30 134 42 190 91 216
-         C137 241 203 217 225 164"
-      fill="none"
-      stroke="#052E16"
-      stroke-width="42"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      opacity="0.9"
-    />
-
+       d="m 181,36 c 19,0 31,10.089027 31,22.929607 0,12.840579 -9,21.095238 -21,21.095238 h -10 z"
+       fill="url(#roll)"
+       id="path14"
+       style="fill:url(#roll);stroke-width:0.957697" />
     <path
-      d="M216 67
-         C174 36 103 44 65 91
-         C30 134 42 190 91 216
-         C137 241 203 217 225 164"
-      fill="none"
-      stroke="url(#snakeGrad)"
-      stroke-width="31"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    />
-
+       d="m 185.42439,42.509669 c 5.89587,0.676236 10.5458,2.668956 12.21502,3.662734 5.00281,2.978433 8.88633,8.608949 8.88633,13.787474 0,6.90638 -4.7315,13.495627 -10.77965,13.495627 -4.83851,0 -8.3251,-4.066889 -7.91964,-7.498457 0.40802,-3.45319 2.97411,-7.938458 6.603,-7.938458"
+       fill="none"
+       stroke="#8e6335"
+       stroke-width="1.71097"
+       stroke-linecap="round"
+       id="path27"
+       sodipodi:nodetypes="cssssc"
+       style="fill:none;fill-opacity:1;stroke:url(#linearGradient28)" />
     <path
-      d="M213 53
-         C231 49 245 60 245 77
-         C245 94 228 105 212 98
-         C195 91 193 59 213 53Z"
-      fill="#15803D"
-      stroke="#052E16"
-      stroke-width="5"
-      stroke-linejoin="round"
-    />
-
-    <circle cx="227" cy="71" r="3.7" fill="#F8FAFC"/>
-
+       d="m 188.00523,44.839928 c 4.87413,0.587486 8.71822,2.318685 10.09817,3.182042 4.13582,2.58755 7.34632,7.479126 7.34632,11.97803 0,6 -4.56217,12.79895 -9.56217,12.79895 -4,0 -7.3471,-4.7053 -7.01191,-7.686516 0.3373,-3 3.57408,-6.79895 6.57408,-6.79895"
+       fill="none"
+       stroke="#8e6335"
+       stroke-width="1.45"
+       stroke-linecap="round"
+       id="path16"
+       sodipodi:nodetypes="cssssc" />
+    <!-- Gold under-layer revealed by the lower curl -->
     <path
-      d="M242 82L252 86M252 86L256 83M252 86L256 91"
-      fill="none"
-      stroke="#EF4444"
-      stroke-width="3"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    />
+       d="m 156,220 h 14 c 11,0 18,-8 18,-18 v -6 c -4,5 -9,8 -17,8 0,7 -6,12 -15,16 z"
+       fill="url(#fold)"
+       id="path17"
+       style="fill:url(#fold)" />
+    <!-- Main parchment -->
+    <path
+       d="m 65,36 h 123 v 160 c -4,5 -9,8 -17,8 0,7 -6,12 -15,16 H 65 C 52.3,220 44,211.7 44,199 V 57 C 44,44.3 52.3,36 65,36 Z"
+       fill="url(#paper)"
+       id="path18"
+       style="fill:url(#paper)" />
+    <!-- Refined curl seam -->
+    <path
+       d="M 187.10559,196.50683 C 183.10559,201.50683 179,204 171,204 c 0,7 -5.40373,11.24472 -14.40373,15.24472"
+       fill="none"
+       stroke="#c89b59"
+       stroke-width="1.45"
+       stroke-linecap="round"
+       id="path19"
+       sodipodi:nodetypes="ccc" />
+    <!-- Soft paper highlights -->
+    <path
+       d="m 64,44 c 14,-4 43,-4 71,-3"
+       fill="none"
+       stroke="#ffffff"
+       stroke-width="2.4"
+       stroke-linecap="round"
+       opacity="0.34"
+       clip-path="url(#paperClip)"
+       id="path21" />
+    <path
+       d="M 52,73 V 188"
+       fill="none"
+       stroke="#ffffff"
+       stroke-width="1.8"
+       stroke-linecap="round"
+       opacity="0.22"
+       clip-path="url(#paperClip)"
+       id="path22" />
   </g>
-
-  <g filter="url(#shadow)">
-    <rect
-      x="67"
-      y="43"
-      width="122"
-      height="24"
-      rx="12"
-      fill="url(#cylinderGrad)"
-    />
+  <!-- Bibliographic at-sign, converted to paths for portable rendering -->
+  <g
+     transform="translate(-7 -3)"
+     fill="#1d7a5e"
+     clip-path="url(#paperClip)"
+     id="g23">
     <path
-      d="M80 50H176"
-      stroke="#E6C978"
-      stroke-width="4"
-      stroke-linecap="round"
-      opacity="0.7"
-    />
-
-    <rect
-      x="67"
-      y="189"
-      width="122"
-      height="24"
-      rx="12"
-      fill="url(#cylinderGrad)"
-    />
-    <path
-      d="M80 196H176"
-      stroke="#E6C978"
-      stroke-width="4"
-      stroke-linecap="round"
-      opacity="0.45"
-    />
-
-    <path
-      d="M76 58
-         H180
-         C190 58 196 66 194 78
-         C191 94 191 162 194 178
-         C196 190 190 198 180 198
-         H76
-         C66 198 60 190 62 178
-         C65 162 65 94 62 78
-         C60 66 66 58 76 58Z"
-      fill="url(#scrollGrad)"
-    />
-
-    <path
-      d="M76 58
-         H180
-         C190 58 196 66 194 78
-         C191 94 191 162 194 178
-         C196 190 190 198 180 198
-         H76
-         C66 198 60 190 62 178
-         C65 162 65 94 62 78
-         C60 66 66 58 76 58Z"
-      fill="none"
-      stroke="#7C5525"
-      stroke-width="3"
-      opacity="0.78"
-    />
+       d="M96.212 92.580Q96.212 95.795 97.585 97.654Q98.959 99.513 101.312 99.513Q103.639 99.513 105.029 97.645Q106.419 95.770 106.419 92.580Q106.419 89.406 105.013 87.564Q103.614 85.722 101.261 85.722Q98.959 85.722 97.585 87.564Q96.212 89.406 96.212 92.580ZM106.939 100.451Q106.151 102.309 104.410 103.348Q102.676 104.378 100.349 104.378Q95.844 104.378 93.030 101.120Q90.217 97.863 90.217 92.630Q90.217 87.396 93.039 84.131Q95.869 80.857 100.349 80.857Q102.676 80.857 104.410 81.903Q106.151 82.950 106.939 84.801V81.376H112.406V99.513Q115.655 99.010 117.514 96.381Q119.373 93.752 119.373 89.649Q119.373 87.028 118.611 84.742Q117.849 82.448 116.308 80.539Q113.821 77.348 110.087 75.623Q106.361 73.890 102.023 73.890Q98.984 73.890 96.212 74.694Q93.441 75.489 91.079 77.030Q87.211 79.601 85.050 83.670Q82.890 87.731 82.890 92.471Q82.890 96.373 84.288 99.789Q85.695 103.197 88.333 105.818Q90.954 108.380 94.337 109.728Q97.728 111.076 101.580 111.076Q104.870 111.076 108.169 109.846Q111.469 108.615 113.796 106.521L116.593 110.767Q113.327 113.304 109.467 114.652Q105.607 116.000 101.630 116.000Q96.790 116.000 92.494 114.283Q88.207 112.567 84.858 109.301Q81.508 106.027 79.750 101.723Q78.000 97.419 78.000 92.471Q78.000 87.706 79.775 83.394Q81.559 79.073 84.858 75.799Q88.149 72.559 92.528 70.784Q96.916 69.000 101.630 69.000Q107.491 69.000 112.281 71.236Q117.070 73.471 120.286 77.683Q122.245 80.254 123.250 83.252Q124.263 86.241 124.263 89.540Q124.263 96.632 119.993 100.559Q115.731 104.478 107.960 104.478H106.939Z"
+       id="path23" />
   </g>
-
-  <g clip-path="url(#scrollClip)">
+  <!-- Catalogue lines -->
+  <g
+     fill="none"
+     stroke="#10273c"
+     stroke-width="8"
+     stroke-linecap="round"
+     id="g26">
     <path
-      d="M98 82V178"
-      stroke="#8A5F2B"
-      stroke-width="3"
-      stroke-linecap="round"
-      opacity="0.35"
-    />
-
-    <text
-      x="82"
-      y="100"
-      font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
-      font-size="24"
-      font-weight="800"
-      fill="#4A341F"
-    >@</text>
-
-    <path d="M111 93H143" stroke="#5B3A1D" stroke-width="7" stroke-linecap="round"/>
-
+       d="M77 132H155"
+       id="path24" />
     <path
-      d="M151 85
-         C144 85 142 90 145 94
-         C148 97 148 100 143 102
-         C148 104 148 107 145 110
-         C142 114 144 119 151 119"
-      fill="none"
-      stroke="#5B3A1D"
-      stroke-width="4.5"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      opacity="0.85"
-    />
-
-    <path d="M83 120H93M88 115V125" stroke="#16A34A" stroke-width="5" stroke-linecap="round"/>
-    <path d="M111 120H166" stroke="#16A34A" stroke-width="7" stroke-linecap="round"/>
-
-    <path d="M83 144H93" stroke="#DC2626" stroke-width="5" stroke-linecap="round"/>
-    <path d="M111 144H154" stroke="#DC2626" stroke-width="7" stroke-linecap="round"/>
-
-    <path d="M111 167H162" stroke="#6F4A25" stroke-width="6" stroke-linecap="round"/>
-    <path d="M111 184H145" stroke="#7A552B" stroke-width="5.5" stroke-linecap="round" opacity="0.75"/>
+       d="M77 158H155"
+       id="path25" />
+    <path
+       d="M77 184H155"
+       id="path26" />
   </g>
+  <metadata
+     id="metadata26">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:title>Pynakes app icon</dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
 </svg>
