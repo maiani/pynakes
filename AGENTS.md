@@ -10,16 +10,15 @@ Guidance for coding agents (and humans) **developing** this repository.
 ## What this project is
 
 `pynakes` is a headless, agent-safe BibTeX/BibLaTeX maintenance toolkit with a
-custom parser built for round-trip fidelity. It interoperates losslessly with
-JabRef and the BibTeX/BibLaTeX toolchain — that compatibility is a guarantee it
-keeps, not its identity. The base identity remains the deterministic `.bib`
-maintenance engine; it is adding an optional **Pinax** mode for a `.bib` plus the
-materials it points to, addressed by citation key.
+custom parser built for round-trip fidelity. At the file layer it interoperates
+losslessly with JabRef and the BibTeX/BibLaTeX toolchain — that compatibility is
+a guarantee it keeps, not its identity. The base identity remains the
+deterministic `.bib` maintenance engine. Its optional **Pinax** mode manages a
+`.bib` together with the materials it points to, addressed by citation key.
 See [docs/guides/architecture.md](docs/guides/architecture.md) for the design,
 [docs/vision.md](docs/vision.md) for the design philosophy,
 [DEVPLAN.md](DEVPLAN.md) for the phased plan, and
-[docs/guides/pinax.md](docs/guides/pinax.md) for the in-progress corpus layer
-(the **Pinax**) and its build steps.
+[docs/guides/pinax.md](docs/guides/pinax.md) for the Pinax model and behavior.
 
 ## Layout
 
@@ -31,40 +30,45 @@ src/pynakes/
   io.py               load_bib / save_bib / save_text / save_plain_text (atomic writes)
   editing.py          surgical raw-text field/key edits + entry-level helpers
   engine.py           Bibliography lifecycle: open, stage, preview/diff, commit, reload
-  groups.py keys.py fields.py files.py lint.py
-  authors.py journals.py normalize.py  format operations
-  importer.py         resolve + import references by DOI / arXiv id (metadata only)
+  _engine_*.py        focused Bibliography operation mixins/helpers
+  canonical.py        explicit, whole-file canonical layout formatting
+  groups.py group_tree.py keys.py fields.py files.py lint.py
+  authors.py journals.py normalize.py
+  importer.py         resolve + import references by DOI / arXiv id or supported URL
   integrity.py        verify / enrich / published (opt-in --online lookups)
-  metadata.py         jabref-meta + pynakes-meta parsing, classification, safe updates
+  metadata/           jabref-meta + pynakes-meta parsing, schemas, safe updates
+  filestore.py        Pinax paths, manifests, validation, and material transactions
+  fetch.py providers/ explicit network-backed material and metadata providers
+  interchange/       CSL-JSON, RIS, MODS, EndNote, and CSV codecs
+  cli_commands/       command callbacks grouped by concern
   usage.py            cited-entry detection/tagging and TeX citation-key rewrites
   capabilities.py     machine-readable capability description
-  diff.py cli.py
-tests/                pytest suite + tests/fixtures/*.bib
+  batch.py setops.py diff.py cli.py cli_common.py cli_discovery.py
+tests/                pytest suite, conformance fixtures, and opt-in agent eval
 ```
-
-The in-progress **Pinax** corpus layer adds `filestore.py` (materials on disk,
-addressed by citation key) and `fetch.py` (arXiv PDF/source download) — not yet
-implemented; build it via the [DEVPLAN](DEVPLAN.md#pinax-implementation-steps)
-step plan against the [pinax spec](docs/guides/pinax.md), one committable step at
-a time.
 
 ## Setup & checks
 
 ```bash
-pip install -e ".[dev]"      # or ".[dev,docs]" for the docs site
+pip install -e ".[dev,docs]" # complete development and documentation toolchain
 pre-commit install           # enable ruff hooks on commit
-pytest                       # full suite (fast; deterministic)
+pytest --cov --cov-fail-under=90
 ruff check src tests         # lint
 ruff format --check src tests
-mkdocs build                 # docs site (needs the docs extra)
+mkdocs build --strict
 mkdocs serve                 # live-preview the docs at localhost:8000
+python -m build              # release artifact check
+python -m twine check dist/*
 ```
 
 The API reference is generated from docstrings by `mkdocstrings`
 ([docs/api/reference.md](docs/api/reference.md)); keep public-module docstrings
 accurate rather than hand-maintaining a symbol list.
 
-Run `pytest && ruff check src tests` before considering any change done.
+For code changes, run the test suite and both Ruff checks before considering the
+change done. Run the strict docs build when documentation or public APIs change;
+run the artifact checks for packaging or release work. CI runs Python 3.11–3.13,
+the 90% coverage gate, strict docs, and wheel/sdist checks.
 
 ## Invariants to preserve
 
@@ -84,7 +88,7 @@ tests pass:
    `status, action, file, dry_run, modified, modified_entries, warnings` (+
    command-specific keys, + `diff` when `--diff`). Errors → exit 1
    (`{"status":"error",...}`); conflicts → exit 2 with `options`. New commands
-   go through the shared `_finish_mod` / `_safe` helpers in `cli.py`. The
+   go through the shared `_finish_mod` / `_safe` helpers in `cli_common.py`. The
    contract is documented in
    [docs/guides/llm-integration.md](docs/guides/llm-integration.md) and guarded
    by tests in `tests/test_cli.py`.
@@ -94,23 +98,26 @@ tests pass:
 ## Conventions
 
 - Python ≥ 3.11, type hints throughout. Ruff line length 100 (E501 ignored).
-- CLI: Typer sub-apps (`groups`, `keys`, `fields`, `files`, `dedupe`,
-  `metadata`, `journals`) plus top-level commands (`add`, `normalize`,
-  `convert`, …); one operation module per concern, kept small and unit-testable
-  independent of the CLI.
+- CLI: top-level transforms/checks plus Typer resource families (`ref`,
+  `groups`, `keys`, `fields`, `dedupe`, `metadata`, `tex`, `asset`, `corpus`).
+  Command callbacks live in `cli_commands/`; operation modules stay independently
+  unit-testable. Keep `capabilities` synchronized with the live command surface.
 - Try to limit file length preferably to ~500 lines, with a maximum limit of 1000.
 - Add tests and a `CHANGELOG.md` entry with each behavioral change.
-- Use generic, invented example references or alternatively old, famous, historical references to famous papers in various fields in  code, tests, comments, docstrings, and
-  `CHANGELOG.md`. Never commit examples
-  derived from private data, recent bug reports, or user-provided `.bib` entries;
-  reproduce/fix with the real entry locally, then commit only a generic equivalent.
+- Use generic invented references or old, famous historical works in code,
+  tests, comments, docstrings, and `CHANGELOG.md`. Never commit examples derived
+  from private data, recent bug reports, or user-provided `.bib` entries;
+  reproduce with the real entry locally, then commit only a generic equivalent.
 
 ## Don't
 
-- The parser is deliberate to maintain round-trip fidelity.
+- Don't replace or bypass the custom parser; it is deliberate and preserves
+  round-trip fidelity.
 - Don't introduce nondeterminism (time, randomness, ordering) in core logic.
-  Network access is confined to `add` (DOI/arXiv import) and the opt-in
-  `--online` integrity lookups; everything else stays offline and deterministic.
+  Network access must remain explicit: `ref import`, `ref ... --fetch`,
+  `asset fetch`, or opt-in `--online` integrity operations. Everything else
+  stays offline and deterministic.
 - Don't let a command emit a traceback — route failures through `_safe`.
-- Don't claim a feature is implemented when it is a stub (keep capabilities,
-  README, and DEVPLAN honest).
+- Don't claim a feature is implemented when it is a stub. Keep `capabilities`,
+  README, and docs honest; keep DEVPLAN forward-looking and put completed work
+  in `CHANGELOG.md`.

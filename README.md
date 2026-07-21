@@ -17,7 +17,7 @@
 The Python CLI makes small, explicit, reviewable changes to `.bib` files —
 minimal diffs, dry-run previews, atomic writes, and structured JSON.
 
-Works on Python 3.11+, Linux, macOS, and Windows, with minimal dependencies.
+Requires Python 3.11+ and is packaged as an OS-independent CLI and library.
 
 Untouched entries write back byte-for-byte — no hidden reformatting, reordering, or re-quoting. The file stays diff-friendly in git and yours for decades.
 
@@ -26,11 +26,13 @@ A `.bib` file is the index card; a **pinax** is the card together with the shelf
 
 ## Why pynakes
 
-- **Reviewable by design.** Every modifying command previews as a unified diff (`--dry-run --diff`) before anything is written, then writes atomically with a `.bak` backup. Ambiguous cases — conflicting merges, duplicate DOIs — are reported with exit code `2` rather than guessed.
+- **Reviewable by design.** Modifying commands support `--dry-run --diff` for review before writing. Writes are atomic and re-parse-validated; `--backup` optionally retains the previous file. Ambiguous cases — conflicting merges, duplicate DOIs — are reported with exit code `2` rather than guessed.
 - **Round-trip fidelity.** An entry you don't touch is written back byte-for-byte. pynakes never normalizes whitespace, reorders fields, or re-quotes values behind your back — so diffs stay tiny and reviewable.
 - **A deterministic execution layer for agents and CI.** Stable JSON output and exit codes, machine-readable `capabilities`, structured change plans, and `--strict` / pre-commit gates let an agent exercise judgment without directly rewriting bibliography text.
 - **Deterministic and offline by default.** No hidden time, randomness, or ordering; network access is explicit (`ref import`, `asset fetch`, or `--online`) and confined to the few commands that need it.
-- **Losslessly interoperable.** Reads and writes the BibTeX/BibLaTeX toolchain's files unchanged, and round-trips JabRef's own metadata and `saveActions` — adding the `pynakes-meta` namespace only where no existing equivalent exists.
+- **Preservation-first interoperability.** Untouched BibTeX/BibLaTeX source and
+  JabRef metadata round-trip unchanged. `pynakes-meta` holds native settings;
+  JabRef metadata can be preserved, adopted, and projected explicitly.
 
 ## Two workflows
 
@@ -46,16 +48,18 @@ then:
 - **Dedupe & merge** — detect and resolve duplicates, with conflict reporting
 - **Bulk-edit fields** — set, rename, move, append, clear, or protect fields on matching references
 - **Manage groups and keys** — list, rename, repair, generate from patterns
-- **Convert** between BibTeX/BibLaTeX dialects and CSL-JSON, RIS, MODS, EndNote
-- **Track citation usage** — find cited, unused, and missing keys in `.tex` sources
+- **Convert** between BibTeX/BibLaTeX dialects; import/export CSL-JSON, RIS,
+  MODS, and EndNote; export CSV
+- **Track citation usage** — find cited, unused, and missing keys in `.tex` or
+  `.aux` sources
 - **Remove** entries with a single command
 
-All through the standardized lifecycle: load → stage →
-preview/diff → commit. Broad JabRef metadata interop — round-trip
-`saveActions` (15/24 formatters), group definitions (full parity with all
-four group types), save-order configuration, and key patterns (partial —
-10 common markers + 5 modifiers). Every modifying command supports
-`--dry-run --diff` before writing, and writes atomically with an optional `.bak` backup.
+All through the standardized lifecycle: load → stage → preview/diff → commit.
+JabRef v5.15 interoperability covers metadata preservation and classification,
+offline-compatible `saveActions`, all four group types, save-order configuration,
+and common key-pattern markers and modifiers. Unsupported formatter names are
+reported rather than silently applied. Every modifying command supports
+`--dry-run --diff` and atomic writes; backups are opt-in.
 
 ### 2. Pinax — the corpus layer
 
@@ -65,7 +69,7 @@ Opt in by setting a `files-dir` in the library metadata. Now every citation key 
 - **Open-access published PDFs** — resolved from DOI via OpenAlex, CrossRef, and publisher-specific URL overrides; `.published.pdf` lands only for genuinely OA papers, never misidentified repository mirrors
 - **`asset fetch`** — download configured materials for all entries or one key
 - **`asset check`** — validate presence, detect orphans, verify checksums, optionally fix (`--fix`)
-- **`ref remove`** — removes both the entry and its materials 
+- **`ref remove`** — removes both the entry and its materials by default
 - **Coordinated key edits** — renaming a key moves its materials
 - **`corpus combine`/`corpus split`** — materials follow their entries
 
@@ -157,13 +161,11 @@ See the [LLM Integration guide](docs/guides/llm-integration.md) for the full JSO
 
 ## Status
 
-v0.5 is the first public alpha release. The single-file bibliography engine is
-feature-complete for this release: parser/writer with byte-for-byte round-trip
-fidelity, all maintenance operations, broad JabRef metadata interop, and a
-self-describing agent surface (more than 1,300 tests with a CI-enforced 90%
-coverage floor). The Pinax
-corpus layer is fully implemented including arXiv download and open-access
-published-PDF import.
+v0.5.0 is the first public alpha. It includes the preservation-first
+parser/writer, the documented maintenance command surface, broad JabRef v5.15
+interoperability, machine-readable command discovery, and the optional Pinax
+corpus layer with arXiv and published-PDF material workflows. CI tests Python
+3.11–3.13 and enforces a 90% coverage floor.
 
 Until v1.0, pynakes does **not** guarantee backward compatibility for the Python
 API, CLI syntax, or JSON envelopes. The project aims to keep automation
@@ -191,6 +193,7 @@ MIT — see [LICENSE](LICENSE).
 
 ## Contributing
 
-Contributions are welcome. Open an issue to discuss the feature or bug, write
-tests for any new functionality, and ensure `pytest` and `ruff` pass before
-opening a PR.
+Contributions are welcome. Open an issue to discuss the feature or bug, add
+tests for behavioral changes, and run the test suite plus both Ruff checks
+before opening a PR. See [AGENTS.md](AGENTS.md) for the complete development
+and verification conventions.
