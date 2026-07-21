@@ -224,6 +224,52 @@ def test_cli_combine_dedupe_conflict_exits_2(tmp_path: Path) -> None:
     assert not Path(out).exists()
 
 
+def test_cli_combine_self_output_does_not_crash_on_own_materials(tmp_path: Path) -> None:
+    # Regression (F14): `corpus combine A.bib B.bib --out A.bib` aborted with a
+    # SameFileError copying A's own pinax materials onto themselves.
+    primary = tmp_path / "primary.bib"
+    primary.write_text(
+        "@article{Shockley1949,\n  title = {Junctions}\n}\n"
+        "@comment{pynakes-meta:\nfiles-dir: primary.files\n}\n"
+    )
+    primary_files = tmp_path / "primary.files"
+    primary_files.mkdir()
+    (primary_files / "Shockley1949.published.pdf").write_bytes(b"own")
+    harvest = _write(tmp_path, "harvest.bib", "@article{Bardeen1948,\n  title = {Transistor}\n}\n")
+
+    result = runner.invoke(
+        app, ["corpus", "combine", str(primary), harvest, "--out", str(primary), "--json"]
+    )
+
+    assert result.exit_code == 0, result.output
+    combined = parse_bib(primary.read_text())
+    assert set(combined.entries.keys()) == {"Shockley1949", "Bardeen1948"}
+    # The library's own material is left untouched (the self-copy was skipped).
+    assert (primary_files / "Shockley1949.published.pdf").read_bytes() == b"own"
+
+
+def test_cli_combine_self_output_preserves_custom_files_dir(tmp_path: Path) -> None:
+    # Regression (F14b): a self-combine must keep the library's own files-dir
+    # rather than silently renaming it to the --out basename ("primary.files").
+    primary = tmp_path / "primary.bib"
+    primary.write_text(
+        "@article{Shockley1949,\n  title = {Junctions}\n}\n"
+        "@comment{pynakes-meta:\nfiles-dir: materials\n}\n"
+    )
+    materials = tmp_path / "materials"
+    materials.mkdir()
+    (materials / "Shockley1949.published.pdf").write_bytes(b"own")
+    harvest = _write(tmp_path, "harvest.bib", "@article{Bardeen1948,\n  title = {Transistor}\n}\n")
+
+    result = runner.invoke(
+        app, ["corpus", "combine", str(primary), harvest, "--out", str(primary), "--json"]
+    )
+
+    assert result.exit_code == 0, result.output
+    combined = parse_bib(primary.read_text())
+    assert combined.pynakes_metadata["files-dir"] == "materials"
+
+
 # --- CLI: split ------------------------------------------------------------
 
 

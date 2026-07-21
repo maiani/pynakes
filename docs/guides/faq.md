@@ -223,8 +223,4 @@ A:
 - **Quick questions**: Check this FAQ
 - **Issues**: Report bugs on [GitHub Issues](https://github.com/maiani/pynakes/issues)
 - **Discussions**: Ask questions on [GitHub Discussions](https://github.com/maiani/pynakes/discussions)
-- **Email**: [andrea.maiani@su.se](mailto:andrea.maiani@su.se)
-
-### Q: Is there a Slack/Discord community?
-
-A: Not yet. As the project grows, we may set up a community channel. For now, use GitHub Discussions.
+- **Email**: [dev@andreamaiani.com](mailto:dev@andreamaiani.com)

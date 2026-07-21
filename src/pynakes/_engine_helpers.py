@@ -43,6 +43,33 @@ class CommitResult:
     modified: bool
 
 
+@dataclass(frozen=True)
+class SourceSpan:
+    """One exact block location in the pristine source text."""
+
+    start: int
+    end: int
+    raw: str
+
+
+@dataclass(frozen=True)
+class SourceSnapshot:
+    """Identity-aware source locations captured with a pristine engine state."""
+
+    entries: dict[int, SourceSpan]
+    raw_comments: tuple[str, ...]
+    comments: dict[int, SourceSpan]
+    complete: bool
+
+
+@dataclass(frozen=True)
+class SpanEdit:
+    """Replace one pristine source span with ``replacement``."""
+
+    span: SourceSpan
+    replacement: str
+
+
 class ExternalModificationError(Exception):
     """Raised when a bound bibliography's file changed since it was opened."""
 
@@ -54,6 +81,69 @@ class ExternalModificationError(Exception):
 def snapshot_entries(lib: BibFile) -> dict[int, str | None]:
     """Return a mapping of ``id(entry) → raw_content`` for all entries."""
     return {id(entry): entry.raw_content for entry in lib.entries.values()}
+
+
+def snapshot_source_spans(text: str, lib: BibFile) -> SourceSnapshot:
+    """Capture exact entry/comment positions from ``lib.source_layout``.
+
+    The layout retains entry object identity and raw-comment indices, so these
+    spans remain unambiguous even when two blocks contain identical bytes.  An
+    incomplete snapshot signals an in-memory library without a source layout;
+    those libraries retain the explicit whole-model rendering path.
+    """
+    entry_spans: dict[int, SourceSpan] = {}
+    comment_spans: dict[int, SourceSpan] = {}
+    cursor = 0
+    for gap, kind, ref in lib.source_layout:
+        if text[cursor : cursor + len(gap)] != gap:
+            return SourceSnapshot(entry_spans, tuple(lib.raw_comments), comment_spans, False)
+        cursor += len(gap)
+        raw = _source_block_raw(lib, kind, ref)
+        if raw is None or text[cursor : cursor + len(raw)] != raw:
+            return SourceSnapshot(entry_spans, tuple(lib.raw_comments), comment_spans, False)
+        span = SourceSpan(cursor, cursor + len(raw), raw)
+        if kind == "entry":
+            entry_spans[id(ref)] = span
+        elif kind == "comment":
+            comment_spans[ref] = span
+        cursor = span.end
+
+    complete = text[cursor:] == lib.source_trailing
+    return SourceSnapshot(entry_spans, tuple(lib.raw_comments), comment_spans, complete)
+
+
+def _source_block_raw(lib: BibFile, kind: str, ref: object) -> str | None:
+    if kind == "entry":
+        return ref.raw_content
+    if kind == "comment":
+        return lib.raw_comments[ref]
+    if kind == "string":
+        return lib.raw_strings[ref]
+    if kind == "preamble":
+        return lib.preamble[ref]
+    if kind == "raw":
+        return ref
+    return None
+
+
+def apply_span_edits(text: str, edits: list[SpanEdit]) -> str:
+    """Apply validated, non-overlapping source edits from right to left."""
+    ordered = sorted(edits, key=lambda edit: (edit.span.start, edit.span.end))
+    previous_end = -1
+    for edit in ordered:
+        span = edit.span
+        if span.start < previous_end:
+            raise ValueError("overlapping surgical source edits")
+        if span.start < 0 or span.end < span.start or span.end > len(text):
+            raise ValueError("surgical source edit is outside the pristine text")
+        if text[span.start : span.end] != span.raw:
+            raise ValueError("surgical source edit no longer matches the pristine text")
+        previous_end = span.end
+
+    for edit in reversed(ordered):
+        span = edit.span
+        text = text[: span.start] + edit.replacement + text[span.end :]
+    return text
 
 
 def metadata_bool(lib: BibFile, name: str, default: bool) -> bool:
@@ -112,26 +202,23 @@ def append_entry_text(
     return original_text + line_ending + line_ending + entry_text + line_ending
 
 
-def entry_removal_text(pristine_text: str, raw_content: str) -> str | None:
-    """Return the span to blank out when deleting *raw_content* from *pristine_text*.
+def entry_removal_span(pristine_text: str, span: SourceSpan) -> SourceSpan:
+    """Extend an entry span over its trailing inter-block whitespace.
 
-    Removing only the entry's own ``raw_content`` leaves the blank-line gap
+    Removing only the entry's own source span leaves the blank-line gap
     that preceded it *and* the one that followed it back to back, doubling
     the separator. When another block follows, the span is extended over
     that trailing gap so exactly one blank-line separator remains (the one
     that preceded the removed entry). At end of file there is no trailing
     gap to fold away, so the entry text alone is returned unchanged.
     """
-    start = pristine_text.find(raw_content)
-    if start == -1:
-        return None
-    end = start + len(raw_content)
+    end = span.end
     tail = end
     while tail < len(pristine_text) and pristine_text[tail] in " \t\r\n":
         tail += 1
     if tail < len(pristine_text):
         end = tail
-    return pristine_text[start:end]
+    return SourceSpan(span.start, end, pristine_text[span.start : end])
 
 
 def _trailing_metadata_start(text: str, blocks: list[MetadataBlock]) -> int | None:

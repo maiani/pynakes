@@ -13,6 +13,7 @@ from pathlib import Path
 
 import typer
 
+from pynakes._text_utils import strip_meta_terminator
 from pynakes.bibtex_writer import write_bib
 from pynakes.cli_common import (
     _BACKUP_OPTION,
@@ -27,7 +28,7 @@ from pynakes.cli_common import (
 from pynakes.diff import generate_diff
 from pynakes.filestore import FILES_DIR_KEY, FileStore
 from pynakes.io import load_bib, save_text
-from pynakes.metadata import set_metadata
+from pynakes.metadata import metadata_value, set_metadata
 from pynakes.model import BibFile
 from pynakes.setops import PartitionRule, merge_libraries, partition_library, strip_metadata_blocks
 from pynakes.usage import collect_cited_keys
@@ -48,8 +49,12 @@ def _entry_sources(named_libs: list[tuple[str, BibFile]]) -> dict[int, FileStore
     return sources
 
 
-def _ensure_pinax_output(lib: BibFile, out: str) -> FileStore:
-    set_metadata(lib, FILES_DIR_KEY, f"{Path(out).stem}.files")
+def _ensure_pinax_output(lib: BibFile, out: str, *, preserve_files_dir: bool = False) -> FileStore:
+    # Deriving files-dir from the --out basename is right for a fresh output
+    # (keeps inputs read-only), but a self-combine (--out is also an input) must
+    # keep that library's own files-dir so a custom value isn't silently renamed.
+    if not (preserve_files_dir and metadata_value(lib, FILES_DIR_KEY) is not None):
+        set_metadata(lib, FILES_DIR_KEY, f"{Path(out).stem}.files")
     store = FileStore.from_metadata(lib, out)
     if store is None:
         raise ValueError("could not resolve output files-dir")
@@ -62,6 +67,7 @@ def _copy_pinax_materials(
     sources: dict[int, FileStore],
     *,
     dry_run: bool,
+    preserve_files_dir: bool = False,
 ) -> list[dict[str, str]]:
     if not sources:
         return []
@@ -69,7 +75,7 @@ def _copy_pinax_materials(
     if duplicates:
         keys = ", ".join(sorted(duplicates))
         raise ValueError(f"Pinax output requires unique citation keys: {keys}")
-    target = _ensure_pinax_output(lib, out)
+    target = _ensure_pinax_output(lib, out, preserve_files_dir=preserve_files_dir)
     copied: list[dict[str, str]] = []
     if dry_run:
         return copied
@@ -121,7 +127,11 @@ def combine(
         )
         return
 
-    pinax_materials = _copy_pinax_materials(merged.lib, out, pinax_sources, dry_run=params.dry_run)
+    self_output = Path(out).resolve() in {Path(p).resolve() for p in inputs}
+    primary_files_dir = metadata_value(merged.lib, FILES_DIR_KEY)
+    pinax_materials = _copy_pinax_materials(
+        merged.lib, out, pinax_sources, dry_run=params.dry_run, preserve_files_dir=self_output
+    )
     content = write_bib(merged.lib)
     entries = len(merged.lib.entries)
 
@@ -135,6 +145,25 @@ def combine(
     warnings: list[dict[str, object]] = []
     if merged.duplicate_keys:
         warnings.append({"type": "duplicate_keys", "keys": merged.duplicate_keys})
+    output_files_dir = metadata_value(merged.lib, FILES_DIR_KEY)
+    if (
+        pinax_sources
+        and not self_output
+        and primary_files_dir is not None
+        and output_files_dir is not None
+        and strip_meta_terminator(primary_files_dir) != strip_meta_terminator(output_files_dir)
+    ):
+        warnings.append(
+            {
+                "type": "files_dir_changed",
+                "from": strip_meta_terminator(primary_files_dir),
+                "to": strip_meta_terminator(output_files_dir),
+                "message": (
+                    "Output files-dir derived from --out differs from the primary "
+                    "input's; materials were copied into the output's files-dir."
+                ),
+            }
+        )
 
     human = [f"Combined {len(merged.inputs)} file(s) → {entries} {_entries(entries)}."]
     if pinax_sources:

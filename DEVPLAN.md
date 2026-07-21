@@ -110,6 +110,41 @@ All of these block the v0.5.0 tag.
       `enrich` updates entries from those sources. Both accept `--published`
       and `--online` but with different intent. Ensure `--help` and the LLM
       integration guide make this distinction explicit.
+- [x] **Bug: metadata-only `groups` changes never commit.** `groups add-group`
+      (and `remove`/`move`/`rename-group`) reported success on a fresh
+      `group-tree` but wrote nothing: the surgical renderer emits only staged
+      `(old_raw, new_raw)` metadata replacements, and group-tree CRUD mutated the
+      model without staging (`--json` showed `modified: false`,
+      `metadata_changed: 1`). Fixed at the root: the engine snapshots raw comments
+      alongside entries and derives metadata edits at render time, so supported
+      metadata mutations cannot be omitted by a caller that forgets separate
+      staging bookkeeping and the CLI can bootstrap a tree.
+- [x] **Bug: identical source blocks lose positional identity during edits.**
+      Surgical rendering used first-match string replacement, so editing the
+      second byte-identical duplicate entry could rewrite the first even though
+      `change_plan()` identified the second occurrence. The engine now snapshots
+      exact source spans for entries and comments and applies validated edits by
+      offset. `is_dirty` is likewise derived from actual output or pending Pinax
+      transactions, avoiding false dirty state after semantic no-ops.
+- [x] **Bug: `corpus combine --out X` fails when `X` is also an input.**
+      Self-combine aborted with a `SameFileError` copying a pinax material onto
+      itself. Fixed: `FileStore.copy_materials_from` skips a copy whose source
+      and destination resolve to the same file (`filestore.py`); a self-combine
+      keeps the input's own `files-dir` instead of deriving it from `--out`, and
+      a non-self combine that changes `files-dir` now warns
+      (`cli_commands/setops.py`).
+- [x] **Bug/UX: `keys rename`/`generate` hard-fails with no TeX sources.** Fixed:
+      the flawed `require_sources` gate is gone — no configured sources is a
+      zero-update success with a warning, while explicitly passing sources that
+      resolve to no `.tex` files still errors (`cli_commands/keys.py`).
+- [x] **Bug: `groups add-entry` left orphan memberships out of the tree.** Adding
+      an entry to a group absent from an existing `group-tree` wrote the entry's
+      `groups={}` field but never registered the group as a node, so the
+      membership was invisible to `groups tree`, `groups list` (which defers to
+      the tree), and JabRef — with no warning. Fixed: when a tree exists,
+      `add-entry` registers the group as a node so the views agree
+      (`_engine_groups.py`); flat, tree-less libraries keep entry-field-only
+      groups.
 - [ ] **Final changelog and version bump.** Tag v0.5.0.
 - [x] **JabRef parity audit correction.** README.md's "full JabRef metadata
       parity" replaced with "broad JabRef metadata interop" and a component
@@ -139,14 +174,38 @@ cross-cutting patterns.
   ISBN, nature.com, journals.aps.org, plus the new Elsevier/Springer/Wiley/PLOS
   patterns) and resolves it through the appropriate provider, normalizing the
   result into a uniform metadata dict.
-- **Richer `search`**: fuzzy title matching, date-range filtering,
-  "entries missing field X" queries, search-result JSON with match
-  explanations — covers common agent facepalms without writing ad-hoc grep.
+- **Richer `search` + `--where` grammar**: fuzzy title matching, date-range
+  filtering, "entries missing field X" queries, search-result JSON with match
+  explanations. Extend the `--where` grammar (shared by `search`, `fields`, and
+  `corpus split`) beyond single predicates to boolean `and`/`or`, `key in [...]`,
+  and numeric comparison (`year >= 2025`) — covers common agent facepalms
+  without writing ad-hoc grep.
+- **Multi-entry triage view**: `ref show --keys k1,k2,… [--abstract]` (or
+  `search --show-abstract`) to scan a set of candidate entries in one call
+  instead of one invocation per key.
+- **`metadata doctor [--fix]` + metadata-aware `lint`**: rename known-legacy
+  metadata keys to their current spelling, validate enum *values* (catch typo'd
+  policy tokens), flag `[pynakes:unknown:*]` keys, and collapse duplicate
+  metadata blocks — today metadata drift passes silently.
+- **`init --from` / `metadata adopt-profile`**: `init --from other.bib` on an
+  existing pinax file should merge in the missing maintenance-profile keys
+  (dialect, key-pattern, normalize-keys, sort-order) rather than no-op;
+  alternatively add `metadata adopt-profile --from other.bib` for coherent
+  multi-library setups.
+- **Quieter `lint` consistency heuristic**: scope the "missing field X vs peers"
+  check within entry-type *and* identity class (preprint/published/book/code),
+  or gate it behind `lint --consistency`, so healthy libraries don't bury real
+  issues under peer-consistency noise.
+- **`asset fetch`/`check` file targeting**: a `--all`/`--file` form to operate
+  on every entry in a specific library when sibling `.bib` files share the
+  directory (today the first positional is read as a citation key, and bare
+  auto-detect fails with multiple `.bib` files present).
 - **Cross-cutting consolidation**: unify interface patterns, reduce duplication
   across import, identity, and metadata pathways.
 
-**Done when**: broader import paths and improved `search` implemented, tested,
-and documented; `pytest && ruff` green; CHANGELOG updated; version bumped to 0.6.0.
+**Done when**: broader import paths, richer `search`/`--where`, `metadata
+doctor`, and the `lint`/`groups`/`asset` UX fixes implemented, tested, and
+documented; `pytest && ruff` green; CHANGELOG updated; version bumped to 0.6.0.
 
 ---
 
@@ -177,6 +236,24 @@ CHANGELOG updated; version bumped to 0.7.0.
 - **`Library` (corpus)**: `Library.open(dir)`; `collections()`,
   `collection(path)`; cross-file `search`/`find_key`/dedup, reusing the identity
   primitive from v0.7. A Library holds many `.bib` files (many pinakes).
+- **Cross-library entry operations** — the motions single-file mode can't
+  express, built on the `Library` + v0.7 identity primitive:
+  - **`corpus pick`** — cross-library entry cherry-pick, the missing verb:
+    `corpus pick SRC.bib… --keys K1,K2,… --into DEST.bib [--with-materials]
+    [--strip-groups | --map-group "Src=Dest"] [--dedupe]`. Pull a focused subset
+    out of one or more larger libraries into a target library in a single
+    reviewable command, replacing a harvest→strip→combine→re-group script. This
+    is the operation the "seed a new library from neighbors" workflow is built on
+    and the one entry-level motion with no path today.
+  - **`corpus search`** — one query across N libraries with a `[file]` column
+    ("which of my libraries already has this?"), surfacing `Library.search` at
+    the CLI.
+  - **`corpus dedupe` / `dedupe --against other.bib`** — cross-file
+    duplicate/identity check so entries are vetted against siblings before a
+    transplant.
+  - **`ref import --from sibling.bib KEY`** — pull a single entry from a sibling
+    library by key without first digging out its DOI (a lighter cousin of
+    `corpus pick`).
 - **`Catalogue` (index)**: a derived, rebuildable search index (e.g. SQLite FTS)
   over the Library; strictly derived, never a competing source of truth.
 - **MCP server**: a thin [Model Context Protocol](https://modelcontextprotocol.io)
@@ -194,10 +271,10 @@ CHANGELOG updated; version bumped to 0.7.0.
 - **`Catalogue`-backed rich query CLI**: `search` gains full-text and
   field-scoped queries against the index, not just raw entry iteration.
 
-**Done when**: `Library` and `Catalogue` shipped with tests and docs; MCP
-server published as a companion package; agent-plan and change-summary
-features shipped; `pytest && ruff` green; CHANGELOG updated; version bumped
-to 0.8.0.
+**Done when**: `Library`, `Catalogue`, and the cross-library entry operations
+(`corpus pick`/`search`/`dedupe`) shipped with tests and docs; MCP server
+published as a companion package; agent-plan and change-summary features
+shipped; `pytest && ruff` green; CHANGELOG updated; version bumped to 0.8.0.
 
 ---
 

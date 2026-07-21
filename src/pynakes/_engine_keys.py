@@ -1,8 +1,8 @@
 """Key-operation mixin for :class:`~pynakes.engine.Bibliography`.
 
 All methods here delegate to :mod:`pynakes.keys` / :mod:`pynakes.usage` and
-call ``self._mark()`` / ``self._stage_pinax_renames()`` to record staging
-state.  Do not import this module directly; use ``pynakes.engine``.
+stage any matching Pinax renames; bibliography dirty state is derived from the
+result. Do not import this module directly; use ``pynakes.engine``.
 """
 
 from __future__ import annotations
@@ -26,28 +26,24 @@ class BibliographyKeys:
         """Regenerate all citation keys from entry metadata."""
         renames = key_ops.regenerate_keys(self.lib)
         self._stage_pinax_renames(renames)
-        self._mark(bool(renames))
         return renames
 
     def generate_key(self, key: str) -> tuple[str, str] | None:
         """Regenerate one citation key from its entry metadata."""
         rename = key_ops.regenerate_key(self.lib, key)
         self._stage_pinax_renames([rename] if rename is not None else [])
-        self._mark(rename is not None)
         return rename
 
     def repair_keys(self) -> list[tuple[str, str]]:
         """Repair duplicate citation keys."""
         renames = key_ops.repair_duplicate_keys(self.lib)
         self._stage_pinax_renames(renames)
-        self._mark(bool(renames))
         return renames
 
     def rename_key(self, old: str, new: str) -> int:
         """Rename one unique citation key."""
         count = key_ops.rename_key(self.lib, old, new)
         self._stage_pinax_renames([(old, new)] if count else [])
-        self._mark(count)
         return count
 
     def _rewrite_tex_for_renames(self, renames: list[tuple[str, str]]) -> int:

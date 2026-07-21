@@ -205,6 +205,40 @@ Interop, CLI, and API:
   across the JabRef and pynakes namespaces.
 - Declare Click as a direct runtime dependency for CLI discovery and shell
   completion, fixing clean CI installs with newer Typer releases.
+- **Group-tree CRUD persists metadata-only changes.** `groups add-group` (and
+  `remove`/`rename`/`move`/`update-group`) reported success while writing nothing
+  when the change touched only the `group-tree` metadata with no entry edit: the
+  engine staged metadata mutations for the surgical renderer only on
+  `metadata set`, so group-tree edits made straight to the model were never
+  emitted (`modified: false` despite `metadata_changed: 1`). Metadata rendering
+  is now derived from the pristine source snapshot, so all supported metadata
+  mutations persist without operation-specific staging.
+- **Surgical edits preserve the identity of byte-identical blocks.** Rendering
+  previously found an entry by its raw text and replaced the first match, so
+  editing the second of two identical duplicate-key entries could modify the
+  first physical entry while the structured plan reported the second. The
+  engine now snapshots exact source spans and applies validated offset edits;
+  entry removals and metadata replacements use the same positional mechanism.
+- **`is_dirty` reflects actual staged work.** It is now derived from rendered
+  output plus deferred Pinax transactions instead of merely recording that a
+  mutating command ran, so setting metadata to its existing value no longer
+  makes `reload()` require `force=True` when nothing would be discarded.
+- **`corpus combine --out X` where `X` is also an input no longer aborts.** A
+  self-combine previously raised a `SameFileError` copying a Pinax material onto
+  itself; `copy_materials_from` now skips a copy whose source and destination
+  resolve to the same file. A self-combine also keeps the library's own
+  `files-dir` instead of silently renaming it to the `--out` basename, and a
+  non-self combine that changes the derived `files-dir` emits a warning.
+- **`keys rename`/`generate` succeed on a library with no TeX sources.** Renaming
+  a key when none are configured (no argument and no `tex-sources` metadata) is
+  now a zero-update success with a warning rather than a `NoTeXSources` error — a
+  fresh library has no manuscript linked yet. Explicitly passing sources that
+  resolve to no `.tex` files remains an error.
+- **`groups add-entry` keeps the group-tree in sync.** Adding an entry to a group
+  absent from an existing `group-tree` previously wrote only the entry's
+  `groups={}` field, leaving an orphan membership invisible to `groups tree`,
+  `groups list`, and JabRef. When a tree exists the group is now registered as a
+  node so the views agree; flat, tree-less libraries keep entry-field-only groups.
 
 ## [0.4.0] - 2026-06-26
 Complete single-file BibTeX/BibLaTeX maintenance engine

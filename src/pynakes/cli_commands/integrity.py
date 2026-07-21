@@ -90,7 +90,7 @@ def verify(
     strict: bool = typer.Option(False, "--strict", help="Exit 1 if warnings or errors are found"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Verify entries against authoritative metadata (read-only, does not modify the file).
+    """Verify entries against authoritative metadata (read-only).
 
     Checks DOI-backed entries against provider metadata; with ``--published`` it
     also reports preprints that now have a published version available.

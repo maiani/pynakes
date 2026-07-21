@@ -1044,6 +1044,95 @@ def test_groups_list_entries_cli_strict_omits_descendants(tmp_path: Path) -> Non
 
 
 # ---------------------------------------------------------------------------
+# Regression: metadata-only group-tree CRUD must persist through the CLI
+# ---------------------------------------------------------------------------
+
+
+def test_groups_add_group_cli_persists_on_fresh_library(tmp_path: Path) -> None:
+    # Regression: `groups add-group` on a library with no group-tree reported
+    # success while writing nothing — the commit gate saw modified=False because
+    # the metadata-only change was never staged for the surgical renderer.
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{Bardeen1948,\n  title = {The Transistor}\n}\n")
+
+    r1 = CliRunner().invoke(app, ["groups", "add-group", str(bib), "Devices", "--json"])
+    assert r1.exit_code == 0, r1.output
+    assert json.loads(r1.output)["modified"] is True
+    assert "group-tree" in bib.read_text()
+
+    # A second node bootstraps a real hierarchy through the CLI alone.
+    r2 = CliRunner().invoke(
+        app, ["groups", "add-group", str(bib), "Transistors", "--parent", "Devices", "--json"]
+    )
+    assert r2.exit_code == 0, r2.output
+
+    tree = list_tree(parse_bib(bib.read_text()))
+    assert tree is not None
+    assert {n.name for n in tree} == {"Devices", "Transistors"}
+
+
+def test_groups_remove_group_cli_persists(tmp_path: Path) -> None:
+    # The same commit-gate bug affected remove/rename/move; verify remove persists.
+    lib = BibFile()
+    lib.pynakes_metadata_blocks = []
+    add_node(lib, "Keep")
+    add_node(lib, "Drop")
+    bib = tmp_path / "refs.bib"
+    bib.write_text(write_bib(lib))
+
+    result = CliRunner().invoke(app, ["groups", "remove-group", str(bib), "Drop", "--json"])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["modified"] is True
+    tree = list_tree(parse_bib(bib.read_text()))
+    assert tree is not None
+    assert {n.name for n in tree} == {"Keep"}
+
+
+# ---------------------------------------------------------------------------
+# Regression: `groups add-entry` keeps the group-tree in sync
+# ---------------------------------------------------------------------------
+
+
+def test_add_entry_registers_group_in_existing_tree(tmp_path: Path) -> None:
+    # Regression: adding an entry to a group absent from an existing tree left an
+    # orphan membership invisible to `groups tree`/`groups list` and JabRef. The
+    # group is now registered as a node so the membership is addressable.
+    lib = BibFile()
+    lib.pynakes_metadata_blocks = []
+    add_node(lib, "Papers")
+    lib.entries.add(BibEntry(key="Shockley1949", type="article", fields={"title": "PN"}))
+    bib = tmp_path / "refs.bib"
+    bib.write_text(write_bib(lib))
+
+    result = CliRunner().invoke(
+        app, ["groups", "add-entry", str(bib), "Shockley1949", "Semiconductors", "--json"]
+    )
+
+    assert result.exit_code == 0, result.output
+    reparsed = parse_bib(bib.read_text())
+    tree = list_tree(reparsed)
+    assert tree is not None
+    assert {n.name for n in tree} == {"Papers", "Semiconductors"}
+    assert list_entries_in_group_tree(reparsed, "Semiconductors") == ["Shockley1949"]
+
+
+def test_add_entry_on_treeless_library_creates_no_tree(tmp_path: Path) -> None:
+    # A flat, tree-less library keeps entry-field-only groups: add-entry must not
+    # synthesize a group-tree behind the user's back (`groups list` still shows it).
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{Bardeen1948,\n  title = {Transistor}\n}\n")
+
+    result = CliRunner().invoke(
+        app, ["groups", "add-entry", str(bib), "Bardeen1948", "Devices", "--json"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert list_tree(parse_bib(bib.read_text())) is None
+    assert "groups = {Devices}" in bib.read_text()
+
+
+# ---------------------------------------------------------------------------
 # Regression: CLI groups list uses tree-aware API
 # ---------------------------------------------------------------------------
 

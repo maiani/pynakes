@@ -2,8 +2,9 @@
 
 ``Bibliography`` wraps one :class:`~pynakes.model.BibFile`, remembers the pristine
 file text it was opened from, stages edits in memory, and can preview, diff, or
-commit those staged edits. Entry edits use the same surgical splice strategy as
-the CLI so unchanged entries stay byte-stable where possible.
+commit those staged edits. Entry and metadata edits are applied to identity-aware
+spans in the pristine source, so even byte-identical duplicate blocks remain
+distinct and unchanged content stays byte-stable.
 
 Operation methods (field edits, key ops, normalization, import, …) live in
 :mod:`pynakes._engine_ops`; low-level text helpers live in
@@ -21,13 +22,18 @@ from pynakes._engine_helpers import (
     CommitResult,
     ExternalModificationError,
     FileFingerprint,
+    SourceSnapshot,
+    SpanEdit,
     append_entry_text,
+    apply_span_edits,
     compute_change_plan,
+    entry_removal_span,
     fingerprint,
     insert_metadata_comment,
     iter_changed_entries,
     read_text,
     snapshot_entries,
+    snapshot_source_spans,
 )
 from pynakes._engine_keys import BibliographyKeys
 from pynakes._engine_ops import BibliographyOperations
@@ -35,7 +41,6 @@ from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.canonical import CanonicalLayout, write_bib_canonical
 from pynakes.diff import generate_diff
-from pynakes.editing import splice_into_text
 from pynakes.filestore import FileStore, PinaxRenameTransaction
 from pynakes.io import load_bib, save_text
 from pynakes.model import BibEntry, BibFile, EntryStore, QueryFilter
@@ -67,13 +72,14 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
 
     lib: BibFile
     path: Path | None = None
-    _dirty: bool = False
     _pristine_text: str = ""
     _entry_snapshot: dict[int, str | None] = field(default_factory=dict)
+    _source_snapshot: SourceSnapshot = field(
+        default_factory=lambda: SourceSnapshot({}, (), {}, False)
+    )
     _fingerprint: FileFingerprint | None = None
     _appended_entries: list[BibEntry] = field(default_factory=list)
     _removed_entries: list[BibEntry] = field(default_factory=list)
-    _text_replacements: list[tuple[str | None, str]] = field(default_factory=list)
     _consolidate_metadata: bool = False
     _pinax_renames: list[tuple[str, str]] = field(default_factory=list)
     _pinax_material_merges: list[tuple[str, str]] = field(default_factory=list)
@@ -85,11 +91,13 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
         bound_path = Path(path)
         lib = load_bib(str(bound_path))
         pristine_text = read_text(bound_path, lib.encoding)
+        source_snapshot = snapshot_source_spans(pristine_text, lib)
         coll = cls(
             lib,
             bound_path,
             _pristine_text=pristine_text,
             _entry_snapshot=snapshot_entries(lib),
+            _source_snapshot=source_snapshot,
             _fingerprint=fingerprint(bound_path),
         )
         FileStore.from_metadata(coll.lib, bound_path)
@@ -99,11 +107,13 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
     def from_text(cls, text: str, path: str | Path | None = None) -> "Bibliography":
         """Create a bibliography from BibTeX text."""
         lib = parse_bib(text)
+        source_snapshot = snapshot_source_spans(text, lib)
         coll = cls(
             lib,
             Path(path) if path is not None else None,
             _pristine_text=text,
             _entry_snapshot=snapshot_entries(lib),
+            _source_snapshot=source_snapshot,
         )
         if coll.path is not None:
             FileStore.from_metadata(coll.lib, coll.path)
@@ -113,11 +123,13 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
     def from_bibfile(cls, lib: BibFile, path: str | Path | None = None) -> "Bibliography":
         """Wrap an existing library without copying it."""
         text = write_bib(lib)
+        source_snapshot = snapshot_source_spans(text, lib)
         coll = cls(
             lib,
             Path(path) if path is not None else None,
             _pristine_text=text,
             _entry_snapshot=snapshot_entries(lib),
+            _source_snapshot=source_snapshot,
         )
         if coll.path is not None:
             FileStore.from_metadata(coll.lib, coll.path)
@@ -130,8 +142,8 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
 
     @property
     def is_dirty(self) -> bool:
-        """Return whether an engine operation changed the in-memory library."""
-        return self._dirty
+        """Return whether output or a deferred Pinax transaction is staged."""
+        return self.is_modified or bool(self._pinax_renames or self._pinax_material_merges)
 
     @property
     def is_modified(self) -> bool:
@@ -145,13 +157,15 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
             return None
         return FileStore.from_metadata(self.lib, self.path)
 
-    def _mark(self, changed: int | bool) -> None:
-        if changed:
-            self._dirty = True
-
     def mark_dirty(self, changed: int | bool = True) -> None:
-        """Mark the bibliography dirty after a caller mutates ``lib`` directly."""
-        self._mark(changed)
+        """Compatibility hook after a caller mutates ``lib`` directly.
+
+        Dirty state is derived from renderable output, so no flag needs setting.
+        When ``changed`` is truthy, render once to validate that the direct model
+        mutation is represented by the engine's serialization paths.
+        """
+        if changed:
+            self.preview()
 
     # --- lifecycle -------------------------------------------------------
 
@@ -231,12 +245,10 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
     def _clear_staged_edits(self) -> None:
         self._appended_entries.clear()
         self._removed_entries.clear()
-        self._text_replacements.clear()
         self._pinax_renames.clear()
         self._pinax_material_merges.clear()
         self._consolidate_metadata = False
         self._format_layout = None
-        self._dirty = False
 
     def reset(self) -> None:
         """Discard staged edits and restore the pristine in-memory library."""
@@ -244,19 +256,21 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
         self.lib = parse_bib(self._pristine_text)
         self.lib.encoding = encoding
         self._entry_snapshot = snapshot_entries(self.lib)
+        self._source_snapshot = snapshot_source_spans(self._pristine_text, self.lib)
         self._clear_staged_edits()
 
     def reload(self, *, force: bool = False) -> None:
         """Reload the bound file from disk, optionally discarding staged edits."""
         if self.path is None:
             raise ValueError("reload requires a bound path")
-        if self._dirty and not force:
+        if self.is_dirty and not force:
             raise ValueError("cannot reload a dirty bibliography without force=True")
         lib = load_bib(str(self.path))
         FileStore.from_metadata(lib, self.path)
         self.lib = lib
         self._pristine_text = read_text(self.path, self.lib.encoding)
         self._entry_snapshot = snapshot_entries(self.lib)
+        self._source_snapshot = snapshot_source_spans(self._pristine_text, self.lib)
         self._fingerprint = fingerprint(self.path)
         self._clear_staged_edits()
 
@@ -266,6 +280,7 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
         self.lib.encoding = encoding
         self._pristine_text = text
         self._entry_snapshot = snapshot_entries(self.lib)
+        self._source_snapshot = snapshot_source_spans(text, self.lib)
         self._fingerprint = fingerprint
         self._clear_staged_edits()
 
@@ -282,9 +297,9 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
             self.lib.entries.values(), self._entry_snapshot, appended_ids
         )
 
-    def _entry_edits(self) -> list[tuple[str, str]] | None:
+    def _entry_edits(self) -> list[SpanEdit] | None:
         """Return surgical entry edits, or ``None`` when a full rewrite is needed."""
-        edits: list[tuple[str, str]] = []
+        edits: list[SpanEdit] = []
         for entry, before, missing in self._iter_changed_entries():
             if missing:
                 return None
@@ -293,7 +308,52 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
             if entry.raw_content is None:
                 return None
             if entry.raw_content != before:
-                edits.append((before, entry.raw_content))
+                span = self._source_snapshot.entries.get(id(entry))
+                if span is None:
+                    if self._source_snapshot.complete:
+                        raise RuntimeError("snapshotted entry has no pristine source span")
+                    return None
+                edits.append(SpanEdit(span, entry.raw_content))
+        return edits
+
+    def _metadata_edits(self) -> tuple[list[SpanEdit], list[str]] | None:
+        """Derive raw-comment edits from the pristine and current model states.
+
+        Metadata operations preserve physical comment slots: they replace a slot
+        in place, blank it when removing the final key, or append a new slot.  The
+        snapshot therefore lets rendering discover metadata changes without every
+        operation also maintaining a parallel text-replacement list.
+        """
+        edits: list[SpanEdit] = []
+        insertions: list[str] = []
+        raw_comments_snapshot = self._source_snapshot.raw_comments
+        size = max(len(raw_comments_snapshot), len(self.lib.raw_comments))
+        for index in range(size):
+            old = raw_comments_snapshot[index] if index < len(raw_comments_snapshot) else None
+            new = self.lib.raw_comments[index] if index < len(self.lib.raw_comments) else ""
+            if old == new:
+                continue
+            if not old:
+                if new:
+                    insertions.append(new)
+                continue
+            span = self._source_snapshot.comments.get(index)
+            if span is None:
+                if self._source_snapshot.complete:
+                    raise RuntimeError("snapshotted comment has no pristine source span")
+                return None
+            edits.append(SpanEdit(span, new))
+        return edits, insertions
+
+    def _removed_entry_edits(self) -> list[SpanEdit] | None:
+        edits: list[SpanEdit] = []
+        for entry in self._removed_entries:
+            span = self._source_snapshot.entries.get(id(entry))
+            if span is None:
+                if self._source_snapshot.complete:
+                    raise RuntimeError("removed entry has no pristine source span")
+                return None
+            edits.append(SpanEdit(entry_removal_span(self._pristine_text, span), ""))
         return edits
 
     def _render_text(self) -> str:
@@ -310,17 +370,24 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
         return text
 
     def _render_entry_text(self) -> str:
-        text = self._apply_text_replacements(self._pristine_text)
-        if text is None:
+        entry_edits = self._entry_edits()
+        removed_entry_edits = self._removed_entry_edits()
+        metadata_edits = self._metadata_edits()
+        if entry_edits is None or removed_entry_edits is None or metadata_edits is None:
+            # Libraries constructed without a source layout have no positional
+            # identity to preserve; whole-model rendering is explicit for them.
             return write_bib(self.lib)
-        edits = self._entry_edits()
-        if edits is None:
-            return write_bib(self.lib)
-        if edits:
-            spliced = splice_into_text(text, edits)
-            if spliced is None:
-                return write_bib(self.lib)
-            text = spliced
+        comment_edits, comment_insertions = metadata_edits
+        try:
+            text = apply_span_edits(
+                self._pristine_text,
+                [*entry_edits, *removed_entry_edits, *comment_edits],
+            )
+        except ValueError as exc:
+            raise RuntimeError(f"could not apply surgical source edits: {exc}") from exc
+
+        for comment in comment_insertions:
+            text = insert_metadata_comment(text, comment, self.lib.line_ending)
 
         for entry in self._appended_entries:
             text = append_entry_text(
@@ -331,16 +398,6 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
                 self.lib.line_ending,
                 self.lib.metadata_blocks,
             )
-        return text
-
-    def _apply_text_replacements(self, text: str) -> str | None:
-        for old, new in self._text_replacements:
-            if old is None:
-                text = insert_metadata_comment(text, new, self.lib.line_ending)
-            elif old in text:
-                text = text.replace(old, new, 1)
-            else:
-                return None
         return text
 
     def _changed_entry_count(self) -> int:

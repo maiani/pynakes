@@ -357,6 +357,10 @@ class FileStore:
         for kind in ARTIFACT_KINDS:
             src = getattr(source_paths, kind)
             dst = getattr(target_paths, kind)
+            if src.resolve() == dst.resolve():
+                # Source and target resolve to the same location (e.g. a combine
+                # whose --out is also an input): the material is already in place.
+                continue
             if src.is_file():
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst)

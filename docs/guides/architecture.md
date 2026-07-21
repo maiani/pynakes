@@ -130,8 +130,9 @@ of truth) and #5 (determinism):
   snapshot, fingerprint, is_dirty}`. Its in-memory state is a derived buffer over
   the file, never an authoritative model.
 - **Rendering and diffing are derived from explicit snapshots.** Bibliography
-  retains pristine text and per-entry snapshots, then derives preview text and a
-  diff from its staged library.
+  retains pristine text plus identity-aware entry/comment source spans, then
+  derives preview text and a diff from its staged library. Offset-based edits
+  keep byte-identical duplicate blocks distinct.
 - **Litmus test for any state:** *if I delete it and re-read from disk, do I lose
   anything?* No → a safe derived buffer. Yes → a second source of truth, which is
   not allowed.

@@ -161,10 +161,14 @@ def _rewrite_tex_sources(
     renames: list[tuple[str, str]],
     json_output: bool,
     sources: list[str] | None = None,
-    *,
-    require_sources: bool,
 ) -> tuple[list[dict], list[str], int]:
-    """Rewrite linked TeX citations for already-staged citation-key renames."""
+    """Rewrite linked TeX citations for already-staged citation-key renames.
+
+    With no TeX sources configured (no argument and no ``tex-sources`` metadata)
+    there is simply nothing to update, so this returns a zero-update success —
+    a fresh library with no manuscript linked is a normal case, not an error.
+    Explicitly-provided sources that resolve to no ``.tex`` files remain an error.
+    """
     if not renames:
         return [], [], 0
 
@@ -172,8 +176,6 @@ def _rewrite_tex_sources(
         list(sources) if sources else tex_sources_from_metadata(coll.lib, Path(file).parent)
     )
     if not resolved_sources:
-        if require_sources:
-            _no_tex_sources(json_output)
         return [], [], 0
 
     tex_files = iter_tex_files(resolved_sources)
@@ -255,7 +257,6 @@ def keys_generate(
         params,
         renames,
         json_output,
-        require_sources=False,
     )
     if source_changes:
         human.append(f"  TeX citations changed={total_source_occurrences}")
@@ -404,13 +405,28 @@ def keys_rename(
         [(old, new)],
         json_output,
         list(sources) if sources else None,
-        require_sources=True,
     )
 
     human = [
         f"{_verb('rename', params)} citation key {old!r} to {new!r}.",
         f"  bib entries changed={bib_changed}, TeX citations changed={total_source_occurrences}",
     ]
+
+    # A rename with no TeX sources configured succeeds (a fresh library has no
+    # manuscript yet); warn so the caller knows no \cite keys were rewritten.
+    warnings: list[dict] = []
+    if bib_changed and not source_changes:
+        warnings.append(
+            {
+                "type": "no_tex_sources",
+                "message": (
+                    "Renamed the citation key but updated no manuscript citations: no "
+                    "TeX sources are configured. Pass a .tex file/dir or set 'tex-sources' "
+                    "metadata to rewrite \\cite keys."
+                ),
+            }
+        )
+        human.append(f"  {warnings[0]['message']}")
 
     if params.diff:
         bib_diff = coll.diff()
@@ -425,6 +441,7 @@ def keys_rename(
         params,
         human,
         diff_text=diff_text,
+        warnings=warnings,
         old=old,
         new=new,
         source_occurrences=total_source_occurrences,

@@ -1,8 +1,9 @@
 """Operation-method mixin for :class:`~pynakes.engine.Bibliography`.
 
-All methods here delegate to the relevant operation modules and call
-``self._mark()`` / ``self._stage_pinax_renames()`` to record staging state.
-Do not import this module directly; use ``pynakes.engine``.
+All methods here delegate to the relevant operation modules and stage any
+matching Pinax transactions. Bibliography dirty state is derived from rendered
+output and those transactions. Do not import this module directly; use
+``pynakes.engine``.
 
 Group-tree and key operations live in :mod:`pynakes._engine_groups` and
 :mod:`pynakes._engine_keys` respectively.
@@ -24,7 +25,6 @@ from pynakes import metadata as metadata_ops
 from pynakes import normalize as normalize_ops
 from pynakes._engine_helpers import (
     build_fetch_queue,
-    entry_removal_text,
     metadata_fetch_policy,
     run_fetch_loop,
 )
@@ -107,13 +107,11 @@ class BibliographyOperations:
     def rename_field(self, old: str, new: str, where: str | QueryFilter = None) -> int:
         """Rename a field on matching entries."""
         count = field_ops.rename_field(self.lib, old, new, self._where(where))
-        self._mark(count)
         return count
 
     def set_field(self, field: str, value: str, where: str | QueryFilter = None) -> int:
         """Set or replace a field on matching entries."""
         count = field_ops.set_field(self.lib, field, value, self._where(where))
-        self._mark(count)
         return count
 
     def edit_entry(
@@ -151,7 +149,6 @@ class BibliographyOperations:
             if not normalized_type:
                 raise ValueError("Entry type must not be empty")
             type_changed = set_entry_type(entry, normalized_type)
-            self._mark(type_changed)
         return {
             "fields_set": set_count,
             "fields_cleared": clear_count,
@@ -161,7 +158,6 @@ class BibliographyOperations:
     def move_field(self, old: str, new: str, where: str | QueryFilter = None) -> int:
         """Move a field on matching entries."""
         count = field_ops.move_field(self.lib, old, new, self._where(where))
-        self._mark(count)
         return count
 
     def append_field(
@@ -172,13 +168,11 @@ class BibliographyOperations:
     ) -> int:
         """Append a delimited field value on matching entries."""
         count = field_ops.append_field(self.lib, field, value, self._where(where))
-        self._mark(count)
         return count
 
     def clear_field(self, field: str, where: str | QueryFilter = None) -> int:
         """Remove a field from matching entries."""
         count = field_ops.clear_field(self.lib, field, self._where(where))
-        self._mark(count)
         return count
 
     def protect_title(
@@ -194,7 +188,6 @@ class BibliographyOperations:
             where=self._where(where),
             terms=terms,
         )
-        self._mark(count)
         return count
 
     # --- format/metadata operations -------------------------------------
@@ -203,7 +196,6 @@ class BibliographyOperations:
         """Stage a layout-only canonical rewrite and return the entry count."""
         self._format_layout = layout or CanonicalLayout()
         self._entry_snapshot = {}
-        self._mark(True)
         return len(self.lib.entries)
 
     def normalize(
@@ -224,21 +216,6 @@ class BibliographyOperations:
         if report.renamed_keys:
             self._stage_pinax_renames(report.renamed_keys)
             self._rewrite_tex_for_renames(report.renamed_keys)
-        self._mark(
-            bool(
-                report.authors
-                or report.journals
-                or report.dois
-                or report.months
-                or sum(report.title_fields.values())
-                or report.entry_types
-                or report.field_names
-                or report.keys
-                or report.sort_entries_count
-                or self._consolidate_metadata
-                or self._format_layout is not None
-            )
-        )
         return report
 
     def convert(self, target: str) -> convert_ops.ConvertResult:
@@ -249,7 +226,6 @@ class BibliographyOperations:
                 self.set_metadata("databaseType", "bibtex")
             elif target == "biblatex":
                 self.set_metadata("databaseType", "biblatex")
-        self._mark(bool(report.entries))
         return report
 
     def abbreviate_journals(
@@ -260,7 +236,6 @@ class BibliographyOperations:
         """Abbreviate journal titles in memory."""
         sources = journal_ops.load_sources(journal_table, ltwa_table)
         report = journal_ops.normalize_journals(self.lib, "abbreviated", sources)
-        self._mark(report.changed)
         return report
 
     def expand_journals(
@@ -271,7 +246,6 @@ class BibliographyOperations:
         """Expand journal titles in memory."""
         sources = journal_ops.load_sources(journal_table, ltwa_table)
         report = journal_ops.normalize_journals(self.lib, "full", sources)
-        self._mark(report.changed)
         return report
 
     def import_doi(
@@ -292,7 +266,6 @@ class BibliographyOperations:
         )
         self.lib.entries.add(entry)
         self._appended_entries.append(entry)
-        self._mark(True)
         return entry
 
     def import_reference(
@@ -320,7 +293,6 @@ class BibliographyOperations:
         )
         self.lib.entries.add(entry)
         self._appended_entries.append(entry)
-        self._mark(True)
         return kind, entry
 
     def add_entry(
@@ -343,7 +315,6 @@ class BibliographyOperations:
         entry = BibEntry(key=key, type=entry_type, fields=dict(fields), modified=True)
         self.lib.entries.add(entry)
         self._appended_entries.append(entry)
-        self._mark(True)
         return entry
 
     def set_metadata(
@@ -360,15 +331,12 @@ class BibliographyOperations:
         update = metadata_ops.set_metadata(
             self.lib, key, value, namespace=namespace, allow_unknown=allow_unknown
         )
-        self._text_replacements.append((update.old_raw, update.new_raw))
         # Mirror an aliased pynakes-native write (dialect, sort-order,
         # key-pattern) into the jabref-meta projection on JabRef-tracked files so
         # JabRef never sees a stale value; a no-op otherwise.
         mirror = metadata_ops.project_aliased_to_jabref(self.lib, update)
         if mirror is not None:
-            self._text_replacements.append((mirror.old_raw, mirror.new_raw))
             update.mirrored = mirror
-        self._mark(True)
         return update
 
     def remove_metadata(
@@ -378,8 +346,6 @@ class BibliographyOperations:
         update = metadata_ops.remove_metadata(self.lib, key, namespace=namespace)
         if update is None:
             return None
-        self._text_replacements.append((update.old_raw, update.new_raw))
-        self._mark(True)
         return update
 
     def adopt_jabref(self) -> metadata_ops.JabRefAdoptReport:
@@ -421,16 +387,9 @@ class BibliographyOperations:
         clusters = dedupe_ops.find_duplicate_clusters(self.lib)
         pinax_materials, pinax_merges = self._plan_pinax_dedupe_materials(clusters)
         report = dedupe_ops.merge_duplicates(self.lib, clusters)
-        for entry in report.removed_entries:
-            if entry.raw_content:
-                span = (
-                    entry_removal_text(self._pristine_text, entry.raw_content) or entry.raw_content
-                )
-                self._text_replacements.append((span, ""))
         self._removed_entries.extend(report.removed_entries)
         report.pinax_materials = pinax_materials
         self._stage_pinax_material_merges(pinax_merges)
-        self._mark(report.removed_entry_count or report.field_changes)
         return report
 
     def _plan_pinax_dedupe_materials(
@@ -471,14 +430,8 @@ class BibliographyOperations:
         """
         entries = self.lib.entries.get_all(key)
         for entry in entries:
-            if entry.raw_content:
-                span = (
-                    entry_removal_text(self._pristine_text, entry.raw_content) or entry.raw_content
-                )
-                self._text_replacements.append((span, ""))
             self.lib.entries.remove(entry)
             self._removed_entries.append(entry)
-        self._mark(len(entries))
         return len(entries)
 
     def enrich(
@@ -489,7 +442,6 @@ class BibliographyOperations:
     ) -> integrity_ops.EnrichReport:
         """Conservatively fill missing metadata in memory."""
         report = integrity_ops.enrich_library(self.lib, online=online, cache_dir=cache_dir)
-        self._mark(report.changed_fields)
         return report
 
     def apply_published(
@@ -505,7 +457,6 @@ class BibliographyOperations:
             apply=True,
             cache_dir=cache_dir,
         )
-        self._mark(bool(report.updates))
         return report
 
     # --- Pinax fetch/ensure operations -----------------------------------

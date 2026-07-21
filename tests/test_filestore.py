@@ -182,6 +182,20 @@ def test_copy_materials_skips_root_creation_when_entry_has_no_files(tmp_path: Pa
     assert not target_root.parent.exists()
 
 
+def test_copy_materials_from_same_store_is_noop(tmp_path: Path) -> None:
+    # A store copying an entry's materials onto itself (e.g. a combine whose --out
+    # is also an input) must be a no-op, not a shutil.SameFileError.
+    root = tmp_path / "refs.files"
+    root.mkdir()
+    (root / "A.published.pdf").write_bytes(b"pdf")
+    store = FileStore(root=root, bib_path=tmp_path / "refs.bib")
+
+    copied = store.copy_materials_from(store, "A")
+
+    assert copied == []
+    assert (root / "A.published.pdf").read_bytes() == b"pdf"
+
+
 def test_rename_materials_moves_paths_and_manifest_with_rollback(tmp_path: Path) -> None:
     root = tmp_path / "refs.files"
     root.mkdir()

@@ -1812,12 +1812,34 @@ class TestKeysCommand:
         assert "@article{Smith2020ML," in bib.read_text()
         assert r"\cite{Smith2020ML}" in tex.read_text()
 
-    def test_rename_without_sources_or_metadata_errors(self, tmp_path: Path) -> None:
+    def test_rename_without_sources_succeeds_with_warning(self, tmp_path: Path) -> None:
+        # A fresh library with no manuscript linked has zero citations to update,
+        # so the rename succeeds (0 TeX updates) and warns instead of hard-failing.
         bib = tmp_path / "refs.bib"
         bib.write_text("@article{Smith2020,\n  title = {T}\n}\n")
 
         result = runner.invoke(
             app, ["keys", "rename", str(bib), "Smith2020", "Smith2020ML", "--json"]
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["modified"] is True
+        assert data["source_occurrences"] == 0
+        assert "@article{Smith2020ML," in bib.read_text()
+        assert [w for w in data["warnings"] if w["type"] == "no_tex_sources"]
+
+    def test_rename_with_explicit_nontex_source_still_errors(self, tmp_path: Path) -> None:
+        # Explicitly pointing at a source that resolves to no .tex files remains an
+        # error — only the "no sources configured at all" case is now tolerated.
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{Smith2020,\n  title = {T}\n}\n")
+        empty_dir = tmp_path / "manuscript"
+        empty_dir.mkdir()
+
+        result = runner.invoke(
+            app,
+            ["keys", "rename", str(bib), "Smith2020", "Smith2020ML", str(empty_dir), "--json"],
         )
 
         assert result.exit_code == 1, result.output

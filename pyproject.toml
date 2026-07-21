@@ -11,7 +11,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
 authors = [
-    {name = "Andrea Maiani", email = "andrea.maiani@su.se"}
+    {name = "Andrea Maiani", email = "dev@andreamaiani.com"}
 ]
 keywords = [
     "bibtex",

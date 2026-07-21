@@ -4,8 +4,11 @@ from pathlib import Path
 
 import pytest
 
+from pynakes import metadata as metadata_ops
+from pynakes._engine_helpers import SourceSnapshot, SourceSpan
 from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
+from pynakes.editing import set_entry_field
 from pynakes.engine import Bibliography, ExternalModificationError
 from pynakes.normalize import NormalizeOptions
 
@@ -59,6 +62,45 @@ def test_change_plan_reports_modified_duplicate_key_entry() -> None:
     ]
 
 
+def test_identical_duplicate_edit_uses_source_identity() -> None:
+    original_entry = "@article{A,\n  title = {Same}\n}"
+    text = f"{original_entry}\n\n@comment{{separator}}\n\n{original_entry}\n"
+    coll = Bibliography.from_text(text)
+    second = coll.entries.get_all("A")[1]
+
+    set_entry_field(second, "title", "Changed")
+    coll.mark_dirty()
+
+    preview = coll.preview()
+    before_separator, after_separator = preview.split("@comment{separator}")
+    assert "title = {Same}" in before_separator
+    assert "title = {Changed}" not in before_separator
+    assert "title = {Changed}" in after_separator
+    assert coll.change_plan()["entries"] == [
+        {
+            "change": "modified",
+            "key": "A",
+            "entry_index": 1,
+            "fields": {"title": {"old": "Same", "new": "Changed"}},
+        }
+    ]
+
+
+def test_invalid_surgical_span_fails_instead_of_falling_back_to_full_render() -> None:
+    coll = Bibliography.from_text("@article{A,\n  title = {Old}\n}\n")
+    entry = coll.entries["A"]
+    set_entry_field(entry, "title", "New")
+    snapshot = coll._source_snapshot
+    valid = snapshot.entries[id(entry)]
+    invalid = SourceSpan(valid.start, valid.end, "not the pristine entry")
+    coll._source_snapshot = SourceSnapshot(
+        {id(entry): invalid}, snapshot.raw_comments, snapshot.comments, True
+    )
+
+    with pytest.raises(RuntimeError, match="could not apply surgical source edits"):
+        coll.preview()
+
+
 def test_change_plan_detects_rename_not_remove_add() -> None:
     coll = Bibliography.from_text("@article{Old,\n  title = {t}\n}\n")
     from pynakes import keys as key_ops
@@ -82,6 +124,28 @@ def test_change_plan_reports_metadata_changes() -> None:
     plan = coll.change_plan()
     assert plan["summary"]["metadata_changed"] == 1
     assert plan["metadata"] == [{"key": "normalize-dois", "old": None, "new": "on"}]
+
+
+def test_semantic_metadata_change_implies_modified_output() -> None:
+    coll = Bibliography.from_text("@article{A,\n  title = {t}\n}\n")
+
+    # Metadata helpers mutate the model without knowing about engine rendering.
+    # The engine must still derive the serialized change from that model state.
+    metadata_ops.set_metadata(coll.lib, "normalize-dois", "on")
+    coll.mark_dirty()
+
+    assert coll.change_plan()["summary"]["metadata_changed"] == 1
+    assert coll.is_modified is True
+    assert "normalize-dois: on" in coll.preview()
+
+
+def test_layout_only_change_can_be_modified_with_empty_semantic_plan() -> None:
+    coll = Bibliography.from_text("@article{A,title={t}}\n")
+
+    coll.format()
+
+    assert coll.is_modified is True
+    assert not any(coll.change_plan()["summary"].values())
 
 
 def test_change_plan_empty_when_unmodified() -> None:
@@ -144,6 +208,66 @@ def test_volume_preview_diff_commit_and_reset(tmp_path: Path) -> None:
     assert "groups = {Read}" in bib.read_text()
     assert coll.is_dirty is False
     assert coll.diff() == ""
+
+
+def test_metadata_only_group_change_is_rendered_and_committed(tmp_path: Path) -> None:
+    # Root-cause regression: metadata mutations written straight to the model
+    # (group-tree CRUD) were not staged for the surgical renderer, so preview()
+    # equalled the pristine text and commit() wrote nothing despite a real change.
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{Shockley1949,\n  title = {The Theory of p-n Junctions}\n}\n")
+    coll = Bibliography.open(bib)
+
+    assert coll.add_group_node("Semiconductors") is True
+    assert coll.is_modified is True
+    assert "group-tree" in coll.preview()
+
+    result = coll.commit()
+
+    assert result.modified is True
+    assert "Semiconductors" in bib.read_text()
+    # The node survives a reopen (it was actually persisted).
+    reopened = Bibliography.open(bib)
+    assert [n.name for n in reopened.list_tree() or []] == ["Semiconductors"]
+
+
+def test_metadata_add_then_remove_collapses_to_no_output_change() -> None:
+    original = "@article{A,\n  title = {t}\n}\n"
+    coll = Bibliography.from_text(original)
+
+    coll.set_metadata("normalize-dois", "on")
+    coll.remove_metadata("normalize-dois")
+
+    assert coll.preview() == original
+    assert coll.is_modified is False
+    assert not any(coll.change_plan()["summary"].values())
+
+
+def test_setting_existing_metadata_value_does_not_make_buffer_dirty(tmp_path: Path) -> None:
+    original = "@comment{pynakes-meta:\nnormalize-dois: on\n}\n"
+    bib = tmp_path / "refs.bib"
+    bib.write_text(original)
+    coll = Bibliography.open(bib)
+
+    coll.set_metadata("normalize-dois", "on")
+
+    assert coll.is_modified is False
+    assert coll.is_dirty is False
+    assert not any(coll.change_plan()["summary"].values())
+    coll.reload()
+
+
+def test_reload_refreshes_source_snapshot(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{A,\n  title = {t}\n}\n")
+    coll = Bibliography.open(bib)
+    replacement = "@comment{pynakes-meta:\nnormalize-dois: on\n}\n\n@article{A,\n  title = {t}\n}\n"
+
+    bib.write_text(replacement)
+    coll.reload(force=True)
+
+    assert coll.preview() == replacement
+    assert coll.is_modified is False
 
 
 def test_volume_reload_discards_disk_changes_when_forced(tmp_path: Path) -> None:

@@ -114,6 +114,9 @@ file changed underneath, it raises `ExternalModificationError` instead of
 silently overwriting external edits. Call `externally_changed()` to poll the
 same check before committing.
 
+`is_dirty` is derived from actual preview output plus pending Pinax filesystem
+transactions, so a semantic no-op does not block `reload()`.
+
 `FileFingerprint` is that optimistic-concurrency snapshot. A
 `CommitResult` contains the pre-commit staged diff, whether content was
 written, and the changed-entry count.
