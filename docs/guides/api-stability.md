@@ -16,6 +16,18 @@ guide](llm-integration.md).
 
 ## Supported Python modules
 
+The package root is a curated convenience API for the common application
+workflow:
+
+```python
+from pynakes import Bibliography, CanonicalLayout
+```
+
+It exports the lifecycle facade, core models, parser/writer and file I/O entry
+points, their result types, and the exceptions callers commonly need to handle.
+`pynakes.__all__` is the authoritative list. Domain-specific operations remain
+in the modules below instead of being duplicated wholesale at package level.
+
 The following modules are the intended public Python surface. During the alpha
 period, non-underscore classes, functions, exceptions, and constants in these
 modules are the supported way to integrate with pynakes, but they are not yet
@@ -23,17 +35,18 @@ covered by a backward-compatibility guarantee.
 
 | Area | Stable modules |
 | --- | --- |
-| Data and lifecycle | `pynakes.model`, `pynakes.io`, `pynakes.engine`, `pynakes.bibtex_parser`, `pynakes.bibtex_writer`, `pynakes.diff` |
+| Data and lifecycle | `pynakes`, `pynakes.model`, `pynakes.io`, `pynakes.engine`, `pynakes.bibtex_parser`, `pynakes.bibtex_writer`, `pynakes.diff` |
 | Bibliography operations | `pynakes.authors`, `pynakes.convert`, `pynakes.importer`, `pynakes.fields`, `pynakes.groups`, `pynakes.journals`, `pynakes.keys`, `pynakes.normalize` |
+| Whole-file formatting | `pynakes.canonical` |
 | Analysis and maintenance | `pynakes.dedupe`, `pynakes.files`, `pynakes.integrity`, `pynakes.lint`, `pynakes.metadata`, `pynakes.usage` |
 | Set operations (projections) | `pynakes.setops` |
 | Composition | `pynakes.batch` |
 | Introspection | `pynakes.capabilities` and `pynakes.__version__` |
 
 The [API reference](../api/index.md) documents the data model, return objects,
-exceptions, and typical operation calls. The most important stable entry points
-are `model.BibEntry`, `model.BibFile`, `model.EntryStore`, and
-`engine.Bibliography`.
+exceptions, and typical operation calls. The most important entry points are
+available directly as `pynakes.Bibliography`, `pynakes.BibEntry`,
+`pynakes.BibFile`, and `pynakes.EntryStore`.
 
 All operation functions mutate a supplied `BibFile` in place unless their
 documentation explicitly says otherwise. They return a count, a report, or a

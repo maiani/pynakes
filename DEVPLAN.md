@@ -15,10 +15,17 @@ Completed work is recorded in [CHANGELOG.md](CHANGELOG.md) and the git log.
 Generalize import paths beyond DOI/arXiv and consolidate the engine's
 cross-cutting patterns. This release also establishes one shared notion of work
 identity so the new providers do not add another parallel reconciliation path.
+Tasks below are listed in implementation priority order.
 
-- **Complete JabRef formatting compatibility**: implement and test the remaining
-  v5.15 formatter-as-modifier behavior and key-pattern markers/modifiers, using
-  upstream JabRef implementations, tests, and golden vectors as the oracle.
+- **Cross-cutting consolidation**: unify interface patterns, reduce duplication
+  across import, identity, and metadata pathways.
+- **Identity primitive**: a `Work` type that unifies identifier resolution
+  (DOI, arXiv, OpenAlex ID, ORCID) with metadata fingerprinting (title hashing,
+  author normalization) so any consumer answers "is this the same work?" through
+  one tested path.
+- **Refactor consumers**: `dedupe` uses the primitive for its similarity
+  heuristic; `verify`/`enrich` use it for online-lookup routing; `ref import`
+  uses it to reconcile metadata from multiple sources.
 - **New import paths**: expand the
   [import-provider inventory](docs/guides/import-providers.md) through the
   normalized provider interface and declarative URL resolver tables.
@@ -27,6 +34,17 @@ identity so the new providers do not add another parallel reconciliation path.
   ISBN, nature.com, journals.aps.org, plus the new Elsevier/Springer/Wiley/PLOS
   patterns) and resolves it through the appropriate provider, normalizing the
   result into a uniform metadata dict.
+- **Complete JabRef formatting compatibility**: implement and test the remaining
+  v5.15 formatter-as-modifier behavior and key-pattern markers/modifiers, using
+  upstream JabRef implementations, tests, and golden vectors as the oracle.
+- **`metadata doctor [--fix]` + metadata-aware `lint`**: rename known-legacy
+  metadata keys to their current spelling, validate enum *values* (catch typo'd
+  policy tokens), flag `[pynakes:unknown:*]` keys, and collapse duplicate
+  metadata blocks — today metadata drift passes silently.
+- **Quieter `lint` consistency heuristic**: scope the "missing field X vs peers"
+  check within entry-type *and* identity class (preprint/published/book/code),
+  or gate it behind `lint --consistency`, so healthy libraries don't bury real
+  issues under peer-consistency noise.
 - **Richer `search` + shared `--where` grammar**: fuzzy title matching, date-range
   filtering, "entries missing field X" queries, search-result JSON with match
   explanations. Extend the `--where` grammar beyond single predicates to boolean
@@ -37,27 +55,10 @@ identity so the new providers do not add another parallel reconciliation path.
 - **Multi-entry triage view**: `ref show --keys k1,k2,… [--abstract]` (or
   `search --show-abstract`) to scan a set of candidate entries in one call
   instead of one invocation per key.
-- **`metadata doctor [--fix]` + metadata-aware `lint`**: rename known-legacy
-  metadata keys to their current spelling, validate enum *values* (catch typo'd
-  policy tokens), flag `[pynakes:unknown:*]` keys, and collapse duplicate
-  metadata blocks — today metadata drift passes silently.
-- **Quieter `lint` consistency heuristic**: scope the "missing field X vs peers"
-  check within entry-type *and* identity class (preprint/published/book/code),
-  or gate it behind `lint --consistency`, so healthy libraries don't bury real
-  issues under peer-consistency noise.
 - **`asset fetch`/`check` file targeting**: a `--all`/`--file` form to operate
   on every entry in a specific library when sibling `.bib` files share the
   directory (today the first positional is read as a citation key, and bare
   auto-detect fails with multiple `.bib` files present).
-- **Cross-cutting consolidation**: unify interface patterns, reduce duplication
-  across import, identity, and metadata pathways.
-- **Identity primitive**: a `Work` type that unifies identifier resolution
-  (DOI, arXiv, OpenAlex ID, ORCID) with metadata fingerprinting (title hashing,
-  author normalization) so any consumer answers "is this the same work?" through
-  one tested path.
-- **Refactor consumers**: `dedupe` uses the primitive for its similarity
-  heuristic; `verify`/`enrich` use it for online-lookup routing; `ref import`
-  uses it to reconcile metadata from multiple sources.
 
 **Done when**: broader import paths, richer `search`/`--where`, `metadata doctor`, the
 `lint`/`groups`/`asset` UX fixes, and the shared identity primitive are

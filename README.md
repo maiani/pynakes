@@ -102,6 +102,28 @@ See the [Installation guide](docs/guides/installation.md) for shell completion a
 
 ## Quick start
 
+### Python
+
+The curated package API covers the common application workflow without going
+through the CLI:
+
+```python
+from pynakes import Bibliography, CanonicalLayout
+
+bib = Bibliography.open("refs.bib")
+issues = bib.lint()
+
+bib.format(CanonicalLayout(field_order="preferred", wrap_values="stable"))
+print(bib.diff())
+bib.commit(backup=True)
+```
+
+`Bibliography` stages changes in memory. Use `preview()`, `diff()`, and
+`change_plan()` before `commit()`. Lower-level parsers, writers, models, and
+operation modules remain available for applications that need them.
+
+### Command line
+
 ```bash
 # Create a new library, then inspect and check for issues
 pynakes init mylib.bib

@@ -4,6 +4,7 @@ Kept in sync with the actually-implemented CLI commands so agents can introspect
 the tool rather than guessing. Update this when commands are added or removed.
 """
 
+from pynakes import __all__ as PUBLIC_API_EXPORTS
 from pynakes import __version__ as VERSION
 
 # Stable type vocabulary for command-schema introspection. The on-disk click
@@ -216,6 +217,18 @@ def get_capabilities() -> dict:
         "supports_backup": True,
         "supports_atomic_write": True,
         "supports_multiple_files": True,
+        "python_api": {
+            "facade": "pynakes.Bibliography",
+            "public_exports": list(PUBLIC_API_EXPORTS),
+            "constructors": [
+                "Bibliography.open",
+                "Bibliography.from_text",
+                "Bibliography.from_bibfile",
+            ],
+            "review": ["preview", "diff", "change_plan", "lint"],
+            "persistence": ["commit", "reset", "reload", "externally_changed"],
+            "transport_independent": True,
+        },
         # Two structurally identical metadata comment namespaces are read and
         # merged (pynakes-meta overrides jabref-meta). `metadata set` routes a
         # JabRef-native key to jabref-meta only when the file is already

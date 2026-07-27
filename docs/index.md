@@ -1,9 +1,10 @@
 # pynakes
 
-A command-line maintenance engine for BibTeX, BibLaTeX, and JabRef-compatible
-files. Pynakes inspects, validates, previews, and applies bibliography changes
-while preserving source text it does not modify. Its structured output and exit
-codes support interactive use, scripts, and CI.
+A Python library and command-line maintenance engine for BibTeX, BibLaTeX, and
+JabRef-compatible files. Pynakes inspects, validates, previews, and applies
+bibliography changes while preserving source text it does not modify. Its
+in-process API, structured CLI output, and exit codes support applications,
+interactive use, scripts, and CI.
 
 > **Status — v0.5 public alpha.** The single-file bibliography engine is
 > feature-complete for this release, with Pinax material handling implemented

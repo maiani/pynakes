@@ -2,10 +2,11 @@
 
 Python API for programmatic usage of `pynakes`.
 
-The command-line interface is the primary supported surface, but the operation
-modules are also usable directly. Most operations mutate a `BibFile` in place
-and return counts or operation-specific results. The supported Python API and
-semantic-versioning promise are defined in [Public API & stability](../guides/api-stability.md).
+The package exposes a first-class application API; callers do not need to invoke
+the CLI or decode its JSON envelopes. Most operations mutate a `BibFile` in
+place and return counts or operation-specific results. For transactional file
+editing, use `Bibliography`. The supported Python API and semantic-versioning
+promise are defined in [Public API & stability](../guides/api-stability.md).
 
 !!! tip "Looking for signatures, classes, and return types?"
     The complete symbol reference — every public class, function, exception,
@@ -13,12 +14,70 @@ semantic-versioning promise are defined in [Public API & stability](../guides/ap
     [Module Reference](reference.md) page, so it never drifts from the code.
     This page is a task-oriented tour of the same API.
 
+## Recommended application workflow
+
+Common lifecycle and model names are available from the package root:
+
+```python
+from pynakes import Bibliography, CanonicalLayout, ExternalModificationError
+
+bib = Bibliography.open("refs.bib")
+
+issues = bib.lint()
+bib.format(
+    CanonicalLayout(
+        field_order="preferred",
+        entry_order="preserve",
+        wrap_values="stable",
+        line_width=100,
+    )
+)
+
+print(bib.change_plan())  # structured semantic summary
+print(bib.diff())         # exact textual patch
+
+try:
+    result = bib.commit(backup=True)
+except ExternalModificationError:
+    # The file changed after it was opened. Reload or reconcile; do not guess.
+    raise
+```
+
+Nothing is written until `commit()`. An application can call `reset()` to
+discard staged work or use `preview()` to obtain the complete prospective
+output. `commit()` revalidates and writes atomically.
+
+For an in-memory transform with no filesystem binding:
+
+```python
+from pynakes import Bibliography
+
+bib = Bibliography.from_text("@misc{Example, title={An Example}}\n")
+bib.set_field("year", "2020", "key = Example")
+result_text = bib.preview()
+```
+
+### Embedding in an MCP or service process
+
+Use `Bibliography` as the per-resource state boundary and call its methods
+directly. This keeps transport concerns outside the bibliography engine:
+
+- expose operation return objects or their `to_dict()` methods where available;
+- use `change_plan()` for semantic review and `diff()` for exact text review;
+- map domain exceptions to protocol errors rather than parsing CLI messages;
+- retain the open-to-commit fingerprint check for concurrent file changes;
+- invoke network-backed methods only when the tool call explicitly authorizes
+  online access.
+
+The CLI and an MCP server can therefore remain thin adapters over the same
+in-process operations.
+
 ## Data Models
 
 ### BibEntry
 
 ```python
-from pynakes.model import BibEntry
+from pynakes import BibEntry
 
 entry = BibEntry(
     key="Smith2020",
@@ -35,7 +94,7 @@ entry = BibEntry(
 ### BibFile
 
 ```python
-from pynakes.model import BibFile, EntryStore
+from pynakes import BibFile, EntryStore
 
 lib = BibFile(entries=EntryStore([entry]))
 print(len(lib.entries))
@@ -76,7 +135,7 @@ and `ExternalModificationError` for a concurrent bibliography commit.
 ## I/O
 
 ```python
-from pynakes.io import load_bib, save_bib
+from pynakes import load_bib, save_bib
 
 lib = load_bib("refs.bib")
 result = save_bib(lib, "refs.bib", backup=True, atomic=True)
@@ -91,7 +150,7 @@ returned library.
 ## Engine Facade
 
 ```python
-from pynakes.engine import ExternalModificationError, Bibliography
+from pynakes import Bibliography, ExternalModificationError
 
 coll = Bibliography.open("refs.bib")
 issues = coll.lint()

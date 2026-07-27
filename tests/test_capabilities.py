@@ -39,6 +39,14 @@ class TestGetCapabilities:
         assert "repeated fields" in formatting["lint_gate"]
         assert "format_bibliography" in get_capabilities()["capabilities"]
 
+    def test_python_api_facade_is_machine_readable(self) -> None:
+        api = get_capabilities()["python_api"]
+        assert api["facade"] == "pynakes.Bibliography"
+        assert api["transport_independent"] is True
+        assert "Bibliography" in api["public_exports"]
+        assert "change_plan" in api["review"]
+        assert "commit" in api["persistence"]
+
     def test_commands_match_registered_cli_commands(self) -> None:
         # The declared command list must not drift from the actual CLI surface.
         declared = set(get_capabilities()["commands"])

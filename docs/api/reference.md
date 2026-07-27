@@ -7,6 +7,10 @@ stability guarantees are defined in
 [Public API & stability](../guides/api-stability.md). For a task-oriented tour
 with usage examples, see the [API overview](index.md).
 
+## Curated package API
+
+::: pynakes
+
 ## Data and lifecycle
 
 ::: pynakes.model
@@ -20,6 +24,10 @@ with usage examples, see the [API overview](index.md).
 ::: pynakes.bibtex_writer
 
 ::: pynakes.diff
+
+## Whole-file formatting
+
+::: pynakes.canonical
 
 ## Bibliography operations
 

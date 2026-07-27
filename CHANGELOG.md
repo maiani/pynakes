@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The Python package now exposes a curated top-level application API, including
+  `Bibliography`, core model and lifecycle result types, formatting policy,
+  parser/writer functions, file I/O, and common exceptions. The API guide
+  documents transactional, in-memory, and future MCP/service embedding
+  workflows; `pynakes.canonical` is now explicitly public.
 - `format` now supports explicit `--alignment`, `--field-order`,
   `--entry-order`, and `--block-order` policies. The same defaults can travel
   with a library through validated `format-*` metadata, and
