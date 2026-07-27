@@ -35,8 +35,8 @@ nav:
   - Installation: guides/installation.md
   - Usage: guides/usage.md
   - Import Providers: guides/import-providers.md
-  - Library Profile: guides/library-profile.md
-  - Public API & Stability: guides/api-stability.md
+  - Metadata Reference: guides/metadata-reference.md
+  - Public API: guides/public-api.md
   - LLM Integration: guides/llm-integration.md
   - Agent Beta Eval: guides/agent-beta-eval.md
   - Git Workflows: guides/git-workflows.md

@@ -47,6 +47,13 @@ class TestGetCapabilities:
         assert "change_plan" in api["review"]
         assert "commit" in api["persistence"]
 
+    def test_work_matching_contract_is_explicit(self) -> None:
+        matching = get_capabilities()["work_matching"]
+        assert matching["statuses"] == ["exact", "probable", "conflict", "unknown"]
+        assert matching["relationships_are_separate"] is True
+        assert matching["non_work_identity"] == ["orcid"]
+        assert "compare_work_evidence" in get_capabilities()["capabilities"]
+
     def test_commands_match_registered_cli_commands(self) -> None:
         # The declared command list must not drift from the actual CLI surface.
         declared = set(get_capabilities()["commands"])

@@ -8,7 +8,6 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 from pynakes._identifiers import (
-    canonical_doi,
     doi_from_text,
     normalize_arxiv,
     normalize_doi,
@@ -16,7 +15,7 @@ from pynakes._identifiers import (
 from pynakes._text_utils import _normalize_text, entry_year
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.editing import set_entry_field, set_entry_type
-from pynakes.importer import entry_arxiv_id
+from pynakes.identity import evidence_from_entry
 from pynakes.keys import _first_author_last_name
 from pynakes.metadata import library_dialect
 from pynakes.model import BibEntry, BibFile
@@ -646,16 +645,15 @@ def _doi_from_entry_urls(entry: BibEntry) -> str | None:
 
 
 def _preprint_identity(entry: BibEntry) -> tuple[str, str] | None:
-    arxiv = entry_arxiv_id(entry)
-    if arxiv:
-        return "arxiv", arxiv
-    doi = entry.fields.get("doi", "")
-    try:
-        normalized = canonical_doi(doi)
-    except ValueError:
-        normalized = ""
-    if normalized.startswith(_PREPRINT_DOI_PREFIXES):
-        return "preprint_doi", normalized
+    identifiers = evidence_from_entry(entry).identifiers.by_kind()
+    if arxiv := identifiers.get("arxiv"):
+        return "arxiv", sorted(arxiv)[0]
+    if doi := identifiers.get("doi"):
+        normalized = sorted(doi)[0]
+        if normalized.startswith(_PREPRINT_DOI_PREFIXES):
+            return "preprint_doi", normalized
+    if ssrn := identifiers.get("ssrn"):
+        return "ssrn", sorted(ssrn)[0]
     url = " ".join(entry.fields.get(field, "") for field in ("url", "howpublished", "note")).lower()
     if "ssrn.com" in url:
         return "ssrn", url

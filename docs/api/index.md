@@ -6,7 +6,7 @@ The package exposes a first-class application API; callers do not need to invoke
 the CLI or decode its JSON envelopes. Most operations mutate a `BibFile` in
 place and return counts or operation-specific results. For transactional file
 editing, use `Bibliography`. The supported Python API and semantic-versioning
-promise are defined in [Public API & stability](../guides/api-stability.md).
+promise are defined in [Public API and compatibility](../guides/public-api.md).
 
 !!! tip "Looking for signatures, classes, and return types?"
     The complete symbol reference — every public class, function, exception,
@@ -71,6 +71,28 @@ directly. This keeps transport concerns outside the bibliography engine:
 
 The CLI and an MCP server can therefore remain thin adapters over the same
 in-process operations.
+
+## Work-matching evidence
+
+Pynakes represents what is known about two records without claiming a universal
+bibliographic identity:
+
+```python
+from pynakes import compare_work_evidence, evidence_from_entry
+
+left = evidence_from_entry(bib.entries["Lovelace1843"])
+right = evidence_from_entry(bib.entries["Lovelace1843Copy"])
+match = compare_work_evidence(left, right)
+
+print(match.status)   # exact, probable, conflict, or unknown
+print(match.reasons)  # inspectable evidence for the decision
+```
+
+Matching normalized identifiers produce `exact`; incompatible identifiers of
+the same kind produce `conflict`. Title, year, and shared-author similarity can
+produce only `probable`. A title fingerprint is candidate evidence, never an
+identity. ORCID is deliberately excluded because it identifies a contributor,
+and preprint/publication relationships remain a separate concern.
 
 ## Data Models
 
@@ -376,12 +398,12 @@ merge_report = merge_duplicates(lib, clusters)  # raises DedupeConflictError if 
 verification = verify_library(lib, online=False)
 ```
 
-`WorkIdentity` is a stable identifier (such as a DOI or arXiv identifier) used
-to explain a `DuplicateCluster`. A merge reports the selected primary record as
-`ClusterMerge`; a conflicting field/type is a `MergeConflict`, never an
-automatic loss of data. Integrity report objects keep provider findings separate
-from `FieldUpdate` records, so callers can distinguish an observation from an
-applied enrichment.
+`WorkIdentifier` is one normalized piece of evidence (such as a DOI or arXiv
+identifier) used to explain a `DuplicateCluster`; it is not a universal entity
+identifier. A merge reports the selected primary record as `ClusterMerge`; a
+conflicting field/type is a `MergeConflict`, never an automatic loss of data.
+Integrity report objects keep provider findings separate from `FieldUpdate`
+records, so callers can distinguish an observation from an applied enrichment.
 
 ## Usage Analysis
 
@@ -454,7 +476,7 @@ except ReferenceImportError as exc:
 
 ## Next Steps
 
-- [Public API & stability](../guides/api-stability.md)
+- [Public API and compatibility](../guides/public-api.md)
 - [Usage Guide](../guides/usage.md)
 - [Examples](../examples/index.md)
 - [Architecture](../guides/architecture.md)

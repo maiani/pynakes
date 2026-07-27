@@ -280,7 +280,7 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
 
 - **Opt-in and testable.** Network access is explicit; the default test
   suite never touches it (fetchers are injectable, as in `importer.py`).
-- **Sources.** arXiv first — an entry's arXiv id (via `importer.entry_arxiv_id`)
+- **Sources.** arXiv first — an entry's arXiv id (via `identity.entry_arxiv_id`)
   yields the preprint PDF at `arxiv.org/pdf/<id>` and the source tarball at
   `arxiv.org/e-print/<id>`, stored as the `.preprint` and `.source` artifacts.
   An open-access published PDF (resolved from the entry's DOI) lands as
@@ -403,7 +403,7 @@ have to hold it:
 The fix is a **DOI → arXiv back-resolution** folded into the online published
 pass, so `enrich --published --online` reconciles identity *both* ways: for an
 entry that has a publisher DOI but no resolvable arXiv id
-(`importer.entry_arxiv_id` returns `None`), it looks the work up by DOI and, when
+(`identity.entry_arxiv_id` returns `None`), it looks the work up by DOI and, when
 a preprint exists, backfills the arXiv id.
 
 - **Sources: OpenAlex first, Semantic Scholar fallback.** OpenAlex

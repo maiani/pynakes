@@ -1,31 +1,26 @@
 # pynakes development plan
 
 pynakes is a **standalone bib-file engine** — a Python library + CLI, complete
-and valuable on its own. Any application built on top of it (capture, reading,
-a UI, sync) is a **separate, downstream project** and is explicitly not in this
-plan.
+and valuable on its own. Applications built on top of it (capture, reading, a
+UI, sync) remain separate companion projects rather than layers inside the core
+engine. This plan may track their integration milestones, but they must consume
+the same pinned public API instead of adding a second parser, data model, or
+source of truth.
 
 This document is the **road to 1.0** and the major releases beyond it.
 Completed work is recorded in [CHANGELOG.md](CHANGELOG.md) and the git log.
 
 ## Road to 1.0
 
-### v0.6 — Generalization, consolidation, and shared identity
+### v0.6 — Generalization, consolidation, and shared work matching
 
 Generalize import paths beyond DOI/arXiv and consolidate the engine's
-cross-cutting patterns. This release also establishes one shared notion of work
-identity so the new providers do not add another parallel reconciliation path.
+cross-cutting patterns. New providers and consumers build on the shared,
+conservative work-matching evidence implemented in this release.
 Tasks below are listed in implementation priority order.
 
 - **Cross-cutting consolidation**: unify interface patterns, reduce duplication
   across import, identity, and metadata pathways.
-- **Identity primitive**: a `Work` type that unifies identifier resolution
-  (DOI, arXiv, OpenAlex ID, ORCID) with metadata fingerprinting (title hashing,
-  author normalization) so any consumer answers "is this the same work?" through
-  one tested path.
-- **Refactor consumers**: `dedupe` uses the primitive for its similarity
-  heuristic; `verify`/`enrich` use it for online-lookup routing; `ref import`
-  uses it to reconcile metadata from multiple sources.
 - **New import paths**: expand the
   [import-provider inventory](docs/guides/import-providers.md) through the
   normalized provider interface and declarative URL resolver tables.
@@ -45,6 +40,13 @@ Tasks below are listed in implementation priority order.
   check within entry-type *and* identity class (preprint/published/book/code),
   or gate it behind `lint --consistency`, so healthy libraries don't bury real
   issues under peer-consistency noise.
+- **Single-bibliography analysis**: add a public `pynakes.analysis` API
+  namespace and a read-only `stats` command returning typed and JSON-friendly
+  reports for one `BibFile`/`Bibliography`. Start with deterministic descriptive
+  measures: entries by type and year, author/journal frequencies, identifier
+  and required-field coverage, lint finding counts, group membership, and
+  declared linked-file coverage. Keep analysis offline and separate from
+  mutation; do not turn heuristic scores into quality judgments.
 - **Richer `search` + shared `--where` grammar**: fuzzy title matching, date-range
   filtering, "entries missing field X" queries, search-result JSON with match
   explanations. Extend the `--where` grammar beyond single predicates to boolean
@@ -60,21 +62,21 @@ Tasks below are listed in implementation priority order.
   directory (today the first positional is read as a citation key, and bare
   auto-detect fails with multiple `.bib` files present).
 
-**Done when**: broader import paths, richer `search`/`--where`, `metadata doctor`, the
-`lint`/`groups`/`asset` UX fixes, and the shared identity primitive are
-implemented, tested, and documented; `dedupe`, `verify`/`enrich`, and `ref
-import` use that primitive; `pytest && ruff` green; CHANGELOG updated; version
-bumped to 0.6.0.
+**Done when**: broader import paths, richer `search`/`--where`, `metadata
+doctor`, single-bibliography `analysis`/`stats`, and the
+`lint`/`groups`/`asset` UX fixes are implemented, tested, and documented;
+`pytest && ruff` green; CHANGELOG updated; version bumped to 0.6.0.
 
 ---
 
 ### v0.7 — Multi-bib setup, Library, Catalogue, and MCP server
 
 - **`Library` (corpus)**: `Library.open(dir)`; `collections()`,
-  `collection(path)`; cross-file `search`/`find_key`/dedup, reusing the identity
-  primitive from v0.6. A Library holds many `.bib` files (many pinakes).
+  `collection(path)`; cross-file `search`/`find_key`/dedup, reusing the
+  work-matching evidence from v0.6. A Library holds many `.bib` files (many
+  pinakes).
 - **Cross-library entry operations** — the motions single-file mode can't
-  express, built on the `Library` + v0.6 identity primitive:
+  express, built on the `Library` + v0.6 work-matching evidence:
   - **`corpus pick`** — cross-library entry cherry-pick, the missing verb:
     `corpus pick SRC.bib… --keys K1,K2,… --into DEST.bib [--with-materials]
     [--strip-groups | --map-group "Src=Dest"] [--dedupe]`. Pull a focused subset
@@ -93,6 +95,10 @@ bumped to 0.6.0.
     `corpus pick`).
 - **`Catalogue` (index)**: a derived, rebuildable search index (e.g. SQLite FTS)
   over the Library; strictly derived, never a competing source of truth.
+- **Library-wide analysis**: lift the v0.6 analysis reports over `Library`,
+  retaining per-file provenance while adding corpus-wide rollups and
+  cross-library coverage/duplication views. Reuse the same typed results rather
+  than creating an unrelated statistics implementation.
 - **MCP server**: a thin [Model Context Protocol](https://modelcontextprotocol.io)
   companion on the pinned pynakes API, allowing agents to interrogate a personal
   corpus conversationally — "find papers by X on topic Y", "which entries are
@@ -108,10 +114,11 @@ bumped to 0.6.0.
 - **`Catalogue`-backed rich query CLI**: `search` gains full-text and
   field-scoped queries against the index, not just raw entry iteration.
 
-**Done when**: `Library`, `Catalogue`, and the cross-library entry operations
-(`corpus pick`/`search`/`dedupe`) shipped with tests and docs; MCP server
-published as a companion package; agent-plan and change-summary features
-shipped; `pytest && ruff` green; CHANGELOG updated; version bumped to 0.7.0.
+**Done when**: `Library`, `Catalogue`, Library-wide analysis, and the
+cross-library entry operations (`corpus pick`/`search`/`dedupe`) shipped with
+tests and docs; MCP server published as a companion package; agent-plan and
+change-summary features shipped; `pytest && ruff` green; CHANGELOG updated;
+version bumped to 0.7.0.
 
 ---
 
@@ -129,9 +136,9 @@ results, not estimates.
 - **Linear parser path**: remove repeated whole-prefix line counting and linear
   duplicate-key membership checks during parsing while preserving duplicate
   keys, exact source layout, and parse-error locations.
-- **Blocked identity and dedupe matching**: use the shared `Work` identity from
-  v0.6 to build candidate sets by stable identifiers and metadata fingerprints;
-  do not compare every unrelated pair with fuzzy title matching.
+- **Blocked identity and dedupe matching**: use the shared work-matching
+  evidence from v0.6 to build candidate sets by stable identifiers and metadata
+  fingerprints; do not compare every unrelated pair with fuzzy title matching.
 - **Single-pass bulk edits**: apply recorded source spans in source order rather
   than repeatedly searching and copying the entire bibliography for every
   changed entry.
@@ -171,18 +178,31 @@ server ship in v0.7 as optional companions.
 
 ## v2.0 — Beyond 1.0
 
-These stay **in pynakes** — pure bib-file mechanisms, no application scope —
-but together they are the cross-file corpus layer a downstream application builds
-directly on.
+The data and analysis items stay **in pynakes** as pure bib-file mechanisms.
+The editor/GUI item is a separately distributed companion tracked here because
+it exercises the pinned integration boundary.
 
 - **Projections** — `combine` and `split` formalized as first-class **views of
   the `Library`**, with reconciliation.
 - **Additional interchange formats** — any import/export formats beyond the
   existing CSL-JSON/RIS/MODS/EndNote quartet, building on `pynakes.interchange`.
+- **Linked-material reference graph** — extract bibliography/reference lists
+  from linked paper source or PDFs, resolve their identifiers conservatively,
+  and expose the result as a derived citation graph for analysis. Preserve
+  provenance and uncertainty; never write inferred references into the source
+  `.bib` automatically.
 - **Content-intelligence layers** — full-text extraction, content search,
   RAG/embeddings, and rich agent notes/memory, as an opt-in extra never on the
   bibliography write path.
-- **Thin `pynakes` Bimas GUI** — a lightweight desktop GUI built on the pinned
-  API, reading/writing `.bib` files through the library, not the CLI.
+- **Editor/GUI companion** — prototype a VS Code/Open VSX extension (distributed
+  as a `.vsix`) as the first graphical client. It should browse and search
+  bibliographies, expose analysis/stats and linked-material state, navigate
+  between TeX citations and entries, stage edits, show the exact diff, and
+  require approval before commit. Keep it a thin client over the pinned
+  pynakes API or MCP/service boundary: no independent BibTeX parser, metadata
+  schema, or source of truth. A standalone Bimas desktop GUI can reuse the same
+  boundary later if editor embedding proves too restrictive.
 
-**Done when**: 2.0.0 is on PyPI with all of the above shipped and documented.
+**Done when**: the core 2.0.0 release is on PyPI with its mechanisms documented,
+and the first editor/GUI companion prototype is published against the pinned
+integration API.

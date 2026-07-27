@@ -258,6 +258,7 @@ against every process crash, operating-system failure, or storage failure.
 | fields.py | Generic field changes, simple predicates, and title capitalization protection. |
 | authors.py | BibTeX name-list splitting, last-name extraction, and conservative/JabRef-style normalization. |
 | importer.py | Reference-import orchestration: canonical identifier resolution, duplicate checks, citation-key assignment, and conversion from normalized provider metadata into staged entries. |
+| identity.py | Offline normalized work evidence and conservative, explainable comparison (`exact`, `probable`, `conflict`, or `unknown`); shared by dedupe, import, and integrity routing. |
 | providers/records.py, providers/registry.py | The provider-neutral `ReferenceMetadata` boundary and explicit deterministic import-provider selection. |
 | providers/metadata/, providers/repositories/ | External-service implementations grouped by role; callers import providers from these role-specific packages directly. |
 | providers/url_resolvers/ | Ordered declarative identifier, repository, and publisher URL recognition. Ordinary publisher URL-to-DOI patterns are table entries rather than standalone clients. |
@@ -286,7 +287,7 @@ class's behavior.
 | Area | Classes | Concept |
 | --- | --- | --- |
 | Normalization/conversion/journals | NormalizeOptions, NormalizeResult, ConvertResult, JournalMapping, JournalSources, JournalResult | Configured policy, source layers, applied transformations, and warnings. |
-| Dedupe | WorkIdentity, DuplicateCluster, MergeConflict, ClusterMerge, DedupeMergeReport | Evidence that records describe one work, conservative merge outcomes, and unresolved ambiguity. |
+| Work matching/dedupe | WorkIdentifier, WorkIdentifiers, WorkEvidence, WorkMatch, DuplicateCluster, MergeConflict, ClusterMerge, DedupeMergeReport | Explainable evidence comparisons, conservative merge outcomes, and unresolved ambiguity. |
 | Integrity | IntegrityIssue, VerifyReport, FieldUpdate, EnrichReport, PublishedCandidate, PublishedReport | Remote-check findings and intentionally applied metadata changes. |
 | File/usage/lint | LinkedFile, FileCheckReport, UsageReport, LintIssue | Read-only analysis findings and summaries. |
 | Metadata/I/O | MetadataUpdate, SaveResult | A precise raw metadata replacement and a write outcome with backup/error context. |

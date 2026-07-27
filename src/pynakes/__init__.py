@@ -22,6 +22,14 @@ from pynakes.engine import (
     ExternalModificationError,
     FileFingerprint,
 )
+from pynakes.identity import (
+    WorkEvidence,
+    WorkIdentifier,
+    WorkIdentifiers,
+    WorkMatch,
+    compare_work_evidence,
+    evidence_from_entry,
+)
 from pynakes.io import SaveResult, load_bib, save_bib
 from pynakes.model import BibEntry, BibFile, EntryStore, QueryFilter
 
@@ -38,7 +46,13 @@ __all__ = [
     "ParseError",
     "QueryFilter",
     "SaveResult",
+    "WorkEvidence",
+    "WorkIdentifier",
+    "WorkIdentifiers",
+    "WorkMatch",
     "__version__",
+    "compare_work_evidence",
+    "evidence_from_entry",
     "load_bib",
     "parse_bib",
     "save_bib",

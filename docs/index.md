@@ -63,7 +63,7 @@ pynakes normalize refs.bib
 - [Installation Guide](guides/installation.md)
 - [Quick Start](guides/quickstart.md)
 - [Usage Guide](guides/usage.md)
-- [Public API & Stability](guides/api-stability.md)
+- [Public API and compatibility](guides/public-api.md)
 - [API Reference](api/index.md)
 - [Examples](examples/index.md)
 - [Architecture](guides/architecture.md)

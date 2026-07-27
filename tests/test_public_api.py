@@ -12,6 +12,14 @@ from pynakes.engine import (
     ExternalModificationError,
     FileFingerprint,
 )
+from pynakes.identity import (
+    WorkEvidence,
+    WorkIdentifier,
+    WorkIdentifiers,
+    WorkMatch,
+    compare_work_evidence,
+    evidence_from_entry,
+)
 from pynakes.io import SaveResult, load_bib, save_bib
 from pynakes.model import BibEntry, BibFile, EntryStore, QueryFilter
 
@@ -30,6 +38,12 @@ def test_top_level_api_exports_curated_symbols() -> None:
         "ParseError": ParseError,
         "QueryFilter": QueryFilter,
         "SaveResult": SaveResult,
+        "WorkEvidence": WorkEvidence,
+        "WorkIdentifier": WorkIdentifier,
+        "WorkIdentifiers": WorkIdentifiers,
+        "WorkMatch": WorkMatch,
+        "compare_work_evidence": compare_work_evidence,
+        "evidence_from_entry": evidence_from_entry,
         "load_bib": load_bib,
         "parse_bib": parse_bib,
         "save_bib": save_bib,

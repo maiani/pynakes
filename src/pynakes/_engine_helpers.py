@@ -495,7 +495,7 @@ def run_fetch_loop(
         download_published_material,
         download_supplement_material,
     )
-    from pynakes.importer import entry_arxiv_id
+    from pynakes.identity import entry_arxiv_id
 
     fetched: list[dict] = []
     skipped: list[dict] = []

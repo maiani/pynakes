@@ -11,8 +11,8 @@ class ReferenceMetadata:
 
     Provider clients translate their native response format into this record.
     ``fields`` contains semantic BibTeX/BibLaTeX field values ready for the
-    target dialect, while ``identifiers`` keeps canonical identities available
-    to duplicate detection and future cross-provider merging.  The record is
+    target dialect, while ``identifiers`` keeps canonical identifier evidence
+    available to duplicate detection and cross-provider comparison. The record is
     deliberately independent of :class:`~pynakes.model.BibEntry`: citation-key
     assignment and library mutation remain importer responsibilities.
     """

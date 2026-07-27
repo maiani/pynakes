@@ -8,7 +8,6 @@ import json
 
 import typer
 
-from pynakes import importer as importer_ops
 from pynakes.cli_common import (
     _entries,
     _resolve_input_bib,
@@ -17,6 +16,7 @@ from pynakes.cli_common import (
 )
 from pynakes.engine import Bibliography
 from pynakes.filestore import FileStore
+from pynakes.identity import entry_arxiv_id
 
 # --- inspect ---------------------------------------------------------------
 
@@ -53,7 +53,7 @@ def inspect(
                 record.update(
                     store.annotation_for(
                         entry.key,
-                        refetchable=importer_ops.entry_arxiv_id(entry) is not None,
+                        refetchable=entry_arxiv_id(entry) is not None,
                     )
                 )
             entries.append(record)

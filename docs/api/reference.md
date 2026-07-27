@@ -4,7 +4,7 @@ This reference is generated directly from the source docstrings, so it always
 matches the installed version rather than a hand-maintained copy. Every
 non-underscore name in the modules below is part of the public API; the
 stability guarantees are defined in
-[Public API & stability](../guides/api-stability.md). For a task-oriented tour
+[Public API and compatibility](../guides/public-api.md). For a task-oriented tour
 with usage examples, see the [API overview](index.md).
 
 ## Curated package API
@@ -28,6 +28,10 @@ with usage examples, see the [API overview](index.md).
 ## Whole-file formatting
 
 ::: pynakes.canonical
+
+## Work-matching evidence
+
+::: pynakes.identity
 
 ## Bibliography operations
 

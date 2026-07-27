@@ -1,4 +1,4 @@
-# Public API & stability
+# Public API and compatibility
 
 This page describes the intended public surface for pynakes, but v0.5 is still
 an alpha release. Until 1.0, pynakes does **not** guarantee backward
@@ -38,6 +38,7 @@ covered by a backward-compatibility guarantee.
 | Data and lifecycle | `pynakes`, `pynakes.model`, `pynakes.io`, `pynakes.engine`, `pynakes.bibtex_parser`, `pynakes.bibtex_writer`, `pynakes.diff` |
 | Bibliography operations | `pynakes.authors`, `pynakes.convert`, `pynakes.importer`, `pynakes.fields`, `pynakes.groups`, `pynakes.journals`, `pynakes.keys`, `pynakes.normalize` |
 | Whole-file formatting | `pynakes.canonical` |
+| Work-matching evidence | `pynakes.identity` |
 | Analysis and maintenance | `pynakes.dedupe`, `pynakes.files`, `pynakes.integrity`, `pynakes.lint`, `pynakes.metadata`, `pynakes.usage` |
 | Set operations (projections) | `pynakes.setops` |
 | Composition | `pynakes.batch` |

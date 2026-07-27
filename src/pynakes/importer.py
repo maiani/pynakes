@@ -15,11 +15,15 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from pynakes._identifiers import (
-    arxiv_id_from_text,
     canonical_doi,
     looks_like_arxiv_id,
     normalize_arxiv,
     normalize_doi,
+)
+from pynakes.identity import (
+    WorkIdentifiers,
+    evidence_from_entry,
+    find_exact_matches,
 )
 from pynakes.keys import UnsupportedCitationKeyPatternError, generate_key, unique_key
 from pynakes.model import BibEntry, BibFile
@@ -249,38 +253,10 @@ def entry_from_metadata(metadata: ReferenceMetadata) -> BibEntry:
 def existing_keys_for_doi(lib: BibFile, doi: str) -> list[str]:
     """Return citation keys already using ``doi`` in ``lib``."""
     target = canonical_doi(doi)
-    keys: list[str] = []
-    for entry in lib.entries.values():
-        existing = entry.fields.get("doi")
-        if not existing:
-            continue
-        try:
-            if canonical_doi(existing) == target:
-                keys.append(entry.key)
-        except ValueError:
-            continue
-    return keys
+    return find_exact_matches(lib, {"doi": target})
 
 
 # --- arXiv ----------------------------------------------------------------
-
-
-def entry_arxiv_id(entry: BibEntry) -> str | None:
-    """Return the normalized arXiv id an entry already carries, if any."""
-    for field_name in ("arxiv", "eprint"):
-        value = entry.fields.get(field_name)
-        if not value:
-            continue
-        archive = entry.fields.get("archiveprefix") or entry.fields.get("eprinttype") or ""
-        if field_name == "arxiv" or archive.lower() == "arxiv":
-            normalized = normalize_arxiv(value)
-            if normalized:
-                return normalized
-    for field_name in ("url", "howpublished", "note"):
-        normalized = arxiv_id_from_text(entry.fields.get(field_name, ""))
-        if normalized:
-            return normalized
-    return None
 
 
 def existing_keys_for_arxiv(lib: BibFile, identifier: str) -> list[str]:
@@ -288,51 +264,22 @@ def existing_keys_for_arxiv(lib: BibFile, identifier: str) -> list[str]:
     target = normalize_arxiv(identifier)
     if target is None:
         return []
-    return [entry.key for entry in lib.entries.values() if entry_arxiv_id(entry) == target]
-
-
-_IDENTIFIER_FIELDS = {
-    PMID: ("pmid",),
-    PMCID: ("pmcid",),
-    EUROPE_PMC: ("europepmc",),
-    SSRN: ("ssrn",),
-    NBER: ("number",),
-    BIORXIV: ("doi", "eprint"),
-    MEDRXIV: ("doi", "eprint"),
-    ZENODO: ("zenodo",),
-    OSF: ("osf",),
-    HAL: ("halid",),
-    CHEMRXIV: ("chemrxiv",),
-    RESEARCH_SQUARE: ("researchsquare",),
-}
+    return find_exact_matches(lib, {"arxiv": target})
 
 
 def existing_keys_for_identifier(lib: BibFile, kind: str, identifier: str) -> list[str]:
     """Return citation keys already carrying one normalized provider identity."""
-    if kind == DOI:
-        return existing_keys_for_doi(lib, identifier)
-    if kind == ARXIV:
-        return existing_keys_for_arxiv(lib, identifier)
-    target = identifier.casefold()
-    fields = _IDENTIFIER_FIELDS.get(kind, ())
-    return [
-        entry.key
-        for entry in lib.entries.values()
-        if any(entry.fields.get(field, "").strip().casefold() == target for field in fields)
-    ]
+    return find_exact_matches(lib, {kind: identifier})
 
 
 def imported_entry_identifier(entry: BibEntry, kind: str) -> str:
     """Return the provider identifier recorded on an imported entry."""
-    if kind == DOI:
-        return entry.fields.get("doi", entry.key)
-    if kind == ARXIV:
-        return entry_arxiv_id(entry) or entry.key
-    fields = _IDENTIFIER_FIELDS.get(kind, ())
-    return next(
-        (entry.fields[field] for field in fields if entry.fields.get(field)),
-        entry.fields.get("doi") or entry.fields.get("eprint") or entry.key,
-    )
+    evidence = evidence_from_entry(entry)
+    values = evidence.identifiers.by_kind().get(kind)
+    if values:
+        return sorted(values)[0]
+    primary = evidence.identifiers.primary()
+    return primary.value if primary is not None else entry.key
 
 
 def fetch_arxiv_atom(identifier: str, timeout: float = 15.0) -> str:
@@ -353,7 +300,8 @@ def arxiv_entry(record: ArxivRecord, *, dialect: str = "bibtex") -> BibEntry:
     BibLaTeX libraries get an ``@online`` entry (with a ``date`` field and
     ``eprintclass``); BibTeX libraries get an ``@misc`` entry (with ``year``,
     ``archivePrefix``, and ``primaryClass``). The arXiv id is always recorded in
-    ``eprint`` so :func:`entry_arxiv_id` and dedup recognize it in either form.
+    ``eprint`` so :func:`pynakes.identity.entry_arxiv_id` and dedup recognize it
+    in either form.
     """
     metadata = arxiv.metadata_from_record(record, dialect=dialect)
     return entry_from_metadata(metadata)
@@ -534,15 +482,23 @@ def prepare_imported_reference(
         except (ProviderFetchError, ValueError) as exc:
             raise ReferenceImportError(f"{provider.name}: {exc}") from exc
 
+        entry = entry_from_metadata(metadata)
         if not allow_duplicate:
-            duplicate_keys: list[str] = []
-            for identity_kind, identity in metadata.identifiers.items():
-                for existing_key in existing_keys_for_identifier(lib, identity_kind, identity):
-                    if existing_key not in duplicate_keys:
-                        duplicate_keys.append(existing_key)
+            candidate_identifiers = WorkIdentifiers.from_pairs(
+                [
+                    *metadata.identifiers.items(),
+                    *(
+                        (item.kind, item.value)
+                        for item in evidence_from_entry(entry).identifiers.items
+                    ),
+                ]
+            )
+            duplicate_keys = find_exact_matches(
+                lib,
+                candidate_identifiers,
+            )
             if duplicate_keys:
                 raise DuplicateReferenceError(kind, normalized, duplicate_keys)
-        entry = entry_from_metadata(metadata)
         _assign_key(
             entry,
             lib,

@@ -22,7 +22,7 @@ build. Pass `--strict` to turn a finding into a non-zero exit code:
 mismatches against authoritative DOI metadata, which you usually *do* want to
 block on. `lint` profile warnings are intentionally gated: they say the library
 no longer matches its declared preferences. Other warnings (e.g. a missing DOI)
-remain advisory. See [Library Profile](library-profile.md).
+remain advisory. See [Metadata Reference](metadata-reference.md).
 
 ## Multiple files
 

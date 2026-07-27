@@ -5,33 +5,24 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
-from difflib import SequenceMatcher
 
 from pynakes._identifiers import canonical_doi, normalize_arxiv
-from pynakes._text_utils import _normalize_text, entry_year
-from pynakes.authors import last_name, split_name_list
+from pynakes._text_utils import _normalize_text
 from pynakes.editing import set_entry_field, set_entry_type
-from pynakes.importer import entry_arxiv_id
+from pynakes.identity import (
+    WorkIdentifier,
+    WorkIdentifiers,
+    compare_work_evidence,
+    evidence_from_entry,
+)
 from pynakes.model import BibEntry, BibFile
-
-
-@dataclass(frozen=True)
-class WorkIdentity:
-    """Stable identity for one bibliographic work."""
-
-    kind: str
-    value: str
-
-    def to_dict(self) -> dict[str, str]:
-        """Serialize the identity to a JSON-friendly dict."""
-        return {"kind": self.kind, "value": self.value}
 
 
 @dataclass
 class DuplicateCluster:
     """A group of entries that appear to describe the same work."""
 
-    identity: WorkIdentity
+    identity: WorkIdentifier
     reason: str
     entries: list[BibEntry]
 
@@ -52,7 +43,7 @@ class DuplicateCluster:
 class MergeConflict:
     """One ambiguous value that blocks an automatic merge."""
 
-    cluster: WorkIdentity
+    cluster: WorkIdentifier
     field: str
     values: dict[str, str]
 
@@ -69,7 +60,7 @@ class MergeConflict:
 class ClusterMerge:
     """Summary of one cluster merge."""
 
-    identity: WorkIdentity
+    identity: WorkIdentifier
     primary_key: str
     removed_keys: list[str]
     field_changes: dict[str, str] = field(default_factory=dict)
@@ -132,7 +123,6 @@ class DedupeConflictError(Exception):
         super().__init__(f"{len(conflicts)} dedupe merge conflict(s)")
 
 
-_ID_PRIORITY = {"doi": 0, "arxiv": 1, "pmid": 2, "pmcid": 3, "isbn": 4}
 _DELIMITED_FIELDS = {"groups", "keywords", "keyword", "tags"}
 
 
@@ -167,24 +157,17 @@ def find_duplicate_clusters(lib: BibFile) -> list[DuplicateCluster]:
         reasons[keep].update(reasons.pop(drop, set()))
         reasons[keep].add(reason)
 
-    stable_by_entry = [_stable_identities(entry) for entry in entries]
-    by_identity: dict[WorkIdentity, list[int]] = defaultdict(list)
-    for i, identities in enumerate(stable_by_entry):
-        for identity in identities:
-            by_identity[identity].append(i)
-    for identity, indices in by_identity.items():
-        if len(indices) < 2:
-            continue
-        first = indices[0]
-        for other in indices[1:]:
-            union(first, other, identity.kind)
-
-    for i, left in enumerate(entries):
+    evidence = [evidence_from_entry(entry) for entry in entries]
+    for i in range(len(entries)):
         for j in range(i + 1, len(entries)):
-            right = entries[j]
-            if not _stable_ids_compatible(stable_by_entry[i], stable_by_entry[j]):
-                continue
-            if _fuzzy_same_work(left, right):
+            match = compare_work_evidence(evidence[i], evidence[j])
+            if match.status == "exact":
+                left_ids = evidence[i].identifiers.by_kind()
+                right_ids = evidence[j].identifiers.by_kind()
+                for kind in sorted(set(left_ids).intersection(right_ids)):
+                    if left_ids[kind].intersection(right_ids[kind]):
+                        union(i, j, kind)
+            elif match.status == "probable":
                 union(i, j, "fuzzy")
 
     grouped: dict[int, list[int]] = defaultdict(list)
@@ -380,70 +363,24 @@ def _richer_containing_value(left: str, right: str) -> str | None:
     return None
 
 
-def _stable_identities(entry: BibEntry) -> list[WorkIdentity]:
-    identities: list[WorkIdentity] = []
-    doi = entry.fields.get("doi")
-    if doi:
-        try:
-            identities.append(WorkIdentity("doi", canonical_doi(doi)))
-        except ValueError:
-            pass
-
-    arxiv = entry_arxiv_id(entry)
-    if arxiv:
-        identities.append(WorkIdentity("arxiv", arxiv))
-
-    for field_name in ("pmid", "pmcid", "isbn"):
-        value = entry.fields.get(field_name)
-        if value:
-            identities.append(WorkIdentity(field_name, _normalize_identifier(value)))
-
-    return sorted(identities, key=lambda identity: _ID_PRIORITY[identity.kind])
-
-
 def _normalize_identifier(value: str) -> str:
     return re.sub(r"[^a-z0-9]", "", value.lower())
 
 
-def _stable_ids_compatible(left: list[WorkIdentity], right: list[WorkIdentity]) -> bool:
-    if not left or not right:
-        return True
-    left_by_kind = {identity.kind: identity.value for identity in left}
-    right_by_kind = {identity.kind: identity.value for identity in right}
-    shared = set(left_by_kind).intersection(right_by_kind)
-    if not shared:
-        return True
-    return all(left_by_kind[kind] == right_by_kind[kind] for kind in shared)
-
-
-def _fuzzy_same_work(left: BibEntry, right: BibEntry) -> bool:
-    if entry_year(left) != entry_year(right):
-        return False
-    left_title = _normalized_title(left)
-    right_title = _normalized_title(right)
-    if len(left_title) < 12 or len(right_title) < 12:
-        return False
-    if SequenceMatcher(None, left_title, right_title).ratio() < 0.92:
-        return False
-    return bool(set(_author_names(left)).intersection(_author_names(right)))
-
-
-def _cluster_identity(entries: list[BibEntry]) -> WorkIdentity:
-    stable: list[WorkIdentity] = []
-    for entry in entries:
-        stable.extend(_stable_identities(entry))
-    if stable:
-        return sorted(stable, key=lambda identity: _ID_PRIORITY[identity.kind])[0]
+def _cluster_identity(entries: list[BibEntry]) -> WorkIdentifier:
+    identifiers = WorkIdentifiers.from_pairs(
+        [
+            (identifier.kind, identifier.value)
+            for entry in entries
+            for identifier in evidence_from_entry(entry).identifiers.items
+        ]
+    )
+    if primary := identifiers.primary():
+        return primary
     first = entries[0]
-    author = _author_names(first)[0] if _author_names(first) else "anon"
-    return WorkIdentity("fuzzy", f"{author}:{entry_year(first)}:{_normalized_title(first)}")
-
-
-def _author_names(entry: BibEntry) -> list[str]:
-    raw = entry.fields.get("author") or entry.fields.get("editor") or ""
-    names = [last_name(name).lower() for name in split_name_list(raw)]
-    return [name for name in names if name]
-
-
-def _normalized_title(entry: BibEntry) -> str:
-    return _normalize_text(entry.fields.get("title", ""))
+    evidence = evidence_from_entry(first)
+    author = evidence.authors[0] if evidence.authors else "anon"
+    return WorkIdentifier(
+        "fuzzy",
+        f"{author}:{evidence.year}:{evidence.title_fingerprint}",
+    )

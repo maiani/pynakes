@@ -68,6 +68,25 @@ def test_fuzzy_cluster_can_include_entry_without_stable_id() -> None:
     assert [entry.key for entry in clusters[0].entries] == ["WithDOI", "NoDOI"]
 
 
+def test_conflicting_stable_identifiers_block_fuzzy_clustering() -> None:
+    lib = parse_bib(
+        "@article{A,\n"
+        "  author = {John Smith},\n"
+        "  title = {A Practical Test of Bibliography Deduplication},\n"
+        "  year = {2020},\n"
+        "  doi = {10.5555/first}\n"
+        "}\n\n"
+        "@article{B,\n"
+        "  author = {John Smith},\n"
+        "  title = {A practical test of bibliography deduplication},\n"
+        "  year = {2020},\n"
+        "  doi = {10.5555/second}\n"
+        "}\n"
+    )
+
+    assert find_duplicate_clusters(lib) == []
+
+
 def test_merge_duplicates_copies_missing_data_and_removes_duplicate() -> None:
     coll = Bibliography.from_text(
         "@article{A,\n"

@@ -8,6 +8,7 @@ from typer.testing import CliRunner
 from pynakes import integrity
 from pynakes.bibtex_parser import parse_bib
 from pynakes.cli import app
+from pynakes.identity import entry_arxiv_id
 from pynakes.integrity import enrich_library, verify_library
 from pynakes.providers._http import ProviderFetchError
 from pynakes.providers.metadata import doi, openalex, semantic_scholar
@@ -230,7 +231,7 @@ def test_check_published_backfills_arxiv_for_bibtex_doi_entry() -> None:
     assert [update.field for update in report.updates] == ["eprint", "archiveprefix"]
     assert entry.fields["eprint"] == "2401.00001"
     assert entry.fields["archiveprefix"] == "arXiv"
-    assert integrity.entry_arxiv_id(entry) == "2401.00001"
+    assert entry_arxiv_id(entry) == "2401.00001"
 
 
 def test_check_published_backfills_arxiv_for_biblatex_doi_entry() -> None:

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A public `pynakes.identity` module now extracts normalized offline work
+  evidence and returns explainable `exact`, `probable`, `conflict`, or
+  `unknown` comparisons. Stable identifiers remain evidence rather than a
+  universal work entity; metadata similarity is only `probable`, ORCID is
+  excluded as author identity, and provider relationship lookup stays separate.
 - The Python package now exposes a curated top-level application API, including
   `Bibliography`, core model and lifecycle result types, formatting policy,
   parser/writer functions, file I/O, and common exceptions. The API guide
@@ -30,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `dedupe`, reference-import duplicate checks, and integrity preprint routing
+  now share `pynakes.identity` extraction and comparison. The former
+  `dedupe.WorkIdentity` name is replaced by `identity.WorkIdentifier`; no
+  deprecated alias is retained during alpha.
 - The explicit formatting policies replace the former `--tabular`,
   `--sort-fields`, and `--preserve-field-order` compatibility flags. This
   alpha-stage interface intentionally carries no deprecated aliases.

@@ -85,7 +85,7 @@ when no file is given. Auto-detection ignores RevTeX-generated `*Notes.bib`
 auxiliary files; pass one explicitly if you really want to inspect it. These
 checks support `--strict`, which exits `1` for errors or profile deviations so
 it can gate a build. See
-[Library Profile](library-profile.md) for the complete schema and
+[Metadata Reference](metadata-reference.md) for the complete schema and
 [Git Workflows](git-workflows.md) for pre-commit and CI recipes.
 
 ## groups
@@ -133,7 +133,7 @@ pynakes groups remove-group refs.bib "NLP"   # removes group + its children
 ```
 
 `groups list` reports flat per-entry membership only; it does not currently
-expand tree descendants. See [Library Profile](library-profile.md#grouping)
+expand tree descendants. See [Metadata Reference](metadata-reference.md#grouping)
 for the tree's node schema and native format.
 
 ## keys

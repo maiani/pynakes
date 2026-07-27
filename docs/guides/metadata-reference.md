@@ -1,11 +1,11 @@
-# Library profile
+# Bibliography metadata reference
 
 `@comment{pynakes-meta: ...}` and `@comment{jabref-meta: ...}` can record a
-library's maintenance preferences — and, for `group-tree`, actual library
-content — inside the `.bib` file. `pynakes-meta` is pynakes' own canonical
-schema; `jabref-meta` is a JabRef compatibility projection. pynakes merges both
-namespaces by key (case-insensitively); when both define the same key,
-`pynakes-meta` wins. `normalize` uses these preferences as its defaults and
+bibliography's maintenance settings — and, for `group-tree`, actual
+bibliography content — inside the `.bib` file. `pynakes-meta` is pynakes' own
+canonical schema; `jabref-meta` is a JabRef compatibility projection. pynakes
+merges both namespaces by key (case-insensitively); when both define the same
+key, `pynakes-meta` wins. `normalize` uses these settings as its defaults and
 `lint` verifies the lintable subset without changing the file.
 
 This page is the complete reference: every `pynakes-meta` key pynakes
@@ -248,8 +248,8 @@ determine their canonical form without a mapping. Add a
 matters.
 
 The warnings are advisory in a normal run. `pynakes lint --strict` exits `1`
-for structural errors and these profile-conformance warnings, allowing a
-repository to enforce its own stored profile in CI. Other advisory warnings,
+for structural errors and these metadata-conformance warnings, allowing a
+repository to enforce its own stored settings in CI. Other advisory warnings,
 such as a missing DOI, remain non-blocking.
 
 ```bibtex
