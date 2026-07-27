@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Reference imports now pass provider responses through a shared
+  `ReferenceMetadata` record and an explicit provider registry. Metadata
+  services and repositories now live directly under `providers.metadata` and
+  `providers.repositories`; the former flat provider modules were removed.
+- DOI, arXiv, Nature, and APS URL recognition now uses an ordered declarative
+  resolver table, providing the extension point for the broader v0.6 import
+  paths without adding one module per publisher URL pattern.
+
 ## [0.5.1] - 2026-07-21
 
 ### Added

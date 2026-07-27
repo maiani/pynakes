@@ -976,7 +976,7 @@ class TestImportCommand:
         monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
         monkeypatch.setattr(
-            "pynakes.providers.openalex.oa_pdf_url_for_doi",
+            "pynakes.providers.metadata.openalex.oa_pdf_url_for_doi",
             lambda doi, **kwargs: "https://example.com/provider.pdf",
         )
         monkeypatch.setattr(
@@ -3210,7 +3210,7 @@ class TestAssetFetchPublished:
         )
 
         monkeypatch.setattr(
-            "pynakes.providers.openalex.oa_pdf_url_for_doi",
+            "pynakes.providers.metadata.openalex.oa_pdf_url_for_doi",
             lambda doi, **kwargs: "https://example.com/paper.pdf",
         )
         monkeypatch.setattr(
@@ -3280,7 +3280,10 @@ class TestAssetFetchPublished:
         def fail_resolver(doi: str, **kwargs) -> str | None:
             raise AssertionError("dry-run should not call network")
 
-        monkeypatch.setattr("pynakes.providers.openalex.oa_pdf_url_for_doi", fail_resolver)
+        monkeypatch.setattr(
+            "pynakes.providers.metadata.openalex.oa_pdf_url_for_doi",
+            fail_resolver,
+        )
         monkeypatch.chdir(tmp_path)
 
         result = runner.invoke(app, ["asset", "fetch", "--dry-run", "--json"])
@@ -3307,7 +3310,10 @@ class TestAssetFetchPublished:
         def fail_resolver(doi: str, **kwargs) -> str | None:
             raise AssertionError("network should not be called")
 
-        monkeypatch.setattr("pynakes.providers.openalex.oa_pdf_url_for_doi", fail_resolver)
+        monkeypatch.setattr(
+            "pynakes.providers.metadata.openalex.oa_pdf_url_for_doi",
+            fail_resolver,
+        )
         monkeypatch.chdir(tmp_path)
 
         result = runner.invoke(app, ["asset", "fetch", "--json"])

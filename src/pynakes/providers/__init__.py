@@ -1,1 +1,1 @@
-"""External metadata provider clients used by pynakes operations."""
+"""External provider clients grouped by metadata service and repository."""

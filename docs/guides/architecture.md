@@ -245,7 +245,10 @@ the CLI.
 | keys.py | Citation-key generation, validation, duplicate detection/repair, and key renames. |
 | fields.py | Generic field changes, simple predicates, and title capitalization protection. |
 | authors.py | BibTeX name-list splitting, last-name extraction, and conservative/JabRef-style normalization. |
-| importer.py | Reference import: identifier resolution (DOI/arXiv), DOI canonicalization, arXiv normalization/Atom parsing, and entry preparation. It is the DOI and arXiv identifier authority. |
+| importer.py | Reference-import orchestration: canonical identifier resolution, duplicate checks, citation-key assignment, and conversion from normalized provider metadata into staged entries. |
+| providers/records.py, providers/registry.py | The provider-neutral `ReferenceMetadata` boundary and explicit deterministic import-provider selection. |
+| providers/metadata/, providers/repositories/ | External-service implementations grouped by role; callers import providers from these role-specific packages directly. |
+| providers/url_resolvers/ | Ordered declarative identifier, repository, and publisher URL recognition. Ordinary publisher URL-to-DOI patterns are table entries rather than standalone clients. |
 | filestore.py | Pinax material paths, presence scanning, orphan/drift detection and repair, provenance manifests, material copying, and atomic writes inside a configured `files-dir`. |
 | fetch.py | arXiv material URL construction, injectable PDF/source byte fetchers, safe source archive extraction, and FileStore installation. |
 | metadata/ (core.py, schema.py, jabref.py) | Structured top-level metadata, layered by dependency direction: `core` is the namespace-neutral comment engine (parse/format/set/remove/consolidate); `schema` is pynakes' own canonical key registry and native reads, JabRef-unaware; `jabref` is the compatibility adapter — JabRef's key tables and value grammars, the JabRef group parsers/serializers (`parse_jabref_grouping`, `format_jabref_grouping`, `parse_jabref_groups_lines`), owner/namespace arbitration, and fallback-aware accessors (`library_dialect`, `library_sort_order`). Domain code depends on `schema`'s concepts through `jabref`'s accessors, never on JabRef's literal keys. See the [JabRef compatibility guide](jabref-compatibility.md). |
@@ -306,8 +309,9 @@ primitives contact providers in the current implementation. Integrity workflows
 require an explicit `online=True`/`--online` opt-in and support deterministic
 caching; Pinax downloads require the explicit `asset fetch` command or `ref import --fetch`.
 Plain `.bib` maintenance never fetches materials. Network parsing lives in
-`importer.py`, `integrity.py`, and `fetch.py`; tests mock or fixture this
-boundary so the normal suite never relies on external availability.
+the provider implementations; `importer.py`, `integrity.py`, and `fetch.py`
+translate provider failures into their domain errors. Tests mock or fixture
+this boundary so the normal suite never relies on external availability.
 
 ## Testing and change discipline
 

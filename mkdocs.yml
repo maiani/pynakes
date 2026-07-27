@@ -34,6 +34,7 @@ nav:
   - Quick Start: guides/quickstart.md
   - Installation: guides/installation.md
   - Usage: guides/usage.md
+  - Import Providers: guides/import-providers.md
   - Library Profile: guides/library-profile.md
   - Public API & Stability: guides/api-stability.md
   - LLM Integration: guides/llm-integration.md

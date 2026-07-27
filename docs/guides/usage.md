@@ -358,6 +358,9 @@ references are detected before importing. arXiv entries are written as `@online`
 in BibLaTeX libraries and `@misc` in BibTeX ones, following the library's
 `databaseType` metadata (defaulting to BibTeX when unset).
 
+See [Import providers](import-providers.md) for the complete supported and
+planned identifier, repository, catalogue, and publisher URL inventory.
+
 ## files
 
 Validate JabRef linked files stored in `file` fields.

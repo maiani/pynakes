@@ -21,8 +21,10 @@ import httpx
 from pynakes._identifiers import normalize_arxiv, normalize_doi
 from pynakes.fetch_progress import FetchArtifact, FetchProgress, FetchProgressEvent
 from pynakes.filestore import FileStore
-from pynakes.providers import arxiv, crossref, openalex, publisher
+from pynakes.providers import publisher
 from pynakes.providers._http import USER_AGENT, ProviderFetchError, fetch_bytes
+from pynakes.providers.metadata import crossref, openalex
+from pynakes.providers.repositories import arxiv
 
 FetchArxivBytes = Callable[[str], bytes]
 FetchPublishedPdfUrl = Callable[[str], str | None]
@@ -142,7 +144,7 @@ def fetch_arxiv_pdf(
 ) -> bytes:
     """Fetch arXiv PDF bytes for ``identifier``.
 
-    Thin wrapper over :func:`pynakes.providers.arxiv.fetch_pdf` translating
+    Thin wrapper over :func:`pynakes.providers.repositories.arxiv.fetch_pdf` translating
     provider errors into :class:`ArxivFetchError`.
     """
     try:
@@ -163,7 +165,7 @@ def fetch_arxiv_source(
 ) -> bytes:
     """Fetch arXiv source archive bytes for ``identifier``.
 
-    Thin wrapper over :func:`pynakes.providers.arxiv.fetch_source` translating
+    Thin wrapper over :func:`pynakes.providers.repositories.arxiv.fetch_source` translating
     provider errors into :class:`ArxivFetchError`.
     """
     try:

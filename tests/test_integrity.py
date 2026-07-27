@@ -9,8 +9,9 @@ from pynakes import integrity
 from pynakes.bibtex_parser import parse_bib
 from pynakes.cli import app
 from pynakes.integrity import enrich_library, verify_library
-from pynakes.providers import arxiv, doi, openalex, semantic_scholar
 from pynakes.providers._http import ProviderFetchError
+from pynakes.providers.metadata import doi, openalex, semantic_scholar
+from pynakes.providers.repositories import arxiv
 
 runner = CliRunner()
 

@@ -1,4 +1,4 @@
-"""OpenAlex provider helpers."""
+"""OpenAlex metadata provider helpers."""
 
 from __future__ import annotations
 

@@ -1,7 +1,7 @@
 """Import BibTeX entries from external identifiers.
 
-Resolves a user-supplied identifier (DOI, DOI URL, arXiv id, arXiv URL) to its
-type, fetches authoritative metadata, and prepares a ready-to-append
+Resolves a user-supplied identifier or supported URL, asks the matching
+provider for normalized metadata, and prepares a ready-to-append
 :class:`~pynakes.model.BibEntry`. The library is never mutated here; callers
 (see :class:`~pynakes.engine.Bibliography`) stage the returned entry.
 
@@ -11,10 +11,8 @@ arXiv Atom API. Neither path downloads PDFs or linked files — only metadata.
 
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 
-from pynakes._calendar import MONTH_NUM_TO_ABBR
 from pynakes._identifiers import (
     arxiv_id_from_text,
     canonical_doi,
@@ -22,46 +20,21 @@ from pynakes._identifiers import (
     normalize_arxiv,
     normalize_doi,
 )
-from pynakes.bibtex_parser import ParseError, parse_bib
-from pynakes.editing import set_entry_field
 from pynakes.keys import UnsupportedCitationKeyPatternError, generate_key, unique_key
 from pynakes.model import BibEntry, BibFile
-from pynakes.providers import arxiv
-from pynakes.providers import doi as doi_provider
 from pynakes.providers._http import ProviderFetchError
+from pynakes.providers.metadata import doi as doi_provider
+from pynakes.providers.records import ReferenceMetadata
+from pynakes.providers.registry import get_import_provider
+from pynakes.providers.repositories import arxiv
+from pynakes.providers.url_resolvers import extract_publisher_doi, resolve_reference_url
 
 # Re-exported for callers that import the parsed-record type from this module.
 ArxivRecord = arxiv.ArxivRecord
 
-# Table of known journal URL patterns that encode the DOI directly.
-# Each entry is (compiled pattern, extractor callable).  The extractor
-# receives the re.Match and returns the bare DOI string.
-# Extend here to support additional publishers without touching the resolver.
-_JOURNAL_URL_RESOLVERS: list[tuple[re.Pattern[str], Callable[[re.Match[str]], str]]] = [
-    (
-        # nature.com article URLs: slug IS the DOI suffix under prefix 10.1038
-        # e.g. https://www.nature.com/articles/s41535-025-00801-3
-        #   → DOI 10.1038/s41535-025-00801-3
-        re.compile(r"^https?://(?:www\.)?nature\.com/articles/([^/?#\s]+)", re.IGNORECASE),
-        lambda m: f"10.1038/{m.group(1)}",
-    ),
-    (
-        # APS (American Physical Society) article and PDF URLs: DOI embedded in path
-        # e.g. https://journals.aps.org/rmp/abstract/10.1103/k13g-z9s8
-        #      https://journals.aps.org/rmp/pdf/10.1103/k13g-z9s8
-        #   → DOI 10.1103/k13g-z9s8
-        re.compile(
-            r"^https?://journals\.aps\.org/\w+/(?:abstract|pdf)/(10\.\d{4,9}/\S+?)(?:[/?#]|$)",
-            re.IGNORECASE,
-        ),
-        lambda m: m.group(1),
-    ),
-]
-
 KEY_SOURCES = {"generated", "provider"}
 
-# Identifier types ``resolve_identifier`` can return. ``journal_url`` is reserved
-# for a future resolver and currently raises ``UnsupportedIdentifierError``.
+# Identifier types ``resolve_identifier`` can return.
 DOI = "doi"
 ARXIV = "arxiv"
 
@@ -129,21 +102,12 @@ FetchArxivAtom = Callable[[str], str]
 def extract_doi_from_journal_url(url: str) -> str | None:
     """Extract a DOI from a recognized journal article URL, or return ``None``.
 
-    Consults :data:`_JOURNAL_URL_RESOLVERS`. Currently supports:
+    Consults the declarative publisher URL resolver table. Currently supports:
 
     * ``nature.com/articles/{slug}`` → DOI ``10.1038/{slug}``
     * ``journals.aps.org/{journal}/abstract/{doi}`` → DOI embedded in path
     """
-    stripped = url.strip()
-    for pattern, extractor in _JOURNAL_URL_RESOLVERS:
-        m = pattern.match(stripped)
-        if m:
-            doi = extractor(m)
-            try:
-                return normalize_doi(doi)
-            except ValueError:
-                continue
-    return None
+    return extract_publisher_doi(url)
 
 
 def resolve_identifier(value: str) -> tuple[str, str]:
@@ -159,8 +123,12 @@ def resolve_identifier(value: str) -> tuple[str, str]:
     if not raw:
         raise UnsupportedIdentifierError("Empty identifier")
 
+    resolved_url = resolve_reference_url(raw)
+    if resolved_url is not None:
+        return resolved_url.kind, resolved_url.identifier
+
     lowered = raw.lower()
-    if "arxiv.org/" in lowered or lowered.startswith("arxiv:"):
+    if lowered.startswith("arxiv:"):
         normalized = normalize_arxiv(raw)
         if normalized is None:
             raise UnsupportedIdentifierError(f"Malformed arXiv identifier: {value!r}")
@@ -177,11 +145,6 @@ def resolve_identifier(value: str) -> tuple[str, str]:
         if normalized is not None:
             return ARXIV, normalized
 
-    # A recognized journal article URL (DOI extractable from the URL structure).
-    extracted = extract_doi_from_journal_url(raw)
-    if extracted is not None:
-        return DOI, extracted
-
     raise UnsupportedIdentifierError(
         f"Unrecognized identifier {value!r}; expected a DOI, arXiv id/URL, "
         f"or a supported journal article URL (nature.com, journals.aps.org)"
@@ -191,7 +154,7 @@ def resolve_identifier(value: str) -> tuple[str, str]:
 def fetch_bibtex_for_doi(doi: str, timeout: float = 15.0) -> str:
     """Fetch BibTeX metadata for ``doi`` via DOI content negotiation.
 
-    Thin domain wrapper over :func:`pynakes.providers.doi.fetch_bibtex` that
+    Thin domain wrapper over :func:`pynakes.providers.metadata.doi.fetch_bibtex` that
     translates provider transport errors into :class:`DOIImportError`.
     """
     try:
@@ -203,16 +166,22 @@ def fetch_bibtex_for_doi(doi: str, timeout: float = 15.0) -> str:
 def entry_from_bibtex(text: str) -> BibEntry:
     """Parse provider BibTeX and return the first entry."""
     try:
-        lib = parse_bib(text)
-    except ParseError as exc:
-        raise DOIImportError(f"Provider returned invalid BibTeX: {exc.message}") from exc
-    entries = lib.entries.values()
-    if not entries:
-        raise DOIImportError("Provider returned no BibTeX entries")
-    entry = entries[0]
-    entry.raw_content = None
-    entry.modified = True
-    return entry
+        metadata = doi_provider.parse_bibtex(text)
+    except ProviderFetchError as exc:
+        raise DOIImportError(str(exc)) from exc
+    return entry_from_metadata(metadata)
+
+
+def entry_from_metadata(metadata: ReferenceMetadata) -> BibEntry:
+    """Convert normalized provider metadata into an unstaged entry."""
+    return BibEntry(
+        key=metadata.provider_key or "imported",
+        type=metadata.entry_type,
+        fields=dict(metadata.fields),
+        field_expressions=dict(metadata.field_expressions),
+        raw_content=None,
+        modified=True,
+    )
 
 
 def existing_keys_for_doi(lib: BibFile, doi: str) -> list[str]:
@@ -263,7 +232,7 @@ def existing_keys_for_arxiv(lib: BibFile, identifier: str) -> list[str]:
 def fetch_arxiv_atom(identifier: str, timeout: float = 15.0) -> str:
     """Fetch arXiv Atom XML for ``identifier``. Split out so tests can stub it.
 
-    Thin domain wrapper over :func:`pynakes.providers.arxiv.fetch_atom` that
+    Thin domain wrapper over :func:`pynakes.providers.repositories.arxiv.fetch_atom` that
     translates provider transport errors into :class:`ArxivImportError`.
     """
     try:
@@ -280,45 +249,14 @@ def arxiv_entry(record: ArxivRecord, *, dialect: str = "bibtex") -> BibEntry:
     ``archivePrefix``, and ``primaryClass``). The arXiv id is always recorded in
     ``eprint`` so :func:`entry_arxiv_id` and dedup recognize it in either form.
     """
-    biblatex = dialect == "biblatex"
-    fields: dict[str, str] = {}
-    if record.authors:
-        fields["author"] = " and ".join(record.authors)
-    if record.title:
-        fields["title"] = record.title
-    if record.published:
-        if biblatex:
-            fields["date"] = record.published
-        else:
-            fields["year"] = record.published[:4]
-            month_part = record.published[5:7]
-            if month_part in MONTH_NUM_TO_ABBR:
-                fields["month"] = MONTH_NUM_TO_ABBR[month_part]
-    fields["eprint"] = record.arxiv_id
-    fields["eprinttype" if biblatex else "archivePrefix"] = "arxiv" if biblatex else "arXiv"
-    if record.primary_class:
-        fields["eprintclass" if biblatex else "primaryClass"] = record.primary_class
-    fields["url"] = arxiv.abs_url(record.arxiv_id)
-    if record.doi:
-        fields["doi"] = record.doi
-    if record.summary:
-        fields["abstract"] = record.summary
-    if record.updated:
-        fields["updated"] = record.updated
-
-    return BibEntry(
-        key="arxiv",  # replaced with a unique key by prepare_imported_*
-        type="online" if biblatex else "misc",
-        fields=fields,
-        raw_content=None,
-        modified=True,
-    )
+    metadata = arxiv.metadata_from_record(record, dialect=dialect)
+    return entry_from_metadata(metadata)
 
 
 def fetch_arxiv_record(identifier: str, fetcher: FetchArxivAtom | None = None) -> ArxivRecord:
     """Fetch and parse arXiv metadata for ``identifier``.
 
-    Delegates fetch/parse to :mod:`pynakes.providers.arxiv`. The default Atom
+    Delegates fetch/parse to :mod:`pynakes.providers.repositories.arxiv`. The default Atom
     fetcher is this module's :func:`fetch_arxiv_atom` wrapper so callers and
     tests can substitute it; provider errors become :class:`ArxivImportError`.
     """
@@ -387,9 +325,12 @@ def prepare_imported_entry(
 
     if fetcher is None:
         fetcher = fetch_bibtex_for_doi
-    entry = entry_from_bibtex(fetcher(normalized))
-    provider_key = entry.key
-    set_entry_field(entry, "doi", normalized)
+    try:
+        metadata = get_import_provider(DOI).load(normalized, "bibtex", fetcher)
+    except ProviderFetchError as exc:
+        raise DOIImportError(str(exc)) from exc
+    entry = entry_from_metadata(metadata)
+    provider_key = metadata.provider_key
 
     _assign_key(entry, lib, key=key, key_source=key_source, provider_key=provider_key)
     return entry
@@ -422,8 +363,13 @@ def prepare_imported_arxiv(
         if duplicate_keys:
             raise DuplicateArxivError(normalized, duplicate_keys)
 
-    record = fetch_arxiv_record(normalized, fetcher=fetcher)
-    entry = arxiv_entry(record, dialect=dialect)
+    if fetcher is None:
+        fetcher = fetch_arxiv_atom
+    try:
+        metadata = get_import_provider(ARXIV).load(normalized, dialect, fetcher)
+    except ProviderFetchError as exc:
+        raise ArxivImportError(str(exc)) from exc
+    entry = entry_from_metadata(metadata)
     # arXiv feeds carry no provider citation key, so "provider" falls back to
     # generation.
     _assign_key(entry, lib, key=key, key_source=key_source, provider_key=None)

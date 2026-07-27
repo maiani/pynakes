@@ -1,4 +1,4 @@
-"""arXiv provider client: URL helpers, metadata fetch/parse, and downloads."""
+"""arXiv repository client: URL helpers, metadata fetch/parse, and downloads."""
 
 from __future__ import annotations
 
@@ -7,8 +7,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from urllib.parse import quote
 
+from pynakes._calendar import MONTH_NUM_TO_ABBR
 from pynakes._identifiers import normalize_arxiv
 from pynakes.providers._http import DownloadProgress, ProviderFetchError, fetch_bytes, fetch_text
+from pynakes.providers.records import ReferenceMetadata
 
 BASE_URL = "https://arxiv.org"
 EXPORT_API = "https://export.arxiv.org/api/query"
@@ -106,6 +108,61 @@ def fetch_record(identifier: str, fetcher: FetchArxivAtom | None = None) -> Arxi
     if fetcher is None:
         fetcher = fetch_atom
     return parse_atom(fetcher(normalized), normalized)
+
+
+def metadata_from_record(
+    record: ArxivRecord,
+    *,
+    dialect: str = "bibtex",
+) -> ReferenceMetadata:
+    """Normalize an arXiv record for the requested bibliography dialect."""
+    biblatex = dialect.lower() == "biblatex"
+    fields: dict[str, str] = {}
+    if record.authors:
+        fields["author"] = " and ".join(record.authors)
+    if record.title:
+        fields["title"] = record.title
+    if record.published:
+        if biblatex:
+            fields["date"] = record.published
+        else:
+            year = record.published[:4]
+            month = record.published[5:7]
+            if year:
+                fields["year"] = year
+            if month in MONTH_NUM_TO_ABBR:
+                fields["month"] = MONTH_NUM_TO_ABBR[month]
+    fields["eprint"] = record.arxiv_id
+    fields["eprinttype" if biblatex else "archivePrefix"] = "arxiv" if biblatex else "arXiv"
+    if record.primary_class:
+        fields["eprintclass" if biblatex else "primaryClass"] = record.primary_class
+    fields["url"] = abs_url(record.arxiv_id)
+    if record.doi:
+        fields["doi"] = record.doi
+    if record.summary:
+        fields["abstract"] = record.summary
+    if record.updated:
+        fields["updated"] = record.updated
+
+    identifiers = {"arxiv": record.arxiv_id}
+    if record.doi:
+        identifiers["doi"] = record.doi
+    return ReferenceMetadata(
+        provider="arXiv",
+        entry_type="online" if biblatex else "misc",
+        fields=fields,
+        identifiers=identifiers,
+    )
+
+
+def fetch_metadata(
+    identifier: str,
+    *,
+    dialect: str = "bibtex",
+    fetcher: FetchArxivAtom | None = None,
+) -> ReferenceMetadata:
+    """Fetch and normalize arXiv metadata."""
+    return metadata_from_record(fetch_record(identifier, fetcher=fetcher), dialect=dialect)
 
 
 def fetch_pdf(

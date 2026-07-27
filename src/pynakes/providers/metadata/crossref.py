@@ -1,4 +1,4 @@
-"""CrossRef metadata provider helpers."""
+"""Crossref metadata provider helpers."""
 
 from __future__ import annotations
 

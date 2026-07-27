@@ -20,10 +20,10 @@ from pynakes.importer import entry_arxiv_id
 from pynakes.keys import _first_author_last_name
 from pynakes.metadata import library_dialect
 from pynakes.model import BibEntry, BibFile
-from pynakes.providers import arxiv as arxiv_provider
-from pynakes.providers import doi as doi_provider
 from pynakes.providers._http import ProviderFetchError, cache_path
 from pynakes.providers.identity import resolve_arxiv_id_for_doi
+from pynakes.providers.metadata import doi as doi_provider
+from pynakes.providers.repositories import arxiv as arxiv_provider
 
 
 @dataclass
@@ -417,7 +417,7 @@ def fetch_doi_entry(doi: str, *, cache_dir: str | Path | None = None) -> BibEntr
 def fetch_arxiv_metadata(identifier: str, *, cache_dir: str | Path | None = None) -> dict[str, str]:
     """Fetch the published DOI/journal an arXiv preprint links to, if any.
 
-    Delegates the Atom fetch/parse to :mod:`pynakes.providers.arxiv` and keeps
+    Delegates fetch/parse to :mod:`pynakes.providers.repositories.arxiv` and keeps
     only the deterministic on-disk cache here. Returns
     ``{"doi": ..., "journal": ...}``.
     """

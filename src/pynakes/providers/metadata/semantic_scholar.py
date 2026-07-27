@@ -1,4 +1,4 @@
-"""Semantic Scholar provider helpers."""
+"""Semantic Scholar metadata provider helpers."""
 
 from __future__ import annotations
 

@@ -1,13 +1,19 @@
 """External provider client tests."""
 
 import json
+import re
 from pathlib import Path
 
 import httpx
 import pytest
 
-from pynakes.providers import arxiv, identity, openalex, publisher, semantic_scholar
+from pynakes.providers import identity, publisher
 from pynakes.providers._http import ProviderFetchError, cache_path
+from pynakes.providers.metadata import openalex, semantic_scholar
+from pynakes.providers.records import ReferenceMetadata
+from pynakes.providers.registry import get_import_provider
+from pynakes.providers.repositories import arxiv
+from pynakes.providers.url_resolvers import URLRule, resolve_reference_url, resolve_url
 
 OPENALEX_WORK = {
     "locations": [
@@ -29,6 +35,93 @@ SEMANTIC_SCHOLAR_PAPER = {
     },
     "url": "https://www.semanticscholar.org/paper/test",
 }
+
+
+def test_reference_metadata_normalizes_names_and_serializes_copies() -> None:
+    metadata = ReferenceMetadata(
+        provider=" Example ",
+        entry_type="ARTICLE",
+        fields={" title ": "Test"},
+        identifiers={"DOI": "10.5555/test"},
+        provider_key="provider-key",
+    )
+
+    assert metadata.provider == "Example"
+    assert metadata.entry_type == "article"
+    assert metadata.fields == {"title": "Test"}
+    assert metadata.identifier("doi") == "10.5555/test"
+    assert metadata.to_dict()["fields"] == {"title": "Test"}
+
+
+def test_import_provider_registry_loads_normalized_doi_metadata() -> None:
+    provider = get_import_provider("doi")
+    metadata = provider.load(
+        "10.5555/test",
+        "bibtex",
+        lambda identifier: f"@article{{provider-key, title = {{Test}}, doi = {{{identifier}}}}}",
+    )
+
+    assert provider.name == "doi.org"
+    assert metadata.provider_key == "provider-key"
+    assert metadata.identifier("doi") == "10.5555/test"
+
+
+def test_doi_provider_normalizes_identifier_field_expression() -> None:
+    metadata = get_import_provider("doi").load(
+        "10.5555/test",
+        "bibtex",
+        lambda identifier: (
+            f"@article{{provider-key, title = {{Test}}, doi = {{https://doi.org/{identifier}}}}}"
+        ),
+    )
+
+    assert metadata.fields["doi"] == "10.5555/test"
+    assert metadata.field_expressions["doi"] == "{10.5555/test}"
+
+
+def test_import_provider_registry_rejects_unknown_kind() -> None:
+    with pytest.raises(KeyError, match="No import provider"):
+        get_import_provider("unknown")
+
+
+@pytest.mark.parametrize(
+    "url,kind,identifier,source",
+    [
+        ("https://doi.org/10.5555/test", "doi", "10.5555/test", "doi.org"),
+        ("https://arxiv.org/pdf/2301.00001v2.pdf", "arxiv", "2301.00001", "arXiv"),
+        (
+            "https://www.nature.com/articles/s41535-025-00801-3",
+            "doi",
+            "10.1038/s41535-025-00801-3",
+            "Nature",
+        ),
+    ],
+)
+def test_reference_url_registry_resolves_ordered_rules(
+    url: str,
+    kind: str,
+    identifier: str,
+    source: str,
+) -> None:
+    resolved = resolve_reference_url(url)
+
+    assert resolved is not None
+    assert (resolved.kind, resolved.identifier, resolved.source) == (kind, identifier, source)
+
+
+def test_url_registry_accepts_extension_rules() -> None:
+    rule = URLRule(
+        source="Example Repository",
+        kind="example",
+        pattern=re.compile(r"^https://example\.org/records/(\d+)$"),
+        extract=lambda match: match.group(1),
+        normalize=lambda identifier: identifier,
+    )
+
+    resolved = resolve_url("https://example.org/records/42", (rule,))
+
+    assert resolved is not None
+    assert resolved.identifier == "42"
 
 
 def test_arxiv_material_urls_normalize_identifiers() -> None:

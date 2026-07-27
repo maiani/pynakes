@@ -19,8 +19,9 @@ cross-cutting patterns.
   v5.15 formatter-as-modifier behavior and key-pattern markers/modifiers, using
   upstream JabRef implementations, tests, and golden vectors as the oracle.
 
-- **New import paths**: PubMed PMID/PMCID, ISBN, SSRN ID, NBER ID, generalized
-  journal-URL resolver table covering common publisher patterns.
+- **New import paths**: expand the
+  [import-provider inventory](docs/guides/import-providers.md) through the
+  normalized provider interface and declarative URL resolver tables.
 - **Generalized URL import**: `ref import <url>` auto-detects identifier type
   from any supported publisher/catalog URL (DOI, arXiv, PubMed, SSRN, NBER,
   ISBN, nature.com, journals.aps.org, plus the new Elsevier/Springer/Wiley/PLOS

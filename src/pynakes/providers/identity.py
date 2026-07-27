@@ -6,8 +6,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from pynakes._identifiers import normalize_doi
-from pynakes.providers import openalex, semantic_scholar
 from pynakes.providers._http import ProviderFetchError
+from pynakes.providers.metadata import openalex, semantic_scholar
 
 
 def resolve_arxiv_id_for_doi(
