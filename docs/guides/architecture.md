@@ -287,7 +287,7 @@ exception where callers need structured recovery:
 | Condition | Exception / outcome |
 | --- | --- |
 | Structurally malformed BibTeX | ParseError |
-| Reference import failure, duplicate DOI/arXiv, explicit key conflict | ReferenceImportError (DOIImportError/ArxivImportError), DuplicateReferenceError (DuplicateDOIError/DuplicateArxivError), CitationKeyConflictError |
+| Reference import failure, duplicate provider identity, explicit key conflict | ReferenceImportError (with DOI/arXiv specializations), DuplicateReferenceError (with DOI/arXiv specializations), CitationKeyConflictError |
 | Unrecognized identifier passed to `ref import` | UnsupportedIdentifierError |
 | Unsupported JabRef key pattern | UnsupportedCitationKeyPatternError |
 | Duplicate/ambiguous metadata block | DuplicateMetadataError |
@@ -304,12 +304,12 @@ interactive choice is possible. Modifying command responses share `status`,
 
 ## Network boundary
 
-Only DOI/arXiv import, integrity workflows, and the Pinax arXiv download
-primitives contact providers in the current implementation. Integrity workflows
-require an explicit `online=True`/`--online` opt-in and support deterministic
-caching; Pinax downloads require the explicit `asset fetch` command or `ref import --fetch`.
-Plain `.bib` maintenance never fetches materials. Network parsing lives in
-the provider implementations; `importer.py`, `integrity.py`, and `fetch.py`
+Only explicit reference import, integrity workflows, and Pinax download
+primitives contact providers. Integrity workflows require an explicit
+`online=True`/`--online` opt-in and support deterministic caching; Pinax
+downloads require the explicit `asset fetch` command or `ref import --fetch`.
+Plain `.bib` maintenance never fetches materials. Network parsing lives in the
+provider implementations; `importer.py`, `integrity.py`, and `fetch.py`
 translate provider failures into their domain errors. Tests mock or fixture
 this boundary so the normal suite never relies on external availability.
 

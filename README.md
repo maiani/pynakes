@@ -45,7 +45,8 @@ then:
 - **Lint** — validate required fields, DOI shape, key conflicts (CI-gate multiple files)
 - **Normalize** — authors, DOIs, months, journals, `saveActions` pipeline
 - **Format** — deterministic layout-only rewrites with explicit layout flags
-- **Import** by DOI or arXiv identifier, with configurable key generation, or add a manual entry
+- **Import** by DOI, repository/preprint id, or supported URL, with configurable
+  key generation, or add a manual entry
 - **Dedupe & merge** — detect and resolve duplicates, with conflict reporting
 - **Bulk-edit fields** — set, rename, move, append, clear, or protect fields on matching references
 - **Manage groups and keys** — list, rename, repair, generate from patterns
@@ -101,9 +102,10 @@ pynakes init mylib.bib
 pynakes inspect mylib.bib
 pynakes lint mylib.bib --json
 
-# Import a reference by DOI or arXiv id, or add one manually
+# Import by DOI, repository id, or supported URL, or add one manually
 pynakes ref import 10.5555/example mylib.bib
 pynakes ref import arXiv:2301.00001 mylib.bib
+pynakes ref import PMID:12345678 mylib.bib
 pynakes ref add Manual2026 mylib.bib --field title="Manual Reference" --field year=2026
 pynakes ref add  # interactive
 pynakes ref show Manual2026 mylib.bib

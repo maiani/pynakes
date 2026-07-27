@@ -329,7 +329,7 @@ stdin is an error rather than a prompt.
 
 ## import
 
-Import a reference by DOI **or** arXiv identifier. The identifier type is
+Import a reference by DOI, repository/preprint identifier, or supported URL. The type is
 auto-detected, so the same command handles all of these:
 
 ```bash
@@ -337,6 +337,9 @@ pynakes ref import 10.5555/example refs.bib --dry-run --diff
 pynakes ref import https://doi.org/10.5555/example refs.bib
 pynakes ref import arXiv:2301.00001 refs.bib
 pynakes ref import https://arxiv.org/abs/2301.00001 refs.bib
+pynakes ref import PMID:12345678 refs.bib
+pynakes ref import https://www.nber.org/papers/w12345 refs.bib
+pynakes ref import https://zenodo.org/records/1234567 refs.bib
 ```
 
 Options:
@@ -349,14 +352,13 @@ pynakes ref import arXiv:2301.00001 refs.bib --fetch
 pynakes ref import 10.5555/example refs.bib --fetch --cache-dir .pynakes-cache
 ```
 
-DOIs are fetched through DOI-resolver content negotiation; arXiv ids are fetched
-from the arXiv Atom API. By default `ref import` imports metadata only; `--fetch`
-also downloads configured Pinax materials for the new entry: arXiv preprint
-PDF/source when an arXiv id is present, and an open-access published PDF when
-the entry has a DOI and a suitable `fetch-policy`. Existing matching DOI/arXiv
-references are detected before importing. arXiv entries are written as `@online`
-in BibLaTeX libraries and `@misc` in BibTeX ones, following the library's
-`databaseType` metadata (defaulting to BibTeX when unset).
+Each identifier is fetched through its matching provider. By default
+`ref import` imports metadata only; `--fetch` also downloads configured Pinax
+materials for the new entry: arXiv preprint PDF/source when an arXiv id is
+present, and an open-access published PDF when the entry has a DOI and a
+suitable `fetch-policy`. Existing matching provider ids and returned DOIs are
+detected before importing. Provider entries follow the library's
+BibTeX/BibLaTeX dialect.
 
 See [Import providers](import-providers.md) for the complete supported and
 planned identifier, repository, catalogue, and publisher URL inventory.

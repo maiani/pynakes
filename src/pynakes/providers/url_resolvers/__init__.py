@@ -6,8 +6,9 @@ from pynakes.providers.url_resolvers.publishers import (
     extract_publisher_doi,
 )
 from pynakes.providers.url_resolvers.registry import ResolvedURL, URLRule, resolve_url
+from pynakes.providers.url_resolvers.repositories import REPOSITORY_URL_RULES
 
-DEFAULT_URL_RULES = (*IDENTIFIER_URL_RULES, *PUBLISHER_URL_RULES)
+DEFAULT_URL_RULES = (*IDENTIFIER_URL_RULES, *REPOSITORY_URL_RULES, *PUBLISHER_URL_RULES)
 
 
 def resolve_reference_url(value: str) -> ResolvedURL | None:
@@ -18,6 +19,7 @@ def resolve_reference_url(value: str) -> ResolvedURL | None:
 __all__ = [
     "DEFAULT_URL_RULES",
     "PUBLISHER_URL_RULES",
+    "REPOSITORY_URL_RULES",
     "ResolvedURL",
     "URLRule",
     "extract_publisher_doi",

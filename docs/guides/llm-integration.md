@@ -94,7 +94,8 @@ its operation vocabulary through `capabilities`.
 - Use `ref edit <key>` for a multi-field patch to one reference.
 - Use `fields` with `--where` for bulk field operations over a selection.
 - Use `ref add` for a fully local, manually supplied reference.
-- Use `ref import` for network-backed DOI or arXiv metadata resolution.
+- Use `ref import` for network-backed DOI, repository, preprint, and
+  working-paper metadata resolution.
 - Use `format` for layout only and `normalize` for bibliographic conventions.
 - Use `keys rename` when a key change must also update TeX citations; use
   `keys generate` to apply the configured key pattern.

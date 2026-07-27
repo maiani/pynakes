@@ -22,7 +22,9 @@ from pynakes.engine import Bibliography
 
 
 def import_reference(
-    identifier: str = typer.Argument(..., help="DOI, DOI URL, arXiv id, or arXiv URL to import"),
+    identifier: str = typer.Argument(
+        ..., help="DOI, repository identifier, or supported reference URL to import"
+    ),
     file: str | None = bib_file_argument(),
     key: str | None = typer.Option(None, "--key", help="Citation key to use"),
     key_source: str = typer.Option(
@@ -46,7 +48,7 @@ def import_reference(
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Import a reference by DOI or arXiv identifier."""
+    """Import a reference from a supported identifier or URL."""
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     file = _resolve_input_bib(file, json_output)
     if key_source not in importer_ops.KEY_SOURCES:
@@ -139,7 +141,7 @@ def import_reference(
             _emit_error(json_output, "InvalidInput", str(exc))
             return
 
-    label = entry.fields.get("doi") or entry.fields.get("eprint") or entry.key
+    label = importer_ops.imported_entry_identifier(entry, kind)
     human = [f"{_verb('import', params, 'Imported')} {kind} {label} as {entry.key}."]
     if fetch_report is not None:
         human.extend(

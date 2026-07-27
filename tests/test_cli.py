@@ -13,6 +13,8 @@ from pynakes import __version__
 from pynakes import importer as importer_ops
 from pynakes.cli import app
 from pynakes.cli_common import _metadata_cache_dir
+from pynakes.providers.records import ReferenceMetadata
+from pynakes.providers.repositories import ssrn
 
 runner = CliRunner()
 
@@ -885,6 +887,36 @@ class TestImportCommand:
         assert "month = {jan}" in text
         assert "abstract = {We present a deep test of the arXiv import functionality.}" in text
         assert "updated = {2023-01-15}" in text
+
+    def test_add_repository_identifier_uses_registered_provider(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        monkeypatch.setattr(
+            ssrn,
+            "fetch_metadata",
+            lambda identifier, **kwargs: ReferenceMetadata(
+                provider="SSRN",
+                entry_type="techreport",
+                fields={
+                    "author": "Alan Turing",
+                    "title": "On Computable Numbers",
+                    "year": "1936",
+                    "ssrn": identifier,
+                    "doi": "10.5555/archive.1",
+                },
+                identifiers={"ssrn": identifier, "doi": "10.5555/archive.1"},
+            ),
+        )
+
+        result = runner.invoke(app, ["ref", "import", "SSRN:123456", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["identifier_type"] == "ssrn"
+        assert data["identifier"] == "123456"
+        assert data["doi"] == "10.5555/archive.1"
+        assert "ssrn = {123456}" in bib.read_text()
 
     def test_add_arxiv_url_in_biblatex_writes_online_entry(
         self, tmp_path: Path, monkeypatch

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `ref import` now accepts PubMed and PubMed Central identifiers, Europe PMC
+  records, SSRN and NBER working papers, bioRxiv and medRxiv preprints, Zenodo
+  records, OSF Preprints, HAL records, ChemRxiv preprints, and Research Square
+  manuscripts. Provider-prefixed identifiers and canonical archive URLs are
+  supported, with duplicate detection across repository ids and returned DOIs.
+
 ### Changed
 
 - Reference imports now pass provider responses through a shared

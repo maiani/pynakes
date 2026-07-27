@@ -5,8 +5,9 @@ provider for normalized metadata, and prepares a ready-to-append
 :class:`~pynakes.model.BibEntry`. The library is never mutated here; callers
 (see :class:`~pynakes.engine.Bibliography`) stage the returned entry.
 
-DOI metadata comes from DOI content negotiation; arXiv metadata comes from the
-arXiv Atom API. Neither path downloads PDFs or linked files — only metadata.
+Metadata comes from the API or citation-metadata interface of the selected
+identifier authority or repository. Import never downloads PDFs or linked
+files — only metadata.
 """
 
 from __future__ import annotations
@@ -25,8 +26,19 @@ from pynakes.model import BibEntry, BibFile
 from pynakes.providers._http import ProviderFetchError
 from pynakes.providers.metadata import doi as doi_provider
 from pynakes.providers.records import ReferenceMetadata
-from pynakes.providers.registry import get_import_provider
-from pynakes.providers.repositories import arxiv
+from pynakes.providers.registry import RawMetadataFetcher, get_import_provider
+from pynakes.providers.repositories import (
+    arxiv,
+    chemrxiv,
+    europe_pmc,
+    hal,
+    nber,
+    osf,
+    pubmed,
+    research_square,
+    ssrn,
+    zenodo,
+)
 from pynakes.providers.url_resolvers import extract_publisher_doi, resolve_reference_url
 
 # Re-exported for callers that import the parsed-record type from this module.
@@ -37,6 +49,35 @@ KEY_SOURCES = {"generated", "provider"}
 # Identifier types ``resolve_identifier`` can return.
 DOI = "doi"
 ARXIV = "arxiv"
+PMID = "pmid"
+PMCID = "pmcid"
+EUROPE_PMC = "europe_pmc"
+SSRN = "ssrn"
+NBER = "nber"
+BIORXIV = "biorxiv"
+MEDRXIV = "medrxiv"
+ZENODO = "zenodo"
+OSF = "osf"
+HAL = "hal"
+CHEMRXIV = "chemrxiv"
+RESEARCH_SQUARE = "research_square"
+
+IDENTIFIER_KINDS = {
+    DOI,
+    ARXIV,
+    PMID,
+    PMCID,
+    EUROPE_PMC,
+    SSRN,
+    NBER,
+    BIORXIV,
+    MEDRXIV,
+    ZENODO,
+    OSF,
+    HAL,
+    CHEMRXIV,
+    RESEARCH_SQUARE,
+}
 
 
 # --- errors ----------------------------------------------------------------
@@ -55,7 +96,7 @@ class ArxivImportError(ReferenceImportError):
 
 
 class UnsupportedIdentifierError(ReferenceImportError):
-    """Raised when an identifier is not recognized as a DOI or arXiv id."""
+    """Raised when an identifier is not recognized by an import provider."""
 
 
 class DuplicateReferenceError(ReferenceImportError):
@@ -113,11 +154,10 @@ def extract_doi_from_journal_url(url: str) -> str | None:
 def resolve_identifier(value: str) -> tuple[str, str]:
     """Classify ``value`` and return ``(kind, normalized_identifier)``.
 
-    ``kind`` is :data:`DOI` or :data:`ARXIV`. arXiv is detected first because an
-    arXiv URL or ``arXiv:`` prefix is unambiguous; a bare ``10.x/...`` string is
-    a DOI. Recognized journal article URLs (e.g. ``nature.com``) have their DOI
-    extracted and also resolve as :data:`DOI`. Raises
-    :class:`UnsupportedIdentifierError` for anything else.
+    URLs are resolved by the ordered provider URL table. Bare DOI and arXiv
+    identifiers retain their convenient forms; identifiers that would
+    otherwise be ambiguous require a provider prefix such as ``PMID:`` or
+    ``Zenodo:``.
     """
     raw = value.strip()
     if not raw:
@@ -134,6 +174,28 @@ def resolve_identifier(value: str) -> tuple[str, str]:
             raise UnsupportedIdentifierError(f"Malformed arXiv identifier: {value!r}")
         return ARXIV, normalized
 
+    labeled: tuple[tuple[str, str, Callable[[str], str]], ...] = (
+        ("pmcid:", PMCID, lambda value: pubmed.canonical_identifier(value, kind=PMCID)),
+        ("pmid:", PMID, lambda value: pubmed.canonical_identifier(value, kind=PMID)),
+        ("epmc:", EUROPE_PMC, europe_pmc.normalize_identifier),
+        ("europepmc:", EUROPE_PMC, europe_pmc.normalize_identifier),
+        ("ssrn:", SSRN, ssrn.normalize_identifier),
+        ("nber:", NBER, nber.normalize_identifier),
+        ("biorxiv:", BIORXIV, normalize_doi),
+        ("medrxiv:", MEDRXIV, normalize_doi),
+        ("zenodo:", ZENODO, zenodo.normalize_identifier),
+        ("osf:", OSF, osf.normalize_identifier),
+        ("hal:", HAL, hal.normalize_identifier),
+        ("chemrxiv:", CHEMRXIV, chemrxiv.normalize_identifier),
+        ("researchsquare:", RESEARCH_SQUARE, research_square.normalize_identifier),
+    )
+    for prefix, kind, normalizer in labeled:
+        if lowered.startswith(prefix):
+            try:
+                return kind, normalizer(raw[len(prefix) :])
+            except ValueError as exc:
+                raise UnsupportedIdentifierError(str(exc)) from exc
+
     try:
         return DOI, normalize_doi(raw)
     except ValueError:
@@ -146,8 +208,8 @@ def resolve_identifier(value: str) -> tuple[str, str]:
             return ARXIV, normalized
 
     raise UnsupportedIdentifierError(
-        f"Unrecognized identifier {value!r}; expected a DOI, arXiv id/URL, "
-        f"or a supported journal article URL (nature.com, journals.aps.org)"
+        f"Unrecognized identifier {value!r}; expected a DOI, arXiv id, "
+        "provider-prefixed identifier, or supported repository/publisher URL"
     )
 
 
@@ -227,6 +289,50 @@ def existing_keys_for_arxiv(lib: BibFile, identifier: str) -> list[str]:
     if target is None:
         return []
     return [entry.key for entry in lib.entries.values() if entry_arxiv_id(entry) == target]
+
+
+_IDENTIFIER_FIELDS = {
+    PMID: ("pmid",),
+    PMCID: ("pmcid",),
+    EUROPE_PMC: ("europepmc",),
+    SSRN: ("ssrn",),
+    NBER: ("number",),
+    BIORXIV: ("doi", "eprint"),
+    MEDRXIV: ("doi", "eprint"),
+    ZENODO: ("zenodo",),
+    OSF: ("osf",),
+    HAL: ("halid",),
+    CHEMRXIV: ("chemrxiv",),
+    RESEARCH_SQUARE: ("researchsquare",),
+}
+
+
+def existing_keys_for_identifier(lib: BibFile, kind: str, identifier: str) -> list[str]:
+    """Return citation keys already carrying one normalized provider identity."""
+    if kind == DOI:
+        return existing_keys_for_doi(lib, identifier)
+    if kind == ARXIV:
+        return existing_keys_for_arxiv(lib, identifier)
+    target = identifier.casefold()
+    fields = _IDENTIFIER_FIELDS.get(kind, ())
+    return [
+        entry.key
+        for entry in lib.entries.values()
+        if any(entry.fields.get(field, "").strip().casefold() == target for field in fields)
+    ]
+
+
+def imported_entry_identifier(entry: BibEntry, kind: str) -> str:
+    """Return the provider identifier recorded on an imported entry."""
+    if kind == DOI:
+        return entry.fields.get("doi", entry.key)
+    if kind == ARXIV:
+        return entry_arxiv_id(entry) or entry.key
+    fields = _IDENTIFIER_FIELDS.get(kind, ())
+    return next(
+        (entry.fields[field] for field in fields if entry.fields.get(field)),
+        entry.fields.get("doi") or entry.fields.get("eprint") or entry.key,
+    )
 
 
 def fetch_arxiv_atom(identifier: str, timeout: float = 15.0) -> str:
@@ -386,11 +492,11 @@ def prepare_imported_reference(
     allow_duplicate: bool = False,
     doi_fetcher: FetchBibTeX | None = None,
     arxiv_fetcher: FetchArxivAtom | None = None,
+    metadata_fetcher: RawMetadataFetcher | None = None,
 ) -> tuple[str, BibEntry]:
     """Resolve ``identifier``, fetch metadata, and prepare an entry.
 
-    Returns ``(kind, entry)`` where ``kind`` is :data:`DOI` or :data:`ARXIV`.
-    Dispatches to the DOI or arXiv path; the library is not modified.
+    Returns ``(kind, entry)``. The library is not modified.
     """
     kind, normalized = resolve_identifier(identifier)
     if kind == ARXIV:
@@ -403,7 +509,7 @@ def prepare_imported_reference(
             allow_duplicate=allow_duplicate,
             fetcher=arxiv_fetcher,
         )
-    else:
+    elif kind == DOI:
         entry = prepare_imported_entry(
             lib,
             normalized,
@@ -411,5 +517,37 @@ def prepare_imported_reference(
             key_source=key_source,
             allow_duplicate_doi=allow_duplicate,
             fetcher=doi_fetcher,
+        )
+    else:
+        if key_source not in KEY_SOURCES:
+            raise ValueError(
+                f"Invalid key source {key_source!r}; expected one of: "
+                f"{', '.join(sorted(KEY_SOURCES))}"
+            )
+        if not allow_duplicate:
+            duplicate_keys = existing_keys_for_identifier(lib, kind, normalized)
+            if duplicate_keys:
+                raise DuplicateReferenceError(kind, normalized, duplicate_keys)
+        provider = get_import_provider(kind)
+        try:
+            metadata = provider.load(normalized, dialect, metadata_fetcher)
+        except (ProviderFetchError, ValueError) as exc:
+            raise ReferenceImportError(f"{provider.name}: {exc}") from exc
+
+        if not allow_duplicate:
+            duplicate_keys: list[str] = []
+            for identity_kind, identity in metadata.identifiers.items():
+                for existing_key in existing_keys_for_identifier(lib, identity_kind, identity):
+                    if existing_key not in duplicate_keys:
+                        duplicate_keys.append(existing_key)
+            if duplicate_keys:
+                raise DuplicateReferenceError(kind, normalized, duplicate_keys)
+        entry = entry_from_metadata(metadata)
+        _assign_key(
+            entry,
+            lib,
+            key=key,
+            key_source=key_source,
+            provider_key=metadata.provider_key,
         )
     return kind, entry

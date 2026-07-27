@@ -200,11 +200,12 @@ file (key: `files-dir`). Fetch behaviour is configured by:
    and `pynakes asset check {bibname}.bib --root .` before and after changes.
 
 4. **Add new references through pynakes** — use
-   `pynakes ref import <identifier> {bibname}.bib` for DOI/arXiv metadata lookup,
+   `pynakes ref import <identifier> {bibname}.bib` for DOI/repository metadata lookup,
    or `pynakes ref add <key> {bibname}.bib --field name=value` for a manual entry,
    rather than writing entries by hand. `ref import` auto-detects DOI
-   (`10.1103/PhysRevLett.116.061102`), arXiv ID (`2301.00001`), or a journal
-   article URL and ensures consistent formatting and citation-key generation.
+   (`10.1103/PhysRevLett.116.061102`), arXiv ID (`2301.00001`),
+   provider-prefixed identifiers (`PMID:12345678`), and supported reference
+   URLs, then ensures consistent formatting and citation-key generation.
 
 5. **Remove entries with `pynakes ref remove`** — use
    `pynakes ref remove {bibname}.bib <citekey>` to delete an entry and its Pinax

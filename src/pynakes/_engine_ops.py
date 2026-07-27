@@ -276,12 +276,10 @@ class BibliographyOperations:
         key_source: str = "generated",
         allow_duplicate: bool = False,
     ) -> tuple[str, BibEntry]:
-        """Import one reference (DOI or arXiv) into memory.
+        """Import one reference from a supported identifier or URL into memory.
 
-        The identifier type is auto-detected. arXiv entries use ``@online`` for
-        BibLaTeX libraries and ``@misc`` for BibTeX ones, per the library's
-        ``databaseType`` metadata (defaulting to BibTeX). Returns
-        ``(kind, entry)``.
+        The identifier type is auto-detected and provider metadata is normalized
+        for the library's BibTeX/BibLaTeX dialect. Returns ``(kind, entry)``.
         """
         kind, entry = importer_ops.prepare_imported_reference(
             self.lib,
