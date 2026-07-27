@@ -63,6 +63,15 @@ to find the operation module that owns a key.
 | `normalize-dois` | normalization | Boolean | `normalize` | — |
 | `normalize-identifier-case` | normalization | Boolean | `normalize` | — |
 | `normalize-format-metadata` | normalization | Boolean | `normalize` | — |
+| `format-indent` | formatting | Positive space count or `tab` (default: `2`) | `format` | — |
+| `format-alignment` | formatting | `compact` or `equals` (default: `compact`) | `format` | — |
+| `format-trailing-comma` | formatting | Boolean (default: `true`) | `format` | — |
+| `format-blank-lines` | formatting | Boolean (default: `true`) | `format` | — |
+| `format-field-order` | formatting | `preferred`, `preserve`, or `alphabetical` | `format` | — |
+| `format-entry-order` | formatting | `preserve`, `key`, or `profile` | `format` | — |
+| `format-block-order` | formatting | `canonical` or `preserve` (default: `canonical`) | `format` | — |
+| `format-wrap-values` | formatting | `off`, `stable`, or `canonical` (default: `off`) | `format` | — |
+| `format-line-width` | formatting | Integer at least 20 (default: `100`) | `format` wrapping | — |
 | `lint-required-fields` | lint | Fields required on every entry | `lint` | — |
 | `lint-required-fields-<entrytype>` | lint | Extra fields required on one entry type | `lint` | — |
 | `tex-sources` | usage | List of TeX files or directories, relative to the `.bib` file | `keys`, `tex scan` | — |

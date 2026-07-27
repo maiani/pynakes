@@ -64,13 +64,50 @@ class TestFormatCommand:
         output = _plain_cli_output(result.output)
         assert "Rewrite layout only" in output
         assert "--indent" in output
-        assert "--sort-fields" in output
-        assert "pynakes' preferred field order" in output
+        assert "--alignment" in output
+        assert "--field-order" in output
+        assert "--entry-order" in output
+        assert "--block-order" in output
+        assert "--wrap-values" in output
+        assert "--line-width" in output
+        assert "--sort-fields" not in output
+        assert "--preserve-field-order" not in output
+        assert "--tabular" not in output
         assert "--settings" not in output
 
         normalize_help = _plain_cli_output(runner.invoke(app, ["normalize", "--help"]).output)
         assert "--layout" not in normalize_help
         assert "--check" not in normalize_help
+
+    def test_format_refuses_repeated_fields_with_lint_findings(self, tmp_path: Path) -> None:
+        path = tmp_path / "refs.bib"
+        original = "@misc{A, title={First}, title={Second}}\n"
+        path.write_text(original)
+        result = runner.invoke(app, ["format", str(path), "--json"])
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert payload["error"] == "FormatLintError"
+        assert [issue["type"] for issue in payload["issues"]] == ["duplicate_field"]
+        assert path.read_text() == original
+
+    def test_format_reads_profile_and_explicit_options_win(self, tmp_path: Path) -> None:
+        path = tmp_path / "refs.bib"
+        path.write_text(
+            "@comment{pynakes-meta:\n"
+            "format-indent: 4\n"
+            "format-field-order: alphabetical\n"
+            "format-block-order: preserve\n"
+            "}\n"
+            "@misc{B, zeta={Z}, alpha={A}}\n"
+        )
+        result = runner.invoke(
+            app,
+            ["format", str(path), "--indent", "\t", "--field-order", "preserve"],
+        )
+        assert result.exit_code == 0, result.output
+        output = path.read_text()
+        assert "\tzeta = {Z}," in output
+        assert output.index("zeta =") < output.index("alpha =")
 
     def test_stdin_stdout_bypasses_lone_bib_autodiscovery(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -123,7 +160,7 @@ class TestFormatCommand:
         path.write_text("@article{A, year={2020}, title={T}}\n")
         result = runner.invoke(
             app,
-            ["format", str(path), "--indent", "\t", "--preserve-field-order"],
+            ["format", str(path), "--indent", "\t", "--field-order", "preserve"],
         )
         assert result.exit_code == 0, result.output
         output = path.read_text()

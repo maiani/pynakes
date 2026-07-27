@@ -28,7 +28,7 @@ from pynakes._engine_helpers import (
     metadata_fetch_policy,
     run_fetch_loop,
 )
-from pynakes.canonical import CanonicalLayout
+from pynakes.canonical import CanonicalLayout, validate_format_input
 from pynakes.editing import set_entry_type
 from pynakes.fetch_progress import FetchProgress
 from pynakes.filestore import FILES_DIR_KEY, resolve_files_dir
@@ -193,7 +193,8 @@ class BibliographyOperations:
     # --- format/metadata operations -------------------------------------
 
     def format(self, layout: CanonicalLayout | None = None) -> int:
-        """Stage a layout-only canonical rewrite and return the entry count."""
+        """Lint, then stage a layout-only canonical rewrite and return the entry count."""
+        validate_format_input(self.lib)
         self._format_layout = layout or CanonicalLayout()
         self._entry_snapshot = {}
         return len(self.lib.entries)

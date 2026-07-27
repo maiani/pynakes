@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `format` now supports explicit `--alignment`, `--field-order`,
+  `--entry-order`, and `--block-order` policies. The same defaults can travel
+  with a library through validated `format-*` metadata, and
+  `capabilities --json` reports the complete policy surface and defaults.
+- Opt-in `format --wrap-values stable|canonical --line-width N` safely wraps
+  prose and name-list values while preserving delimiters and protecting
+  verbatim/date fields, bare macros and numbers, brace/math groups, and `#`
+  concatenations.
 - `ref import` now accepts PubMed and PubMed Central identifiers, Europe PMC
   records, SSRN and NBER working papers, bioRxiv and medRxiv preprints, Zenodo
   records, OSF Preprints, HAL records, ChemRxiv preprints, and Research Square
@@ -17,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The explicit formatting policies replace the former `--tabular`,
+  `--sort-fields`, and `--preserve-field-order` compatibility flags. This
+  alpha-stage interface intentionally carries no deprecated aliases.
+- `format` runs lint before staging and refuses repeated fields, which the
+  semantic field mapping cannot rewrite losslessly. It now fails with a
+  structured `FormatLintError` rather than silently keeping only the final
+  repeated assignment.
 - Project invariants now live in the architecture guide; DEVPLAN contains only
   release scope and completion criteria.
 - Pinax metadata is consistently namespaced: use `pinax-files-dir` and

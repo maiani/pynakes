@@ -23,6 +23,7 @@ MetadataCategory = Literal[
     "selectors",
     "citation-key",
     "normalization",
+    "formatting",
     "lint",
     "usage",
     "pinax",
@@ -36,6 +37,7 @@ CATEGORY_GROUPS: MetadataCategory = "groups"
 CATEGORY_SELECTORS: MetadataCategory = "selectors"
 CATEGORY_CITATION_KEY: MetadataCategory = "citation-key"
 CATEGORY_NORMALIZATION: MetadataCategory = "normalization"
+CATEGORY_FORMATTING: MetadataCategory = "formatting"
 CATEGORY_LINT: MetadataCategory = "lint"
 CATEGORY_USAGE: MetadataCategory = "usage"
 CATEGORY_PINAX: MetadataCategory = "pinax"
@@ -53,6 +55,15 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     "normalize-protected-terms": CATEGORY_NORMALIZATION,
     "normalize-journal-table": CATEGORY_NORMALIZATION,
     "normalize-ltwa-table": CATEGORY_NORMALIZATION,
+    "format-indent": CATEGORY_FORMATTING,
+    "format-alignment": CATEGORY_FORMATTING,
+    "format-trailing-comma": CATEGORY_FORMATTING,
+    "format-blank-lines": CATEGORY_FORMATTING,
+    "format-field-order": CATEGORY_FORMATTING,
+    "format-entry-order": CATEGORY_FORMATTING,
+    "format-block-order": CATEGORY_FORMATTING,
+    "format-wrap-values": CATEGORY_FORMATTING,
+    "format-line-width": CATEGORY_FORMATTING,
     "pinax-files-dir": CATEGORY_PINAX,
     "pinax-fetch-policy": CATEGORY_PINAX,
     # Linked LaTeX sources that cite this library; consulted by the citation-key
@@ -76,6 +87,13 @@ PYNAKES_PREFIX_KEYS: dict[str, MetadataCategory] = {
 
 _VALID_DIALECTS = {"bibtex", "biblatex"}
 VALID_FETCH_POLICIES = {"preprint", "published", "source", "supplement", "bestpdf"}
+_FORMAT_CHOICES = {
+    "format-alignment": {"compact", "equals"},
+    "format-field-order": {"preferred", "preserve", "alphabetical"},
+    "format-entry-order": {"preserve", "key", "profile"},
+    "format-block-order": {"preserve", "canonical"},
+    "format-wrap-values": {"off", "stable", "canonical"},
+}
 
 
 def validate_metadata_value(key: str, value: str) -> None:
@@ -105,6 +123,39 @@ def validate_metadata_value(key: str, value: str) -> None:
                 f"Invalid pinax-fetch-policy value(s) {invalid!r}; "
                 f"expected one or more of: {', '.join(sorted(VALID_FETCH_POLICIES))}"
             )
+        return
+
+    if normalized_key in _FORMAT_CHOICES:
+        choices = _FORMAT_CHOICES[normalized_key]
+        if stripped.lower() not in choices:
+            raise ValueError(
+                f"Invalid {normalized_key} {stripped!r}; expected one of: "
+                f"{', '.join(sorted(choices))}"
+            )
+        return
+
+    if normalized_key in {"format-trailing-comma", "format-blank-lines"}:
+        if stripped.lower() not in {"true", "false", "yes", "no", "on", "off", "1", "0"}:
+            raise ValueError(f"Invalid Boolean value for {normalized_key}: {stripped!r}")
+        return
+
+    if normalized_key == "format-line-width":
+        try:
+            width = int(stripped)
+        except ValueError as exc:
+            raise ValueError("format-line-width must be an integer") from exc
+        if width < 20:
+            raise ValueError("format-line-width must be at least 20")
+        return
+
+    if normalized_key == "format-indent":
+        if stripped.lower() != "tab":
+            try:
+                width = int(stripped)
+            except ValueError as exc:
+                raise ValueError("format-indent must be a positive integer or 'tab'") from exc
+            if width < 1:
+                raise ValueError("format-indent must be a positive integer or 'tab'")
         return
 
     # Remaining known pynakes keys: refuse empty values.

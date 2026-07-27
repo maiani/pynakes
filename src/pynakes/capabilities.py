@@ -35,6 +35,7 @@ _ERROR_CODES = {
             "InvalidNamespace": "metadata set: namespace was not 'jabref' or 'pynakes'.",
             "InvalidNormalizeOption": "normalize: an option value was not allowed.",
             "RecursiveFormatError": "format --recursive: one or more files failed.",
+            "FormatLintError": "format: lint errors make a lossless rewrite unsafe.",
             "KeyNotFound": "A referenced citation key is not in the library (remove, keys rename, etc.).",
             "InvalidIdentifier": "import: an identifier value was malformed.",
             "UnsupportedIdentifier": "import: no provider recognized the identifier or URL.",
@@ -258,6 +259,7 @@ def get_capabilities() -> dict:
             "backfill_arxiv_ids",
             "enrich_metadata",
             "normalize_library",
+            "format_bibliography",
             "convert_to_biblatex",
             "convert_to_bibtex",
             "export_csl_json",
@@ -315,7 +317,8 @@ def get_capabilities() -> dict:
             "(list, set, remove, adopt-jabref)",
             "normalize": "Normalize entries (titles, authors, journals, DOIs, "
             "identifier case, ordering) per the library's configured settings",
-            "format": "Rewrite bibliography layout only with explicit layout flags",
+            "format": "Lint, then rewrite bibliography layout with portable profile settings "
+            "and explicit policy overrides",
             "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "
             "formats (export/import CSL-JSON, RIS, MODS, EndNote, and export CSV)",
             "search": "Search entries by free text, phrases, or field-scoped terms",
@@ -332,6 +335,42 @@ def get_capabilities() -> dict:
         "error_codes": _ERROR_CODES,
         "predicate_grammar": _PREDICATE_GRAMMAR,
         "search_query_grammar": _SEARCH_QUERY_GRAMMAR,
+        "formatting": {
+            "lint_gate": (
+                "Formatting runs lint and refuses findings that make a canonical "
+                "rewrite lossy (currently repeated fields)."
+            ),
+            "profile_prefix": "format-",
+            "defaults": {
+                "indent": 2,
+                "alignment": "compact",
+                "trailing_comma": True,
+                "blank_lines": True,
+                "field_order": "preferred",
+                "entry_order": "preserve",
+                "block_order": "canonical",
+                "wrap_values": "off",
+                "line_width": 100,
+            },
+            "choices": {
+                "alignment": ["compact", "equals"],
+                "field_order": ["preferred", "preserve", "alphabetical"],
+                "entry_order": ["preserve", "key", "profile"],
+                "block_order": ["preserve", "canonical"],
+                "wrap_values": ["off", "stable", "canonical"],
+            },
+            "wrapping": {
+                "never": [
+                    "verbatim identifiers and paths",
+                    "date fields",
+                    "bare macros and numbers",
+                    "concatenated expressions",
+                ],
+                "names": "break only between top-level names",
+                "prose": "break only at brace- and math-top-level whitespace",
+                "delimiters": "preserved",
+            },
+        },
         # The operations accepted by `batch` (op name → required/optional params).
         "batch_operations": _batch_operations(),
     }

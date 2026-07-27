@@ -6,20 +6,34 @@ source text.  The canonical formatter is deterministic and idempotent: a
 second pass over its own output produces no changes.
 
 BibTeX/BibLaTeX and TeX awareness:
-    Wrapping never changes brace grouping, capitalization protection,
-    macros, quoted/braced atoms, ``#`` concatenation, names, URLs, or
-    field meaning.  The value text is emitted verbatim inside its brace
-    wrapper; only the structural envelope (whitespace, line breaks,
-    commas) is canonicalized.
+    Value wrapping is opt-in and never changes delimiters, brace grouping,
+    capitalization protection, macros, ``#`` concatenation, URLs, or field
+    meaning. Unsafe expression categories remain byte-exact.
 """
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
+from typing import Literal
 
-from pynakes.bibtex_parser import parse_raw_string_definition
+from pynakes.bibtex_parser import parse_bib, parse_raw_string_definition
 from pynakes.bibtex_writer import _quote_field_value, render_entry
+from pynakes.editing import raw_field_names
+from pynakes.metadata import library_sort_order, metadata_bool, metadata_value
 from pynakes.model import BibEntry, BibFile
+
+Alignment = Literal["compact", "equals"]
+FieldOrder = Literal["preferred", "preserve", "alphabetical"]
+EntryOrder = Literal["preserve", "key", "profile"]
+BlockOrder = Literal["preserve", "canonical"]
+WrapValues = Literal["off", "stable", "canonical"]
+
+ALIGNMENTS = ("compact", "equals")
+FIELD_ORDERS = ("preferred", "preserve", "alphabetical")
+ENTRY_ORDERS = ("preserve", "key", "profile")
+BLOCK_ORDERS = ("preserve", "canonical")
+WRAP_VALUE_MODES = ("off", "stable", "canonical")
 
 # ---------------------------------------------------------------------------
 # Layout configuration
@@ -179,21 +193,137 @@ _STRUCTURAL_FIELDS = frozenset({"crossref", "xdata", "xref"})
 
 @dataclass(frozen=True)
 class CanonicalLayout:
-    """Configuration for canonical whole-file layout formatting.
-
-    ``indent`` is the string used for one level of field indentation (default:
-    two spaces).  ``tabular`` controls whether fields are aligned on ``=`` in a
-    tabular fashion.  ``trailing_comma`` adds a trailing comma after the last
-    field.  ``blank_line_entries`` inserts a blank line between consecutive
-    entries. Field values are never wrapped because doing so can alter source
-    expressions.
-    """
+    """Configuration for canonical whole-file layout formatting."""
 
     indent: str = "  "
-    tabular: bool = False
+    alignment: Alignment = "compact"
     trailing_comma: bool = True
     blank_line_entries: bool = True
-    sort_fields: bool = True
+    field_order: FieldOrder = "preferred"
+    entry_order: EntryOrder = "preserve"
+    block_order: BlockOrder = "canonical"
+    wrap_values: WrapValues = "off"
+    line_width: int = 100
+
+    def __post_init__(self) -> None:
+        if not self.indent:
+            raise ValueError("format indent must be a non-empty string")
+        _validate_choice("alignment", self.alignment, ALIGNMENTS)
+        _validate_choice("field order", self.field_order, FIELD_ORDERS)
+        _validate_choice("entry order", self.entry_order, ENTRY_ORDERS)
+        _validate_choice("block order", self.block_order, BLOCK_ORDERS)
+        _validate_choice("wrap-values mode", self.wrap_values, WRAP_VALUE_MODES)
+        if self.line_width < 20:
+            raise ValueError("format line width must be at least 20")
+
+
+class FormatLintError(ValueError):
+    """Raised when lint errors make canonical formatting unsafe."""
+
+    def __init__(self, issues) -> None:
+        self.issues = list(issues)
+        summary = "; ".join(issue.message for issue in self.issues[:3])
+        if len(self.issues) > 3:
+            summary += f"; and {len(self.issues) - 3} more"
+        super().__init__(f"format refused because lint reported errors: {summary}")
+
+
+def _validate_choice(label: str, value: str, choices: tuple[str, ...]) -> None:
+    if value not in choices:
+        raise ValueError(f"Invalid format {label} {value!r}; choose {', '.join(choices)}")
+
+
+def validate_format_input(lib: BibFile) -> list:
+    """Run lint and refuse findings that imply a lossy canonical rewrite.
+
+    Bibliographic-quality errors such as a missing required field do not make a
+    layout rewrite unsafe. They remain visible through ``pynakes lint`` but do
+    not prevent formatting an incomplete draft.
+    """
+    from pynakes.lint import lint
+
+    issues = lint(lib)
+    errors = [issue for issue in issues if issue.type == "duplicate_field"]
+    if errors:
+        raise FormatLintError(errors)
+    return issues
+
+
+def _metadata_choice(lib: BibFile, key: str, default: str, choices: tuple[str, ...]) -> str:
+    value = metadata_value(lib, key)
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    _validate_choice(key, normalized, choices)
+    return normalized
+
+
+def layout_from_metadata(
+    lib: BibFile,
+    *,
+    indent: str | None = None,
+    alignment: Alignment | None = None,
+    trailing_comma: bool | None = None,
+    blank_line_entries: bool | None = None,
+    field_order: FieldOrder | None = None,
+    entry_order: EntryOrder | None = None,
+    block_order: BlockOrder | None = None,
+    wrap_values: WrapValues | None = None,
+    line_width: int | None = None,
+) -> CanonicalLayout:
+    """Resolve portable ``format-*`` metadata, with explicit arguments winning."""
+    raw_indent = metadata_value(lib, "format-indent")
+    profile_indent = CanonicalLayout.indent
+    if raw_indent is not None:
+        token = raw_indent.strip()
+        if token.lower() == "tab":
+            profile_indent = "\t"
+        elif token.isdigit():
+            profile_indent = " " * int(token)
+        else:
+            profile_indent = raw_indent
+
+    raw_width = metadata_value(lib, "format-line-width")
+    profile_width = CanonicalLayout.line_width if raw_width is None else int(raw_width.strip())
+    return CanonicalLayout(
+        indent=profile_indent if indent is None else indent,
+        alignment=(
+            _metadata_choice(lib, "format-alignment", "compact", ALIGNMENTS)
+            if alignment is None
+            else alignment
+        ),
+        trailing_comma=(
+            metadata_bool(metadata_value(lib, "format-trailing-comma"), True)
+            if trailing_comma is None
+            else trailing_comma
+        ),
+        blank_line_entries=(
+            metadata_bool(metadata_value(lib, "format-blank-lines"), True)
+            if blank_line_entries is None
+            else blank_line_entries
+        ),
+        field_order=(
+            _metadata_choice(lib, "format-field-order", "preferred", FIELD_ORDERS)
+            if field_order is None
+            else field_order
+        ),
+        entry_order=(
+            _metadata_choice(lib, "format-entry-order", "preserve", ENTRY_ORDERS)
+            if entry_order is None
+            else entry_order
+        ),
+        block_order=(
+            _metadata_choice(lib, "format-block-order", "canonical", BLOCK_ORDERS)
+            if block_order is None
+            else block_order
+        ),
+        wrap_values=(
+            _metadata_choice(lib, "format-wrap-values", "off", WRAP_VALUE_MODES)
+            if wrap_values is None
+            else wrap_values
+        ),
+        line_width=profile_width if line_width is None else line_width,
+    )
 
 
 _DEFAULT_LAYOUT = CanonicalLayout()
@@ -213,8 +343,18 @@ def _sorted_fields(entry: BibEntry, layout: CanonicalLayout) -> list[tuple[str, 
     dict-insertion order. Structural fields (``crossref``, ``xdata``, ``xref``)
     are always emitted first so inheritance relationships are visible.
     """
-    if not layout.sort_fields:
+    policy = layout.field_order
+    if policy == "preserve":
         return list(entry.fields.items())
+    if policy == "alphabetical":
+        structural = [
+            item for item in entry.fields.items() if item[0].lower() in _STRUCTURAL_FIELDS
+        ]
+        ordinary = [
+            item for item in entry.fields.items() if item[0].lower() not in _STRUCTURAL_FIELDS
+        ]
+        ordinary.sort(key=lambda item: item[0].casefold())
+        return structural + ordinary
 
     entry_type_lower = entry.type.lower()
     known_order = _FIELD_ORDER.get(entry_type_lower, [])
@@ -263,23 +403,347 @@ def format_entry(
         layout = _DEFAULT_LAYOUT
 
     semantic_fields = _sorted_fields(entry, layout)
-    fields = [
+    fields: list[tuple[str, str]] = [
         (name, entry.field_expressions.get(name, _quote_field_value(value)))
         for name, value in semantic_fields
     ]
+    if layout.wrap_values != "off":
+        return _render_wrapped_entry(entry, fields, layout, line_ending)
     return render_entry(
         entry,
         fields,
         line_ending=line_ending,
         indent=layout.indent,
-        tabular=layout.tabular,
+        tabular=layout.alignment == "equals",
         trailing_comma=layout.trailing_comma,
     )
+
+
+_VERBATIM_FIELDS = frozenset(
+    {"url", "doi", "eprint", "file", "isbn", "issn", "urldate", "howpublished"}
+)
+_DATE_FIELDS = frozenset({"date", "year", "month", "day", "eventdate", "origdate"})
+_NAME_FIELDS = frozenset(
+    {"author", "editor", "translator", "bookauthor", "commentator", "annotator"}
+)
+
+
+def _render_wrapped_entry(
+    entry: BibEntry,
+    fields: list[tuple[str, str]],
+    layout: CanonicalLayout,
+    line_ending: str,
+) -> str:
+    """Render an entry with opt-in, expression-preserving value wrapping."""
+    width = max((len(name) for name, _ in fields), default=0) if layout.alignment == "equals" else 0
+    lines = [f"@{entry.type}{{{entry.key},"]
+    for index, (name, expression) in enumerate(fields):
+        pad = " " * (width - len(name)) if width else ""
+        prefix = f"{layout.indent}{name}{pad} = "
+        comma = "," if layout.trailing_comma or index < len(fields) - 1 else ""
+        wrapped = _wrap_expression(
+            name,
+            expression,
+            prefix=prefix,
+            comma=comma,
+            mode=layout.wrap_values,
+            line_width=layout.line_width,
+        )
+        lines.extend(wrapped)
+    lines.append("}")
+    return line_ending.join(lines)
+
+
+def _wrap_expression(
+    field_name: str,
+    expression: str,
+    *,
+    prefix: str,
+    comma: str,
+    mode: WrapValues,
+    line_width: int,
+) -> list[str]:
+    """Wrap one safe literal expression, preserving its outer delimiter."""
+    normalized_name = field_name.lower()
+    if (
+        normalized_name in _VERBATIM_FIELDS
+        or normalized_name in _DATE_FIELDS
+        or _has_top_level_concat(expression)
+    ):
+        return [f"{prefix}{expression}{comma}"]
+
+    delimited = _literal_inner(expression)
+    if delimited is None:
+        return [f"{prefix}{expression}{comma}"]
+    opener, inner, closer = delimited
+    if normalized_name in _NAME_FIELDS:
+        chunks, authored_breaks = _split_names(inner)
+    else:
+        chunks, authored_breaks = _split_prose(inner)
+    if len(chunks) <= 1:
+        return [f"{prefix}{expression}{comma}"]
+
+    continuation = " " * (len(prefix) + len(opener))
+    current = f"{prefix}{opener}{chunks[0]}"
+    lines: list[str] = []
+    for index, chunk in enumerate(chunks[1:], start=1):
+        candidate = f"{current} {chunk}"
+        keep_authored = mode == "stable" and authored_breaks[index - 1]
+        if keep_authored or len(candidate) + len(closer) + len(comma) > line_width:
+            lines.append(current)
+            current = f"{continuation}{chunk}"
+        else:
+            current = candidate
+    lines.append(f"{current}{closer}{comma}")
+    return lines
+
+
+def _literal_inner(expression: str) -> tuple[str, str, str] | None:
+    stripped = expression.strip()
+    if len(stripped) < 2:
+        return None
+    if stripped[0] == "{" and stripped[-1] == "}" and _balanced_braces(stripped[1:-1]):
+        return "{", stripped[1:-1], "}"
+    if stripped[0] == '"' and stripped[-1] == '"' and _balanced_braces(stripped[1:-1]):
+        return '"', stripped[1:-1], '"'
+    return None
+
+
+def _balanced_braces(value: str) -> bool:
+    depth = 0
+    escaped = False
+    for char in value:
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\":
+            escaped = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth < 0:
+                return False
+    return depth == 0
+
+
+def _has_top_level_concat(expression: str) -> bool:
+    depth = 0
+    in_quotes = False
+    escaped = False
+    for char in expression:
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\":
+            escaped = True
+        elif char == '"' and depth == 0:
+            in_quotes = not in_quotes
+        elif not in_quotes and char == "{":
+            depth += 1
+        elif not in_quotes and char == "}":
+            depth -= 1
+        elif not in_quotes and depth == 0 and char == "#":
+            return True
+    return False
+
+
+def _split_prose(value: str) -> tuple[list[str], list[bool]]:
+    """Split at brace/math-top-level whitespace and remember authored newlines."""
+    chunks: list[str] = []
+    breaks: list[bool] = []
+    current: list[str] = []
+    pending_whitespace: list[str] = []
+    brace_depth = 0
+    in_math = False
+    escaped = False
+
+    for char in value:
+        if not char.isspace() and pending_whitespace:
+            if chunks:
+                breaks.append(any(item in "\r\n" for item in pending_whitespace))
+            pending_whitespace.clear()
+        if escaped:
+            current.append(char)
+            escaped = False
+            continue
+        if char == "\\":
+            current.append(char)
+            escaped = True
+            continue
+        if char.isspace() and brace_depth == 0 and not in_math:
+            if current:
+                chunks.append("".join(current))
+                current = []
+            pending_whitespace.append(char)
+            continue
+        current.append(char)
+        if char == "{":
+            brace_depth += 1
+        elif char == "}":
+            brace_depth -= 1
+        elif char == "$" and brace_depth == 0:
+            in_math = not in_math
+    if current:
+        chunks.append("".join(current))
+    # There is one boundary marker for every adjacent pair.
+    return chunks, (breaks + [False] * max(0, len(chunks) - 1 - len(breaks)))
+
+
+def _split_names(value: str) -> tuple[list[str], list[bool]]:
+    """Split a name list only at top-level ``and`` separators."""
+    pieces, separators = _split_prose(value)
+    if len(pieces) <= 1:
+        return pieces, separators
+    names: list[str] = []
+    boundaries: list[bool] = []
+    current: list[str] = []
+    for index, piece in enumerate(pieces):
+        if piece.lower() == "and" and current and index + 1 < len(pieces):
+            names.append(" ".join([*current, "and"]))
+            boundaries.append(separators[index] if index < len(separators) else False)
+            current = []
+        else:
+            current.append(piece)
+    if current:
+        names.append(" ".join(current))
+    return names, boundaries[: max(0, len(names) - 1)]
 
 
 # ---------------------------------------------------------------------------
 # Whole-file canonical formatting
 # ---------------------------------------------------------------------------
+
+
+def _assert_representable(lib: BibFile) -> None:
+    for entry in lib.entries.values():
+        if entry.raw_content is None:
+            continue
+        names = raw_field_names(entry.raw_content)
+        normalized = [name.lower() for name in names]
+        duplicates = sorted({name for name in normalized if normalized.count(name) > 1})
+        if duplicates:
+            raise ValueError(
+                f"format cannot losslessly represent repeated field(s) in entry "
+                f"{entry.key!r}: {', '.join(duplicates)}"
+            )
+
+
+def _semantic_signature(lib: BibFile, *, normalize_whitespace: bool) -> Counter:
+    def value_signature(value: str) -> str:
+        return " ".join(value.split()) if normalize_whitespace else value
+
+    entries = [
+        (
+            entry.key,
+            entry.type,
+            tuple(sorted((name, value_signature(value)) for name, value in entry.fields.items())),
+        )
+        for entry in lib.entries.values()
+    ]
+    return Counter(entries)
+
+
+def _validate_formatted_semantics(lib: BibFile, text: str, layout: CanonicalLayout) -> None:
+    """Reparse formatter output and verify the represented bibliography is unchanged."""
+    reparsed = parse_bib(text)
+    normalize_whitespace = layout.wrap_values != "off"
+    if _semantic_signature(lib, normalize_whitespace=normalize_whitespace) != _semantic_signature(
+        reparsed, normalize_whitespace=normalize_whitespace
+    ):
+        raise ValueError("format safety check failed: canonical output changed entry semantics")
+
+    def raw_blocks(values: list[str]) -> Counter:
+        return Counter(value.strip("\r\n") for value in values)
+
+    if raw_blocks(lib.raw_strings) != raw_blocks(reparsed.raw_strings):
+        raise ValueError(
+            "format safety check failed: canonical output changed @string declarations"
+        )
+    if raw_blocks(lib.preamble) != raw_blocks(reparsed.preamble):
+        raise ValueError("format safety check failed: canonical output changed @preamble blocks")
+    if raw_blocks(lib.raw_comments) != raw_blocks(reparsed.raw_comments):
+        raise ValueError("format safety check failed: canonical output changed @comment blocks")
+
+
+def _ordered_entries(
+    lib: BibFile,
+    layout: CanonicalLayout,
+    entries: list[BibEntry] | None = None,
+) -> list[BibEntry]:
+    selected = list(lib.entries.values()) if entries is None else list(entries)
+    if layout.entry_order == "preserve":
+        return selected
+    criteria = (
+        [("key", False)] if layout.entry_order == "key" else list(library_sort_order(lib) or [])
+    )
+    if not criteria:
+        return selected
+
+    # Reuse normalize's tested stable sorting and crossref-parent ordering on a
+    # temporary store so formatting never mutates the live bibliography model.
+    from pynakes.normalize import sort_entries
+
+    temporary = BibFile(entries=selected)
+    sort_entries(temporary, criteria)
+    return list(temporary.entries.values())
+
+
+def _write_preserved_blocks(lib: BibFile, layout: CanonicalLayout) -> str:
+    """Format entries while preserving top-level block positions as barriers."""
+    le = lib.line_ending
+    blocks: list[tuple[str, str]] = []
+    entry_run: list[BibEntry] = []
+    emitted_entries: set[int] = set()
+
+    def flush_entries() -> None:
+        if not entry_run:
+            return
+        for entry in _ordered_entries(lib, layout, entry_run):
+            blocks.append(("entry", format_entry(entry, layout, le)))
+            emitted_entries.add(id(entry))
+        entry_run.clear()
+
+    for gap, kind, ref in lib.source_layout:
+        if gap.strip():
+            flush_entries()
+            blocks.append(("raw", gap.strip("\r\n")))
+        if kind == "entry" and isinstance(ref, BibEntry):
+            entry_run.append(ref)
+            continue
+        flush_entries()
+        if kind == "comment" and isinstance(ref, int) and ref < len(lib.raw_comments):
+            blocks.append(("comment", lib.raw_comments[ref]))
+        elif kind == "string" and isinstance(ref, int) and ref < len(lib.raw_strings):
+            blocks.append(("string", lib.raw_strings[ref]))
+        elif kind == "preamble" and isinstance(ref, int) and ref < len(lib.preamble):
+            blocks.append(("preamble", lib.preamble[ref]))
+        elif kind == "raw":
+            blocks.append(("raw", str(ref)))
+    flush_entries()
+
+    missing = [entry for entry in lib.entries.values() if id(entry) not in emitted_entries]
+    for entry in _ordered_entries(lib, layout, missing):
+        blocks.append(("entry", format_entry(entry, layout, le)))
+
+    trailing = lib.source_trailing.strip("\r\n")
+    if trailing:
+        blocks.append(("raw", trailing))
+    if not blocks:
+        return ""
+
+    parts: list[str] = []
+    previous_kind: str | None = None
+    for kind, text in blocks:
+        clean = text.strip("\r\n")
+        if not clean:
+            continue
+        if parts:
+            consecutive_entries = previous_kind == "entry" and kind == "entry"
+            parts.append(le * (2 if not consecutive_entries or layout.blank_line_entries else 1))
+        parts.append(clean)
+        previous_kind = kind
+    return "".join(parts) + le
 
 
 def write_bib_canonical(
@@ -294,7 +758,7 @@ def write_bib_canonical(
     declarations, ``@preamble``, metadata blocks, and entries are all rendered
     in a deterministic order.
 
-    Deterministic ordering:
+    With ``block_order="canonical"``, deterministic ordering is:
         1. ``pynakes-meta`` comment blocks (consolidated)
         2. Other ``@comment`` blocks
         3. ``@string`` declarations (alphabetical by key)
@@ -302,12 +766,18 @@ def write_bib_canonical(
         5. ``@entry`` blocks (in their original order)
         6. ``jabref-meta`` comment blocks (one per key)
 
-    Within each entry, fields follow pynakes' preferred field-order table. This
-    is a readability convention, not a BibTeX/BibLaTeX requirement. The output
-    is idempotent: formatting twice gives the same result.
+    With ``block_order="preserve"``, non-entry blocks remain in source order and
+    act as barriers for entry sorting. Within each entry, fields follow the
+    selected field-order policy. The output is idempotent: formatting twice
+    gives the same result.
     """
     if layout is None:
         layout = _DEFAULT_LAYOUT
+    _assert_representable(lib)
+    if layout.block_order == "preserve" and lib.source_layout:
+        text = _write_preserved_blocks(lib, layout)
+        _validate_formatted_semantics(lib, text, layout)
+        return text
 
     le = lib.line_ending
     parts: list[str] = []
@@ -402,7 +872,7 @@ def write_bib_canonical(
         parts.append(le * 2)
 
     # Entries.
-    entries = list(lib.entries.values())
+    entries = _ordered_entries(lib, layout)
     for idx, entry in enumerate(entries):
         entry_text = format_entry(entry, layout, le)
         parts.append(entry_text)
@@ -428,4 +898,5 @@ def write_bib_canonical(
 
     if text and not text.endswith(le):
         text += le
+    _validate_formatted_semantics(lib, text, layout)
     return text

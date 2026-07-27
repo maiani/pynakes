@@ -396,8 +396,14 @@ values or conventions:
 pynakes format refs.bib --dry-run --diff
 pynakes format refs.bib
 pynakes format refs.bib --check
-pynakes format refs.bib --preserve-field-order
+pynakes format refs.bib --field-order preserve
+pynakes format refs.bib --wrap-values stable --line-width 100
 ```
+
+`format` runs the lint checks first and refuses source shapes that its semantic
+model cannot rewrite losslessly, currently repeated assignments of one field in
+an entry. Other lint findings remain available through `pynakes lint` but do not
+block layout formatting of an incomplete draft.
 
 By default, fields use **pynakes' preferred order**. This is not prescribed by
 BibTeX, BibLaTeX, or JabRef; field order has no bibliographic meaning. It is a
@@ -412,10 +418,19 @@ readability convention chosen to make entries predictable and easy to scan:
 4. Unknown and custom fields retain their relative source order after the known
    fields, avoiding an arbitrary alphabetical reshuffle.
 
-Use `--preserve-field-order` when the library already has a preferred ordering.
-The other layout controls configure indentation, `=` alignment, trailing
-commas, and blank lines. Unlike ordinary surgical commands, `format` is an
-explicit whole-file rewrite.
+`--field-order` accepts `preferred`, `preserve`, or `alphabetical`.
+`--entry-order` accepts `preserve`, `key`, or `profile` (the library's `sort-order` /
+`saveOrderConfig`). `--block-order preserve` keeps comments, strings, preambles,
+and raw source in place as barriers while sorting entry runs; the default
+`canonical` policy retains pynakes' metadata/JabRef placement convention.
+
+Safe value wrapping is opt-in. `--wrap-values stable` preserves authored legal
+breaks and repairs overflow; `canonical` reflows safe values from scratch.
+Names break only between top-level names. Verbatim identifiers and paths, dates,
+bare macros/numbers, and `#` concatenations are never wrapped, and value
+delimiters are preserved. The other layout controls configure indentation,
+`=` alignment, trailing commas, and blank lines. Unlike ordinary surgical
+commands, `format` is an explicit whole-file rewrite.
 
 ## normalize
 

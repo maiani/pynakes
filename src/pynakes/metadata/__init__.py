@@ -79,6 +79,7 @@ from pynakes.metadata.jabref import (
 from pynakes.metadata.schema import (
     CATEGORY_CITATION_KEY,
     CATEGORY_FILES,
+    CATEGORY_FORMATTING,
     CATEGORY_GROUPS,
     CATEGORY_LIBRARY,
     CATEGORY_LINT,
@@ -123,6 +124,7 @@ library_database_type = library_dialect
 __all__ = [
     "CATEGORY_CITATION_KEY",
     "CATEGORY_FILES",
+    "CATEGORY_FORMATTING",
     "CATEGORY_GROUPS",
     "CATEGORY_LIBRARY",
     "CATEGORY_LINT",

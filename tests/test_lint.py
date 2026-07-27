@@ -311,6 +311,15 @@ def test_reports_noncanonical_identifier_case_without_inspecting_values() -> Non
     ]
 
 
+def test_reports_repeated_fields_case_insensitively() -> None:
+    lib = parse_bib("@misc{A, Title={First}, title={Second}}\n")
+    issues = [issue for issue in lint(lib) if issue.type == "duplicate_field"]
+    assert len(issues) == 1
+    assert issues[0].severity == "error"
+    assert issues[0].key == "A"
+    assert issues[0].field == "title"
+
+
 def test_fixtures_lint_without_errors() -> None:
     # simple.bib should produce no error-severity issues (only DOI warnings).
     lib = parse_bib((FIXTURES / "simple.bib").read_text())

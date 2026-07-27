@@ -15,7 +15,13 @@ from pathlib import Path
 import pytest
 
 from pynakes.bibtex_parser import parse_bib
-from pynakes.canonical import CanonicalLayout, format_entry, write_bib_canonical
+from pynakes.canonical import (
+    CanonicalLayout,
+    FormatLintError,
+    format_entry,
+    layout_from_metadata,
+    write_bib_canonical,
+)
 from pynakes.engine import Bibliography
 from pynakes.group_tree import library_group_tree
 from pynakes.model import BibEntry, BibFile
@@ -67,13 +73,13 @@ class TestFormatEntry:
         last_field_line = lines[-2]  # Before closing brace
         assert not last_field_line.endswith(",")
 
-    def test_tabular_alignment(self) -> None:
+    def test_equals_alignment(self) -> None:
         entry = BibEntry(
             key="Test2020",
             type="article",
             fields={"a": "1", "bb": "2", "ccc": "3"},
         )
-        layout = CanonicalLayout(tabular=True)
+        layout = CanonicalLayout(alignment="equals")
         result = format_entry(entry, layout)
         # Fields should be aligned on =
         assert "a   = {1}," in result
@@ -143,6 +149,46 @@ class TestFormatEntry:
         field_names = [fl.split("=")[0].strip() for fl in field_lines]
         # customfield should come after known fields
         assert field_names[-1] == "customfield"
+
+    def test_alphabetical_field_policy_keeps_structural_fields_first(self) -> None:
+        entry = BibEntry(
+            key="Child",
+            type="misc",
+            fields={"zeta": "Z", "crossref": "Parent", "alpha": "A"},
+        )
+        result = format_entry(entry, CanonicalLayout(field_order="alphabetical"))
+        field_names = [line.strip().split()[0] for line in result.splitlines()[1:-1]]
+        assert field_names == ["crossref", "alpha", "zeta"]
+
+    @pytest.mark.parametrize("mode", ["stable", "canonical"])
+    def test_safe_value_wrapping_is_idempotent_and_preserves_expressions(self, mode: str) -> None:
+        source = (
+            '@misc{A, title="An authored\n'
+            'line break with {Protected Terms} and $E = mc^2$ that needs safe wrapping", '
+            "author={One, A. and Two, B. and Three, C. and Four, D.}, "
+            'url={https://example.org/a/very/long/path}, month=jan, note=prefix # " suffix"}\n'
+        )
+        layout = CanonicalLayout(wrap_values=mode, line_width=50)
+        once = write_bib_canonical(parse_bib(source), layout)
+        assert write_bib_canonical(parse_bib(once), layout) == once
+        assert '"An authored' in once
+        assert "{Protected Terms}" in once
+        assert "$E = mc^2$" in once
+        assert "https://example.org/a/very/long/path" in once
+        assert 'prefix # " suffix"' in once
+        assert "month = jan" in once
+        assert "\n            Three, C." in once
+
+    def test_stable_wrap_retains_an_authored_break_canonical_reflows_it(self) -> None:
+        source = "@misc{A, title={An authored\nline break with enough trailing words to wrap}}\n"
+        stable = write_bib_canonical(
+            parse_bib(source), CanonicalLayout(wrap_values="stable", line_width=60)
+        )
+        canonical = write_bib_canonical(
+            parse_bib(source), CanonicalLayout(wrap_values="canonical", line_width=60)
+        )
+        assert "title = {An authored\n" in stable
+        assert "title = {An authored line break" in canonical
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +263,15 @@ class TestWriteBibCanonical:
         assert '@string{x = "First"}' in result
         assert '@string{x = "Second"}' in result
         assert write_bib_canonical(parse_bib(result)) == result
+
+    def test_repeated_fields_are_refused_instead_of_collapsed(self) -> None:
+        source = "@misc{A, title={First}, title={Second}}\n"
+        with pytest.raises(ValueError, match="repeated field"):
+            write_bib_canonical(parse_bib(source))
+        coll = Bibliography.from_text(source)
+        with pytest.raises(FormatLintError) as exc:
+            coll.format()
+        assert [issue.type for issue in exc.value.issues] == ["duplicate_field"]
 
     def test_unparsed_source_text_is_preserved_and_idempotent(self) -> None:
         source = (
@@ -305,6 +360,51 @@ class TestWriteBibCanonical:
         result1 = write_bib_canonical(lib)
         result2 = write_bib_canonical(lib)
         assert result1 == result2
+
+    def test_preserve_block_order_uses_comments_as_entry_sort_barriers(self) -> None:
+        source = (
+            "@misc{B, title={B}}\n"
+            "@misc{A, title={A}}\n"
+            "@comment{second section}\n"
+            "@misc{D, title={D}}\n"
+            "@misc{C, title={C}}\n"
+        )
+        layout = CanonicalLayout(block_order="preserve", entry_order="key")
+        result = write_bib_canonical(parse_bib(source), layout)
+        assert result.index("@misc{A") < result.index("@misc{B")
+        assert result.index("@misc{B") < result.index("@comment{second section}")
+        assert result.index("@comment{second section}") < result.index("@misc{C")
+        assert result.index("@misc{C") < result.index("@misc{D")
+
+    def test_portable_format_profile_resolves_with_cli_precedence(self) -> None:
+        source = (
+            "@comment{pynakes-meta:\n"
+            "format-indent: 4\n"
+            "format-alignment: equals\n"
+            "format-field-order: alphabetical\n"
+            "format-entry-order: key\n"
+            "format-block-order: preserve\n"
+            "format-wrap-values: stable\n"
+            "format-line-width: 72\n"
+            "format-trailing-comma: false\n"
+            "format-blank-lines: false\n"
+            "}\n"
+            "@misc{A, title={T}}\n"
+        )
+        lib = parse_bib(source)
+        profile = layout_from_metadata(lib)
+        assert profile == CanonicalLayout(
+            indent="    ",
+            alignment="equals",
+            trailing_comma=False,
+            blank_line_entries=False,
+            field_order="alphabetical",
+            entry_order="key",
+            block_order="preserve",
+            wrap_values="stable",
+            line_width=72,
+        )
+        assert layout_from_metadata(lib, line_width=90).line_width == 90
 
     def test_idempotent(self) -> None:
         lib = BibFile(
@@ -400,10 +500,10 @@ def test_every_fixture_is_semantics_preserving_and_idempotent(path: Path) -> Non
     [
         CanonicalLayout(indent="\t"),
         CanonicalLayout(indent="    "),
-        CanonicalLayout(tabular=True),
+        CanonicalLayout(alignment="equals"),
         CanonicalLayout(trailing_comma=False),
         CanonicalLayout(blank_line_entries=False),
-        CanonicalLayout(sort_fields=False),
+        CanonicalLayout(field_order="preserve"),
     ],
 )
 def test_every_layout_knob_is_idempotent(layout: CanonicalLayout) -> None:

@@ -19,10 +19,6 @@ identity so the new providers do not add another parallel reconciliation path.
 - **Complete JabRef formatting compatibility**: implement and test the remaining
   v5.15 formatter-as-modifier behavior and key-pattern markers/modifiers, using
   upstream JabRef implementations, tests, and golden vectors as the oracle.
-- **Formatting options and capability reporting**: expand the canonical
-  formatter's useful layout controls, keep them composable and idempotent, and
-  expose the supported options accurately through CLI help and `capabilities`
-  so callers do not need to infer the formatter surface.
 - **New import paths**: expand the
   [import-provider inventory](docs/guides/import-providers.md) through the
   normalized provider interface and declarative URL resolver tables.
@@ -31,12 +27,13 @@ identity so the new providers do not add another parallel reconciliation path.
   ISBN, nature.com, journals.aps.org, plus the new Elsevier/Springer/Wiley/PLOS
   patterns) and resolves it through the appropriate provider, normalizing the
   result into a uniform metadata dict.
-- **Richer `search` + `--where` grammar**: fuzzy title matching, date-range
+- **Richer `search` + shared `--where` grammar**: fuzzy title matching, date-range
   filtering, "entries missing field X" queries, search-result JSON with match
-  explanations. Extend the `--where` grammar (shared by `search`, `fields`, and
-  `corpus split`) beyond single predicates to boolean `and`/`or`, `key in [...]`,
-  and numeric comparison (`year >= 2025`) — covers common agent facepalms
-  without writing ad-hoc grep.
+  explanations. Extend the `--where` grammar beyond single predicates to boolean
+  `and`/`or`, `key in [...]`, and numeric comparison (`year >= 2025`) — covers
+  common agent facepalms without writing ad-hoc grep. Make it one transversal
+  selector surface shared by entry-addressable commands (`search`, `fields`,
+  `format`, and corpus operations) rather than adding command-specific filters.
 - **Multi-entry triage view**: `ref show --keys k1,k2,… [--abstract]` (or
   `search --show-abstract`) to scan a set of candidate entries in one call
   instead of one invocation per key.
@@ -62,8 +59,7 @@ identity so the new providers do not add another parallel reconciliation path.
   heuristic; `verify`/`enrich` use it for online-lookup routing; `ref import`
   uses it to reconcile metadata from multiple sources.
 
-**Done when**: broader import paths, improved formatter controls and capability
-reporting, richer `search`/`--where`, `metadata doctor`, the
+**Done when**: broader import paths, richer `search`/`--where`, `metadata doctor`, the
 `lint`/`groups`/`asset` UX fixes, and the shared identity primitive are
 implemented, tested, and documented; `dedupe`, `verify`/`enrich`, and `ref
 import` use that primitive; `pytest && ruff` green; CHANGELOG updated; version
@@ -116,6 +112,47 @@ bumped to 0.6.0.
 published as a companion package; agent-plan and change-summary features
 shipped; `pytest && ruff` green; CHANGELOG updated; version bumped to 0.7.0.
 
+---
+
+### v0.8 — Performance and scale
+
+Measure and improve the offline paths that become important once v0.7 can work
+across many bibliographies. Performance claims must be backed by reproducible
+results, not estimates.
+
+- **Reproducible benchmark suite**: add generated and fixture-backed corpora at
+  documented sizes; measure parse, unchanged write, lint, search, dedupe,
+  canonical formatting, bulk surgical edits, Library queries, and Catalogue
+  builds. Record the Python version, platform, corpus shape, and peak memory
+  alongside timing results.
+- **Linear parser path**: remove repeated whole-prefix line counting and linear
+  duplicate-key membership checks during parsing while preserving duplicate
+  keys, exact source layout, and parse-error locations.
+- **Blocked identity and dedupe matching**: use the shared `Work` identity from
+  v0.6 to build candidate sets by stable identifiers and metadata fingerprints;
+  do not compare every unrelated pair with fuzzy title matching.
+- **Single-pass bulk edits**: apply recorded source spans in source order rather
+  than repeatedly searching and copying the entire bibliography for every
+  changed entry.
+- **Library and Catalogue profiling**: measure index construction, refresh,
+  cross-file search, and identity reconciliation from v0.7; optimize only
+  profiles that show material cost.
+- **Regression budgets**: establish benchmark baselines before choosing
+  thresholds, then gate material regressions in representative offline
+  operations without using brittle wall-clock assertions in the correctness
+  suite.
+- **Evidence-based documentation**: publish only measurements produced by the
+  benchmark suite, with their environment and corpus; document known scaling
+  limits and do not infer an untested maximum library size.
+
+**Done when**: the benchmark suite and baseline report are published; common
+offline paths have no known accidental quadratic scans; dedupe avoids exhaustive
+pairwise fuzzy comparison for ordinary nonmatching corpora; benchmarked
+regression budgets are enforced; correctness, round-trip, and duplicate-key
+tests remain green; CHANGELOG updated; version bumped to 0.8.0.
+
+---
+
 ### v1.0 — Launch
 
 **A polished single-file maintenance engine, losslessly JabRef-compatible, with
@@ -128,6 +165,8 @@ server ship in v0.7 as optional companions.
   intact; coverage ≥90%; `ruff` clean.
 
 **Done when**: 1.0.0 is on PyPI.
+
+---
 
 ## v2.0 — Beyond 1.0
 

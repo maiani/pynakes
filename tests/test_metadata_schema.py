@@ -91,6 +91,7 @@ def test_metadata_package_reexports_every_previously_public_name() -> None:
         "CATEGORY_LIBRARY",
         "CATEGORY_SAVE",
         "CATEGORY_FILES",
+        "CATEGORY_FORMATTING",
         "CATEGORY_GROUPS",
         "CATEGORY_SELECTORS",
         "CATEGORY_CITATION_KEY",
@@ -299,6 +300,25 @@ def test_parse_fetch_policy_selects_supplement() -> None:
 def test_validate_fetch_policy_rejects_invalid() -> None:
     with pytest.raises(ValueError, match="Invalid pinax-fetch-policy"):
         metadata_pkg.validate_metadata_value("pinax-fetch-policy", "maybe")
+
+
+def test_format_profile_keys_are_owned_and_validated() -> None:
+    assert metadata_pkg.metadata_category("format-field-order") == "formatting"
+    metadata_pkg.validate_metadata_value("format-indent", "4")
+    metadata_pkg.validate_metadata_value("format-indent", "tab")
+    metadata_pkg.validate_metadata_value("format-line-width", "100")
+    metadata_pkg.validate_metadata_value("format-field-order", "alphabetical")
+    metadata_pkg.validate_metadata_value("format-entry-order", "profile")
+    metadata_pkg.validate_metadata_value("format-block-order", "preserve")
+    metadata_pkg.validate_metadata_value("format-wrap-values", "stable")
+    metadata_pkg.validate_metadata_value("format-trailing-comma", "false")
+
+    with pytest.raises(ValueError, match="format-field-order"):
+        metadata_pkg.validate_metadata_value("format-field-order", "random")
+    with pytest.raises(ValueError, match="at least 20"):
+        metadata_pkg.validate_metadata_value("format-line-width", "10")
+    with pytest.raises(ValueError, match="positive integer"):
+        metadata_pkg.validate_metadata_value("format-indent", "spaces")
 
 
 def test_validate_known_key_rejects_empty_value() -> None:

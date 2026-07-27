@@ -306,12 +306,42 @@ def lint(lib: BibFile) -> list[LintIssue]:
 
     for entry in lib.entries.values():
         fields = lib.resolved_fields(entry)
+        issues.extend(_lint_duplicate_fields(entry))
         issues.extend(_lint_undefined_string_references(entry, lib))
         issues.extend(_lint_entry(entry, fields, dialect=dialect))
         issues.extend(_lint_profile_entry(entry, lib, profile, journal_sources, fields))
 
     issues.extend(_lint_field_consistency(lib, dialect=dialect))
     return issues
+
+
+def _lint_duplicate_fields(entry: BibEntry) -> list[LintIssue]:
+    """Report repeated field assignments that the semantic mapping cannot represent.
+
+    The round-trip parser retains the complete entry source, but ``BibEntry.fields``
+    intentionally exposes a mapping. A canonical rewrite must therefore refuse a
+    repeated field instead of silently keeping only the mapping's final value.
+    """
+    if entry.raw_content is None:
+        return []
+    names = raw_field_names(entry.raw_content)
+    counts: dict[str, int] = {}
+    spelling: dict[str, str] = {}
+    for name in names:
+        normalized = name.lower()
+        counts[normalized] = counts.get(normalized, 0) + 1
+        spelling.setdefault(normalized, name)
+    return [
+        LintIssue(
+            "duplicate_field",
+            "error",
+            f"Entry {entry.key!r} contains field {spelling[name]!r} {count} times",
+            key=entry.key,
+            field=name,
+        )
+        for name, count in counts.items()
+        if count > 1
+    ]
 
 
 def _lint_field_consistency(lib: BibFile, *, dialect: str = "bibtex") -> list[LintIssue]:

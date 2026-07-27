@@ -31,6 +31,14 @@ class TestGetCapabilities:
         caps = get_capabilities()
         assert json.loads(json.dumps(caps)) == caps
 
+    def test_formatting_policies_and_defaults_are_explicit(self) -> None:
+        formatting = get_capabilities()["formatting"]
+        assert formatting["defaults"]["field_order"] == "preferred"
+        assert formatting["defaults"]["block_order"] == "canonical"
+        assert formatting["choices"]["wrap_values"] == ["off", "stable", "canonical"]
+        assert "repeated fields" in formatting["lint_gate"]
+        assert "format_bibliography" in get_capabilities()["capabilities"]
+
     def test_commands_match_registered_cli_commands(self) -> None:
         # The declared command list must not drift from the actual CLI surface.
         declared = set(get_capabilities()["commands"])

@@ -49,7 +49,8 @@ then:
 - **Inspect** — entry count, encoding, duplicates, JabRef metadata
 - **Lint** — validate required fields, DOI shape, key conflicts (CI-gate multiple files)
 - **Normalize** — authors, DOIs, months, journals, `saveActions` pipeline
-- **Format** — deterministic layout-only rewrites with explicit layout flags
+- **Format** — lint-gated, deterministic layout rewrites with portable
+  field/entry/block ordering and opt-in safe value wrapping
 - **Import** by DOI, repository/preprint id, or supported URL, with configurable
   key generation, or add a manual entry
 - **Dedupe & merge** — detect and resolve duplicates, with conflict reporting

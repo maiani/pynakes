@@ -51,7 +51,11 @@ records the pinned grammar and corpus requirements.
 
 ### Q: What if I have a very large bibliography?
 
-A: pynakes is designed to handle large files efficiently. Parsing and writing scale linearly. For files with 10k+ entries, operations should complete in seconds.
+A: Pynakes does not yet publish a supported size limit or a performance
+guarantee. The current automated stress tests exercise parse/write with 2,000
+entries, lint with 1,500 entries, and duplicate-key repair with 200 entries.
+Those are correctness tests, not benchmarks. Larger libraries may expose slow
+paths, especially fuzzy deduplication; performance work is planned for v0.8.
 
 ## Troubleshooting
 
@@ -173,15 +177,17 @@ corpus-management app or a thin companion built on pynakes' pinned API.
 
 ### Q: How fast is pynakes?
 
-A: On typical hardware:
-- Parse 1000 entries: ~100ms
-- Lint: ~50ms per 1000 entries
-- Key repair: ~200ms per 1000 entries
-- Write: ~100ms per 1000 entries
+A: There is no published cross-platform benchmark yet. Runtime depends on file
+size, entry shape, the operation, cache state, and—where providers are
+used—network latency. v0.8 will add a reproducible benchmark suite and publish
+measurements with their environment and corpus.
 
 ### Q: What's the largest bibliography pynakes can handle?
 
-A: Tested up to 100k entries without issues. Memory usage scales linearly with library size.
+A: No supported maximum has been established. Pynakes keeps both parsed data
+and preservation source text in memory, so size and memory behavior must be
+measured rather than inferred. The exact automated stress-test coverage is
+listed above.
 
 ## Contributing
 
