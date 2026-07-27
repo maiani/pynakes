@@ -278,14 +278,14 @@ def test_validate_dialect_rejects_empty() -> None:
 
 def test_validate_fetch_policy_accepts_valid() -> None:
     for val in ("preprint", "published", "source", "supplement", "bestpdf"):
-        metadata_pkg.validate_metadata_value("fetch-policy", val)
+        metadata_pkg.validate_metadata_value("pinax-fetch-policy", val)
 
 
 def test_validate_fetch_policy_accepts_comma_separated() -> None:
-    metadata_pkg.validate_metadata_value("fetch-policy", "preprint, published")
-    metadata_pkg.validate_metadata_value("fetch-policy", "bestpdf, source")
-    metadata_pkg.validate_metadata_value("fetch-policy", "preprint,published,source")
-    metadata_pkg.validate_metadata_value("fetch-policy", "published,supplement")
+    metadata_pkg.validate_metadata_value("pinax-fetch-policy", "preprint, published")
+    metadata_pkg.validate_metadata_value("pinax-fetch-policy", "bestpdf, source")
+    metadata_pkg.validate_metadata_value("pinax-fetch-policy", "preprint,published,source")
+    metadata_pkg.validate_metadata_value("pinax-fetch-policy", "published,supplement")
 
 
 def test_parse_fetch_policy_selects_supplement() -> None:
@@ -297,8 +297,8 @@ def test_parse_fetch_policy_selects_supplement() -> None:
 
 
 def test_validate_fetch_policy_rejects_invalid() -> None:
-    with pytest.raises(ValueError, match="Invalid fetch-policy"):
-        metadata_pkg.validate_metadata_value("fetch-policy", "maybe")
+    with pytest.raises(ValueError, match="Invalid pinax-fetch-policy"):
+        metadata_pkg.validate_metadata_value("pinax-fetch-policy", "maybe")
 
 
 def test_validate_known_key_rejects_empty_value() -> None:
@@ -309,7 +309,7 @@ def test_validate_known_key_rejects_empty_value() -> None:
     with pytest.raises(ValueError, match="must not be empty"):
         metadata_pkg.validate_metadata_value("tex-sources", "")
     with pytest.raises(ValueError, match="must not be empty"):
-        metadata_pkg.validate_metadata_value("protected-terms", "")
+        metadata_pkg.validate_metadata_value("normalize-protected-terms", "")
     with pytest.raises(ValueError, match="must not be empty"):
         metadata_pkg.validate_metadata_value("lint-required-fields", "")
 
@@ -332,10 +332,20 @@ def test_validate_accepts_non_empty_known_values() -> None:
     metadata_pkg.validate_metadata_value("sort-order", "year:desc")
     metadata_pkg.validate_metadata_value("key-pattern", "[auth][year]")
     metadata_pkg.validate_metadata_value("tex-sources", "paper.tex")
-    metadata_pkg.validate_metadata_value("protected-terms", "pH,NaCl")
-    metadata_pkg.validate_metadata_value("files-dir", "refs.files")
-    metadata_pkg.validate_metadata_value("journal-table", "J. Phys.: A, J. Chem.")
+    metadata_pkg.validate_metadata_value("normalize-protected-terms", "pH,NaCl")
+    metadata_pkg.validate_metadata_value("pinax-files-dir", "refs.files")
+    metadata_pkg.validate_metadata_value("normalize-journal-table", "J. Phys.: A, J. Chem.")
     metadata_pkg.validate_metadata_value("normalize-dois", "true")
+
+
+def test_unprefixed_normalization_profile_keys_are_not_recognized() -> None:
+    for key in ("protected-terms", "journal-table", "ltwa-table"):
+        assert metadata_pkg.metadata_category(key) == "unknown"
+
+
+def test_unprefixed_pinax_files_dir_is_not_recognized() -> None:
+    assert metadata_pkg.metadata_category("files-dir") == "unknown"
+    assert metadata_pkg.metadata_category("fetch-policy") == "unknown"
 
 
 def test_validate_dialect_handles_trailing_semicolon() -> None:

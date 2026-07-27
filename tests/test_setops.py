@@ -116,7 +116,7 @@ def test_partition_used_unused_split() -> None:
 def test_strip_metadata_blocks_drops_jabref_and_pynakes_meta() -> None:
     lib = parse_bib(
         A
-        + "@comment{pynakes-meta:\nfiles-dir: refs.files\n}\n\n"
+        + "@comment{pynakes-meta:\npinax-files-dir: refs.files\n}\n\n"
         + "@Comment{jabref-meta: databaseType:bibtex;}\n\n"
         + "% a plain top-level comment, not metadata\n"
     )
@@ -163,7 +163,7 @@ def test_cli_combine_copies_pinax_materials_and_manifest(tmp_path: Path) -> None
     source = tmp_path / "source.bib"
     source.write_text(
         "@article{Smith2020,\n  title = {Alpha}\n}\n"
-        "@comment{pynakes-meta:\nfiles-dir: source.files\n}\n"
+        "@comment{pynakes-meta:\npinax-files-dir: source.files\n}\n"
     )
     source_files = tmp_path / "source.files"
     source_files.mkdir()
@@ -197,7 +197,7 @@ def test_cli_combine_copies_pinax_materials_and_manifest(tmp_path: Path) -> None
     assert data["pinax_materials"][0]["kind"] == "preprint_pdf"
     assert (tmp_path / "all.files" / "Smith2020.preprint.pdf").read_bytes() == b"pdf"
     combined = parse_bib(Path(out).read_text())
-    assert combined.pynakes_metadata["files-dir"] == "all.files"
+    assert combined.pynakes_metadata["pinax-files-dir"] == "all.files"
     manifest = json.loads((tmp_path / "all.files" / ".pinax" / "manifest.json").read_text())
     assert manifest["files"]["Smith2020"]["preprint_canonical"] is True
 
@@ -230,7 +230,7 @@ def test_cli_combine_self_output_does_not_crash_on_own_materials(tmp_path: Path)
     primary = tmp_path / "primary.bib"
     primary.write_text(
         "@article{Shockley1949,\n  title = {Junctions}\n}\n"
-        "@comment{pynakes-meta:\nfiles-dir: primary.files\n}\n"
+        "@comment{pynakes-meta:\npinax-files-dir: primary.files\n}\n"
     )
     primary_files = tmp_path / "primary.files"
     primary_files.mkdir()
@@ -249,12 +249,12 @@ def test_cli_combine_self_output_does_not_crash_on_own_materials(tmp_path: Path)
 
 
 def test_cli_combine_self_output_preserves_custom_files_dir(tmp_path: Path) -> None:
-    # Regression (F14b): a self-combine must keep the library's own files-dir
+    # Regression (F14b): a self-combine must keep the library's own pinax-files-dir
     # rather than silently renaming it to the --out basename ("primary.files").
     primary = tmp_path / "primary.bib"
     primary.write_text(
         "@article{Shockley1949,\n  title = {Junctions}\n}\n"
-        "@comment{pynakes-meta:\nfiles-dir: materials\n}\n"
+        "@comment{pynakes-meta:\npinax-files-dir: materials\n}\n"
     )
     materials = tmp_path / "materials"
     materials.mkdir()
@@ -267,7 +267,7 @@ def test_cli_combine_self_output_preserves_custom_files_dir(tmp_path: Path) -> N
 
     assert result.exit_code == 0, result.output
     combined = parse_bib(primary.read_text())
-    assert combined.pynakes_metadata["files-dir"] == "materials"
+    assert combined.pynakes_metadata["pinax-files-dir"] == "materials"
 
 
 # --- CLI: split ------------------------------------------------------------
@@ -294,7 +294,7 @@ def test_cli_split_copies_pinax_materials_to_matching_output(tmp_path: Path) -> 
     source.write_text(
         "@article{Smith2020,\n  title = {Alpha},\n  groups = {ML}\n}\n"
         "@article{Jones2021,\n  title = {Beta},\n  groups = {Bio}\n}\n"
-        "@comment{pynakes-meta:\nfiles-dir: source.files\n}\n"
+        "@comment{pynakes-meta:\npinax-files-dir: source.files\n}\n"
     )
     source_files = tmp_path / "source.files"
     source_files.mkdir()
@@ -312,7 +312,7 @@ def test_cli_split_copies_pinax_materials_to_matching_output(tmp_path: Path) -> 
     assert outputs[ml]["pinax_materials"][0]["kind"] == "preprint_pdf"
     assert (tmp_path / "ml.files" / "Smith2020.preprint.pdf").read_bytes() == b"pdf"
     assert not (tmp_path / "rest.files" / "Smith2020.preprint.pdf").exists()
-    assert parse_bib(Path(ml).read_text()).pynakes_metadata["files-dir"] == "ml.files"
+    assert parse_bib(Path(ml).read_text()).pynakes_metadata["pinax-files-dir"] == "ml.files"
 
 
 def test_cli_split_catch_all_bucket_with_no_materials_does_not_crash(tmp_path: Path) -> None:
@@ -324,7 +324,7 @@ def test_cli_split_catch_all_bucket_with_no_materials_does_not_crash(tmp_path: P
     source.write_text(
         "@article{Smith2020,\n  title = {Alpha},\n  groups = {ML}\n}\n"
         "@article{Jones2021,\n  title = {Beta},\n  groups = {Bio}\n}\n"
-        "@comment{pynakes-meta:\nfiles-dir: source.files\n}\n"
+        "@comment{pynakes-meta:\npinax-files-dir: source.files\n}\n"
     )
     (tmp_path / "source.files").mkdir()  # no material files inside
     ml = str(tmp_path / "ml.bib")
@@ -351,7 +351,7 @@ def test_cli_split_catch_all_bucket_with_no_materials_does_not_crash(tmp_path: P
 def test_cli_split_minimal_drops_metadata_and_skips_materials(tmp_path: Path) -> None:
     source = tmp_path / "source.bib"
     source.write_text(
-        "@comment{pynakes-meta:\nfiles-dir: source.files\n}\n\n"
+        "@comment{pynakes-meta:\npinax-files-dir: source.files\n}\n\n"
         "@Comment{jabref-meta: databaseType:bibtex;}\n\n"
         "@article{Smith2020,\n  title = {Alpha},\n  groups = {ML}\n}\n"
         "@article{Jones2021,\n  title = {Beta},\n  groups = {Bio}\n}\n"

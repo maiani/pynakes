@@ -17,6 +17,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Project invariants now live in the architecture guide; DEVPLAN contains only
+  release scope and completion criteria.
+- Pinax metadata is consistently namespaced: use `pinax-files-dir` and
+  `pinax-fetch-policy`. The former `files-dir` and `fetch-policy` keys are no
+  longer recognized.
+- Normalization profile metadata is consistently namespaced: use
+  `normalize-protected-terms`, `normalize-journal-table`, and
+  `normalize-ltwa-table`. The former unprefixed keys are no longer recognized.
+- Atomic writes with backups now stage a copied `.bak` while leaving the
+  destination in place until the final replacement, and clean up the prepared
+  destination after handled replacement failures.
+- Project and automation documentation now describes concrete command behavior
+  instead of presenting “agent-safe” or “deterministic execution” as product
+  guarantees; capabilities report explicit network access rather than a broad
+  `safe_by_default` claim.
 - Reference imports now pass provider responses through a shared
   `ReferenceMetadata` record and an explicit provider registry. Metadata
   services and repositories now live directly under `providers.metadata` and

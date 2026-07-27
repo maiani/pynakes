@@ -50,11 +50,11 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     "sort-order": CATEGORY_SAVE,
     # Native default citation-key pattern, aliasing JabRef's ``keypatterndefault``.
     "key-pattern": CATEGORY_CITATION_KEY,
-    "protected-terms": CATEGORY_NORMALIZATION,
-    "journal-table": CATEGORY_NORMALIZATION,
-    "ltwa-table": CATEGORY_NORMALIZATION,
-    "files-dir": CATEGORY_PINAX,
-    "fetch-policy": CATEGORY_PINAX,
+    "normalize-protected-terms": CATEGORY_NORMALIZATION,
+    "normalize-journal-table": CATEGORY_NORMALIZATION,
+    "normalize-ltwa-table": CATEGORY_NORMALIZATION,
+    "pinax-files-dir": CATEGORY_PINAX,
+    "pinax-fetch-policy": CATEGORY_PINAX,
     # Linked LaTeX sources that cite this library; consulted by the citation-key
     # commands so .tex edits stay consistent without re-specifying the files.
     "tex-sources": CATEGORY_USAGE,
@@ -97,12 +97,12 @@ def validate_metadata_value(key: str, value: str) -> None:
         return
 
     # Fetch policy must be a comma-separated list of recognised values.
-    if normalized_key in {"fetch-policy", "fetch-policy"}:
+    if normalized_key == "pinax-fetch-policy":
         values = [v.strip().lower() for v in stripped.replace(";", ",").split(",") if v.strip()]
         invalid = [v for v in values if v not in VALID_FETCH_POLICIES]
         if invalid:
             raise ValueError(
-                f"Invalid fetch-policy value(s) {invalid!r}; "
+                f"Invalid pinax-fetch-policy value(s) {invalid!r}; "
                 f"expected one or more of: {', '.join(sorted(VALID_FETCH_POLICIES))}"
             )
         return

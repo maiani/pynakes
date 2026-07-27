@@ -460,10 +460,10 @@ class BibliographyOperations:
     # --- Pinax fetch/ensure operations -----------------------------------
 
     def ensure_files_dir(self) -> bool:
-        """Bootstrap ``files-dir`` metadata if not already configured.
+        """Bootstrap ``pinax-files-dir`` metadata if not already configured.
 
         Returns True if metadata was set (bibliography marked dirty), False if
-        ``files-dir`` was already present.
+        ``pinax-files-dir`` was already present.
         """
         for name in self.lib.metadata:
             if name.strip().lower() == FILES_DIR_KEY:
@@ -496,7 +496,7 @@ class BibliographyOperations:
         Args:
             target: Optional single citation key to fetch. If None, fetch all.
             policy: Optional explicit fetch policy. When provided, overrides the
-                library's metadata ``fetch-policy`` setting.
+                library's metadata ``pinax-fetch-policy`` setting.
             dry_run: If True, report what would be fetched without downloading.
             pdf_fetcher: Injectable arXiv PDF fetcher for testing.
             source_fetcher: Injectable arXiv source fetcher for testing.
@@ -511,7 +511,7 @@ class BibliographyOperations:
 
         Returns:
             A dict with ``fetched``, ``skipped``, ``failed`` lists, plus
-            ``fetch_policy`` dict reflecting the resolved fetch-policy.
+            ``fetch_policy`` dict reflecting the resolved Pinax fetch policy.
         """
         if access not in {"open", "institutional"}:
             raise ValueError(f"Unknown fetch access mode: {access!r}")
@@ -520,7 +520,7 @@ class BibliographyOperations:
             self.ensure_files_dir()
             store = self.files
             if store is None:
-                raise ValueError("could not resolve files-dir after bootstrapping")
+                raise ValueError("could not resolve pinax-files-dir after bootstrapping")
 
         store.ensure_root()
 

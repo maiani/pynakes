@@ -252,7 +252,7 @@ namespaces looks like this:
 @comment{pynakes-meta:
 normalize-journal-style: abbreviated
 normalize-author-style: jabref
-protected-terms: GPU,API,JSON
+normalize-protected-terms: GPU,API,JSON
 }
 
 @article{Smith2021,
@@ -270,7 +270,8 @@ These settings act as **defaults** when you run operations — no flags needed:
 # Honors keypatterndefault from jabref-meta:
 pynakes keys generate refs.bib --all --dry-run --diff
 
-# Honors journal-style/author-style/protected-terms from pynakes-meta:
+# Honors normalize-journal-style/normalize-author-style/normalize-protected-terms
+# from pynakes-meta:
 pynakes normalize refs.bib --dry-run --diff
 ```
 
@@ -283,7 +284,7 @@ pynakes metadata list refs.bib
 #   [jabref:known:files] fileDirectory = /home/me/papers
 #   [pynakes:known:pynakes] normalize-journal-style = abbreviated
 #   [pynakes:known:pynakes] normalize-author-style = jabref
-#   [pynakes:known:pynakes] protected-terms = GPU,API,JSON
+#   [pynakes:known:pynakes] normalize-protected-terms = GPU,API,JSON
 ```
 
 Add a preference. A JabRef-native key lands in `jabref-meta` (so JabRef keeps

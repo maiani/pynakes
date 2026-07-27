@@ -1,7 +1,7 @@
 """CLI command registration for ``pynakes ref remove``.
 
 Removes entries by citation key through the standard lifecycle. In a pinax,
-removes the entry's materials from ``files-dir`` by default (``--keep-files``
+removes the entry's materials from ``pinax-files-dir`` by default (``--keep-files``
 opts out).
 """
 

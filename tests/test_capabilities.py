@@ -15,7 +15,7 @@ class TestGetCapabilities:
         caps = get_capabilities()
         assert caps["tool"] == "pynakes"
         assert caps["version"] == VERSION
-        assert caps["safe_by_default"] is True
+        assert caps["network_access_is_explicit"] is True
         assert caps["supports_dry_run"] is True
         assert caps["supports_json_output"] is True
         assert isinstance(caps["capabilities"], list)

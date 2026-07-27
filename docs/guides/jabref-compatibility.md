@@ -1,7 +1,7 @@
 # JabRef compatibility
 
-pynakes is a deterministic `.bib`/`.bib`latex maintenance engine first. It
-interoperates losslessly with JabRef — parsing and preserving JabRef's own
+pynakes is a `.bib`/`.bib`latex maintenance engine first. It interoperates
+losslessly with JabRef — parsing and preserving JabRef's own
 metadata comments, understanding JabRef's value grammars, and keeping a
 JabRef-tracked file readable in JabRef — but that compatibility is a guarantee
 it keeps, not its identity. pynakes is not a JabRef clone or a JabRef-only
@@ -81,7 +81,7 @@ planned but not yet implemented.
 
 Every metadata key has an *owner*: JabRef-native keys (`databaseType`,
 `saveActions`, `keypatterndefault`, …) are understood by JabRef; pynakes-owned
-keys (`dialect`, `sort-order`, `normalize-*`, `files-dir`, …) and anything
+keys (`dialect`, `sort-order`, `normalize-*`, `pinax-files-dir`, …) and anything
 unrecognized are understood only by pynakes. `default_namespace(key, lib)`
 decides where a new key is written:
 

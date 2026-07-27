@@ -4,32 +4,40 @@ The design reference for pynakes contributors and maintainers. For task-oriented
 usage see the [Usage guide](usage.md); for direct Python use see the
 [API reference](../api/index.md).
 
-## Purpose and constraints
+## Purpose
 
 pynakes is a headless maintenance engine for BibTeX, BibLaTeX, and
 JabRef-compatible .bib files. It makes small, reviewable changes without
 discarding information a reference manager or a human placed in the file.
-It is also the deterministic execution layer beneath agentic bibliography
-workflows: an agent decides what should change, while pynakes exposes bounded
-operations that inspect, validate, preview, and apply the change.
+The same bounded operations are available to interactive users, scripts, CI,
+and LLM-assisted tools.
 
-1. **Preserve before normalizing.** Unknown fields, duplicate citation keys,
-   comments, JabRef metadata, line endings, and source encodings remain data,
-   not parser errors.
-2. **Make minimal edits.** Entry mutations go through `editing.py`, which changes
+## Core invariants
+
+These constraints apply across operation modules, interfaces, and releases:
+
+1. **Round-trip fidelity.** Unmodified entries write back byte-for-byte unless
+   canonical whole-file formatting is explicitly requested.
+2. **Preserve before normalizing.** Unknown fields, duplicate citation keys,
+   comments, JabRef metadata, line endings, and source encodings remain data.
+3. **Make minimal edits.** Entry mutations go through `editing.py`, which changes
    the relevant raw field/key text while keeping the rest of the entry intact.
-3. **Be explicit about uncertainty.** Dedupe, metadata enrichment, and DOI import
+4. **Keep operation behavior consistent.** Operations mutate in place and
+   return a count or structured report.
+5. **Keep the CLI contract consistent.** Modifying commands use the shared JSON
+   envelope and exit-code conventions.
+6. **Be explicit about uncertainty.** Dedupe, metadata enrichment, and imports
    report conflicts instead of silently selecting a value.
-4. **Keep the file authoritative.** In-memory state is a derived working view;
+7. **Keep the file authoritative.** In-memory state is a derived working view;
    there is no database or persistent sidecar state of record.
-5. **Remain deterministic by default.** Network access is explicit (with
-   `--online` where supported) and provider responses can be cached.
+8. **Make side effects explicit.** Network access requires an online command or
+   option, and provider responses can be cached.
 
 ## Domain vocabulary and core concepts
 
 The model has three nested concepts: **entry** < **bibliography** < future
 **library**. A Pinax is not a fourth model layer; it is an optional mode of one
-Bibliography when `pynakes-meta` declares a `files-dir`.
+Bibliography when `pynakes-meta` declares a `pinax-files-dir`.
 
 | Concept | Implemented class | Meaning |
 | --- | --- | --- |
@@ -38,7 +46,7 @@ Bibliography when `pynakes-meta` declares a `files-dir`.
 | File model | BibFile | Semantic content of one parsed .bib file: entries, declarations, comments, structured JabRef metadata, encoding, and line-ending style. |
 | Metadata block | MetadataBlock | One top-level metadata comment — `@comment{jabref-meta: ...}` or pynakes' superset `@comment{pynakes-meta: ...}` (tagged by `namespace`) — represented both structurally and as raw text. |
 | Bibliography (working unit) | Bibliography | A staged, reconciled handle over one `.bib` file — "a slice of references covering one aspect of a topic". Supports operations, preview, diff, commit, reset, reload, and external-change detection. |
-| Pinax mode | FileStore + fetch primitives | Optional mode of one Bibliography together with its `files-dir` of citation-key-addressed materials. Plain bibliographies have no Pinax behavior. Includes agent inspection, file checks/fixes, arXiv material fetch, provenance manifests, set-operation copying, and coordinated key-edit material moves. |
+| Pinax mode | FileStore + fetch primitives | Optional mode of one Bibliography together with its `pinax-files-dir` of citation-key-addressed materials. Plain bibliographies have no Pinax behavior. Includes agent inspection, file checks/fixes, arXiv material fetch, provenance manifests, set-operation copying, and coordinated key-edit material moves. |
 | Library (corpus) | — (planned) | A directory of pinakes/bibliographies, enabling cross-file search, dedup, and identity resolution across the full research corpus. Not implemented yet (see [Beyond 1.0](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md)). |
 | Catalogue (index) | — (planned) | A derived, rebuildable search index over the Library (e.g. SQLite FTS). Never a competing source of truth; the Bibliographies are. Not implemented yet. |
 
@@ -234,7 +242,11 @@ Bibliography.
 and `save_text()` support backup creation, temporary-file writes, re-parse
 validation for BibTeX text, and replacement of the destination. They return
 `SaveResult` rather than exposing ordinary write failures as raw tracebacks to
-the CLI.
+the CLI. With atomic writes and backups enabled, a copied backup is staged
+without moving the original, then the prepared destination replaces the
+original in one filesystem operation. Handled failures clean up temporary
+files. These are safety mechanisms and design goals, not formal guarantees
+against every process crash, operating-system failure, or storage failure.
 
 ## Domain modules
 
@@ -249,7 +261,7 @@ the CLI.
 | providers/records.py, providers/registry.py | The provider-neutral `ReferenceMetadata` boundary and explicit deterministic import-provider selection. |
 | providers/metadata/, providers/repositories/ | External-service implementations grouped by role; callers import providers from these role-specific packages directly. |
 | providers/url_resolvers/ | Ordered declarative identifier, repository, and publisher URL recognition. Ordinary publisher URL-to-DOI patterns are table entries rather than standalone clients. |
-| filestore.py | Pinax material paths, presence scanning, orphan/drift detection and repair, provenance manifests, material copying, and atomic writes inside a configured `files-dir`. |
+| filestore.py | Pinax material paths, presence scanning, orphan/drift detection and repair, provenance manifests, material copying, and atomic writes inside a configured `pinax-files-dir`. |
 | fetch.py | arXiv material URL construction, injectable PDF/source byte fetchers, safe source archive extraction, and FileStore installation. |
 | metadata/ (core.py, schema.py, jabref.py) | Structured top-level metadata, layered by dependency direction: `core` is the namespace-neutral comment engine (parse/format/set/remove/consolidate); `schema` is pynakes' own canonical key registry and native reads, JabRef-unaware; `jabref` is the compatibility adapter — JabRef's key tables and value grammars, the JabRef group parsers/serializers (`parse_jabref_grouping`, `format_jabref_grouping`, `parse_jabref_groups_lines`), owner/namespace arbitration, and fallback-aware accessors (`library_dialect`, `library_sort_order`). Domain code depends on `schema`'s concepts through `jabref`'s accessors, never on JabRef's literal keys. See the [JabRef compatibility guide](jabref-compatibility.md). |
 | journals.py | Exact title/ISSN mapping plus LTWA-style journal abbreviation/expansion. |
@@ -337,7 +349,7 @@ downstream transport concern: the CLI already provides a machine-readable, safe
 agent interface.
 
 The next structural extensions are planned in dependency order: optional Pinax
-mode (one `Bibliography` + its `files-dir` of materials), `Library` (a directory
+mode (one `Bibliography` + its `pinax-files-dir` of materials), `Library` (a directory
 of pinakes/bibliographies with cross-file search and identity resolution), and
 `Catalogue` (a derived, rebuildable index over the Library). None of these are
 part of the current implementation — see

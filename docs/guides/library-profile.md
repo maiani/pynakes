@@ -34,7 +34,7 @@ need to repeat the `@comment{pynakes-meta: …}` prefix per key or keep JabRef's
 ```bibtex
 @comment{pynakes-meta:
 normalize-journal-style: abbreviated
-protected-terms: OpenAI,GPU
+normalize-protected-terms: OpenAI,GPU
 lint-required-fields-article: url
 }
 ```
@@ -55,11 +55,11 @@ to find the operation module that owns a key.
 | `key-pattern-<entrytype>` | citation-key | Per-entry-type key pattern; aliases JabRef's `keypattern_<entrytype>` (read native-first) | `keys`, `lint` | `keypattern_<entrytype>` |
 | `normalize-protect-titles` | normalization | Boolean; default `true` for `normalize`; `lint` checks it when stored | `normalize`, `lint` | — |
 | `normalize-title-fields` | normalization | List; default `title,booktitle,maintitle,subtitle` | `normalize`, `lint` | — |
-| `protected-terms` | normalization | List of case-sensitive terms | `normalize`, `lint` | — |
+| `normalize-protected-terms` | normalization | List of case-sensitive terms | `normalize`, `lint` | — |
 | `normalize-author-style` | normalization | `jabref`, `conservative`, or `none` | `normalize` | — |
 | `normalize-journal-style` | normalization | `abbreviated`, `full`, or `none` (default) | `normalize`, `lint` | — |
-| `journal-table` | normalization | CSV/TSV path with exact journal mappings | `normalize`, `lint` | — |
-| `ltwa-table` | normalization | CSV/TSV path with LTWA word mappings | `normalize`, `lint` | — |
+| `normalize-journal-table` | normalization | CSV/TSV path with exact journal mappings | `normalize`, `lint` | — |
+| `normalize-ltwa-table` | normalization | CSV/TSV path with LTWA word mappings | `normalize`, `lint` | — |
 | `normalize-dois` | normalization | Boolean | `normalize` | — |
 | `normalize-identifier-case` | normalization | Boolean | `normalize` | — |
 | `normalize-format-metadata` | normalization | Boolean | `normalize` | — |
@@ -67,8 +67,8 @@ to find the operation module that owns a key.
 | `lint-required-fields-<entrytype>` | lint | Extra fields required on one entry type | `lint` | — |
 | `tex-sources` | usage | List of TeX files or directories, relative to the `.bib` file | `keys`, `tex scan` | — |
 | `group-tree` | groups | Pipe-delimited group hierarchy; aliases JabRef's `grouping` (read native-first) — see [Grouping](#grouping) | `groups tree`/`add-group`/`remove-group`/`rename-group`/`move-group`/`update-group` | `grouping` / `groupsTree` / `groups:N...` |
-| `files-dir` | pinax | Path to the Pinax materials directory, relative to the `.bib` file | `fetch`, `files`, engine | — |
-| `fetch-policy` | pinax | Comma-separated list of: `preprint`, `published`, `source`, `bestpdf` (default `bestpdf`) | `fetch` | — |
+| `pinax-files-dir` | pinax | Path to the Pinax materials directory, relative to the `.bib` file | `fetch`, `files`, engine | — |
+| `pinax-fetch-policy` | pinax | Comma-separated list of: `preprint`, `published`, `source`, `supplement`, `bestpdf` (default `bestpdf`) | `fetch` | — |
 
 `lint-required-fields` values are additive to pynakes' built-in requirements,
 which follow the library's `dialect` (`bibtex` or `biblatex`, aliasing JabRef's
@@ -227,15 +227,16 @@ When configured, `lint` reports each of the following as a warning:
   fallback).
 - A known journal title that is not in the configured `normalize-journal-style`.
 - An unknown journal title that cannot be resolved by the bundled sources,
-  `journal-table`, or `ltwa-table`.
+  `normalize-journal-table`, or `normalize-ltwa-table`.
 - A missing field named by `lint-required-fields`.
 - A title-like field whose case-sensitive terms or acronyms need brace
   protection while `normalize-protect-titles:true` is stored (or
-  `protected-terms` is configured).
+  `normalize-protected-terms` is configured).
 
 Unknown journal titles are reported as `unknown_journal` because pynakes cannot
-determine their canonical form without a mapping. Add a `journal-table` or
-`ltwa-table` when that distinction matters.
+determine their canonical form without a mapping. Add a
+`normalize-journal-table` or `normalize-ltwa-table` when that distinction
+matters.
 
 The warnings are advisory in a normal run. `pynakes lint --strict` exits `1`
 for structural errors and these profile-conformance warnings, allowing a
@@ -246,7 +247,7 @@ such as a missing DOI, remain non-blocking.
 @comment{pynakes-meta:
 key-pattern: [auth][year]
 normalize-journal-style: abbreviated
-protected-terms: LLM,GPU
+normalize-protected-terms: LLM,GPU
 lint-required-fields-article: url
 }
 ```

@@ -171,7 +171,7 @@ sidecar directory (`{bibname}.files/`) that stores downloaded materials
 
 ```
 {bibname}.bib               # BibTeX library (pynakes-managed)
-{bibname}.files/            # Pinax files-dir (auto-generated)
+{bibname}.files/            # Pinax materials directory (auto-generated)
   .pinax/manifest.json    # Integrity manifest (SHA-256, fetch dates, sources)
   {{Key}}.preprint.pdf      # Preprint PDF for entry {{Key}}
   {{Key}}.source/           # Preprint source bundle (LaTeX + figures)
@@ -179,9 +179,9 @@ sidecar directory (`{bibname}.files/`) that stores downloaded materials
   {{Key}}.supplement.pdf    # One unambiguous supplementary PDF
 ```
 
-The `files-dir` path is set in the `pynakes-meta` block inside the `.bib`
-file (key: `files-dir`). Fetch behaviour is configured by:
-- `fetch-policy`: comma-separated list of ``preprint``, ``published``, ``source``,
+The materials path is set in the `pynakes-meta` block inside the `.bib`
+file (key: `pinax-files-dir`). Fetch behaviour is configured by:
+- `pinax-fetch-policy`: comma-separated list of ``preprint``, ``published``, ``source``,
   ``supplement``, and/or ``bestpdf`` (default: ``bestpdf``, which tries published first then
   falls back to preprint when no open-access copy exists)
 

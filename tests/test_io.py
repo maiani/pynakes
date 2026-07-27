@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from pynakes.io import load_bib, save_bib
+from pynakes.io import load_bib, save_bib, save_text
 from pynakes.model import BibEntry, BibFile
 
 
@@ -157,6 +157,52 @@ class TestSaveBib:
         assert output_file.exists()
         content = output_file.read_text()
         assert "@article{Test" in content
+
+    def test_atomic_backup_keeps_destination_until_final_replace(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        output_file = tmp_path / "output.bib"
+        output_file.write_text("old")
+        original_replace = Path.replace
+        observed_final_replace = False
+
+        def checked_replace(source: Path, target: Path | str) -> Path:
+            nonlocal observed_final_replace
+            if Path(target) == output_file:
+                observed_final_replace = True
+                assert output_file.read_text() == "old"
+            return original_replace(source, target)
+
+        monkeypatch.setattr(Path, "replace", checked_replace)
+
+        result = save_text("new", str(output_file), backup=True, atomic=True)
+
+        assert result.success
+        assert observed_final_replace
+        assert output_file.read_text() == "new"
+        assert output_file.with_suffix(".bib.bak").read_text() == "old"
+
+    def test_failed_atomic_replace_keeps_original_and_removes_temp_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        output_file = tmp_path / "output.bib"
+        output_file.write_text("old")
+        original_replace = Path.replace
+
+        def fail_final_replace(source: Path, target: Path | str) -> Path:
+            if Path(target) == output_file:
+                raise OSError("simulated replacement failure")
+            return original_replace(source, target)
+
+        monkeypatch.setattr(Path, "replace", fail_final_replace)
+
+        result = save_text("new", str(output_file), backup=True, atomic=True)
+
+        assert not result.success
+        assert result.error == "simulated replacement failure"
+        assert output_file.read_text() == "old"
+        assert output_file.with_suffix(".bib.bak").read_text() == "old"
+        assert {item.name for item in tmp_path.iterdir()} == {"output.bib", "output.bib.bak"}
 
     def test_save_roundtrip(self, tmp_path: Path) -> None:
         """Test save and load roundtrip."""

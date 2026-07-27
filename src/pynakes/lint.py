@@ -195,15 +195,15 @@ def resolve_lint_profile(lib: BibFile) -> LintProfile:
     title_fields = (
         metadata_list(metadata_value(lib, "normalize-title-fields")) or LintProfile.title_fields
     )
-    protected_terms = metadata_list(metadata_value(lib, "protected-terms"))
+    protected_terms = metadata_list(metadata_value(lib, "normalize-protected-terms"))
     protect_titles = metadata_bool(
         metadata_value(lib, "normalize-protect-titles"),
         bool(protected_terms),
     )
     return LintProfile(
         journal_style=journal_style,
-        journal_table=metadata_value(lib, "journal-table"),
-        ltwa_table=metadata_value(lib, "ltwa-table"),
+        journal_table=metadata_value(lib, "normalize-journal-table"),
+        ltwa_table=metadata_value(lib, "normalize-ltwa-table"),
         # Normalization protects titles by default, but lint enforces only a
         # stored title preference. This keeps unprofiled libraries advisory.
         protect_titles=protect_titles,

@@ -52,7 +52,9 @@ def test_filestore_from_metadata_absent_for_plain_bibliography(tmp_path: Path) -
 
 
 def test_filestore_from_metadata_uses_pynakes_files_dir(tmp_path: Path) -> None:
-    lib = parse_bib("@article{A, title = {T}}\n@comment{pynakes-meta:\nfiles-dir: materials\n}\n")
+    lib = parse_bib(
+        "@article{A, title = {T}}\n@comment{pynakes-meta:\npinax-files-dir: materials\n}\n"
+    )
 
     store = FileStore.from_metadata(lib, tmp_path / "refs.bib")
 
@@ -286,7 +288,7 @@ def test_scan_deduplicates_keys(tmp_path: Path) -> None:
 
 def test_bibliography_open_exposes_filestore_when_files_dir_is_set(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
-    bib.write_text("@article{A, title = {T}}\n@comment{pynakes-meta:\nfiles-dir:\n}\n")
+    bib.write_text("@article{A, title = {T}}\n@comment{pynakes-meta:\npinax-files-dir:\n}\n")
 
     coll = Bibliography.open(bib)
 
@@ -307,8 +309,8 @@ def test_bibliography_fetch_materials_uses_symlinked_bib_directory(tmp_path: Pat
         "  archiveprefix = {arXiv}\n"
         "}\n"
         "@comment{pynakes-meta:\n"
-        "files-dir: refs.files\n"
-        "fetch-policy: preprint\n"
+        "pinax-files-dir: refs.files\n"
+        "pinax-fetch-policy: preprint\n"
         "}\n"
     )
     link_bib = link_dir / "refs.bib"
@@ -327,7 +329,9 @@ def test_bibliography_fetch_materials_uses_symlinked_bib_directory(tmp_path: Pat
 
 def test_bibliography_open_rejects_invalid_files_dir(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
-    bib.write_text("@article{A, title = {T}}\n@comment{pynakes-meta:\nfiles-dir: ../outside\n}\n")
+    bib.write_text(
+        "@article{A, title = {T}}\n@comment{pynakes-meta:\npinax-files-dir: ../outside\n}\n"
+    )
 
     with pytest.raises(ValueError, match="must not escape"):
         Bibliography.open(bib)
@@ -338,11 +342,11 @@ def test_bibliography_set_metadata_validates_files_dir(tmp_path: Path) -> None:
     bib.write_text("@article{A, title = {T}}\n")
     coll = Bibliography.open(bib)
 
-    coll.set_metadata("files-dir", "materials")
+    coll.set_metadata("pinax-files-dir", "materials")
     assert coll.files is not None
     assert coll.files.root == tmp_path / "materials"
     with pytest.raises(ValueError, match="must not escape"):
-        coll.set_metadata("files-dir", "../outside")
+        coll.set_metadata("pinax-files-dir", "../outside")
 
 
 def test_write_published_pdf_writes_atomically(tmp_path: Path) -> None:

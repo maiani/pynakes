@@ -1,32 +1,32 @@
 # LLM & automation integration
 
-Pynakes is the deterministic bibliography maintenance engine beneath an
-agentic workflow. The agent decides what should change; pynakes inspects,
-validates, previews, and applies that change safely and reproducibly. Pynakes
-does not replace the agent's judgment, and the agent does not need to rewrite
-BibTeX directly.
+Pynakes exposes bibliography inspection and editing commands that scripts and
+LLM-assisted tools can call without rewriting BibTeX directly. It provides
+validation, previews, structured results, and conflict reporting; callers
+remain responsible for deciding which changes to request and accept.
 
 This guide defines how an LLM or automation workflow should drive that engine:
-command discovery, the safe edit workflow, exit codes, and the structured JSON
+command discovery, the preview-and-commit workflow, exit codes, and the structured JSON
 contract. For command-by-command tutorials, see the [usage guide](usage.md).
 
 > Working *on* the pynakes codebase instead of using it? See `AGENTS.md` at the
 > repository root.
 
-## Automation guarantees
+## Automation behavior
 
-- **Deterministic by default.** Local input produces local output. Network
-  access is limited to explicit online workflows: `ref import`, `asset fetch`,
-  `ref import --fetch`, `verify --online`, and `enrich --online`.
+- **Explicit network access.** Network use is limited to `ref import`, `asset
+  fetch`, `ref import --fetch`, `verify --online`, and `enrich --online`.
 - **Reviewable edits.** Ordinary modifying commands support `--dry-run` and
   `--diff`. The maintenance operation `asset check --fix` is the exception: it
   writes directly and can retain the prior manifest with `--backup`.
 - **Structured output.** Use `--json`; do not parse human-readable output.
 - **Explicit conflicts.** A blocked operation exits `2` and returns resolution
   options instead of choosing one.
-- **Safe writes.** Commits are atomic and re-parse-validated. Surgical edits
-  leave untouched entries byte-for-byte identical. `--backup` retains a
-  `<file>.bak` copy where supported.
+- **Validated replacement.** Commits prepare a temporary file, re-parse it, and
+  replace the destination. Surgical edits leave untouched entries byte-for-byte
+  identical. `--backup` retains a `<file>.bak` copy where supported. These
+  mechanisms reduce common failure risks but are not formal durability
+  guarantees.
 
 ## Discover the command surface
 
@@ -51,7 +51,7 @@ Use the schema to construct calls and `pynakes <command> --help` for a focused
 human-readable view. The [usage guide](usage.md) explains the individual
 commands and their semantics.
 
-## Safe execution workflow
+## Preview and apply workflow
 
 1. Inspect the library and run the relevant checks.
 
@@ -116,7 +116,7 @@ imported entry, the calling agent should:
 4. Choose a group, preview `groups add-entry` with `--dry-run --diff --json`,
    and then apply it.
 
-This is an agent judgment step, not a deterministic pynakes operation.
+This choice belongs to the caller rather than to a pynakes operation.
 
 ## Exit codes
 

@@ -323,7 +323,7 @@ def test_lint_checks_the_stored_profile() -> None:
         "@comment{jabref-meta: keypatterndefault:[auth][year];}\n"
         "@comment{pynakes-meta: normalize-journal-style:abbreviated;}\n"
         "@comment{pynakes-meta: lint-required-fields-article:url;}\n"
-        "@comment{pynakes-meta: protected-terms:OpenAI;}\n\n"
+        "@comment{pynakes-meta: normalize-protected-terms:OpenAI;}\n\n"
         "@article{WrongKey,\n"
         "  author = {Jane Smith},\n"
         "  title = {OpenAI and DNA},\n"

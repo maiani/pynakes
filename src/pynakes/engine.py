@@ -152,7 +152,7 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
 
     @property
     def files(self) -> FileStore | None:
-        """Return the Pinax file store when ``files-dir`` metadata is configured."""
+        """Return the Pinax file store when ``pinax-files-dir`` metadata is configured."""
         if self.path is None:
             return None
         return FileStore.from_metadata(self.lib, self.path)

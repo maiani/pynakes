@@ -73,22 +73,22 @@ def test_metadata_owner_separates_jabref_and_pynakes_keys() -> None:
     assert metadata_owner("databaseType") == "jabref"
     assert metadata_owner("keypattern_article") == "jabref"
     assert metadata_owner("normalize-journal-style") == "pynakes"
-    assert metadata_owner("files-dir") == "pynakes"
+    assert metadata_owner("pinax-files-dir") == "pynakes"
     assert metadata_owner("unknownThing") == "unknown"
 
 
 def test_pynakes_owned_keys_have_domain_categories() -> None:
     assert metadata_category("normalize-journal-style") == "normalization"
-    assert metadata_category("protected-terms") == "normalization"
+    assert metadata_category("normalize-protected-terms") == "normalization"
     assert metadata_category("lint-required-fields-article") == "lint"
     assert metadata_category("tex-sources") == "usage"
-    assert metadata_category("files-dir") == "pinax"
+    assert metadata_category("pinax-files-dir") == "pinax"
 
 
 def test_default_namespace_routes_by_owner() -> None:
     # Without file context the answer is by owner (the static "belongs to" view).
     assert default_namespace("databaseType") == "jabref"
-    assert default_namespace("files-dir") == "pynakes"
+    assert default_namespace("pinax-files-dir") == "pynakes"
     assert default_namespace("unknownThing") == "pynakes"
 
 
@@ -105,11 +105,11 @@ def test_default_namespace_is_file_context_aware() -> None:
     # A JabRef-native key stays in pynakes-meta on an untracked file...
     assert default_namespace("databaseType", untracked) == "pynakes"
     # ...but pynakes-owned keys are always pynakes-meta regardless.
-    assert default_namespace("files-dir", untracked) == "pynakes"
+    assert default_namespace("pinax-files-dir", untracked) == "pynakes"
 
     tracked = parse_bib("@comment{jabref-meta: protectedflag:true;}\n")
     assert default_namespace("databaseType", tracked) == "jabref"
-    assert default_namespace("files-dir", tracked) == "pynakes"
+    assert default_namespace("pinax-files-dir", tracked) == "pynakes"
 
 
 def test_consolidate_metadata_splits_pynakes_top_and_jabref_bottom() -> None:
@@ -339,33 +339,33 @@ def test_pynakes_meta_round_trips_after_set(tmp_path: Path) -> None:
 def test_set_multiple_pynakes_keys_share_one_consolidated_block() -> None:
     lib = parse_bib("")
     set_metadata(lib, "normalize-journal-style", "abbreviated")
-    set_metadata(lib, "protected-terms", "GPU,API")
+    set_metadata(lib, "normalize-protected-terms", "GPU,API")
     set_metadata(lib, "normalize-dois", "on")
 
     out = write_bib(lib)
     # Exactly one pynakes-meta comment, holding all three settings.
     assert out.count("@comment{pynakes-meta:") == 1
     assert "normalize-journal-style: abbreviated" in out
-    assert "protected-terms: GPU,API" in out
+    assert "normalize-protected-terms: GPU,API" in out
     assert "normalize-dois: on" in out
 
     reparsed = parse_bib(out)
     assert reparsed.metadata["normalize-journal-style"] == "abbreviated"
-    assert reparsed.metadata["protected-terms"] == "GPU,API"
+    assert reparsed.metadata["normalize-protected-terms"] == "GPU,API"
     assert reparsed.metadata["normalize-dois"] == "on"
 
 
 def test_update_one_key_in_consolidated_block_leaves_others() -> None:
     lib = parse_bib("")
     set_metadata(lib, "normalize-journal-style", "abbreviated")
-    set_metadata(lib, "protected-terms", "GPU,API")
+    set_metadata(lib, "normalize-protected-terms", "GPU,API")
     # Changing one key rewrites the block but preserves the other setting.
     update = set_metadata(lib, "normalize-journal-style", "full")
 
     assert update.created is False
     reparsed = parse_bib(write_bib(lib))
     assert reparsed.metadata["normalize-journal-style"] == "full"
-    assert reparsed.metadata["protected-terms"] == "GPU,API"
+    assert reparsed.metadata["normalize-protected-terms"] == "GPU,API"
 
 
 def test_pynakes_block_round_trips_both_layouts_byte_for_byte() -> None:
@@ -373,26 +373,26 @@ def test_pynakes_block_round_trips_both_layouts_byte_for_byte() -> None:
     new_form = (
         "@comment{pynakes-meta:\n"
         "normalize-journal-style: abbreviated\n"
-        "protected-terms: GPU,API\n"
+        "normalize-protected-terms: GPU,API\n"
         "}\n"
     )
     lib = parse_bib(new_form)
     assert [b.key for b in lib.pynakes_metadata_blocks] == [
         "normalize-journal-style",
-        "protected-terms",
+        "normalize-protected-terms",
     ]
-    assert lib.metadata["protected-terms"] == "GPU,API"
+    assert lib.metadata["normalize-protected-terms"] == "GPU,API"
     assert write_bib(lib) == new_form
 
     # Legacy `key:value;` layout is still read, and round-trips verbatim.
     legacy_form = (
         "@comment{pynakes-meta:\n"
         "normalize-journal-style:abbreviated;\n"
-        "protected-terms:GPU,API;\n"
+        "normalize-protected-terms:GPU,API;\n"
         "}\n"
     )
     legacy = parse_bib(legacy_form)
-    assert legacy.metadata["protected-terms"] == "GPU,API;"
+    assert legacy.metadata["normalize-protected-terms"] == "GPU,API;"
     assert write_bib(legacy) == legacy_form
 
 
@@ -400,7 +400,7 @@ def test_consolidate_merges_separate_pynakes_comments_into_one_block() -> None:
     text = (
         "@comment{pynakes-meta: normalize-journal-style:abbreviated;}\n"
         "@comment{jabref-meta: databaseType:biblatex;}\n"
-        "@comment{pynakes-meta: protected-terms:GPU,API;}\n\n"
+        "@comment{pynakes-meta: normalize-protected-terms:GPU,API;}\n\n"
         "@article{A,\n  title = {T}\n}\n"
     )
     lib = parse_bib(text)
@@ -413,10 +413,10 @@ def test_consolidate_merges_separate_pynakes_comments_into_one_block() -> None:
     assert result.index("@article{A,") < result.index("@comment{jabref-meta:")
     # Legacy `key:value;` inputs are rewritten in the default `key: value` form.
     assert "normalize-journal-style: abbreviated" in result
-    assert "protected-terms: GPU,API" in result
+    assert "normalize-protected-terms: GPU,API" in result
     reparsed = parse_bib(result)
     assert reparsed.metadata["normalize-journal-style"] == "abbreviated"
-    assert reparsed.metadata["protected-terms"] == "GPU,API"
+    assert reparsed.metadata["normalize-protected-terms"] == "GPU,API"
 
 
 def test_normalize_honors_pynakes_meta_journal_style(tmp_path: Path) -> None:
@@ -548,11 +548,11 @@ def test_set_metadata_refuses_invalid_dialect() -> None:
 def test_set_metadata_refuses_invalid_fetch_policy() -> None:
     lib = parse_bib("")
     try:
-        set_metadata(lib, "fetch-policy", "maybe")
+        set_metadata(lib, "pinax-fetch-policy", "maybe")
     except ValueError as exc:
-        assert "Invalid fetch-policy" in str(exc)
+        assert "Invalid pinax-fetch-policy" in str(exc)
     else:
-        raise AssertionError("expected ValueError for invalid fetch-policy")
+        raise AssertionError("expected ValueError for invalid pinax-fetch-policy")
 
 
 def test_set_metadata_refuses_empty_value_for_known_key() -> None:
@@ -580,14 +580,16 @@ def test_set_metadata_accepts_jabref_only_key_with_any_value() -> None:
 
 
 def test_remove_metadata_pynakes_key_rewrites_block_in_place() -> None:
-    lib = parse_bib("@comment{pynakes-meta:\ndatabaseType: biblatex;\nfiles-dir: refs.files;\n}\n")
+    lib = parse_bib(
+        "@comment{pynakes-meta:\ndatabaseType: biblatex;\npinax-files-dir: refs.files;\n}\n"
+    )
 
     update = remove_metadata(lib, "databaseType", namespace="pynakes")
 
     assert update is not None
     assert update.namespace == "pynakes"
     assert "databaseType" not in lib.pynakes_metadata
-    assert lib.pynakes_metadata["files-dir"] == "refs.files"
+    assert lib.pynakes_metadata["pinax-files-dir"] == "refs.files"
 
 
 def test_remove_metadata_drops_emptied_pynakes_comment() -> None:
@@ -761,7 +763,8 @@ def test_metadata_set_duplicate_key_conflicts(tmp_path: Path) -> None:
 def test_metadata_adopt_jabref_anchors_databasetype(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text(
-        "@article{Curie1898,\n  title = {T}\n}\n\n@comment{pynakes-meta:\nfiles-dir: refs.files;\n}\n"
+        "@article{Curie1898,\n  title = {T}\n}\n\n"
+        "@comment{pynakes-meta:\npinax-files-dir: refs.files;\n}\n"
     )
 
     result = runner.invoke(app, ["metadata", "adopt-jabref", str(bib), "--json"])
@@ -781,7 +784,8 @@ def test_metadata_adopt_jabref_rehomes_native_key(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text(
         "@article{A,\n  title = {T}\n}\n\n"
-        "@comment{pynakes-meta:\ndatabaseType: biblatex;\nfiles-dir: refs.files;\n}\n"
+        "@comment{pynakes-meta:\ndatabaseType: biblatex;\n"
+        "pinax-files-dir: refs.files;\n}\n"
     )
 
     result = runner.invoke(app, ["metadata", "adopt-jabref", str(bib), "--json"])
@@ -794,7 +798,7 @@ def test_metadata_adopt_jabref_rehomes_native_key(tmp_path: Path) -> None:
     # databaseType is gone from the pynakes-meta comment, but its companions remain.
     pynakes_block = text.split("pynakes-meta:")[1].split("}")[0]
     assert "databaseType" not in pynakes_block
-    assert "files-dir" in pynakes_block
+    assert "pinax-files-dir" in pynakes_block
 
 
 def test_metadata_adopt_jabref_idempotent(tmp_path: Path) -> None:
@@ -814,7 +818,7 @@ def test_metadata_adopt_jabref_idempotent(tmp_path: Path) -> None:
 def test_metadata_adopt_then_native_set_routes_to_jabref(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text(
-        "@article{A,\n  title = {T}\n}\n\n@comment{pynakes-meta:\nfiles-dir: refs.files;\n}\n"
+        "@article{A,\n  title = {T}\n}\n\n@comment{pynakes-meta:\npinax-files-dir: refs.files;\n}\n"
     )
 
     runner.invoke(app, ["metadata", "adopt-jabref", str(bib)])
@@ -827,7 +831,7 @@ def test_metadata_adopt_then_native_set_routes_to_jabref(tmp_path: Path) -> None
 def test_metadata_adopt_jabref_dry_run_does_not_write(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     original = (
-        "@article{A,\n  title = {T}\n}\n\n@comment{pynakes-meta:\nfiles-dir: refs.files;\n}\n"
+        "@article{A,\n  title = {T}\n}\n\n@comment{pynakes-meta:\npinax-files-dir: refs.files;\n}\n"
     )
     bib.write_text(original)
 
@@ -858,7 +862,9 @@ def test_metadata_remove_jabref_key(tmp_path: Path) -> None:
 
 def test_metadata_remove_pynakes_key(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
-    bib.write_text("@comment{pynakes-meta:\ndatabaseType: biblatex;\nfiles-dir: refs.files;\n}\n")
+    bib.write_text(
+        "@comment{pynakes-meta:\ndatabaseType: biblatex;\npinax-files-dir: refs.files;\n}\n"
+    )
 
     result = runner.invoke(app, ["metadata", "remove", str(bib), "databaseType", "--json"])
 
@@ -868,7 +874,7 @@ def test_metadata_remove_pynakes_key(tmp_path: Path) -> None:
     assert data["namespace"] == "pynakes"
     text = bib.read_text()
     assert "databaseType" not in text
-    assert "files-dir" in text
+    assert "pinax-files-dir" in text
 
 
 def test_metadata_remove_absent_key_errors(tmp_path: Path) -> None:

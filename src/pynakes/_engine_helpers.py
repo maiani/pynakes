@@ -156,11 +156,11 @@ def metadata_bool(lib: BibFile, name: str, default: bool) -> bool:
 
 
 def metadata_fetch_policy(lib: BibFile) -> FetchPolicy:
-    """Return the parsed ``fetch-policy`` for *lib*, or the default ``bestpdf``.
+    """Return the parsed ``pinax-fetch-policy`` for *lib*, or default ``bestpdf``.
 
     A thin ``lib``-aware wrapper over :func:`pynakes.metadata.parse_fetch_policy`.
     """
-    return _parse_fetch_policy(metadata_value(lib, "fetch-policy"))
+    return _parse_fetch_policy(metadata_value(lib, "pinax-fetch-policy"))
 
 
 def read_text(path: Path, encoding: str) -> str:

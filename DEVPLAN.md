@@ -10,15 +10,19 @@ Completed work is recorded in [CHANGELOG.md](CHANGELOG.md) and the git log.
 
 ## Road to 1.0
 
-### v0.6 — Generalization and consolidation
+### v0.6 — Generalization, consolidation, and shared identity
 
 Generalize import paths beyond DOI/arXiv and consolidate the engine's
-cross-cutting patterns.
+cross-cutting patterns. This release also establishes one shared notion of work
+identity so the new providers do not add another parallel reconciliation path.
 
 - **Complete JabRef formatting compatibility**: implement and test the remaining
   v5.15 formatter-as-modifier behavior and key-pattern markers/modifiers, using
   upstream JabRef implementations, tests, and golden vectors as the oracle.
-
+- **Formatting options and capability reporting**: expand the canonical
+  formatter's useful layout controls, keep them composable and idempotent, and
+  expose the supported options accurately through CLI help and `capabilities`
+  so callers do not need to infer the formatter surface.
 - **New import paths**: expand the
   [import-provider inventory](docs/guides/import-providers.md) through the
   normalized provider interface and declarative URL resolver tables.
@@ -50,21 +54,6 @@ cross-cutting patterns.
   auto-detect fails with multiple `.bib` files present).
 - **Cross-cutting consolidation**: unify interface patterns, reduce duplication
   across import, identity, and metadata pathways.
-
-**Done when**: broader import paths, richer `search`/`--where`, `metadata
-doctor`, and the `lint`/`groups`/`asset` UX fixes implemented, tested, and
-documented; `pytest && ruff` green; CHANGELOG updated; version bumped to 0.6.0.
-
----
-
-### v0.7 — Shared identity
-
-Promote the DOI / arXiv / OpenAlex / ORCID / title machinery (currently spread
-across `dedupe`, `verify`, and `add`) into one explicit, tested primitive. This
-is the foundation for dedup, the `Library`, Catalogue, and projection
-reconciliation — everything keys off a single notion of "the same work".
-
-**Must include**:
 - **Identity primitive**: a `Work` type that unifies identifier resolution
   (DOI, arXiv, OpenAlex ID, ORCID) with metadata fingerprinting (title hashing,
   author normalization) so any consumer answers "is this the same work?" through
@@ -73,19 +62,22 @@ reconciliation — everything keys off a single notion of "the same work".
   heuristic; `verify`/`enrich` use it for online-lookup routing; `ref import`
   uses it to reconcile metadata from multiple sources.
 
-**Done when**: identity primitive shipped with tests and docs; consumers in
-`dedupe`, `verify`, and `add` refactored to use it; `pytest && ruff` green;
-CHANGELOG updated; version bumped to 0.7.0.
+**Done when**: broader import paths, improved formatter controls and capability
+reporting, richer `search`/`--where`, `metadata doctor`, the
+`lint`/`groups`/`asset` UX fixes, and the shared identity primitive are
+implemented, tested, and documented; `dedupe`, `verify`/`enrich`, and `ref
+import` use that primitive; `pytest && ruff` green; CHANGELOG updated; version
+bumped to 0.6.0.
 
 ---
 
-### v0.8 — Multi-bib setup, Library, Catalogue, and MCP server
+### v0.7 — Multi-bib setup, Library, Catalogue, and MCP server
 
 - **`Library` (corpus)**: `Library.open(dir)`; `collections()`,
   `collection(path)`; cross-file `search`/`find_key`/dedup, reusing the identity
-  primitive from v0.7. A Library holds many `.bib` files (many pinakes).
+  primitive from v0.6. A Library holds many `.bib` files (many pinakes).
 - **Cross-library entry operations** — the motions single-file mode can't
-  express, built on the `Library` + v0.7 identity primitive:
+  express, built on the `Library` + v0.6 identity primitive:
   - **`corpus pick`** — cross-library entry cherry-pick, the missing verb:
     `corpus pick SRC.bib… --keys K1,K2,… --into DEST.bib [--with-materials]
     [--strip-groups | --map-group "Src=Dest"] [--dedupe]`. Pull a focused subset
@@ -122,46 +114,20 @@ CHANGELOG updated; version bumped to 0.7.0.
 **Done when**: `Library`, `Catalogue`, and the cross-library entry operations
 (`corpus pick`/`search`/`dedupe`) shipped with tests and docs; MCP server
 published as a companion package; agent-plan and change-summary features
-shipped; `pytest && ruff` green; CHANGELOG updated; version bumped to 0.8.0.
+shipped; `pytest && ruff` green; CHANGELOG updated; version bumped to 0.7.0.
 
 ### v1.0 — Launch
 
+**A polished single-file maintenance engine, losslessly JabRef-compatible, with
+a pinned public API and a PyPI release.** The unit of work is one
+`Bibliography` (one `.bib`). The multi-bib `Library`, `Catalogue`, and MCP
+server ship in v0.7 as optional companions.
+
 - Stable API, semver promise.
-- All eight guiding principles intact; coverage ≥90%; `ruff` clean.
+- All [core architecture invariants](docs/guides/architecture.md#core-invariants)
+  intact; coverage ≥90%; `ruff` clean.
 
 **Done when**: 1.0.0 is on PyPI.
-
----
-
-## Guiding principles (non-negotiable)
-
-Invariants from [docs/guides/architecture.md](docs/guides/architecture.md) and
-[CLAUDE.md](CLAUDE.md):
-
-1. **Round-trip fidelity** — unmodified entries write back byte-for-byte unless
-   the user explicitly requests canonical whole-file layout formatting.
-2. **Edits go through `editing.py`** — surgical, minimal-diff.
-3. **Operations mutate in place and return a count/report.**
-4. **Stable JSON envelope + exit-code contract.**
-5. **Duplicate keys tolerated, not an error.**
-6. **The file is the single source of truth; preserve by default, and impose a
-   canonical layout only when explicitly requested.**
-7. **Determinism** — no time/randomness/ordering in core logic; network is
-   opt-in and isolated.
-
-**What "pynakes 1.0" is**
-
-**A polished, deterministic, single-file maintenance engine — agent-safe,
-losslessly JabRef-compatible — with a pinned public API, released on PyPI.** The
-unit of work is one `Bibliography` (one `.bib`). 1.0 means: it does single-file
-maintenance excellently, covers the JabRef bib-file feature set, promises API
-stability (semver), and is installable. The multi-bib `Library`, `Catalogue`,
-and MCP server ship in v0.8 as optional companions — they extend reach without
-changing the core.
-
-**Beyond 1.0** (deferred to [v2.0](#v20--beyond-10)): projections as `Library`
-views with reconciliation, additional interchange formats,
-content-intelligence layers, and the Bimas GUI.
 
 ## v2.0 — Beyond 1.0
 
@@ -175,7 +141,7 @@ directly on.
   existing CSL-JSON/RIS/MODS/EndNote quartet, building on `pynakes.interchange`.
 - **Content-intelligence layers** — full-text extraction, content search,
   RAG/embeddings, and rich agent notes/memory, as an opt-in extra never on the
-  deterministic write path.
+  bibliography write path.
 - **Thin `pynakes` Bimas GUI** — a lightweight desktop GUI built on the pinned
   API, reading/writing `.bib` files through the library, not the CLI.
 

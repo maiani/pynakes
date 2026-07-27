@@ -9,11 +9,10 @@ Guidance for coding agents (and humans) **developing** this repository.
 
 ## What this project is
 
-`pynakes` is a headless, agent-safe BibTeX/BibLaTeX maintenance toolkit with a
+`pynakes` is a headless BibTeX/BibLaTeX maintenance toolkit with a
 custom parser built for round-trip fidelity. At the file layer it interoperates
 losslessly with JabRef and the BibTeX/BibLaTeX toolchain — that compatibility is
-a guarantee it keeps, not its identity. The base identity remains the
-deterministic `.bib` maintenance engine. Its optional **Pinax** mode manages a
+a guarantee it keeps, not its identity. Its optional **Pinax** mode manages a
 `.bib` together with the materials it points to, addressed by citation key.
 See [docs/guides/architecture.md](docs/guides/architecture.md) for the design,
 [docs/vision.md](docs/vision.md) for the design philosophy,
@@ -113,10 +112,10 @@ tests pass:
 
 - Don't replace or bypass the custom parser; it is deliberate and preserves
   round-trip fidelity.
-- Don't introduce nondeterminism (time, randomness, ordering) in core logic.
+- Don't introduce time, randomness, or unstable ordering in core logic.
   Network access must remain explicit: `ref import`, `ref ... --fetch`,
   `asset fetch`, or opt-in `--online` integrity operations. Everything else
-  stays offline and deterministic.
+  stays offline and performs no hidden network I/O.
 - Don't let a command emit a traceback — route failures through `_safe`.
 - Don't claim a feature is implemented when it is a stub. Keep `capabilities`,
   README, and docs honest; keep DEVPLAN forward-looking and put completed work

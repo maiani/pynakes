@@ -443,7 +443,7 @@ class TestInspectAndLint:
             "  eprint = {2101.00001}\n"
             "}\n"
             "@comment{pynakes-meta:\n"
-            "files-dir:\n"
+            "pinax-files-dir:\n"
             "}\n"
         )
 
@@ -708,7 +708,9 @@ class TestFilesCommand:
             )
         )
         bib = tmp_path / "refs.bib"
-        bib.write_text("@article{A,\n  title = {T}\n}\n@comment{pynakes-meta:\nfiles-dir:\n}\n")
+        bib.write_text(
+            "@article{A,\n  title = {T}\n}\n@comment{pynakes-meta:\npinax-files-dir:\n}\n"
+        )
 
         result = runner.invoke(app, ["asset", "check", str(bib), "--json"])
 
@@ -745,7 +747,9 @@ class TestFilesCommand:
             )
         )
         bib = tmp_path / "refs.bib"
-        bib.write_text("@article{A,\n  title = {T}\n}\n@comment{pynakes-meta:\nfiles-dir:\n}\n")
+        bib.write_text(
+            "@article{A,\n  title = {T}\n}\n@comment{pynakes-meta:\npinax-files-dir:\n}\n"
+        )
 
         result = runner.invoke(app, ["asset", "check", str(bib), "--fix", "--json"])
 
@@ -785,7 +789,9 @@ class TestFilesCommand:
             )
         )
         bib = tmp_path / "refs.bib"
-        bib.write_text("@article{A,\n  title = {T}\n}\n@comment{pynakes-meta:\nfiles-dir:\n}\n")
+        bib.write_text(
+            "@article{A,\n  title = {T}\n}\n@comment{pynakes-meta:\npinax-files-dir:\n}\n"
+        )
 
         result = runner.invoke(app, ["asset", "check", str(bib), "--fix", "--backup", "--json"])
 
@@ -967,11 +973,11 @@ class TestImportCommand:
         }
         assert (tmp_path / "refs.files" / f"{key}.preprint.pdf").read_bytes() == b"%PDF fixture"
         assert not (tmp_path / "refs.files" / f"{key}.source").exists()
-        assert "files-dir: refs.files" in bib.read_text()
+        assert "pinax-files-dir: refs.files" in bib.read_text()
 
     def test_add_fetch_honors_fetch_source_metadata(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
-        bib.write_text("@comment{pynakes-meta:\nfetch-policy: preprint\n}\n")
+        bib.write_text("@comment{pynakes-meta:\npinax-fetch-policy: preprint\n}\n")
         monkeypatch.setattr(importer_ops, "fetch_arxiv_atom", lambda identifier: ARXIV_ATOM)
         monkeypatch.setattr(
             "pynakes.fetch.fetch_arxiv_pdf", lambda arxiv_id, **kwargs: b"%PDF fixture"
@@ -1004,7 +1010,7 @@ class TestImportCommand:
     def test_import_fetch_reuses_published_fetch_path(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
         cache = tmp_path / "provider-cache"
-        bib.write_text("@comment{pynakes-meta:\nfetch-policy: published\n}\n")
+        bib.write_text("@comment{pynakes-meta:\npinax-fetch-policy: published\n}\n")
         monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", lambda doi: self.provider_bibtex)
 
         monkeypatch.setattr(
@@ -1410,7 +1416,7 @@ class TestReferenceCrud:
         bib.write_text(
             "@article{Noether1918, title = {Invariant Variational Problems}}\n"
             "@article{Einstein1905, title = {On the Electrodynamics of Moving Bodies}}\n"
-            "@comment{pynakes-meta:\nfiles-dir: refs.files\n}\n"
+            "@comment{pynakes-meta:\npinax-files-dir: refs.files\n}\n"
         )
         files = tmp_path / "refs.files"
         files.mkdir()
@@ -1832,7 +1838,7 @@ class TestKeysCommand:
         (files / "Smith2020.preprint.pdf").write_bytes(b"pdf")
         bib = tmp_path / "refs.bib"
         bib.write_text(
-            "@article{Smith2020,\n  title = {T}\n}\n@comment{pynakes-meta:\nfiles-dir:\n}\n"
+            "@article{Smith2020,\n  title = {T}\n}\n@comment{pynakes-meta:\npinax-files-dir:\n}\n"
         )
         tex = tmp_path / "paper.tex"
         tex.write_text(r"\cite{Smith2020}" "\n")
@@ -1852,7 +1858,7 @@ class TestKeysCommand:
         bib = tmp_path / "refs.bib"
         bib.write_text(
             "@article{Old,\n  author = {Jane Smith},\n  title = {A Test},\n  year = {2020}\n}\n"
-            "@comment{pynakes-meta:\nfiles-dir:\n}\n"
+            "@comment{pynakes-meta:\npinax-files-dir:\n}\n"
         )
 
         result = runner.invoke(app, ["keys", "generate", str(bib), "Old", "--dry-run", "--json"])
@@ -3226,7 +3232,7 @@ class TestDryRunDiffJsonIntegration:
 
 
 class TestAssetFetchPublished:
-    """`asset fetch` with `fetch-policy` metadata."""
+    """`asset fetch` with `pinax-fetch-policy` metadata."""
 
     def test_fetch_published_downloads_oa_pdf(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
@@ -3236,8 +3242,8 @@ class TestAssetFetchPublished:
             "  doi = {10.1002/andp.19053221004}\n"
             "}\n"
             "@comment{pynakes-meta:\n"
-            "files-dir: refs.files\n"
-            "fetch-policy: published\n"
+            "pinax-files-dir: refs.files\n"
+            "pinax-fetch-policy: published\n"
             "}\n"
         )
 
@@ -3279,8 +3285,8 @@ class TestAssetFetchPublished:
             "  doi = {not-a-doi}\n"
             "}\n"
             "@comment{pynakes-meta:\n"
-            "files-dir: refs.files\n"
-            "fetch-policy: published\n"
+            "pinax-files-dir: refs.files\n"
+            "pinax-fetch-policy: published\n"
             "}\n"
         )
 
@@ -3304,8 +3310,8 @@ class TestAssetFetchPublished:
             "  doi = {10.1002/andp.19053221004}\n"
             "}\n"
             "@comment{pynakes-meta:\n"
-            "files-dir: refs.files\n"
-            "fetch-policy: published\n"
+            "pinax-files-dir: refs.files\n"
+            "pinax-fetch-policy: published\n"
             "}\n"
         )
 
@@ -3334,8 +3340,8 @@ class TestAssetFetchPublished:
             "  doi = {10.1002/andp.19053221004}\n"
             "}\n"
             "@comment{pynakes-meta:\n"
-            "files-dir: refs.files\n"
-            "fetch-policy: source\n"
+            "pinax-files-dir: refs.files\n"
+            "pinax-fetch-policy: source\n"
             "}\n"
         )
 
@@ -3371,7 +3377,7 @@ class TestAssetFetchPublished:
             "  doi = {10.5555/entitled}\n"
             "}\n"
             "@comment{pynakes-meta:\n"
-            "files-dir: refs.files\n"
+            "pinax-files-dir: refs.files\n"
             "}\n"
         )
         monkeypatch.setattr(

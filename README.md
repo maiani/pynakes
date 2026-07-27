@@ -12,7 +12,9 @@
 > [!WARNING]
 > `pynakes` is alpha-quality software. Interfaces and behavior may change between releases.
 
-`pynakes` is a deterministic bibliography maintenance engine built for reliable agentic workflows, CI, and human use. Agents decide what should change; pynakes inspects, validates, previews, and applies those changes safely and reproducibly.
+`pynakes` is a command-line bibliography maintenance engine for BibTeX,
+BibLaTeX, and JabRef-compatible files. It supports inspection, validation,
+previewed edits, and structured output for people, scripts, and CI.
 
 The Python CLI makes small, explicit, reviewable changes to `.bib` files —
 minimal diffs, dry-run previews, and atomic writes — and reports every change
@@ -29,8 +31,11 @@ A `.bib` file is the index card; a **pinax** is the card together with the shelf
 
 - **Reviewable by design.** Modifying commands support `--dry-run --diff` for review before writing. Writes are atomic and re-parse-validated; `--backup` optionally retains the previous file. Ambiguous cases — conflicting merges, duplicate DOIs — are reported with exit code `2` rather than guessed.
 - **Round-trip fidelity.** An entry you don't touch is written back byte-for-byte. pynakes never normalizes whitespace, reorders fields, or re-quotes values behind your back — so diffs stay tiny and reviewable.
-- **A deterministic execution layer for agents and CI.** Stable JSON output and exit codes, machine-readable `capabilities`, structured change plans, and `--strict` / pre-commit gates let an agent exercise judgment without directly rewriting bibliography text.
-- **Deterministic and offline by default.** No hidden time, randomness, or ordering; network access is explicit (`ref import`, `asset fetch`, or `--online`) and confined to the few commands that need it.
+- **Automation and CI support.** JSON output and exit codes, machine-readable
+  `capabilities`, structured change plans, and `--strict` / pre-commit gates
+  allow callers to inspect outcomes without rewriting bibliography text.
+- **Explicit network access.** Network use is limited to `ref import`, `asset
+  fetch`, and operations invoked with `--online`.
 - **Preservation-first interoperability.** Untouched BibTeX/BibLaTeX source and
   JabRef metadata round-trip unchanged. `pynakes-meta` holds native settings;
   JabRef metadata can be preserved, adopted, and projected explicitly.
@@ -65,7 +70,7 @@ reported rather than silently applied. Every modifying command supports
 
 ### 2. Pinax — the corpus layer
 
-Opt in by setting a `files-dir` in the library metadata. Now every citation key can carry materials:
+Opt in by setting `pinax-files-dir` in the library metadata. Now every citation key can carry materials:
 
 - **arXiv download** — PDFs and source bundles, automatically fetched, verified, and extracted with provenance tracking (source hash, download timestamp)
 - **Open-access published PDFs** — resolved from DOI via OpenAlex, CrossRef, and publisher-specific URL overrides; `.published.pdf` lands only for genuinely OA papers, never misidentified repository mirrors
@@ -140,25 +145,27 @@ Commands still require an explicit path when there are multiple `.bib` files.
 
 See the [Quick Start guide](docs/guides/quickstart.md) and [Usage guide](docs/guides/usage.md) for the full command surface.
 
-## Safety model
+## Write behavior
 
-Every modifying command:
+Bibliography edits use a staged load → preview → commit lifecycle:
 
-- Validates before writing (parse errors, conflicts, missing required fields)
-- Supports `--dry-run` and `--diff` to preview changes
-- Writes atomically and optionally creates a `.bak` backup
-- Reports conflicts and exits `2` rather than guessing (e.g. duplicate DOI on import)
-- Emits structured JSON (`--json`) for programmatic use
+- Most modifying commands support `--dry-run` and `--diff`
+- Commits prepare and re-parse a temporary file before replacing the destination
+- `--backup` retains the previous contents where the command supports it
+- Ambiguous operations report a conflict and exit `2`
+- `--json` emits structured results for programmatic use
 
-## For scripted and LLM-assisted workflows
+These mechanisms reduce common write risks; they are not a formal guarantee
+against every process, operating-system, or storage failure.
 
-In an agentic workflow, the agent supplies judgment and pynakes supplies the
-deterministic execution layer. The same interface is safe for ordinary scripts
-and CI:
+## For automated workflows
+
+Scripts and LLM-assisted tools can use the same command interface as interactive
+users:
 
 - `--json` returns machine-readable results with status, warnings, and errors
-- `pynakes capabilities --json` describes supported operations for an agent
-- Exit codes: `0` success, `1` error, `2` conflict (safe to retry with user input)
+- `pynakes capabilities --json` describes supported operations
+- Exit codes: `0` success, `1` error, `2` conflict
 
 See the [LLM Integration guide](docs/guides/llm-integration.md) for the full JSON envelope and recommended workflows.
 

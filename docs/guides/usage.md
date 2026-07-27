@@ -356,7 +356,7 @@ Each identifier is fetched through its matching provider. By default
 `ref import` imports metadata only; `--fetch` also downloads configured Pinax
 materials for the new entry: arXiv preprint PDF/source when an arXiv id is
 present, and an open-access published PDF when the entry has a DOI and a
-suitable `fetch-policy`. Existing matching provider ids and returned DOIs are
+suitable `pinax-fetch-policy`. Existing matching provider ids and returned DOIs are
 detected before importing. Provider entries follow the library's
 BibTeX/BibLaTeX dialect.
 
@@ -471,7 +471,7 @@ normalize-journal-style: none
 normalize-protect-titles: false
 normalize-identifier-case: false
 normalize-keys: true
-protected-terms: Proceedings,OpenAI
+normalize-protected-terms: Proceedings,OpenAI
 }
 ```
 
@@ -484,7 +484,7 @@ formatter on a name field drives author normalization and a
 `clean_up_doi` formatter on `doi` drives DOI cleanup; its absence
 disables those steps. An explicit flag or a `pynakes-meta` key overrides.
 JabRef's `short_doi` action is not run: it requires the shortdoi.org network
-service, outside pynakes' deterministic offline normalization boundary, and is
+service, outside pynakes' offline normalization boundary, and is
 reported as an unsupported formatter warning.
 
 When `normalize` detects a JabRef aliased key whose pynakes-native equivalent

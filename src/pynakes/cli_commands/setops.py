@@ -50,14 +50,14 @@ def _entry_sources(named_libs: list[tuple[str, BibFile]]) -> dict[int, FileStore
 
 
 def _ensure_pinax_output(lib: BibFile, out: str, *, preserve_files_dir: bool = False) -> FileStore:
-    # Deriving files-dir from the --out basename is right for a fresh output
+    # Deriving pinax-files-dir from the --out basename is right for a fresh output
     # (keeps inputs read-only), but a self-combine (--out is also an input) must
-    # keep that library's own files-dir so a custom value isn't silently renamed.
+    # keep that library's own pinax-files-dir so a custom value isn't silently renamed.
     if not (preserve_files_dir and metadata_value(lib, FILES_DIR_KEY) is not None):
         set_metadata(lib, FILES_DIR_KEY, f"{Path(out).stem}.files")
     store = FileStore.from_metadata(lib, out)
     if store is None:
-        raise ValueError("could not resolve output files-dir")
+        raise ValueError("could not resolve output pinax-files-dir")
     return store
 
 
@@ -159,8 +159,8 @@ def combine(
                 "from": strip_meta_terminator(primary_files_dir),
                 "to": strip_meta_terminator(output_files_dir),
                 "message": (
-                    "Output files-dir derived from --out differs from the primary "
-                    "input's; materials were copied into the output's files-dir."
+                    "Output pinax-files-dir derived from --out differs from the primary "
+                    "input's; materials were copied into the output's pinax-files-dir."
                 ),
             }
         )

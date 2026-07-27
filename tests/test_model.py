@@ -142,7 +142,7 @@ class TestBibLibrary:
             entries=[entry],
             strings={"venue": "{Journal}"},
             raw_strings=["@string{venue = {Journal}}"],
-            raw_comments=["@comment{pynakes-meta: files-dir:refs.files;}"],
+            raw_comments=["@comment{pynakes-meta: pinax-files-dir:refs.files;}"],
             encoding="latin-1",
             line_ending="\r\n",
             source_layout=[("", "entry", entry)],
@@ -285,14 +285,14 @@ class TestBibLibrary:
         lib = BibFile(
             entries={},
             jabref_metadata={"databaseType": "biblatex;"},
-            pynakes_metadata={"files-dir": "refs.files"},
+            pynakes_metadata={"pinax-files-dir": "refs.files"},
         )
 
         assert lib.jabref_metadata == {"databaseType": "biblatex;"}
-        assert lib.pynakes_metadata == {"files-dir": "refs.files"}
+        assert lib.pynakes_metadata == {"pinax-files-dir": "refs.files"}
         assert [(block.key, block.namespace) for block in lib.metadata_blocks] == [
             ("databaseType", "jabref"),
-            ("files-dir", "pynakes"),
+            ("pinax-files-dir", "pynakes"),
         ]
 
 

@@ -20,7 +20,7 @@ _TYPE_VOCABULARY = {
 }
 
 # Error/conflict codes a caller may see in the JSON envelope's ``error`` field,
-# enumerated so agents can branch on them deterministically. Grouped by the exit
+# enumerated so callers can route on them explicitly. Grouped by the exit
 # code / status they accompany. Kept in sync with the codes the CLI emits.
 _ERROR_CODES = {
     "error": {
@@ -206,12 +206,10 @@ def get_capabilities() -> dict:
         "tool": "pynakes",
         "version": VERSION,
         "description": (
-            "Small, reviewable, deterministic edits to BibTeX/BibLaTeX .bib files — "
-            "minimal diffs, dry-run previews, atomic writes, and structured JSON — safe "
-            "for scripts, CI, and LLM agents. Losslessly interoperable with JabRef and "
-            "the BibTeX/BibLaTeX toolchain."
+            "BibTeX/BibLaTeX maintenance with minimal diffs, dry-run previews, "
+            "atomic writes, structured JSON, and JabRef interoperability."
         ),
-        "safe_by_default": True,
+        "network_access_is_explicit": True,
         "supports_dry_run": True,
         "supports_json_output": True,
         "supports_backup": True,

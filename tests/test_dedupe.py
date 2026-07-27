@@ -190,7 +190,7 @@ def test_dedupe_merge_moves_pinax_materials_to_surviving_key(tmp_path: Path) -> 
         "  year = {2020},\n"
         "  doi = {10.5555/abc}\n"
         "}\n"
-        "@comment{pynakes-meta:\nfiles-dir:\n}\n"
+        "@comment{pynakes-meta:\npinax-files-dir:\n}\n"
     )
     files = tmp_path / "refs.files"
     files.mkdir()
@@ -233,7 +233,7 @@ def test_dedupe_merge_pinax_materials_respects_dry_run(tmp_path: Path) -> None:
     bib.write_text(
         "@article{Survivor,\n  title = {A Practical Test},\n  doi = {10.5555/abc}\n}\n"
         "@article{Duplicate,\n  title = {A Practical Test},\n  doi = {10.5555/abc}\n}\n"
-        "@comment{pynakes-meta:\nfiles-dir:\n}\n"
+        "@comment{pynakes-meta:\npinax-files-dir:\n}\n"
     )
     files = tmp_path / "refs.files"
     files.mkdir()
@@ -254,7 +254,7 @@ def test_dedupe_merge_pinax_material_conflict_exit_2(tmp_path: Path) -> None:
     bib.write_text(
         "@article{Survivor,\n  title = {A Practical Test},\n  doi = {10.5555/abc}\n}\n"
         "@article{Duplicate,\n  title = {A Practical Test},\n  doi = {10.5555/abc}\n}\n"
-        "@comment{pynakes-meta:\nfiles-dir:\n}\n"
+        "@comment{pynakes-meta:\npinax-files-dir:\n}\n"
     )
     files = tmp_path / "refs.files"
     files.mkdir()

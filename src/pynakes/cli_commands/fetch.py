@@ -1,6 +1,6 @@
 """CLI command registration for ``pynakes asset fetch``.
 
-Downloads arXiv materials (PDF and source) for entries into the Pinax files-dir.
+Downloads arXiv materials (PDF and source) into the configured Pinax directory.
 """
 
 from enum import Enum
@@ -120,13 +120,13 @@ def fetch(
     ),
     file: str | None = bib_file_argument(),
     preprint: bool | None = typer.Option(
-        None, "--preprint", help="Fetch preprint PDF (overrides metadata fetch-policy)"
+        None, "--preprint", help="Fetch preprint PDF (overrides metadata pinax-fetch-policy)"
     ),
     published: bool | None = typer.Option(
-        None, "--published", help="Fetch published PDF (overrides metadata fetch-policy)"
+        None, "--published", help="Fetch published PDF (overrides metadata pinax-fetch-policy)"
     ),
     source: bool | None = typer.Option(
-        None, "--source", help="Fetch arXiv source archive (overrides metadata fetch-policy)"
+        None, "--source", help="Fetch arXiv source (overrides metadata pinax-fetch-policy)"
     ),
     supplement: bool | None = typer.Option(
         None, "--supplement", help="Fetch one unambiguous supplementary PDF"
@@ -134,7 +134,10 @@ def fetch(
     bestpdf: bool | None = typer.Option(
         None,
         "--bestpdf",
-        help="Best available PDF: published if OA, otherwise preprint (overrides metadata fetch-policy)",
+        help=(
+            "Best available PDF: published if OA, otherwise preprint "
+            "(overrides metadata pinax-fetch-policy)"
+        ),
     ),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(

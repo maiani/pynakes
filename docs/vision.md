@@ -1,17 +1,14 @@
 # Philosophy
 
-**pynakes makes small, explicit, reviewable changes to bibliography files —
-without reformatting, reordering, or corrupting the metadata a human or
-reference manager curated.**
+**pynakes makes explicit, reviewable changes to bibliography files while
+preserving source text it does not modify.**
 
-It is a deterministic engine, not an application. These are the design beliefs
-that shape it.
+It is a maintenance engine, not a bibliography application. These are the
+design beliefs that shape it.
 
-That engine is designed to sit beneath agentic bibliography workflows. The
-agent supplies interpretation and judgment; pynakes supplies bounded
-operations, inspection, validation, previews, conflict handling, and atomic
-writes. This separation makes an agent's actions reproducible and reviewable,
-while keeping the same engine directly useful to humans, scripts, and CI.
+Pynakes supplies bounded operations, inspection, validation, previews, conflict
+handling, and atomic writes. The same commands are directly useful to humans,
+scripts, CI, and LLM-assisted tools.
 
 ## Bibfiles in plain text, in git
 
@@ -24,32 +21,31 @@ That choice pays off only if the files stay diff-friendly:
 - **Round-trip fidelity.** An entry you don't touch is written back
   byte-for-byte. pynakes never normalizes whitespace, reorders fields, or
   re-quotes values behind your back.
-- **Surgical edits.** Changing one field is a one-line diff — not a reformatted
-  file. This is the property most tools that touch `.bib` files destroy, and the
-  one that makes keeping your bibliography in version control actually livable.
+- **Surgical edits.** Field and key changes use localized source edits instead
+  of reformatting the whole entry.
 - **The file is the single source of truth.** In-memory state is a derived
   working view; there is no database or persistent sidecar of record. Any index
   or cache is rebuildable and never competes with the files.
 
-## Safe for humans and machines
+## Reviewable automation
 
-pynakes is built so that a script or an LLM agent can edit a database you care
-about without you having to trust it blindly:
+Scripts and LLM-assisted tools can use pynakes without directly generating
+BibTeX:
 
-- **Reviewability is the substrate of trust.** Dry-run, unified diffs, atomic
-  validated writes, and *reporting conflicts instead of guessing* make every
-  machine action previewable and reversible.
-- **Preserve, don't impose.** The engine never rejects or rewrites data on its
-  own. Structure (required fields, identifiers) is *advisory* — enforced by
-  `lint` / `normalize` only when asked.
-- **Deterministic by default.** No time, randomness, or hidden ordering in core
-  logic. Network access is explicit (`ref import`, `asset fetch`, or `--online`) and isolated.
+- **Preview before commit.** Dry-run and unified diffs expose planned edits;
+  ambiguous operations report conflicts instead of choosing silently.
+- **Preserve unless asked to transform.** Normalization and formatting happen
+  only through explicit commands. Lint findings are advisory unless strict mode
+  is requested.
+- **Explicit side effects.** Network access is limited to `ref import`, `asset
+  fetch`, and operations invoked with `--online`.
 
 ## In JabRef's lineage
 
-pynakes is strongly influenced by JabRef. JabRef is the program that treated a `.bib` file as something worth curating with care, and pynakes carries that conviction forward —
-rebuilt headless, git-native, and safe for machines to drive. It is a descendant,
-not a rival: it speaks JabRef's metadata vocabulary fluently and reads JabRef's
+pynakes is strongly influenced by JabRef. JabRef is the program that treated a
+`.bib` file as something worth curating with care, and pynakes carries that
+conviction forward in a headless, git-oriented tool. It is a descendant, not a
+rival: it speaks JabRef's metadata vocabulary fluently and reads JabRef's
 configuration as guidance, honoring `saveOrderConfig`, `saveActions`, and key
 patterns whenever a library carries them.
 
@@ -68,7 +64,7 @@ lifecycle. It is complete and valuable on its own — for researchers, scripts,
 CI, and agents — with no dependency on any application above it.
 
 The optional Pinax mode keeps that base intact while letting a bibliography own a
-`files-dir` of citation-key-addressed materials. No `files-dir` means no Pinax
+`pinax-files-dir` of citation-key-addressed materials. No `pinax-files-dir` means no Pinax
 behavior. Cross-file corpus work — a `Library` over many pinakes, a derived
 `Catalogue` index — is on the post-1.0 roadmap; see
 [DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).

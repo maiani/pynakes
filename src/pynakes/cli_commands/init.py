@@ -7,7 +7,7 @@ like ``combine``/``split`` — reports the file it creates rather than using the
 single-file modify envelope.
 
 When ``--pinax`` is passed with an existing ``.bib`` file, the file is converted
-to a Pinax by adding the ``files-dir`` and fetch-policy metadata (no ``--force``
+to a Pinax by adding ``pinax-files-dir`` and ``pinax-fetch-policy`` metadata (no ``--force``
 needed — the conversion is additive). Combined with ``--from``, it also merges
 in any maintenance-profile keys (``dialect``, ``key-pattern``, ``normalize-keys``,
 ``sort-order``, ...) the template has and this library lacks, rather than
@@ -47,7 +47,7 @@ from pynakes.metadata import jabref_projection
 
 
 def _has_pinax_metadata(coll: Bibliography) -> bool:
-    """Return True when the bibliography already has a ``files-dir`` set."""
+    """Return True when the bibliography already has a ``pinax-files-dir`` set."""
     return any(k.strip().lower() == FILES_DIR_KEY for k in coll.lib.metadata)
 
 
@@ -98,10 +98,10 @@ def _convert_to_pinax(
     warnings: list[str] = []
 
     if not _has_pinax_metadata(coll):
-        coll.set_metadata("files-dir", f"{stem}.files")
-        coll.set_metadata("fetch-policy", "bestpdf")
+        coll.set_metadata("pinax-files-dir", f"{stem}.files")
+        coll.set_metadata("pinax-fetch-policy", "bestpdf")
     else:
-        warnings.append("files-dir already set; pinax metadata unchanged")
+        warnings.append("pinax-files-dir already set; pinax metadata unchanged")
 
     if from_ is not None:
         template_entries = collect_profile(Bibliography.open(from_).lib)
@@ -165,7 +165,9 @@ def init(
     from_: str | None = typer.Option(
         None, "--from", help="Copy the metadata profile from an existing .bib library"
     ),
-    pinax: bool = typer.Option(False, "--pinax", help="Seed pinax mode (files-dir, fetch-policy)"),
+    pinax: bool = typer.Option(
+        False, "--pinax", help="Seed pinax mode (pinax-files-dir, pinax-fetch-policy)"
+    ),
     agent_guide: bool = typer.Option(
         False,
         "--agent-guide",
@@ -248,8 +250,8 @@ def init(
         overrides.append(("key-pattern", key_pattern, "pynakes"))
     if pinax:
         stem = Path(file).stem
-        overrides.append(("files-dir", f"{stem}.files", "pynakes"))
-        overrides.append(("fetch-policy", "bestpdf", "pynakes"))
+        overrides.append(("pinax-files-dir", f"{stem}.files", "pynakes"))
+        overrides.append(("pinax-fetch-policy", "bestpdf", "pynakes"))
     entries = apply_overrides(entries, overrides)
 
     # With --jabref, project the native dialect/key-pattern into their JabRef

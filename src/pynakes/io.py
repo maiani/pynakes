@@ -3,6 +3,7 @@
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from shutil import copyfile
 
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.bibtex_writer import write_bib
@@ -23,6 +24,19 @@ class SaveResult:
     file_path: str
     backup_path: str | None = None
     error: str | None = None
+
+
+def _write_backup(path: Path) -> str:
+    """Copy ``path`` to ``<path>.bak`` without moving the original away."""
+    backup_path = Path(f"{path}.bak")
+    with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as tmp:
+        staged_backup = Path(tmp.name)
+    try:
+        copyfile(path, staged_backup)
+        staged_backup.replace(backup_path)
+    finally:
+        staged_backup.unlink(missing_ok=True)
+    return str(backup_path)
 
 
 def _decode_bytes(data: bytes) -> tuple[str, str]:
@@ -106,13 +120,17 @@ def save_text(
     (``validate=False``, the default). Shares the same atomic-write and backup
     mechanics in both cases.
 
-    The backup rename happens **after** the new file is safely in place so a
-    crash between the temp-write and the final rename never loses data: the
-    original is still at its original path until the atomic swap succeeds.
+    When backup and atomic writing are both enabled, the backup is staged as a
+    copy and published before the destination is atomically replaced. The
+    original therefore remains at the destination path until the final replace.
+    Temporary files are removed on handled failures. These mechanics reduce
+    common interruption hazards; they are not a formal durability guarantee
+    against every process, operating-system, or storage failure.
     """
     path = Path(file_path)
     backup_path = None
     original_exists = path.exists()
+    tmp_path: Path | None = None
 
     try:
         if atomic:
@@ -125,15 +143,14 @@ def save_text(
                 encoding=encoding,
                 newline="",
             ) as tmp:
+                tmp_path = Path(tmp.name)
                 tmp.write(content)
-                tmp_path = tmp.name
 
             if validate:
                 try:
-                    with open(tmp_path, "r", encoding=encoding) as f:
+                    with tmp_path.open("r", encoding=encoding) as f:
                         parse_bib(f.read())
                 except ParseError as e:
-                    Path(tmp_path).unlink(missing_ok=True)
                     return SaveResult(
                         success=False,
                         file_path=file_path,
@@ -141,39 +158,32 @@ def save_text(
                         error=f"Validation failed: {e}",
                     )
 
-            # Rename original to .bak only after the temp file is ready and
-            # validated.  A crash between the backup rename and the final
-            # replace would leave the original at backup_path; the except
-            # block restores it.
+            # Publish a copied backup without moving the destination away.
             if backup and original_exists:
-                backup_path = str(path) + ".bak"
-                path.rename(backup_path)
+                backup_path = _write_backup(path)
 
             # Atomic swap: on POSIX this is a single syscall.
-            Path(tmp_path).replace(path)
+            tmp_path.replace(path)
+            tmp_path = None
         else:
-            # Non-atomic write — backup first if requested.
+            # Non-atomic write — preserve a copied backup first if requested.
             if backup and original_exists:
-                backup_path = str(path) + ".bak"
-                path.rename(backup_path)
+                backup_path = _write_backup(path)
             with open(path, "w", encoding=encoding, newline="") as f:
                 f.write(content)
 
         return SaveResult(success=True, file_path=file_path, backup_path=backup_path, error=None)
 
     except _WRITE_ERRORS as e:
-        # Best-effort restore: if the original was moved to .bak but the new
-        # file is not yet at path, put the original back.
-        if backup_path and not path.exists():
-            Path(backup_path).rename(path)
-            backup_path = None
-
         return SaveResult(
             success=False,
             file_path=file_path,
             backup_path=backup_path,
             error=str(e),
         )
+    finally:
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
 
 
 def save_plain_text(

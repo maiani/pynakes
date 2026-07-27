@@ -9,13 +9,13 @@
 
 ## Identity
 
-**pynakes is first a deterministic `.bib` maintenance engine.** That identity
-stays intact: a plain `.bib` remains first-class, offline, reviewable, and free
+**pynakes is first a `.bib` maintenance engine.** A plain `.bib` remains
+first-class, offline, reviewable, and free
 of material-management behavior. Pinax is the optional corpus mode layered on
 top: the `.bib` file remains the source of truth and center of gravity, while the
 *corpus* is that file **plus the materials it points to** — PDFs and source
 bundles — addressed by citation key. pynakes keeps the references and their
-materials consistent, deterministically and reviewably. It is **not** a
+materials consistent through explicit, reviewable operations. It is **not** a
 knowledge base.
 
 The name is the project's own: *pynakes* is the *pinakes* (πίνακες) Callimachus
@@ -37,9 +37,9 @@ the `.bib`?*
 
 Everything in the right column builds a *derived intelligence layer over the
 content* of the materials. Such layers do not treat the `.bib` as their source
-of truth, they are often non-deterministic and dependency-heavy, and they are
+of truth, they are dependency-heavy, and they are
 genuinely hard to get right. They are **deferred, not forbidden**: when they
-come, they live *above or beside* the deterministic, bib-file-centric core — as
+come, they live *above or beside* the bib-file-centric core — as
 an opt-in extra (e.g. `pynakes[…]`) or a separate tool — so the core keeps its
 guarantees. See [Deliberately deferred](#deliberately-deferred).
 
@@ -53,31 +53,31 @@ guarantees. See [Deliberately deferred](#deliberately-deferred).
 
 **A pinax is a bibliography that also owns a directory of its materials.** It is
 not a new file format, a new object, or a new command namespace — it is a *mode*
-a bibliography enters when its `pynakes-meta` declares a `files-dir`:
+a bibliography enters when its `pynakes-meta` declares a `pinax-files-dir`:
 
-- A `.bib` with **no** `files-dir` is a plain bibliography. Nothing changes: no
+- A `.bib` with **no** `pinax-files-dir` is a plain bibliography. Nothing changes: no
   material linting, no fetching, no required PDFs, no extra network or filesystem
   expectations.
-- A `.bib` **with** a `files-dir` is a pinax: the same file, the same commands,
+- A `.bib` **with** a `pinax-files-dir` is a pinax: the same file, the same commands,
   but file-aware — keys address materials on disk, and operations keep the
   references and the materials consistent.
 
 ```bibtex
 @comment{pynakes-meta:
-files-dir: refs.files
+pinax-files-dir: refs.files
 }
 ```
 
 That single key is the switch. Set it and the bibliography is a pinax; remove it
 and it is a plain `.bib` again, the materials left untouched on disk.
 
-### The switch is `files-dir` — no redundant toggle
+### The switch is `pinax-files-dir` — no redundant toggle
 
-`files-dir` alone is the switch; there is deliberately **no** separate
+`pinax-files-dir` alone is the switch; there is deliberately **no** separate
 `pinax: true` boolean. Reasons:
 
 1. **Single source of truth, no invalid states.** A separate flag would permit
-   contradictions (`pinax: true` with no directory; a `files-dir` with
+   contradictions (`pinax: true` with no directory; a `pinax-files-dir` with
    `pinax: false`) that then need precedence rules to resolve.
 2. **The directory is the substantive fact.** "Is this a corpus?" and "where are
    its materials?" are the same question; the path answers both.
@@ -91,17 +91,17 @@ What a toggle reaches for — explicit intent and zero configuration — belongs
 the UX layer, not as a stored duplicate key:
 
 - A deliberate enable writes the default for you: `pynakes init --pinax refs.bib`
-  (or `metadata set files-dir`) records `files-dir: refs.files`, so you opt in on
+  (or `metadata set pinax-files-dir`) records `pinax-files-dir: refs.files`, so you opt in on
   purpose and never have to invent a directory name.
 - The default directory is **`<stem>.files`** (collision-safe when several `.bib`
-  files share a folder). A valueless `files-dir:` means "I am a pinax — use the
+  files share a folder). A valueless `pinax-files-dir:` means "I am a pinax — use the
   default."
 
 The one future condition that would justify an umbrella flag: if "pinax" ever
 means a *bundle* of behaviors toggled independently of whether materials are
 present (e.g. an auto-index). Since those are [deferred](#deliberately-deferred),
 that day is not here — and keeping such behaviors as their own keys lets an
-umbrella appear later without repainting `files-dir`.
+umbrella appear later without repainting `pinax-files-dir`.
 
 ## On-disk layout
 
@@ -110,7 +110,7 @@ from the citation key:
 
 ```text
 refs.bib
-refs.files/                       ← files-dir, declared in pynakes-meta
+refs.files/                       ← pinax-files-dir, declared in pynakes-meta
   alvarez2019.published.pdf       ← published PDF (version of record):  <citekey>.published.pdf
   alvarez2019.preprint.pdf        ← arXiv PDF:  <citekey>.preprint.pdf
   alvarez2019.source/             ← arXiv source bundle:  <citekey>.source/
@@ -133,14 +133,14 @@ version later appears: you just add `<citekey>.published.pdf` beside the existin
 
 | Shape | Path | Meaning |
 | --- | --- | --- |
-| **Published PDF** | `<files-dir>/<citekey>.published.pdf` | The version of record — present when available (often only if open-access). |
-| **Preprint PDF** | `<files-dir>/<citekey>.preprint.pdf` | The arXiv PDF. |
-| **Preprint source** | `<files-dir>/<citekey>.source/` | The arXiv source tree. **Read-only** in v1 — fetched, not authored. |
-| **Supplement PDF** | `<files-dir>/<citekey>.supplement.pdf` | Supplementary material (data, extended proofs, etc.). |
-| **Erratum PDF** | `<files-dir>/<citekey>.erratum.pdf` | Corrected / revised version. |
+| **Published PDF** | `<pinax-files-dir>/<citekey>.published.pdf` | The version of record — present when available (often only if open-access). |
+| **Preprint PDF** | `<pinax-files-dir>/<citekey>.preprint.pdf` | The arXiv PDF. |
+| **Preprint source** | `<pinax-files-dir>/<citekey>.source/` | The arXiv source tree. **Read-only** in v1 — fetched, not authored. |
+| **Supplement PDF** | `<pinax-files-dir>/<citekey>.supplement.pdf` | Supplementary material (data, extended proofs, etc.). |
+| **Erratum PDF** | `<pinax-files-dir>/<citekey>.erratum.pdf` | Corrected / revised version. |
 
 The filename is *derived* from the citation key, never stored. pynakes discovers
-materials by scanning `files-dir` against the keys it already knows; there is no
+materials by scanning `pinax-files-dir` against the keys it already knows; there is no
 per-entry `file` field to maintain (see
 [Breaking with JabRef's `file` field](#breaking-with-jabrefs-file-field)).
 
@@ -152,7 +152,7 @@ authoritative-and-irreplaceable:
 
 | Concern | Question | Source of truth | Rebuildable? |
 | --- | --- | --- | --- |
-| **Presence** | "Is there a PDF for `bohr1913`?" | the filesystem — scan `files-dir` | Always. |
+| **Presence** | "Is there a PDF for `bohr1913`?" | the filesystem — scan `pinax-files-dir` | Always. |
 | **Addressing** | "Where does `bohr1913` live?" | derived from the citation key | Always — a pure function. |
 | **Provenance** | "Where did this come from? Re-fetchable?" | `.pinax/manifest.json` | Partly — see below. |
 
@@ -175,8 +175,8 @@ is additive — it earns its place by recording provenance for precious files.
 
 ## Invariants the pinax mode adds
 
-These extend — never weaken — the guiding principles in
-[Architecture](architecture.md). They apply only when a `files-dir` is set.
+These extend the core invariants in
+[Architecture](architecture.md). They apply only when a `pinax-files-dir` is set.
 
 1. **Unique keys are a precondition for addressing materials.** Duplicate
    citation keys are already a problem everywhere — the BibTeX/Biber toolchain
@@ -190,9 +190,9 @@ These extend — never weaken — the guiding principles in
    hard precondition for those operations.
 2. **Materials are addressed, not tracked.** The filename is a pure function of
    the citation key. pynakes derives a path and scans; it records no path per
-   entry and writes no `file` field by default. `files-dir` itself must be a
+   entry and writes no `file` field by default. `pinax-files-dir` itself must be a
    *relative* path that does not escape the `.bib`'s directory — a pinax never
-   reads or writes outside its own tree, so a hand-edited `files-dir: /etc` or
+   reads or writes outside its own tree, so a hand-edited `pinax-files-dir: /etc` or
    `../../elsewhere` is rejected.
 3. **Presence is the filesystem; the manifest is provenance-only and
    rebuildable** for everything except precious files.
@@ -209,7 +209,8 @@ These extend — never weaken — the guiding principles in
    network into core logic.
 7. **Operations preserve the pinax.** Any operation that produces a `.bib` from a
    pinax produces a *pinax* — carrying the materials and per-entry state for the
-   entries it emits. `corpus combine` of pinakes yields a pinax whose files-dir is the
+   entries it emits. `corpus combine` of pinakes yields a pinax whose
+   `pinax-files-dir` is the
    union; `corpus split` yields several pinakes, each with its entries' materials. These
    stay **non-destructive**: materials are plainly **copied** into the outputs (no
    hardlinks or clever sharing), so inputs remain intact and a wrong result is
@@ -222,16 +223,16 @@ These extend — never weaken — the guiding principles in
 
 A pinax is a mode, not a tool, so the CLI gains **no `pinax` namespace** — at most
 one new top-level verb (`asset fetch`). Existing commands become file-aware when — and
-only when — a `files-dir` is set:
+only when — a `pinax-files-dir` is set:
 
 | To… | Use | What changes for a pinax |
 | --- | --- | --- |
-| Declare the files-dir | `init --pinax`, or `metadata set files-dir` | The only step that "creates" a pinax. |
+| Declare the materials directory | `init --pinax`, or `metadata set pinax-files-dir` | The only step that "creates" a pinax. |
 | See what materials exist | `inspect [--json]` | The report gains per-entry presence and local paths — the [agent surface](#agent-surface). |
-| Validate materials | `asset check [--fix]` | Reports missing/orphan/drift between references and `files-dir`; reconciles with `--fix`. |
+| Validate materials | `asset check [--fix]` | Reports missing/orphan/drift between references and `pinax-files-dir`; reconciles with `--fix`. |
 | Rename / regenerate keys | `keys rename`, `keys generate`, `keys repair` | Every material sharing the key — `<citekey>.published.pdf`, `<citekey>.preprint.pdf`, `<citekey>.source/` — moves with it (see [Coordinated edits](#coordinated-edits-and-atomicity)). |
 | Download missing materials | `asset fetch` (the one new download verb) | See [Fetch](#fetch-the-first-slice). |
-| Combine / split | `corpus combine`, `corpus split` | Produce pinakes; each output entry's materials are copied into the output's files-dir. Non-destructive — inputs untouched. |
+| Combine / split | `corpus combine`, `corpus split` | Produce pinakes; each output entry's materials are copied into the output's `pinax-files-dir`. Non-destructive — inputs untouched. |
 
 Everything else keeps working unchanged and simply *gains* file-awareness the
 moment the metadata key is present. That is the whole point of making a pinax a
@@ -241,13 +242,13 @@ property of the data rather than a separate command.
 
 The same principle holds in the Python API: **a pinax is a mode of
 `Bibliography`, not a wrapper class.** A bibliography opened from a `.bib` with a
-`files-dir` exposes a `files` handle (a `FileStore`); one without exposes `None`.
+`pinax-files-dir` exposes a `files` handle (a `FileStore`); one without exposes `None`.
 The lifecycle object does not change.
 
 ```python
 bib = Bibliography.open("refs.bib")
 if bib.files:                       # truthy ⇔ this bibliography is a pinax
-    report = bib.fetch_materials("alvarez2019")   # download into files-dir
+    report = bib.fetch_materials("alvarez2019")   # download into pinax-files-dir
 ```
 
 The mechanics stay out of the text engine: path computation, scanning, and moves
@@ -261,7 +262,7 @@ unaffected.
 
 `asset fetch` is the first concrete brick, and it sits dead-center on the identity:
 materials, addressed by citekey, with the `.bib` staying authoritative,
-deterministic, reviewable, and no content-intelligence.
+reviewable, and free of content-intelligence.
 
 Given an arXiv entry, it downloads the PDF and the source bundle into the right
 place:
@@ -277,7 +278,7 @@ versions](#preprint-and-published-versions).)
 
 It obeys the existing [network boundary](architecture.md#network-boundary):
 
-- **Opt-in and deterministic.** Network access is explicit; the default test
+- **Opt-in and testable.** Network access is explicit; the default test
   suite never touches it (fetchers are injectable, as in `importer.py`).
 - **Sources.** arXiv first — an entry's arXiv id (via `importer.entry_arxiv_id`)
   yields the preprint PDF at `arxiv.org/pdf/<id>` and the source tarball at
@@ -298,8 +299,8 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
   actual PDF). A step silently returns `None` when it does not know the paper;
   the chain stops at the first hit.
 - **Zero-config.** If the `.bib` is not yet a pinax, `asset fetch` records the default
-  `files-dir` (`<stem>.files`) and creates it — one command bootstraps the corpus.
-- **Atomic writes.** A download lands in a temporary name inside `files-dir` and
+  `pinax-files-dir` (`<stem>.files`) and creates it — one command bootstraps the corpus.
+- **Atomic writes.** A download lands in a temporary name inside `pinax-files-dir` and
   is atomically renamed into place; a partial download never leaves a half-file
   under a citation key. Source tarballs extract safely (no path traversal, no
   symlinks) into `<citekey>.source/`.
@@ -312,9 +313,10 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
   created. `failed` is reserved for an actual download or I/O error.
 - **Envelope.** `asset fetch` extends the standard JSON envelope with `fetched` /
   `skipped` / `failed` lists; `modified` reflects whether the `.bib` changed (e.g.
-  a `files-dir` was recorded), not the downloads themselves.
+  a `pinax-files-dir` was recorded), not the downloads themselves.
 
-What `asset fetch` downloads is **governed by metadata** — a single `fetch-policy`
+What `asset fetch` downloads is **governed by metadata** — a single
+`pinax-fetch-policy`
 key, a comma-separated list of artifact names, selects what to download (it never
 triggers network access on its own during offline operations). Per-invocation
 flags `--preprint`, `--published`, `--source`, `--supplement`, and `--bestpdf` override the
@@ -322,8 +324,8 @@ metadata policy for one call:
 
 ```bibtex
 @comment{pynakes-meta:
-files-dir: refs.files
-fetch-policy: bestpdf
+pinax-files-dir: refs.files
+pinax-fetch-policy: bestpdf
 }
 ```
 
@@ -337,7 +339,7 @@ and the two version classes hang off it by name:
 - `<citekey>.published.pdf` — the **published** version of record.
 - `<citekey>.preprint.pdf` and `<citekey>.source/` — the **arXiv** PDF and source.
 
-The `fetch-policy` key selects what `asset fetch` downloads: `preprint` the arXiv
+The `pinax-fetch-policy` key selects what `asset fetch` downloads: `preprint` the arXiv
 PDF, `source` the arXiv source tree, `published` the `.published.pdf`
 PDF, and `supplement` the `.supplement.pdf` PDF — set in metadata (or overridden
 per invocation with `--preprint`, `--published`, `--source`, `--supplement`, or
@@ -407,7 +409,7 @@ a preprint exists, backfills the arXiv id.
 - **Sources: OpenAlex first, Semantic Scholar fallback.** OpenAlex
   (`https://api.openalex.org/works/doi:<doi>`) needs no API key, its data is CC0,
   and it is already the identity backbone named for
-  [v0.7](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md). OpenAlex
+  [v0.6](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md). OpenAlex
   represents arXiv as a *location*, not an id field, so the resolver scans the
   work's `locations[]` for an `arxiv.org/abs/<id>` URL and parses it with the
   shared identifier helpers. When OpenAlex has the work but not the arXiv
@@ -453,13 +455,14 @@ cost of addressing materials by citation key, and it is acceptable because the
 drift is always detectable and the fix always reviewable.
 
 Rename is the **only in-place** material operation, and so the riskiest: it
-mutates an existing files-dir rather than writing fresh outputs the way `corpus combine`
+mutates an existing `pinax-files-dir` rather than writing fresh outputs the way
+`corpus combine`
 / `corpus split` do (where a failure just discards a half-written output). It warrants
 its own focused design pass before implementation.
 
 ## Provenance manifest (Tier 1)
 
-The manifest is additive and optional, at `<files-dir>/.pinax/manifest.json`, and
+The manifest is additive and optional, at `<pinax-files-dir>/.pinax/manifest.json`, and
 records **provenance only**:
 
 ```json
@@ -538,7 +541,7 @@ silently orphan a material.
 
 These are **not in the near-term identity** and deserve dedicated thought. They
 are deferred, not forbidden; when they arrive they sit *above or beside* the
-deterministic, bib-file-centric core — as an opt-in extra (e.g. `pynakes[…]`, and
+bib-file-centric core — as an opt-in extra (e.g. `pynakes[…]`, and
 a "bimas" experience layer may live here) or a separate tool — never woven into
 the core write path.
 
@@ -564,7 +567,8 @@ each step conforms to, and
 [DEVPLAN](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md) tracks it as a
 checklist.
 
-1. **`files-dir` + `FileStore` foundation (offline).** Recognize the `files-dir`
+1. **`pinax-files-dir` + `FileStore` foundation (offline).** Recognize the
+   `pinax-files-dir`
    `pynakes-meta` key; add `filestore.py` with the deterministic version-class
     paths (`<citekey>.published.pdf`, `<citekey>.preprint.pdf`, `<citekey>.source/`),
    directory scan, and presence checks; expose `Bibliography.files`
@@ -575,9 +579,9 @@ checklist.
    Unit-tested with fixtures, no real network. *(Implemented.)*
 3. **The `asset fetch` command.** `pynakes asset fetch [target] [file]
     [--dry-run] [--cache-dir DIR] [--json]`, with what-to-download governed by
-    the `fetch-policy` metadata key;
+    the `pinax-fetch-policy` metadata key;
     `Bibliography.ensure_files_dir` + `fetch_materials`; the zero-config default
-   `files-dir`; the JSON envelope; registration in `cli.py` and
+   `pinax-files-dir`; the JSON envelope; registration in `cli.py` and
    `capabilities.py`. *(The first end-to-end useful slice — "given an arXiv
    entry, download the PDF and source into the right place.")*
 4. **Agent surface.** `inspect --json` reports per-entry `published_pdf` /
@@ -589,7 +593,7 @@ checklist.
    per-entry `preprint_canonical` boolean (default `false`); `asset fetch` writes it and
    may initialize the boolean; `canonical_*` resolves from it. *(Implemented.)*
 6. **Pinax-aware `corpus combine` / `corpus split`.** Each output is a pinax; an output entry's
-   materials and per-entry state are copied into its files-dir. Non-destructive —
+   materials and per-entry state are copied into its `pinax-files-dir`. Non-destructive —
    inputs untouched. (Lower-risk than rename: outputs are fresh, so a failure just
    discards a half-written output.) *(Implemented.)*
 7. **Coordinated key edits (own design pass).** `keys rename` / `generate` /
@@ -619,7 +623,7 @@ Settled in discussion:
 
 - **`asset fetch` is a top-level command** (like `add` / `normalize`), not a new
   namespace.
-- **What to fetch is metadata-driven** — the `fetch-policy` key, not a
+- **What to fetch is metadata-driven** — the `pinax-fetch-policy` key, not a
    per-invocation flag.
 - **`add --fetch` is a convenience trigger** — it imports the reference, then
   runs the same metadata-driven fetch policy for the new key.
@@ -629,18 +633,18 @@ Settled in discussion:
   **plainly copying** materials into the outputs (no hardlinks); both stay
   non-destructive, and you delete the source pinax to reclaim disk after a split.
   `preprint_canonical` and provenance travel as copied per-entry state.
-- **`files-dir` is constrained** — relative, never escaping the `.bib`'s directory.
+- **`pinax-files-dir` is constrained** — relative, never escaping the `.bib`'s directory.
 - **Metadata format stays `pynakes-meta`** for now; a TOML sidecar in the
-  files-dir is the planned home for corpus config when it outgrows flat scalars
+  `pinax-files-dir` is the planned home for corpus config when it outgrows flat scalars
   (never TOML-in-`@comment{}`).
 
 Still open:
 
-1. **Default fetch-policy** — `bestpdf` (try published, fall back to preprint).
+1. **Default `pinax-fetch-policy`** — `bestpdf` (try published, fall back to preprint).
    Whether `source` should be fetched by default alongside `bestpdf`.
 2. **Command-surface migration** — how `asset check` reports both legacy JabRef
-   `file` fields and Pinax `files-dir` materials without confusing plain `.bib`
-   users. Leaning: file-awareness is gated on `files-dir`, so a plain `.bib` sees
+   `file` fields and `pinax-files-dir` materials without confusing plain `.bib`
+   users. Leaning: file-awareness is gated on `pinax-files-dir`, so a plain `.bib` sees
    `asset check` exactly as today; a pinax adds a separate, clearly-labeled
    materials section (presence / orphans / drift) while still validating any
    legacy `file` descriptors it finds.

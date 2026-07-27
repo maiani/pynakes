@@ -190,7 +190,7 @@ def test_init_pinax_creates_files_dir_beside_target(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert (project / "refs.files").is_dir()
     assert not (tmp_path / "refs.files").exists()
-    assert load_bib(str(out)).metadata["files-dir"].strip() == "refs.files"
+    assert load_bib(str(out)).metadata["pinax-files-dir"].strip() == "refs.files"
 
 
 def test_init_new_pinax_writes_agent_guide(tmp_path: Path) -> None:
@@ -217,14 +217,14 @@ def test_init_converts_existing_library_to_pinax_idempotently(tmp_path: Path) ->
     assert (tmp_path / "library.files").is_dir()
     assert (tmp_path / "AGENTS.md").exists()
     metadata = load_bib(str(out)).metadata
-    assert metadata["files-dir"] == "library.files"
-    assert metadata["fetch-policy"] == "bestpdf"
+    assert metadata["pinax-files-dir"] == "library.files"
+    assert metadata["pinax-fetch-policy"] == "bestpdf"
 
     second = runner.invoke(app, ["init", str(out), "--pinax", "--json"])
     assert second.exit_code == 0, second.output
     second_data = json.loads(second.output)
     assert second_data["modified"] is False
-    assert any("files-dir already set" in warning for warning in second_data["warnings"])
+    assert any("pinax-files-dir already set" in warning for warning in second_data["warnings"])
 
 
 def test_init_pinax_from_merges_missing_profile_keys(tmp_path: Path) -> None:

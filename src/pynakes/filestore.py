@@ -20,7 +20,7 @@ from pynakes._text_utils import strip_meta_terminator
 from pynakes.metadata import metadata_value
 from pynakes.model import BibEntry, BibFile
 
-FILES_DIR_KEY = "files-dir"
+FILES_DIR_KEY = "pinax-files-dir"
 PUBLISHED_SUFFIX = ".published"
 PREPRINT_SUFFIX = ".preprint"
 SOURCE_SUFFIX = ".source"
@@ -98,7 +98,7 @@ class MaterialPresence:
 
 @dataclass(frozen=True)
 class OrphanMaterial:
-    """One material-shaped path in ``files-dir`` whose key is not in the library."""
+    """One material-shaped path in ``pinax-files-dir`` whose key is not in the library."""
 
     key: str
     kind: str
@@ -159,7 +159,7 @@ class FileStore:
 
     @classmethod
     def from_metadata(cls, lib: BibFile, bib_path: str | Path) -> "FileStore | None":
-        """Return the configured file store, or ``None`` when no ``files-dir`` is set."""
+        """Return the configured file store, or ``None`` when no ``pinax-files-dir`` is set."""
         value = metadata_value(lib, FILES_DIR_KEY)
         if value is None:
             return None
@@ -721,7 +721,7 @@ class FileStore:
 
 
 def resolve_files_dir(value: str, bib_path: str | Path) -> Path:
-    """Resolve and validate a ``files-dir`` metadata value.
+    """Resolve and validate a ``pinax-files-dir`` metadata value.
 
     Empty values use the default ``<bib-stem>.files`` directory. Non-empty values
     must be relative to the bibliography directory and must not escape it. A
@@ -735,10 +735,12 @@ def resolve_files_dir(value: str, bib_path: str | Path) -> Path:
         return base / f"{bib.stem}.files"
     path = Path(raw).expanduser()
     if path.is_absolute():
-        raise ValueError("files-dir must be a relative path inside the bibliography directory")
+        raise ValueError(
+            "pinax-files-dir must be a relative path inside the bibliography directory"
+        )
     resolved = Path(os.path.abspath(os.fspath(base / path)))
     if not resolved.is_relative_to(base):
-        raise ValueError("files-dir must not escape the bibliography directory")
+        raise ValueError("pinax-files-dir must not escape the bibliography directory")
     return resolved
 
 

@@ -41,7 +41,8 @@ OFFLINE_CATALOG = [
     "then split a subset back out and inspect both outputs.",
     "Trigger at least one expected structured error, such as a missing file or bad query, "
     "and report whether the JSON envelope is actionable.",
-    "Create or inspect a Pinax files-dir without online access, then verify inspect/json "
+    "Create or inspect a Pinax materials directory (`pinax-files-dir`) without online access, "
+    "then verify inspect/json "
     "and asset-check behavior on a bibliography with no fetched materials.",
     "Remove or rename an entry in a Pinax-style bibliography and verify the command output "
     "makes material cleanup or rename behavior clear.",
@@ -54,9 +55,9 @@ ONLINE_CATALOG = [
     "metadata against the arXiv URL/eprint fields.",
     "Use `ref import --fetch` with an arXiv identifier to create a Pinax entry and fetch "
     "preprint PDF/source materials in one workflow.",
-    "Create or inspect a Pinax files-dir, set fetch-policy metadata, "
+    "Create or inspect a Pinax materials directory, set pinax-fetch-policy metadata, "
     "then fetch arXiv materials and inspect the manifest.",
-    "Configure fetch-policy for a DOI-backed entry and run `asset fetch`, distinguishing "
+    "Configure pinax-fetch-policy for a DOI-backed entry and run `asset fetch`, distinguishing "
     "product issues from OpenAlex/provider failures.",
     "Start from a DOI-backed paper, use online published enrichment to backfill its arXiv id, "
     "then build a Pinax and fetch the arXiv PDF/source materials.",

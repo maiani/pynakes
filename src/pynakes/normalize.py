@@ -159,7 +159,7 @@ def _resolve_title_fields(lib: BibFile, option: list[str] | None) -> list[str]:
 
 def _resolve_terms(lib: BibFile, option: list[str] | None) -> list[str]:
     terms = list(option or [])
-    terms.extend(metadata_list(metadata_value(lib, "protected-terms")))
+    terms.extend(metadata_list(metadata_value(lib, "normalize-protected-terms")))
     return terms
 
 
@@ -294,8 +294,8 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
     journal_style = _resolve_choice(
         lib, opts.journal_style, "journal-style", journal_ops.JOURNAL_STYLES, "none"
     )
-    journal_table = opts.journal_table or metadata_value(lib, "journal-table")
-    ltwa_table = opts.ltwa_table or metadata_value(lib, "ltwa-table")
+    journal_table = opts.journal_table or metadata_value(lib, "normalize-journal-table")
+    ltwa_table = opts.ltwa_table or metadata_value(lib, "normalize-ltwa-table")
     journal_sources = journal_ops.load_sources(journal_table, ltwa_table)
     journal_result = journal_ops.normalize_journals(lib, journal_style, journal_sources)
     result.journals = journal_result.changed
