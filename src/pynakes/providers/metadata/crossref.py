@@ -10,6 +10,53 @@ from pynakes._identifiers import normalize_doi
 from pynakes.providers._http import fetch_json
 
 API_URL = "https://api.crossref.org/works/"
+WORKS_QUERY_URL = "https://api.crossref.org/works"
+
+
+def fetch_doi_by_alternative_id(
+    alternative_id: str,
+    *,
+    cache_dir: str | Path | None = None,
+    urlopen: Callable[..., object] | None = None,
+) -> str | None:
+    """Resolve a publisher-assigned alternative id to its DOI, or ``None``.
+
+    Elsevier and other publishers deposit their internal article identifier
+    (for Elsevier, the PII) as a Crossref ``alternative-id``, which makes this
+    the resolution path for publisher URLs that carry no DOI.
+    """
+    value = alternative_id.strip()
+    if not value:
+        return None
+    url = (
+        f"{WORKS_QUERY_URL}?filter=alternative-id:{quote(value, safe='')}"
+        "&rows=1&select=DOI,alternative-id"
+    )
+    data = fetch_json(
+        url,
+        namespace="crossref-alternative-id",
+        identifier=value,
+        provider="CrossRef",
+        cache_dir=cache_dir,
+        opener=urlopen,
+    )
+    if data is None:
+        return None
+    message = data.get("message")
+    items = message.get("items") if isinstance(message, dict) else None
+    if not isinstance(items, list):
+        return None
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        raw = item.get("DOI")
+        if not isinstance(raw, str):
+            continue
+        try:
+            return normalize_doi(raw)
+        except ValueError:
+            continue
+    return None
 
 
 def fetch_work_by_doi(

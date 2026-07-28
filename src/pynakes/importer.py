@@ -17,8 +17,11 @@ from collections.abc import Callable
 from pynakes._identifiers import (
     canonical_doi,
     looks_like_arxiv_id,
+    looks_like_isbn,
     normalize_arxiv,
     normalize_doi,
+    normalize_isbn,
+    normalize_pii,
 )
 from pynakes.identity import (
     WorkIdentifiers,
@@ -28,6 +31,7 @@ from pynakes.identity import (
 from pynakes.keys import UnsupportedCitationKeyPatternError, generate_key, unique_key
 from pynakes.model import BibEntry, BibFile
 from pynakes.providers._http import ProviderFetchError
+from pynakes.providers.metadata import acl_anthology, dblp, inspire
 from pynakes.providers.metadata import doi as doi_provider
 from pynakes.providers.records import ReferenceMetadata
 from pynakes.providers.registry import RawMetadataFetcher, get_import_provider
@@ -43,7 +47,11 @@ from pynakes.providers.repositories import (
     ssrn,
     zenodo,
 )
-from pynakes.providers.url_resolvers import extract_publisher_doi, resolve_reference_url
+from pynakes.providers.url_resolvers import (
+    extract_publisher_doi,
+    resolve_reference_url,
+    url_resolution_hint,
+)
 
 # Re-exported for callers that import the parsed-record type from this module.
 ArxivRecord = arxiv.ArxivRecord
@@ -65,6 +73,11 @@ OSF = "osf"
 HAL = "hal"
 CHEMRXIV = "chemrxiv"
 RESEARCH_SQUARE = "research_square"
+PII = "pii"
+ISBN = "isbn"
+INSPIRE = "inspire"
+DBLP = "dblp"
+ACL = "acl"
 
 IDENTIFIER_KINDS = {
     DOI,
@@ -81,6 +94,11 @@ IDENTIFIER_KINDS = {
     HAL,
     CHEMRXIV,
     RESEARCH_SQUARE,
+    PII,
+    ISBN,
+    INSPIRE,
+    DBLP,
+    ACL,
 }
 
 
@@ -147,10 +165,18 @@ FetchArxivAtom = Callable[[str], str]
 def extract_doi_from_journal_url(url: str) -> str | None:
     """Extract a DOI from a recognized journal article URL, or return ``None``.
 
-    Consults the declarative publisher URL resolver table. Currently supports:
+    Consults the DOI-bearing rules of the declarative publisher URL resolver
+    table. Currently supports:
 
     * ``nature.com/articles/{slug}`` → DOI ``10.1038/{slug}``
     * ``journals.aps.org/{journal}/abstract/{doi}`` → DOI embedded in path
+    * ``link.springer.com/{article,chapter,book,…}/{doi}`` → DOI in path
+    * ``onlinelibrary.wiley.com/doi/{doi}`` → DOI in path
+    * ``journals.plos.org/{journal}/article?id={doi}`` → DOI in query
+
+    Publisher URLs addressed by another identifier — such as a ScienceDirect
+    PII — resolve through :func:`resolve_identifier` and their own provider
+    instead, so they are not returned here.
     """
     return extract_publisher_doi(url)
 
@@ -158,10 +184,11 @@ def extract_doi_from_journal_url(url: str) -> str | None:
 def resolve_identifier(value: str) -> tuple[str, str]:
     """Classify ``value`` and return ``(kind, normalized_identifier)``.
 
-    URLs are resolved by the ordered provider URL table. Bare DOI and arXiv
-    identifiers retain their convenient forms; identifiers that would
-    otherwise be ambiguous require a provider prefix such as ``PMID:`` or
-    ``Zenodo:``.
+    URLs are resolved by the ordered provider URL table, so any supported
+    repository, catalogue, or publisher article URL can be passed directly.
+    Bare DOI, arXiv, and unambiguous ISBN identifiers retain their convenient
+    forms; identifiers that would otherwise be ambiguous require a provider
+    prefix such as ``PMID:`` or ``Zenodo:``.
     """
     raw = value.strip()
     if not raw:
@@ -192,6 +219,13 @@ def resolve_identifier(value: str) -> tuple[str, str]:
         ("hal:", HAL, hal.normalize_identifier),
         ("chemrxiv:", CHEMRXIV, chemrxiv.normalize_identifier),
         ("researchsquare:", RESEARCH_SQUARE, research_square.normalize_identifier),
+        ("pii:", PII, normalize_pii),
+        ("isbn:", ISBN, normalize_isbn),
+        ("isbn-10:", ISBN, normalize_isbn),
+        ("isbn-13:", ISBN, normalize_isbn),
+        ("inspire:", INSPIRE, inspire.normalize_identifier),
+        ("dblp:", DBLP, dblp.normalize_identifier),
+        ("acl:", ACL, acl_anthology.normalize_identifier),
     )
     for prefix, kind, normalizer in labeled:
         if lowered.startswith(prefix):
@@ -211,9 +245,18 @@ def resolve_identifier(value: str) -> tuple[str, str]:
         if normalized is not None:
             return ARXIV, normalized
 
+    # A bare ISBN, restricted to the forms no other record id can be mistaken for.
+    if looks_like_isbn(raw):
+        return ISBN, normalize_isbn(raw)
+
+    # A recognized host whose article URLs carry no recoverable identifier.
+    hint = url_resolution_hint(raw)
+    if hint is not None:
+        raise UnsupportedIdentifierError(f"Cannot resolve {value!r}: {hint}")
+
     raise UnsupportedIdentifierError(
-        f"Unrecognized identifier {value!r}; expected a DOI, arXiv id, "
-        "provider-prefixed identifier, or supported repository/publisher URL"
+        f"Unrecognized identifier {value!r}; expected a DOI, arXiv id, ISBN, "
+        "provider-prefixed identifier, or supported repository/catalogue/publisher URL"
     )
 
 

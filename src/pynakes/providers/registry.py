@@ -6,7 +6,14 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
-from pynakes.providers.metadata import doi
+from pynakes.providers.metadata import (
+    acl_anthology,
+    dblp,
+    doi,
+    elsevier,
+    inspire,
+    openlibrary,
+)
 from pynakes.providers.records import ReferenceMetadata
 from pynakes.providers.repositories import (
     arxiv,
@@ -83,7 +90,9 @@ def _load_medrxiv(
     return biorxiv.fetch_metadata(identifier, server="medrxiv", dialect=dialect, fetcher=fetcher)
 
 
-def _repository_loader(module: object) -> MetadataLoader:
+def _client_loader(module: object) -> MetadataLoader:
+    """Adapt any client exposing ``fetch_metadata(identifier, dialect, fetcher)``."""
+
     def load(
         identifier: str, dialect: str, fetcher: RawMetadataFetcher | None
     ) -> ReferenceMetadata:
@@ -99,17 +108,22 @@ IMPORT_PROVIDERS: Mapping[str, ImportProvider] = MappingProxyType(
         "pmid": ImportProvider("pmid", "PubMed", _load_pmid),
         "pmcid": ImportProvider("pmcid", "PubMed Central", _load_pmcid),
         "europe_pmc": ImportProvider("europe_pmc", "Europe PMC", _load_europe_pmc),
-        "ssrn": ImportProvider("ssrn", "SSRN", _repository_loader(ssrn)),
-        "nber": ImportProvider("nber", "NBER", _repository_loader(nber)),
+        "ssrn": ImportProvider("ssrn", "SSRN", _client_loader(ssrn)),
+        "nber": ImportProvider("nber", "NBER", _client_loader(nber)),
         "biorxiv": ImportProvider("biorxiv", "bioRxiv", _load_biorxiv),
         "medrxiv": ImportProvider("medrxiv", "medRxiv", _load_medrxiv),
-        "zenodo": ImportProvider("zenodo", "Zenodo", _repository_loader(zenodo)),
-        "osf": ImportProvider("osf", "OSF Preprints", _repository_loader(osf)),
-        "hal": ImportProvider("hal", "HAL", _repository_loader(hal)),
-        "chemrxiv": ImportProvider("chemrxiv", "ChemRxiv", _repository_loader(chemrxiv)),
+        "zenodo": ImportProvider("zenodo", "Zenodo", _client_loader(zenodo)),
+        "osf": ImportProvider("osf", "OSF Preprints", _client_loader(osf)),
+        "hal": ImportProvider("hal", "HAL", _client_loader(hal)),
+        "chemrxiv": ImportProvider("chemrxiv", "ChemRxiv", _client_loader(chemrxiv)),
         "research_square": ImportProvider(
-            "research_square", "Research Square", _repository_loader(research_square)
+            "research_square", "Research Square", _client_loader(research_square)
         ),
+        "pii": ImportProvider("pii", "Elsevier ScienceDirect", _client_loader(elsevier)),
+        "isbn": ImportProvider("isbn", "Open Library", _client_loader(openlibrary)),
+        "inspire": ImportProvider("inspire", "INSPIRE-HEP", _client_loader(inspire)),
+        "dblp": ImportProvider("dblp", "DBLP", _client_loader(dblp)),
+        "acl": ImportProvider("acl", "ACL Anthology", _client_loader(acl_anthology)),
     }
 )
 

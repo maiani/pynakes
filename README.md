@@ -51,8 +51,8 @@ then:
 - **Normalize** — authors, DOIs, months, journals, `saveActions` pipeline
 - **Format** — lint-gated, deterministic layout rewrites with portable
   field/entry/block ordering and opt-in safe value wrapping
-- **Import** by DOI, repository/preprint id, or supported URL, with configurable
-  key generation, or add a manual entry
+- **Import** by DOI, repository/preprint id, ISBN, or supported publisher URL,
+  with configurable key generation, or add a manual entry
 - **Dedupe & merge** — detect and resolve duplicates, with conflict reporting
 - **Bulk-edit fields** — set, rename, move, append, clear, or protect fields on matching references
 - **Manage groups and keys** — list, rename, repair, generate from patterns
@@ -130,10 +130,13 @@ pynakes init mylib.bib
 pynakes inspect mylib.bib
 pynakes lint mylib.bib --json
 
-# Import by DOI, repository id, or supported URL, or add one manually
+# Import by DOI, repository id, ISBN, or supported URL, or add one manually
 pynakes ref import 10.5555/example mylib.bib
 pynakes ref import arXiv:2301.00001 mylib.bib
 pynakes ref import PMID:12345678 mylib.bib
+pynakes ref import 978-0-00-000000-2 mylib.bib
+pynakes ref import INSPIRE:Author:2024abc mylib.bib
+pynakes ref import https://link.springer.com/article/10.5555/example mylib.bib
 pynakes ref add Manual2026 mylib.bib --field title="Manual Reference" --field year=2026
 pynakes ref add  # interactive
 pynakes ref show Manual2026 mylib.bib

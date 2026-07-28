@@ -329,8 +329,8 @@ stdin is an error rather than a prompt.
 
 ## import
 
-Import a reference by DOI, repository/preprint identifier, or supported URL. The type is
-auto-detected, so the same command handles all of these:
+Import a reference by DOI, repository/preprint identifier, ISBN, or supported
+URL. The type is auto-detected, so the same command handles all of these:
 
 ```bash
 pynakes ref import 10.5555/example refs.bib --dry-run --diff
@@ -341,6 +341,47 @@ pynakes ref import PMID:12345678 refs.bib
 pynakes ref import https://www.nber.org/papers/w12345 refs.bib
 pynakes ref import https://zenodo.org/records/1234567 refs.bib
 ```
+
+Publisher article URLs and book ISBNs work the same way, so a page URL copied
+from a browser can be imported without first digging out its DOI:
+
+```bash
+pynakes ref import https://link.springer.com/article/10.5555/example refs.bib
+pynakes ref import https://onlinelibrary.wiley.com/doi/10.5555/example refs.bib
+pynakes ref import https://journals.plos.org/plosone/article?id=10.5555/example refs.bib
+pynakes ref import https://iopscience.iop.org/article/10.5555/example refs.bib
+pynakes ref import https://scipost.org/SciPostPhys.10.1.001 refs.bib
+pynakes ref import https://www.jstor.org/stable/1171664 refs.bib
+pynakes ref import https://www.sciencedirect.com/science/article/pii/S0123456789012345 refs.bib
+pynakes ref import 978-0-00-000000-2 refs.bib
+pynakes ref import ISBN:0123456789 refs.bib
+```
+
+SciPost article ids and numeric JSTOR stable ids become their publisher's DOI;
+ScienceDirect URLs carry a Publisher Item Identifier, which is resolved to a DOI
+before the metadata lookup. ISBNs resolve through Open Library and produce a
+`@book` entry; check digits are validated locally, so a mistyped ISBN fails
+before any network request.
+
+Discipline-specific databases publish their own BibTeX, which carries detail the
+DOI record omits — eprints and report numbers from INSPIRE, venue and editor
+details from the ACL Anthology:
+
+```bash
+pynakes ref import INSPIRE:Author:2024abc refs.bib
+pynakes ref import https://inspirehep.net/literature/451647 refs.bib
+pynakes ref import DBLP:journals/cacm/Codd70 refs.bib
+pynakes ref import https://aclanthology.org/2023.acl-long.1 refs.bib
+```
+
+An INSPIRE texkey is the citation key high-energy physics already uses, so
+`--key-source provider` adopts it verbatim. DBLP's own key is not usable as a
+citation key, so a key is generated instead.
+
+Some platforms publish article URLs with no identifier in them at all — AIP's
+`pubs.aip.org` pages and legacy ISSN-based IOPscience URLs among them. Those
+fail with advice to import the DOI printed on the article page rather than
+guessing at a match.
 
 Options:
 

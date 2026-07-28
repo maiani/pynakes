@@ -1,5 +1,25 @@
 """Metadata provider implementations."""
 
-from pynakes.providers.metadata import crossref, doi, openalex, semantic_scholar
+from pynakes.providers.metadata import (
+    acl_anthology,
+    crossref,
+    dblp,
+    doi,
+    elsevier,
+    inspire,
+    openalex,
+    openlibrary,
+    semantic_scholar,
+)
 
-__all__ = ["crossref", "doi", "openalex", "semantic_scholar"]
+__all__ = [
+    "acl_anthology",
+    "crossref",
+    "dblp",
+    "doi",
+    "elsevier",
+    "inspire",
+    "openalex",
+    "openlibrary",
+    "semantic_scholar",
+]

@@ -32,6 +32,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   records, OSF Preprints, HAL records, ChemRxiv preprints, and Research Square
   manuscripts. Provider-prefixed identifiers and canonical archive URLs are
   supported, with duplicate detection across repository ids and returned DOIs.
+- `ref import` now resolves Springer Nature, Wiley Online Library, PLOS, and
+  Elsevier ScienceDirect article URLs, so a page URL can be imported without
+  first extracting its DOI. Springer, Wiley, and PLOS URLs carry the DOI in
+  their path or query; ScienceDirect URLs and `PII:` identifiers resolve through
+  the Crossref `alternative-id` index to the article's DOI, keeping the PII as
+  identifier evidence.
+- `ref import` now resolves IOPscience, SciPost, and JSTOR article URLs, plus
+  legacy `aip.scitation.org/doi/<doi>` URLs. SciPost article ids map to their
+  `10.21468` DOI and numeric JSTOR stable ids to their `10.2307` DOI, while
+  JSTOR book chapters and hosted content carry the full DOI in the stable path.
+- `ref import` now reports actionable advice instead of a generic failure for
+  URLs that are recognizable but carry no recoverable identifier: modern AIP
+  `pubs.aip.org` article URLs, legacy ISSN-based IOPscience URLs, and JSTOR
+  stable ids that are neither numeric nor a DOI.
+- `ref import` now accepts INSPIRE-HEP records (record id or texkey), DBLP
+  records, and ACL Anthology papers, each through the BibTeX those services
+  publish, so eprints, report numbers, and venue/editor detail that DOI records
+  omit are preserved. An INSPIRE texkey is adopted verbatim by `--key-source
+  provider`; DBLP's unusable key is discarded in favor of a generated one, and
+  its `timestamp`/`biburl`/`bibsource` bookkeeping fields are dropped.
+- `ref import` now accepts ISBNs and Open Library `openlibrary.org/isbn/<isbn>`
+  URLs, producing a `@book` entry with publisher, place, edition, and series
+  from Open Library edition data. Hyphenated or spaced ISBN-10/ISBN-13 values
+  and compact `978`/`979` ISBN-13 values are recognized bare; a compact ISBN-10
+  uses the `ISBN:` prefix. Check digits are validated before any lookup, and
+  duplicate detection matches the `isbn` field of existing entries.
 
 ### Changed
 

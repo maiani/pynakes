@@ -23,12 +23,16 @@ Tasks below are listed in implementation priority order.
   across import, identity, and metadata pathways.
 - **New import paths**: expand the
   [import-provider inventory](docs/guides/import-providers.md) through the
-  normalized provider interface and declarative URL resolver tables.
-- **Generalized URL import**: `ref import <url>` auto-detects identifier type
-  from any supported publisher/catalog URL (DOI, arXiv, PubMed, SSRN, NBER,
-  ISBN, nature.com, journals.aps.org, plus the new Elsevier/Springer/Wiley/PLOS
-  patterns) and resolves it through the appropriate provider, normalizing the
-  result into a uniform metadata dict.
+  normalized provider interface and declarative URL resolver tables. The
+  remaining Planned rows are the publisher platforms (IEEE, ACM, RSC, ACS,
+  Project Euclid), the metadata indexes as import entry points (Crossref,
+  DataCite, OpenAlex, Semantic Scholar), and the other book catalogues (Google
+  Books, Library of Congress). Candidates not yet in the inventory, ordered by
+  the size of the community whose canonical identifier is not a DOI: NASA ADS
+  (bibcodes; needs a user-supplied API token), OpenReview, RePEc/IDEAS handles,
+  zbMATH Open and MathSciNet review numbers, institutional-repository URN
+  resolvers such as DiVA, and SciELO. Google Scholar stays out of scope: it has
+  no API and scraping it is against its terms.
 - **Complete JabRef formatting compatibility**: implement and test the remaining
   v5.15 formatter-as-modifier behavior and key-pattern markers/modifiers, using
   upstream JabRef implementations, tests, and golden vectors as the oracle.
