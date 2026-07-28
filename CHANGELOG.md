@@ -152,6 +152,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolver table, providing the extension point for the broader v0.6 import
   paths without adding one module per publisher URL pattern.
 
+### Fixed
+
+- **`asset fetch` can always name its library.** The whole-library form (no
+  citation key) had no way to say *which* `.bib` when siblings shared the
+  directory: the first positional is the citation key, so `asset fetch refs.bib`
+  fell through to auto-detection and failed with "Multiple *.bib files found;
+  specify one as an argument" — while the user had just specified one. It now
+  accepts `--file` for that form (the same option `ref add` already uses when its
+  key argument is omitted), reports a pointed error when a `.bib` path is passed
+  where the citation key goes, and treats a blank key as "every entry" instead of
+  looking up the empty key. `asset check` was never affected — it takes libraries
+  as variadic positionals.
+
 ## [0.5.1] - 2026-07-21
 
 ### Added

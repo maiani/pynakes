@@ -50,13 +50,8 @@ Tasks below are listed in implementation priority order.
 - **Multi-entry triage view**: `ref show --keys k1,k2,… [--abstract]` (or
   `search --show-abstract`) to scan a set of candidate entries in one call
   instead of one invocation per key.
-- **`asset fetch`/`check` file targeting**: a `--all`/`--file` form to operate
-  on every entry in a specific library when sibling `.bib` files share the
-  directory (today the first positional is read as a citation key, and bare
-  auto-detect fails with multiple `.bib` files present).
-
 **Done when**: broader import paths, `metadata doctor`, single-bibliography
-`analysis`/`stats`, and the `lint`/`groups`/`asset` UX fixes are implemented,
+`analysis`/`stats`, and the `lint`/`groups` UX fixes are implemented,
 tested, and documented;
 `pytest && ruff` green; CHANGELOG updated; version bumped to 0.6.0.
 

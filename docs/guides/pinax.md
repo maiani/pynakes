@@ -272,6 +272,16 @@ pynakes asset fetch alvarez2019 refs.bib  →  refs.files/alvarez2019.preprint.p
                                              refs.files/alvarez2019.source/
 ```
 
+Omit the citation key to fetch every entry with configured missing materials.
+Because the key is the first positional argument, that whole-library form names
+the library with `--file`:
+
+```bash
+pynakes asset fetch --file refs.bib          # every entry in this library
+pynakes asset fetch alvarez2019 refs.bib     # one entry
+pynakes asset fetch                          # every entry, lone .bib auto-detected
+```
+
 (arXiv yields the preprint; a published `<citekey>.published.pdf` lands only when an
 open-access published PDF is found — see [Preprint and published
 versions](#preprint-and-published-versions).)

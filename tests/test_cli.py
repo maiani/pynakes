@@ -3584,6 +3584,94 @@ class TestAssetFetchPublished:
         )
 
 
+class TestAssetFetchLibraryTargeting:
+    """Naming the library for a whole-library `asset fetch`."""
+
+    LIB = (
+        "@article{Newton1687,\n"
+        "  title = {Principia},\n"
+        "  eprint = {1234.5678},\n"
+        "  archiveprefix = {arXiv}\n"
+        "}\n"
+        "@comment{pynakes-meta:\n"
+        "pinax-files-dir: main.files\n"
+        "}\n"
+    )
+
+    def _library_pair(self, tmp_path: Path, monkeypatch) -> None:
+        (tmp_path / "main.bib").write_text(self.LIB)
+        (tmp_path / "other.bib").write_text(self.LIB)
+        monkeypatch.chdir(tmp_path)
+
+    def test_file_option_targets_a_library_among_siblings(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        # The citation key comes first positionally, so the whole-library form
+        # needs --file; with siblings present, auto-detection cannot decide.
+        self._library_pair(tmp_path, monkeypatch)
+
+        result = runner.invoke(app, ["asset", "fetch", "--file", "main.bib", "--dry-run", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["file"] == "main.bib"
+        assert data["dry_run"] is True
+
+    def test_library_path_as_the_key_argument_is_a_pointed_error(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        self._library_pair(tmp_path, monkeypatch)
+
+        result = runner.invoke(app, ["asset", "fetch", "main.bib", "--dry-run", "--json"])
+
+        assert result.exit_code == 1
+        message = json.loads(result.output)["message"]
+        assert "citation key, not a library path" in message
+        assert "--file main.bib" in message
+
+    def test_library_given_twice_is_refused(self, tmp_path: Path, monkeypatch) -> None:
+        self._library_pair(tmp_path, monkeypatch)
+
+        result = runner.invoke(
+            app,
+            ["asset", "fetch", "Newton1687", "main.bib", "--file", "other.bib", "--json"],
+        )
+
+        assert result.exit_code == 1
+        assert "not both positionally and with --file" in json.loads(result.output)["message"]
+
+    def test_blank_key_means_every_entry(self, tmp_path: Path, monkeypatch) -> None:
+        # An unset variable in a script ("$KEY") must not become a lookup for
+        # the empty citation key.
+        self._library_pair(tmp_path, monkeypatch)
+
+        result = runner.invoke(app, ["asset", "fetch", "", "main.bib", "--dry-run", "--json"])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["file"] == "main.bib"
+
+    def test_key_with_positional_library_still_works(self, tmp_path: Path, monkeypatch) -> None:
+        self._library_pair(tmp_path, monkeypatch)
+
+        result = runner.invoke(
+            app, ["asset", "fetch", "Newton1687", "main.bib", "--dry-run", "--json"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["file"] == "main.bib"
+
+    def test_check_accepts_explicit_libraries(self, tmp_path: Path, monkeypatch) -> None:
+        # `asset check` takes libraries as variadic positionals, so it never had
+        # the targeting gap `fetch` did.
+        self._library_pair(tmp_path, monkeypatch)
+
+        result = runner.invoke(app, ["asset", "check", "main.bib", "other.bib", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert [item["file"] for item in data["files"]] == ["main.bib", "other.bib"]
+
+
 class TestLintCategories:
     """`lint` reports which command fixes a finding and can filter by category."""
 

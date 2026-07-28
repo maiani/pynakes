@@ -4,6 +4,7 @@ Downloads arXiv materials (PDF and source) into the configured Pinax directory.
 """
 
 from enum import Enum
+from pathlib import Path
 from types import TracebackType
 
 import typer
@@ -114,11 +115,24 @@ class _RichFetchProgress:
                 self._progress.remove_task(task_id)
 
 
+def _looks_like_bib_path(target: str | None) -> bool:
+    """Return whether ``target`` is a path to an existing ``.bib`` file.
+
+    A citation key is never also a ``.bib`` file on disk, so this distinguishes
+    ``asset fetch refs.bib`` (a mis-typed whole-library run) from
+    ``asset fetch Newton1687`` without guessing.
+    """
+    return target is not None and target.lower().endswith(".bib") and Path(target).is_file()
+
+
 def fetch(
     target: str | None = typer.Argument(
         None, help="Citation key to fetch (default: all entries with configured missing materials)"
     ),
     file: str | None = bib_file_argument(),
+    file_option: str | None = typer.Option(
+        None, "--file", help="Library path when the citation-key argument is omitted"
+    ),
     preprint: bool | None = typer.Option(
         None, "--preprint", help="Fetch preprint PDF (overrides metadata pinax-fetch-policy)"
     ),
@@ -154,9 +168,33 @@ def fetch(
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Download Pinax materials, optionally using existing institutional network access."""
+    """Download Pinax materials, optionally using existing institutional network access.
+
+    With no citation key every entry with configured missing materials is
+    fetched. Since the key comes first positionally, name the library with
+    ``--file`` for that whole-library form (``asset fetch --file refs.bib``);
+    the positional library path is for the single-key form
+    (``asset fetch KEY refs.bib``).
+    """
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    file = _resolve_input_bib(file, json_output)
+    if file is not None and file_option is not None:
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            "Specify the library once, not both positionally and with --file",
+        )
+    if target is not None and not target.strip():
+        # A blank key (an unset variable in a script) means "no key", not a
+        # lookup for the empty key.
+        target = None
+    if file is None and file_option is None and _looks_like_bib_path(target):
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            f"The first argument is a citation key, not a library path; "
+            f"use --file {target} to fetch every entry in that library",
+        )
+    file = _resolve_input_bib(file_option or file, json_output)
 
     try:
         coll = Bibliography.open(file)

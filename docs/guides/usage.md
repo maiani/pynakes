@@ -505,6 +505,19 @@ pynakes asset check refs.bib --root ~/papers --json
 pynakes asset check refs.bib --fix --backup
 ```
 
+`asset check` takes one or more libraries as positional arguments (handy for CI
+gating). `asset fetch` downloads materials for one entry or for a whole library;
+its first positional is a citation key, so the whole-library form names the
+library with `--file`:
+
+```bash
+pynakes asset fetch alvarez2019 refs.bib   # one entry
+pynakes asset fetch --file refs.bib        # every entry with missing materials
+```
+
+See the [Pinax guide](pinax.md#fetch-the-first-slice) for what gets downloaded
+and how `pinax-fetch-policy` governs it.
+
 The checker parses plain paths and JabRef descriptors such as:
 
 ```bibtex
