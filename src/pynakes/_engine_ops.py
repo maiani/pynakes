@@ -28,7 +28,7 @@ from pynakes._engine_helpers import (
     metadata_fetch_policy,
     run_fetch_loop,
 )
-from pynakes.canonical import CanonicalLayout, validate_format_input
+from pynakes.canonical import CanonicalLayout, format_selected_entries, validate_format_input
 from pynakes.editing import set_entry_type
 from pynakes.fetch_progress import FetchProgress
 from pynakes.filestore import FILES_DIR_KEY, resolve_files_dir
@@ -192,12 +192,27 @@ class BibliographyOperations:
 
     # --- format/metadata operations -------------------------------------
 
-    def format(self, layout: CanonicalLayout | None = None) -> int:
-        """Lint, then stage a layout-only canonical rewrite and return the entry count."""
+    def format(
+        self,
+        layout: CanonicalLayout | None = None,
+        where: str | QueryFilter = None,
+    ) -> int:
+        """Lint, then stage a layout-only rewrite and return the entry count.
+
+        Without ``where`` this is the whole-file canonical rewrite. With a
+        ``where`` selector it reformats only the matching entries, in place, so
+        unmatched entries and the file's block layout stay byte-for-byte
+        identical; whole-file policies (entry order, block order, blank lines
+        between entries) are not part of a selection and do not apply.
+        """
         validate_format_input(self.lib)
-        self._format_layout = layout or CanonicalLayout()
-        self._entry_snapshot = {}
-        return len(self.lib.entries)
+        resolved = layout or CanonicalLayout()
+        selector = self._where(where)
+        if selector is None:
+            self._format_layout = resolved
+            self._entry_snapshot = {}
+            return len(self.lib.entries)
+        return format_selected_entries(self.lib, resolved, selector)
 
     def normalize(
         self,

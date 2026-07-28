@@ -79,6 +79,8 @@ with usage examples, see the [API overview](index.md).
 
 ::: pynakes.capabilities
 
-## Search
+## Selection and search
+
+::: pynakes.query
 
 ::: pynakes.search

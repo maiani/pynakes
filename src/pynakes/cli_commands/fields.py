@@ -6,7 +6,6 @@ retaining the stable CLI contract.
 
 import typer
 
-from pynakes import fields as fields_ops
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     RunParams,
@@ -16,18 +15,12 @@ from pynakes.cli_common import (
     _safe,
     _verb,
     bib_file_argument,
+    build_where_filter,
+    where_option,
 )
 from pynakes.engine import Bibliography
 
 # --- fields ----------------------------------------------------------------
-
-
-def _build_filter(where: str | None) -> fields_ops.QueryFilter:
-    # A bad expression raises ValueError, which @_safe renders as a structured
-    # exit-1 error (honoring --json), so no local handling is needed here.
-    if where is None:
-        return None
-    return fields_ops.parse_query(where)
 
 
 def _run_field_op(
@@ -54,7 +47,7 @@ def fields_rename(
     file: str | None = bib_file_argument(),
     old: str = typer.Argument(..., help="Existing field name"),
     new: str = typer.Argument(..., help="New field name"),
-    where: str | None = typer.Option(None, "--where", help="Filter expression"),
+    where: str | None = where_option(),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
@@ -63,7 +56,7 @@ def fields_rename(
     """Rename a field across matching references."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    flt = _build_filter(where)
+    flt = build_where_filter(where)
     _run_field_op(
         file,
         "fields_rename",
@@ -78,7 +71,7 @@ def fields_set(
     file: str | None = bib_file_argument(),
     field: str = typer.Argument(..., help="Field name"),
     value: str = typer.Argument(..., help="Replacement value"),
-    where: str | None = typer.Option(None, "--where", help="Filter matching references"),
+    where: str | None = where_option(),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
@@ -87,7 +80,7 @@ def fields_set(
     """Set or replace a field on matching references."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    flt = _build_filter(where)
+    flt = build_where_filter(where)
     _run_field_op(
         file,
         "fields_set",
@@ -102,7 +95,7 @@ def fields_move(
     file: str | None = bib_file_argument(),
     old: str = typer.Argument(..., help="Existing field name"),
     new: str = typer.Argument(..., help="Target field name"),
-    where: str | None = typer.Option(None, "--where", help="Filter expression"),
+    where: str | None = where_option(),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
@@ -111,7 +104,7 @@ def fields_move(
     """Move a field on matching references, without replacing the target."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    flt = _build_filter(where)
+    flt = build_where_filter(where)
     _run_field_op(
         file,
         "fields_move",
@@ -126,7 +119,7 @@ def fields_append(
     file: str | None = bib_file_argument(),
     field: str = typer.Argument(..., help="Field name"),
     value: str = typer.Argument(..., help="Value to append"),
-    where: str | None = typer.Option(None, "--where", help="Filter expression"),
+    where: str | None = where_option(),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
@@ -135,7 +128,7 @@ def fields_append(
     """Append a value to a delimited field on matching references."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    flt = _build_filter(where)
+    flt = build_where_filter(where)
     _run_field_op(
         file,
         "fields_append",
@@ -149,7 +142,7 @@ def fields_append(
 def fields_clear(
     file: str | None = bib_file_argument(),
     field: str = typer.Argument(..., help="Field name to remove"),
-    where: str | None = typer.Option(None, "--where", help="Filter expression"),
+    where: str | None = where_option(),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
@@ -158,7 +151,7 @@ def fields_clear(
     """Remove a field from matching references."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    flt = _build_filter(where)
+    flt = build_where_filter(where)
     _run_field_op(
         file,
         "fields_clear",
@@ -175,7 +168,7 @@ def fields_protect_title(
     term: list[str] | None = typer.Option(
         None, "--term", help="Additional exact term to brace-protect"
     ),
-    where: str | None = typer.Option(None, "--where", help="Filter expression"),
+    where: str | None = where_option(),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
@@ -184,7 +177,7 @@ def fields_protect_title(
     """Brace-protect capitalization-sensitive tokens in title-like fields."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    flt = _build_filter(where)
+    flt = build_where_filter(where)
     terms = term or []
     _run_field_op(
         file,

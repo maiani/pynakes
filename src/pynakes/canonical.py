@@ -14,6 +14,7 @@ BibTeX/BibLaTeX and TeX awareness:
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 
@@ -37,6 +38,7 @@ __all__ = [
     "FormatLintError",
     "WrapValues",
     "format_entry",
+    "format_selected_entries",
     "layout_from_metadata",
     "validate_format_input",
     "write_bib_canonical",
@@ -688,6 +690,62 @@ def _validate_formatted_semantics(lib: BibFile, text: str, layout: CanonicalLayo
         raise ValueError("format safety check failed: canonical output changed @preamble blocks")
     if raw_blocks(lib.raw_comments) != raw_blocks(reparsed.raw_comments):
         raise ValueError("format safety check failed: canonical output changed @comment blocks")
+
+
+def format_selected_entries(
+    lib: BibFile,
+    layout: CanonicalLayout | None = None,
+    predicate: Callable[[BibEntry], bool] | None = None,
+) -> int:
+    """Reformat the entries matching ``predicate`` in place; return how many matched.
+
+    This is the *selection* counterpart to :func:`write_bib_canonical`. A
+    selection cannot own whole-file decisions — block placement, entry order,
+    blank lines between entries — so this rewrites only the layout *inside* each
+    matching entry, by replacing its ``raw_content``. Every other byte of the
+    file, including unmatched entries, is left exactly as it was, which keeps
+    the diff to the entries the caller asked for.
+    """
+    if layout is None:
+        layout = _DEFAULT_LAYOUT
+    # An entry's semantic values come from the library's ``@string`` namespace, so
+    # the per-entry safety check has to reparse it in that context, not in
+    # isolation, or a macro reference would look like a changed value.
+    strings = "".join(f"{raw.strip()}{lib.line_ending}" for raw in lib.raw_strings)
+    matched = 0
+    for entry in lib.entries.values():
+        if predicate is not None and not predicate(entry):
+            continue
+        matched += 1
+        text = format_entry(entry, layout, lib.line_ending)
+        _validate_formatted_entry(entry, text, layout, strings)
+        if entry.raw_content != text:
+            # ``field_expressions`` deliberately keeps the source spelling of each
+            # value: layout owns indentation, order, commas, and wrapping, and
+            # re-deriving expressions from wrapped output would let a second pass
+            # wrap already-wrapped text.
+            entry.raw_content = text
+    return matched
+
+
+def _validate_formatted_entry(
+    entry: BibEntry,
+    text: str,
+    layout: CanonicalLayout,
+    strings: str = "",
+) -> None:
+    """Verify that reformatting one entry changed its layout only."""
+    normalize_whitespace = layout.wrap_values != "off"
+    expected = _semantic_signature(
+        BibFile(entries=[entry]), normalize_whitespace=normalize_whitespace
+    )
+    actual = _semantic_signature(
+        parse_bib(f"{strings}{text}"), normalize_whitespace=normalize_whitespace
+    )
+    if expected != actual:
+        raise ValueError(
+            f"format safety check failed: layout rewrite changed entry {entry.key!r} semantics"
+        )
 
 
 def _ordered_entries(

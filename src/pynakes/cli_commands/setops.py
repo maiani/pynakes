@@ -24,6 +24,8 @@ from pynakes.cli_common import (
     _finish_create,
     _safe,
     _verb,
+    build_where_filter,
+    where_option,
 )
 from pynakes.diff import generate_diff
 from pynakes.filestore import FILES_DIR_KEY, FileStore
@@ -98,13 +100,22 @@ def combine(
         help="Collapse entries that share a citation key; differing same-key "
         "entries are reported as a conflict instead of guessing",
     ),
+    where: str | None = where_option(
+        "Keep only the entries matching this selector in the combined output"
+    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would change without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff of the output"),
     backup: bool = _BACKUP_OPTION,
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Combine several .bib files into one (optionally deduping by citation key)."""
+    """Combine several .bib files into one (optionally deduping by citation key).
+
+    With ``--where`` the output keeps only the entries matching the shared
+    selector grammar, so combining a focused subset out of several libraries is
+    one command rather than a combine-then-prune script.
+    """
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    selector = build_where_filter(where)
     named_inputs = _load_inputs(inputs)
     pinax_sources = _entry_sources(named_inputs)
     merged = merge_libraries(named_inputs, dedupe=dedupe)
@@ -126,6 +137,11 @@ def combine(
             ],
         )
         return
+
+    if selector is not None:
+        kept = [entry for entry in merged.lib.entries.values() if selector(entry)]
+        merged.lib = merged.lib.derive(kept)
+        merged.duplicate_keys = sorted(merged.lib.entries.duplicate_keys())
 
     self_output = Path(out).resolve() in {Path(p).resolve() for p in inputs}
     primary_files_dir = metadata_value(merged.lib, FILES_DIR_KEY)
@@ -165,7 +181,8 @@ def combine(
             }
         )
 
-    human = [f"Combined {len(merged.inputs)} file(s) → {entries} {_entries(entries)}."]
+    selection = f" matching {where!r}" if where is not None else ""
+    human = [f"Combined {len(merged.inputs)} file(s) → {entries} {_entries(entries)}{selection}."]
     if pinax_sources:
         human.append(f"  pinax materials copied: {len(pinax_materials)}")
     if merged.duplicate_keys:
@@ -183,6 +200,7 @@ def combine(
         warnings=warnings,
         inputs=merged.inputs,
         dedupe=dedupe,
+        where=where,
         entries=entries,
         pinax_materials=pinax_materials,
     )
@@ -212,8 +230,9 @@ def split(
     to: list[str] = typer.Option(
         ...,
         "--to",
-        help="Output rule FILE='predicate' (repeatable). Predicate: a --where "
-        'expression, or one of * / used / unused / group "Name".',
+        help="Output rule FILE='predicate' (repeatable). Predicate: any --where "
+        "expression (including and/or/not), or one of * / used / unused / "
+        'group "Name".',
     ),
     copy: bool = typer.Option(
         False,

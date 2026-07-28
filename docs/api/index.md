@@ -299,6 +299,47 @@ protect_title_capitalization(lib, terms=["OpenAI"])
 move_field(lib, "school", "institution")
 ```
 
+## Selecting entries
+
+`pynakes.query` compiles the selector grammar the CLI exposes as `--where`
+(`fields.parse_query` is the same function). A compiled expression is a callable
+predicate over entries, usable directly by any operation that takes `where`, and
+`to_dict()` describes what was parsed:
+
+```python
+from pynakes.query import parse_query
+
+recent_gaps = parse_query("year >= 2025 and doi missing and type in [article, inproceedings]")
+selected = [entry for entry in lib.entries.values() if recent_gaps(entry)]
+recent_gaps.to_dict()  # JSON-friendly description of the parsed expression
+```
+
+Pass `cited_keys=` to enable the `used` / `unused` predicates. Operators cover
+substring, equality, ordered comparison (numeric, partial-date, or textual),
+list membership, regular expressions, fuzzy similarity, and field
+presence/absence; see the [selector reference](../guides/usage.md#selecting-entries-where).
+
+## Search
+
+`search_entries` is read-only. Terms are ANDed, `field:term` scopes a term, and
+`fuzzy=True` also accepts misspellings. Each result carries the fields it matched
+plus one `FieldMatch` per hit explaining it:
+
+```python
+from pynakes.query import parse_query
+from pynakes.search import search_entries
+
+results = search_entries(
+    lib,
+    'title:"quantom computting"',
+    where=parse_query("year >= 2020"),
+    fuzzy=True,
+)
+for result in results:
+    for match in result.matches:
+        print(result.key, match.field, match.kind, round(match.score, 2), match.excerpt)
+```
+
 ## Reference Import (DOI / arXiv)
 
 ```python

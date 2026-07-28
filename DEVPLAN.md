@@ -47,13 +47,6 @@ Tasks below are listed in implementation priority order.
   and required-field coverage, lint finding counts, group membership, and
   declared linked-file coverage. Keep analysis offline and separate from
   mutation; do not turn heuristic scores into quality judgments.
-- **Richer `search` + shared `--where` grammar**: fuzzy title matching, date-range
-  filtering, "entries missing field X" queries, search-result JSON with match
-  explanations. Extend the `--where` grammar beyond single predicates to boolean
-  `and`/`or`, `key in [...]`, and numeric comparison (`year >= 2025`) — covers
-  common agent facepalms without writing ad-hoc grep. Make it one transversal
-  selector surface shared by entry-addressable commands (`search`, `fields`,
-  `format`, and corpus operations) rather than adding command-specific filters.
 - **Multi-entry triage view**: `ref show --keys k1,k2,… [--abstract]` (or
   `search --show-abstract`) to scan a set of candidate entries in one call
   instead of one invocation per key.
@@ -62,9 +55,9 @@ Tasks below are listed in implementation priority order.
   directory (today the first positional is read as a citation key, and bare
   auto-detect fails with multiple `.bib` files present).
 
-**Done when**: broader import paths, richer `search`/`--where`, `metadata
-doctor`, single-bibliography `analysis`/`stats`, and the
-`lint`/`groups`/`asset` UX fixes are implemented, tested, and documented;
+**Done when**: broader import paths, `metadata doctor`, single-bibliography
+`analysis`/`stats`, and the `lint`/`groups`/`asset` UX fixes are implemented,
+tested, and documented;
 `pytest && ruff` green; CHANGELOG updated; version bumped to 0.6.0.
 
 ---

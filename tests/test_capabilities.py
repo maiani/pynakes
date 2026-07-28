@@ -129,8 +129,33 @@ class TestErrorCatalogAndGrammar:
     def test_predicate_grammar_is_present(self) -> None:
         grammar = get_capabilities()["predicate_grammar"]
         assert "contains" in grammar["field_operators"]
-        assert "*" in grammar["split_predicates"]
+        assert "in [a, b]" in grammar["field_operators"]
+        assert "*" in grammar["bucket_predicates"]
+        assert "and" in grammar["boolean"]
         assert grammar["examples"]
+
+    def test_schema_help_text_carries_no_console_markup_escapes(self) -> None:
+        # Help strings escape `[` for Typer's Rich renderer; the schema is data,
+        # so an agent must read `in [a, b]`, not `in \[a, b]`.
+        schemas = get_capabilities()["command_schemas"]
+        where = next(
+            option for option in schemas["search"]["options"] if option["flags"] == ["--where"]
+        )
+        assert "in [article, inproceedings]" in where["help"]
+        assert "\\[" not in where["help"]
+
+    def test_predicate_grammar_names_every_selector_surface(self) -> None:
+        # One transversal selector surface: if a command grows a --where, it
+        # belongs here, so an agent can tell where a selector is accepted.
+        grammar = get_capabilities()["predicate_grammar"]
+        assert grammar["used_by"] == [
+            "fields (--where)",
+            "search (--where)",
+            "format (--where)",
+            "corpus combine (--where)",
+            "corpus split (--to)",
+            "batch (fields.* where)",
+        ]
 
     def test_search_query_grammar_is_present(self) -> None:
         grammar = get_capabilities()["search_query_grammar"]

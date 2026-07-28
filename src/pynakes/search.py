@@ -1,4 +1,12 @@
-"""Read-only search over entries in a parsed bibliography."""
+"""Read-only search over entries in a parsed bibliography.
+
+Search is term-based: whitespace-separated terms are ANDed, quoted phrases stay
+together, and a ``field:`` prefix scopes a term. Matching is exact (substring)
+by default and optionally fuzzy, and every hit is explained — which field, which
+term, exact or fuzzy, how strongly, and the surrounding text. Entry *selection*
+is a separate concern handled by the shared ``--where`` grammar in
+:mod:`pynakes.query`, which this module accepts as a filter.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +15,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
 from pynakes.model import BibEntry, BibFile
+from pynakes.query import FUZZY_THRESHOLD, fuzzy_score
 
 
 @dataclass(frozen=True)
@@ -23,13 +32,48 @@ class SearchTerm:
 
 
 @dataclass(frozen=True)
+class FieldMatch:
+    """Why one field of an entry matched: which term hit it, how, and how well.
+
+    ``kind`` is ``"exact"`` for a substring hit and ``"fuzzy"`` for a
+    similarity hit; ``score`` is 1.0 for exact matches and the normalized
+    similarity (see :func:`pynakes.query.fuzzy_score`) otherwise. ``excerpt``
+    is the surrounding text, so a caller can show *what* matched without
+    re-searching the value.
+    """
+
+    field: str
+    term: str
+    kind: str
+    score: float
+    excerpt: str
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize the field match to a JSON-friendly dict."""
+        return {
+            "field": self.field,
+            "term": self.term,
+            "kind": self.kind,
+            "score": round(self.score, 4),
+            "excerpt": self.excerpt,
+        }
+
+
+@dataclass(frozen=True)
 class SearchResult:
-    """One entry matched by :func:`search_entries`."""
+    """One entry matched by :func:`search_entries`.
+
+    ``matched_fields`` names the fields that matched, in first-hit order;
+    ``matches`` explains each hit individually, and ``score`` is the weakest
+    term score (every term must match, so the weakest one bounds the result).
+    """
 
     key: str
     type: str
     matched_fields: list[str]
     fields: dict[str, str]
+    matches: tuple[FieldMatch, ...] = ()
+    score: float = 1.0
 
     def to_dict(self) -> dict[str, object]:
         """Serialize the match to a JSON-friendly dict."""
@@ -38,6 +82,8 @@ class SearchResult:
             "type": self.type,
             "matched_fields": self.matched_fields,
             "fields": dict(self.fields),
+            "score": round(self.score, 4),
+            "matches": [match.to_dict() for match in self.matches],
         }
 
 
@@ -62,13 +108,17 @@ def _field_tier(field: str) -> int:
 def _rank_results(results: list[SearchResult]) -> list[SearchResult]:
     """Stably sort matches by relevance: strongest matched field first.
 
-    Ties (including whole-entry ties) keep their relative order, so this is a
-    pure reordering of ``results`` — a no-op when every match already has the
-    same best-matched-field tier.
+    Within a tier, a stronger match score wins, so an exact hit outranks a
+    fuzzy one on the same field. Remaining ties keep their relative order, so
+    this is a pure reordering of ``results`` — a no-op when every match has the
+    same best-matched-field tier and score.
     """
     return sorted(
         results,
-        key=lambda result: min(_field_tier(field) for field in result.matched_fields),
+        key=lambda result: (
+            min(_field_tier(field) for field in result.matched_fields),
+            -result.score,
+        ),
     )
 
 
@@ -108,6 +158,7 @@ def search_entries(
     fields: Iterable[str] | None = None,
     where: Callable[[BibEntry], bool] | None = None,
     case_sensitive: bool = False,
+    fuzzy: bool = False,
     limit: int | None = None,
     rank: bool = True,
 ) -> list[SearchResult]:
@@ -117,11 +168,17 @@ def search_entries(
     terms search only their target. ``fields`` restricts stored fields included
     in free-text search and output; ``key`` and ``type`` remain searchable.
 
+    With ``fuzzy=True`` a term that has no substring hit still matches a field
+    whose normalized similarity reaches :data:`pynakes.query.FUZZY_THRESHOLD`,
+    which finds misspelled and inflected titles. Every match — exact or fuzzy —
+    is explained in :attr:`SearchResult.matches`.
+
     By default (``rank=True``) matches are ordered by relevance — the
     strongest matched field wins, in the order key > title > author > other
-    fields > groups/abstract — with ties broken by file order. Pass
-    ``rank=False`` to keep the raw file order instead (also lets ``limit``
-    short-circuit the scan once enough matches are found).
+    fields > groups/abstract, then the stronger match score — with remaining
+    ties broken by file order. Pass ``rank=False`` to keep the raw file order
+    instead (also lets ``limit`` short-circuit the scan once enough matches are
+    found).
     """
     if limit is not None and limit < 0:
         raise ValueError("Search limit must be non-negative")
@@ -134,15 +191,18 @@ def search_entries(
         if where is not None and not where(entry):
             continue
 
-        match = _match_entry(entry, terms, field_filter, case_sensitive)
+        match = _match_entry(entry, terms, field_filter, case_sensitive, fuzzy)
         if match is None:
             continue
+        matched_fields, matches, score = match
         results.append(
             SearchResult(
                 key=entry.key,
                 type=entry.type,
-                matched_fields=match,
+                matched_fields=matched_fields,
                 fields=_output_fields(entry, field_filter),
+                matches=matches,
+                score=score,
             )
         )
         if limit is not None and not rank and len(results) >= limit:
@@ -167,16 +227,22 @@ def _match_entry(
     terms: list[SearchTerm],
     field_filter: set[str] | None,
     case_sensitive: bool,
-) -> list[str] | None:
+    fuzzy: bool,
+) -> tuple[list[str], tuple[FieldMatch, ...], float] | None:
+    """Return the matched fields, their explanations, and the weakest term score."""
     matched: list[str] = []
+    explanations: list[FieldMatch] = []
+    score = 1.0
     for term in terms:
-        fields = _term_matches(entry, term, field_filter, case_sensitive)
-        if not fields:
+        hits = _term_matches(entry, term, field_filter, case_sensitive, fuzzy)
+        if not hits:
             return None
-        for field in fields:
-            if field not in matched:
-                matched.append(field)
-    return matched
+        score = min(score, max(hit.score for hit in hits))
+        explanations.extend(hits)
+        for hit in hits:
+            if hit.field not in matched:
+                matched.append(hit.field)
+    return matched, tuple(explanations), score
 
 
 def _term_matches(
@@ -184,13 +250,36 @@ def _term_matches(
     term: SearchTerm,
     field_filter: set[str] | None,
     case_sensitive: bool,
-) -> list[str]:
-    candidates = _candidate_values(entry, term.field, field_filter)
-    return [
-        field
-        for field, value in candidates
-        if _contains(value, term.value, case_sensitive=case_sensitive)
-    ]
+    fuzzy: bool,
+) -> list[FieldMatch]:
+    hits: list[FieldMatch] = []
+    for field, value in _candidate_values(entry, term.field, field_filter):
+        position = _find(value, term.value, case_sensitive=case_sensitive)
+        if position is not None:
+            hits.append(
+                FieldMatch(
+                    field=field,
+                    term=term.value,
+                    kind="exact",
+                    score=1.0,
+                    excerpt=_excerpt(value, position, position + len(term.value)),
+                )
+            )
+            continue
+        if not fuzzy:
+            continue
+        score = fuzzy_score(value, term.value)
+        if score >= FUZZY_THRESHOLD:
+            hits.append(
+                FieldMatch(
+                    field=field,
+                    term=term.value,
+                    kind="fuzzy",
+                    score=score,
+                    excerpt=_excerpt(value, 0, len(value)),
+                )
+            )
+    return hits
 
 
 def _candidate_values(
@@ -216,7 +305,22 @@ def _candidate_values(
     return values
 
 
-def _contains(haystack: str, needle: str, *, case_sensitive: bool) -> bool:
+def _find(haystack: str, needle: str, *, case_sensitive: bool) -> int | None:
+    """Return where ``needle`` starts in ``haystack``, or ``None``."""
     if case_sensitive:
-        return needle in haystack
-    return needle.casefold() in haystack.casefold()
+        position = haystack.find(needle)
+    else:
+        position = haystack.casefold().find(needle.casefold())
+    return None if position < 0 else position
+
+
+#: Context kept on each side of a match in :attr:`FieldMatch.excerpt`.
+_EXCERPT_CONTEXT = 30
+
+
+def _excerpt(value: str, start: int, end: int) -> str:
+    """Return the matched span of ``value`` with a little surrounding context."""
+    left = max(0, start - _EXCERPT_CONTEXT)
+    right = min(len(value), end + _EXCERPT_CONTEXT)
+    text = " ".join(value[left:right].split())
+    return f"{'…' if left else ''}{text}{'…' if right < len(value) else ''}"

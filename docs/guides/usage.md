@@ -16,6 +16,69 @@ Exit codes:
 - `1`: error, such as parse, I/O, or validation failure
 - `2`: conflict, such as duplicate DOI import without `--allow-duplicate`
 
+## Selecting entries (`--where`)
+
+Every command that addresses a *set* of entries takes the same selector: the
+`--where` grammar. A selector written for one command is valid for the others,
+so there are no command-specific filter flags to learn.
+
+Accepted by [`fields`](#fields) (`--where`), [`search`](#search) (`--where`),
+[`format`](#format) (`--where`), [`corpus combine`](#combine) (`--where`),
+[`corpus split`](#split) (`--to` rules), and the `fields.*` operations of
+`corpus batch`.
+
+Predicates combine with `and`, `or`, and `not`; `and` binds tighter than `or`,
+and parentheses group explicitly:
+
+```bash
+pynakes fields set refs.bib note "review" \
+  --where 'year >= 2024 and doi missing and type in [article, inproceedings]'
+
+pynakes search widgets refs.bib --where 'not (group "Reviewed" or keywords contains draft)'
+```
+
+Field operators:
+
+| Operator | Meaning |
+| --- | --- |
+| `contains` | case-insensitive substring |
+| `=`, `==` | case-insensitive equality |
+| `!=` | case-insensitive inequality (true when the field is absent) |
+| `>`, `>=`, `<`, `<=` | ordered comparison (numeric, date, or text — see below) |
+| `in [a, b]`, `not in [a, b]` | membership in a list of values |
+| `matches` | case-insensitive regular expression |
+| `~` | fuzzy match (normalized similarity ≥ 0.8) |
+| `exists` | the field is present |
+| `missing` | the field is absent or empty |
+
+Ordered comparisons compare numerically when both sides are numbers, as partial
+dates (`YYYY[-MM[-DD]]`) when both sides are dates, and as text otherwise — so
+`year >= 2025` orders by value rather than by string, and `date >= 2020-06` is a
+date range. Partial dates compare by their known components: an entry with only
+`year = {2020}` does not satisfy `date >= 2020-06`.
+
+Besides stored fields, four names are special: `key` (citation key), `type`
+(entry type), `year` (falls back to the year inside `date`), and `date` (falls
+back to a date composed from `year`/`month`/`day`). `group "Name"` tests JabRef
+group membership; the stored field itself is reachable as `groups`.
+
+```bash
+pynakes search . refs.bib --where 'key in [Newton1687, Euler1748]'
+pynakes search . refs.bib --where 'date >= 1900-06 and date <= 1910'
+pynakes search . refs.bib --where 'abstract missing'          # "entries missing field X"
+pynakes search . refs.bib --where 'title ~ "quantum computing"'
+pynakes search . refs.bib --where 'journal matches "^Phys\. Rev\."'
+```
+
+Quote values containing spaces or punctuation; bare tokens may not contain
+whitespace, brackets, commas, or comparison characters. A comparison against a
+field an entry does not have is false, except `!=` and `missing`, which are
+true. `corpus split --to` additionally accepts the bucket predicates `*`
+(catch-all), and `used` / `unused` against `--tex`/`--aux` sources, which
+compose with everything else (`used and year >= 2020`).
+
+`pynakes capabilities --json` reports this grammar under `predicate_grammar`.
+
 ## init
 
 Create a new `.bib` library, seeded with a metadata profile. With no options it
@@ -287,7 +350,7 @@ pynakes fields append refs.bib keywords "AI" --dry-run --diff
 pynakes fields clear refs.bib abstract --dry-run --diff
 ```
 
-Supported filters:
+`--where` is the shared [entry selector](#selecting-entries-where):
 
 ```bash
 pynakes fields append refs.bib keywords "transformers" \
@@ -295,6 +358,7 @@ pynakes fields append refs.bib keywords "transformers" \
 
 pynakes fields clear refs.bib doi --where 'type = book'
 pynakes fields clear refs.bib note --where 'doi exists'
+pynakes fields clear refs.bib abstract --where 'year < 2000 or type in [book, thesis]'
 ```
 
 Title capitalization protection:
@@ -504,6 +568,20 @@ delimiters are preserved. The other layout controls configure indentation,
 `=` alignment, trailing commas, and blank lines. Unlike ordinary surgical
 commands, `format` is an explicit whole-file rewrite.
 
+`--where` narrows the rewrite to the entries a
+[selector](#selecting-entries-where) matches; every other byte of the file —
+including unmatched entries — stays identical, so the diff covers exactly the
+entries you asked for:
+
+```bash
+pynakes format refs.bib --where 'year >= 2024' --dry-run --diff
+pynakes format refs.bib --where 'key in [Newton1687]' --alignment equals
+```
+
+A selection owns the layout *inside* each entry it matches, not the layout of
+the file, so the whole-file options `--entry-order`, `--block-order`, and
+`--blank-lines`/`--no-blank-lines` cannot be combined with `--where`.
+
 ## normalize
 
 Run the daily maintenance pass.
@@ -634,6 +712,13 @@ pynakes corpus combine a.bib b.bib --out combined.bib
 pynakes corpus combine a.bib b.bib --out combined.bib --dedupe --dry-run --diff
 ```
 
+`--where` keeps only the entries a [selector](#selecting-entries-where) matches,
+so a focused subset of several libraries is one command:
+
+```bash
+pynakes corpus combine a.bib b.bib --out recent.bib --where 'year >= 2020 and doi exists'
+```
+
 ## split
 
 Combine one or more inputs (merged in memory) and route their entries into
@@ -641,9 +726,9 @@ several output files, each selected by a predicate. This is `1.bib 2.bib → 3.b
 4.bib` in one step.
 
 Each `--to FILE='predicate'` rule pairs an output file with a selector. The
-predicate is a [`--where`](#fields) expression, or one of `*` (catch-all),
-`used` / `unused` (against the citations found in `--tex`/`--aux` sources), or
-`group "Name"`.
+predicate is any [`--where`](#selecting-entries-where) expression — including
+`and`/`or`/`not` — plus the bucket predicates `*` (catch-all) and `used` /
+`unused` (against the citations found in `--tex`/`--aux` sources).
 
 ```bash
 # Partition by group (first match wins; `*` collects the rest)
@@ -655,6 +740,11 @@ pynakes corpus split refs.bib extra.bib \
 pynakes corpus split refs.bib --tex paper.tex \
   --to used.bib='used' \
   --to unused.bib='*' --dry-run --diff
+
+# Bucket predicates compose with field predicates
+pynakes corpus split refs.bib --tex paper.tex \
+  --to recent-cited.bib='used and year >= 2020' \
+  --to rest.bib='*'
 ```
 
 Routing is **first match** by default — each entry lands in the first output
@@ -713,6 +803,26 @@ pynakes search widgets refs.bib --field title --where 'year = 2024' --json
 
 Terms are ANDed. Quoted phrases stay together. `field:term` scopes a term to a
 field; plain terms search the key, type, and stored fields.
+
+`--fuzzy` also accepts near-misses — misspellings and inflections — by
+normalized similarity, so a half-remembered title still finds its entry:
+
+```bash
+pynakes search 'nueral widgts' refs.bib --fuzzy
+pynakes search widgets refs.bib --where 'year >= 2020 and abstract missing' --json
+```
+
+Results are ranked by match strength (key > title > author > other fields >
+groups/abstract, then by score) with ties in file order; `--no-rank` restores
+plain file order. With `--json` each result explains itself: `matched_fields`
+names the fields that matched and `matches` lists one entry per hit with its
+`field`, `term`, `kind` (`exact` or `fuzzy`), `score`, and the matching
+`excerpt`. The result's `score` is the weakest term score, and `where_parsed`
+echoes the parsed selector.
+
+Which entries are searched is a separate question from what matches: `--where`
+answers it with the shared [selector grammar](#selecting-entries-where),
+covering date ranges and missing-field queries without search-specific flags.
 
 ## dedupe
 

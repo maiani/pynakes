@@ -3,6 +3,7 @@
 import pytest
 
 from pynakes.bibtex_parser import parse_bib
+from pynakes.query import parse_query
 from pynakes.search import _candidate_values, parse_search_query, search_entries
 
 _LIB = (
@@ -120,3 +121,77 @@ def test_limit_applies_after_ranking() -> None:
     results = search_entries(lib, "widgets", limit=1)
 
     assert [result.key for result in results] == ["widgets_2022"]
+
+
+# --- fuzzy matching and match explanations ---------------------------------
+
+
+def test_fuzzy_finds_a_misspelled_title() -> None:
+    lib = parse_bib(_LIB)
+
+    assert search_entries(lib, "nueral widgts") == []
+    results = search_entries(lib, "nueral widgts", fuzzy=True)
+
+    assert [result.key for result in results] == ["Alpha2024"]
+    assert [match.kind for match in results[0].matches] == ["fuzzy", "fuzzy"]
+    assert 0.8 <= results[0].score < 1.0
+
+
+def test_exact_matches_are_explained_with_field_term_and_excerpt() -> None:
+    lib = parse_bib(_LIB)
+
+    (result,) = search_entries(lib, "title:neural")
+
+    assert [(m.field, m.term, m.kind, m.score) for m in result.matches] == [
+        ("title", "neural", "exact", 1.0)
+    ]
+    assert result.matches[0].excerpt == "Neural Widgets for Small Libraries"
+    assert result.score == 1.0
+
+
+def test_excerpt_is_trimmed_around_a_deep_match() -> None:
+    long_abstract = "start " + "filler word " * 12 + "needle " + "tail word " * 12
+    lib = parse_bib("@article{A,\n  abstract = {" + long_abstract + "}\n}\n")
+
+    (result,) = search_entries(lib, "abstract:needle")
+
+    excerpt = result.matches[0].excerpt
+    assert excerpt.startswith("…") and excerpt.endswith("…")
+    assert "needle" in excerpt
+    assert len(excerpt) < len(long_abstract)
+
+
+def test_exact_matches_outrank_fuzzy_ones_within_a_tier() -> None:
+    lib = parse_bib(
+        "@article{Fuzzy,\n  title = {Widgts and Gadgets}\n}\n\n"
+        "@article{Exact,\n  title = {Widgets and Gadgets}\n}\n"
+    )
+
+    results = search_entries(lib, "widgets", fuzzy=True)
+
+    assert [result.key for result in results] == ["Exact", "Fuzzy"]
+
+
+def test_result_dict_carries_score_and_matches() -> None:
+    lib = parse_bib(_LIB)
+
+    payload = search_entries(lib, "title:manual")[0].to_dict()
+
+    assert payload["score"] == 1.0
+    assert payload["matches"] == [
+        {
+            "field": "title",
+            "term": "manual",
+            "kind": "exact",
+            "score": 1.0,
+            "excerpt": "Manual Widgets",
+        }
+    ]
+
+
+def test_where_selects_the_entries_searched() -> None:
+    lib = parse_bib(_LIB)
+
+    results = search_entries(lib, "widgets", where=parse_query("year >= 2024"))
+
+    assert [result.key for result in results] == ["Alpha2024"]

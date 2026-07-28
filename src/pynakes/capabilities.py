@@ -6,6 +6,7 @@ the tool rather than guessing. Update this when commands are added or removed.
 
 from pynakes import __all__ as PUBLIC_API_EXPORTS
 from pynakes import __version__ as VERSION
+from pynakes.query import FUZZY_THRESHOLD, WHERE_GRAMMAR
 
 # Stable type vocabulary for command-schema introspection. The on-disk click
 # type names are mapped to this small, version-independent set so the pinned
@@ -57,26 +58,20 @@ _ERROR_CODES = {
     },
 }
 
-# The predicate grammar shared by `fields --where`, `search --where`, and
-# `split --to` rules.
+# One transversal selector surface: the same grammar for every command that
+# addresses a set of entries. Described by `pynakes.query`, so the capability
+# description cannot drift from the parser.
 _PREDICATE_GRAMMAR = {
-    "used_by": ["fields (--where)", "search (--where)", "split (--to)"],
-    "field_operators": ["contains", "=", "==", "exists"],
-    "special_fields": {"type": "the entry type", "key": "the citation key"},
-    "split_predicates": {
-        "*": "matches every entry (catch-all / rest bucket)",
-        "used": "citation key appears in the --tex/--aux sources",
-        "unused": "citation key does not appear in the sources",
-        'group "Name"': "entry belongs to the named group",
-    },
-    "examples": [
-        'title contains "digital currency"',
-        "type = article",
-        "doi exists",
-        'group "Machine Learning"',
-        "used",
-        "*",
+    "used_by": [
+        "fields (--where)",
+        "search (--where)",
+        "format (--where)",
+        "corpus combine (--where)",
+        "corpus split (--to)",
+        "batch (fields.* where)",
     ],
+    "bucket_predicates_used_by": ["corpus split (--to)"],
+    **WHERE_GRAMMAR,
 }
 
 _SEARCH_QUERY_GRAMMAR = {
@@ -93,10 +88,25 @@ _SEARCH_QUERY_GRAMMAR = {
         "Each result reports the field(s) it matched: key, type, or any stored "
         "field name (title, author, groups, abstract, ...)."
     ),
+    "match_explanations": (
+        "Each result also reports one entry per hit in `matches`: field, term, "
+        "kind (exact|fuzzy), score, and the matching excerpt; `score` on the "
+        "result is the weakest term score."
+    ),
+    "fuzzy": (
+        f"--fuzzy also matches near-misses by normalized similarity >= "
+        f"{FUZZY_THRESHOLD} (misspellings, inflections). `--where 'title ~ \"…\"'` "
+        f"applies the same similarity as a selector."
+    ),
+    "selection": (
+        "--where narrows which entries are searched using the shared predicate "
+        "grammar, covering date ranges (year >= 2020) and missing-field "
+        "questions (abstract missing) without command-specific flags."
+    ),
     "ranking": (
         "Results are ranked by relevance by default: key > title > author > "
-        "other fields > groups/abstract, ties kept in file order. --no-rank "
-        "restores plain file order."
+        "other fields > groups/abstract, then by match score, ties kept in file "
+        "order. --no-rank restores plain file order."
     ),
 }
 
@@ -137,6 +147,16 @@ def _stable_type(param) -> str:
     return f"list[{base}]" if is_list else base
 
 
+def _plain_help(text: str) -> str:
+    """Strip Rich console-markup escapes from help text.
+
+    Help strings escape ``[`` so Typer's Rich renderer prints literal brackets
+    (``in \\[a, b]``). The capability description is data, not a rendered
+    console line, so it reports the text as a reader would type it.
+    """
+    return text.replace("\\[", "[")
+
+
 def _param_schema(param) -> dict:
     """Describe one click argument or option as a JSON-friendly dict."""
     entry: dict[str, object] = {
@@ -144,7 +164,7 @@ def _param_schema(param) -> dict:
         "type": _stable_type(param),
         "required": bool(param.required),
     }
-    help_text = (getattr(param, "help", "") or "").strip()
+    help_text = _plain_help((getattr(param, "help", "") or "").strip())
     if help_text:
         entry["help"] = help_text
     if getattr(param.type, "name", "") == "choice":
@@ -163,7 +183,7 @@ def _param_schema(param) -> dict:
 
 def _command_schema(command) -> dict:
     """Describe one click command: its help, arguments, and options."""
-    help_text = (command.help or command.short_help or "").strip().splitlines()
+    help_text = _plain_help((command.help or command.short_help or "").strip()).splitlines()
     arguments = [_param_schema(p) for p in command.params if p.param_type_name == "argument"]
     options = [_param_schema(p) for p in command.params if p.param_type_name == "option"]
     return {
@@ -344,7 +364,7 @@ def get_capabilities() -> dict:
         },
         # Self-description for agents: the full per-command schema (args/options/
         # types) derived from the live CLI, the enumerated error/conflict codes,
-        # and the predicate grammar shared by `fields --where` and `split --to`.
+        # and the one selector grammar shared by every entry-addressable command.
         "command_schemas": command_schemas(),
         "error_codes": _ERROR_CODES,
         "predicate_grammar": _PREDICATE_GRAMMAR,
@@ -384,6 +404,12 @@ def get_capabilities() -> dict:
                 "prose": "break only at brace- and math-top-level whitespace",
                 "delimiters": "preserved",
             },
+            "selection": (
+                "--where reformats only the matching entries and leaves every "
+                "other byte untouched. A selection owns the layout inside an "
+                "entry, so the whole-file options --entry-order, --block-order, "
+                "and --blank-lines cannot be combined with it."
+            ),
         },
         "work_matching": {
             "module": "pynakes.identity",

@@ -4,7 +4,7 @@ import functools
 import json
 import os
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TypeVar
@@ -16,6 +16,8 @@ from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography, ExternalModificationError
 from pynakes.io import save_text
+from pynakes.model import QueryFilter
+from pynakes.query import parse_query
 
 _F = TypeVar("_F", bound=Callable)
 
@@ -101,6 +103,42 @@ def _emit(
 
 def _entries(count: int) -> str:
     return "entry" if count == 1 else "entries"
+
+
+# --- shared entry selection ------------------------------------------------
+
+#: Brackets are escaped for Typer's Rich help renderer, which would otherwise
+#: read them as console markup and drop them from the text.
+WHERE_HELP = (
+    "Select entries with the shared --where grammar: predicates joined by "
+    "and/or/not, e.g. 'year >= 2025 and type in \\[article, inproceedings]'. "
+    "Operators: contains, =, !=, >, >=, <, <=, in \\[..], matches, ~ (fuzzy), "
+    "exists, missing. See `pynakes capabilities` for the full grammar."
+)
+
+
+def where_option(help: str = WHERE_HELP) -> typer.Option:
+    """Return the shared ``--where`` entry-selector option.
+
+    Every entry-addressable command takes the same option with the same grammar
+    (:func:`pynakes.query.parse_query`), so a selector written for one command
+    is valid for the others.
+    """
+    return typer.Option(None, "--where", help=help)
+
+
+def build_where_filter(
+    where: str | None, *, cited_keys: Iterable[str] | None = None
+) -> QueryFilter:
+    """Compile a ``--where`` expression, or return ``None`` when it is unset.
+
+    A malformed expression raises ``ValueError``, which :func:`_safe` renders as
+    a structured exit-1 error (honoring ``--json``), so callers need no local
+    handling.
+    """
+    if where is None:
+        return None
+    return parse_query(where, cited_keys=cited_keys)
 
 
 @dataclass

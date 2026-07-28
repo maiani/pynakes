@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- One transversal entry selector: the new public `pynakes.query` module compiles
+  the `--where` grammar shared by `fields`, `search`, `format`, `corpus combine`,
+  `corpus split --to`, and the `fields.*` batch operations. Predicates now
+  compose with `and`, `or`, `not`, and parentheses, and the operator set grows
+  beyond `contains`/`=`/`exists` to `!=`, ordered comparison (`>`, `>=`, `<`,
+  `<=`), `in [a, b]` / `not in [...]`, `matches` (regular expression), `~`
+  (fuzzy), and `missing`. Ordered comparison is numeric for numbers, partial-date
+  for `YYYY[-MM[-DD]]` dates, and textual otherwise, so `year >= 2025` and
+  `date >= 2020-06` mean what they read as. The special fields are `key`, `type`,
+  `year` (falling back to the year inside `date`), and `date` (falling back to
+  `year`/`month`/`day`); `corpus split` buckets keep `*`, `used`, `unused`, and
+  `group "Name"`, which now compose with everything else
+  (`used and year >= 2020`). `capabilities --json` reports the grammar under
+  `predicate_grammar`.
+- `search --fuzzy` matches misspelled and inflected terms by normalized
+  similarity, and every result now explains itself: `matches` lists one entry per
+  hit with its field, term, `exact`/`fuzzy` kind, score, and the matching
+  excerpt, alongside a result `score` and the parsed selector in `where_parsed`.
+  Ranking breaks within-tier ties by score, so exact hits outrank fuzzy ones.
+- `format --where` reformats only the entries a selector matches, leaving every
+  other byte of the file — including unmatched entries — identical. A selection
+  owns the layout inside an entry, so the whole-file `--entry-order`,
+  `--block-order`, and `--blank-lines` options are refused alongside it.
+- `corpus combine --where` keeps only the matching entries in the combined
+  output, so a focused subset of several libraries no longer needs a
+  combine-then-prune script.
 - A public `pynakes.identity` module now extracts normalized offline work
   evidence and returns explainable `exact`, `probable`, `conflict`, or
   `unknown` comparisons. Stable identifiers remain evidence rather than a

@@ -187,6 +187,67 @@ class TestFormatCommand:
         assert failed.exit_code == 1
         assert json.loads(failed.output)["status"] == "error"
 
+    def test_where_reformats_only_matching_entries(self, tmp_path: Path) -> None:
+        path = tmp_path / "refs.bib"
+        path.write_text(
+            "@book{Newton1687,\n"
+            "    title={Principia},\n"
+            "      author = {Newton, Isaac},\n"
+            "  year={1687},\n"
+            "}\n\n"
+            "@article{Euler1748,\n"
+            "   title={Introductio},   year={1748}\n"
+            "}\n"
+        )
+
+        result = runner.invoke(app, ["format", str(path), "--where", "type = book", "--json"])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["where"] == "type = book"
+        assert payload["modified_entries"] == 1
+        output = path.read_text()
+        # The selected entry is canonical; the untouched one is byte-identical.
+        assert "@book{Newton1687,\n  author = {Newton, Isaac},\n  title = {Principia},\n" in output
+        assert "   title={Introductio},   year={1748}\n" in output
+
+    def test_where_selection_reports_no_change_when_already_formatted(self, tmp_path: Path) -> None:
+        path = tmp_path / "refs.bib"
+        path.write_text("@article{A,\n  title = {T},\n}\n\n@misc{B,title={T}}\n")
+
+        check = runner.invoke(app, ["format", str(path), "--where", "key = A", "--check", "--json"])
+
+        assert check.exit_code == 0, check.output
+        payload = json.loads(check.output)
+        assert payload["modified"] is False
+        assert payload["message"] == "Selected entries are already formatted"
+
+    def test_where_rejects_whole_file_layout_options(self, tmp_path: Path) -> None:
+        path = tmp_path / "refs.bib"
+        path.write_text("@article{A,title={T}}\n")
+
+        result = runner.invoke(
+            app,
+            ["format", str(path), "--where", "type = article", "--entry-order", "key", "--json"],
+        )
+
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert payload["error"] == "InvalidInput"
+        assert "--entry-order" in payload["message"]
+        assert path.read_text() == "@article{A,title={T}}\n"
+
+    def test_where_expression_error_is_structured(self, tmp_path: Path) -> None:
+        path = tmp_path / "refs.bib"
+        path.write_text("@article{A,title={T}}\n")
+
+        result = runner.invoke(app, ["format", str(path), "--where", "type ==", "--json"])
+
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert payload["error"] == "InvalidInput"
+        assert path.read_text() == "@article{A,title={T}}\n"
+
 
 def test_default_metadata_cache_dir_anchors_symlinked_bib_at_link_path(tmp_path: Path) -> None:
     real_dir = tmp_path / "real"
@@ -681,6 +742,63 @@ class TestSearchCommand:
         data = json.loads(result.output)
         assert data["status"] == "error"
         assert data["error"] == "InvalidInput"
+
+    def test_search_composed_where_covers_ranges_and_missing_fields(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Alpha2024,\n  title = {Widgets}, year = {2024}\n}\n\n"
+            "@article{Beta2019,\n  title = {Widgets}, year = {2019}, doi = {10.0/b}\n}\n\n"
+            "@article{Gamma2025,\n  title = {Widgets}, year = {2025}, doi = {10.0/g}\n}\n"
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "search",
+                "widgets",
+                str(bib),
+                "--where",
+                "year >= 2020 and doi missing",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert [match["key"] for match in data["matches"]] == ["Alpha2024"]
+        assert data["where_parsed"] == {
+            "and": [
+                {"field": "year", "op": ">=", "value": "2020"},
+                {"field": "doi", "op": "missing"},
+            ]
+        }
+
+    def test_search_fuzzy_reports_explained_matches(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@misc{Alpha,\n  title = {Neural Widgets for Small Libraries}\n}\n")
+
+        strict = runner.invoke(app, ["search", "nueral widgts", str(bib), "--json"])
+        assert json.loads(strict.output)["count"] == 0
+
+        result = runner.invoke(app, ["search", "nueral widgts", str(bib), "--fuzzy", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["fuzzy"] is True
+        match = data["matches"][0]
+        assert match["key"] == "Alpha"
+        assert {hit["kind"] for hit in match["matches"]} == {"fuzzy"}
+        assert all(hit["field"] == "title" for hit in match["matches"])
+        assert 0.8 <= match["score"] < 1.0
+
+    def test_search_fuzzy_human_output_shows_the_score(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@misc{Alpha,\n  title = {Neural Widgets for Small Libraries}\n}\n")
+
+        result = runner.invoke(app, ["search", "nueral", str(bib), "--fuzzy"])
+
+        assert result.exit_code == 0, result.output
+        assert "[title, ~0." in result.output
 
 
 class TestFilesCommand:
@@ -2010,6 +2128,30 @@ class TestFieldsCommand:
         assert data["action"] == "fields_set"
         assert data["modified_entries"] == 1
         assert bib.read_text().count("year = {2025}") == 1
+
+    def test_set_accepts_a_composed_selector(self, tmp_path: Path) -> None:
+        # The bulk-edit selection an agent actually wants: a range plus a
+        # missing-field test, in one expression rather than several passes.
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(
+            app,
+            [
+                "fields",
+                "set",
+                str(bib),
+                "note",
+                "review",
+                "--where",
+                "year >= 2021 and doi missing and type in [book, inproceedings]",
+                "--json",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["modified_entries"] == 2
+        text = bib.read_text()
+        assert text.count("note = {review}") == 2
+        assert "note" not in text.split("@book")[0]  # Smith2020 (2020, has a DOI) untouched
 
     def test_rename_with_diff(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")

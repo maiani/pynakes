@@ -15,12 +15,14 @@ from pynakes.cli_common import (
     RunParams,
     _emit,
     _emit_error,
+    _entries,
     _finish_mod,
     _preview_or_commit,
     _resolve_input_bib,
     _safe,
     bib_file_argument,
     is_auxiliary_bib_file,
+    where_option,
 )
 from pynakes.engine import Bibliography
 from pynakes.model import BibFile
@@ -102,8 +104,16 @@ def _recursive_files(target: Path) -> list[Path]:
     )
 
 
-def _check_payload(file: str, coll: Bibliography) -> dict[str, object]:
+def _check_payload(file: str, coll: Bibliography, where: str | None = None) -> dict[str, object]:
     modified = coll.is_modified
+    if where is None:
+        message = "File needs formatting" if modified else "File is already formatted"
+    else:
+        message = (
+            "Selected entries need formatting"
+            if modified
+            else "Selected entries are already formatted"
+        )
     return {
         "status": "success",
         "action": "format-check",
@@ -112,13 +122,19 @@ def _check_payload(file: str, coll: Bibliography) -> dict[str, object]:
         "modified": modified,
         "modified_entries": coll.changed_entries_count() if modified else 0,
         "warnings": [],
+        "where": where,
         "plan": coll.change_plan(),
-        "message": "File needs formatting" if modified else "File is already formatted",
+        "message": message,
     }
 
 
 def _run_recursive(
-    files: list[Path], overrides: FormatOverrides, params: RunParams, *, check: bool
+    files: list[Path],
+    overrides: FormatOverrides,
+    params: RunParams,
+    *,
+    check: bool,
+    where: str | None = None,
 ) -> None:
     results: list[dict[str, object]] = []
     failures = 0
@@ -128,10 +144,10 @@ def _run_recursive(
         try:
             coll = Bibliography.open(path)
             layout = _layout(coll.lib, overrides)
-            coll.format(layout)
+            coll.format(layout, where)
             plan = coll.change_plan()
             if check:
-                payload = _check_payload(str(path), coll)
+                payload = _check_payload(str(path), coll, where)
                 dirty += int(bool(payload["modified"]))
             else:
                 diff_text, modified, changed = _preview_or_commit(coll, params)
@@ -144,6 +160,7 @@ def _run_recursive(
                     "modified": modified,
                     "modified_entries": changed,
                     "warnings": [],
+                    "where": where,
                     "plan": plan,
                 }
                 if params.diff and diff_text:
@@ -220,6 +237,10 @@ def format_bibliography(
     line_width: int | None = typer.Option(
         None, "--line-width", min=20, help="Maximum line width for wrapped values"
     ),
+    where: str | None = where_option(
+        "Reformat only the entries matching this selector; the rest of the file "
+        "stays byte-for-byte identical"
+    ),
     check: bool = typer.Option(False, "--check", help="Exit 1 when layout changes are needed"),
     to_stdout: bool = typer.Option(
         False, "--stdout", help="Write formatted bibliography to stdout"
@@ -230,7 +251,13 @@ def format_bibliography(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
     backup: bool = _BACKUP_OPTION,
 ) -> None:
-    """Rewrite layout only; never change bibliographic values or conventions."""
+    """Rewrite layout only; never change bibliographic values or conventions.
+
+    ``--where`` restricts the rewrite to the matching entries. A selection owns
+    the layout inside each entry it matches, not the layout of the file, so
+    ``--entry-order``, ``--block-order``, and ``--blank-lines`` are whole-file
+    policies that cannot be combined with it.
+    """
     if to_stdout and (json_output or check or recursive):
         _emit_error(
             json_output,
@@ -239,6 +266,20 @@ def format_bibliography(
         )
     if file == "-" and not to_stdout:
         _emit_error(json_output, "InvalidInput", "stdin input (-) requires --stdout")
+    if where is not None:
+        whole_file = {
+            "--entry-order": entry_order,
+            "--block-order": block_order,
+            "--blank-lines/--no-blank-lines": blank_line_entries,
+        }
+        conflicting = [name for name, value in whole_file.items() if value is not None]
+        if conflicting:
+            _emit_error(
+                json_output,
+                "InvalidInput",
+                f"--where selects entries, so it cannot be combined with the "
+                f"whole-file option(s) {', '.join(conflicting)}",
+            )
     overrides = FormatOverrides(
         indent=indent,
         alignment=alignment,
@@ -257,13 +298,13 @@ def format_bibliography(
         files = _recursive_files(target)
         if not files:
             _emit_error(json_output, "FileNotFound", f"No .bib files found under {target}")
-        _run_recursive(files, overrides, params, check=check)
+        _run_recursive(files, overrides, params, check=check, where=where)
         return
 
     if file == "-":
         coll = Bibliography.from_text(sys.stdin.read())
         try:
-            coll.format(_layout(coll.lib, overrides))
+            coll.format(_layout(coll.lib, overrides), where)
         except FormatLintError as exc:
             _emit_error(
                 json_output,
@@ -277,7 +318,7 @@ def format_bibliography(
     resolved = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(resolved)
     try:
-        coll.format(_layout(coll.lib, overrides))
+        selected = coll.format(_layout(coll.lib, overrides), where)
     except FormatLintError as exc:
         _emit_error(
             json_output,
@@ -289,12 +330,17 @@ def format_bibliography(
         sys.stdout.write(coll.preview())
         return
     if check:
-        payload = _check_payload(resolved, coll)
+        payload = _check_payload(resolved, coll, where)
         _emit(json_output, payload, [f"{resolved}: {payload['message'].lower()}"])
         if payload["modified"]:
             raise typer.Exit(code=1)
         return
-    _finish_mod(resolved, "format", coll, params, ["Formatted bibliography layout."], warnings=[])
+    human = (
+        f"Formatted the layout of {selected} selected {_entries(selected)}."
+        if where is not None
+        else "Formatted bibliography layout."
+    )
+    _finish_mod(resolved, "format", coll, params, [human], warnings=[], where=where)
 
 
 def register(app: typer.Typer) -> None:

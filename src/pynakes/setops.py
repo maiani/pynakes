@@ -8,16 +8,16 @@ the single-file engine rather than the future corpus ``Library``.
 ``merge_libraries`` concatenates several libraries into one (optionally deduping
 entries that share a citation key). ``partition_library`` routes each entry of a
 working library to one or more output buckets selected by a predicate. The
-predicate language is :func:`pynakes.fields.parse_query` extended with ``*``
-(any), ``used`` / ``unused`` (against a cited-key set), and ``group "Name"``.
+predicate language is the shared selector grammar in :mod:`pynakes.query`, whose
+``*`` (any), ``used`` / ``unused`` (against a cited-key set), and ``group
+"Name"`` predicates exist for exactly this purpose.
 """
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from pynakes import groups as group_ops
-from pynakes.fields import parse_query
 from pynakes.model import BibEntry, BibFile
+from pynakes.query import parse_query
 
 Predicate = Callable[[BibEntry], bool]
 
@@ -110,44 +110,16 @@ def strip_metadata_blocks(lib: BibFile) -> BibFile:
 # --- predicates ------------------------------------------------------------
 
 
-def _unquote(text: str) -> str:
-    text = text.strip()
-    if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
-        return text[1:-1]
-    return text
-
-
 def compile_predicate(expr: str, cited_keys: set[str] | None = None) -> Predicate:
     """Compile one bucket predicate into a callable over entries.
 
-    Grammar (one predicate per bucket):
-
-    - ``*`` — matches every entry (use as a catch-all / "rest" bucket).
-    - ``used`` / ``unused`` — citation key is / is not in ``cited_keys``.
-    - ``group "Name"`` — entry belongs to the named JabRef group.
-    - anything else — a :func:`pynakes.fields.parse_query` field expression
-      (``title contains "x"``, ``type = article``, ``doi exists`` …).
+    This is the shared ``--where`` grammar (:func:`pynakes.query.parse_query`)
+    with the bucket-only predicates ``*``, ``used`` / ``unused``, and
+    ``group "Name"`` available, so a bucket accepts anything ``--where``
+    accepts — including boolean composition, e.g.
+    ``used and year >= 2020 and not group "Reviewed"``.
     """
-    text = expr.strip()
-    if text == "*":
-        return lambda _entry: True
-
-    lowered = text.lower()
-    if lowered in {"used", "unused"}:
-        keys = cited_keys
-        if keys is None:
-            raise ValueError(f"predicate {expr!r} needs cited keys; pass --tex/--aux sources")
-        if lowered == "used":
-            return lambda entry: entry.key in keys
-        return lambda entry: entry.key not in keys
-
-    if lowered.startswith("group ") or lowered.startswith("group="):
-        name = _unquote(text[len("group") :].lstrip(" ="))
-        if not name:
-            raise ValueError(f"predicate {expr!r} needs a group name")
-        return lambda entry: name in group_ops.entry_groups(entry)
-
-    return parse_query(text)
+    return parse_query(expr.strip(), cited_keys=cited_keys)
 
 
 # --- partition -------------------------------------------------------------

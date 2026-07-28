@@ -40,6 +40,7 @@ covered by a backward-compatibility guarantee.
 | Whole-file formatting | `pynakes.canonical` |
 | Work-matching evidence | `pynakes.identity` |
 | Analysis and maintenance | `pynakes.dedupe`, `pynakes.files`, `pynakes.integrity`, `pynakes.lint`, `pynakes.metadata`, `pynakes.usage` |
+| Selection and search | `pynakes.query`, `pynakes.search` |
 | Set operations (projections) | `pynakes.setops` |
 | Composition | `pynakes.batch` |
 | Introspection | `pynakes.capabilities` and `pynakes.__version__` |

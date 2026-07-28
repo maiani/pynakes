@@ -78,6 +78,17 @@ def test_compile_predicate_variants() -> None:
     assert compile_predicate("unused", {"Smith2020"})(e_bio) is True
 
 
+def test_compile_predicate_composes_bucket_and_field_predicates() -> None:
+    # A bucket accepts anything --where accepts, so a routing rule can be as
+    # precise as a selection: cited, but only the ones still in a group.
+    e_ml = parse_bib(A).entries["Smith2020"]
+    e_bio = parse_bib(B).entries["Jones2021"]
+    predicate = compile_predicate('used and not group "Bio"', {"Smith2020", "Jones2021"})
+
+    assert predicate(e_ml) is True
+    assert predicate(e_bio) is False
+
+
 def test_partition_first_match_is_a_partition() -> None:
     lib = parse_bib(A + B)
     rules = [PartitionRule("ml.bib", 'group "ML"'), PartitionRule("rest.bib", "*")]
@@ -157,6 +168,60 @@ def test_cli_combine_writes_combined_file(tmp_path: Path) -> None:
     assert data["written"] is True
     reparsed = parse_bib(Path(out).read_text())
     assert set(reparsed.entries.keys()) == {"Smith2020", "Jones2021"}
+
+
+def test_cli_combine_where_keeps_only_matching_entries(tmp_path: Path) -> None:
+    a = _write(tmp_path, "1.bib", A)
+    b = _write(tmp_path, "2.bib", B)
+    out = str(tmp_path / "all.bib")
+
+    result = runner.invoke(
+        app,
+        ["corpus", "combine", a, b, "--out", out, "--where", 'group "Bio"', "--json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["where"] == 'group "Bio"'
+    assert data["entries"] == 1
+    assert set(parse_bib(Path(out).read_text()).entries.keys()) == {"Jones2021"}
+
+
+def test_cli_combine_where_error_is_structured(tmp_path: Path) -> None:
+    a = _write(tmp_path, "1.bib", A)
+    out = tmp_path / "all.bib"
+
+    result = runner.invoke(
+        app, ["corpus", "combine", a, a, "--out", str(out), "--where", "title contains", "--json"]
+    )
+
+    assert result.exit_code == 1
+    assert json.loads(result.output)["error"] == "InvalidInput"
+    assert not out.exists()
+
+
+def test_cli_split_routes_by_a_composed_predicate(tmp_path: Path) -> None:
+    source = _write(tmp_path, "refs.bib", A + B)
+    keep = tmp_path / "keep.bib"
+    rest = tmp_path / "rest.bib"
+
+    result = runner.invoke(
+        app,
+        [
+            "corpus",
+            "split",
+            source,
+            "--to",
+            f'{keep}=group "ML" and title contains alpha',
+            "--to",
+            f"{rest}=*",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert set(parse_bib(keep.read_text()).entries.keys()) == {"Smith2020"}
+    assert set(parse_bib(rest.read_text()).entries.keys()) == {"Jones2021"}
 
 
 def test_cli_combine_copies_pinax_materials_and_manifest(tmp_path: Path) -> None:

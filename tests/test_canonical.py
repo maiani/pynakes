@@ -20,6 +20,7 @@ from pynakes.canonical import (
     CanonicalLayout,
     FormatLintError,
     format_entry,
+    format_selected_entries,
     layout_from_metadata,
     write_bib_canonical,
 )
@@ -558,3 +559,108 @@ def test_surgical_edits_keep_the_entry_type_spelling() -> None:
     lib = parse_bib("@ARTICLE{A,\n  title = {T},\n  year = {2020}\n}\n")
 
     assert "@ARTICLE{A," in write_bib(lib)
+
+
+# ---------------------------------------------------------------------------
+# selective (--where) formatting
+# ---------------------------------------------------------------------------
+
+
+_SELECTION_SOURCE = (
+    "% a leading comment\n"
+    "@article{A,\n"
+    "    Title={First},\n"
+    "  year={2020}\n"
+    "}\n\n\n"
+    "@book{B,   title={Second},  publisher={Elsevier}  }\n"
+)
+
+
+def test_format_selected_entries_rewrites_only_matching_entries() -> None:
+    lib = parse_bib(_SELECTION_SOURCE)
+
+    matched = format_selected_entries(lib, CanonicalLayout(), lambda entry: entry.type == "book")
+
+    assert matched == 1
+    output = write_bib(lib)
+    # The unmatched entry, the comment, and the blank runs are byte-identical.
+    assert "    Title={First},\n  year={2020}\n}\n\n\n" in output
+    assert "% a leading comment" in output
+    assert "@book{B,\n  title = {Second},\n  publisher = {Elsevier},\n}" in output
+
+
+def test_format_selected_entries_is_idempotent() -> None:
+    lib = parse_bib(_SELECTION_SOURCE)
+    predicate = None  # every entry
+
+    format_selected_entries(lib, CanonicalLayout(), predicate)
+    once = write_bib(lib)
+    format_selected_entries(lib, CanonicalLayout(), predicate)
+
+    assert write_bib(lib) == once
+
+
+def test_format_selected_entries_preserves_semantics() -> None:
+    lib = parse_bib(_SELECTION_SOURCE)
+    before = {key: dict(entry.fields) for key, entry in lib.entries.items()}
+
+    format_selected_entries(lib, CanonicalLayout(field_order="alphabetical"), None)
+
+    reparsed = parse_bib(write_bib(lib))
+    assert {key: dict(e.fields) for key, e in reparsed.entries.items()} == before
+
+
+def test_selective_format_leaves_unmatched_entries_out_of_the_diff() -> None:
+    coll = Bibliography.from_text(_SELECTION_SOURCE)
+
+    matched = coll.format(CanonicalLayout(), "type = article")
+
+    assert matched == 1
+    diff = coll.diff()
+    assert "@book{B," not in diff
+    assert "Title={First}" in diff
+
+
+def test_selective_format_survives_a_later_surgical_edit() -> None:
+    # Reformatting an entry replaces its raw_content, so the surgical editors
+    # must still find their way around it afterwards.
+    coll = Bibliography.from_text(_SELECTION_SOURCE)
+    coll.format(CanonicalLayout(), "key = A")
+    coll.set_field("note", "checked", "key = A")
+
+    output = coll.preview()
+    assert "  year = {2020},\n  note = {checked}\n}" in output
+    assert "@book{B,   title={Second},  publisher={Elsevier}  }" in output
+
+
+def test_format_selected_entries_resolves_string_macros_in_its_safety_check() -> None:
+    # An entry's semantic values are @string-interpolated, so the per-entry check
+    # must reparse it with the library's macro namespace rather than in isolation
+    # (otherwise `journal = NMI # {...}` reads as a changed value and is refused).
+    lib = parse_bib(
+        "@string{NMI = {Nature Mach. Intell.}}\n\n"
+        "@article{A,\n  journal = NMI # { Supplement},\n  title={T}\n}\n"
+    )
+
+    assert format_selected_entries(lib, CanonicalLayout(), None) == 1
+
+    output = write_bib(lib)
+    assert "journal = NMI # { Supplement}," in output
+    assert parse_bib(output).entries["A"].fields["journal"] == "Nature Mach. Intell. Supplement"
+
+
+def test_format_selected_entries_wrapping_is_idempotent() -> None:
+    lib = parse_bib(
+        "@article{A,\n"
+        "  author = {Ada Example and Bob Example and Cyd Example and Dee Example},\n"
+        "  title = {A Long Prose Title That Runs Well Past Any Reasonable Line Width Limit}\n"
+        "}\n"
+    )
+    layout = CanonicalLayout(wrap_values="canonical", line_width=60)
+
+    format_selected_entries(lib, layout, None)
+    once = write_bib(lib)
+    format_selected_entries(lib, layout, None)
+
+    assert write_bib(lib) == once
+    assert "and\n" in once  # the value really was wrapped

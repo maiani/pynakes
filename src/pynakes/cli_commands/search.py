@@ -4,9 +4,15 @@ import json
 
 import typer
 
-from pynakes import fields as fields_ops
 from pynakes import search as search_ops
-from pynakes.cli_common import _entries, _resolve_input_bib, _safe, bib_file_argument
+from pynakes.cli_common import (
+    _entries,
+    _resolve_input_bib,
+    _safe,
+    bib_file_argument,
+    build_where_filter,
+    where_option,
+)
 from pynakes.engine import Bibliography
 
 
@@ -21,8 +27,13 @@ def search(
         "--field",
         help="Restrict stored fields searched and returned; repeat for multiple fields",
     ),
-    where: str | None = typer.Option(None, "--where", help="Filter expression"),
+    where: str | None = where_option(),
     case_sensitive: bool = typer.Option(False, "--case-sensitive", help="Match case sensitively"),
+    fuzzy: bool = typer.Option(
+        False,
+        "--fuzzy",
+        help="Also match near-misses (misspellings, inflections) by similarity",
+    ),
     limit: int | None = typer.Option(None, "--limit", help="Maximum number of matches"),
     no_rank: bool = typer.Option(
         False,
@@ -36,19 +47,26 @@ def search(
     Each result is tagged with the field(s) that matched, e.g. \\[title] or
     \\[title, groups]: ``key`` and ``type`` for the citation key and entry
     type, or the matching stored field name (``title``, ``author``,
-    ``groups``, ``abstract``, ...). By default, results are ranked by match
-    strength — key > title > author > other fields > groups/abstract — with
-    ties kept in file order; pass ``--no-rank`` for plain file order.
+    ``groups``, ``abstract``, ...). With ``--json`` every hit is explained
+    individually — field, term, exact or fuzzy, score, and the matching excerpt.
+    By default, results are ranked by match strength — key > title > author >
+    other fields > groups/abstract, then by score — with ties kept in file
+    order; pass ``--no-rank`` for plain file order.
+
+    ``--where`` narrows *which* entries are searched with the shared selector
+    grammar, so date ranges and "missing field" questions need no special
+    flags: ``--where 'year >= 2020 and abstract missing'``.
     """
     file = _resolve_input_bib(file, json_output)
     lib = Bibliography.open(file).lib
-    where_filter = fields_ops.parse_query(where) if where is not None else None
+    where_filter = build_where_filter(where)
     results = search_ops.search_entries(
         lib,
         query,
         fields=field,
         where=where_filter,
         case_sensitive=case_sensitive,
+        fuzzy=fuzzy,
         limit=limit,
         rank=not no_rank,
     )
@@ -62,8 +80,10 @@ def search(
                     "file": file,
                     "query": query,
                     "where": where,
+                    "where_parsed": where_filter.to_dict() if where_filter is not None else None,
                     "fields": field or [],
                     "case_sensitive": case_sensitive,
+                    "fuzzy": fuzzy,
                     "limit": limit,
                     "ranked": not no_rank,
                     "count": len(results),
@@ -78,7 +98,10 @@ def search(
     for result in results:
         title = result.fields.get("title")
         suffix = f" — {title}" if title else ""
-        typer.echo(f"  @{result.type}{{{result.key}}}{suffix} [{', '.join(result.matched_fields)}]")
+        tag = ", ".join(result.matched_fields)
+        if any(match.kind == "fuzzy" for match in result.matches):
+            tag += f", ~{result.score:.2f}"
+        typer.echo(f"  @{result.type}{{{result.key}}}{suffix} [{tag}]")
 
 
 def register(app: typer.Typer) -> None:

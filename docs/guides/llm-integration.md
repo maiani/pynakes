@@ -42,9 +42,11 @@ It includes:
 - `command_groups` and `command_schemas`: the live commands, arguments,
   options, types, defaults, and help text.
 - `error_codes`: the error and conflict codes on which a caller can branch.
-- `predicate_grammar`: expressions accepted by `fields --where`,
-  `search --where`, and `corpus split --to`.
-- `search_query_grammar`: term, phrase, field, and ranking behavior.
+- `predicate_grammar`: the one selector grammar every entry-addressable
+  command accepts (`fields`, `search`, `format`, `corpus combine --where`, and
+  `corpus split --to`), including boolean composition and its operator table.
+- `search_query_grammar`: term, phrase, field, fuzzy, ranking, and
+  match-explanation behavior.
 - `batch_operations`: the operation vocabulary accepted by `corpus batch`.
 
 Use the schema to construct calls and `pynakes <command> --help` for a focused
@@ -92,7 +94,10 @@ its operation vocabulary through `capabilities`.
 
 - Use `ref show <key>` to read one uniquely keyed reference.
 - Use `ref edit <key>` for a multi-field patch to one reference.
-- Use `fields` with `--where` for bulk field operations over a selection.
+- Use `fields` with `--where` for bulk field operations over a selection. The
+  same selector works on `search`, `format`, and the corpus operations, so
+  scope a set once — `'year >= 2025 and doi missing'` — and reuse the
+  expression rather than filtering with `grep`.
 - Use `ref add` for a fully local, manually supplied reference.
 - Use `ref import` for network-backed DOI, repository, preprint, and
   working-paper metadata resolution.
@@ -103,6 +108,11 @@ its operation vocabulary through `capabilities`.
 `ref show` and `ref edit` require the key to identify exactly one entry. If it
 is duplicated, repair the duplicate keys or select entries with a bulk
 `fields --where` operation instead of guessing.
+
+To find candidates from a half-remembered title, `search --fuzzy` matches near
+misses and reports, per hit, which field matched, whether the match was exact or
+fuzzy, its score, and the matching excerpt — enough to decide without reading
+each entry.
 
 ### Agent-assisted classification
 

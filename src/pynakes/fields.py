@@ -7,8 +7,9 @@ the touched field changes in a diff). A ``where`` filter — a predicate over a
 """
 
 import re
-from collections.abc import Callable, Iterator
+from collections.abc import Iterable, Iterator
 
+from pynakes import query
 from pynakes.editing import (
     append_delimited_field,
     remove_entry_field,
@@ -224,20 +225,9 @@ def protect_title_capitalization(
 
 # --- query filters ---------------------------------------------------------
 
-# Supports: `FIELD contains "x"`, `FIELD = "x"` / `FIELD == "x"`, `FIELD exists`.
-# The special field names `type` and `key` match the entry type and citation
-# key respectively, rather than a stored field.
-_QUERY_RE = re.compile(
-    r"""^\s*(?P<field>\w+)\s+
-        (?P<op>contains|==|=|exists)
-        (?:\s+(?:"(?P<dq>[^"]*)"|'(?P<sq>[^']*)'|(?P<bare>\S+)))?
-        \s*$""",
-    re.IGNORECASE | re.VERBOSE,
-)
 
-
-def parse_query(expr: str) -> Callable[[BibEntry], bool]:
-    """Compile a simple ``--where`` expression into a predicate.
+def parse_query(expr: str, *, cited_keys: Iterable[str] | None = None) -> query.Node:
+    """Compile a ``--where`` expression into a predicate.
 
     Examples::
 
@@ -245,36 +235,13 @@ def parse_query(expr: str) -> Callable[[BibEntry], bool]:
         type = article
         key == "Smith2020"
         doi exists
+        year >= 2025 and type in [article, inproceedings]
+
+    The grammar lives in :mod:`pynakes.query`, shared by every command that
+    selects entries; see :func:`pynakes.query.parse_query` for its full
+    description and the meaning of ``cited_keys``.
 
     Raises:
         ValueError: if the expression cannot be parsed.
     """
-    match = _QUERY_RE.match(expr)
-    if not match:
-        raise ValueError(f"Invalid query expression: {expr!r}")
-
-    field = match.group("field").lower()
-    op = match.group("op").lower()
-    value = match.group("dq")
-    if value is None:
-        value = match.group("sq")
-    if value is None:
-        value = match.group("bare")
-
-    def get(entry: BibEntry) -> str:
-        if field == "type":
-            return entry.type
-        if field == "key":
-            return entry.key
-        return entry.fields.get(field, "")
-
-    if op == "exists":
-        return lambda e: field in ("type", "key") or field in e.fields
-
-    if value is None:
-        raise ValueError(f"Query operator {op!r} requires a value: {expr!r}")
-
-    needle = value.lower()
-    if op == "contains":
-        return lambda e: needle in get(e).lower()
-    return lambda e: get(e).lower() == needle
+    return query.parse_query(expr, cited_keys=cited_keys)
