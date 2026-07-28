@@ -24,6 +24,7 @@ from pynakes.authors import last_name, split_name_list
 from pynakes.model import BibEntry, BibFile
 
 __all__ = [
+    "IdentityClass",
     "MatchStatus",
     "WorkEvidence",
     "WorkIdentifier",
@@ -32,11 +33,38 @@ __all__ = [
     "compare_work_evidence",
     "entry_arxiv_id",
     "evidence_from_entry",
+    "identity_class",
     "find_exact_matches",
     "normalize_work_identifier",
 ]
 
 MatchStatus = Literal["exact", "probable", "conflict", "unknown"]
+IdentityClass = Literal["preprint", "published", "book", "code", "unknown"]
+
+# Entry types that decide a class on their own.
+_CODE_TYPES = frozenset({"software", "dataset"})
+_BOOK_TYPES = frozenset(
+    {
+        "book",
+        "mvbook",
+        "inbook",
+        "bookinbook",
+        "suppbook",
+        "booklet",
+        "collection",
+        "mvcollection",
+        "incollection",
+        "suppcollection",
+        "reference",
+        "mvreference",
+        "inreference",
+    }
+)
+# Types whose venue alone establishes publication, without a volume or pages.
+_PUBLISHED_TYPES = frozenset({"inproceedings", "conference", "proceedings", "mvproceedings"})
+_VENUE_FIELDS = ("journal", "journaltitle", "booktitle", "eventtitle")
+_LOCATOR_FIELDS = ("volume", "pages", "number", "issue", "publisher")
+_PREPRINT_SERVER_FIELDS = ("biorxiv", "medrxiv", "chemrxiv", "researchsquare", "ssrn", "osf")
 
 _ID_PRIORITY = {
     "doi": 0,
@@ -198,6 +226,45 @@ def entry_arxiv_id(entry: BibEntry) -> str | None:
         if normalized:
             return normalized
     return None
+
+
+def identity_class(entry: BibEntry) -> IdentityClass:
+    """Classify what kind of work an entry describes, from offline evidence only.
+
+    The classes describe how a work was made available, which is what governs
+    the metadata it can be expected to carry: a ``preprint`` has no issue or
+    publisher, a ``code`` record has no pagination. Cross-entry consistency
+    checks use this so that records are only compared with comparable peers.
+
+    Publication evidence wins over eprint evidence: an entry with both a journal
+    reference and an eprint is a published article that also exists as a
+    preprint, not a preprint.
+    """
+    etype = entry.type.lower()
+    if etype in _CODE_TYPES:
+        return "code"
+    if etype in _BOOK_TYPES:
+        return "book"
+    fields = entry.fields
+    has_venue = any(fields.get(name, "").strip() for name in _VENUE_FIELDS)
+    has_locator = any(fields.get(name, "").strip() for name in _LOCATOR_FIELDS)
+    if has_venue and (has_locator or etype in _PUBLISHED_TYPES):
+        return "published"
+    if _has_eprint_evidence(entry):
+        return "preprint"
+    if has_venue:
+        return "published"
+    return "unknown"
+
+
+def _has_eprint_evidence(entry: BibEntry) -> bool:
+    """Return whether an entry carries preprint-server evidence."""
+    if entry_arxiv_id(entry) is not None:
+        return True
+    fields = entry.fields
+    if any(fields.get(name, "").strip() for name in ("eprint", "archiveprefix", "eprinttype")):
+        return True
+    return any(fields.get(name, "").strip() for name in _PREPRINT_SERVER_FIELDS)
 
 
 def evidence_from_entry(

@@ -60,6 +60,8 @@ class TestLintStrict:
             "issue_count",
             "errors",
             "warnings",
+            "info",
+            "by_category",
             "issues",
         }
         assert "files" not in data  # not the aggregate shape

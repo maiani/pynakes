@@ -435,6 +435,7 @@ def format_entry(
         indent=layout.indent,
         tabular=layout.alignment == "equals",
         trailing_comma=layout.trailing_comma,
+        entry_type=entry.type.lower(),
     )
 
 
@@ -455,7 +456,9 @@ def _render_wrapped_entry(
 ) -> str:
     """Render an entry with opt-in, expression-preserving value wrapping."""
     width = max((len(name) for name, _ in fields), default=0) if layout.alignment == "equals" else 0
-    lines = [f"@{entry.type}{{{entry.key},"]
+    # Entry types are case-insensitive in BibTeX, so canonical layout lowercases
+    # them exactly as the parser already lowercases field names.
+    lines = [f"@{entry.type.lower()}{{{entry.key},"]
     for index, (name, expression) in enumerate(fields):
         pad = " " * (width - len(name)) if width else ""
         prefix = f"{layout.indent}{name}{pad} = "
@@ -655,7 +658,9 @@ def _semantic_signature(lib: BibFile, *, normalize_whitespace: bool) -> Counter:
     entries = [
         (
             entry.key,
-            entry.type,
+            # Compared case-insensitively: an entry type carries no case
+            # semantics, so recasing it is not a semantic change.
+            entry.type.lower(),
             tuple(sorted((name, value_signature(value)) for name, value in entry.fields.items())),
         )
         for entry in lib.entries.values()

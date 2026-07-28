@@ -152,9 +152,15 @@ def render_entry(
     indent: str = "  ",
     tabular: bool = False,
     trailing_comma: bool = True,
+    entry_type: str | None = None,
 ) -> str:
-    """Render one entry from already-delimited field expressions."""
-    lines = [f"@{entry.type}{{{entry.key},"]
+    """Render one entry from already-delimited field expressions.
+
+    ``entry_type`` overrides the rendered type, which the canonical formatter
+    uses to emit the case-insensitive entry type in its canonical lowercase
+    form. Ordinary edits keep the entry's own spelling.
+    """
+    lines = [f"@{entry_type or entry.type}{{{entry.key},"]
     width = max((len(name) for name, _ in fields), default=0) if tabular else 0
     for index, (name, expression) in enumerate(fields):
         pad = " " * (width - len(name)) if width else ""

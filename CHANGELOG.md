@@ -58,8 +58,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and compact `978`/`979` ISBN-13 values are recognized bare; a compact ISBN-10
   uses the `ISBN:` prefix. Check digits are validated before any lookup, and
   duplicate detection matches the `isbn` field of existing entries.
+- `pynakes.identity.identity_class` classifies an entry as `preprint`,
+  `published`, `book`, `code`, or `unknown` from offline evidence, with
+  publication evidence outranking eprint evidence so a published article that
+  also exists as a preprint is classified as published.
+- Every `lint` finding now carries a `category` — `correctness`, `content`,
+  `layout`, `consistency`, or `profile` — and the `fixer` command that resolves
+  it, so a report says whether `normalize`, `format`, or a human decision is
+  needed. `lint --category` filters the report, `lint --json` gains `info` and
+  `by_category` counts alongside per-finding `category` and `fixer` keys, and
+  human output ends with the commands that would clear the fixable findings.
+  `lint` remains read-only.
 
 ### Changed
+
+- `format` now lowercases entry types, which BibTeX treats case-insensitively,
+  the way it already lowercases field names. This clears every `layout`-category
+  lint finding, which previously included one (`noncanonical_entry_type_case`)
+  that only `normalize` resolved — so layout drift no longer reaches
+  `normalize --check` as content drift. Surgical edits still preserve the entry
+  type as spelled.
+- The `lint` cross-entry consistency check now groups entries by entry type
+  **and** identity class, and ignores publisher decoration (`issn`, `publisher`,
+  `month`, `url`, `abstract`, `keywords`, `language`, `isbn`, `eissn`, `day`,
+  `pagetotal`, `urldate`, `copyright`). A preprint is no longer judged against
+  published articles that carry issue and publisher metadata by construction,
+  and a record from a discipline database is no longer flagged for the publisher
+  decoration that DOI content negotiation happens to supply. Gaps between
+  genuinely comparable peers are still reported.
+- `lint` gained an `info` severity beneath `warning`, and layout and consistency
+  findings now use it: `noncanonical_entry_type_case`,
+  `noncanonical_field_name_case`, `inconsistent_field`, and `missing_doi`. This
+  keeps advisory findings from burying a structural `error`. Exit-code behavior
+  is unchanged — only errors and metadata-profile deviations gate `--strict`.
 
 - `dedupe`, reference-import duplicate checks, and integrity preprint routing
   now share `pynakes.identity` extraction and comparison. The former

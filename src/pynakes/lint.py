@@ -1,12 +1,19 @@
 """Validation checks for a BibTeX library.
 
 Reports issues as a flat list of :class:`LintIssue` objects, each tagged with a
-severity (``error`` or ``warning``), the offending entry key, and a message.
-Checks: duplicate keys, missing required fields (by entry type), undefined
-BibTeX string references, cross-entry field consistency (a field most entries
-of a type define but some omit), malformed or missing DOIs, malformed JabRef
-``groups`` formatting, noncanonical entry-type / field-name casing, unresolved
-journal titles, and deviations from the library's stored metadata profile.
+severity (``error``, ``warning``, or ``info``), a category, the offending entry
+key, and a message. Checks: duplicate keys, missing required fields (by entry
+type), undefined BibTeX string references, cross-entry field consistency (a
+field most entries of a type define but some omit), malformed or missing DOIs,
+malformed JabRef ``groups`` formatting, noncanonical entry-type / field-name
+casing, unresolved journal titles, and deviations from the library's stored
+metadata profile.
+
+``lint`` only diagnoses; it never rewrites a library. The category of a finding
+names which command resolves it — ``normalize`` for content conventions and
+``format`` for layout — while ``correctness`` and ``consistency`` findings need
+a human decision. Severity ranks urgency: layout and consistency findings are
+``info`` so that they cannot bury a structural ``error``.
 
 BibLaTeX required-field validation follows the official BibLaTeX manual on
 CTAN, section 2.1 "Entry Types" and entry-type aliases:
@@ -21,6 +28,7 @@ from pynakes._identifiers import normalize_doi
 from pynakes.bibtex_parser import parse_raw_string_definition
 from pynakes.editing import raw_field_names, raw_field_value
 from pynakes.fields import TITLE_FIELDS, title_capitalization_is_protected
+from pynakes.identity import identity_class
 from pynakes.journals import JOURNAL_FIELDS, JournalSources, expected_journal_title, load_sources
 from pynakes.keys import (
     UnsupportedCitationKeyPatternError,
@@ -162,6 +170,29 @@ _CONSISTENCY_SKIP_FIELDS = frozenset(
     }
 )
 
+# Fields whose absence is never a defect, only a difference in how rich the
+# metadata source was. A record from a discipline database legitimately lacks
+# the publisher decoration that DOI content negotiation supplies, so comparing
+# these across peers reports provenance, not a bibliographic gap. Fields that
+# a type genuinely requires are already excluded by ``required_field_rules``.
+_CONSISTENCY_DECORATION_FIELDS = frozenset(
+    {
+        "abstract",
+        "copyright",
+        "day",
+        "eissn",
+        "isbn",
+        "issn",
+        "keywords",
+        "language",
+        "month",
+        "pagetotal",
+        "publisher",
+        "url",
+        "urldate",
+    }
+)
+
 # Profile findings remain warnings for interactive use, but ``lint --strict``
 # treats them as a failed conformance gate.
 PROFILE_ISSUE_TYPES = frozenset(
@@ -228,21 +259,83 @@ def is_profile_issue(issue: "LintIssue") -> bool:
     return issue.type in PROFILE_ISSUE_TYPES
 
 
+LintSeverity = Literal["error", "warning", "info"]
+LintCategory = Literal["correctness", "content", "layout", "consistency", "profile"]
+
+SEVERITIES: tuple[LintSeverity, ...] = ("error", "warning", "info")
+
+# Which command resolves a category, or ``None`` when a human must decide.
+CATEGORY_FIXERS: dict[LintCategory, str | None] = {
+    "correctness": None,
+    "content": "normalize",
+    "layout": "format",
+    "consistency": None,
+    "profile": None,
+}
+
+# Every finding belongs to exactly one category. ``correctness`` findings are
+# structural problems no command can safely resolve; ``content`` and ``layout``
+# findings name the command that fixes them; ``consistency`` findings are
+# heuristic observations, not defects.
+ISSUE_CATEGORIES: dict[str, LintCategory] = {
+    "duplicate_field": "correctness",
+    "duplicate_key": "correctness",
+    "empty_key": "correctness",
+    "missing_required_field": "correctness",
+    "undefined_string_reference": "correctness",
+    "no_entries": "correctness",
+    "citation_key_pattern_mismatch": "content",
+    "journal_style_mismatch": "content",
+    "malformed_doi": "content",
+    "malformed_groups": "content",
+    "title_capitalization_unprotected": "content",
+    "unknown_journal": "content",
+    "unsupported_citation_key_pattern": "content",
+    "noncanonical_entry_type_case": "layout",
+    "noncanonical_field_name_case": "layout",
+    "inconsistent_field": "consistency",
+    "missing_doi": "consistency",
+    "invalid_profile_setting": "profile",
+    "missing_profile_required_field": "profile",
+}
+
+
+def issue_category(issue_type: str) -> LintCategory:
+    """Return the category of ``issue_type``.
+
+    Unmapped types fall back to ``correctness`` so a new check is never silently
+    treated as advisory; ``tests/test_lint.py`` asserts the mapping is complete.
+    """
+    return ISSUE_CATEGORIES.get(issue_type, "correctness")
+
+
 @dataclass
 class LintIssue:
     """A single validation finding."""
 
     type: str
-    severity: Literal["error", "warning"]
+    severity: LintSeverity
     message: str
     key: str | None = None
     field: str | None = None
+
+    @property
+    def category(self) -> LintCategory:
+        """Return which kind of problem this finding is."""
+        return issue_category(self.type)
+
+    @property
+    def fixer(self) -> str | None:
+        """Return the command that resolves this finding, if any."""
+        return CATEGORY_FIXERS[self.category]
 
     def to_dict(self) -> dict[str, object]:
         """Serialize the finding to a JSON-friendly dict for CLI output."""
         return {
             "type": self.type,
             "severity": self.severity,
+            "category": self.category,
+            "fixer": self.fixer,
             "message": self.message,
             "key": self.key,
             "field": self.field,
@@ -345,19 +438,24 @@ def _lint_duplicate_fields(entry: BibEntry) -> list[LintIssue]:
 
 
 def _lint_field_consistency(lib: BibFile, *, dialect: str = "bibtex") -> list[LintIssue]:
-    """Report fields a majority of same-type entries define but some omit.
+    """Report fields a majority of comparable entries define but some omit.
 
-    A field is flagged for an entry only when a strict majority of same-type
-    entries carry it and this entry does not. Required fields and JabRef
-    structural/management fields are excluded. Findings are advisory warnings.
+    Entries are grouped by entry type **and**
+    :func:`~pynakes.identity.identity_class`, so a preprint is compared with
+    preprints and a book with books rather than with published articles that
+    carry issue and publisher metadata by construction. A field is flagged only
+    when a strict majority of the group carries it and this entry does not.
+    Required fields, JabRef structural/management fields, and publisher
+    decoration whose absence is never a defect are excluded. Findings are
+    advisory ``info`` in the ``consistency`` category.
     """
-    by_type: dict[str, list[BibEntry]] = {}
+    by_group: dict[tuple[str, str], list[BibEntry]] = {}
     for entry in lib.entries.values():
         if entry.key.strip():
-            by_type.setdefault(entry.type.lower(), []).append(entry)
+            by_group.setdefault((entry.type.lower(), identity_class(entry)), []).append(entry)
 
     issues: list[LintIssue] = []
-    for etype, entries in by_type.items():
+    for (etype, _identity), entries in by_group.items():
         total = len(entries)
         if total < 3:
             continue
@@ -379,6 +477,7 @@ def _lint_field_consistency(lib: BibFile, *, dialect: str = "bibtex") -> list[Li
             and count * 2 > total
             and name not in required
             and name not in _CONSISTENCY_SKIP_FIELDS
+            and name not in _CONSISTENCY_DECORATION_FIELDS
         }
 
         for entry, fields in zip(entries, resolved):
@@ -387,7 +486,7 @@ def _lint_field_consistency(lib: BibFile, *, dialect: str = "bibtex") -> list[Li
                     issues.append(
                         LintIssue(
                             "inconsistent_field",
-                            "warning",
+                            "info",
                             f"{etype} entry {entry.key!r} is missing field {name!r}, which "
                             f"{present_counts[name]} of {total} {etype} entries define",
                             key=entry.key,
@@ -485,7 +584,7 @@ def _lint_doi(entry: BibEntry, fields: dict[str, str]) -> list[LintIssue]:
         return [
             LintIssue(
                 "missing_doi",
-                "warning",
+                "info",
                 f"Entry {entry.key!r} ({etype}) has no DOI",
                 key=entry.key,
                 field="doi",
@@ -542,7 +641,7 @@ def _lint_entry(
         issues.append(
             LintIssue(
                 "noncanonical_entry_type_case",
-                "warning",
+                "info",
                 f"Entry {entry.key!r} uses mixed-case entry type {entry.type!r}; use {etype!r}",
                 key=entry.key,
             )
@@ -555,7 +654,7 @@ def _lint_entry(
             issues.append(
                 LintIssue(
                     "noncanonical_field_name_case",
-                    "warning",
+                    "info",
                     f"Entry {entry.key!r} uses mixed-case field name {name!r}; use {canonical!r}",
                     key=entry.key,
                     field=canonical,

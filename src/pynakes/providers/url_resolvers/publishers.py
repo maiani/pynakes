@@ -168,8 +168,9 @@ UNRESOLVABLE_URL_HINTS = (
     (
         re.compile(r"^https?://pubs\.aip\.org/", re.IGNORECASE),
         "AIP article URLs on pubs.aip.org address articles by volume, issue, and "
-        "an internal article id rather than by DOI; import the DOI shown on the "
-        "article page instead",
+        "an internal article id rather than by DOI, and the page states its DOI "
+        "only behind a browser challenge; import the DOI shown on the article "
+        "page instead",
     ),
     (
         re.compile(r"^https?://(?:www\.)?iopscience\.iop\.org/", re.IGNORECASE),

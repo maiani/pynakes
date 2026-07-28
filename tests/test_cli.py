@@ -532,6 +532,8 @@ class TestInspectAndLint:
         assert data["issues"][-1] == {
             "type": "undefined_string_reference",
             "severity": "error",
+            "category": "correctness",
+            "fixer": None,
             "message": "Entry 'A' field 'month' references undefined BibTeX string name 'june'",
             "key": "A",
             "field": "month",
@@ -3438,3 +3440,92 @@ class TestAssetFetchPublished:
         assert (tmp_path / "refs.files" / "Noether1918.supplement.pdf").read_bytes() == (
             b"%PDF supplement"
         )
+
+
+class TestLintCategories:
+    """`lint` reports which command fixes a finding and can filter by category."""
+
+    MIXED = (
+        "@Article{A,\n"
+        "  Author = {Jane Doe},\n"
+        "  title = {A Study},\n"
+        "  journal = {Nature},\n"
+        "  YEAR = {2020}\n"
+        "}\n"
+    )
+
+    def test_json_reports_severity_tiers_and_category_counts(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(self.MIXED)
+
+        result = runner.invoke(app, ["lint", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["info"] > 0
+        assert data["by_category"]["layout"] == 3
+        assert set(data["by_category"]) >= {"consistency", "layout"}
+        layout = [i for i in data["issues"] if i["category"] == "layout"]
+        assert all(i["severity"] == "info" and i["fixer"] == "format" for i in layout)
+
+    def test_human_output_names_the_fixing_command(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(self.MIXED)
+
+        result = runner.invoke(app, ["lint", str(bib)])
+
+        assert "Run `pynakes format` to resolve 3 of them." in result.output
+
+    def test_category_filter_narrows_the_report(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(self.MIXED)
+
+        result = runner.invoke(app, ["lint", str(bib), "--category", "layout", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert set(data["by_category"]) == {"layout"}
+        assert data["issue_count"] == 3
+
+    def test_category_filter_accepts_several_categories(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(self.MIXED)
+
+        result = runner.invoke(
+            app,
+            ["lint", str(bib), "--category", "layout", "--category", "consistency", "--json"],
+        )
+
+        data = json.loads(result.output)
+        assert set(data["by_category"]) == {"layout", "consistency"}
+
+    def test_unknown_category_is_an_error(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(self.MIXED)
+
+        result = runner.invoke(app, ["lint", str(bib), "--category", "nope", "--json"])
+
+        assert result.exit_code == 1
+        data = json.loads(result.output)
+        assert data["status"] == "error"
+        assert data["error"] == "InvalidCategory"
+
+    def test_format_clears_every_layout_finding(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(self.MIXED)
+
+        assert runner.invoke(app, ["format", str(bib)]).exit_code == 0
+        result = runner.invoke(app, ["lint", str(bib), "--category", "layout", "--json"])
+
+        data = json.loads(result.output)
+        assert data["issue_count"] == 0
+
+    def test_advisory_findings_alone_do_not_fail_strict(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(self.MIXED)
+
+        result = runner.invoke(app, ["lint", str(bib), "--strict", "--json"])
+
+        # Only errors and profile deviations gate a strict run.
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["errors"] == 0

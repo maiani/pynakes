@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from pynakes.bibtex_parser import parse_bib
+from pynakes.bibtex_writer import write_bib
 from pynakes.canonical import (
     CanonicalLayout,
     FormatLintError,
@@ -489,8 +490,10 @@ def test_every_fixture_is_semantics_preserving_and_idempotent(path: Path) -> Non
     original = parse_bib(path.read_text())
     formatted = write_bib_canonical(original)
     reparsed = parse_bib(formatted)
-    before = [(entry.key, entry.type, entry.fields) for entry in original.entries.values()]
-    after = [(entry.key, entry.type, entry.fields) for entry in reparsed.entries.values()]
+    # Entry types are compared case-insensitively: canonical layout lowercases
+    # them, which BibTeX treats as the same type.
+    before = [(entry.key, entry.type.lower(), entry.fields) for entry in original.entries.values()]
+    after = [(entry.key, entry.type.lower(), entry.fields) for entry in reparsed.entries.values()]
     assert after == before
     assert write_bib_canonical(reparsed) == formatted
 
@@ -510,3 +513,48 @@ def test_every_layout_knob_is_idempotent(layout: CanonicalLayout) -> None:
     source = '@article{A, year={2020}, title="Quoted", month=jan}\n'
     once = write_bib_canonical(parse_bib(source), layout)
     assert write_bib_canonical(parse_bib(once), layout) == once
+
+
+# --- entry-type case -------------------------------------------------------
+
+
+@pytest.mark.parametrize("source_type", ["Article", "ARTICLE", "aRtIcLe"])
+def test_canonical_layout_lowercases_the_entry_type(source_type: str) -> None:
+    # Entry types are case-insensitive in BibTeX, so canonical layout emits the
+    # lowercase form, matching the field names the parser already lowercases.
+    lib = parse_bib(f"@{source_type}{{A,\n  title = {{T}},\n  year = {{2020}}\n}}\n")
+
+    output = write_bib_canonical(lib)
+
+    assert "@article{A," in output
+    assert f"@{source_type}{{" not in output or source_type == "article"
+
+
+def test_canonical_layout_preserves_the_citation_key_case() -> None:
+    # Only the type is case-insensitive; a citation key is not.
+    lib = parse_bib("@ARTICLE{MixedKey2020,\n  title = {T},\n  year = {2020}\n}\n")
+
+    output = write_bib_canonical(lib)
+
+    assert "@article{MixedKey2020," in output
+
+
+def test_entry_type_recasing_is_not_a_semantic_change() -> None:
+    # The formatter's own safety check must accept type recasing; if it did not,
+    # write_bib_canonical would raise here.
+    lib = parse_bib("@ARTICLE{A,\n  Title = {T},\n  YEAR = {2020}\n}\n")
+
+    output = write_bib_canonical(lib)
+    reparsed = parse_bib(output)
+
+    assert reparsed.entries["A"].type == "article"
+    assert reparsed.entries["A"].fields == lib.entries["A"].fields
+    assert write_bib_canonical(reparsed) == output
+
+
+def test_surgical_edits_keep_the_entry_type_spelling() -> None:
+    # Only `format` recases types; an ordinary write must not touch an entry it
+    # was not asked to change.
+    lib = parse_bib("@ARTICLE{A,\n  title = {T},\n  year = {2020}\n}\n")
+
+    assert "@ARTICLE{A," in write_bib(lib)

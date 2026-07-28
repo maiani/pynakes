@@ -40,10 +40,6 @@ Tasks below are listed in implementation priority order.
   metadata keys to their current spelling, validate enum *values* (catch typo'd
   policy tokens), flag `[pynakes:unknown:*]` keys, and collapse duplicate
   metadata blocks — today metadata drift passes silently.
-- **Quieter `lint` consistency heuristic**: scope the "missing field X vs peers"
-  check within entry-type *and* identity class (preprint/published/book/code),
-  or gate it behind `lint --consistency`, so healthy libraries don't bury real
-  issues under peer-consistency noise.
 - **Single-bibliography analysis**: add a public `pynakes.analysis` API
   namespace and a read-only `stats` command returning typed and JSON-friendly
   reports for one `BibFile`/`Bibliography`. Start with deterministic descriptive

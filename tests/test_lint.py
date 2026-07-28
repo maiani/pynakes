@@ -1,11 +1,23 @@
 """Tests for linting / validation checks."""
 
+import ast
 from pathlib import Path
 
 import pytest
 
 from pynakes.bibtex_parser import parse_bib
-from pynakes.lint import LintProfile, _lint_entry, _lint_profile_entry, lint
+from pynakes.identity import identity_class
+from pynakes.lint import (
+    CATEGORY_FIXERS,
+    ISSUE_CATEGORIES,
+    SEVERITIES,
+    LintIssue,
+    LintProfile,
+    _lint_entry,
+    _lint_profile_entry,
+    issue_category,
+    lint,
+)
 from pynakes.model import BibEntry
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -173,11 +185,14 @@ def test_valid_doi_with_url_prefix_ok() -> None:
     assert "malformed_doi" not in _types(lint(lib))
 
 
-def test_missing_doi_warns_for_article() -> None:
+def test_missing_doi_is_reported_as_advisory_for_article() -> None:
     lib = parse_bib("@article{A,\n  author={X},\n  title={T},\n  journal={J},\n  year={2020}\n}\n")
     missing = [i for i in lint(lib) if i.type == "missing_doi"]
     assert len(missing) == 1
-    assert missing[0].severity == "warning"
+    # A missing DOI is an observation, not a defect: it must not bury an error.
+    assert missing[0].severity == "info"
+    assert missing[0].category == "consistency"
+    assert missing[0].fixer is None
 
 
 def test_malformed_groups() -> None:
@@ -210,7 +225,8 @@ def test_field_consistency_flags_majority_field_missing_from_one_entry() -> None
     )
     issues = [i for i in lint(lib) if i.type == "inconsistent_field"]
     assert _consistency(issues) == [("a3", "doi")]
-    assert all(i.severity == "warning" for i in issues)
+    assert all(i.severity == "info" for i in issues)
+    assert all(i.category == "consistency" for i in issues)
     assert "3 of 4" in issues[0].message
 
 
@@ -522,3 +538,182 @@ def test_custom_biblatex_entry_type_and_field_names_produce_no_errors() -> None:
     assert not error_issues, f"unexpected errors on custom entry: {error_issues}"
     # The custom field must survive a round-trip through lint.
     assert lib.entries["Dataset"].fields["custom:field"] == "A project-defined value"
+
+
+# --- severity and category axes --------------------------------------------
+
+
+def test_every_emitted_issue_type_has_a_category() -> None:
+    # Parses lint.py so a newly added check cannot silently inherit the
+    # correctness fallback: every LintIssue type must be mapped explicitly.
+    source = Path(__file__).resolve().parents[1] / "src" / "pynakes" / "lint.py"
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+    emitted = {
+        node.args[0].value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", "") == "LintIssue"
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+    }
+    assert emitted, "no LintIssue constructions found; the parser needs updating"
+    assert emitted <= set(ISSUE_CATEGORIES), (
+        f"unmapped lint issue types: {sorted(emitted - set(ISSUE_CATEGORIES))}"
+    )
+    assert set(ISSUE_CATEGORIES) <= emitted, (
+        f"stale lint issue types in ISSUE_CATEGORIES: {sorted(set(ISSUE_CATEGORIES) - emitted)}"
+    )
+
+
+def test_every_emitted_severity_is_declared() -> None:
+    source = Path(__file__).resolve().parents[1] / "src" / "pynakes" / "lint.py"
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+    severities = {
+        node.args[1].value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", "") == "LintIssue"
+        and len(node.args) > 1
+        and isinstance(node.args[1], ast.Constant)
+    }
+    assert severities <= set(SEVERITIES)
+
+
+def test_every_category_declares_whether_a_command_fixes_it() -> None:
+    assert set(CATEGORY_FIXERS) == set(ISSUE_CATEGORIES.values())
+    # Only normalize and format may be named as fixers; lint never rewrites.
+    assert {fixer for fixer in CATEGORY_FIXERS.values() if fixer} == {"normalize", "format"}
+
+
+@pytest.mark.parametrize(
+    "issue_type,category,fixer",
+    [
+        ("duplicate_key", "correctness", None),
+        ("missing_required_field", "correctness", None),
+        ("journal_style_mismatch", "content", "normalize"),
+        ("malformed_doi", "content", "normalize"),
+        ("noncanonical_entry_type_case", "layout", "format"),
+        ("noncanonical_field_name_case", "layout", "format"),
+        ("inconsistent_field", "consistency", None),
+        ("missing_doi", "consistency", None),
+        ("invalid_profile_setting", "profile", None),
+    ],
+)
+def test_issue_category_and_fixer(issue_type: str, category: str, fixer: str | None) -> None:
+    issue = LintIssue(issue_type, "warning", "message")
+
+    assert issue.category == category
+    assert issue.fixer == fixer
+    assert issue.to_dict()["category"] == category
+    assert issue.to_dict()["fixer"] == fixer
+
+
+def test_unmapped_issue_type_falls_back_to_correctness() -> None:
+    assert issue_category("a_check_added_later") == "correctness"
+
+
+def test_layout_findings_are_advisory_and_point_at_format() -> None:
+    lib = parse_bib(
+        "@Article{A,\n  Author = {Jane Doe},\n  title = {A Study},\n"
+        "  journal = {Nature},\n  YEAR = {2020},\n  doi = {10.1234/abc}\n}\n"
+    )
+
+    layout = [i for i in lint(lib) if i.category == "layout"]
+
+    assert {i.type for i in layout} == {
+        "noncanonical_entry_type_case",
+        "noncanonical_field_name_case",
+    }
+    assert all(i.severity == "info" for i in layout)
+    assert all(i.fixer == "format" for i in layout)
+
+
+def test_advisory_findings_never_outrank_a_structural_error() -> None:
+    # An entry missing a required field must remain the highest severity even
+    # when it also has layout and consistency findings.
+    lib = parse_bib("@Article{A,\n  Title = {A Study},\n  journal = {J},\n  YEAR = {2020}\n}\n")
+
+    issues = lint(lib)
+
+    assert any(i.severity == "error" and i.category == "correctness" for i in issues)
+    assert {i.severity for i in issues if i.category in {"layout", "consistency"}} == {"info"}
+
+
+# --- consistency scoping ---------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "source,expected",
+    [
+        ("@article{A, author={A}, title={T}, journal={J}, year={2020}, volume={1}}", "published"),
+        ("@article{A, author={A}, title={T}, journal={J}, year={2020}, pages={1--9}}", "published"),
+        # A venue alone publishes a conference paper; it has no volume or pages.
+        ("@inproceedings{A, author={A}, title={T}, booktitle={Proc}, year={2020}}", "published"),
+        # Publication evidence outranks eprint evidence.
+        (
+            "@article{A, author={A}, title={T}, journal={J}, year={2020}, volume={1},"
+            " eprint={2301.00001}, archiveprefix={arXiv}}",
+            "published",
+        ),
+        (
+            "@article{A, author={A}, title={T}, year={2020}, eprint={2301.00001},"
+            " archiveprefix={arXiv}}",
+            "preprint",
+        ),
+        ("@misc{A, author={A}, title={T}, year={2020}, arxiv={2301.00001}}", "preprint"),
+        ("@article{A, author={A}, title={T}, year={2020}, ssrn={123456}}", "preprint"),
+        ("@book{A, author={A}, title={T}, publisher={P}, year={2020}}", "book"),
+        ("@incollection{A, author={A}, title={T}, booktitle={B}, year={2020}}", "book"),
+        ("@software{A, author={A}, title={T}, year={2020}}", "code"),
+        ("@dataset{A, author={A}, title={T}, year={2020}}", "code"),
+        ("@phdthesis{A, author={A}, title={T}, school={S}, year={2020}}", "unknown"),
+    ],
+)
+def test_identity_class_of_an_entry(source: str, expected: str) -> None:
+    entry = next(iter(parse_bib(source + "\n").entries.values()))
+
+    assert identity_class(entry) == expected
+
+
+def test_consistency_does_not_judge_preprints_against_published_peers() -> None:
+    # Same entry type, different identity class: grouping by type alone would
+    # flag both preprints for the volume their published peers carry.
+    lib = parse_bib(
+        "@article{P1, author={A}, title={T1}, journal={J}, year={2020}, volume={1}}\n"
+        "@article{P2, author={B}, title={T2}, journal={J}, year={2021}, volume={2}}\n"
+        "@article{P3, author={C}, title={T3}, journal={J}, year={2022}, volume={3}}\n"
+        "@article{P4, author={D}, title={T4}, journal={J}, year={2023}, volume={4}}\n"
+        "@article{E1, author={E}, title={T5}, year={2024}, eprint={2401.00001},"
+        " archiveprefix={arXiv}}\n"
+        "@article{E2, author={F}, title={T6}, year={2024}, eprint={2401.00002},"
+        " archiveprefix={arXiv}}\n"
+    )
+
+    assert _consistency(lint(lib)) == []
+
+
+def test_consistency_still_flags_a_gap_within_one_identity_class() -> None:
+    # Scoping must not silence the check: comparable peers are still compared.
+    lib = parse_bib(
+        "@article{P1, author={A}, title={T1}, journal={J}, year={2020}, volume={1}}\n"
+        "@article{P2, author={B}, title={T2}, journal={J}, year={2021}, volume={2}}\n"
+        "@article{P3, author={C}, title={T3}, journal={J}, year={2022}, volume={3}}\n"
+        "@article{P4, author={D}, title={T4}, journal={J}, year={2023}, pages={1--9}}\n"
+    )
+
+    assert _consistency(lint(lib)) == [("P4", "volume")]
+
+
+@pytest.mark.parametrize("decoration", ["issn", "publisher", "month", "url", "abstract"])
+def test_consistency_ignores_publisher_decoration(decoration: str) -> None:
+    # A record from a metadata-sparse source legitimately lacks these; their
+    # absence reports provenance, not a bibliographic gap.
+    entries = "".join(
+        f"@article{{P{index}, author={{A}}, title={{T{index}}}, journal={{J}},"
+        f" year={{202{index}}}, volume={{{index}}}, {decoration}={{value}}}}\n"
+        for index in range(1, 4)
+    )
+    sparse = "@article{Sparse, author={Z}, title={TZ}, journal={J}, year={2024}, volume={9}}\n"
+    lib = parse_bib(entries + sparse)
+
+    assert _consistency(lint(lib)) == []

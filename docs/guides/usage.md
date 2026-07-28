@@ -60,18 +60,44 @@ pynakes lint                         # auto-detects one .bib file
 pynakes lint refs.bib
 pynakes lint refs.bib --json
 pynakes lint refs.bib chapters/*.bib --strict   # multi-file CI gate
+pynakes lint refs.bib --category correctness    # only structural problems
 ```
 
 Checks include duplicate citation keys, dialect-aware missing required fields by
-entry type, malformed DOI fields, missing article DOI warnings, malformed group
+entry type, malformed DOI fields, missing article DOIs, malformed group
 fields, and mixed-case entry types or field names. BibLaTeX required-field
 validation follows the official BibLaTeX manual from CTAN, section 2.1 entry
 types and aliases:
 <https://mirrors.ctan.org/macros/latex/contrib/biblatex/doc/biblatex.pdf>. It
 also verifies the lintable parts of a stored library profile: citation-key
 patterns, journal style, profile-required fields, and title brace protection.
-Casing and profile findings are warnings; run `normalize` to repair formatting
-issues surgically.
+
+`lint` only diagnoses; it never rewrites a library. Every finding carries a
+**category** naming what kind of problem it is and which command resolves it,
+and a **severity** ranking urgency:
+
+| Category | Fixed by | Severity | Examples |
+| --- | --- | --- | --- |
+| `correctness` | you decide | `error` | duplicate keys, missing required fields, undefined string references |
+| `content` | `normalize` | `warning` | journal style, malformed DOI, unprotected title case, key-pattern mismatch |
+| `layout` | `format` | `info` | mixed-case entry types and field names |
+| `consistency` | nothing — an observation | `info` | missing article DOI, a field most comparable peers define |
+| `profile` | you decide | `warning` | deviations from the library's stored lint profile |
+
+The cross-entry consistency check compares an entry only with peers of the same
+entry type **and** identity class — `preprint`, `published`, `book`, `code`, or
+`unknown` — so a preprint is never judged against published articles that carry
+issue and publisher metadata by construction. It also ignores publisher
+decoration such as `issn`, `publisher`, `month`, `url`, and `abstract`, whose
+absence reflects how rich the metadata source was rather than a gap in the
+reference.
+
+Layout and consistency findings are `info` so that they cannot bury a structural
+`error`; `--category` filters the report, and `--json` adds `info` and
+`by_category` counts plus per-finding `category` and `fixer` keys. Only errors
+and profile deviations gate `--strict`. Human output ends with the commands that
+would clear the fixable findings, for example
+`Run `pynakes format` to resolve 3 of them.`
 
 `pynakes normalize refs.bib` also repairs bare full month names such as
 `month = june`, which BibTeX interprets as an undefined string reference. It
@@ -445,6 +471,11 @@ pynakes format refs.bib --wrap-values stable --line-width 100
 model cannot rewrite losslessly, currently repeated assignments of one field in
 an entry. Other lint findings remain available through `pynakes lint` but do not
 block layout formatting of an incomplete draft.
+
+`format` clears every `layout`-category lint finding: it lowercases entry types
+and field names, both of which BibTeX treats case-insensitively, so recasing them
+changes no bibliographic value. Only `format` does this — an ordinary surgical
+edit leaves the spelling of entries it was not asked to change untouched.
 
 By default, fields use **pynakes' preferred order**. This is not prescribed by
 BibTeX, BibLaTeX, or JabRef; field order has no bibliographic meaning. It is a
