@@ -156,6 +156,7 @@ def search_entries(
     query: str,
     *,
     fields: Iterable[str] | None = None,
+    extra_fields: Iterable[str] | None = None,
     where: Callable[[BibEntry], bool] | None = None,
     case_sensitive: bool = False,
     fuzzy: bool = False,
@@ -167,6 +168,9 @@ def search_entries(
     Free terms search the citation key, entry type, and stored fields. Fielded
     terms search only their target. ``fields`` restricts stored fields included
     in free-text search and output; ``key`` and ``type`` remain searchable.
+    ``extra_fields`` names fields reported in every result regardless of that
+    restriction, so a caller can display a field — an abstract, say — without
+    widening what the query searches.
 
     With ``fuzzy=True`` a term that has no substring hit still matches a field
     whose normalized similarity reaches :data:`pynakes.query.FUZZY_THRESHOLD`,
@@ -185,6 +189,7 @@ def search_entries(
 
     terms = parse_search_query(query)
     field_filter = {name.lower() for name in fields} if fields is not None else None
+    always = {name.lower() for name in extra_fields or ()}
     results: list[SearchResult] = []
 
     for entry in lib.entries.values():
@@ -200,7 +205,7 @@ def search_entries(
                 key=entry.key,
                 type=entry.type,
                 matched_fields=matched_fields,
-                fields=_output_fields(entry, field_filter),
+                fields=_output_fields(entry, field_filter, always),
                 matches=matches,
                 score=score,
             )
@@ -216,10 +221,13 @@ def search_entries(
     return results
 
 
-def _output_fields(entry: BibEntry, field_filter: set[str] | None) -> dict[str, str]:
+def _output_fields(
+    entry: BibEntry, field_filter: set[str] | None, always: Iterable[str] = ()
+) -> dict[str, str]:
     if field_filter is None:
         return dict(entry.fields)
-    return {name: value for name, value in entry.fields.items() if name.lower() in field_filter}
+    reported = field_filter.union(always)
+    return {name: value for name, value in entry.fields.items() if name.lower() in reported}
 
 
 def _match_entry(

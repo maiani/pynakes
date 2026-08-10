@@ -14,6 +14,7 @@ from pynakes.cli_common import (
     where_option,
 )
 from pynakes.engine import Bibliography
+from pynakes.triage import abstract_excerpt
 
 
 def search(
@@ -33,6 +34,11 @@ def search(
         False,
         "--fuzzy",
         help="Also match near-misses (misspellings, inflections) by similarity",
+    ),
+    show_abstract: bool = typer.Option(
+        False,
+        "--show-abstract",
+        help="Print an excerpt of each result's abstract beneath the hit",
     ),
     limit: int | None = typer.Option(None, "--limit", help="Maximum number of matches"),
     no_rank: bool = typer.Option(
@@ -56,6 +62,11 @@ def search(
     ``--where`` narrows *which* entries are searched with the shared selector
     grammar, so date ranges and "missing field" questions need no special
     flags: ``--where 'year >= 2020 and abstract missing'``.
+
+    ``--show-abstract`` adds a one-line abstract excerpt under each hit, so a
+    candidate set can be triaged from the search itself; ``--json`` always
+    carries the full abstract. To read whole entries instead, pass the keys to
+    ``ref show --keys``.
     """
     file = _resolve_input_bib(file, json_output)
     lib = Bibliography.open(file).lib
@@ -64,6 +75,7 @@ def search(
         lib,
         query,
         fields=field,
+        extra_fields=("abstract",) if show_abstract else None,
         where=where_filter,
         case_sensitive=case_sensitive,
         fuzzy=fuzzy,
@@ -84,6 +96,7 @@ def search(
                     "fields": field or [],
                     "case_sensitive": case_sensitive,
                     "fuzzy": fuzzy,
+                    "show_abstract": show_abstract,
                     "limit": limit,
                     "ranked": not no_rank,
                     "count": len(results),
@@ -102,6 +115,9 @@ def search(
         if any(match.kind == "fuzzy" for match in result.matches):
             tag += f", ~{result.score:.2f}"
         typer.echo(f"  @{result.type}{{{result.key}}}{suffix} [{tag}]")
+        if show_abstract:
+            excerpt = abstract_excerpt(result.fields.get("abstract"))
+            typer.echo(f"      {excerpt or '(no abstract)'}")
 
 
 def register(app: typer.Typer) -> None:

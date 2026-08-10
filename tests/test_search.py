@@ -38,6 +38,20 @@ def test_field_scoped_terms() -> None:
     assert results[0].matched_fields == ["title", "type"]
 
 
+def test_extra_fields_are_reported_without_widening_the_search() -> None:
+    lib = parse_bib(
+        "@article{Alpha2024,\n  title = {Neural Widgets},\n  abstract = {Concerning gadgets.}\n}\n"
+    )
+
+    results = search_entries(lib, "widgets", fields=["title"], extra_fields=["abstract"])
+
+    assert results[0].fields == {
+        "title": "Neural Widgets",
+        "abstract": "Concerning gadgets.",
+    }
+    assert search_entries(lib, "gadgets", fields=["title"], extra_fields=["abstract"]) == []
+
+
 def test_field_limit_restricts_stored_field_search_and_output() -> None:
     lib = parse_bib(_LIB)
 

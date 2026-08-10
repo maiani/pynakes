@@ -694,6 +694,47 @@ class TestSearchCommand:
         assert "1 matching entry" in result.output
         assert "@misc{Alpha}" in result.output
 
+    def test_search_show_abstract_adds_an_excerpt_per_hit(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Alpha2024,\n"
+            "  title = {Widgets in Practice},\n"
+            "  abstract = {A study of widgets\n    across many libraries.}\n"
+            "}\n\n"
+            "@book{Beta2023,\n"
+            "  title = {More Widgets}\n"
+            "}\n"
+        )
+
+        result = runner.invoke(app, ["search", "widgets", str(bib), "--show-abstract"])
+
+        assert result.exit_code == 0, result.output
+        assert "A study of widgets across many libraries." in result.output
+        assert "(no abstract)" in result.output
+
+    def test_search_show_abstract_survives_a_field_restriction(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Alpha2024,\n"
+            "  title = {Widgets in Practice},\n"
+            "  abstract = {Restricted output still carries this.}\n"
+            "}\n"
+        )
+
+        options = [str(bib), "--field", "title", "--show-abstract", "--json"]
+        reported = runner.invoke(app, ["search", "widgets", *options])
+        # A term that only occurs in the abstract still does not match, so
+        # reporting the field has not widened the search.
+        searched = runner.invoke(app, ["search", "restricted", *options])
+
+        assert reported.exit_code == 0, reported.output
+        data = json.loads(reported.output)
+        assert data["show_abstract"] is True
+        assert data["matches"][0]["fields"]["abstract"] == "Restricted output still carries this."
+        assert data["matches"][0]["matched_fields"] == ["title"]
+        assert searched.exit_code == 0, searched.output
+        assert json.loads(searched.output)["count"] == 0
+
     def test_search_ranks_by_match_strength_by_default(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text(
@@ -1508,6 +1549,162 @@ class TestReferenceCrud:
         assert data["key"] == "Smith2020"
         assert data["entry_type"] == "article"
         assert data["fields"]["title"] == "A Comprehensive Study on Machine Learning"
+
+    def test_show_one_reference_human_output_lists_every_field(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+
+        result = runner.invoke(app, ["ref", "show", "Smith2020", str(bib)])
+
+        assert result.exit_code == 0, result.output
+        assert "@article{Smith2020}" in result.output
+        assert "  pages = 123--145" in result.output
+        assert "  doi = 10.1234/nature.ml.2020" in result.output
+
+    def test_show_summarizes_several_keys_in_one_call(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+
+        result = runner.invoke(
+            app, ["ref", "show", "--keys", "Brown2022,Smith2020", str(bib), "--json"]
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["status"] == "success"
+        assert data["action"] == "ref_show"
+        assert data["count"] == 2
+        # Requested order is preserved rather than file order.
+        assert [entry["key"] for entry in data["entries"]] == ["Brown2022", "Smith2020"]
+        assert data["entries"][0]["entry_type"] == "inproceedings"
+        assert data["entries"][0]["summary"]["booktitle"] == "Proceedings of ICML 2022"
+        # The summary is compact: stored fields outside it are not reported.
+        assert "pages" not in data["entries"][0]["summary"]
+        assert "abstract" not in data["entries"][1]["summary"]
+
+    def test_show_keys_accepts_repeated_options_and_drops_repeats(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+
+        result = runner.invoke(
+            app,
+            [
+                "ref",
+                "show",
+                "--keys",
+                "Smith2020, Jones2021",
+                "--keys",
+                "Smith2020",
+                str(bib),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["keys"] == ["Smith2020", "Jones2021"]
+        assert data["count"] == 2
+
+    def test_show_keys_abstract_distinguishes_empty_from_unrequested(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Fermi1934,\n"
+            "  title = {Versuch einer Theorie der Betastrahlen},\n"
+            "  abstract = {An attempt at a quantitative\n    theory of beta decay.}\n"
+            "}\n\n"
+            "@article{Noether1918,\n"
+            "  title = {Invariante Variationsprobleme}\n"
+            "}\n"
+        )
+
+        result = runner.invoke(
+            app,
+            ["ref", "show", "--keys", "Fermi1934,Noether1918", str(bib), "--abstract", "--json"],
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["abstract"] is True
+        assert data["entries"][0]["summary"]["abstract"] == (
+            "An attempt at a quantitative\n    theory of beta decay."
+        )
+        assert data["entries"][1]["summary"]["abstract"] is None
+
+    def test_show_keys_human_output_is_scannable(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+
+        result = runner.invoke(app, ["ref", "show", "--keys", "Smith2020,Green2023", str(bib)])
+
+        assert result.exit_code == 0, result.output
+        assert "2 entries." in result.output
+        assert "@article{Smith2020}" in result.output
+        assert "@phdthesis{Green2023}" in result.output
+        assert "Quantum Computing Algorithms" in result.output
+
+    def test_show_keys_reports_every_unknown_key_at_once(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+
+        result = runner.invoke(
+            app, ["ref", "show", "--keys", "Smith2020,Ghost,Phantom", str(bib), "--json"]
+        )
+
+        assert result.exit_code == 1, result.output
+        data = json.loads(result.output)
+        assert data["status"] == "error"
+        assert data["error"] == "KeyNotFound"
+        assert data["keys"] == ["Ghost", "Phantom"]
+
+    def test_show_keys_conflicts_on_a_duplicated_key(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "duplicate_entries.bib")
+
+        result = runner.invoke(app, ["ref", "show", "--keys", "Smith2020", str(bib), "--json"])
+
+        assert result.exit_code == 2, result.output
+        data = json.loads(result.output)
+        assert data["status"] == "conflict"
+        assert data["error"] == "DuplicateCitationKey"
+        assert data["keys"] == ["Smith2020"]
+        assert [option["id"] for option in data["options"]] == [
+            "repair_duplicates",
+            "inspect_all",
+        ]
+
+    def test_show_keys_resolves_inherited_fields(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@book{Collection,\n"
+            "  title = {A Collected Volume},\n"
+            "  publisher = {Example Press},\n"
+            "  year = {1900}\n"
+            "}\n\n"
+            "@inbook{Chapter,\n"
+            "  crossref = {Collection},\n"
+            "  title = {A Single Chapter}\n"
+            "}\n"
+        )
+
+        plain = runner.invoke(app, ["ref", "show", "--keys", "Chapter", str(bib), "--json"])
+        inherited = runner.invoke(
+            app, ["ref", "show", "--keys", "Chapter", str(bib), "--resolved", "--json"]
+        )
+
+        assert plain.exit_code == 0, plain.output
+        assert inherited.exit_code == 0, inherited.output
+        assert "year" not in json.loads(plain.output)["entries"][0]["summary"]
+        assert json.loads(inherited.output)["entries"][0]["summary"]["year"] == "1900"
+
+    def test_show_rejects_conflicting_and_missing_key_selections(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+
+        both = runner.invoke(
+            app, ["ref", "show", "Smith2020", str(bib), "--keys", "Jones2021", "--json"]
+        )
+        empty = runner.invoke(app, ["ref", "show", str(bib), "--keys", "", "--json"])
+        nothing = runner.invoke(app, ["ref", "show", "--json"])
+        stray_abstract = runner.invoke(
+            app, ["ref", "show", "Smith2020", str(bib), "--abstract", "--json"]
+        )
+
+        for result in (both, empty, nothing, stray_abstract):
+            assert result.exit_code == 1, result.output
+            assert json.loads(result.output)["error"] == "InvalidInput"
 
     def test_edit_patches_fields_and_type_in_one_transaction(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")

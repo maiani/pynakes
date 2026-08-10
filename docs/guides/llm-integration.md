@@ -92,7 +92,9 @@ its operation vocabulary through `capabilities`.
 
 ## Choosing the right operation
 
-- Use `ref show <key>` to read one uniquely keyed reference.
+- Use `ref show <key>` to read one uniquely keyed reference, and
+  `ref show --keys k1,k2,… [--abstract]` to triage a candidate set in one call
+  instead of one invocation per key.
 - Use `ref edit <key>` for a multi-field patch to one reference.
 - Use `fields` with `--where` for bulk field operations over a selection. The
   same selector works on `search`, `format`, and the corpus operations, so
@@ -112,7 +114,12 @@ is duplicated, repair the duplicate keys or select entries with a bulk
 To find candidates from a half-remembered title, `search --fuzzy` matches near
 misses and reports, per hit, which field matched, whether the match was exact or
 fuzzy, its score, and the matching excerpt — enough to decide without reading
-each entry.
+each entry. Add `--show-abstract` when the excerpt is not enough to separate
+the candidates, then summarize the survivors with one
+`ref show --keys k1,k2,… --abstract --json` call: each entry reports its
+`entry_type` and a `summary` of title, creator, date, venue, and identifiers,
+with `abstract: null` where none is stored. Read a chosen entry in full with a
+single-key `ref show <key> --json`.
 
 ### Agent-assisted classification
 

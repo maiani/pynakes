@@ -84,3 +84,5 @@ with usage examples, see the [API overview](index.md).
 ::: pynakes.query
 
 ::: pynakes.search
+
+::: pynakes.triage

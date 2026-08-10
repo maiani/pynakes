@@ -401,11 +401,26 @@ Read or transactionally patch one uniquely identified reference:
 ```bash
 pynakes ref show Manual2026 refs.bib
 pynakes ref show Manual2026 refs.bib --resolved --json
+pynakes ref show --keys Manual2026,Newton1687 refs.bib --abstract
 pynakes ref edit Manual2026 refs.bib \
   --field title="Revised title" --field year=2027 \
   --clear-field note --type book --dry-run --diff
 pynakes ref edit Manual2026 refs.bib  # interactive when no change options are supplied
 ```
+
+`--keys` turns `ref show` into a **triage view**: instead of every stored field
+of one reference, it prints a compact summary of each requested reference — the
+title, the first present of `author`/`editor`, the first present of
+`year`/`date`, the most specific venue field (`journaltitle`, `journal`,
+`booktitle`, …), and every identifier present (`doi`, `eprint`, `isbn`, `url`).
+That is enough to judge a set of candidates in one call rather than one
+invocation per key. Add `--abstract` to include each abstract; entries that
+store none report `(none)` (JSON `null`), so "no abstract" is distinguishable
+from "not requested". The keys may be comma-separated, the option repeated, or
+both; repeats collapse and the requested order is preserved. Every unknown key
+is reported together in one exit-1 `KeyNotFound` error. With `--keys` the
+positional argument is the library, so `ref show --keys a,b refs.bib` reads
+naturally.
 
 `ref edit` applies all requested field and type changes in one commit. It does
 not rename the citation key: use `keys rename` for that coordinated operation,
@@ -836,6 +851,19 @@ echoes the parsed selector.
 Which entries are searched is a separate question from what matches: `--where`
 answers it with the shared [selector grammar](#selecting-entries-where),
 covering date ranges and missing-field queries without search-specific flags.
+
+`--show-abstract` prints a one-line abstract excerpt under each hit, so a
+result list can be triaged without a second command; a result with no stored
+abstract says `(no abstract)`. The excerpt is for reading — `--json` always
+carries the full abstract, including when `--field` restricts the fields
+searched, and reporting the abstract never widens what the query matches:
+
+```bash
+pynakes search 'quantum computing' refs.bib --fuzzy --show-abstract --limit 10
+```
+
+For the promising keys, `ref show --keys k1,k2,…` prints the summarized
+entries; a single `ref show <key>` prints one in full.
 
 ## dedupe
 

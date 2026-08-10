@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A multi-entry triage view: `ref show --keys k1,k2,…` summarizes a set of
+  candidate references in one call instead of one invocation per key. Each
+  entry reports its title, the first present of `author`/`editor`, the first
+  present of `year`/`date`, its most specific venue field, and every identifier
+  it carries; `--abstract` adds the abstract, reported as `(none)`/`null` when
+  the entry stores none, so "no abstract" is distinguishable from "not
+  requested". Keys may be comma-separated or the option repeated, repeats
+  collapse, the requested order is preserved, and every unknown key is reported
+  together rather than one per run. `search --show-abstract` prints the same
+  triage material inline under each hit, so a result list can be narrowed
+  before any entry is opened. The new public `pynakes.triage` module exposes
+  the summary and excerpt selection.
 - One transversal entry selector: the new public `pynakes.query` module compiles
   the `--where` grammar shared by `fields`, `search`, `format`, `corpus combine`,
   `corpus split --to`, and the `fields.*` batch operations. Predicates now

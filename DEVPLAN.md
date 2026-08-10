@@ -47,9 +47,6 @@ Tasks below are listed in implementation priority order.
   and required-field coverage, lint finding counts, group membership, and
   declared linked-file coverage. Keep analysis offline and separate from
   mutation; do not turn heuristic scores into quality judgments.
-- **Multi-entry triage view**: `ref show --keys k1,k2,… [--abstract]` (or
-  `search --show-abstract`) to scan a set of candidate entries in one call
-  instead of one invocation per key.
 **Done when**: broader import paths, `metadata doctor`, single-bibliography
 `analysis`/`stats`, and the `lint`/`groups` UX fixes are implemented,
 tested, and documented;

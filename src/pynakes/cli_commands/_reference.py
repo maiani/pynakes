@@ -4,13 +4,27 @@ import re
 
 import typer
 
-from pynakes.cli_common import _emit_conflict, _emit_error
+from pynakes.cli_common import InvalidInputError, _emit_conflict, _emit_error
 from pynakes.engine import Bibliography
 from pynakes.lint import required_field_rules
 from pynakes.metadata import library_dialect
 from pynakes.model import BibEntry
 
 _FIELD_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_:-]*$")
+
+#: Offered whenever a requested citation key identifies more than one entry.
+#: The commands that address entries by key refuse to guess which physical
+#: entry was meant, so both options are ways for the caller to disambiguate.
+_DUPLICATE_KEY_OPTIONS = [
+    {
+        "id": "repair_duplicates",
+        "description": "Run keys repair, then retry with the resulting unique key",
+    },
+    {
+        "id": "inspect_all",
+        "description": "Inspect the library to review every duplicate instance",
+    },
+]
 
 _FIELD_LABELS = {
     "booktitle": "Book title",
@@ -115,15 +129,70 @@ def unique_entry(coll: Bibliography, key: str, json_output: bool, *, action: str
             f"Citation key {key!r} identifies {len(matches)} references",
             action=action,
             key=key,
-            options=[
-                {
-                    "id": "repair_duplicates",
-                    "description": "Run keys repair, then retry with the resulting unique key",
-                },
-                {
-                    "id": "inspect_all",
-                    "description": "Inspect the library to review every duplicate instance",
-                },
-            ],
+            options=_DUPLICATE_KEY_OPTIONS,
         )
     return matches[0]
+
+
+def parse_key_list(values: list[str]) -> list[str]:
+    """Parse repeated and comma-separated ``--keys`` values into unique keys.
+
+    ``--keys a,b --keys c`` and ``--keys a,b,c`` are the same request. Order is
+    the order given, and a key repeated across the values appears once, so a
+    caller pasting a candidate list from two searches gets one summary per
+    reference rather than one per mention.
+    """
+    keys: list[str] = []
+    for value in values:
+        for key in value.split(","):
+            key = key.strip()
+            if key and key not in keys:
+                keys.append(key)
+    if not keys:
+        raise InvalidInputError("--keys requires at least one citation key")
+    return keys
+
+
+def unique_entries(
+    coll: Bibliography, keys: list[str], json_output: bool, *, action: str
+) -> list[BibEntry]:
+    """Return one entry per key, or emit the CLI error/conflict envelope.
+
+    Reports *every* unresolvable key at once rather than failing on the first
+    one, so a caller fixes one round of mistakes instead of rediscovering them
+    key by key. Unknown keys are an exit-1 ``KeyNotFound`` error and duplicated
+    keys an exit-2 ``DuplicateCitationKey`` conflict, matching what
+    :func:`unique_entry` reports for a single key.
+    """
+    matches = {key: coll.entries.get_all(key) for key in keys}
+
+    missing = [key for key, found in matches.items() if not found]
+    if missing:
+        listed = ", ".join(repr(key) for key in missing)
+        _emit_error(
+            json_output,
+            "KeyNotFound",
+            f"No reference with key {listed}"
+            if len(missing) == 1
+            else f"No references with keys {listed}",
+            action=action,
+            keys=missing,
+        )
+
+    duplicated = [key for key, found in matches.items() if len(found) > 1]
+    if duplicated:
+        listed = ", ".join(repr(key) for key in duplicated)
+        if len(duplicated) == 1:
+            message = f"Citation key {listed} identifies {len(matches[duplicated[0]])} references"
+        else:
+            message = f"Citation keys {listed} identify more than one reference each"
+        _emit_conflict(
+            json_output,
+            "DuplicateCitationKey",
+            message,
+            action=action,
+            keys=duplicated,
+            options=_DUPLICATE_KEY_OPTIONS,
+        )
+
+    return [matches[key][0] for key in keys]
