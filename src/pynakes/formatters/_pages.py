@@ -1,9 +1,11 @@
-"""Page-number formatters."""
+"""Page-number formatters and citation-key page-marker helpers."""
 
 import re
 
 _EM_EN_DASH = re.compile("[–—]")
 _DASH_RUN = re.compile(r"[ ]*-+[ ]*")
+_DIGIT_RUN = re.compile(r"\d+")
+_LEADING_NON_DIGIT = re.compile(r"^\D*")
 
 
 def normalize_page_numbers(value: str) -> str:
@@ -30,3 +32,27 @@ def normalize_page_numbers(value: str) -> str:
     # JabRef applies UnprotectTermsFormatter; for page values that means
     # dropping brace protection (e.g. "{1}--{2}" -> "1--2").
     return fixed.replace("{", "").replace("}", "")
+
+
+def first_page(value: str) -> str:
+    """Return the lowest page number in *value* (JabRef ``firstpage``).
+
+    Scans every digit run in the raw field rather than splitting a single
+    range: ``"7,41,73--97"`` returns ``"7"``.
+    """
+    numbers = [int(match) for match in _DIGIT_RUN.findall(value)]
+    return str(min(numbers)) if numbers else ""
+
+
+def last_page(value: str) -> str:
+    """Return the highest page number in *value* (JabRef ``lastpage``)."""
+    numbers = [int(match) for match in _DIGIT_RUN.findall(value)]
+    return str(max(numbers)) if numbers else ""
+
+
+def page_prefix(value: str) -> str:
+    """Return the non-digit prefix before the first digit (JabRef ``pageprefix``).
+
+    ``"L7"`` returns ``"L"``; a value with no non-digit prefix returns ``""``.
+    """
+    return _LEADING_NON_DIGIT.match(value).group(0)

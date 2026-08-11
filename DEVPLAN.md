@@ -33,9 +33,6 @@ Tasks below are listed in implementation priority order.
   zbMATH Open and MathSciNet review numbers, institutional-repository URN
   resolvers such as DiVA, and SciELO. Google Scholar stays out of scope: it has
   no API and scraping it is against its terms.
-- **Complete JabRef formatting compatibility**: implement and test the remaining
-  v5.15 formatter-as-modifier behavior and key-pattern markers/modifiers, using
-  upstream JabRef implementations, tests, and golden vectors as the oracle.
 - **Single-bibliography analysis**: add a public `pynakes.analysis` API
   namespace and a read-only `stats` command returning typed and JSON-friendly
   reports for one `BibFile`/`Bibliography`. Start with deterministic descriptive

@@ -22,8 +22,10 @@ from pynakes.bibtex_parser import parse_bib
 from pynakes.formatters import (
     FIELD_FORMATTERS,
     capitalize,
+    first_page,
     html_to_latex,
     html_to_unicode,
+    last_page,
     latex_cleanup,
     latex_to_unicode,
     lower_case,
@@ -31,6 +33,7 @@ from pynakes.formatters import (
     normalize_month,
     normalize_page_numbers,
     ordinals_to_superscript,
+    page_prefix,
     sentence_case,
     title_case,
     unicode_to_latex,
@@ -125,6 +128,24 @@ PAGE_VECTORS = [
 @pytest.mark.parametrize("value,expected", PAGE_VECTORS)
 def test_normalize_page_numbers_parity(value: str, expected: str) -> None:
     assert normalize_page_numbers(value) == expected
+
+
+# --- firstpage / lastpage / pageprefix (citation-key page markers) ---------
+
+PAGE_RANGE_VECTORS = [
+    ("73--97", "73", "97", ""),
+    ("7,41,73--97", "7", "97", ""),  # documented example: lowest/highest of all runs
+    ("L7--L9", "7", "9", "L"),
+    ("12", "12", "12", ""),
+    ("", "", "", ""),
+]
+
+
+@pytest.mark.parametrize("value,first,last,prefix", PAGE_RANGE_VECTORS)
+def test_page_marker_helpers_parity(value: str, first: str, last: str, prefix: str) -> None:
+    assert first_page(value) == first
+    assert last_page(value) == last
+    assert page_prefix(value) == prefix
 
 
 # --- latex_cleanup ---------------------------------------------------------

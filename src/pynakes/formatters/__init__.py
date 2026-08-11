@@ -47,7 +47,7 @@ from pynakes.formatters._latex import (
     latex_to_unicode,
     unicode_to_latex,
 )
-from pynakes.formatters._pages import normalize_page_numbers
+from pynakes.formatters._pages import first_page, last_page, normalize_page_numbers, page_prefix
 from pynakes.formatters._registry import FIELD_FORMATTERS, FormattersRegistry
 from pynakes.formatters._units import ordinals_to_superscript, units_to_latex
 
@@ -81,7 +81,10 @@ __all__ = [
     "latex_to_unicode",
     "unicode_to_latex",
     # pages
+    "first_page",
+    "last_page",
     "normalize_page_numbers",
+    "page_prefix",
     # registry
     "FIELD_FORMATTERS",
     "FormattersRegistry",

@@ -120,6 +120,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `groups:` format is exempt from the duplicate check because it repeats the
   `groups` key once per group line by design. All three findings are warnings
   that, like the other stored-profile deviations, also gate `lint --strict`.
+- Citation-key pattern generation gains an editor-field marker family (`edtr`,
+  `editors`, `editorIni`, `edtrIniN`, `editorsN`, `editorLast` — these read
+  only the `editor` field and never fall back to `author`, unlike the existing
+  `auth`-family default), page markers derived from the `pages` field
+  (`firstpage`/`lastpage` scan every number in the value rather than just the
+  ends of one range, and `pageprefix` extracts a leading non-digit prefix like
+  `L` from `L7`), and a `fulltitle` marker that keeps a title's every word and
+  original spacing instead of filtering to significant words. The modifier
+  chain gains `sentencecase`, a `regex("pattern","replacement")` modifier, and
+  a `(default)` fallback inserted when the preceding marker resolved empty;
+  more usefully, any registered field formatter (`latex_cleanup`,
+  `remove_braces`, `unicode_to_latex`, ...) is now usable directly as a
+  modifier, e.g. `[title:latex_cleanup]`, closing the gap between the
+  citation-key pattern language and the formatter registry. `truncateN` now
+  trims trailing whitespace after truncating, so a value cut mid-word never
+  ends in a stray space. A handful of rarer combinator markers
+  (`authN_M`, `authorsAlpha`, `editorLastForeIni`, `keywordN`, and similar)
+  remain unsupported and continue to fail explicitly rather than silently
+  generating a wrong key.
 
 ### Changed
 

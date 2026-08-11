@@ -3,7 +3,11 @@
 Generated keys follow the ``AuthorYearTitle`` pattern (e.g. ``Smith2020Big``):
 first author's last name, four-digit year, first significant title word.
 If a library stores a citation-key pattern (pynakes' native ``key-pattern`` keys,
-or JabRef's ``keypattern_*`` as a fallback), that pattern is used instead.
+or JabRef's ``keypattern_*`` as a fallback), that pattern is used instead. The
+pattern language (markers in ``[brackets]``, modifiers chained after ``:``) and
+its supported vocabulary mirror JabRef's citation-key patterns; markers or
+modifiers outside that vocabulary raise
+:class:`UnsupportedCitationKeyPatternError` rather than generating a wrong key.
 Generation is deterministic — the same entry always yields the same key.
 """
 
@@ -15,7 +19,13 @@ from pynakes.authors import ascii_fold as _ascii_fold
 from pynakes.authors import last_name as _last_name
 from pynakes.authors import split_name_list as _split_name_list
 from pynakes.editing import rename_entry_key
-from pynakes.formatters import latex_to_plain_text
+from pynakes.formatters import (
+    FIELD_FORMATTERS,
+    first_page,
+    last_page,
+    latex_to_plain_text,
+    page_prefix,
+)
 from pynakes.metadata import library_key_pattern
 from pynakes.model import BibEntry, BibFile
 
@@ -64,10 +74,19 @@ def duplicate_key_counts(lib: BibFile) -> dict[str, int]:
     return lib.entries.duplicate_keys()
 
 
-def _author_last_names(entry: BibEntry) -> list[str]:
-    """Return the last names of every author/editor (author preferred)."""
-    raw = entry.fields.get("author") or entry.fields.get("editor") or ""
+def _last_names_for(entry: BibEntry, field: str, fallback: str | None = None) -> list[str]:
+    raw = entry.fields.get(field) or (entry.fields.get(fallback, "") if fallback else "") or ""
     return [name for name in (_last_name(p) for p in _split_name_list(raw)) if name]
+
+
+def _author_last_names(entry: BibEntry) -> list[str]:
+    """Return the last names of every author, falling back to editor when absent."""
+    return _last_names_for(entry, "author", fallback="editor")
+
+
+def _editor_last_names(entry: BibEntry) -> list[str]:
+    """Return the last names of every editor. Does not fall back to ``author``."""
+    return _last_names_for(entry, "editor")
 
 
 def _first_author_last_name(entry: BibEntry) -> str:
@@ -81,26 +100,33 @@ def _last_author_last_name(entry: BibEntry) -> str:
     return names[-1] if names else "Anon"
 
 
-def _author_ini(entry: BibEntry) -> str:
-    """JabRef ``authorIni``: five first-author chars plus later initials."""
-    names = _author_last_names(entry)
+def _first_editor_last_name(entry: BibEntry) -> str:
+    names = _editor_last_names(entry)
+    return names[0] if names else "Anon"
+
+
+def _last_editor_last_name(entry: BibEntry) -> str:
+    names = _editor_last_names(entry)
+    return names[-1] if names else "Anon"
+
+
+def _ini(names: list[str]) -> str:
+    """Five leading-name chars plus later initials (JabRef ``authorIni``/``editorIni``)."""
     if not names:
         return "Anon"
     return names[0][:5] + "".join(name[:1] for name in names[1:])
 
 
-def _auth_ini_n(entry: BibEntry, count: int) -> str:
-    """JabRef ``authIniN``: distribute at most N leading surname characters."""
-    names = _author_last_names(entry)
+def _ini_n(names: list[str], count: int) -> str:
+    """Distribute at most N leading surname chars (JabRef ``authIniN``/``edtrIniN``)."""
     if not names or count <= 0:
         return ""
     width, remainder = divmod(count, len(names))
     return "".join(name[: width + (index < remainder)] for index, name in enumerate(names))
 
 
-def _authors_n(entry: BibEntry, count: int) -> str:
-    """JabRef ``authorsN``: up to N surnames, with EtAl when truncated."""
-    names = _author_last_names(entry)
+def _names_n(names: list[str], count: int) -> str:
+    """Up to N surnames, with ``EtAl`` when truncated (JabRef ``authorsN``/``editorsN``)."""
     return "".join(names[:count]) + ("EtAl" if len(names) > count else "")
 
 
@@ -109,9 +135,7 @@ def _year(entry: BibEntry) -> str:
 
 
 def _first_title_word(entry: BibEntry) -> str:
-    for word in _significant_title_words(entry):
-        return _capitalize_word(word)
-    return ""
+    return _veryshorttitle_of(entry.fields.get("title", ""))
 
 
 def _words(value: str) -> list[str]:
@@ -122,28 +146,41 @@ def _capitalize_word(word: str) -> str:
     return word[:1].upper() + word[1:] if word else ""
 
 
-def _significant_title_words(entry: BibEntry) -> list[str]:
-    return [
-        word
-        for word in _words(entry.fields.get("title", ""))
-        if word.lower() not in _TITLE_STOPWORDS
-    ]
+def _significant_words(value: str) -> list[str]:
+    return [word for word in _words(value) if word.lower() not in _TITLE_STOPWORDS]
+
+
+def _veryshorttitle_of(value: str) -> str:
+    words = _significant_words(value)
+    return _capitalize_word(words[0]) if words else ""
+
+
+def _shorttitle_of(value: str) -> str:
+    return "".join(_capitalize_word(word) for word in _significant_words(value)[:3])
 
 
 _MARKER_HANDLERS: dict[str, Callable[[BibEntry], str]] = {
     "auth": _first_author_last_name,
     "authors": lambda e: "".join(_author_last_names(e)),
-    "authorini": _author_ini,
+    "authorini": lambda e: _ini(_author_last_names(e)),
     "authorlast": _last_author_last_name,
+    "edtr": _first_editor_last_name,
+    "editors": lambda e: "".join(_editor_last_names(e)),
+    "editorini": lambda e: _ini(_editor_last_names(e)),
+    "editorlast": _last_editor_last_name,
     "year": _year,
     "shortyear": lambda e: _year(e)[-2:],
-    "veryshorttitle": lambda e: (
-        _capitalize_word(_significant_title_words(e)[0]) if _significant_title_words(e) else ""
+    "veryshorttitle": lambda e: _veryshorttitle_of(e.fields.get("title", "")),
+    "shorttitle": lambda e: _shorttitle_of(e.fields.get("title", "")),
+    "title": lambda e: "".join(
+        _capitalize_word(w) for w in _significant_words(e.fields.get("title", ""))
     ),
-    "shorttitle": lambda e: "".join(_capitalize_word(w) for w in _significant_title_words(e)[:3]),
-    "title": lambda e: "".join(_capitalize_word(w) for w in _significant_title_words(e)),
+    "fulltitle": lambda e: latex_to_plain_text(e.fields.get("title", "")).strip(),
     "camel": lambda e: "".join(_capitalize_word(w) for w in _words(e.fields.get("title", ""))),
     "entrytype": lambda e: _capitalize_word(e.type),
+    "firstpage": lambda e: first_page(e.fields.get("pages", "")),
+    "lastpage": lambda e: last_page(e.fields.get("pages", "")),
+    "pageprefix": lambda e: page_prefix(e.fields.get("pages", "")),
 }
 
 
@@ -159,8 +196,44 @@ def _apply_marker_casing(value: str, base: str) -> str:
     return value
 
 
+def _split_top_level(text: str, sep: str = ":") -> list[str]:
+    """Split *text* on *sep* outside parenthesized groups and backslash escapes.
+
+    A ``regex("a:b","c")`` or ``(text:with:colons)`` modifier argument can
+    contain a literal separator; this only splits where the pattern language
+    itself would, leaving such arguments intact.
+    """
+    parts: list[str] = []
+    current: list[str] = []
+    depth = 0
+    escaped = False
+    for char in text:
+        if escaped:
+            current.append(char)
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        elif char == "(":
+            depth += 1
+            current.append(char)
+        elif char == ")":
+            depth = max(0, depth - 1)
+            current.append(char)
+        elif char == sep and depth == 0:
+            parts.append("".join(current))
+            current = []
+        else:
+            current.append(char)
+    parts.append("".join(current))
+    return parts
+
+
+def _has_default_value_modifier(modifiers: list[str]) -> bool:
+    return any(re.fullmatch(r"\(.+\)", modifier.strip()) for modifier in modifiers)
+
+
 def _resolve_marker(entry: BibEntry, marker: str) -> str:
-    base, *_modifiers = marker.split(":")
+    base, *_modifiers = _split_top_level(marker)
     base = base.strip()
     lower_base = base.lower()
 
@@ -173,9 +246,15 @@ def _resolve_marker(entry: BibEntry, marker: str) -> str:
         elif lower_base.startswith("auth") and lower_base[4:].isdigit():
             value = _first_author_last_name(entry)[: int(lower_base[4:])]
         elif lower_base.startswith("authini") and lower_base[7:].isdigit():
-            value = _auth_ini_n(entry, int(lower_base[7:]))
+            value = _ini_n(_author_last_names(entry), int(lower_base[7:]))
         elif lower_base.startswith("authors") and lower_base[7:].isdigit():
-            value = _authors_n(entry, int(lower_base[7:]))
+            value = _names_n(_author_last_names(entry), int(lower_base[7:]))
+        elif lower_base.startswith("edtr") and lower_base[4:].isdigit():
+            value = _first_editor_last_name(entry)[: int(lower_base[4:])]
+        elif lower_base.startswith("edtrini") and lower_base[7:].isdigit():
+            value = _ini_n(_editor_last_names(entry), int(lower_base[7:]))
+        elif lower_base.startswith("editors") and lower_base[7:].isdigit():
+            value = _names_n(_editor_last_names(entry), int(lower_base[7:]))
         elif lower_base.startswith("camel") and lower_base[5:].isdigit():
             count = int(lower_base[5:])
             value = "".join(
@@ -186,32 +265,104 @@ def _resolve_marker(entry: BibEntry, marker: str) -> str:
         else:
             value = entry.fields.get(base.lower(), "")
             if not value and base not in entry.fields and lower_base not in entry.fields:
-                raise UnsupportedCitationKeyPatternError(
-                    f"Unsupported JabRef citation-key marker [{base}]"
-                )
+                if not _has_default_value_modifier(_modifiers):
+                    raise UnsupportedCitationKeyPatternError(
+                        f"Unsupported JabRef citation-key marker [{base}]"
+                    )
 
     value = _apply_marker_casing(value, base)
     return _apply_modifiers(value, _modifiers)
 
 
+# Key-pattern-only modifier spellings that delegate to a registered formatter
+# under a different name (JabRef spells these two ways: a short modifier
+# keyword here, and an underscored ``saveActions`` formatter key in
+# ``FIELD_FORMATTERS``, both driving the same underlying transform).
+_MODIFIER_FORMATTER_ALIASES: dict[str, str] = {
+    "lower": "lower_case",
+    "upper": "upper_case",
+    "capitalize": "capitalize",
+    "titlecase": "title_case",
+    "sentencecase": "sentence_case",
+}
+
+_TRUNCATE_RE = re.compile(r"\Atruncate(\d+)\Z")
+_REGEX_MODIFIER_RE = re.compile(r'\A\("(?P<pattern>.*?)"\s*,\s*"(?P<replacement>.*)"\)\Z')
+
+
+def _abbr_modifier(value: str) -> str:
+    """First character of each token, split on parens/space/CR/LF/quote (JabRef ``abbr``)."""
+    stripped = re.sub(r"[{}']", "", value)
+    return "".join(word[0] for word in re.split(r'[() \r\n"]', stripped) if word)
+
+
+def _regex_modifier(value: str, modifier: str) -> str | None:
+    """Apply a ``regex("pattern","replacement")`` modifier, translating Java's
+    ``$1``-style backreferences to Python's ``\\1``.
+
+    A pattern containing a literal ``[``/``]`` (e.g. a character class like
+    ``[a-z]``) is not supported here: ``_PATTERN_MARKER_RE`` scans the whole
+    pattern for ``[marker]`` spans before modifiers are parsed, so a literal
+    bracket inside this argument is misread as a marker boundary.
+    """
+    match = _REGEX_MODIFIER_RE.match(modifier[len("regex") :])
+    if not match:
+        return None
+    replacement = re.sub(r"\$(\d+)", r"\\\1", match.group("replacement"))
+    return re.sub(match.group("pattern"), replacement, value)
+
+
+def _resolve_modifier(value: str, modifier: str) -> str | None:
+    """Resolve one modifier to its output, or ``None`` if not recognized."""
+    alias = _MODIFIER_FORMATTER_ALIASES.get(modifier)
+    if alias is not None:
+        return FIELD_FORMATTERS[alias](value)
+    if modifier == "veryshorttitle":
+        return _veryshorttitle_of(value)
+    if modifier == "shorttitle":
+        return _shorttitle_of(value)
+    if modifier.startswith("camel"):
+        suffix = modifier[len("camel") :]
+        if suffix == "":
+            return "".join(_capitalize_word(word) for word in _words(value))
+        if suffix.isdigit():
+            return "".join(_capitalize_word(word) for word in _words(value)[: int(suffix)])
+        return None
+    if modifier.startswith("regex"):
+        return _regex_modifier(value, modifier)
+    truncate_match = _TRUNCATE_RE.match(modifier)
+    if truncate_match:
+        return value[: int(truncate_match.group(1))].rstrip()
+    formatter = FIELD_FORMATTERS.get(modifier)
+    return formatter(value) if formatter is not None else None
+
+
 def _apply_modifiers(value: str, modifiers: list[str]) -> str:
+    # The ``(x)`` default-value modifier fires on the pre-chain value, not the
+    # running one — an earlier modifier turning a value empty (or non-empty)
+    # does not affect whether the default applies.
+    original = value
     for modifier in modifiers:
         modifier = modifier.strip()
-        if modifier == "lower":
-            value = value.lower()
-        elif modifier == "upper":
-            value = value.upper()
-        elif modifier in ("capitalize", "titlecase"):
-            # JabRef treats these citation-key modifiers identically.
-            value = "".join(_capitalize_word(word.lower()) for word in _words(value))
-        elif modifier == "abbr":
-            value = "".join(word[:1] for word in _words(value))
-        elif modifier.startswith("truncate") and modifier[len("truncate") :].isdigit():
-            value = value[: int(modifier[len("truncate") :])]
-        elif modifier:
-            raise UnsupportedCitationKeyPatternError(
-                f"Unsupported JabRef citation-key modifier :{modifier}"
-            )
+        if not modifier:
+            continue
+        if modifier == "abbr":
+            value = _abbr_modifier(value)
+            continue
+        resolved = _resolve_modifier(value, modifier)
+        if resolved is not None:
+            value = resolved
+            continue
+        if modifier[0] == "(" and modifier[-1] == ")" and len(modifier) > 1:
+            # Recognized default-value syntax; JabRef only substitutes when the
+            # marker resolved empty and a non-empty default was given, and
+            # otherwise leaves the value unchanged rather than erroring.
+            if not original and len(modifier) > 2:
+                value = modifier[1:-1]
+            continue
+        raise UnsupportedCitationKeyPatternError(
+            f"Unsupported JabRef citation-key modifier :{modifier}"
+        )
     return value
 
 

@@ -259,8 +259,25 @@ present:
 @comment{jabref-meta: keypattern_article:[auth][year][veryshorttitle];}
 ```
 
-Unsupported JabRef key-pattern markers fail explicitly instead of silently
-generating incorrect keys.
+Unsupported key-pattern markers or modifiers fail explicitly instead of
+silently generating an incorrect key.
+
+Markers cover authors (`auth`, `authors`, `authorIni`, `authIniN`, `authorsN`,
+`authorLast`, and `authN`), the equivalent editor family (`edtr`, `editors`,
+`editorIni`, `edtrIniN`, `editorsN`, `editorLast` — these read only the
+`editor` field, never falling back to `author`), `year`/`shortyear`,
+title markers (`title`, `shorttitle`, `veryshorttitle`, `camel`/`camelN`,
+and `fulltitle`, which keeps every word and its original spacing instead of
+filtering to significant words), page markers derived from the `pages` field
+(`firstpage`/`lastpage` — the lowest/highest of every number found, not just
+the ends of one range — and `pageprefix`, e.g. `L` from `L7`), `entrytype`,
+and any literal field name. Modifiers chain after `:` — `lower`, `upper`,
+`capitalize`, `titlecase`, `sentencecase`, `abbr`, `truncateN`, `regex("pattern","replacement")`,
+and a `(default)` fallback inserted when the preceding marker resolved empty —
+plus any registered field formatter (`latex_cleanup`, `remove_braces`, ...)
+usable directly as a modifier. A handful of rarer combinator markers
+(`authN_M`, `authorsAlpha`, `editorLastForeIni`, `keywordN`, and similar) are
+not yet supported and raise the same explicit error.
 
 Pass a citation key to apply that preferred pattern to just one entry, or
 `--all` to regenerate the whole library. Like `keys rename`, generated renames

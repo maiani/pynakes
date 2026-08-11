@@ -161,6 +161,133 @@ class TestGenerateKey:
         with pytest.raises(UnsupportedCitationKeyPatternError, match="modifier"):
             generate_key_from_pattern(e, "[auth:bogusmod]")
 
+    @pytest.mark.parametrize(
+        "marker",
+        [
+            "authN_M",
+            "edtr.edtr.ea",
+            "authorsAlpha",
+            "authorsAlphaLNI",
+            "authorLastForeIni",
+            "keywordN",
+        ],
+    )
+    def test_unsupported_combinator_markers_still_error(self, marker: str) -> None:
+        # These remain intentionally out of scope; they must keep failing
+        # explicitly rather than silently resolving wrong or empty.
+        e = _entry(author="John Smith", year="2024", title="A Study")
+        with pytest.raises(UnsupportedCitationKeyPatternError, match="Unsupported"):
+            generate_key_from_pattern(e, f"[{marker}]")
+
+    def test_editor_marker_variants(self) -> None:
+        e = _entry(
+            editor="Ada Example and Grace Sample and Rex Fixture",
+            year="2024",
+            title="A Study",
+        )
+        assert generate_key_from_pattern(e, "[edtr]") == "example"
+        assert generate_key_from_pattern(e, "[Edtr]") == "Example"
+        assert generate_key_from_pattern(e, "[EDTR]") == "EXAMPLE"
+        assert generate_key_from_pattern(e, "[edtr3]") == "exa"
+        assert generate_key_from_pattern(e, "[editors]") == "examplesamplefixture"
+        assert generate_key_from_pattern(e, "[editors2]") == "examplesampleetal"
+        assert generate_key_from_pattern(e, "[editorlast]") == "fixture"
+        assert generate_key_from_pattern(e, "[editorini]") == "exampsf"
+        assert generate_key_from_pattern(e, "[edtrini4]") == "exsf"
+
+    def test_editor_marker_does_not_fall_back_to_author(self) -> None:
+        # Unlike [auth]/[authors], which fall back to editor when author is
+        # absent, [edtr]/[editors] must never read the author field. A leading
+        # literal keeps the result from being empty, which would otherwise
+        # trigger the unrelated "empty pattern falls back to AuthorYearTitle"
+        # behavior and mask what this test checks.
+        e = _entry(author="John Smith", year="2024", title="A Study")
+        assert generate_key_from_pattern(e, "[edtr]") == "anon"
+        assert generate_key_from_pattern(e, "x[editors]") == "x"
+
+    def test_page_markers(self) -> None:
+        e = _entry(author="John Smith", year="2024", title="A Study", pages="7,41,73--97")
+        assert generate_key_from_pattern(e, "[firstpage]") == "7"
+        assert generate_key_from_pattern(e, "[lastpage]") == "97"
+        # See test_editor_marker_does_not_fall_back_to_author for why the
+        # empty case needs a non-empty literal wrapper.
+        assert generate_key_from_pattern(e, "x[pageprefix]") == "x"
+
+        prefixed = _entry(author="John Smith", year="2024", title="A Study", pages="L7--L9")
+        assert generate_key_from_pattern(prefixed, "[Pageprefix]") == "L"
+
+        no_pages = _entry(author="John Smith", year="2024", title="A Study")
+        # An empty pattern result falls back to the default AuthorYearTitle key.
+        assert generate_key_from_pattern(no_pages, "[firstpage]") == generate_key(no_pages)
+
+    def test_fulltitle_marker_preserves_stopwords_and_spacing(self) -> None:
+        e = _entry(author="John Smith", year="2024", title="A Study of Rare Things")
+        # Unlike [title]/[shorttitle], [fulltitle] keeps every word and its
+        # original spacing (spaces only disappear at final key sanitization).
+        assert generate_key_from_pattern(e, "[fulltitle:truncate3]") == "as"
+        assert generate_key_from_pattern(e, "[title]") != generate_key_from_pattern(
+            e, "[fulltitle]"
+        )
+
+    def test_formatter_modifier_variants(self) -> None:
+        # Any registered field formatter is usable directly as a modifier.
+        e = _entry(author="John Smith", year="2024", title="A Study", journal="{Sample} Journal")
+        assert generate_key_from_pattern(e, "[journal:remove_braces]") == "samplejournal"
+        assert generate_key_from_pattern(e, "[journal:sentencecase]") == "samplejournal"
+
+    def test_title_word_modifiers_apply_to_arbitrary_fields(self) -> None:
+        # veryshorttitle/shorttitle/camel are markers, but JabRef also exposes
+        # them as modifiers applying the same word-selection algorithm to
+        # whatever value precedes them in the chain, not just the title field.
+        e = _entry(
+            author="John Smith",
+            year="2024",
+            title="A Study",
+            journal="the deep learning review quarterly",
+        )
+        assert generate_key_from_pattern(e, "[journal:veryshorttitle]") == "Deep"
+        assert generate_key_from_pattern(e, "[journal:shorttitle]") == "DeepLearningReview"
+        # Unlike shorttitle, camel does not filter stopwords.
+        assert generate_key_from_pattern(e, "[journal:camel]") == "TheDeepLearningReviewQuarterly"
+
+    def test_regex_modifier(self) -> None:
+        e = _entry(author="John Smith", year="2024", title="A Study", journal="report.etal")
+        assert generate_key_from_pattern(e, r'[journal:regex("\.etal","EtAl")]') == "reportEtAl"
+
+    def test_malformed_regex_modifier_errors(self) -> None:
+        e = _entry(author="John Smith", year="2024", title="A Study", journal="x")
+        with pytest.raises(UnsupportedCitationKeyPatternError, match="modifier"):
+            generate_key_from_pattern(e, "[journal:regex(bogus)]")
+
+    def test_regex_modifier_supports_backreferences(self) -> None:
+        # Character classes such as [a-z] inside a regex modifier are outside
+        # this pass's scope: the pattern's own [marker] bracket scanner would
+        # misread the literal '[' as a marker boundary. Groups without a
+        # bracketed class exercise backreference support without hitting that.
+        e = _entry(author="John Smith", year="2024", title="A Study", journal="aabb")
+        assert generate_key_from_pattern(e, r'[journal:regex("(a+)(b+)","$2$1")]') == "bbaa"
+
+    def test_default_value_modifier(self) -> None:
+        e = _entry(author="John Smith", year="2024", title="A Study")
+        assert generate_key_from_pattern(e, "[volume:(nd)]") == "nd"
+
+        with_volume = _entry(author="John Smith", year="2024", title="A Study", volume="12")
+        assert generate_key_from_pattern(with_volume, "[volume:(nd)]") == "12"
+
+    def test_default_value_modifier_checks_pre_chain_value(self) -> None:
+        # The default only fires when the marker's own resolved value was
+        # empty, not when an earlier modifier in the chain made it empty: here
+        # regex(...) empties a non-empty "keep", so the default is not applied.
+        e = _entry(author="John Smith", year="2024", title="A Study", journal="keep")
+        pattern = 'x[journal:regex("keep",""):(fallback)]'
+        assert generate_key_from_pattern(e, pattern) == "x"
+
+    def test_truncate_trims_trailing_whitespace(self) -> None:
+        e = _entry(author="John Smith", year="2024", title="A Study", journal="ab cd")
+        # Truncating "ab cd" (marker-cased to "Ab cd") to 3 chars lands on a
+        # trailing space, which JabRef's truncateN strips.
+        assert generate_key_from_pattern(e, "[Journal:truncate3]") == "Ab"
+
 
 class TestDuplicateDetection:
     def test_detects_duplicates(self) -> None:
