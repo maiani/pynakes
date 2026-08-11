@@ -36,10 +36,6 @@ Tasks below are listed in implementation priority order.
 - **Complete JabRef formatting compatibility**: implement and test the remaining
   v5.15 formatter-as-modifier behavior and key-pattern markers/modifiers, using
   upstream JabRef implementations, tests, and golden vectors as the oracle.
-- **`metadata doctor [--fix]` + metadata-aware `lint`**: rename known-legacy
-  metadata keys to their current spelling, validate enum *values* (catch typo'd
-  policy tokens), flag `[pynakes:unknown:*]` keys, and collapse duplicate
-  metadata blocks — today metadata drift passes silently.
 - **Single-bibliography analysis**: add a public `pynakes.analysis` API
   namespace and a read-only `stats` command returning typed and JSON-friendly
   reports for one `BibFile`/`Bibliography`. Start with deterministic descriptive
@@ -47,7 +43,7 @@ Tasks below are listed in implementation priority order.
   and required-field coverage, lint finding counts, group membership, and
   declared linked-file coverage. Keep analysis offline and separate from
   mutation; do not turn heuristic scores into quality judgments.
-**Done when**: broader import paths, `metadata doctor`, single-bibliography
+**Done when**: broader import paths, single-bibliography
 `analysis`/`stats`, and the `lint`/`groups` UX fixes are implemented,
 tested, and documented;
 `pytest && ruff` green; CHANGELOG updated; version bumped to 0.6.0.

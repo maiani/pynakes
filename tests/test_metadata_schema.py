@@ -302,6 +302,16 @@ def test_validate_fetch_policy_rejects_invalid() -> None:
         metadata_pkg.validate_metadata_value("pinax-fetch-policy", "maybe")
 
 
+def test_validate_journal_style_enum() -> None:
+    for style in ("none", "abbreviated", "full", "NONE", "Abbreviated", "full;"):
+        metadata_pkg.validate_metadata_value("normalize-journal-style", style)
+
+    with pytest.raises(ValueError, match="normalize-journal-style"):
+        metadata_pkg.validate_metadata_value("normalize-journal-style", "abbreviate")
+    with pytest.raises(ValueError, match="normalize-journal-style"):
+        metadata_pkg.validate_metadata_value("normalize-journal-style", "")
+
+
 def test_format_profile_keys_are_owned_and_validated() -> None:
     assert metadata_pkg.metadata_category("format-field-order") == "formatting"
     metadata_pkg.validate_metadata_value("format-indent", "4")

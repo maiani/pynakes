@@ -107,9 +107,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `by_category` counts alongside per-finding `category` and `fixer` keys, and
   human output ends with the commands that would clear the fixable findings.
   `lint` remains read-only.
+- Metadata-aware `lint` findings for the library's stored settings, so metadata
+  drift no longer passes silently. `unknown_metadata_key` flags any
+  `pynakes-meta` key outside the pynakes schema (`jabref-meta` is JabRef's own
+  namespace, and pynakes only catalogues a subset of its vocabulary, so an
+  uncatalogued JabRef key is tolerated); `invalid_metadata_value` validates a
+  key's value against the grammar pynakes defines for it — a typo'd
+  `pinax-fetch-policy` or `normalize-journal-style` token, a dialect that is
+  not `bibtex`/`biblatex`, or a bad formatting choice; and
+  `duplicate_metadata_block` reports repeated blocks for one key within a
+  namespace, which make the effective metadata ambiguous. The JabRef flat
+  `groups:` format is exempt from the duplicate check because it repeats the
+  `groups` key once per group line by design. All three findings are warnings
+  that, like the other stored-profile deviations, also gate `lint --strict`.
 
 ### Changed
 
+- `validate_metadata_value` now enforces the `normalize-journal-style` enum
+  (`none`, `abbreviated`, or `full`), so `metadata set` refuses a typo'd journal
+  style at write time and `lint` reports it as `invalid_metadata_value` rather
+  than the profile-specific finding.
 - `format` now lowercases entry types, which BibTeX treats case-insensitively,
   the way it already lowercases field names. This clears every `layout`-category
   lint finding, which previously included one (`noncanonical_entry_type_case`)

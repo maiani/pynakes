@@ -135,6 +135,16 @@ types and aliases:
 also verifies the lintable parts of a stored library profile: citation-key
 patterns, journal style, profile-required fields, and title brace protection.
 
+The library's stored metadata comments are validated too, so metadata drift no
+longer passes silently: a `pynakes-meta` key outside the pynakes schema is
+flagged, a key's value is checked against the grammar pynakes defines for it
+(a typo'd `pinax-fetch-policy` or `normalize-journal-style` token, a dialect
+that is not `bibtex`/`biblatex`, or a bad formatting choice), and repeated
+blocks for one key within a namespace — which make the effective metadata
+ambiguous — are reported. The JabRef flat `groups:` format is exempt from the
+duplicate check, since it repeats the `groups` key once per group line by
+design.
+
 `lint` only diagnoses; it never rewrites a library. Every finding carries a
 **category** naming what kind of problem it is and which command resolves it,
 and a **severity** ranking urgency:
@@ -158,8 +168,9 @@ reference.
 Layout and consistency findings are `info` so that they cannot bury a structural
 `error`; `--category` filters the report, and `--json` adds `info` and
 `by_category` counts plus per-finding `category` and `fixer` keys. Only errors
-and profile deviations gate `--strict`. Human output ends with the commands that
-would clear the fixable findings, for example
+and profile deviations gate `--strict` — including metadata drift (unknown
+pynakes keys, invalid metadata values, duplicate blocks). Human output ends
+with the commands that would clear the fixable findings, for example
 `Run `pynakes format` to resolve 3 of them.`
 
 `pynakes normalize refs.bib` also repairs bare full month names such as

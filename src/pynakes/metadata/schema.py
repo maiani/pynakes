@@ -87,6 +87,9 @@ PYNAKES_PREFIX_KEYS: dict[str, MetadataCategory] = {
 
 _VALID_DIALECTS = {"bibtex", "biblatex"}
 VALID_FETCH_POLICIES = {"preprint", "published", "source", "supplement", "bestpdf"}
+# Matches ``pynakes.journals.JOURNAL_STYLES`` (kept in sync by the lint profile
+# and normalize sharing the same persisted enum).
+_VALID_JOURNAL_STYLES = {"none", "abbreviated", "full"}
 _FORMAT_CHOICES = {
     "format-alignment": {"compact", "equals"},
     "format-field-order": {"preferred", "preserve", "alphabetical"},
@@ -101,7 +104,9 @@ def validate_metadata_value(key: str, value: str) -> None:
 
     Applies to any metadata key whose value format pynakes understands:
     ``dialect``/``databaseType`` must be ``bibtex`` or ``biblatex``, the ``fetch-*``
-    booleans must be a recognised truthy/falsy spelling, and all other known keys
+    booleans must be a recognised truthy/falsy spelling,
+    ``normalize-journal-style`` must be ``none``/``abbreviated``/``full``, the
+    ``format-*`` choices must come from their enum, and all other known keys
     must have a non-empty value. Unknown-key values (including JabRef-only keys
     whose grammar pynakes does not define) are accepted without validation.
     """
@@ -122,6 +127,14 @@ def validate_metadata_value(key: str, value: str) -> None:
             raise ValueError(
                 f"Invalid pinax-fetch-policy value(s) {invalid!r}; "
                 f"expected one or more of: {', '.join(sorted(VALID_FETCH_POLICIES))}"
+            )
+        return
+
+    if normalized_key == "normalize-journal-style":
+        if stripped.lower() not in _VALID_JOURNAL_STYLES:
+            raise ValueError(
+                f"Invalid normalize-journal-style {stripped!r}; expected one of: "
+                f"{', '.join(sorted(_VALID_JOURNAL_STYLES))}"
             )
         return
 

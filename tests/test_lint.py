@@ -55,6 +55,88 @@ def test_warns_when_no_entries_found() -> None:
     assert issues[0].severity == "warning"
 
 
+def test_metadata_lint_reports_typoed_fetch_policy_tokens() -> None:
+    lib = parse_bib("@comment{pynakes-meta: pinax-fetch-policy: bestpdf,unfamiliar;}\n")
+
+    issues = [issue for issue in lint(lib) if issue.type == "invalid_metadata_value"]
+
+    assert len(issues) == 1
+    assert issues[0].severity == "warning"
+    assert issues[0].category == "correctness"
+    assert issues[0].key == "pinax-fetch-policy"
+    assert issues[0].field == "pinax-fetch-policy"
+    assert "unfamiliar" in issues[0].message
+
+
+def test_metadata_lint_rejects_typoed_journal_style() -> None:
+    lib = parse_bib("@comment{pynakes-meta: normalize-journal-style:abbreviate;}\n")
+
+    issue_types = _types(lint(lib))
+
+    assert "invalid_metadata_value" in issue_types
+    assert "invalid_profile_setting" not in issue_types
+
+
+def test_metadata_lint_scopes_unknown_keys_to_pynakes_meta() -> None:
+    # pynakes owns pynakes-meta and claims to understand every key there, so an
+    # unknown key is drift. jabref-meta is JabRef's namespace and pynakes only
+    # catalogues a subset of its vocabulary, so an uncatalogued JabRef key is
+    # tolerated rather than reported.
+    lib = parse_bib(
+        "@comment{pynakes-meta: mystery-test-key: value;}\n"
+        "@comment{jabref-meta: someFutureJabrefKey: value;}\n"
+    )
+
+    unknown = [issue for issue in lint(lib) if issue.type == "unknown_metadata_key"]
+
+    assert [issue.key for issue in unknown] == ["mystery-test-key"]
+
+
+def test_metadata_lint_flags_duplicate_blocks_within_and_across_comments() -> None:
+    lib = parse_bib(
+        "@comment{pynakes-meta:\n"
+        "pinax-fetch-policy: preprint\n"
+        "pinax-fetch-policy: published\n"
+        "}\n"
+        "@comment{pynakes-meta: pinax-fetch-policy: source;}\n"
+    )
+
+    duplicates = [issue for issue in lint(lib) if issue.type == "duplicate_metadata_block"]
+
+    assert len(duplicates) == 1
+    assert duplicates[0].severity == "warning"
+    assert duplicates[0].key == "pinax-fetch-policy"
+    assert "3 blocks" in duplicates[0].message
+
+
+def test_metadata_lint_tolerates_jabref_flat_groups_format() -> None:
+    # The flat ``groups:`` format repeats the ``groups`` key once per group
+    # line by design; it must not read as a duplicate metadata block.
+    lib = parse_bib(
+        "@comment{jabref-meta: groups:0 All Papers:;}\n"
+        "@comment{jabref-meta: groups:1 Machine Learning:;}\n"
+        "@comment{jabref-meta: groups:1 Blockchain:;}\n"
+    )
+
+    assert not [issue for issue in lint(lib) if issue.type == "duplicate_metadata_block"]
+
+
+def test_metadata_lint_silent_on_valid_metadata() -> None:
+    lib = parse_bib(
+        "@comment{pynakes-meta: normalize-journal-style:none;}\n"
+        "@comment{pynakes-meta: pinax-fetch-policy:bestpdf;}\n"
+        "@comment{jabref-meta: databaseType:bibtex;}\n"
+    )
+
+    drift = [
+        issue
+        for issue in lint(lib)
+        if issue.type
+        in {"unknown_metadata_key", "invalid_metadata_value", "duplicate_metadata_block"}
+    ]
+    assert drift == []
+
+
 def test_missing_required_field() -> None:
     lib = parse_bib("@article{A,\n  title = {T},\n  year = {2020}\n}\n")
     issues = [i for i in lint(lib) if i.type == "missing_required_field"]

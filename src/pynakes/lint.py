@@ -6,8 +6,9 @@ key, and a message. Checks: duplicate keys, missing required fields (by entry
 type), undefined BibTeX string references, cross-entry field consistency (a
 field most entries of a type define but some omit), malformed or missing DOIs,
 malformed JabRef ``groups`` formatting, noncanonical entry-type / field-name
-casing, unresolved journal titles, and deviations from the library's stored
-metadata profile.
+casing, unresolved journal titles, metadata-comment schema drift (unknown
+pynakes keys, invalid values, duplicate blocks), and deviations from the
+library's stored metadata profile.
 
 ``lint`` only diagnoses; it never rewrites a library. The category of a finding
 names which command resolves it — ``normalize`` for content conventions and
@@ -38,10 +39,12 @@ from pynakes.metadata import (
     library_dialect,
     library_key_pattern,
     metadata_bool,
+    metadata_category,
     metadata_list,
     metadata_value,
+    validate_metadata_value,
 )
-from pynakes.model import BibEntry, BibFile, undefined_string_references
+from pynakes.model import BibEntry, BibFile, MetadataBlock, undefined_string_references
 
 RequiredRules = dict[str, list[tuple[str, ...]]]
 
@@ -194,7 +197,10 @@ _CONSISTENCY_DECORATION_FIELDS = frozenset(
 )
 
 # Profile findings remain warnings for interactive use, but ``lint --strict``
-# treats them as a failed conformance gate.
+# treats them as a failed conformance gate. Metadata drift belongs here too: an
+# unknown ``pynakes-meta`` key, a value the key's grammar rejects, or duplicate
+# blocks for one key all mean the library's persisted settings are not what
+# pynakes will apply.
 PROFILE_ISSUE_TYPES = frozenset(
     {
         "citation_key_pattern_mismatch",
@@ -204,6 +210,9 @@ PROFILE_ISSUE_TYPES = frozenset(
         "unsupported_citation_key_pattern",
         "invalid_profile_setting",
         "unknown_journal",
+        "unknown_metadata_key",
+        "invalid_metadata_value",
+        "duplicate_metadata_block",
     }
 )
 
@@ -297,6 +306,9 @@ ISSUE_CATEGORIES: dict[str, LintCategory] = {
     "missing_doi": "consistency",
     "invalid_profile_setting": "profile",
     "missing_profile_required_field": "profile",
+    "unknown_metadata_key": "correctness",
+    "invalid_metadata_value": "correctness",
+    "duplicate_metadata_block": "correctness",
 }
 
 
@@ -349,16 +361,10 @@ def lint(lib: BibFile) -> list[LintIssue]:
     journal_sources = None
     dialect = library_dialect(lib)
 
-    if profile.journal_style not in {"none", "abbreviated", "full"}:
-        issues.append(
-            LintIssue(
-                "invalid_profile_setting",
-                "warning",
-                "Profile normalize-journal-style must be one of 'none', 'abbreviated', or 'full'; "
-                f"got {profile.journal_style!r}",
-            )
-        )
-    elif profile.journal_style != "none":
+    # A value outside the journal-style enum is reported by ``_lint_metadata``
+    # as ``invalid_metadata_value`` (the schema is the single validator); here
+    # only a well-formed non-default style needs its sources loaded.
+    if profile.journal_style in {"abbreviated", "full"}:
         try:
             journal_sources = load_sources(profile.journal_table, profile.ltwa_table)
         except (OSError, UnicodeError, ValueError, csv.Error) as exc:
@@ -404,7 +410,75 @@ def lint(lib: BibFile) -> list[LintIssue]:
         issues.extend(_lint_entry(entry, fields, dialect=dialect))
         issues.extend(_lint_profile_entry(entry, lib, profile, journal_sources, fields))
 
+    issues.extend(_lint_metadata(lib))
     issues.extend(_lint_field_consistency(lib, dialect=dialect))
+    return issues
+
+
+def _lint_metadata(lib: BibFile) -> list[LintIssue]:
+    """Audit top-level metadata comments for schema drift and duplicate blocks.
+
+    Unknown keys are reported for the ``pynakes-meta`` namespace only: pynakes
+    owns it and claims to understand every key it writes, while ``jabref-meta``
+    is JabRef's vocabulary and pynakes only catalogues a subset of it. Values
+    are validated for every known key whose grammar pynakes defines (dialect,
+    fetch-policy tokens, formatting choices, journal style). Repeated blocks for
+    one key within a namespace make the effective metadata ambiguous and are
+    reported — except the JabRef flat ``groups:`` format, which legitimately
+    repeats the ``groups`` key once per group line.
+    """
+    counts: dict[tuple[str, str], list[MetadataBlock]] = {}
+    issues: list[LintIssue] = []
+
+    for block in lib.metadata_blocks:
+        namespace_key = (block.namespace, block.key.lower())
+        # The JabRef flat ``groups:`` format is one block per group by design;
+        # excluding it keeps a normal JabRef library from reading as drift.
+        if not (block.namespace == "jabref" and block.key.lower() == "groups"):
+            counts.setdefault(namespace_key, []).append(block)
+
+        if metadata_category(block.key) == "unknown":
+            if block.namespace == "pynakes":
+                issues.append(
+                    LintIssue(
+                        "unknown_metadata_key",
+                        "warning",
+                        f"Metadata key {block.key!r} in pynakes-meta is not recognized by the "
+                        "pynakes key schema",
+                        key=block.key,
+                        field=block.key,
+                    )
+                )
+            continue
+
+        try:
+            validate_metadata_value(block.key, block.value)
+        except ValueError as exc:
+            issues.append(
+                LintIssue(
+                    "invalid_metadata_value",
+                    "warning",
+                    f"Metadata key {block.key!r} in {block.namespace}-meta has an invalid "
+                    f"value: {exc}",
+                    key=block.key,
+                    field=block.key,
+                )
+            )
+
+    for (namespace, _key), blocks in counts.items():
+        if len(blocks) > 1:
+            key = blocks[0].key
+            issues.append(
+                LintIssue(
+                    "duplicate_metadata_block",
+                    "warning",
+                    f"{namespace}-meta contains {len(blocks)} blocks for key {key!r}; "
+                    "the path preserves them but the effective metadata is ambiguous",
+                    key=key,
+                    field=key,
+                )
+            )
+
     return issues
 
 

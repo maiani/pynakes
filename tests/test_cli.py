@@ -623,6 +623,31 @@ class TestInspectAndLint:
         strict = runner.invoke(app, ["lint", str(bib), "--strict", "--json"])
         assert strict.exit_code == 1, strict.output
 
+    def test_lint_strict_fails_on_metadata_drift(self, tmp_path: Path) -> None:
+        # A typo'd stored metadata value is stored-profile drift: advisory in
+        # interactive lint, but a failed conformance gate under --strict.
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: pinax-fetch-policy:bestpdf,unfamiliar;}\n\n"
+            "@article{A,\n"
+            "  author = {Jane Smith},\n"
+            "  title = {A Study},\n"
+            "  journal = {Nature},\n"
+            "  year = {2024},\n"
+            "  doi = {10.1234/example}\n"
+            "}\n"
+        )
+
+        advisory = runner.invoke(app, ["lint", str(bib), "--json"])
+        assert advisory.exit_code == 0, advisory.output
+        assert any(
+            issue["type"] == "invalid_metadata_value"
+            for issue in json.loads(advisory.output)["issues"]
+        )
+
+        strict = runner.invoke(app, ["lint", str(bib), "--strict", "--json"])
+        assert strict.exit_code == 1, strict.output
+
 
 class TestSearchCommand:
     def test_search_json_reports_matches(self, tmp_path: Path) -> None:
