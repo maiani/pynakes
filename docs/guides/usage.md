@@ -232,9 +232,28 @@ pynakes groups update-group refs.bib "Deep Learning" --color "00ff00ff" --contex
 pynakes groups remove-group refs.bib "NLP"   # removes group + its children
 ```
 
-`groups list` reports flat per-entry membership only; it does not currently
-expand tree descendants. See [Metadata Reference](metadata-reference.md#grouping)
-for the tree's node schema and native format.
+`groups list` reports every known group — the union of flat per-entry tags and
+tree nodes — so a flat-only group is never hidden by the presence of a tree, and
+a member-less tree node still appears. Each group lists its direct members only;
+it does not expand tree descendants. Use `groups list-entries` for
+descendant-inclusive membership, or `--exact` to restrict it to direct members:
+
+```bash
+pynakes groups list-entries refs.bib "Machine Learning"           # includes descendants
+pynakes groups list-entries refs.bib "Machine Learning" --exact   # direct members only
+```
+
+A group name that matches neither a tree node nor a flat tag is a `KeyNotFound`
+error rather than an empty result, so a typo is distinguishable from a group
+that genuinely has no members.
+
+`groups update-group` distinguishes an omitted option from an explicit empty
+one: passing `--parent ""`, `--color ""`, or `--description ""` clears that
+property, and `--expanded`/`--collapsed` both take effect. Invoked with no
+options it reports no modification instead of claiming an update.
+
+See [Metadata Reference](metadata-reference.md#grouping) for the tree's node
+schema and native format.
 
 ## keys
 

@@ -160,12 +160,87 @@ OPEN_LIBRARY_JSON = json.dumps(
         ),
         ("https://openlibrary.org/isbn/9780000000002", (ISBN, "9780000000002")),
         ("https://openlibrary.org/isbn/978-0-00-000000-2.json", (ISBN, "9780000000002")),
+        # ACM Digital Library: the DOI is the literal path segment.
+        ("https://dl.acm.org/doi/10.5555/acm.article.1", (DOI, "10.5555/acm.article.1")),
+        (
+            "https://dl.acm.org/doi/fullHtml/10.5555/acm.article.2",
+            (DOI, "10.5555/acm.article.2"),
+        ),
+        (
+            "https://dl.acm.org/doi/abs/10.5555/acm.article.3?cid=1#abstract",
+            (DOI, "10.5555/acm.article.3"),
+        ),
+        ("https://dl.acm.org/doi/10.5555/acm.article.4/", (DOI, "10.5555/acm.article.4")),
+        # American Chemical Society: same literal-DOI layout as ACM.
+        ("https://pubs.acs.org/doi/10.5555/acs.article.1", (DOI, "10.5555/acs.article.1")),
+        (
+            "https://pubs.acs.org/doi/epdf/10.5555/acs.article.2",
+            (DOI, "10.5555/acs.article.2"),
+        ),
+        (
+            "https://pubs.acs.org/doi/full/10.5555/acs.article.3?cookieSet=1#section",
+            (DOI, "10.5555/acs.article.3"),
+        ),
+        ("https://pubs.acs.org/doi/10.5555/acs.article.4/", (DOI, "10.5555/acs.article.4")),
+        # Royal Society of Chemistry: the DOI is derived from the article suffix.
+        (
+            "https://pubs.rsc.org/en/content/articlelanding/2023/ra/d3ra90060f",
+            (DOI, "10.1039/d3ra90060f"),
+        ),
+        (
+            "https://pubs.rsc.org/en/content/articlepdf/2023/ra/d3ra90060f",
+            (DOI, "10.1039/d3ra90060f"),
+        ),
+        (
+            "https://pubs.rsc.org/en/content/articlehtml/2023/ra/d3ra90060f?page=search",
+            (DOI, "10.1039/d3ra90060f"),
+        ),
+        (
+            "https://pubs.rsc.org/en/content/articlelanding/2023/ra/d3ra90060f/",
+            (DOI, "10.1039/d3ra90060f"),
+        ),
+        # Project Euclid: the DOI is the final path segment and contains a slash.
+        (
+            "https://projecteuclid.org/journals/statistical-science/volume-8/issue-1/"
+            "Simulated-Annealing/10.1214/ss/1177011077",
+            (DOI, "10.1214/ss/1177011077"),
+        ),
+        (
+            "https://projecteuclid.org/journals/statistical-science/volume-8/issue-1/"
+            "Simulated-Annealing/10.1214/ss/1177011077.full",
+            (DOI, "10.1214/ss/1177011077"),
+        ),
+        (
+            "https://projecteuclid.org/journals/statistical-science/volume-8/issue-1/"
+            "Simulated-Annealing/10.1214/ss/1177011077.short",
+            (DOI, "10.1214/ss/1177011077"),
+        ),
+        (
+            "https://projecteuclid.org/journals/statistical-science/volume-8/issue-1/"
+            "Simulated-Annealing/10.1214/ss/1177011077?fromPreview=1#top",
+            (DOI, "10.1214/ss/1177011077"),
+        ),
+        (
+            "https://projecteuclid.org/journals/statistical-science/volume-8/issue-1/"
+            "Simulated-Annealing/10.1214/ss/1177011077/",
+            (DOI, "10.1214/ss/1177011077"),
+        ),
     ],
 )
 def test_resolve_identifier_accepts_publisher_and_catalogue_urls(
     url: str, expected: tuple[str, str]
 ) -> None:
     assert resolve_identifier(url) == expected
+
+
+def test_rsc_rule_does_not_resolve_an_out_of_scope_url_shape() -> None:
+    # Only /en/content/article{landing,html,pdf}/ carries a derivable DOI; other
+    # RSC content-path shapes must fall through rather than produce a wrong one.
+    url = "https://pubs.rsc.org/en/content/chapter/2023/ra/d3ra90060f"
+
+    assert extract_publisher_doi(url) is None
+    with pytest.raises(UnsupportedIdentifierError):
+        resolve_identifier(url)
 
 
 @pytest.mark.parametrize(
@@ -180,6 +255,13 @@ def test_resolve_identifier_accepts_publisher_and_catalogue_urls(
         ("https://iopscience.iop.org/0034-4885/81/1/016501", "iopscience.iop.org/article"),
         # JSTOR stable ids that are neither numeric nor a DOI.
         ("https://www.jstor.org/stable/community.12345", "numeric or already a DOI"),
+        # IEEE Xplore addresses articles by an internal document number, both in
+        # the modern and the legacy URL shape.
+        ("https://ieeexplore.ieee.org/document/8433652", "IEEE Xplore"),
+        (
+            "https://ieeexplore.ieee.org/xpl/articleDetails.jsp?arnumber=8433652",
+            "IEEE Xplore",
+        ),
     ],
 )
 def test_resolve_identifier_explains_recognized_but_unresolvable_urls(
@@ -222,6 +304,17 @@ def test_publisher_url_rules_report_their_source() -> None:
         ("https://scipost.org/SciPostPhys.10.1.001", "10.21468/SciPostPhys.10.1.001"),
         ("https://www.jstor.org/stable/1171664", "10.2307/1171664"),
         ("https://aip.scitation.org/doi/10.5555/aip.1", "10.5555/aip.1"),
+        ("https://dl.acm.org/doi/10.5555/acm.1", "10.5555/acm.1"),
+        ("https://pubs.acs.org/doi/10.5555/acs.1", "10.5555/acs.1"),
+        (
+            "https://pubs.rsc.org/en/content/articlelanding/2023/ra/d3ra90060f",
+            "10.1039/d3ra90060f",
+        ),
+        (
+            "https://projecteuclid.org/journals/statistical-science/volume-8/issue-1/"
+            "Simulated-Annealing/10.1214/ss/1177011077.full",
+            "10.1214/ss/1177011077",
+        ),
     ],
 )
 def test_extract_publisher_doi_covers_new_publishers(url: str, expected_doi: str) -> None:

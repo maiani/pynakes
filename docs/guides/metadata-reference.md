@@ -222,10 +222,12 @@ dynamic membership is still something only JabRef computes when it opens the
 file; pynakes commands report it as having no explicit members until JabRef
 (or a future pynakes feature) evaluates the expression.
 
-`groups list`/`add-entry`/`remove-entry` (flat per-entry membership) are
-independent of the tree and never touch `grouping` — see the
-[Usage guide](usage.md#groups) for the full CLI surface, including the CRUD
-commands available on the tree.
+`groups add-entry`/`remove-entry` maintain flat per-entry membership, but they
+are not fully independent of the tree: when a tree already exists, adding an
+entry to a group that has no node registers one, so the tree stays a complete
+index of the groups in use. `groups list` reads both views and reports their
+union. See the [Usage guide](usage.md#groups) for the full CLI surface,
+including the CRUD commands available on the tree.
 
 ## Lint conformance
 

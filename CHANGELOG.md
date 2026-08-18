@@ -5,9 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
+## [0.6.0] - 2026-08-18
 ### Added
+
+- `ref import` now accepts the scholarly metadata indexes as import entry
+  points in their own right: `Crossref:<doi>`, `DataCite:<doi>`,
+  `OpenAlex:W<digits>`, and `SemanticScholar:<paper id>`, along with the
+  `api.crossref.org/works/…`, `api.datacite.org/dois/…`,
+  `api.openalex.org/works/…`, `openalex.org/W…`, and
+  `semanticscholar.org/paper/…` record URLs. A `Crossref:` or `DataCite:`
+  prefix selects that index's own JSON record instead of DOI content
+  negotiation, which is the reason to name it explicitly. DataCite is a new
+  provider covering members whose content-negotiated BibTeX is thin, such as
+  Dryad, Figshare, and Dataverse. None of the four requires an API key: the
+  Crossref and OpenAlex `mailto=` parameter is polite-pool courtesy rather than
+  authentication, and the Semantic Scholar Graph API answers unauthenticated at
+  low volume.
+- `ref import` now accepts three further communities whose canonical identifier
+  is not a DOI. RFC and IETF documents resolve through their deterministic
+  `10.17487/rfc<number>` DOI — accepted as `RFC:9110`, a bare `rfc9110`, or a
+  `datatracker.ietf.org`, `rfc-editor.org`, or legacy `tools.ietf.org` URL —
+  with the RFC number left unpadded, since the zero-padded form does not resolve
+  for low numbers. IACR ePrint accepts `IACR:<year>/<number>` and
+  `eprint.iacr.org` URLs, reading the BibTeX record embedded in each paper's
+  landing page because the archive publishes no separate citation endpoint.
+  zbMATH Open accepts `zbMATH:<Zbl or DE number>` and `zbmath.org` URLs through
+  its public, key-free JSON API. OpenReview was evaluated and left unsupported:
+  its public API answers a bot challenge to non-browser clients, so covering it
+  would mean defeating that challenge.
+- `ref import` now resolves ACM Digital Library, American Chemical Society,
+  Royal Society of Chemistry, and Project Euclid article URLs. ACM and ACS carry
+  the DOI in the path, with or without a view segment (`abs`, `full`, `pdf`,
+  `epdf`, `fullHtml`, `book`); an RSC `articlelanding`/`articlehtml`/`articlepdf`
+  URL maps its article suffix to a `10.1039/<suffix>` DOI; and a Project Euclid
+  journal URL carries a DOI containing an internal slash, with an optional
+  `.full` or `.short` suffix.
 
 - A multi-entry triage view: `ref show --keys k1,k2,…` summarizes a set of
   candidate references in one call instead of one invocation per key. Each
@@ -142,6 +174,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `groups list` now reports the union of flat per-entry tags and group-tree
+  nodes, listing each group's direct members. Previously, the presence of any
+  tree node switched the listing to tree names alone, so a flat-only group and
+  its members disappeared from the report while remaining in the file — a
+  grouped entry read as ungrouped, with a `success` status. Member-less tree
+  nodes now appear too. Use `groups list-entries` for descendant-inclusive
+  membership.
+- `groups list-entries` reports a `KeyNotFound` error for a group name matching
+  neither a tree node nor a flat tag, instead of returning an empty list with a
+  `success` status, so a mistyped name is distinguishable from a group that has
+  no members. This matches `remove-group`, `rename-group`, `move-group`, and
+  `update-group`.
+- `groups tree --json` serializes nodes through a new `GroupNode.to_dict()`
+  rather than the instance `__dict__`, so the payload is an explicit projection
+  like every other structured output. The emitted keys are unchanged.
+- The record-normalization helpers shared by metadata services and repository
+  clients moved from `providers.repositories._common` to `providers._common`,
+  beside `providers._http`, because both trees are equally their consumers.
+  Metadata services answering with JSON now share the fetch-decode-unwrap step
+  in `providers.metadata._json_service`, the counterpart of the existing
+  `_bibtex_service`, and `registry` builds every provider loader from one
+  helper instead of hand-written closures for the ones taking a fixed keyword.
+- Google Books, the Library of Congress, and IEEE Xplore are now recorded as
+  deliberately unsupported rather than planned. Google Books needs an API key
+  for dependable quota and Open Library already covers ISBN-addressed books;
+  IEEE Xplore addresses articles by an internal document number with no
+  published offline mapping to a DOI, so it joins the hosts that are recognized
+  and explained instead of scraped.
+
 - `validate_metadata_value` now enforces the `normalize-journal-style` enum
   (`none`, `abbreviated`, or `full`), so `metadata set` refuses a typo'd journal
   style at write time and `lint` reports it as `invalid_metadata_value` rather
@@ -202,6 +263,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `groups update-group --expanded` had no effect, because the option's own
+  default made an explicit `--expanded` indistinguishable from omitting it. A
+  group collapsed through the CLI could never be re-expanded through it.
+- `groups update-group --parent ""`, `--color ""`, and `--description ""`
+  silently did nothing instead of clearing the property, since an empty string
+  was treated as "not supplied" — while `move-group --parent ""` has always
+  meant "move to root". All three now distinguish an omitted option from an
+  explicit empty one.
+- `groups update-group` invoked with no options reported a successful update.
+  It now reports no modification and leaves the file byte-identical.
+- DataCite creators supplied only as `givenName`/`familyName`, with no combined
+  `name`, were dropped from the author list.
+- OpenAlex records typed `article` — its own spelling of Crossref's
+  `journal-article` — became `@misc`. The shared type map now also covers
+  `article`, `book`, `monograph`, `edited-book`, `reference-book`, `book-part`,
+  `book-section`, and `proceedings`; types whose BibTeX and BibLaTeX names
+  differ still fall back to `misc` rather than guessing per dialect.
+
 - **`asset fetch` can always name its library.** The whole-library form (no
   citation key) had no way to say *which* `.bib` when siblings shared the
   directory: the first positional is the citation key, so `asset fetch refs.bib`
@@ -212,6 +291,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   where the citation key goes, and treats a blank key as "every entry" instead of
   looking up the empty key. `asset check` was never affected — it takes libraries
   as variadic positionals.
+
+### Removed
+
+- **Breaking:** `groups list-entries --strict` is renamed `--exact`, and its
+  JSON key `strict` is renamed `exact`. Elsewhere `--strict` gates the exit
+  code on findings, but here it selected exact-versus-descendant matching and
+  never affected the exit code. The `list_entries_in_group_tree` keyword
+  argument is renamed to match. No alias is kept.
 
 ## [0.5.1] - 2026-07-21
 

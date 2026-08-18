@@ -9,7 +9,6 @@ import json
 import typer
 
 from pynakes import group_tree as group_tree_ops
-from pynakes import groups as groups_ops
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     RunParams,
@@ -34,12 +33,8 @@ def groups_list(
     """List all groups and their members."""
     file = _resolve_input_bib(file, json_output)
     lib = load_bib(file)
-    tree = group_tree_ops.list_tree(lib)
-    if tree is not None:
-        names = [n.name for n in tree]
-    else:
-        names = groups_ops.list_groups(lib)
-    members = {g: group_tree_ops.list_entries_in_group_tree(lib, g) for g in names}
+    names = group_tree_ops.known_group_names(lib)
+    members = {g: group_tree_ops.list_direct_members(lib, g) for g in names}
 
     if json_output:
         typer.echo(
@@ -73,7 +68,7 @@ def groups_tree(
                     "status": "success",
                     "action": "groups_tree",
                     "file": file,
-                    "tree": [n.__dict__ for n in tree] if tree else [],
+                    "tree": [n.to_dict() for n in tree] if tree else [],
                 },
                 indent=2,
             )
@@ -270,11 +265,17 @@ def groups_move_group(
 def groups_update_group(
     file: str | None = bib_file_argument(),
     name: str = typer.Argument(..., help="Group name to update"),
-    parent: str = typer.Option("", "--parent", help="New parent group name"),
-    color: str = typer.Option("", "--color", help="Hex RGBA color (e.g. 8a8a8aff)"),
+    parent: str | None = typer.Option(
+        None, "--parent", help="New parent group name (pass '' to move to root)"
+    ),
+    color: str | None = typer.Option(
+        None, "--color", help="Hex RGBA color (e.g. 8a8a8aff); pass '' to clear"
+    ),
     context: int = typer.Option(-1, "--context", help="0=independent, 1=refining, 2=including"),
-    expanded: bool = typer.Option(True, "--expanded/--collapsed", help="Expanded in the UI"),
-    description: str = typer.Option("", "--description", help="Group description"),
+    expanded: bool | None = typer.Option(None, "--expanded/--collapsed", help="Expanded in the UI"),
+    description: str | None = typer.Option(
+        None, "--description", help="Group description; pass '' to clear"
+    ),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
@@ -285,16 +286,31 @@ def groups_update_group(
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     coll = Bibliography.open(file)
     kwargs: dict = {}
-    if parent:
+    if parent is not None:
         kwargs["parent"] = parent
-    if color:
+    if color is not None:
         kwargs["color"] = color
     if context >= 0:
         kwargs["context"] = context
-    if not expanded:
-        kwargs["expanded"] = False
-    if description:
+    if expanded is not None:
+        kwargs["expanded"] = expanded
+    if description is not None:
         kwargs["description"] = description
+
+    tree = coll.list_tree()
+    exists = tree is not None and any(n.name.lower() == name.lower() for n in tree)
+    if not kwargs:
+        if not exists:
+            _emit_error(
+                json_output,
+                "KeyNotFound",
+                f"Group {name!r} not found in the tree",
+            )
+        action = "groups_update_group"
+        msg = f"No properties given for group {name!r}; nothing to update."
+        _finish_mod(file, action, coll, params, [msg], group=name)
+        return
+
     ok = coll.update_group_node(name, **kwargs)
     if not ok:
         _emit_error(
@@ -311,15 +327,18 @@ def groups_update_group(
 def groups_list_entries(
     file: str | None = bib_file_argument(),
     name: str = typer.Argument(..., help="Group name"),
-    strict: bool = typer.Option(
-        False, "--strict", help="Exact group match only (default: include descendants)"
+    exact: bool = typer.Option(
+        False, "--exact", help="Exact group match only (default: include descendants)"
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """List entries belonging to a group (with descendant propagation by default)."""
     file = _resolve_input_bib(file, json_output)
     lib = load_bib(file)
-    entries = group_tree_ops.list_entries_in_group_tree(lib, name, strict=strict)
+    known = group_tree_ops.known_group_names(lib)
+    if not any(n.lower() == name.lower() for n in known):
+        _emit_error(json_output, "KeyNotFound", f"Group {name!r} not found")
+    entries = group_tree_ops.list_entries_in_group_tree(lib, name, exact=exact)
 
     if json_output:
         typer.echo(
@@ -329,7 +348,7 @@ def groups_list_entries(
                     "action": "groups_list_entries",
                     "file": file,
                     "group": name,
-                    "strict": strict,
+                    "exact": exact,
                     "entries": entries,
                 },
                 indent=2,
@@ -337,7 +356,7 @@ def groups_list_entries(
         )
         return
 
-    desc = " (strict)" if strict else " (with descendants)"
+    desc = " (exact)" if exact else " (with descendants)"
     typer.echo(f"{name}{desc}: {', '.join(entries) if entries else '(no entries)'}")
 
 

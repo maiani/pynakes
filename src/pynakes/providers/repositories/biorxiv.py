@@ -7,10 +7,10 @@ from collections.abc import Callable
 from urllib.parse import quote
 
 from pynakes._identifiers import normalize_doi
+from pynakes.providers._common import repository_metadata
 from pynakes.providers._http import ProviderFetchError, fetch_text
 from pynakes.providers.metadata import doi as doi_provider
 from pynakes.providers.records import ReferenceMetadata
-from pynakes.providers.repositories._common import repository_metadata
 
 API_URL = "https://api.biorxiv.org/details"
 RawFetcher = Callable[[str], str]

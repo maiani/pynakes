@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from pynakes.providers._common import metadata_from_citation_html
 from pynakes.providers._http import fetch_text
 from pynakes.providers.records import ReferenceMetadata
-from pynakes.providers.repositories._common import metadata_from_citation_html
 
 RawFetcher = Callable[[str], str]
 

@@ -147,6 +147,54 @@ PUBLISHER_URL_RULES = (
         normalize=_unquoted_doi,
     ),
     URLRule(
+        source="ACM Digital Library",
+        kind="doi",
+        pattern=re.compile(
+            r"^https?://(?:www\.)?dl\.acm\.org/doi/"
+            r"(?:abs/|full/|pdf/|epdf/|fullHtml/)?"
+            r"(10\.\d{4,9}/[^?#\s]+?)/?(?:[?#].*)?$",
+            re.IGNORECASE,
+        ),
+        extract=lambda match: match.group(1),
+        normalize=_unquoted_doi,
+    ),
+    URLRule(
+        source="American Chemical Society",
+        kind="doi",
+        pattern=re.compile(
+            r"^https?://(?:www\.)?pubs\.acs\.org/doi/"
+            r"(?:abs/|full/|pdf/|epdf/|book/)?"
+            r"(10\.\d{4,9}/[^?#\s]+?)/?(?:[?#].*)?$",
+            re.IGNORECASE,
+        ),
+        extract=lambda match: match.group(1),
+        normalize=_unquoted_doi,
+    ),
+    URLRule(
+        source="Royal Society of Chemistry",
+        kind="doi",
+        pattern=re.compile(
+            r"^https?://(?:www\.)?pubs\.rsc\.org/en/content/article"
+            r"(?:landing|html|pdf)/\d{4}/[a-z0-9]+/"
+            r"([^/?#\s]+?)/?(?:[?#].*)?$",
+            re.IGNORECASE,
+        ),
+        extract=lambda match: f"10.1039/{match.group(1)}",
+        normalize=normalize_doi,
+    ),
+    URLRule(
+        source="Project Euclid",
+        kind="doi",
+        pattern=re.compile(
+            r"^https?://(?:www\.)?projecteuclid\.org/journals/[\w-]+/"
+            r"volume-[\w-]+/issue-[\w-]+/[^/?#\s]+/"
+            r"(10\.\d{4,9}/[^?#\s]+?)(?:\.(?:full|short))?/?(?:[?#].*)?$",
+            re.IGNORECASE,
+        ),
+        extract=lambda match: match.group(1),
+        normalize=normalize_doi,
+    ),
+    URLRule(
         source="Elsevier ScienceDirect",
         kind="pii",
         pattern=re.compile(
@@ -182,6 +230,13 @@ UNRESOLVABLE_URL_HINTS = (
         re.compile(r"^https?://(?:www\.)?jstor\.org/", re.IGNORECASE),
         "only JSTOR stable URLs whose id is numeric or already a DOI can be "
         "mapped to a DOI; import the DOI shown on the item page instead",
+    ),
+    (
+        re.compile(r"^https?://(?:www\.)?ieeexplore\.ieee\.org/", re.IGNORECASE),
+        "IEEE Xplore article URLs address articles by an internal document "
+        "number rather than by DOI, and resolving it requires IEEE's metadata "
+        "API and a registered key; import the DOI shown on the article page "
+        "instead",
     ),
 )
 

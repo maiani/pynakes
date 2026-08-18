@@ -7,9 +7,9 @@ import re
 from collections.abc import Callable
 from urllib.parse import quote
 
+from pynakes.providers._common import clean_text, person_name, repository_metadata
 from pynakes.providers._http import ProviderFetchError, fetch_text
 from pynakes.providers.records import ReferenceMetadata
-from pynakes.providers.repositories._common import clean_text, person_name, repository_metadata
 
 API_URL = "https://api.osf.io/v2/preprints"
 RawFetcher = Callable[[str], str]

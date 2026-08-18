@@ -9,9 +9,10 @@ This page tracks both the current metadata-import surface and asset-fetch
 support. In the **Metadata import** column, **Covered** means that a user can
 pass the listed identifier or URL directly to `ref import`; **Partly covered**
 means that some of the source's URL shapes work and the rest are described
-below; **Planned** means that it is not yet an import entry point. The **Asset
-fetch** column describes what `ref import --fetch` or `asset fetch` can retrieve
-after an entry exists.
+below; **Planned** means that it is not yet an import entry point; **Not supported**
+means that it has been considered and deliberately left out, for the reason the
+row or a section below gives. The **Asset fetch** column describes what
+`ref import --fetch` or `asset fetch` can retrieve after an entry exists.
 
 **DOI PDF pipeline** means the generic DOI-based published-PDF and
 single-supplement resolution path. It is not repository-native fetching and
@@ -34,12 +35,12 @@ URL resolvers.
 | DBLP | Computer-science bibliography | record key, `dblp.org/rec/<key>` URL | **Covered** | DOI PDF pipeline when a DOI is present |
 | ACL Anthology | Computational-linguistics proceedings | Anthology id (`N19-1423`, `2023.acl-long.1`), `aclanthology.org/<id>` URL | **Covered** | DOI PDF pipeline when a DOI is present |
 | Open Library | Book catalogue | ISBN-10/ISBN-13, `openlibrary.org/isbn/<isbn>` URL | **Covered** | None |
-| Google Books | Book catalogue | ISBN / volume id | Planned | None |
-| Library of Congress | National library catalogue | LCCN / `lccn.loc.gov` URL | Planned | None |
-| Crossref | DOI registry / metadata index | Crossref work URL and DOI fallback | Planned | Published-PDF URL fallback for the DOI pipeline |
-| DataCite | DOI registry / metadata index | DataCite DOI / record URL | Planned | None |
-| OpenAlex | Scholarly metadata index | OpenAlex work id / work URL | Planned | OA published-PDF resolver for the DOI pipeline |
-| Semantic Scholar | Scholarly metadata index | paper id / paper URL | Planned | None |
+| Google Books | Book catalogue | ISBN / volume id | **Not supported** (needs an API key; Open Library covers ISBN lookups) | None |
+| Library of Congress | National library catalogue | LCCN / `lccn.loc.gov` URL | **Not supported** (Open Library covers ISBN-addressed books) | None |
+| Crossref | DOI registry / metadata index | `Crossref:<doi>`, `api.crossref.org/works/<doi>` URL | **Covered** | Published-PDF URL fallback for the DOI pipeline |
+| DataCite | DOI registry / metadata index | `DataCite:<doi>`, `api.datacite.org/dois/<doi>` URL | **Covered** | None |
+| OpenAlex | Scholarly metadata index | `OpenAlex:W<digits>`, `openalex.org` / `api.openalex.org` work URL | **Covered** | OA published-PDF resolver for the DOI pipeline |
+| Semantic Scholar | Scholarly metadata index | `SemanticScholar:<paper id>`, `semanticscholar.org/paper/…` URL | **Covered** | None |
 | SSRN | Preprint server | SSRN abstract id / URL | **Covered** | DOI PDF pipeline only; no SSRN-native fetch |
 | NBER | Working-paper archive | NBER working-paper id / URL | **Covered** | DOI PDF pipeline only; no NBER-native fetch |
 | bioRxiv / medRxiv | Preprint servers | DOI or `biorxiv.org` / `medrxiv.org` URL | **Covered** | DOI PDF pipeline only; no native preprint fetch |
@@ -58,17 +59,26 @@ URL resolvers.
 | SciPost | Publisher | `scipost.org/<doi>` or `scipost.org/<article id>` URL | **Covered** | DOI PDF pipeline when a DOI is present |
 | JSTOR | Digital archive | `jstor.org/stable/<numeric id>` or `jstor.org/stable/<doi>` URL | **Covered** | DOI PDF pipeline when a DOI is present |
 | AIP Publishing | Publisher | legacy `aip.scitation.org/doi/<doi>` URL | **Partly covered** | DOI PDF pipeline when a DOI is present |
-| IEEE Xplore | Publisher / digital library | article number or URL to DOI | Planned | DOI PDF pipeline when a DOI is present |
-| ACM Digital Library | Publisher / digital library | DOI or article URL | Planned | DOI PDF pipeline when a DOI is present |
-| Royal Society of Chemistry | Publisher | article URL to DOI | Planned | DOI PDF pipeline when a DOI is present |
-| American Chemical Society | Publisher | article URL to DOI | Planned | DOI PDF pipeline when a DOI is present |
-| Project Euclid | Publisher platform | article URL to DOI | Planned | DOI PDF pipeline when a DOI is present |
+| ACM Digital Library | Publisher / digital library | `dl.acm.org/doi/<doi>` URL, with or without an `abs`, `full`, `pdf`, `epdf`, or `fullHtml` view segment | **Covered** | DOI PDF pipeline when a DOI is present |
+| American Chemical Society | Publisher | `pubs.acs.org/doi/<doi>` URL, with or without an `abs`, `full`, `pdf`, `epdf`, or `book` view segment | **Covered** | DOI PDF pipeline when a DOI is present |
+| Royal Society of Chemistry | Publisher | `pubs.rsc.org/en/content/article(landing\|html\|pdf)/<year>/<code>/<suffix>` URL, mapped to `10.1039/<suffix>` | **Covered** | DOI PDF pipeline when a DOI is present |
+| Project Euclid | Publisher platform | `projecteuclid.org/journals/…/<doi>` URL, with or without a `.full` or `.short` suffix | **Covered** | DOI PDF pipeline when a DOI is present |
+| IEEE Xplore | Publisher / digital library | article number or `ieeexplore.ieee.org` URL | **Not supported** (no offline article-number-to-DOI mapping; recognized and explained) | DOI PDF pipeline when a DOI is present |
 
-Crossref, OpenAlex, and Semantic Scholar already have clients used by other
-workflows. They remain marked Planned until their identifiers or record URLs
-can be passed to `ref import`. Crossref is nevertheless part of the covered
-Elsevier path, where it resolves a PII to its DOI. Google Books requires an API
-key for dependable quota, so ISBN lookups use Open Library only.
+Crossref, OpenAlex, and Semantic Scholar have clients that also serve other
+workflows; their identifiers and record URLs can now be passed to `ref import`
+directly. Crossref remains part of the covered Elsevier path too, where it
+resolves a PII to its DOI. None of the four metadata indexes requires an API
+key: Crossref's and OpenAlex's `mailto=` parameter is polite-pool courtesy
+rather than authentication, and the Semantic Scholar Graph API answers
+unauthenticated at low volume — a key only raises its rate limit.
+
+Google Books and the Library of Congress are deliberately out of scope rather
+than pending. Google Books needs an API key for dependable quota, and Open
+Library already covers ISBN-addressed book lookups, so neither catalogue would
+add a field pynakes does not already obtain. Google Scholar stays out because it
+has no API and scraping it is against its terms. Any of them may be revisited on
+evidence of demand.
 
 ## Accepted repository identifiers
 
@@ -86,7 +96,17 @@ ChemRxiv:record-id            ResearchSquare:rs-123456
 ISBN:0123456789               PII:S0123456789012345
 INSPIRE:451647                INSPIRE:Author:2024abc
 DBLP:journals/cacm/Codd70     ACL:2023.acl-long.1
+Crossref:10.1000/example      DataCite:10.5061/dryad.example
+OpenAlex:W2741809807          SemanticScholar:<40-hex paper id>
 ```
+
+The four metadata indexes take a prefix for the same reason the repositories do:
+a Crossref or DataCite record is addressed by DOI, so `Crossref:` and
+`DataCite:` select that index's JSON record instead of DOI content negotiation,
+which is the point of naming them explicitly. Their public API record URLs
+(`api.crossref.org/works/<doi>`, `api.datacite.org/dois/<doi>`,
+`api.openalex.org/works/<id>`) are accepted directly, as is an
+`openalex.org/W…` or `semanticscholar.org/paper/…` record URL.
 
 Canonical repository URLs are accepted directly. A bare DOI continues to use
 DOI content negotiation; repository-specific URLs select the repository
@@ -144,9 +164,14 @@ that and suggests importing by DOI instead of guessing.
 ## URLs that cannot be resolved
 
 Some platforms publish article URLs that contain no recoverable identifier at
-all. Modern AIP article URLs on `pubs.aip.org` address articles by volume,
-issue, page, and an internal article id; legacy IOPscience URLs are ISSN-based;
-and JSTOR stable ids that are neither numeric nor a DOI have no derivable DOI.
+all. IEEE Xplore addresses articles by an internal document number
+(`ieeexplore.ieee.org/document/8433652`, and the legacy
+`xpl/articleDetails.jsp?arnumber=…` form) that has no published offline mapping
+to a DOI; IEEE's metadata API could resolve it but requires a registered key, so
+IEEE Xplore is recognized and explained rather than covered. Modern AIP article
+URLs on `pubs.aip.org` address articles by volume, issue, page, and an internal
+article id; legacy IOPscience URLs are ISSN-based; and JSTOR stable ids that are
+neither numeric nor a DOI have no derivable DOI.
 Resolving any of them would mean scraping a bot-protected page or guessing, so
 `ref import` instead fails with advice to import the DOI shown on the article
 page. Only the legacy `aip.scitation.org/doi/<doi>` form is resolvable for AIP.
@@ -156,9 +181,15 @@ page. Only the legacy `aip.scitation.org/doi/<doi>` form is resolvable for AIP.
 Import providers are organized by role:
 
 - `providers.metadata` contains metadata services: DOI content negotiation,
-  Crossref, OpenAlex, Semantic Scholar, Elsevier, Open Library, INSPIRE-HEP,
-  DBLP, and the ACL Anthology. Services that answer with BibTeX share the
-  parse-and-relabel step in `providers.metadata._bibtex_service`.
+  Crossref, DataCite, OpenAlex, Semantic Scholar, Elsevier, Open Library,
+  INSPIRE-HEP, DBLP, and the ACL Anthology. Services that answer with BibTeX
+  share the parse-and-relabel step in `providers.metadata._bibtex_service`;
+  those that answer with JSON share the fetch-decode-unwrap step in
+  `providers.metadata._json_service`.
+- `providers._common` holds the record-normalization helpers both trees use —
+  text cleaning, person names, date fields, and the shared metadata assembly.
+  It sits beside `providers._http` rather than inside either tree, because
+  metadata services and repository clients are equally its consumers.
 - `providers.repositories` contains repository clients such as arXiv.
 - `providers.url_resolvers` contains ordered declarative rules that turn
   supported URLs into canonical identifiers, grouped into identifier authority,

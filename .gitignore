@@ -127,5 +127,4 @@ dmypy.json
 .DS_Store
 
 # Project specific
-*.bak
 .agent-eval-runs/

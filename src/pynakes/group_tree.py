@@ -75,6 +75,28 @@ class GroupNode:
     def __hash__(self) -> int:
         return hash(self.name.lower())
 
+    def to_dict(self) -> dict[str, object]:
+        """Serialize this node to a JSON-friendly dict (explicit, not ``__dict__``).
+
+        Field order matches the dataclass declaration so JSON output is stable
+        and identical to the previous ``__dict__``-based serialization.
+        """
+        return {
+            "name": self.name,
+            "parent": self.parent,
+            "context": self.context,
+            "color": self.color,
+            "expanded": self.expanded,
+            "description": self.description,
+            "group_type": self.group_type,
+            "field": self.field,
+            "expression": self.expression,
+            "case_sensitive": self.case_sensitive,
+            "separator": self.separator,
+            "search_flags": self.search_flags,
+            "entries": self.entries,
+        }
+
 
 def _child_groups(nodes: list[GroupNode], parent: str) -> list[GroupNode]:
     """Return the direct children of *parent* in insertion order."""
@@ -568,11 +590,11 @@ def resolve_effective_groups(lib: BibFile, entry) -> list[str]:
     return [g for g in raw if g in effective] + [g for g in effective if g not in raw]
 
 
-def list_entries_in_group_tree(lib: BibFile, group: str, *, strict: bool = False) -> list[str]:
+def list_entries_in_group_tree(lib: BibFile, group: str, *, exact: bool = False) -> list[str]:
     """Return entry keys that belong to *group*, including dynamic matches.
 
-    When *strict* is ``False`` (default), includes entries in descendant groups
-    (downward propagation).  When *strict* is ``True``, only exact group matches
+    When *exact* is ``False`` (default), includes entries in descendant groups
+    (downward propagation).  When *exact* is ``True``, only exact group matches
     are returned (JabRef-compatible behavior).  Both modes evaluate
     ``KeywordGroup`` and ``SearchGroup`` expressions.
     """
@@ -584,7 +606,7 @@ def list_entries_in_group_tree(lib: BibFile, group: str, *, strict: bool = False
     node = _node_by_name(tree, group)
     if node is None:
         return []
-    if strict:
+    if exact:
         return sorted(_group_entry_keys(lib, node))
     keys: set[str] = set()
     for name in _descendant_names(tree, group):
@@ -592,6 +614,44 @@ def list_entries_in_group_tree(lib: BibFile, group: str, *, strict: bool = False
         if descendant:
             keys.update(_group_entry_keys(lib, descendant))
     return sorted(keys)
+
+
+def known_group_names(lib: BibFile) -> list[str]:
+    """Return every group name known to *lib*: tree nodes union flat tags.
+
+    Tree node names come first, in tree order; flat-only group tags — names
+    that appear only in some entry's ``groups`` field, with no corresponding
+    tree node (or when no tree is defined at all) — follow, in first-seen
+    order. This is the deterministic union that ``groups list`` and
+    ``groups list-entries`` (for unknown-name detection) share, so a flat-only
+    group is never dropped just because an unrelated tree exists.
+    """
+    from pynakes.groups import list_groups as _flat_group_names
+
+    tree = library_group_tree(lib)
+    tree_names = [n.name for n in tree] if tree else []
+    seen = {n.lower() for n in tree_names}
+    result = list(tree_names)
+    for name in _flat_group_names(lib):
+        if name.lower() not in seen:
+            seen.add(name.lower())
+            result.append(name)
+    return result
+
+
+def list_direct_members(lib: BibFile, name: str) -> list[str]:
+    """Return the direct members of *name*, without descendant expansion.
+
+    Resolves *name* against a tree node when one exists (evaluating its
+    explicit/dynamic membership), otherwise falls back to entries whose flat
+    ``groups`` field tags *name* directly. This covers flat-only group tags
+    even when an unrelated tree is present elsewhere in the library.
+    """
+    tree = library_group_tree(lib)
+    node = _node_by_name(tree, name) if tree else None
+    if node is not None:
+        return sorted(_group_entry_keys(lib, node))
+    return sorted(entry.key for entry in lib.entries.values() if name in entry_group_names(entry))
 
 
 def add_to_group_tree(lib: BibFile, key: str, group: str) -> int:

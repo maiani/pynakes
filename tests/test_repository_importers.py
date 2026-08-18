@@ -94,10 +94,54 @@ SSRN_BIBTEX = """@techreport{Turing1936,
             "https://www.researchsquare.com/article/rs-12345/v2",
             ("research_square", "rs-12345"),
         ),
+        # RFCs have a deterministic, unpadded DOI: 10.17487/rfc<number>. A padded
+        # form is only a 301 alias and does not resolve at all for the lowest
+        # RFC numbers, so the low numbers below are the important regression case.
+        ("RFC:791", ("doi", "10.17487/rfc791")),
+        ("RFC:20", ("doi", "10.17487/rfc20")),
+        ("RFC:9110", ("doi", "10.17487/rfc9110")),
+        ("rfc791", ("doi", "10.17487/rfc791")),
+        ("RFC 791", ("doi", "10.17487/rfc791")),
+        ("RFC-791", ("doi", "10.17487/rfc791")),
+        ("rfc20", ("doi", "10.17487/rfc20")),
+        (
+            "https://datatracker.ietf.org/doc/rfc9110/",
+            ("doi", "10.17487/rfc9110"),
+        ),
+        (
+            "https://datatracker.ietf.org/doc/html/rfc9110",
+            ("doi", "10.17487/rfc9110"),
+        ),
+        (
+            "https://datatracker.ietf.org/doc/rfc791/",
+            ("doi", "10.17487/rfc791"),
+        ),
+        ("https://www.rfc-editor.org/info/rfc9110", ("doi", "10.17487/rfc9110")),
+        ("https://www.rfc-editor.org/rfc/rfc9110", ("doi", "10.17487/rfc9110")),
+        ("https://www.rfc-editor.org/rfc/rfc9110.txt", ("doi", "10.17487/rfc9110")),
+        ("https://www.rfc-editor.org/rfc/rfc9110.html", ("doi", "10.17487/rfc9110")),
+        ("https://www.rfc-editor.org/info/rfc791", ("doi", "10.17487/rfc791")),
+        ("https://tools.ietf.org/html/rfc7231", ("doi", "10.17487/rfc7231")),
+        # IACR ePrint ids are the community's canonical identifier, not a DOI.
+        ("IACR:2023/1234", ("iacr", "2023/1234")),
+        ("https://eprint.iacr.org/2023/1234", ("iacr", "2023/1234")),
+        ("https://eprint.iacr.org/2023/1234.pdf", ("iacr", "2023/1234")),
     ],
 )
 def test_repository_identifier_resolution(value: str, expected: tuple[str, str]) -> None:
     assert resolve_identifier(value) == expected
+
+
+@pytest.mark.parametrize("rfc_number,doi", [("20", "10.17487/rfc20"), ("791", "10.17487/rfc791")])
+def test_rfc_doi_is_not_zero_padded(rfc_number: str, doi: str) -> None:
+    """A padded DOI (``10.17487/RFC0020``) is only a 301 alias and, for the
+    lowest RFC numbers, does not resolve as a DOI at all — so a naive
+    zero-padding implementation would silently break these two cases."""
+    assert resolve_identifier(f"RFC:{rfc_number}") == ("doi", doi)
+    assert resolve_identifier(f"rfc{rfc_number}") == ("doi", doi)
+    # A user-supplied padded number is still accepted, but always normalized
+    # to the unpadded canonical form.
+    assert resolve_identifier(f"RFC:{rfc_number.zfill(4)}") == ("doi", doi)
 
 
 PUBMED_XML = """<PubmedArticleSet><PubmedArticle>

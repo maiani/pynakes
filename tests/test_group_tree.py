@@ -23,7 +23,9 @@ from pynakes.group_tree import (
     entry_computed_groups,
     entry_group_names,
     format_jabref_grouping,
+    known_group_names,
     library_group_tree,
+    list_direct_members,
     list_entries_in_group_tree,
     list_tree,
     move_node,
@@ -633,7 +635,7 @@ def test_list_entries_in_group_tree_with_tree() -> None:
     lib.entries.add(BibEntry(key="B", type="article", fields={"groups": "Deep Learning"}))
     lib.entries.add(BibEntry(key="C", type="article", fields={"groups": "NLP"}))
     lib.entries.add(BibEntry(key="D", type="article", fields={"groups": "ML"}))
-    # Non-strict: ML includes its descendants
+    # Not exact: ML includes its descendants
     result = list_entries_in_group_tree(lib, "ML")
     assert "B" in result
     assert "C" in result
@@ -641,13 +643,13 @@ def test_list_entries_in_group_tree_with_tree() -> None:
     assert "A" not in result
 
 
-def test_list_entries_in_group_tree_strict() -> None:
+def test_list_entries_in_group_tree_exact() -> None:
     lib = _fresh_lib()
     add_node(lib, "ML")
     add_node(lib, "Deep Learning", parent="ML")
     lib.entries.add(BibEntry(key="B", type="article", fields={"groups": "Deep Learning"}))
     lib.entries.add(BibEntry(key="D", type="article", fields={"groups": "ML"}))
-    result = list_entries_in_group_tree(lib, "ML", strict=True)
+    result = list_entries_in_group_tree(lib, "ML", exact=True)
     assert result == ["D"]
 
 
@@ -897,7 +899,7 @@ def test_list_entries_in_group_tree_combined() -> None:
     assert result == ["A"]
 
 
-def test_list_entries_in_group_tree_strict_dynamic() -> None:
+def test_list_entries_in_group_tree_exact_dynamic() -> None:
     lib = _fresh_lib()
     add_node(lib, "ML")
     update_node(
@@ -909,7 +911,7 @@ def test_list_entries_in_group_tree_strict_dynamic() -> None:
         separator=";",
     )
     lib.entries.add(BibEntry(key="A", type="article", fields={"keywords": "machine learning"}))
-    result = list_entries_in_group_tree(lib, "ML", strict=True)
+    result = list_entries_in_group_tree(lib, "ML", exact=True)
     assert "A" in result
 
 
@@ -1014,13 +1016,13 @@ def test_groups_list_entries_cli_includes_descendants(tmp_path: Path) -> None:
     data = json.loads(result.output)
     assert data["action"] == "groups_list_entries"
     assert data["group"] == "CS"
-    assert data["strict"] is False
+    assert data["exact"] is False
     # Descendant propagation: PaperA (in child ML) and PaperB (in CS itself).
     assert "PaperA" in data["entries"]
     assert "PaperB" in data["entries"]
 
 
-def test_groups_list_entries_cli_strict_omits_descendants(tmp_path: Path) -> None:
+def test_groups_list_entries_cli_exact_omits_descendants(tmp_path: Path) -> None:
     lib = _fresh_lib()
     add_node(lib, "CS")
     add_node(lib, "ML", parent="CS")
@@ -1032,13 +1034,13 @@ def test_groups_list_entries_cli_strict_omits_descendants(tmp_path: Path) -> Non
     bib.write_text(text)
 
     result = CliRunner().invoke(
-        app, ["groups", "list-entries", str(bib), "CS", "--strict", "--json"]
+        app, ["groups", "list-entries", str(bib), "CS", "--exact", "--json"]
     )
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
-    assert data["strict"] is True
-    # Strict mode: only PaperB (directly in CS), not PaperA (in ML).
+    assert data["exact"] is True
+    # Exact mode: only PaperB (directly in CS), not PaperA (in ML).
     assert "PaperA" not in data["entries"]
     assert "PaperB" in data["entries"]
 
@@ -1249,3 +1251,344 @@ def test_group_entry_members_explicit_and_dynamic_deduplicated() -> None:
     assert node is not None
     keys = _group_entry_keys(lib, node)
     assert len([k for k in keys if k == "A"]) == 1
+
+
+# ---------------------------------------------------------------------------
+# Fix 1: `groups list` must union flat tags and tree nodes, direct members only
+# ---------------------------------------------------------------------------
+
+
+def test_known_group_names_union_flat_and_tree() -> None:
+    lib = _fresh_lib()
+    lib.entries.add(BibEntry(key="A", type="article", fields={"groups": "FlatGroup"}))
+    add_node(lib, "TreeGroup")
+    # An unrelated tree node must not hide the flat-only tag.
+    assert known_group_names(lib) == ["TreeGroup", "FlatGroup"]
+
+
+def test_known_group_names_no_tree_is_flat_only() -> None:
+    lib = _fresh_lib()
+    lib.entries.add(BibEntry(key="A", type="article", fields={"groups": "FlatGroup"}))
+    assert known_group_names(lib) == ["FlatGroup"]
+
+
+def test_list_direct_members_flat_only_with_unrelated_tree() -> None:
+    lib = _fresh_lib()
+    lib.entries.add(BibEntry(key="A", type="article", fields={"groups": "FlatGroup"}))
+    add_node(lib, "TreeGroup")
+    # `list_entries_in_group_tree` alone would return [] here (FlatGroup has no
+    # node), but the flat tag is still a real, direct membership.
+    assert list_direct_members(lib, "FlatGroup") == ["A"]
+    assert list_direct_members(lib, "TreeGroup") == []
+
+
+def test_list_direct_members_excludes_descendants() -> None:
+    lib = _fresh_lib()
+    add_node(lib, "CS")
+    add_node(lib, "ML", parent="CS")
+    lib.entries.add(BibEntry(key="A", type="article", fields={"groups": "CS"}))
+    lib.entries.add(BibEntry(key="B", type="article", fields={"groups": "ML"}))
+    assert list_direct_members(lib, "CS") == ["A"]
+    assert list_direct_members(lib, "ML") == ["B"]
+
+
+def test_groups_list_cli_flat_and_tree_union(tmp_path: Path) -> None:
+    """Exact regression from the bug report: a flat-only group must survive the
+    creation of an unrelated tree node, member list intact."""
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@article{Euclid300BCE,\n"
+        "  title = {On the Ratios of Straight Lines},\n"
+        "  author = {Euclid}\n"
+        "}\n"
+    )
+    runner = CliRunner()
+
+    add_entry = runner.invoke(
+        app, ["groups", "add-entry", str(bib), "Euclid300BCE", "FlatGroup", "--json"]
+    )
+    assert add_entry.exit_code == 0, add_entry.output
+
+    before = runner.invoke(app, ["groups", "list", str(bib), "--json"])
+    assert before.exit_code == 0, before.output
+    before_data = json.loads(before.output)
+    assert before_data["groups"] == {"FlatGroup": ["Euclid300BCE"]}
+
+    add_group = runner.invoke(app, ["groups", "add-group", str(bib), "TreeGroup", "--json"])
+    assert add_group.exit_code == 0, add_group.output
+
+    after = runner.invoke(app, ["groups", "list", str(bib), "--json"])
+    assert after.exit_code == 0, after.output
+    after_data = json.loads(after.output)
+    # FlatGroup and its member must not vanish once an unrelated tree exists.
+    assert after_data["groups"]["FlatGroup"] == ["Euclid300BCE"]
+    assert after_data["groups"]["TreeGroup"] == []
+    assert after_data["status"] == "success"
+
+
+# ---------------------------------------------------------------------------
+# Fix 2: `update-group --expanded` can re-expand a collapsed node
+# ---------------------------------------------------------------------------
+
+
+def test_groups_update_group_cli_collapse_then_expand_roundtrip(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{Euclid300BCE,\n  title = {On the Ratios of Straight Lines}\n}\n")
+    runner = CliRunner()
+
+    assert runner.invoke(app, ["groups", "add-group", str(bib), "Geometry"]).exit_code == 0
+
+    collapsed = runner.invoke(
+        app, ["groups", "update-group", str(bib), "Geometry", "--collapsed", "--json"]
+    )
+    assert collapsed.exit_code == 0, collapsed.output
+    tree_after_collapse = json.loads(
+        runner.invoke(app, ["groups", "tree", str(bib), "--json"]).output
+    )["tree"]
+    assert tree_after_collapse[0]["expanded"] is False
+
+    expanded = runner.invoke(
+        app, ["groups", "update-group", str(bib), "Geometry", "--expanded", "--json"]
+    )
+    assert expanded.exit_code == 0, expanded.output
+    tree_after_expand = json.loads(
+        runner.invoke(app, ["groups", "tree", str(bib), "--json"]).output
+    )["tree"]
+    assert tree_after_expand[0]["expanded"] is True
+
+
+# ---------------------------------------------------------------------------
+# Fix 3: `update-group` empty-string clearing, and zero-flag no-op
+# ---------------------------------------------------------------------------
+
+
+def test_groups_update_group_cli_clears_parent_color_description(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{Euclid300BCE,\n  title = {On the Ratios of Straight Lines}\n}\n")
+    runner = CliRunner()
+
+    assert runner.invoke(app, ["groups", "add-group", str(bib), "Geometry"]).exit_code == 0
+    assert (
+        runner.invoke(
+            app,
+            [
+                "groups",
+                "add-group",
+                str(bib),
+                "Postulates",
+                "--parent",
+                "Geometry",
+            ],
+        ).exit_code
+        == 0
+    )
+    seeded = runner.invoke(
+        app,
+        [
+            "groups",
+            "update-group",
+            str(bib),
+            "Postulates",
+            "--color",
+            "8a8a8aff",
+            "--description",
+            "Five postulates",
+            "--json",
+        ],
+    )
+    assert seeded.exit_code == 0, seeded.output
+
+    cleared = runner.invoke(
+        app,
+        [
+            "groups",
+            "update-group",
+            str(bib),
+            "Postulates",
+            "--parent",
+            "",
+            "--color",
+            "",
+            "--description",
+            "",
+            "--json",
+        ],
+    )
+    assert cleared.exit_code == 0, cleared.output
+
+    tree = json.loads(runner.invoke(app, ["groups", "tree", str(bib), "--json"]).output)["tree"]
+    node = next(n for n in tree if n["name"] == "Postulates")
+    assert node["parent"] == ""
+    assert node["color"] == ""
+    assert node["description"] == ""
+
+
+def test_groups_update_group_cli_zero_flags_reports_no_change(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{Euclid300BCE,\n  title = {On the Ratios of Straight Lines}\n}\n")
+    runner = CliRunner()
+    assert runner.invoke(app, ["groups", "add-group", str(bib), "Geometry"]).exit_code == 0
+
+    before_text = bib.read_text()
+    result = runner.invoke(app, ["groups", "update-group", str(bib), "Geometry", "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["modified"] is False
+    assert data["modified_entries"] == 0
+    # A true no-op must not touch the file at all.
+    assert bib.read_text() == before_text
+
+
+def test_groups_update_group_cli_zero_flags_missing_group_still_errors(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{Euclid300BCE,\n  title = {On the Ratios of Straight Lines}\n}\n")
+    result = CliRunner().invoke(app, ["groups", "update-group", str(bib), "Missing", "--json"])
+    assert result.exit_code == 1, result.output
+    assert json.loads(result.output)["error"] == "KeyNotFound"
+
+
+# ---------------------------------------------------------------------------
+# Fix 4: unknown group name errors on `list-entries`; a real-but-empty group
+# still succeeds
+# ---------------------------------------------------------------------------
+
+
+def test_groups_list_entries_cli_unknown_name_errors(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{Euclid300BCE,\n  title = {On the Ratios of Straight Lines}\n}\n")
+    runner = CliRunner()
+    assert (
+        runner.invoke(app, ["groups", "add-entry", str(bib), "Euclid300BCE", "FlatGroup"]).exit_code
+        == 0
+    )
+
+    result = runner.invoke(app, ["groups", "list-entries", str(bib), "TypoedName", "--json"])
+
+    assert result.exit_code == 1, result.output
+    assert json.loads(result.output)["error"] == "KeyNotFound"
+
+
+def test_groups_list_entries_cli_known_empty_group_succeeds(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{Euclid300BCE,\n  title = {On the Ratios of Straight Lines}\n}\n")
+    runner = CliRunner()
+    assert runner.invoke(app, ["groups", "add-group", str(bib), "Geometry"]).exit_code == 0
+
+    result = runner.invoke(app, ["groups", "list-entries", str(bib), "Geometry", "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["entries"] == []
+
+
+# ---------------------------------------------------------------------------
+# Fix 5: `groups tree --json` uses an explicit `to_dict()`, not `__dict__`
+# ---------------------------------------------------------------------------
+
+
+def test_group_node_to_dict_matches_dunder_dict() -> None:
+    node = GroupNode(
+        name="ML",
+        parent="Physics",
+        context=1,
+        color="ff0000ff",
+        expanded=False,
+        description="desc",
+        group_type="KeywordGroup",
+        field="keywords",
+        expression="deep learning",
+        case_sensitive=True,
+        separator=";",
+        search_flags="1",
+        entries=("A", "B"),
+    )
+    assert list(node.to_dict().keys()) == list(node.__dict__.keys())
+    assert node.to_dict() == node.__dict__
+
+
+def test_groups_tree_cli_json_keys_unchanged(tmp_path: Path) -> None:
+    """`groups tree --json` must emit the exact same per-node keys as the old
+    ``n.__dict__`` serialization (only the mechanism changed, not the contract)."""
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{Euclid300BCE,\n  title = {On the Ratios of Straight Lines}\n}\n")
+    runner = CliRunner()
+    assert runner.invoke(app, ["groups", "add-group", str(bib), "Geometry"]).exit_code == 0
+    assert (
+        runner.invoke(
+            app,
+            [
+                "groups",
+                "update-group",
+                str(bib),
+                "Geometry",
+                "--color",
+                "8a8a8aff",
+                "--description",
+                "Euclidean geometry",
+            ],
+        ).exit_code
+        == 0
+    )
+
+    result = runner.invoke(app, ["groups", "tree", str(bib), "--json"])
+    assert result.exit_code == 0, result.output
+    tree = json.loads(result.output)["tree"]
+    assert len(tree) == 1
+
+    expected_keys = [
+        "name",
+        "parent",
+        "context",
+        "color",
+        "expanded",
+        "description",
+        "group_type",
+        "field",
+        "expression",
+        "case_sensitive",
+        "separator",
+        "search_flags",
+        "entries",
+    ]
+    assert list(tree[0].keys()) == expected_keys
+
+
+# ---------------------------------------------------------------------------
+# Fix 6: `groups list-entries --exact` renames `--strict` (breaking change)
+# ---------------------------------------------------------------------------
+
+
+def test_groups_list_entries_cli_strict_flag_no_longer_exists(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{Euclid300BCE,\n  title = {On the Ratios of Straight Lines}\n}\n")
+    result = CliRunner().invoke(
+        app, ["groups", "list-entries", str(bib), "Anything", "--strict", "--json"]
+    )
+    assert result.exit_code != 0
+    assert "--strict" in result.output or "No such option" in result.output
+
+
+def test_groups_list_entries_cli_exact_matches_old_strict_semantics(tmp_path: Path) -> None:
+    lib = _fresh_lib()
+    add_node(lib, "Geometry")
+    add_node(lib, "Postulates", parent="Geometry")
+    lib.entries.add(BibEntry(key="A", type="article", fields={"groups": "Geometry"}))
+    lib.entries.add(BibEntry(key="B", type="article", fields={"groups": "Postulates"}))
+    bib = tmp_path / "refs.bib"
+    bib.write_text(write_bib(lib))
+
+    default = CliRunner().invoke(app, ["groups", "list-entries", str(bib), "Geometry", "--json"])
+    exact = CliRunner().invoke(
+        app, ["groups", "list-entries", str(bib), "Geometry", "--exact", "--json"]
+    )
+
+    assert default.exit_code == 0 and exact.exit_code == 0
+    default_data = json.loads(default.output)
+    exact_data = json.loads(exact.output)
+    assert default_data["exact"] is False
+    assert exact_data["exact"] is True
+    # Default includes the descendant's member; --exact does not.
+    assert "B" in default_data["entries"]
+    assert "B" not in exact_data["entries"]
+    assert "A" in exact_data["entries"]

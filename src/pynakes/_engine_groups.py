@@ -83,6 +83,6 @@ class BibliographyGroups:
         ok = group_tree_ops.update_node(self.lib, name, **kwargs)
         return ok
 
-    def list_entries_in_group_tree(self, group: str, *, strict: bool = False) -> list[str]:
-        """Return entry keys in *group*, including descendants unless *strict*."""
-        return group_tree_ops.list_entries_in_group_tree(self.lib, group, strict=strict)
+    def list_entries_in_group_tree(self, group: str, *, exact: bool = False) -> list[str]:
+        """Return entry keys in *group*, including descendants unless *exact*."""
+        return group_tree_ops.list_entries_in_group_tree(self.lib, group, exact=exact)

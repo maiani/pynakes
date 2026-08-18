@@ -1,8 +1,10 @@
 """Import coverage for bibliographic databases that publish their own BibTeX.
 
-INSPIRE-HEP, DBLP, and the ACL Anthology answer with a BibTeX record, so these
-clients share the parse-and-relabel step in
-:mod:`pynakes.providers.metadata._bibtex_service`.
+INSPIRE-HEP, DBLP, the ACL Anthology, and the IACR ePrint Archive answer with
+a BibTeX record, so these clients share the parse-and-relabel step in
+:mod:`pynakes.providers.metadata._bibtex_service`. IACR has no dedicated
+citation endpoint: its BibTeX is embedded in the paper's own landing page
+HTML and extracted before sharing that step.
 """
 
 from __future__ import annotations
@@ -13,13 +15,14 @@ from pynakes.bibtex_parser import parse_bib
 from pynakes.importer import (
     ACL,
     DBLP,
+    IACR,
     INSPIRE,
     DuplicateReferenceError,
     prepare_imported_reference,
     resolve_identifier,
 )
 from pynakes.providers._http import ProviderFetchError
-from pynakes.providers.metadata import acl_anthology, dblp, inspire
+from pynakes.providers.metadata import acl_anthology, dblp, iacr, inspire
 from pynakes.providers.registry import get_import_provider
 
 INSPIRE_BIBTEX = """@article{Euclid:0300abc,
@@ -64,6 +67,23 @@ ACL_BIBTEX = """@inproceedings{euclid-300-ratios,
 }
 """
 
+IACR_PAGE = """<!doctype html>
+<html><body>
+<h3>On the Ratios of Straight Lines</h3>
+<p class="mt-4"><strong>BibTeX</strong> <button id="bibcopy"></button></p>
+<pre id="bibtex">
+@misc{cryptoeprint:0300/1234,
+      author = {Euclid},
+      title = {On the Ratios of Straight Lines},
+      howpublished = {Cryptology {ePrint} Archive, Paper 0300/1234},
+      year = {300},
+      doi = {10.5555/ancient.geometry.1},
+      url = {https://eprint.iacr.org/0300/1234}
+}
+</pre>
+</body></html>
+"""
+
 
 # --- identifier and URL resolution -----------------------------------------
 
@@ -90,6 +110,9 @@ ACL_BIBTEX = """@inproceedings{euclid-300-ratios,
         ("https://aclanthology.org/N19-1423/", (ACL, "N19-1423")),
         ("https://aclanthology.org/2023.acl-long.1.pdf", (ACL, "2023.acl-long.1")),
         ("https://www.aclweb.org/anthology/P17-1001", (ACL, "P17-1001")),
+        ("IACR:0300/1234", (IACR, "0300/1234")),
+        ("https://eprint.iacr.org/0300/1234", (IACR, "0300/1234")),
+        ("https://eprint.iacr.org/0300/1234.pdf", (IACR, "0300/1234")),
     ],
 )
 def test_resolve_identifier_accepts_database_identifiers(
@@ -107,6 +130,9 @@ def test_resolve_identifier_accepts_database_identifiers(
         (dblp.normalize_identifier, "journals/cacm"),
         (acl_anthology.normalize_identifier, "N19"),
         (acl_anthology.normalize_identifier, "2023.acl-long"),
+        (iacr.normalize_identifier, "1234"),
+        (iacr.normalize_identifier, "300/1234"),
+        (iacr.normalize_identifier, "not-an-id"),
     ],
 )
 def test_database_clients_reject_malformed_identifiers(normalize, value: str) -> None:
@@ -228,6 +254,59 @@ def test_acl_metadata_keeps_venue_details_the_doi_record_omits() -> None:
     assert metadata.identifier("acl") == "N19-1423"
 
 
+# --- IACR ePrint Archive -----------------------------------------------------
+
+
+def test_iacr_requests_the_landing_page() -> None:
+    assert iacr.request_url("0300/1234") == "https://eprint.iacr.org/0300/1234"
+    assert iacr.record_url("0300/1234") == "https://eprint.iacr.org/0300/1234"
+
+
+def test_iacr_metadata_is_extracted_from_the_embedded_bibtex_block() -> None:
+    metadata = iacr.fetch_metadata("0300/1234", fetcher=lambda identifier: IACR_PAGE)
+
+    assert metadata.provider == "IACR ePrint Archive"
+    assert metadata.entry_type == "misc"
+    assert metadata.fields["title"] == "On the Ratios of Straight Lines"
+    assert metadata.fields["author"] == "Euclid"
+    assert metadata.fields["doi"] == "10.5555/ancient.geometry.1"
+    assert metadata.fields["url"] == "https://eprint.iacr.org/0300/1234"
+    assert metadata.identifier("iacr") == "0300/1234"
+    assert metadata.identifier("doi") == "10.5555/ancient.geometry.1"
+
+
+def test_iacr_metadata_discards_its_own_unusable_citation_key() -> None:
+    metadata = iacr.fetch_metadata("0300/1234", fetcher=lambda identifier: IACR_PAGE)
+
+    # "cryptoeprint:0300/1234" is service bookkeeping, not a citation-key convention.
+    assert metadata.provider_key is None
+
+
+def test_iacr_accepts_a_trailing_pdf_suffix() -> None:
+    assert iacr.normalize_identifier("0300/1234.pdf") == "0300/1234"
+
+
+def test_iacr_reports_a_page_with_no_embedded_bibtex() -> None:
+    with pytest.raises(ProviderFetchError, match="no record"):
+        iacr.fetch_metadata("0300/1234", fetcher=lambda identifier: "<html></html>")
+
+
+def test_prepare_imported_reference_generates_a_key_for_iacr() -> None:
+    lib = parse_bib("")
+
+    kind, entry = prepare_imported_reference(
+        lib,
+        "IACR:0300/1234",
+        key_source="provider",
+        metadata_fetcher=lambda identifier: IACR_PAGE,
+    )
+
+    # --key-source provider falls back to generation because IACR's key is unusable.
+    assert kind == IACR
+    assert entry.key == "EuclidRatios"
+    assert not entry.key.startswith("cryptoeprint")
+
+
 # --- registry and duplicate detection --------------------------------------
 
 
@@ -237,6 +316,7 @@ def test_acl_metadata_keeps_venue_details_the_doi_record_omits() -> None:
         (INSPIRE, "INSPIRE-HEP", "451647", INSPIRE_BIBTEX),
         (DBLP, "DBLP", "journals/rag/Euclid300", DBLP_BIBTEX),
         (ACL, "ACL Anthology", "N19-1423", ACL_BIBTEX),
+        (IACR, "IACR ePrint Archive", "0300/1234", IACR_PAGE),
     ],
 )
 def test_database_providers_are_registered(
@@ -256,6 +336,7 @@ def test_database_providers_are_registered(
         ("INSPIRE:451647", INSPIRE_BIBTEX),
         ("DBLP:journals/rag/Euclid300", DBLP_BIBTEX),
         ("ACL:N19-1423", ACL_BIBTEX),
+        ("IACR:0300/1234", IACR_PAGE),
     ],
 )
 def test_database_imports_detect_a_duplicate_by_doi(identifier: str, bibtex: str) -> None:

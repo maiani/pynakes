@@ -12,6 +12,7 @@ files — only metadata.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 
 from pynakes._identifiers import (
@@ -31,7 +32,17 @@ from pynakes.identity import (
 from pynakes.keys import UnsupportedCitationKeyPatternError, generate_key, unique_key
 from pynakes.model import BibEntry, BibFile
 from pynakes.providers._http import ProviderFetchError
-from pynakes.providers.metadata import acl_anthology, dblp, inspire
+from pynakes.providers.metadata import (
+    acl_anthology,
+    crossref,
+    datacite,
+    dblp,
+    iacr,
+    inspire,
+    openalex,
+    semantic_scholar,
+    zbmath,
+)
 from pynakes.providers.metadata import doi as doi_provider
 from pynakes.providers.records import ReferenceMetadata
 from pynakes.providers.registry import RawMetadataFetcher, get_import_provider
@@ -78,6 +89,12 @@ ISBN = "isbn"
 INSPIRE = "inspire"
 DBLP = "dblp"
 ACL = "acl"
+CROSSREF = "crossref"
+DATACITE = "datacite"
+OPENALEX = "openalex"
+SEMANTIC_SCHOLAR = "semantic_scholar"
+IACR = "iacr"
+ZBMATH = "zbmath"
 
 IDENTIFIER_KINDS = {
     DOI,
@@ -99,6 +116,12 @@ IDENTIFIER_KINDS = {
     INSPIRE,
     DBLP,
     ACL,
+    CROSSREF,
+    DATACITE,
+    OPENALEX,
+    SEMANTIC_SCHOLAR,
+    IACR,
+    ZBMATH,
 }
 
 
@@ -157,6 +180,24 @@ class CitationKeyConflictError(ReferenceImportError):
 
 FetchBibTeX = Callable[[str], str]
 FetchArxivAtom = Callable[[str], str]
+
+# A bare "RFC 9110" / "rfc9110" / "RFC-9110" spelling is unambiguous: no other
+# supported identifier kind uses the "rfc" word, so it needs no prefix.
+_BARE_RFC_RE = re.compile(r"^rfc[\s-]?(\d+)$", re.IGNORECASE)
+_RFC_NUMBER_RE = re.compile(r"^\d+$")
+
+
+def _normalize_rfc_number(value: str) -> str:
+    """Normalize an ``RFC:<number>`` prefix's payload to the RFC's DOI.
+
+    The DOI is unpadded (``10.17487/rfc791``, not ``10.17487/rfc0791``): the
+    padded form is only a 301 alias, and for the lowest-numbered RFCs it does
+    not resolve at all, so any padding supplied is stripped via ``int()``.
+    """
+    digits = value.strip()
+    if not _RFC_NUMBER_RE.match(digits):
+        raise ValueError(f"Malformed RFC number: {value!r}")
+    return normalize_doi(f"10.17487/rfc{int(digits)}")
 
 
 # --- identifier resolution -------------------------------------------------
@@ -226,6 +267,13 @@ def resolve_identifier(value: str) -> tuple[str, str]:
         ("inspire:", INSPIRE, inspire.normalize_identifier),
         ("dblp:", DBLP, dblp.normalize_identifier),
         ("acl:", ACL, acl_anthology.normalize_identifier),
+        ("crossref:", CROSSREF, crossref.normalize_identifier),
+        ("datacite:", DATACITE, datacite.normalize_identifier),
+        ("openalex:", OPENALEX, openalex.normalize_identifier),
+        ("semanticscholar:", SEMANTIC_SCHOLAR, semantic_scholar.normalize_identifier),
+        ("iacr:", IACR, iacr.normalize_identifier),
+        ("zbmath:", ZBMATH, zbmath.normalize_identifier),
+        ("rfc:", DOI, _normalize_rfc_number),
     )
     for prefix, kind, normalizer in labeled:
         if lowered.startswith(prefix):
@@ -248,6 +296,11 @@ def resolve_identifier(value: str) -> tuple[str, str]:
     # A bare ISBN, restricted to the forms no other record id can be mistaken for.
     if looks_like_isbn(raw):
         return ISBN, normalize_isbn(raw)
+
+    # A bare RFC number ("RFC 9110", "rfc9110", "RFC-9110").
+    bare_rfc = _BARE_RFC_RE.match(raw)
+    if bare_rfc is not None:
+        return DOI, normalize_doi(f"10.17487/rfc{int(bare_rfc.group(1))}")
 
     # A recognized host whose article URLs carry no recoverable identifier.
     hint = url_resolution_hint(raw)

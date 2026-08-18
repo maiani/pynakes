@@ -27,12 +27,14 @@ def person_name(value: object) -> str:
         return ""
     given = clean_text(
         value.get("given")
+        or value.get("givenName")
         or value.get("firstName")
         or value.get("first_name")
         or value.get("given_name")
     )
     family = clean_text(
         value.get("family")
+        or value.get("familyName")
         or value.get("lastName")
         or value.get("last_name")
         or value.get("family_name")

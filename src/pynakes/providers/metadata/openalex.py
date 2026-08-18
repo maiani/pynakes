@@ -2,15 +2,26 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import quote
 
 from pynakes._identifiers import arxiv_id_from_text, normalize_doi
+from pynakes.providers._common import clean_text, repository_metadata
 from pynakes.providers._http import fetch_json, iter_strings
+from pynakes.providers.metadata._json_service import json_metadata
+from pynakes.providers.metadata.crossref import entry_type_from_crossref_type
 from pynakes.providers.pdf_overrides import publisher_pdf_url
+from pynakes.providers.records import ReferenceMetadata
 
 API_URL = "https://api.openalex.org/works/doi:"
+API_ID_URL = "https://api.openalex.org/works/"
+RawFetcher = Callable[[str], str]
+
+PROVIDER_NAME = "OpenAlex"
+
+_ID_RE = re.compile(r"^[Ww](\d+)$")
 
 
 def fetch_work_by_doi(
@@ -108,6 +119,92 @@ def _extract_doi(raw: object) -> str | None:
         if raw.startswith(prefix):
             return raw[len(prefix) :]
     return raw.strip()
+
+
+def normalize_identifier(identifier: str) -> str:
+    """Normalize an OpenAlex work id (``W`` followed by digits)."""
+    match = _ID_RE.match(identifier.strip())
+    if match is None:
+        raise ValueError(f"Malformed OpenAlex work id: {identifier!r}")
+    return f"W{match.group(1)}"
+
+
+def record_url(identifier: str) -> str:
+    """Return the canonical OpenAlex work landing page."""
+    return f"https://openalex.org/{normalize_identifier(identifier)}"
+
+
+def fetch_work_by_id(
+    work_id: str,
+    *,
+    cache_dir: str | Path | None = None,
+    urlopen: Callable[..., object] | None = None,
+) -> dict | None:
+    """Fetch an OpenAlex work by its native id, using a deterministic cache when provided."""
+    normalized = normalize_identifier(work_id)
+    url = f"{API_ID_URL}{quote(normalized, safe='')}"
+    return fetch_json(
+        url,
+        namespace="openalex-id",
+        identifier=normalized,
+        provider=PROVIDER_NAME,
+        cache_dir=cache_dir,
+        opener=urlopen,
+    )
+
+
+def metadata_from_work(work: dict, identifier: str, dialect: str) -> ReferenceMetadata:
+    """Convert an OpenAlex work record into normalized metadata."""
+    title = clean_text(work.get("title") or work.get("display_name"))
+    authors: list[str] = []
+    for authorship in work.get("authorships") or []:
+        if not isinstance(authorship, dict):
+            continue
+        author = authorship.get("author")
+        if isinstance(author, dict) and (name := clean_text(author.get("display_name"))):
+            authors.append(name)
+
+    fields: dict[str, str] = {}
+    primary = work.get("primary_location")
+    if isinstance(primary, dict):
+        source = primary.get("source")
+        if isinstance(source, dict) and (venue := clean_text(source.get("display_name"))):
+            fields["journal"] = venue
+
+    doi = clean_text(_extract_doi(work.get("doi")))
+    year = work.get("publication_year")
+    published = str(year) if isinstance(year, int) else clean_text(year)
+    return repository_metadata(
+        provider=PROVIDER_NAME,
+        identifier_kind="openalex",
+        identifier=identifier,
+        dialect=dialect,
+        title=title,
+        authors=authors,
+        published=published,
+        url=record_url(identifier),
+        doi=doi,
+        entry_type=entry_type_from_crossref_type(work.get("type")),
+        fields=fields,
+    )
+
+
+def fetch_metadata(
+    identifier: str,
+    *,
+    dialect: str = "bibtex",
+    fetcher: RawFetcher | None = None,
+) -> ReferenceMetadata:
+    """Fetch and normalize an OpenAlex work record, addressed by native work id."""
+    normalized = normalize_identifier(identifier)
+    return json_metadata(
+        normalized,
+        provider=PROVIDER_NAME,
+        dialect=dialect,
+        fetcher=fetcher,
+        fetch_record=fetch_work_by_id,
+        convert=metadata_from_work,
+    )
 
 
 def _locations(work: dict) -> list[dict]:

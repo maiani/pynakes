@@ -12,9 +12,9 @@ from collections.abc import Callable
 from urllib.parse import quote
 
 from pynakes._identifiers import normalize_isbn
+from pynakes.providers._common import add_date_fields, clean_text
 from pynakes.providers._http import ProviderFetchError, fetch_text
 from pynakes.providers.records import ReferenceMetadata
-from pynakes.providers.repositories._common import add_date_fields, clean_text
 
 API_URL = "https://openlibrary.org/api/books"
 RawFetcher = Callable[[str], str]

@@ -12,41 +12,6 @@ Completed work is recorded in [CHANGELOG.md](CHANGELOG.md) and the git log.
 
 ## Road to 1.0
 
-### v0.6 — Generalization, consolidation, and shared work matching
-
-Generalize import paths beyond DOI/arXiv and consolidate the engine's
-cross-cutting patterns. New providers and consumers build on the shared,
-conservative work-matching evidence implemented in this release.
-Tasks below are listed in implementation priority order.
-
-- **Cross-cutting consolidation**: unify interface patterns, reduce duplication
-  across import, identity, and metadata pathways.
-- **New import paths**: expand the
-  [import-provider inventory](docs/guides/import-providers.md) through the
-  normalized provider interface and declarative URL resolver tables. The
-  remaining Planned rows are the publisher platforms (IEEE, ACM, RSC, ACS,
-  Project Euclid), the metadata indexes as import entry points (Crossref,
-  DataCite, OpenAlex, Semantic Scholar), and the other book catalogues (Google
-  Books, Library of Congress). Candidates not yet in the inventory, ordered by
-  the size of the community whose canonical identifier is not a DOI: NASA ADS
-  (bibcodes; needs a user-supplied API token), OpenReview, RePEc/IDEAS handles,
-  zbMATH Open and MathSciNet review numbers, institutional-repository URN
-  resolvers such as DiVA, and SciELO. Google Scholar stays out of scope: it has
-  no API and scraping it is against its terms.
-- **Single-bibliography analysis**: add a public `pynakes.analysis` API
-  namespace and a read-only `stats` command returning typed and JSON-friendly
-  reports for one `BibFile`/`Bibliography`. Start with deterministic descriptive
-  measures: entries by type and year, author/journal frequencies, identifier
-  and required-field coverage, lint finding counts, group membership, and
-  declared linked-file coverage. Keep analysis offline and separate from
-  mutation; do not turn heuristic scores into quality judgments.
-**Done when**: broader import paths, single-bibliography
-`analysis`/`stats`, and the `lint`/`groups` UX fixes are implemented,
-tested, and documented;
-`pytest && ruff` green; CHANGELOG updated; version bumped to 0.6.0.
-
----
-
 ### v0.7 — Multi-bib setup, Library, Catalogue, and MCP server
 
 - **`Library` (corpus)**: `Library.open(dir)`; `collections()`,
@@ -73,10 +38,29 @@ tested, and documented;
     `corpus pick`).
 - **`Catalogue` (index)**: a derived, rebuildable search index (e.g. SQLite FTS)
   over the Library; strictly derived, never a competing source of truth.
-- **Library-wide analysis**: lift the v0.6 analysis reports over `Library`,
-  retaining per-file provenance while adding corpus-wide rollups and
+- **Single-bibliography analysis**: add a public `pynakes.analysis` API
+  namespace and a read-only `analyze` command returning typed and JSON-friendly
+  reports for one `BibFile`/`Bibliography`. Start with deterministic descriptive
+  measures: entries by type and year, author/journal frequencies, identifier
+  and required-field coverage, lint finding counts, group membership, and
+  declared linked-file coverage. The report composes the existing
+  `lint`/`files`/`filestore`/`identity` result objects rather than
+  reimplementing their checks, and is sectioned so the library-wide rollup
+  below aggregates it without redesign. Keep analysis offline and separate from
+  mutation; do not turn heuristic scores into quality judgments. Deferred here
+  from v0.6.
+- **Library-wide analysis**: lift the single-bibliography analysis reports over
+  `Library`, retaining per-file provenance while adding corpus-wide rollups and
   cross-library coverage/duplication views. Reuse the same typed results rather
   than creating an unrelated statistics implementation.
+- **Further import paths**: candidates not yet in the inventory, ordered by the
+  size of the community whose canonical identifier is not a DOI: NASA ADS
+  (bibcodes; needs a user-supplied API token), RePEc/IDEAS handles, MathSciNet
+  review numbers, institutional-repository URN resolvers such as DiVA, and
+  SciELO. OpenReview is held back rather than planned: its public API answers a
+  bot challenge to non-browser clients, so importing from it would mean
+  defeating that challenge. Revisit only if a documented, key-based API path
+  appears.
 - **MCP server**: a thin [Model Context Protocol](https://modelcontextprotocol.io)
   companion on the pinned pynakes API, allowing agents to interrogate a personal
   corpus conversationally — "find papers by X on topic Y", "which entries are
@@ -92,7 +76,8 @@ tested, and documented;
 - **`Catalogue`-backed rich query CLI**: `search` gains full-text and
   field-scoped queries against the index, not just raw entry iteration.
 
-**Done when**: `Library`, `Catalogue`, Library-wide analysis, and the
+**Done when**: `Library`, `Catalogue`, single-bibliography and library-wide
+analysis, and the
 cross-library entry operations (`corpus pick`/`search`/`dedupe`) shipped with
 tests and docs; MCP server published as a companion package; agent-plan and
 change-summary features shipped; `pytest && ruff` green; CHANGELOG updated;
