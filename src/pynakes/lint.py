@@ -23,6 +23,7 @@ https://mirrors.ctan.org/macros/latex/contrib/biblatex/doc/biblatex.pdf
 
 import csv
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 from pynakes._identifiers import normalize_doi
@@ -30,7 +31,13 @@ from pynakes.bibtex_parser import parse_raw_string_definition
 from pynakes.editing import raw_field_names, raw_field_value
 from pynakes.fields import TITLE_FIELDS, title_capitalization_is_protected
 from pynakes.identity import identity_class
-from pynakes.journals import JOURNAL_FIELDS, JournalSources, expected_journal_title, load_sources
+from pynakes.journals import (
+    DEFAULT_JOURNAL_SOURCE,
+    JOURNAL_FIELDS,
+    JournalSources,
+    expected_journal_title,
+    load_sources,
+)
 from pynakes.keys import (
     UnsupportedCitationKeyPatternError,
     generate_key_from_pattern,
@@ -45,6 +52,7 @@ from pynakes.metadata import (
     validate_metadata_value,
 )
 from pynakes.model import BibEntry, BibFile, MetadataBlock, undefined_string_references
+from pynakes.usage import tex_sources_from_metadata, validate_tex_sources
 
 RequiredRules = dict[str, list[tuple[str, ...]]]
 
@@ -222,6 +230,7 @@ class LintProfile:
     """The metadata settings that define lintable library conformance."""
 
     journal_style: str = "none"
+    journal_source: str = DEFAULT_JOURNAL_SOURCE
     journal_table: str | None = None
     ltwa_table: str | None = None
     protect_titles: bool = False
@@ -232,6 +241,9 @@ class LintProfile:
 def resolve_lint_profile(lib: BibFile) -> LintProfile:
     """Resolve the same persisted normalization settings that lint can verify."""
     journal_style = (metadata_value(lib, "normalize-journal-style") or "none").lower()
+    journal_source = (
+        metadata_value(lib, "normalize-journal-source") or DEFAULT_JOURNAL_SOURCE
+    ).lower()
     title_fields = (
         metadata_list(metadata_value(lib, "normalize-title-fields")) or LintProfile.title_fields
     )
@@ -242,6 +254,7 @@ def resolve_lint_profile(lib: BibFile) -> LintProfile:
     )
     return LintProfile(
         journal_style=journal_style,
+        journal_source=journal_source,
         journal_table=metadata_value(lib, "normalize-journal-table"),
         ltwa_table=metadata_value(lib, "normalize-ltwa-table"),
         # Normalization protects titles by default, but lint enforces only a
@@ -309,6 +322,7 @@ ISSUE_CATEGORIES: dict[str, LintCategory] = {
     "unknown_metadata_key": "correctness",
     "invalid_metadata_value": "correctness",
     "duplicate_metadata_block": "correctness",
+    "missing_tex_source": "correctness",
 }
 
 
@@ -354,8 +368,14 @@ class LintIssue:
         }
 
 
-def lint(lib: BibFile) -> list[LintIssue]:
-    """Run all validation checks and return the issues found."""
+def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
+    """Run all validation checks and return the issues found.
+
+    ``base_dir`` (normally the ``.bib``'s folder) resolves the library's
+    ``tex-sources`` metadata so a source path that no longer exists on disk is
+    reported; without it, that check is skipped since relative paths cannot be
+    resolved.
+    """
     issues: list[LintIssue] = []
     profile = resolve_lint_profile(lib)
     journal_sources = None
@@ -366,7 +386,9 @@ def lint(lib: BibFile) -> list[LintIssue]:
     # only a well-formed non-default style needs its sources loaded.
     if profile.journal_style in {"abbreviated", "full"}:
         try:
-            journal_sources = load_sources(profile.journal_table, profile.ltwa_table)
+            journal_sources = load_sources(
+                profile.journal_table, profile.ltwa_table, profile.journal_source
+            )
         except (OSError, UnicodeError, ValueError, csv.Error) as exc:
             issues.append(
                 LintIssue(
@@ -412,7 +434,18 @@ def lint(lib: BibFile) -> list[LintIssue]:
 
     issues.extend(_lint_metadata(lib))
     issues.extend(_lint_field_consistency(lib, dialect=dialect))
+    if base_dir is not None:
+        issues.extend(_lint_tex_sources(lib, base_dir))
     return issues
+
+
+def _lint_tex_sources(lib: BibFile, base_dir: str | Path) -> list[LintIssue]:
+    """Flag ``tex-sources`` metadata entries that don't exist on disk."""
+    sources = tex_sources_from_metadata(lib, base_dir)
+    return [
+        LintIssue("missing_tex_source", "warning", warning["message"], field="tex-sources")
+        for warning in validate_tex_sources(sources)
+    ]
 
 
 def _lint_metadata(lib: BibFile) -> list[LintIssue]:

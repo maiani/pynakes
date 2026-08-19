@@ -4,6 +4,8 @@ This module keeps command callbacks separate from application assembly while
 retaining the stable CLI contract.
 """
 
+from pathlib import Path
+
 import typer
 
 from pynakes.cli_common import (
@@ -21,7 +23,7 @@ from pynakes.lint import lint as lint_lib
 
 def _lint_one(file: str, categories: set[str] | None = None) -> CheckOutcome:
     lib = Bibliography.open(file).lib
-    issues = lint_lib(lib)
+    issues = lint_lib(lib, base_dir=Path(file).parent)
     if categories:
         issues = [issue for issue in issues if issue.category in categories]
     errors = sum(1 for i in issues if i.severity == "error")

@@ -406,6 +406,23 @@ class TestUsedCommand:
         assert "Brown2022" in exported
         assert "Green2023" not in exported  # not cited
 
+    def test_used_warns_on_missing_tex_source(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex,missing.tex;}\n"
+            "@article{Smith2020,\n  title = {T}\n}\n"
+        )
+        (tmp_path / "paper.tex").write_text(r"\cite{Smith2020}" "\n")
+
+        result = runner.invoke(app, ["tex", "scan", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        missing = [w for w in data["warnings"] if w["type"] == "missing_tex_source"]
+        assert len(missing) == 1
+        assert missing[0]["path"].endswith("missing.tex")
+        assert data["report"]["used"] == ["Smith2020"]
+
 
 def _copy(tmp_path: Path, name: str) -> Path:
     dst = tmp_path / "refs.bib"
@@ -2374,6 +2391,83 @@ class TestKeysCommand:
         assert data["status"] == "conflict"
         assert data["error"] == "CitationKeyConflict"
 
+    def test_generate_warns_on_missing_tex_source(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex,missing.tex;}\n"
+            "@article{Old,\n"
+            "  author = {Grace Hopper},\n"
+            "  year = {1952},\n"
+            "  title = {Compiler Methods}\n"
+            "}\n"
+        )
+        (tmp_path / "paper.tex").write_text(r"\cite{Old}" "\n")
+
+        result = runner.invoke(app, ["keys", "generate", str(bib), "Old", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        missing = [w for w in data["warnings"] if w["type"] == "missing_tex_source"]
+        assert len(missing) == 1
+        assert missing[0]["path"].endswith("missing.tex")
+        assert data["source_occurrences"] == 1
+
+    def test_rename_warns_on_missing_tex_source(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex,missing.tex;}\n"
+            "@article{Smith2020,\n  title = {T}\n}\n"
+        )
+        (tmp_path / "paper.tex").write_text(r"\cite{Smith2020}" "\n")
+
+        result = runner.invoke(
+            app, ["keys", "rename", str(bib), "Smith2020", "Smith2020ML", "--json"]
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        missing = [w for w in data["warnings"] if w["type"] == "missing_tex_source"]
+        assert len(missing) == 1
+        assert missing[0]["path"].endswith("missing.tex")
+        assert data["source_occurrences"] == 1
+
+    def test_repair_warns_on_missing_tex_source(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:paper.tex,missing.tex;}\n"
+            "@article{Smith2020,\n  title = {A}\n}\n"
+            "@article{Smith2020,\n  title = {B}\n}\n"
+        )
+        (tmp_path / "paper.tex").write_text(r"\cite{Smith2020}" "\n")
+
+        result = runner.invoke(app, ["keys", "repair", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        missing = [w for w in data["warnings"] if w["type"] == "missing_tex_source"]
+        assert len(missing) == 1
+        assert missing[0]["path"].endswith("missing.tex")
+
+    def test_repair_missing_tex_source_is_not_reported_as_ambiguous_citation(
+        self, tmp_path: Path
+    ) -> None:
+        # A missing tex-sources path is a different problem from a citation
+        # made ambiguous by the repair; the human summary must not conflate
+        # the two counts, and the missing-source message must be visible
+        # without needing --json.
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: tex-sources:missing.tex;}\n"
+            "@article{Smith2020,\n  title = {A}\n}\n"
+            "@article{Smith2020,\n  title = {B}\n}\n"
+        )
+
+        result = runner.invoke(app, ["keys", "repair", str(bib), "--dry-run"])
+
+        assert result.exit_code == 0, result.output
+        assert "not found" in result.output
+        assert "now ambiguous" not in result.output
+
 
 class TestFieldsCommand:
     def test_set_replaces_field_on_matching_references(self, tmp_path: Path) -> None:
@@ -2732,6 +2826,37 @@ class TestNormalizeCommand:
         data = json.loads(result.output)
         assert data["operations"]["journals"] == 1
         assert "journal = {Can. J.}" in bib.read_text()
+
+    def test_normalize_journal_source_none_skips_bundled_data(self, tmp_path: Path) -> None:
+        # With the bundled JabRef exact table off, an already-abbreviated
+        # value with no user table has nothing to resolve it and is left
+        # alone (reported unknown), unlike the "jabref" default.
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {Paper},\n  journal = {Phys. Rev. Lett.}\n}\n")
+
+        result = runner.invoke(
+            app,
+            [
+                "normalize",
+                str(bib),
+                "--journal-style",
+                "abbreviated",
+                "--journal-source",
+                "none",
+                "--author-style",
+                "none",
+                "--title-protection",
+                "off",
+                "--doi-normalization",
+                "off",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["operations"]["journals"] == 0
+        assert any(w.get("journal") == "Phys. Rev. Lett." for w in data["warnings"])
 
     def test_normalize_does_not_write_backup_by_default(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"

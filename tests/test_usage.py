@@ -13,11 +13,13 @@ from pynakes.usage import (
     extract_keys_from_tex,
     rename_citation_key_in_tex,
     rename_citation_keys_in_tex,
+    resolve_existing_tex_sources,
     splice_into_text,
     subset_library,
     tag_with_group,
     tag_with_keyword,
     tex_sources_from_metadata,
+    validate_tex_sources,
 )
 
 
@@ -39,6 +41,49 @@ def test_tex_sources_from_metadata_absolute_kept_and_legacy_alias() -> None:
 def test_tex_sources_from_metadata_absent_is_empty() -> None:
     lib = parse_bib("@article{A,\n  title = {T}\n}\n")
     assert tex_sources_from_metadata(lib, "/proj") == []
+
+
+def test_validate_tex_sources_all_exist(tmp_path: Path) -> None:
+    tex = tmp_path / "paper.tex"
+    tex.write_text("")
+    assert validate_tex_sources([str(tex)]) == []
+
+
+def test_validate_tex_sources_missing(tmp_path: Path) -> None:
+    existing = tmp_path / "paper.tex"
+    existing.write_text("")
+    missing = tmp_path / "nonexistent.tex"
+    warnings = validate_tex_sources([str(existing), str(missing)])
+    assert len(warnings) == 1
+    assert warnings[0]["type"] == "missing_tex_source"
+    assert warnings[0]["path"] == str(missing)
+
+
+def test_validate_tex_sources_empty() -> None:
+    assert validate_tex_sources([]) == []
+
+
+def test_resolve_existing_tex_sources_drops_missing_and_warns(tmp_path: Path) -> None:
+    existing = tmp_path / "paper.tex"
+    existing.write_text("")
+    missing = str(tmp_path / "nonexistent.tex")
+
+    resolved, warnings = resolve_existing_tex_sources([str(existing), missing])
+
+    assert resolved == [str(existing)]
+    assert len(warnings) == 1
+    assert warnings[0]["type"] == "missing_tex_source"
+    assert warnings[0]["path"] == missing
+
+
+def test_resolve_existing_tex_sources_all_exist(tmp_path: Path) -> None:
+    existing = tmp_path / "paper.tex"
+    existing.write_text("")
+
+    resolved, warnings = resolve_existing_tex_sources([str(existing)])
+
+    assert resolved == [str(existing)]
+    assert warnings == []
 
 
 @pytest.fixture

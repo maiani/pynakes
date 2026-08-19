@@ -64,9 +64,10 @@ class BibliographyOperations:
         self,
         journal_table: str | None = None,
         ltwa_table: str | None = None,
+        journal_source: str = journal_ops.DEFAULT_JOURNAL_SOURCE,
     ) -> list[dict[str, str]]:
         """Classify distinct journal titles without modifying the bibliography."""
-        sources = journal_ops.load_sources(journal_table, ltwa_table)
+        sources = journal_ops.load_sources(journal_table, ltwa_table, journal_source)
         seen: dict[str, str] = {}
         for entry in self.lib.entries.values():
             for journal_field in journal_ops.JOURNAL_FIELDS:
@@ -248,9 +249,10 @@ class BibliographyOperations:
         self,
         journal_table: str | None = None,
         ltwa_table: str | None = None,
+        journal_source: str = journal_ops.DEFAULT_JOURNAL_SOURCE,
     ) -> journal_ops.JournalResult:
         """Abbreviate journal titles in memory."""
-        sources = journal_ops.load_sources(journal_table, ltwa_table)
+        sources = journal_ops.load_sources(journal_table, ltwa_table, journal_source)
         report = journal_ops.normalize_journals(self.lib, "abbreviated", sources)
         return report
 
@@ -258,9 +260,10 @@ class BibliographyOperations:
         self,
         journal_table: str | None = None,
         ltwa_table: str | None = None,
+        journal_source: str = journal_ops.DEFAULT_JOURNAL_SOURCE,
     ) -> journal_ops.JournalResult:
         """Expand journal titles in memory."""
-        sources = journal_ops.load_sources(journal_table, ltwa_table)
+        sources = journal_ops.load_sources(journal_table, ltwa_table, journal_source)
         report = journal_ops.normalize_journals(self.lib, "full", sources)
         return report
 

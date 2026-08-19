@@ -5,6 +5,80 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-08-18
+
+### Added
+
+- Journal-title abbreviation now resolves against a bundled copy of every
+  list JabRef itself ships (`journal_abbreviations/*.csv`, all 19 lists
+  vendored from [abbrv.jabref.org](https://github.com/JabRef/abbrv.jabref.org),
+  CC0) by default, replacing the old ~15-entry hardcoded table — matching
+  JabRef's own behavior of combining all of its lists. A new
+  `normalize-journal-source` metadata key (and `normalize --journal-source`
+  flag) selects `jabref` (default) or `none` to fall back to pure rule-based
+  resolution; a `normalize-journal-table`/`--journal-table` still layers a
+  user table on top either way. `scripts/update_journal_abbreviations.py`
+  re-syncs the vendored CSVs from upstream (the file list is discovered from
+  the GitHub API, not hardcoded, so it tracks lists JabRef adds or removes).
+- Single-word journal titles (`Nature`, `Science`, `Econometrica`, ...) are
+  now recognized as already correctly abbreviated per the ISO 4 rule that
+  one-word titles are never abbreviated, instead of relying on a hardcoded
+  per-title exception list.
+
+### Changed
+
+- An already-abbreviated (or already-full) journal title that matches the
+  configured style is now recognized as correct instead of being reported
+  `unknown_journal`. Previously, `expected_journal_title`/lint only matched a
+  field's *full* title against the exact-mapping table (or the reverse for
+  `full` style), so a value already in its target form — e.g. a `journal`
+  field already reading `Phys. Rev. Lett.` — fell through to LTWA word
+  generation, which cannot re-derive an abbreviation from already-abbreviated
+  tokens and declined the whole title.
+- Because the bundled abbreviation table changed (see Added), a handful of
+  economics journals normalize to slightly different abbreviations than
+  before (e.g. `American Economic Review` now abbreviates to
+  `Amer. Econ. Rev.` instead of `Am. Econ. Rev.`, matching JabRef's own list).
+
+- Commands that consume ``tex-sources`` metadata (``tex scan``, ``keys
+  generate``, ``keys rename``, ``keys repair``) now emit a ``missing_tex_source``
+  warning when a configured path does not exist on disk, instead of raising an
+  unhandled ``FileNotFoundError``. The missing paths are skipped and the command
+  succeeds with the remaining sources.
+- `lint` now reports the same `missing_tex_source` finding (category
+  `correctness`) when the library's `tex-sources` metadata points at a path
+  that doesn't exist relative to the `.bib` file, so a broken link surfaces
+  without having to run `tex scan` or `keys generate` first.
+
+### Fixed
+
+- A mixed-case citation-key pattern marker (`[Auth]`, `[Veryshorttitle]`, ...)
+  no longer lowercases everything after the first letter. It previously
+  applied Python `.capitalize()`-style casing, which corrupted legitimately
+  mixed-case values — a compound surname with its hyphen stripped
+  (`Pioro-Ladriere` → `PioroLadriere` → wrongly `Pioroladriere`) or a title
+  starting with an acronym (`AI for ...` → wrongly `Ai`). It now only forces
+  the first letter to uppercase, matching JabRef's marker semantics (marker
+  case doesn't otherwise affect the value; only the fully-lower/fully-upper
+  forms, `[auth]`/`[AUTH]`, force casing).
+- `last_name()` (used by `[auth]`/`[Auth]`/etc. and duplicate-detection) now
+  drops a BibTeX "von" particle from a `von Last, First` author — e.g.
+  `van den Berg, J.` → `Berg`, not `vandenBerg` — matching real BibTeX/JabRef
+  name parsing, where a leading run of lowercase-starting words before the
+  comma is not part of the last name.
+- Journal-table CSV loading (`load_journal_table`/`load_ltwa_table`, and the
+  bundled JabRef lists above) now tolerates a stray space after the
+  delimiter before a quoted field (`"Full Name", "Abbreviation"`). A few
+  upstream lists have this malformed-CSV quirk; without `skipinitialspace`,
+  the leading space and quote characters were kept as literal text in the
+  abbreviation instead of being parsed as a quoted field.
+- `keys repair`'s plain-text summary no longer counts a missing `tex-sources`
+  path as an "ambiguous citation". The two warning types were previously
+  merged into one count, so a missing source with no actual ambiguous
+  citation still printed "N citation(s) now ambiguous in linked TeX sources."
+  The missing-source message is now shown on its own line, matching `keys
+  generate` and `keys rename`.
+
 ## [0.6.0] - 2026-08-18
 ### Added
 

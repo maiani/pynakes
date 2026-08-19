@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pynakes"
-version = "0.6.0"
+version = "0.6.1"
 description = "Agent-friendly, round-trip-faithful BibTeX/BibLaTeX maintenance toolkit"
 readme = "README.md"
 license = "MIT"
@@ -77,7 +77,12 @@ pynakes = "pynakes.cli:app"
 where = ["src"]
 
 [tool.setuptools.package-data]
-pynakes = ["py.typed", "providers/pdf_overrides.json"]
+pynakes = [
+    "py.typed",
+    "providers/pdf_overrides.json",
+    "journal_abbreviations/*.csv",
+    "journal_abbreviations/NOTICE.md",
+]
 
 [tool.pytest]
 testpaths = ["tests"]

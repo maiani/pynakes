@@ -26,6 +26,7 @@ from pynakes.io import save_text
 from pynakes.usage import (
     analyze_usage,
     collect_cited_keys,
+    resolve_existing_tex_sources,
     subset_library,
     tag_with_group,
     tag_with_keyword,
@@ -61,6 +62,9 @@ def used(
     resolved_sources = (
         list(sources) if sources else tex_sources_from_metadata(coll.lib, Path(bib_file).parent)
     )
+    warnings: list[dict] = []
+    if not sources:
+        resolved_sources, warnings = resolve_existing_tex_sources(resolved_sources)
     if not resolved_sources:
         _emit_error(
             json_output,
@@ -99,6 +103,8 @@ def used(
     human = [
         f"Scanned {len(scanned)} source file(s); {report.cited_count} cited key(s).",
     ]
+    for w in warnings:
+        human.append(f"  {w['message']}")
     if report.include_all:
         human.append(r"\nocite{*} found — all entries counted as used.")
     human.append(f"Used:    {len(report.used)}")
@@ -125,7 +131,7 @@ def used(
         "dry_run": params.dry_run,
         "modified": file_modified,
         "modified_entries": tagged_entries,
-        "warnings": [],
+        "warnings": warnings,
         "report": report.to_dict(),
         "tagged": {"field": tag_field, "value": group or keyword, "count": tagged}
         if tag_field

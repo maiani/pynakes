@@ -185,6 +185,15 @@ _MARKER_HANDLERS: dict[str, Callable[[BibEntry], str]] = {
 
 
 def _apply_marker_casing(value: str, base: str) -> str:
+    """Case ``value`` to match how the marker itself was written.
+
+    ``[auth]`` forces lowercase and ``[AUTH]`` forces uppercase (both fully
+    tested, intentional JabRef-compatible behavior). A mixed-case marker like
+    ``[Auth]`` only capitalizes the first character — it must not lowercase
+    the rest, or a legitimately mixed-case value (a compound surname like
+    ``PioroLadriere``, or a title word that's an acronym like ``AI``) gets
+    corrupted into ``Pioroladriere``/``Ai``.
+    """
     if not value:
         return value
     if base.isupper():
@@ -192,7 +201,7 @@ def _apply_marker_casing(value: str, base: str) -> str:
     if base.islower():
         return value.lower()
     if base[0].isupper() and (len(base) < 2 or base[1:].islower()):
-        return value[:1].upper() + value[1:].lower()
+        return value[:1].upper() + value[1:]
     return value
 
 

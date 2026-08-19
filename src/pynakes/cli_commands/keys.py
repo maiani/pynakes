@@ -30,6 +30,7 @@ from pynakes.usage import (
     extract_keys_from_tex,
     iter_tex_files,
     rename_citation_keys_in_tex,
+    resolve_existing_tex_sources,
     tex_sources_from_metadata,
 )
 
@@ -161,22 +162,28 @@ def _rewrite_tex_sources(
     renames: list[tuple[str, str]],
     json_output: bool,
     sources: list[str] | None = None,
-) -> tuple[list[dict], list[str], int]:
+) -> tuple[list[dict], list[str], int, list[dict]]:
     """Rewrite linked TeX citations for already-staged citation-key renames.
 
     With no TeX sources configured (no argument and no ``tex-sources`` metadata)
     there is simply nothing to update, so this returns a zero-update success —
     a fresh library with no manuscript linked is a normal case, not an error.
     Explicitly-provided sources that resolve to no ``.tex`` files remain an error.
+
+    Returns ``(source_changes, source_diff_parts, total_source_occurrences, warnings)``.
     """
     if not renames:
-        return [], [], 0
+        return [], [], 0, []
 
     resolved_sources = (
         list(sources) if sources else tex_sources_from_metadata(coll.lib, Path(file).parent)
     )
     if not resolved_sources:
-        return [], [], 0
+        return [], [], 0, []
+
+    warnings: list[dict] = []
+    if not sources:
+        resolved_sources, warnings = resolve_existing_tex_sources(resolved_sources)
 
     tex_files = iter_tex_files(resolved_sources)
     if not tex_files:
@@ -208,7 +215,7 @@ def _rewrite_tex_sources(
                 "occurrences": occurrences,
             }
         )
-    return source_changes, source_diff_parts, total_source_occurrences
+    return source_changes, source_diff_parts, total_source_occurrences, warnings
 
 
 def keys_generate(
@@ -251,13 +258,17 @@ def keys_generate(
     else:
         human = [f"Citation key {key!r} already matches the preferred pattern."]
     human += [f"  {old} -> {new}" for old, new in renames]
-    source_changes, source_diff_parts, total_source_occurrences = _rewrite_tex_sources(
-        file,
-        coll,
-        params,
-        renames,
-        json_output,
+    source_changes, source_diff_parts, total_source_occurrences, source_warnings = (
+        _rewrite_tex_sources(
+            file,
+            coll,
+            params,
+            renames,
+            json_output,
+        )
     )
+    for w in source_warnings:
+        human.append(f"  {w['message']}")
     if source_changes:
         human.append(f"  TeX citations changed={total_source_occurrences}")
     if params.diff:
@@ -272,6 +283,7 @@ def keys_generate(
         params,
         human,
         diff_text=diff_text,
+        warnings=source_warnings,
         **({"key": key} if key is not None else {}),
         source_occurrences=total_source_occurrences,
         sources=source_changes,
@@ -298,8 +310,12 @@ def keys_repair(
     # `\cite{key}` is now ambiguous rather than simply renamed — rewriting it
     # would be a guess. Instead, warn when a linked source cites a repaired key.
     warnings = _repaired_citation_warnings(coll.lib, file, renames)
-    if warnings:
-        human.append(f"  {len(warnings)} citation(s) now ambiguous in linked TeX sources.")
+    for w in warnings:
+        if w["type"] == "missing_tex_source":
+            human.append(f"  {w['message']}")
+    ambiguous = [w for w in warnings if w["type"] == "ambiguous_citation"]
+    if ambiguous:
+        human.append(f"  {len(ambiguous)} citation(s) now ambiguous in linked TeX sources.")
 
     _finish_mod(
         file,
@@ -320,7 +336,7 @@ def _repaired_citation_warnings(lib, file: str, renames: list[tuple[str, str]]) 
     if not sources:
         return []
     repaired = {old for old, _ in renames}
-    warnings: list[dict] = []
+    sources, warnings = resolve_existing_tex_sources(sources)
     for path in iter_tex_files(sources):
         try:
             cited = set(extract_keys_from_tex(path.read_text(encoding="utf-8", errors="replace")))
@@ -398,13 +414,15 @@ def keys_rename(
         return
 
     bib_changed = coll.rename_key(old, new)
-    source_changes, source_diff_parts, total_source_occurrences = _rewrite_tex_sources(
-        file,
-        coll,
-        params,
-        [(old, new)],
-        json_output,
-        list(sources) if sources else None,
+    source_changes, source_diff_parts, total_source_occurrences, source_warnings = (
+        _rewrite_tex_sources(
+            file,
+            coll,
+            params,
+            [(old, new)],
+            json_output,
+            list(sources) if sources else None,
+        )
     )
 
     human = [
@@ -414,7 +432,9 @@ def keys_rename(
 
     # A rename with no TeX sources configured succeeds (a fresh library has no
     # manuscript yet); warn so the caller knows no \cite keys were rewritten.
-    warnings: list[dict] = []
+    warnings: list[dict] = source_warnings
+    for w in source_warnings:
+        human.append(f"  {w['message']}")
     if bib_changed and not source_changes:
         warnings.append(
             {

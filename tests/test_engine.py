@@ -347,7 +347,9 @@ def test_volume_journal_operations() -> None:
     check = coll.journals_check()
     report = coll.abbreviate_journals()
 
-    assert check == [{"journal": "Physical Review Letters", "status": "builtin_exact"}]
+    assert len(check) == 1
+    assert check[0]["journal"] == "Physical Review Letters"
+    assert check[0]["status"].startswith("jabref:")
     assert report.changed == 1
     assert coll.entries["A"].fields["journal"] == "Phys. Rev. Lett."
 

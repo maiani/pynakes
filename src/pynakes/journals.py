@@ -3,14 +3,24 @@
 The resolver order is intentionally explicit:
 
 1. user-provided title/ISSN mappings,
-2. bundled exact title mappings for known exceptions,
-3. LTWA-style word abbreviation generation,
-4. leave unchanged and warn.
+2. bundled exact title mappings (see ``journal_source``, below),
+3. single-word titles, which ISO 4 leaves unabbreviated,
+4. LTWA-style word abbreviation generation,
+5. leave unchanged and warn.
+
+The bundled exact mappings come from ``journal_source``: ``"jabref"`` (the
+default) loads the vendored CSVs in ``journal_abbreviations/`` — unmodified
+exports from JabRef's own abbreviation lists, see
+``journal_abbreviations/NOTICE.md`` for provenance and license — and
+``"none"`` skips them, leaving only the single-word rule and LTWA generation.
+Either way, a ``journal_table``/``ltwa_table`` (CLI flag or
+``normalize-journal-table``/``normalize-ltwa-table`` metadata) layers
+user-provided mappings on top, since those are less ambiguous than word-level
+generation or a general-purpose bundled list.
 
 The built-in LTWA data is a small seed table for common words. For broader
 coverage, pass an LTWA CSV export with ``--ltwa-table`` or through normalize
-metadata. User journal tables are still preferred because exact journal
-abbreviations are less ambiguous than word-level generation.
+metadata.
 """
 
 import csv
@@ -26,24 +36,37 @@ from pynakes.model import BibEntry, BibFile
 JOURNAL_FIELDS = ("journal", "journaltitle")
 ISSN_FIELDS = ("issn", "eissn", "e-issn")
 JOURNAL_STYLES = {"abbreviated", "full", "none"}
+JOURNAL_SOURCES = {"jabref", "none"}
+DEFAULT_JOURNAL_SOURCE = "jabref"
 
-BUILTIN_EXACT_ABBREVIATIONS = {
-    "ACM Transactions": "ACM Trans.",
-    "American Economic Review": "Am. Econ. Rev.",
-    "Econometrica": "Econometrica",
-    "Journal of Finance": "J. Finance",
-    "Journal of Financial Economics": "J. Financ. Econ.",
-    "Journal of Machine Learning Research": "J. Mach. Learn. Res.",
-    "Journal of Money, Credit and Banking": "J. Money Credit Bank.",
-    "Journal of Political Economy": "J. Polit. Econ.",
-    "Nature": "Nature",
-    "Nature Machine Intelligence": "Nat. Mach. Intell.",
-    "Physical Review B": "Phys. Rev. B",
-    "Physical Review Letters": "Phys. Rev. Lett.",
-    "Proceedings of the National Academy of Sciences": "Proc. Natl. Acad. Sci.",
-    "Review of Economic Studies": "Rev. Econ. Stud.",
-    "Science": "Science",
-}
+# Every journals/*.csv list from https://github.com/JabRef/abbrv.jabref.org
+# (CC0); see journal_abbreviations/NOTICE.md. This mirrors what JabRef itself
+# does — its README: "At each release of JabRef all available journal lists
+# ... are combined ... the last occurring abbreviation is chosen" — so these
+# are loaded in this same alphabetical order (``add_mapping`` keeps the last
+# mapping seen for a given key; ``scripts/update_journal_abbreviations.py``
+# keeps this list in sync with upstream).
+_BUNDLED_JABREF_FILES = (
+    "journal_abbreviations_acs.csv",
+    "journal_abbreviations_aea.csv",
+    "journal_abbreviations_ams.csv",
+    "journal_abbreviations_annee-philologique.csv",
+    "journal_abbreviations_astronomy.csv",
+    "journal_abbreviations_dainst.csv",
+    "journal_abbreviations_entrez.csv",
+    "journal_abbreviations_general.csv",
+    "journal_abbreviations_geology_physics.csv",
+    "journal_abbreviations_geology_physics_variations.csv",
+    "journal_abbreviations_ieee.csv",
+    "journal_abbreviations_ieee_strings.csv",
+    "journal_abbreviations_lifescience.csv",
+    "journal_abbreviations_mathematics.csv",
+    "journal_abbreviations_mechanical.csv",
+    "journal_abbreviations_medicus.csv",
+    "journal_abbreviations_meteorology.csv",
+    "journal_abbreviations_sociology.csv",
+    "journal_abbreviations_ubc.csv",
+)
 
 BUILTIN_LTWA_WORDS = {
     "academy": "Acad.",
@@ -132,6 +155,7 @@ class JournalSources:
     """
 
     title_mappings: dict[str, JournalMapping] = dataclass_field(default_factory=dict)
+    abbreviated_mappings: dict[str, JournalMapping] = dataclass_field(default_factory=dict)
     issn_mappings: dict[str, JournalMapping] = dataclass_field(default_factory=dict)
     ltwa_words: dict[str, str] = dataclass_field(default_factory=lambda: dict(BUILTIN_LTWA_WORDS))
 
@@ -186,7 +210,11 @@ def _sniff_rows(path: Path) -> list[dict[str, str]]:
         return []
     dialect = _sniff_dialect(sample)
     with path.open(encoding="utf-8-sig", newline="") as handle:
-        return list(csv.DictReader(handle, dialect=dialect))
+        # skipinitialspace: a delimiter followed by a space then a quoted
+        # field (`"a", "b"`) is malformed CSV that some upstream lists have;
+        # without it, csv.reader keeps the leading space and quote chars as
+        # literal text instead of treating "b" as quoted.
+        return list(csv.DictReader(handle, dialect=dialect, skipinitialspace=True))
 
 
 def _read_table_rows(path: Path) -> list[list[str]]:
@@ -196,7 +224,8 @@ def _read_table_rows(path: Path) -> list[list[str]]:
         return []
     dialect = _sniff_dialect(sample)
     with path.open(encoding="utf-8-sig", newline="") as handle:
-        return [row for row in csv.reader(handle, dialect=dialect) if row]
+        reader = csv.reader(handle, dialect=dialect, skipinitialspace=True)
+        return [row for row in reader if row]
 
 
 def _looks_like_header(row: list[str]) -> bool:
@@ -229,26 +258,45 @@ def unknown_journal_warnings(titles: list[str]) -> list[dict[str, str]]:
 def add_mapping(sources: JournalSources, mapping: JournalMapping) -> None:
     """Add a title/ISSN mapping. Later mappings for the same key win."""
     sources.title_mappings[_journal_key(mapping.title)] = mapping
+    sources.abbreviated_mappings[_journal_key(mapping.abbreviated)] = mapping
     if mapping.issn:
         sources.issn_mappings[_issn_key(mapping.issn)] = mapping
 
 
-def builtin_sources() -> JournalSources:
-    """Return bundled exact mappings plus the seed LTWA word table."""
-    sources = JournalSources()
-    for title, abbreviated in BUILTIN_EXACT_ABBREVIATIONS.items():
-        add_mapping(
-            sources,
-            JournalMapping(
-                title=title,
-                abbreviated=abbreviated,
-                source="builtin_exact",
-            ),
+def builtin_sources(journal_source: str = DEFAULT_JOURNAL_SOURCE) -> JournalSources:
+    """Return the configured bundled exact mappings plus the seed LTWA word table.
+
+    ``journal_source`` selects the exact-mapping base: ``"jabref"`` (default)
+    loads the vendored JabRef CSVs, ``"none"`` skips them so only the
+    single-word-title rule and LTWA generation apply.
+    """
+    if journal_source not in JOURNAL_SOURCES:
+        raise ValueError(
+            f"Unsupported journal source: {journal_source!r}; "
+            f"expected one of: {', '.join(sorted(JOURNAL_SOURCES))}"
         )
+    sources = JournalSources()
+    if journal_source == "jabref":
+        _load_bundled_jabref(sources)
     return sources
 
 
-def load_journal_table(path: str | Path, sources: JournalSources | None = None) -> JournalSources:
+def _load_bundled_jabref(sources: JournalSources) -> JournalSources:
+    from importlib.resources import as_file, files
+
+    package_dir = files(__package__) / "journal_abbreviations"
+    for name in _BUNDLED_JABREF_FILES:
+        with as_file(package_dir / name) as path:
+            load_journal_table(path, sources, source_label=f"jabref:{name}")
+    return sources
+
+
+def load_journal_table(
+    path: str | Path,
+    sources: JournalSources | None = None,
+    *,
+    source_label: str | None = None,
+) -> JournalSources:
     """Load exact journal mappings from CSV/TSV.
 
     Two layouts are accepted:
@@ -260,9 +308,13 @@ def load_journal_table(path: str | Path, sources: JournalSources | None = None) 
     * **Headerless** — JabRef's own ``abbrv.jabref.org`` format,
       ``"Full Name","Abbreviation"[,"Shortest unique abbreviation"]``. The
       first two columns are used; any third column is ignored.
+
+    ``source_label`` overrides the ``JournalMapping.source`` recorded for
+    every mapping loaded from this table; it defaults to the table's path.
     """
     target = sources or JournalSources()
     table_path = Path(path)
+    label = source_label or str(table_path)
     rows = _read_table_rows(table_path)
     if not rows:
         return target
@@ -274,18 +326,18 @@ def load_journal_table(path: str | Path, sources: JournalSources | None = None) 
             title = _first_present(record, TITLE_COLUMNS)
             abbreviated = _first_present(record, ABBREV_COLUMNS)
             issn = _first_present(record, TABLE_ISSN_COLUMNS) or None
-            _add_table_mapping(target, table_path, title, abbreviated, issn)
+            _add_table_mapping(target, label, title, abbreviated, issn)
     else:
         for raw in rows:
             title = _clean_cell(raw[0]) if raw else ""
             abbreviated = _clean_cell(raw[1]) if len(raw) > 1 else ""
-            _add_table_mapping(target, table_path, title, abbreviated, None)
+            _add_table_mapping(target, label, title, abbreviated, None)
     return target
 
 
 def _add_table_mapping(
     target: JournalSources,
-    table_path: Path,
+    source_label: str,
     title: str,
     abbreviated: str,
     issn: str | None,
@@ -298,7 +350,7 @@ def _add_table_mapping(
             title=title,
             abbreviated=abbreviated,
             issn=issn,
-            source=str(table_path),
+            source=source_label,
         ),
     )
 
@@ -321,9 +373,15 @@ def load_ltwa_table(path: str | Path, sources: JournalSources | None = None) -> 
 def load_sources(
     journal_table: str | Path | None = None,
     ltwa_table: str | Path | None = None,
+    journal_source: str = DEFAULT_JOURNAL_SOURCE,
 ) -> JournalSources:
-    """Load bundled sources plus optional user exact and LTWA tables."""
-    sources = builtin_sources()
+    """Load bundled sources plus optional user exact and LTWA tables.
+
+    ``journal_source`` picks the bundled exact-mapping base; see
+    :func:`builtin_sources`. A ``journal_table``/``ltwa_table`` always layers
+    on top of it, regardless of which base is chosen.
+    """
+    sources = builtin_sources(journal_source)
     if journal_table:
         load_journal_table(journal_table, sources)
     if ltwa_table:
@@ -346,7 +404,15 @@ def _lookup_exact(title: str, entry: BibEntry, sources: JournalSources) -> tuple
         mapping = sources.issn_mappings.get(_issn_key(issn))
         if mapping:
             return mapping.abbreviated, mapping.source
-    mapping = sources.title_mappings.get(_journal_key(title))
+    key = _journal_key(title)
+    mapping = sources.title_mappings.get(key)
+    if mapping:
+        return mapping.abbreviated, mapping.source
+    # Already the configured abbreviation (e.g. the field already reads
+    # "Phys. Rev. Lett."): accept it as-is rather than falling through to
+    # word-level generation, which cannot re-derive an abbreviation from
+    # already-abbreviated tokens and would decline the whole title.
+    mapping = sources.abbreviated_mappings.get(key)
     if mapping:
         return mapping.abbreviated, mapping.source
     return None
@@ -354,9 +420,13 @@ def _lookup_exact(title: str, entry: BibEntry, sources: JournalSources) -> tuple
 
 def _lookup_expansion(title: str, sources: JournalSources) -> tuple[str, str] | None:
     key = _journal_key(title)
-    for mapping in sources.title_mappings.values():
-        if _journal_key(mapping.abbreviated) == key:
-            return mapping.title, mapping.source
+    mapping = sources.abbreviated_mappings.get(key)
+    if mapping:
+        return mapping.title, mapping.source
+    # Already the full title: accept it as-is.
+    mapping = sources.title_mappings.get(key)
+    if mapping:
+        return mapping.title, mapping.source
     return None
 
 
@@ -422,6 +492,22 @@ def abbreviate_title_with_ltwa(title: str, sources: JournalSources | None = None
     return " ".join(part for part in output if part)
 
 
+def _is_single_word_title(title: str) -> bool:
+    """Whether ``title`` is a single word, per ISO 4 never abbreviated on its own.
+
+    ISO 4 abbreviates title *words*; a one-word title (``Nature``, ``Science``,
+    ``Econometrica``) has nothing to abbreviate and is conventionally left in
+    full even when its one word would otherwise shorten inside a longer title
+    (e.g. ``nature`` -> ``Nat.`` is only valid within ``Nature Physics``).
+    """
+    words = [
+        token
+        for token in re.findall(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*|[^\w\s]", title)
+        if not re.fullmatch(r"[^\w\s]", token)
+    ]
+    return len(words) == 1
+
+
 def _target_for_title(
     title: str,
     entry: BibEntry,
@@ -429,10 +515,17 @@ def _target_for_title(
     sources: JournalSources,
 ) -> tuple[str, str] | None:
     if style == "full":
-        return _lookup_expansion(title, sources)
+        exact = _lookup_expansion(title, sources)
+        if exact:
+            return exact
+        if _is_single_word_title(title):
+            return title, "single_word_title"
+        return None
     exact = _lookup_exact(title, entry, sources)
     if exact:
         return exact
+    if _is_single_word_title(title):
+        return title, "single_word_title"
     generated = abbreviate_title_with_ltwa(title, sources)
     if generated:
         return generated, "ltwa"
@@ -463,13 +556,16 @@ def expected_journal_title(
 def classify_journal(title: str, entry: BibEntry, sources: JournalSources) -> str:
     """Describe how ``title`` would resolve for abbreviation.
 
-    Returns the exact-mapping source label (e.g. ``builtin_exact`` or a table
-    path) when an exact title/ISSN mapping exists, ``ltwa`` when an abbreviation
+    Returns the exact-mapping source label (e.g. ``jabref:...`` or a table
+    path) when an exact title/ISSN mapping exists, ``single_word_title`` for a
+    one-word title ISO 4 leaves unabbreviated, ``ltwa`` when an abbreviation
     can be generated from title words, or ``unknown`` otherwise.
     """
     exact = _lookup_exact(title, entry, sources)
     if exact is not None:
         return exact[1]
+    if _is_single_word_title(title):
+        return "single_word_title"
     if abbreviate_title_with_ltwa(title, sources) is not None:
         return "ltwa"
     return "unknown"

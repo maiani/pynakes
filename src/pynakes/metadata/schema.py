@@ -53,6 +53,7 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     # Native default citation-key pattern, aliasing JabRef's ``keypatterndefault``.
     "key-pattern": CATEGORY_CITATION_KEY,
     "normalize-protected-terms": CATEGORY_NORMALIZATION,
+    "normalize-journal-source": CATEGORY_NORMALIZATION,
     "normalize-journal-table": CATEGORY_NORMALIZATION,
     "normalize-ltwa-table": CATEGORY_NORMALIZATION,
     "format-indent": CATEGORY_FORMATTING,
@@ -90,6 +91,8 @@ VALID_FETCH_POLICIES = {"preprint", "published", "source", "supplement", "bestpd
 # Matches ``pynakes.journals.JOURNAL_STYLES`` (kept in sync by the lint profile
 # and normalize sharing the same persisted enum).
 _VALID_JOURNAL_STYLES = {"none", "abbreviated", "full"}
+# Matches ``pynakes.journals.JOURNAL_SOURCES``.
+_VALID_JOURNAL_SOURCES = {"jabref", "none"}
 _FORMAT_CHOICES = {
     "format-alignment": {"compact", "equals"},
     "format-field-order": {"preferred", "preserve", "alphabetical"},
@@ -135,6 +138,14 @@ def validate_metadata_value(key: str, value: str) -> None:
             raise ValueError(
                 f"Invalid normalize-journal-style {stripped!r}; expected one of: "
                 f"{', '.join(sorted(_VALID_JOURNAL_STYLES))}"
+            )
+        return
+
+    if normalized_key == "normalize-journal-source":
+        if stripped.lower() not in _VALID_JOURNAL_SOURCES:
+            raise ValueError(
+                f"Invalid normalize-journal-source {stripped!r}; expected one of: "
+                f"{', '.join(sorted(_VALID_JOURNAL_SOURCES))}"
             )
         return
 

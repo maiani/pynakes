@@ -67,6 +67,7 @@ class NormalizeOptions:
     protected_terms: list[str] | None = None
     author_style: str | None = None
     journal_style: str | None = None
+    journal_source: str | None = None
     journal_table: str | None = None
     ltwa_table: str | None = None
     normalize_dois: bool | None = None
@@ -294,9 +295,16 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
     journal_style = _resolve_choice(
         lib, opts.journal_style, "journal-style", journal_ops.JOURNAL_STYLES, "none"
     )
+    journal_source = _resolve_choice(
+        lib,
+        opts.journal_source,
+        "journal-source",
+        journal_ops.JOURNAL_SOURCES,
+        journal_ops.DEFAULT_JOURNAL_SOURCE,
+    )
     journal_table = opts.journal_table or metadata_value(lib, "normalize-journal-table")
     ltwa_table = opts.ltwa_table or metadata_value(lib, "normalize-ltwa-table")
-    journal_sources = journal_ops.load_sources(journal_table, ltwa_table)
+    journal_sources = journal_ops.load_sources(journal_table, ltwa_table, journal_source)
     journal_result = journal_ops.normalize_journals(lib, journal_style, journal_sources)
     result.journals = journal_result.changed
     result.warnings.extend(journal_ops.unknown_journal_warnings(journal_result.unknown))

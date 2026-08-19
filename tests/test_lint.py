@@ -77,6 +77,14 @@ def test_metadata_lint_rejects_typoed_journal_style() -> None:
     assert "invalid_profile_setting" not in issue_types
 
 
+def test_metadata_lint_rejects_typoed_journal_source() -> None:
+    lib = parse_bib("@comment{pynakes-meta: normalize-journal-source:jabbref;}\n")
+
+    issue_types = _types(lint(lib))
+
+    assert "invalid_metadata_value" in issue_types
+
+
 def test_metadata_lint_scopes_unknown_keys_to_pynakes_meta() -> None:
     # pynakes owns pynakes-meta and claims to understand every key there, so an
     # unknown key is drift. jabref-meta is JabRef's namespace and pynakes only
@@ -135,6 +143,35 @@ def test_metadata_lint_silent_on_valid_metadata() -> None:
         in {"unknown_metadata_key", "invalid_metadata_value", "duplicate_metadata_block"}
     ]
     assert drift == []
+
+
+def test_lint_flags_missing_tex_source(tmp_path: Path) -> None:
+    lib = parse_bib("@comment{pynakes-meta: tex-sources: paper.tex;}\n")
+
+    issues = [issue for issue in lint(lib, base_dir=tmp_path) if issue.type == "missing_tex_source"]
+
+    assert len(issues) == 1
+    assert issues[0].severity == "warning"
+    assert issues[0].category == "correctness"
+    assert issues[0].field == "tex-sources"
+    assert "paper.tex" in issues[0].message
+
+
+def test_lint_silent_on_existing_tex_source(tmp_path: Path) -> None:
+    (tmp_path / "paper.tex").write_text(r"\cite{Smith2020}" "\n")
+    lib = parse_bib("@comment{pynakes-meta: tex-sources: paper.tex;}\n")
+
+    assert not [
+        issue for issue in lint(lib, base_dir=tmp_path) if issue.type == "missing_tex_source"
+    ]
+
+
+def test_lint_skips_tex_source_check_without_base_dir() -> None:
+    # No base_dir means relative tex-sources paths cannot be resolved, so the
+    # check is skipped rather than reported against the wrong directory.
+    lib = parse_bib("@comment{pynakes-meta: tex-sources: paper.tex;}\n")
+
+    assert not [issue for issue in lint(lib) if issue.type == "missing_tex_source"]
 
 
 def test_missing_required_field() -> None:
@@ -448,6 +485,46 @@ def test_lint_checks_the_stored_profile() -> None:
         "title_capitalization_unprotected",
     } <= _types(issues)
     assert all(issue.severity == "warning" for issue in issues)
+
+
+def test_lint_accepts_already_abbreviated_known_journal() -> None:
+    # Regression: a field already holding the builtin abbreviation used to be
+    # reported as unknown_journal because exact lookup only matched full
+    # titles, not the abbreviated form itself.
+    lib = parse_bib(
+        "@comment{pynakes-meta: normalize-journal-style:abbreviated;}\n"
+        "@article{A,\n"
+        "  author = {Jane Smith},\n"
+        "  title = {A Study},\n"
+        "  journal = {Phys. Rev. Lett.},\n"
+        "  year = {2024},\n"
+        "  doi = {10.1234/example}\n"
+        "}\n"
+    )
+
+    issues = lint(lib)
+    assert "unknown_journal" not in _types(issues)
+    assert "journal_style_mismatch" not in _types(issues)
+
+
+def test_lint_journal_source_none_disables_bundled_table() -> None:
+    # normalize-journal-source: none opts out of the bundled JabRef table, so
+    # an already-abbreviated value that only that table would recognize goes
+    # back to being reported unknown.
+    lib = parse_bib(
+        "@comment{pynakes-meta: normalize-journal-style:abbreviated;}\n"
+        "@comment{pynakes-meta: normalize-journal-source:none;}\n"
+        "@article{A,\n"
+        "  author = {Jane Smith},\n"
+        "  title = {A Study},\n"
+        "  journal = {Phys. Rev. Lett.},\n"
+        "  year = {2024},\n"
+        "  doi = {10.1234/example}\n"
+        "}\n"
+    )
+
+    issues = lint(lib)
+    assert "unknown_journal" in _types(issues)
 
 
 def test_lint_reports_unknown_journals_when_style_is_configured() -> None:

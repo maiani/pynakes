@@ -114,19 +114,38 @@ def split_name_list(value: str) -> list[str]:
     return _split_names(value)
 
 
+def _drop_von_particle(segment: str) -> str:
+    """Drop a leading BibTeX "von" particle from a ``von Last`` name segment.
+
+    BibTeX/biblatex name parsing treats a run of lowercase-starting words
+    before the true (capitalized) surname as the "von" part — e.g. ``van
+    den`` in ``van den Berg`` or ``de la`` in ``de la Cruz`` — so the real
+    last name is the capitalized remainder alone. If no word is capitalized
+    (an all-lowercase mononym), the segment is returned unchanged rather than
+    discarded.
+    """
+    words = segment.split()
+    for index, word in enumerate(words):
+        if word[:1].isupper():
+            return " ".join(words[index:])
+    return segment
+
+
 def last_name(person: str) -> str:
     """Extract a person's last name, stripped to letters only.
 
-    Handles ``{Corporate Name}`` (taken whole), ``Last, First`` (part before
-    the comma), and ``First Last`` (final token). Accented Latin characters are
-    folded to ASCII (``Šmith`` → ``Smith``) rather than dropped. Returns
-    ``""`` if empty.
+    Handles ``{Corporate Name}`` (taken whole), ``von Last, First`` (the part
+    before the comma, minus a leading lowercase "von" particle like ``van
+    den``), and ``First von Last`` (the final token). Accented Latin
+    characters are folded to ASCII (``Šmith`` → ``Smith``) rather than
+    dropped. Returns ``""`` if empty.
     """
     person = ascii_fold(person.strip())
     if person.startswith("{") and person.endswith("}"):
         return re.sub(r"[^A-Za-z]", "", person[1:-1])
     if "," in person:
-        return re.sub(r"[^A-Za-z]", "", person.split(",", 1)[0])
+        von_last = _drop_von_particle(person.split(",", 1)[0])
+        return re.sub(r"[^A-Za-z]", "", von_last)
     parts = person.replace("{", "").replace("}", "").split()
     return re.sub(r"[^A-Za-z]", "", parts[-1] if parts else "")
 

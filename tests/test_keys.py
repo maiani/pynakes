@@ -134,6 +134,21 @@ class TestGenerateKey:
         assert generate_key_from_pattern(e, "[authorIni]") == "SmithDR"
         assert generate_key_from_pattern(e, "[authors2]") == "smithdoeetal"
 
+    def test_mixed_case_marker_only_forces_first_letter(self) -> None:
+        # Regression: [Auth]-style markers (capital first letter) used to
+        # force the *entire rest* of the value to lowercase too, corrupting
+        # legitimately mixed-case values: a compound surname stripped of its
+        # hyphen ("Pioro-Ladriere" -> "PioroLadriere") or a title starting
+        # with an acronym ("AI for ..."). Real JabRef markers are
+        # case-insensitive except for the explicit all-lower/all-upper forms
+        # already covered by test_marker_variants; a mixed-case marker should
+        # only guarantee an uppercase first letter, not reshape the rest.
+        e = _entry(author="Michel Pioro-Ladriere", year="2008", title="Electrically driven spin")
+        assert generate_key_from_pattern(e, "[Auth]") == "PioroLadriere"
+
+        e2 = _entry(author="Xin Gao", year="2025", title="AI for materials discovery")
+        assert generate_key_from_pattern(e2, "[Veryshorttitle]") == "AI"
+
     def test_accented_author_names_fold_to_ascii(self) -> None:
         e = _entry(
             author="Šexample, Aa and Øfoo-Bär, Bb",
@@ -145,6 +160,23 @@ class TestGenerateKey:
             "sexample_2020_generic"
         )
         assert generate_key_from_pattern(e, "[authors]") == "sexampleofoobar"
+
+    def test_von_particle_dropped_from_comma_form_last_name(self) -> None:
+        # BibTeX "von Last, First" names: a leading lowercase particle
+        # ("van den", "de la", "von") is not part of the last name.
+        e = _entry(author="van den Berg, J. W. G.", year="2013", title="Fast qubit")
+        assert generate_key_from_pattern(e, "[Auth]") == "Berg"
+
+        e2 = _entry(author="van Riggelen-Doelman, Floor", year="2024", title="Coherent shuttling")
+        assert generate_key_from_pattern(e2, "[Auth]") == "RiggelenDoelman"
+
+        e3 = _entry(author="de la Cruz, Maria", year="2020", title="Sample")
+        assert generate_key_from_pattern(e3, "[auth]") == "cruz"
+
+        # An all-lowercase "von Last" segment with no capitalized word at all
+        # is kept whole rather than discarded down to nothing.
+        e4 = _entry(author="van der berg, jan", year="1990", title="Sample")
+        assert generate_key_from_pattern(e4, "[auth]") == "vanderberg"
 
     def test_modifier_variants(self) -> None:
         e = _entry(

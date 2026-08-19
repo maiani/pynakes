@@ -58,7 +58,8 @@ to find the operation module that owns a key.
 | `normalize-protected-terms` | normalization | List of case-sensitive terms | `normalize`, `lint` | — |
 | `normalize-author-style` | normalization | `jabref`, `conservative`, or `none` | `normalize` | — |
 | `normalize-journal-style` | normalization | `abbreviated`, `full`, or `none` (default) | `normalize`, `lint` | — |
-| `normalize-journal-table` | normalization | CSV/TSV path with exact journal mappings | `normalize`, `lint` | — |
+| `normalize-journal-source` | normalization | `jabref` (bundled JabRef lists, default) or `none` (rule-based only) | `normalize`, `lint` | — |
+| `normalize-journal-table` | normalization | CSV/TSV path with exact journal mappings, layered on top of `normalize-journal-source` | `normalize`, `lint` | — |
 | `normalize-ltwa-table` | normalization | CSV/TSV path with LTWA word mappings | `normalize`, `lint` | — |
 | `normalize-dois` | normalization | Boolean | `normalize` | — |
 | `normalize-identifier-case` | normalization | Boolean | `normalize` | — |
@@ -237,8 +238,8 @@ When configured, `lint` reports each of the following as a warning:
   `key-pattern-<entrytype>` (or JabRef's `keypatterndefault`/`keypattern_*` as a
   fallback).
 - A known journal title that is not in the configured `normalize-journal-style`.
-- An unknown journal title that cannot be resolved by the bundled sources,
-  `normalize-journal-table`, or `normalize-ltwa-table`.
+- An unknown journal title that cannot be resolved by the `normalize-journal-source`
+  bundled table, `normalize-journal-table`, or `normalize-ltwa-table`.
 - A missing field named by `lint-required-fields`.
 - A title-like field whose case-sensitive terms or acronyms need brace
   protection while `normalize-protect-titles:true` is stored (or
@@ -247,7 +248,8 @@ When configured, `lint` reports each of the following as a warning:
 Unknown journal titles are reported as `unknown_journal` because pynakes cannot
 determine their canonical form without a mapping. Add a
 `normalize-journal-table` or `normalize-ltwa-table` when that distinction
-matters.
+matters, or check whether `normalize-journal-source` is set to `none` and the
+journal simply isn't in a table you've configured.
 
 The warnings are advisory in a normal run. `pynakes lint --strict` exits `1`
 for structural errors and these metadata-conformance warnings, allowing a

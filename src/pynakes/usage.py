@@ -31,6 +31,8 @@ __all__ = [
     "tag_with_group",
     "tag_with_keyword",
     "tex_sources_from_metadata",
+    "validate_tex_sources",
+    "resolve_existing_tex_sources",
     "splice_into_text",
 ]
 
@@ -54,6 +56,37 @@ def tex_sources_from_metadata(lib: BibFile, base_dir: str | Path) -> list[str]:
         path = Path(candidate)
         resolved.append(str(path if path.is_absolute() else base / path))
     return resolved
+
+
+def validate_tex_sources(sources: list[str]) -> list[dict]:
+    """Return warnings for resolved source paths that do not exist on disk.
+
+    Each warning is a dict with ``type``, ``message``, and ``path`` keys,
+    suitable for inclusion in the CLI ``warnings`` envelope.
+    """
+    warnings: list[dict] = []
+    for source in sources:
+        if not Path(source).exists():
+            warnings.append(
+                {
+                    "type": "missing_tex_source",
+                    "message": f"TeX source {source!r} not found",
+                    "path": source,
+                }
+            )
+    return warnings
+
+
+def resolve_existing_tex_sources(sources: list[str]) -> tuple[list[str], list[dict]]:
+    """Validate ``sources`` and drop any that don't exist on disk.
+
+    Returns ``(existing_sources, warnings)``; ``existing_sources`` is safe to
+    pass on to :func:`iter_tex_files` without it raising on a missing path.
+    """
+    warnings = validate_tex_sources(sources)
+    if warnings:
+        sources = [s for s in sources if Path(s).exists()]
+    return sources, warnings
 
 
 # ``\citation{key,key2}`` lines emitted by LaTeX into .aux files.

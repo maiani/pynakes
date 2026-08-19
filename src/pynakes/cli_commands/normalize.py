@@ -60,6 +60,12 @@ def normalize(
         "--journal-style",
         help="metadata, abbreviated, full, or none (default: no change unless metadata sets it)",
     ),
+    journal_source: str = typer.Option(
+        "metadata",
+        "--journal-source",
+        help="metadata, jabref, or none (base exact-mapping table before "
+        "--journal-table; default: jabref)",
+    ),
     journal_table: str | None = typer.Option(
         None,
         "--journal-table",
@@ -126,6 +132,7 @@ def normalize(
             term,
             author_style,
             journal_style,
+            journal_source,
             journal_table,
             ltwa_table,
             doi_normalization,
@@ -176,6 +183,7 @@ def _build_normalize_options(
     term: list[str] | None,
     author_style: str,
     journal_style: str,
+    journal_source: str,
     journal_table: str | None,
     ltwa_table: str | None,
     doi_normalization: str,
@@ -191,6 +199,7 @@ def _build_normalize_options(
         protected_terms=term,
         author_style=author_style,
         journal_style=journal_style,
+        journal_source=journal_source,
         journal_table=journal_table,
         ltwa_table=ltwa_table,
         normalize_dois=_optional_bool(doi_normalization),
