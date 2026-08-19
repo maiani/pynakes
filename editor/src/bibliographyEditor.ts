@@ -584,7 +584,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
     if (!(await this.reconcileBuffer(document))) {
       void panel.webview.postMessage({
         type: "commitError",
-        message: "Commit cancelled: the file still has unsaved changes.",
+        message: "Apply cancelled: the file still has unsaved changes.",
       });
       return;
     }
@@ -599,7 +599,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       if (!preview.ok) {
         void panel.webview.postMessage({
           type: "commitError",
-          message: `Cannot commit: ${preview.key} — ${preview.message}`,
+          message: `Cannot apply: ${preview.key} — ${preview.message}`,
         });
         return;
       }
@@ -636,12 +636,12 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       const counts = stagedCount(state);
       const name = path.basename(filePath);
       const approval = await vscode.window.showWarningMessage(
-        `Commit ${counts.fields} ${counts.fields === 1 ? "change" : "changes"} to ` +
+        `Apply ${counts.fields} ${counts.fields === 1 ? "change" : "changes"} to ` +
           `${counts.entries} ${counts.entries === 1 ? "entry" : "entries"} in ${name}?`,
         { modal: true, detail: "The exact diff is shown in the bibliography view." },
-        "Commit",
+        "Apply",
       );
-      if (approval !== "Commit") {
+      if (approval !== "Apply") {
         void panel.webview.postMessage({ type: "commitCancelled" });
         return;
       }
@@ -697,12 +697,12 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       {
         modal: true,
         detail:
-          "Committing writes to the file, so the buffer has to be saved first. " +
+          "Applying writes to the file, so the buffer has to be saved first. " +
           "Save it now and continue?",
       },
-      "Save and Commit",
+      "Save and Apply",
     );
-    if (choice !== "Save and Commit") {
+    if (choice !== "Save and Apply") {
       return false;
     }
     return document.save();

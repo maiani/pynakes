@@ -10,11 +10,13 @@ window.PV = window.PV || {};
 (function (PV) {
   "use strict";
 
+  let panelEl;
   let tabs;
   let body;
   let bar;
 
   PV.panelsInit = (elements) => {
+    panelEl = elements.panel;
     tabs = elements.tabs;
     body = elements.body;
     bar = elements.bar;
@@ -25,6 +27,7 @@ window.PV = window.PV || {};
         return;
       }
       PV.state.panel = tab.dataset.panel;
+      PV.state.panelCollapsed = false;
       PV.persist();
       PV.renderPanels();
     });
@@ -160,12 +163,29 @@ window.PV = window.PV || {};
     return "diff-context";
   }
 
+  function collapseToggle() {
+    const s = PV.state;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "icon-button collapse-toggle panel-toggle";
+    button.title = s.panelCollapsed ? "Expand this panel" : "Collapse this panel";
+    button.textContent = s.panelCollapsed ? "▴" : "▾";
+    button.addEventListener("click", () => {
+      PV.state.panelCollapsed = !PV.state.panelCollapsed;
+      PV.persist();
+      PV.renderPanels();
+    });
+    return button;
+  }
+
   PV.renderPanels = () => {
     const s = PV.state;
+    panelEl.classList.toggle("collapsed", s.panelCollapsed);
     const findingCount = s.lint ? s.lint.counts.total : null;
     tabs.replaceChildren(
       tabButton("findings", "Findings", findingCount),
       tabButton("diff", "Staged diff", s.counts.fields || null),
+      collapseToggle(),
     );
 
     const target = document.createElement("div");
@@ -203,6 +223,7 @@ window.PV = window.PV || {};
     preview.textContent = "Preview";
     preview.addEventListener("click", () => {
       PV.state.panel = "diff";
+      PV.state.panelCollapsed = false;
       PV.persist();
       PV.post({ type: "preview" });
     });
@@ -216,10 +237,11 @@ window.PV = window.PV || {};
     const commit = document.createElement("button");
     commit.type = "button";
     commit.className = "button primary";
-    commit.textContent = "Commit";
+    commit.textContent = "Apply";
     commit.title = "Show the diff and ask for confirmation before writing";
     commit.addEventListener("click", () => {
       PV.state.panel = "diff";
+      PV.state.panelCollapsed = false;
       PV.persist();
       PV.post({ type: "commit" });
     });

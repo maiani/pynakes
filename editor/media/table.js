@@ -200,7 +200,7 @@ window.PV = window.PV || {};
         const dot = document.createElement("span");
         dot.className = "staged-dot";
         dot.textContent = "●";
-        dot.title = "Has uncommitted changes";
+        dot.title = "Has changes not yet applied";
         status.appendChild(dot);
       }
       const severity = s.lint?.worstByKey?.[row.key];

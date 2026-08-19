@@ -19,6 +19,7 @@ window.PV = window.PV || {};
     rows: document.getElementById("rows"),
     empty: document.getElementById("empty"),
     detail: document.getElementById("detail"),
+    panel: document.getElementById("panel"),
     panelTabs: document.getElementById("panel-tabs"),
     panelBody: document.getElementById("panel-body"),
     commitBar: document.getElementById("commit-bar"),
@@ -34,6 +35,7 @@ window.PV = window.PV || {};
   PV.groupsInit(elements.groups);
   PV.detailInit(elements.detail);
   PV.panelsInit({
+    panel: elements.panel,
     tabs: elements.panelTabs,
     body: elements.panelBody,
     bar: elements.commitBar,
@@ -220,10 +222,12 @@ window.PV = window.PV || {};
       case "diff":
         s.diff = message.entries;
         s.panel = "diff";
+        s.panelCollapsed = false;
         PV.renderPanels();
         break;
       case "conflict": {
         s.panel = "diff";
+        s.panelCollapsed = false;
         const detail = message.conflicts
           .map(
             (conflict) =>
@@ -240,17 +244,17 @@ window.PV = window.PV || {};
         s.diff = null;
         notify(
           "success",
-          "Committed " + message.applied.length +
+          "Applied " + message.applied.length +
             (message.applied.length === 1 ? " entry" : " entries") +
             (message.warnings.length ? " — " + message.warnings.join("; ") : ""),
         );
         PV.renderPanels();
         break;
       case "commitCancelled":
-        notify("info", "Commit cancelled. Nothing was written.");
+        notify("info", "Apply cancelled. Nothing was written.");
         break;
       case "commitError":
-        showBanner("error", "Commit failed", message.message, null);
+        showBanner("error", "Apply failed", message.message, null);
         break;
       case "parseError":
         s.rows = [];

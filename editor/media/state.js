@@ -39,10 +39,12 @@ window.PV = window.PV || {};
     },
     selectedGroup: persisted.selectedGroup || null,
     collapsedGroups: new Set(Array.isArray(persisted.collapsed) ? persisted.collapsed : []),
+    sidebarCollapsed: Boolean(persisted.sidebarCollapsed),
     selectedKey: persisted.selectedKey || null,
     sortColumn: persisted.sortColumn || "index",
     sortDescending: Boolean(persisted.sortDescending),
     panel: persisted.panel || "findings",
+    panelCollapsed: Boolean(persisted.panelCollapsed),
     // Column widths in pixels, by column position. Empty means the stylesheet
     // decides; the first drag snapshots the current layout so nothing jumps.
     columnWidths: Array.isArray(persisted.columnWidths) ? persisted.columnWidths : [],
@@ -59,10 +61,12 @@ window.PV = window.PV || {};
       fuzzy: s.search.fuzzy,
       selectedGroup: s.selectedGroup,
       collapsed: [...s.collapsedGroups],
+      sidebarCollapsed: s.sidebarCollapsed,
       selectedKey: s.selectedKey,
       sortColumn: s.sortColumn,
       sortDescending: s.sortDescending,
       panel: s.panel,
+      panelCollapsed: s.panelCollapsed,
       columnWidths: s.columnWidths,
     });
   };

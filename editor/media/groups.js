@@ -13,6 +13,13 @@ window.PV = window.PV || {};
   };
 
   function onClick(event) {
+    const sidebarToggle = event.target.closest("button.sidebar-toggle");
+    if (sidebarToggle) {
+      PV.state.sidebarCollapsed = !PV.state.sidebarCollapsed;
+      PV.persist();
+      PV.renderGroups();
+      return;
+    }
     const twisty = event.target.closest("button.twisty");
     if (twisty) {
       const name = twisty.dataset.group;
@@ -50,12 +57,27 @@ window.PV = window.PV || {};
 
   PV.renderGroups = () => {
     const s = PV.state;
+    container.classList.toggle("collapsed", s.sidebarCollapsed);
     const fragment = document.createDocumentFragment();
 
     const heading = document.createElement("div");
     heading.className = "sidebar-heading";
-    heading.textContent = "Groups";
+    const label = document.createElement("span");
+    label.className = "sidebar-heading-label";
+    label.textContent = "Groups";
+    heading.appendChild(label);
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "icon-button collapse-toggle sidebar-toggle";
+    toggle.title = s.sidebarCollapsed ? "Expand groups" : "Collapse groups";
+    toggle.textContent = s.sidebarCollapsed ? "▸" : "◂";
+    heading.appendChild(toggle);
     fragment.appendChild(heading);
+
+    if (s.sidebarCollapsed) {
+      container.replaceChildren(fragment);
+      return;
+    }
 
     const all = document.createElement("div");
     all.className = "group-row" + (s.selectedGroup === null ? " selected" : "");

@@ -150,7 +150,7 @@ editable install.
 
 `.bib` files still open in the text editor by default — the view is opt-in:
 
-- **Pynakes: Open Bibliography** from the command palette, or
+- **Open with Pynakes** from the command palette, or
 - right-click a `.bib` file in the explorer, or
 - **Reopen Editor With… → Pynakes Bibliography**.
 

@@ -87,7 +87,7 @@ export function renderShell(webview: vscode.Webview, extensionUri: vscode.Uri): 
       </table>
       <p id="empty" class="empty" hidden></p>
     </div>
-    <section class="panel" aria-label="Findings and staged changes">
+    <section id="panel" class="panel" aria-label="Findings and staged changes">
       <div id="panel-tabs" class="panel-tabs" role="tablist"></div>
       <div id="panel-body" class="panel-body"></div>
     </section>

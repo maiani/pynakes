@@ -121,6 +121,28 @@ body {
   text-decoration: underline;
 }
 
+/* Collapse/expand toggles for the groups column and the bottom panel: a
+   larger, fixed-size hit area shared by both so they read as one control
+   family instead of two differently sized, differently styled buttons. */
+.collapse-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 3px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.collapse-toggle:hover {
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+  text-decoration: none;
+}
+
 .link-button {
   padding: 0;
   color: var(--vscode-textLink-foreground);
@@ -201,6 +223,11 @@ body {
   background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
 }
 
+.sidebar.collapsed {
+  flex-basis: 28px;
+  overflow: hidden;
+}
+
 .center {
   display: flex;
   flex: 1 1 auto;
@@ -246,12 +273,24 @@ body {
 /* Groups sidebar --------------------------------------------------------- */
 
 .sidebar-heading {
-  padding: 2px 10px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 6px 6px 10px;
   color: var(--vscode-descriptionForeground);
   font-size: 0.85em;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.sidebar.collapsed .sidebar-heading {
+  justify-content: center;
+  padding: 6px 0;
+}
+
+.sidebar.collapsed .sidebar-heading-label {
+  display: none;
 }
 
 .group-row {
@@ -676,10 +715,23 @@ body.resizing * {
   border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
 }
 
+.panel.collapsed {
+  flex: 0 0 auto;
+}
+
+.panel.collapsed .panel-body {
+  display: none;
+}
+
 .panel-tabs {
   display: flex;
+  align-items: center;
   gap: 2px;
   padding: 4px 8px 0;
+}
+
+.panel-toggle {
+  margin-left: auto;
 }
 
 .tab {
