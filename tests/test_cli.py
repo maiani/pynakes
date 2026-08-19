@@ -709,6 +709,52 @@ class TestSearchCommand:
         data = json.loads(result.output)
         assert [match["key"] for match in data["matches"]] == ["Alpha2024"]
 
+    def test_search_empty_query_selects_by_where_alone(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Alpha2024,\n"
+            "  title = {Graph Widgets},\n"
+            "  doi = {10.1000/alpha},\n"
+            "  year = {2024}\n"
+            "}\n\n"
+            "@book{Beta2023,\n"
+            "  title = {Manual Widgets},\n"
+            "  year = {2023}\n"
+            "}\n"
+        )
+
+        result = runner.invoke(app, ["search", "", str(bib), "--where", "doi missing", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert [match["key"] for match in data["matches"]] == ["Beta2023"]
+        assert data["query"] == ""
+        assert data["matches"][0]["matched_fields"] == []
+        # Ranking is reported honestly: there are no terms to rank by.
+        assert data["ranked"] is False
+
+    def test_search_empty_query_without_where_is_structured(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@misc{Alpha,\n  title = {Plain Widget Note}\n}\n")
+
+        result = runner.invoke(app, ["search", "", str(bib), "--json"])
+
+        assert result.exit_code == 1
+        data = json.loads(result.output)
+        assert data["status"] == "error"
+        assert "query or a where predicate" in data["message"]
+
+    def test_search_predicate_only_human_output_omits_the_match_tag(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@misc{Alpha,\n  title = {Plain Widget Note}\n}\n")
+
+        result = runner.invoke(app, ["search", "", str(bib), "--where", "doi missing"])
+
+        assert result.exit_code == 0, result.output
+        assert "@misc{Alpha} — Plain Widget Note" in result.output
+        # No matched fields means no empty bracket pair.
+        assert "[]" not in result.output
+
     def test_search_human_output_is_clean(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text("@misc{Alpha,\n  title = {Plain Widget Note}\n}\n")

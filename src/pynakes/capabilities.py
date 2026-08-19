@@ -101,7 +101,11 @@ _SEARCH_QUERY_GRAMMAR = {
     "selection": (
         "--where narrows which entries are searched using the shared predicate "
         "grammar, covering date ranges (year >= 2020) and missing-field "
-        "questions (abstract missing) without command-specific flags."
+        "questions (abstract missing) without command-specific flags. An empty "
+        "query selects by predicate alone: search \"\" --where 'doi missing' is "
+        "the read-only path for the selector grammar, returning matches in file "
+        "order with no matched fields. An empty query without --where is "
+        "rejected rather than matching the whole library."
     ),
     "ranking": (
         "Results are ranked by relevance by default: key > title > author > "

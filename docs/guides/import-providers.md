@@ -34,6 +34,10 @@ URL resolvers.
 | INSPIRE-HEP | High-energy-physics database | record id, texkey (`Author:2024abc`), `inspirehep.net/literature/<id>` URL | **Covered** | DOI PDF pipeline; arXiv-native fetch when the record carries an eprint |
 | DBLP | Computer-science bibliography | record key, `dblp.org/rec/<key>` URL | **Covered** | DOI PDF pipeline when a DOI is present |
 | ACL Anthology | Computational-linguistics proceedings | Anthology id (`N19-1423`, `2023.acl-long.1`), `aclanthology.org/<id>` URL | **Covered** | DOI PDF pipeline when a DOI is present |
+| IACR ePrint | Cryptography preprint archive | `IACR:<year>/<number>`, `eprint.iacr.org/<year>/<number>` URL | **Covered** | DOI PDF pipeline when a DOI is present |
+| zbMATH Open | Mathematics review database | `zbMATH:<Zbl or DE number>`, `zbmath.org/<id>` URL | **Covered** | None |
+| RFC / IETF | Standards-body document archive | `RFC:9110` (also bare `rfc9110`), `datatracker.ietf.org`, `rfc-editor.org`, legacy `tools.ietf.org` URL | **Covered** | DOI PDF pipeline |
+| OpenReview | Open peer-review platform | forum id / `openreview.net/forum?id=…` URL | **Not supported** (public API answers a bot challenge to non-browser clients) | None |
 | Open Library | Book catalogue | ISBN-10/ISBN-13, `openlibrary.org/isbn/<isbn>` URL | **Covered** | None |
 | Google Books | Book catalogue | ISBN / volume id | **Not supported** (needs an API key; Open Library covers ISBN lookups) | None |
 | Library of Congress | National library catalogue | LCCN / `lccn.loc.gov` URL | **Not supported** (Open Library covers ISBN-addressed books) | None |
@@ -98,6 +102,8 @@ INSPIRE:451647                INSPIRE:Author:2024abc
 DBLP:journals/cacm/Codd70     ACL:2023.acl-long.1
 Crossref:10.1000/example      DataCite:10.5061/dryad.example
 OpenAlex:W2741809807          SemanticScholar:<40-hex paper id>
+IACR:2023/1234                zbMATH:1607.53082
+RFC:9110
 ```
 
 The four metadata indexes take a prefix for the same reason the repositories do:
@@ -129,6 +135,11 @@ their record landing pages. Open Library returns edition data, which becomes a
 `@book` entry with its publisher, place, edition, and series.
 
 ## Databases that publish their own BibTeX
+
+IACR ePrint has no separate citation endpoint: each paper's landing page embeds
+a ready-made BibTeX record, which is extracted and parsed like any other
+BibTeX-answering service. Its own `cryptoeprint:` key is discarded and a key is
+generated instead, as DBLP's is.
 
 INSPIRE-HEP, DBLP, and the ACL Anthology answer with a BibTeX record, which is
 richer than the DOI record for their communities: INSPIRE supplies the eprint,
@@ -182,7 +193,8 @@ Import providers are organized by role:
 
 - `providers.metadata` contains metadata services: DOI content negotiation,
   Crossref, DataCite, OpenAlex, Semantic Scholar, Elsevier, Open Library,
-  INSPIRE-HEP, DBLP, and the ACL Anthology. Services that answer with BibTeX
+  INSPIRE-HEP, DBLP, the ACL Anthology, IACR ePrint, and zbMATH Open. Services
+  that answer with BibTeX
   share the parse-and-relabel step in `providers.metadata._bibtex_service`;
   those that answer with JSON share the fetch-decode-unwrap step in
   `providers.metadata._json_service`.

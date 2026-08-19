@@ -209,3 +209,38 @@ def test_where_selects_the_entries_searched() -> None:
     results = search_entries(lib, "widgets", where=parse_query("year >= 2024"))
 
     assert [result.key for result in results] == ["Alpha2024"]
+
+
+def test_empty_query_selects_by_predicate_alone() -> None:
+    lib = parse_bib(_LIB)
+
+    results = search_entries(lib, "", where=parse_query("year >= 2024"))
+
+    assert [result.key for result in results] == ["Alpha2024"]
+    # Nothing was matched textually, so nothing is reported as matched.
+    assert results[0].matched_fields == []
+    assert results[0].matches == ()
+
+
+def test_predicate_only_selection_keeps_file_order() -> None:
+    lib = parse_bib(_LIB)
+
+    results = search_entries(lib, "   ", where=parse_query("year exists"))
+
+    # Relevance ranking needs terms, so a predicate-only selection is file order.
+    assert [result.key for result in results] == ["Alpha2024", "Beta2023"]
+
+
+def test_predicate_only_selection_respects_limit() -> None:
+    lib = parse_bib(_LIB)
+
+    results = search_entries(lib, "", where=parse_query("year exists"), limit=1)
+
+    assert [result.key for result in results] == ["Alpha2024"]
+
+
+def test_empty_query_without_a_predicate_is_rejected() -> None:
+    lib = parse_bib(_LIB)
+
+    with pytest.raises(ValueError, match="query or a where predicate"):
+        search_entries(lib, "")

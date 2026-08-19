@@ -551,9 +551,9 @@ silently orphan a material.
 
 These are **not in the near-term identity** and deserve dedicated thought. They
 are deferred, not forbidden; when they arrive they sit *above or beside* the
-bib-file-centric core — as an opt-in extra (e.g. `pynakes[…]`, and
-a "bimas" experience layer may live here) or a separate tool — never woven into
-the core write path.
+bib-file-centric core — as an opt-in extra (e.g. `pynakes[…]`) or a separate
+tool, such as the library-scoped Bimas application — never woven into the core
+write path.
 
 - **Full-text extraction** of PDF/source content into text.
 - **Search over content** and any derived index (e.g. SQLite FTS) — distinct from

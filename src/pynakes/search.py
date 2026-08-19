@@ -172,6 +172,13 @@ def search_entries(
     restriction, so a caller can display a field — an abstract, say — without
     widening what the query searches.
 
+    An empty ``query`` selects by predicate alone: every entry accepted by
+    ``where`` is returned, with no matched fields and no match explanations,
+    in file order. This is the read-only path for the selector grammar —
+    "which entries have no DOI" is a question about a set, not a text match —
+    and it requires ``where``, since an empty query with no predicate would
+    match the whole library and is rejected.
+
     With ``fuzzy=True`` a term that has no substring hit still matches a field
     whose normalized similarity reaches :data:`pynakes.query.FUZZY_THRESHOLD`,
     which finds misspelled and inflected titles. Every match — exact or fuzzy —
@@ -187,7 +194,15 @@ def search_entries(
     if limit is not None and limit < 0:
         raise ValueError("Search limit must be non-negative")
 
-    terms = parse_search_query(query)
+    # An empty query is a predicate-only selection; on its own it would match
+    # every entry, so it is only meaningful together with ``where``.
+    terms = parse_search_query(query) if query.strip() else []
+    if not terms and where is None:
+        raise ValueError("Search needs a query or a where predicate")
+    # Relevance ranking compares matched fields, so it has no meaning without
+    # query terms: a predicate-only selection is always returned in file order.
+    rank = rank and bool(terms)
+
     field_filter = {name.lower() for name in fields} if fields is not None else None
     always = {name.lower() for name in extra_fields or ()}
     results: list[SearchResult] = []
@@ -196,10 +211,14 @@ def search_entries(
         if where is not None and not where(entry):
             continue
 
-        match = _match_entry(entry, terms, field_filter, case_sensitive, fuzzy)
-        if match is None:
-            continue
-        matched_fields, matches, score = match
+        if terms:
+            match = _match_entry(entry, terms, field_filter, case_sensitive, fuzzy)
+            if match is None:
+                continue
+            matched_fields, matches, score = match
+        else:
+            # Selected by predicate: nothing was matched, so nothing is explained.
+            matched_fields, matches, score = [], (), 0.0
         results.append(
             SearchResult(
                 key=entry.key,

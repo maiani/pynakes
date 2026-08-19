@@ -20,7 +20,10 @@ from pynakes.triage import abstract_excerpt
 def search(
     query: str = typer.Argument(
         ...,
-        help='Search query: words/phrases, optionally scoped as field:term or field:"phrase"',
+        help=(
+            "Search query: words/phrases, optionally scoped as field:term or "
+            'field:"phrase". Pass "" to select by --where alone'
+        ),
     ),
     file: str | None = bib_file_argument(),
     field: list[str] | None = typer.Option(
@@ -63,6 +66,13 @@ def search(
     grammar, so date ranges and "missing field" questions need no special
     flags: ``--where 'year >= 2020 and abstract missing'``.
 
+    An empty query selects by predicate alone —
+    ``pynakes search "" --where 'doi missing'`` answers "which entries have no
+    DOI" without a text match. The query argument stays required so that a
+    lone path cannot be mistaken for a query; ``""`` is the explicit opt-in.
+    Predicate-only results report no matched fields and are always in file
+    order, since relevance ranking needs terms to rank.
+
     ``--show-abstract`` adds a one-line abstract excerpt under each hit, so a
     candidate set can be triaged from the search itself; ``--json`` always
     carries the full abstract. To read whole entries instead, pass the keys to
@@ -71,6 +81,7 @@ def search(
     file = _resolve_input_bib(file, json_output)
     lib = Bibliography.open(file).lib
     where_filter = build_where_filter(where)
+    ranked = not no_rank and bool(query.strip())
     results = search_ops.search_entries(
         lib,
         query,
@@ -80,7 +91,7 @@ def search(
         case_sensitive=case_sensitive,
         fuzzy=fuzzy,
         limit=limit,
-        rank=not no_rank,
+        rank=ranked,
     )
 
     if json_output:
@@ -98,7 +109,7 @@ def search(
                     "fuzzy": fuzzy,
                     "show_abstract": show_abstract,
                     "limit": limit,
-                    "ranked": not no_rank,
+                    "ranked": ranked,
                     "count": len(results),
                     "matches": [result.to_dict() for result in results],
                 },
@@ -114,7 +125,8 @@ def search(
         tag = ", ".join(result.matched_fields)
         if any(match.kind == "fuzzy" for match in result.matches):
             tag += f", ~{result.score:.2f}"
-        typer.echo(f"  @{result.type}{{{result.key}}}{suffix} [{tag}]")
+        label = f" [{tag}]" if tag else ""
+        typer.echo(f"  @{result.type}{{{result.key}}}{suffix}{label}")
         if show_abstract:
             excerpt = abstract_excerpt(result.fields.get("abstract"))
             typer.echo(f"      {excerpt or '(no abstract)'}")

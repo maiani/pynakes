@@ -62,13 +62,21 @@ Besides stored fields, four names are special: `key` (citation key), `type`
 back to a date composed from `year`/`month`/`day`). `group "Name"` tests JabRef
 group membership; the stored field itself is reachable as `groups`.
 
+Pass an empty query to select by predicate alone:
+
 ```bash
-pynakes search . refs.bib --where 'key in [Newton1687, Euler1748]'
-pynakes search . refs.bib --where 'date >= 1900-06 and date <= 1910'
-pynakes search . refs.bib --where 'abstract missing'          # "entries missing field X"
-pynakes search . refs.bib --where 'title ~ "quantum computing"'
-pynakes search . refs.bib --where 'journal matches "^Phys\. Rev\."'
+pynakes search "" refs.bib --where 'key in [Newton1687, Euler1748]'
+pynakes search "" refs.bib --where 'date >= 1900-06 and date <= 1910'
+pynakes search "" refs.bib --where 'abstract missing'          # "entries missing field X"
+pynakes search "" refs.bib --where 'title ~ "quantum computing"'
+pynakes search "" refs.bib --where 'journal matches "^Phys\. Rev\."'
 ```
+
+Use `""`, not a filler query like `.`: a filler is a real search term, so
+`search . --where 'abstract missing'` quietly returns only those matching
+entries whose text happens to contain a period. An empty query searches nothing
+and lets the predicate decide, which is the whole set. The query argument stays
+required, so a lone path can never be mistaken for a query.
 
 Quote values containing spaces or punctuation; bare tokens may not contain
 whitespace, brackets, commas, or comparison characters. A comparison against a
@@ -874,6 +882,7 @@ pynakes search learning                   # auto-detects one .bib file
 pynakes search learning refs.bib
 pynakes search 'title:"natural language" type:article' refs.bib --json
 pynakes search widgets refs.bib --field title --where 'year = 2024' --json
+pynakes search "" refs.bib --where 'doi missing'    # predicate only, no text match
 ```
 
 Terms are ANDed. Quoted phrases stay together. `field:term` scopes a term to a
