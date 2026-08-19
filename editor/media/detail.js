@@ -220,7 +220,19 @@ window.PV = window.PV || {};
     copy.type = "button";
     copy.textContent = "Copy key";
     copy.addEventListener("click", () => PV.post({ type: "copyKey", key: row.key }));
-    actions.append(reveal, copy);
+    const compare = document.createElement("button");
+    compare.className = "button";
+    compare.type = "button";
+    const comparing = PV.state.compareBusy === row.key;
+    compare.textContent = comparing ? "Comparing…" : "Compare with remote";
+    compare.disabled = comparing;
+    compare.title = "Fetch DOI/arXiv metadata and compare it field by field";
+    compare.addEventListener("click", () => {
+      PV.state.compareBusy = row.key;
+      PV.renderDetail();
+      PV.post({ type: "compareRemote", key: row.key });
+    });
+    actions.append(reveal, copy, compare);
     if (PV.entryStaged(row.key)) {
       const discard = document.createElement("button");
       discard.className = "button";

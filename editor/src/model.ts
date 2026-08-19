@@ -9,11 +9,26 @@
  * never travels back to the file.
  */
 
+/**
+ * Human-readable projection of an entry's title/name fields, from `inspect
+ * --display`: LaTeX markup and braces already cleaned, name lists already
+ * split. Present only for fields the entry actually has.
+ */
+export interface InspectDisplay {
+  title?: string;
+  booktitle?: string;
+  maintitle?: string;
+  subtitle?: string;
+  author?: string[];
+  editor?: string[];
+}
+
 export interface InspectEntry {
   key: string;
   type: string;
   fields: Record<string, string>;
   resolved_fields?: Record<string, string>;
+  display?: InspectDisplay;
 }
 
 export interface MetadataNamespace {
@@ -154,6 +169,23 @@ export function entryVenue(fields: Record<string, string>): string {
   return "";
 }
 
+/**
+ * Author/editor names for the table.
+ *
+ * Prefers the engine's `display` view — already split into individual names
+ * and cleaned of LaTeX markup and braces, so a brace-protected corporate name
+ * like `{Smith and Sons}` is never misread as two people. Falls back to
+ * client-side splitting of the raw field for an engine that predates
+ * `inspect --display`.
+ */
+export function entryAuthor(entry: InspectEntry): string {
+  const names = entry.display?.author ?? entry.display?.editor;
+  if (names) {
+    return names.map(collapseWhitespace).join("; ");
+  }
+  return formatNames(entry.fields.author ?? entry.fields.editor ?? "");
+}
+
 /** Project the engine's entry list onto table rows, preserving file order. */
 export function toRows(envelope: InspectSuccess): EntryRow[] {
   const duplicates = new Set(Object.keys(envelope.duplicate_keys ?? {}));
@@ -161,8 +193,10 @@ export function toRows(envelope: InspectSuccess): EntryRow[] {
     index,
     key: entry.key,
     type: entry.type,
-    author: formatNames(entry.fields.author ?? entry.fields.editor ?? ""),
-    title: collapseWhitespace(entry.fields.title ?? entry.fields.shorttitle ?? ""),
+    author: entryAuthor(entry),
+    title: collapseWhitespace(
+      entry.display?.title ?? entry.fields.title ?? entry.fields.shorttitle ?? "",
+    ),
     year: entryYear(entry.fields),
     venue: entryVenue(entry.fields),
     duplicate: duplicates.has(entry.key),
@@ -310,5 +344,34 @@ export interface RefEditSuccess {
   };
   diff?: string;
 }
+
+/** One field where `ref compare`'s remote record disagrees with the local entry. */
+export interface FieldComparison {
+  field: string;
+  /** `null` when the entry has no value for this field at all. */
+  local: string | null;
+  remote: string;
+}
+
+export interface RefCompareWarning {
+  type: string;
+  key: string;
+  message: string;
+}
+
+export interface RefCompareSuccess {
+  status: "success";
+  action: "ref_compare";
+  file: string;
+  online: boolean;
+  key: string;
+  /** `"doi"` or `"arxiv"`; `null` when nothing could be compared. */
+  source: string | null;
+  identifier: string | null;
+  fields: FieldComparison[];
+  warnings: RefCompareWarning[];
+}
+
+export type RefCompareEnvelope = RefCompareSuccess | InspectError;
 
 export type RefEditEnvelope = RefEditSuccess | InspectError;

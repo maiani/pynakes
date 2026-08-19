@@ -8,6 +8,7 @@ import { test } from "node:test";
 import {
   type InspectSuccess,
   collapseWhitespace,
+  entryAuthor,
   entryVenue,
   entryYear,
   formatNames,
@@ -112,6 +113,64 @@ test("toRows preserves file order and projects the display columns", () => {
   assert.equal(rows[0].title, "Philosophiae Naturalis Principia Mathematica");
   // An entry without an author falls back to the editor for the name column.
   assert.equal(rows[1].author, "Menabrea, Luigi");
+});
+
+test("entryAuthor prefers the engine's cleaned, pre-split display names", () => {
+  assert.equal(
+    entryAuthor({
+      key: "Peirce1867",
+      type: "article",
+      fields: { author: "{Peirce and Sons Institute}" },
+      display: { author: ["Peirce and Sons Institute"] },
+    }),
+    "Peirce and Sons Institute",
+  );
+});
+
+test("entryAuthor falls back to editor names, then to splitting the raw field", () => {
+  assert.equal(
+    entryAuthor({
+      key: "Lovelace1843",
+      type: "article",
+      fields: { editor: "Menabrea, Luigi" },
+      display: { editor: ["Menabrea, Luigi"] },
+    }),
+    "Menabrea, Luigi",
+  );
+  // No `display` at all — an engine that predates `inspect --display`.
+  assert.equal(
+    entryAuthor({
+      key: "Newton1687",
+      type: "book",
+      fields: { author: "Newton, Isaac and Halley, Edmond" },
+    }),
+    "Newton, Isaac; Halley, Edmond",
+  );
+});
+
+test("toRows prefers the engine's cleaned title and author over raw fields", () => {
+  const rows = toRows(
+    envelope({
+      entry_count: 1,
+      entries: [
+        {
+          key: "Peirce1867",
+          type: "article",
+          fields: {
+            title: "On an {Improvement} in Boole's Calculus",
+            author: "Peirce, C. S. and {Crick and Sons}",
+          },
+          display: {
+            title: "On an Improvement in Boole's Calculus",
+            author: ["Peirce, C. S.", "Crick and Sons"],
+          },
+        },
+      ],
+    }),
+  );
+
+  assert.equal(rows[0].title, "On an Improvement in Boole's Calculus");
+  assert.equal(rows[0].author, "Peirce, C. S.; Crick and Sons");
 });
 
 test("toRows flags every occurrence of a duplicated citation key", () => {

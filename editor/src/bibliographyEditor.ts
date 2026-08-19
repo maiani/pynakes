@@ -17,6 +17,7 @@ import { resolveEngine } from "./engineDiscovery";
 import type { Summary } from "./model";
 import {
   commitEdits,
+  compareEntry,
   previewEdits,
   readLibrary,
   runSearch,
@@ -451,6 +452,11 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       case "preview":
         await this.preview(document, panel);
         return;
+      case "compareRemote":
+        if (message.key) {
+          await this.compareRemote(document, panel, message.key);
+        }
+        return;
       case "commit":
         await this.commit(document, panel);
         return;
@@ -509,6 +515,57 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       );
     } catch (error) {
       void panel.webview.postMessage(await this.describeFailure(error, document));
+    } finally {
+      await mirror?.release();
+    }
+  }
+
+  // -- compare with remote ---------------------------------------------------
+
+  /**
+   * Compare one entry against its DOI/arXiv remote record (read-only).
+   *
+   * The network gate lives here, not in the webview: `online` is decided
+   * from the `pynakes.allowOnlineLookups` setting for this document, so a
+   * user who never opted in never triggers a network call, matching
+   * pynakes' own explicit-network-access policy.
+   */
+  private async compareRemote(
+    document: vscode.TextDocument,
+    panel: vscode.WebviewPanel,
+    key: string,
+  ): Promise<void> {
+    const online = vscode.workspace
+      .getConfiguration("pynakes", document.uri)
+      .get<boolean>("allowOnlineLookups", false);
+    let mirror: TempMirror | undefined;
+    try {
+      const command = await resolveCommand(document.uri);
+      const cwd = this.workingDirectory(document);
+      mirror = await this.sourceFor(document);
+      const outcome = await compareEntry(command, mirror.source, key, online, cwd);
+      void panel.webview.postMessage(
+        outcome.ok
+          ? {
+              type: "compareResult",
+              key,
+              source: outcome.source,
+              identifier: outcome.identifier,
+              fields: outcome.fields,
+              warnings: outcome.warnings,
+            }
+          : { type: "compareError", key, message: outcome.message },
+      );
+    } catch (error) {
+      // A compare failure is scoped to one entry, not the whole view, so it
+      // is reported through `compareError` rather than the generic
+      // `engineError` path other reads use (which blanks the table).
+      const failure = await this.describeFailure(error, document);
+      void panel.webview.postMessage({
+        type: "compareError",
+        key,
+        message: typeof failure.message === "string" ? failure.message : "Compare failed.",
+      });
     } finally {
       await mirror?.release();
     }

@@ -6,7 +6,7 @@
  */
 
 import { buildGroupTree, groupsByEntry, indexLint, type GroupNode, type LintIndex } from "./insights";
-import type { EntryRow, InspectError, RefEditPlanEntry, Summary } from "./model";
+import type { EntryRow, FieldComparison, InspectError, RefEditPlanEntry, Summary } from "./model";
 import { summarize, toRows } from "./model";
 import {
   type PynakesCommand,
@@ -16,6 +16,7 @@ import {
   groupsTree,
   inspectBib,
   lintBib,
+  refCompare,
   refEdit,
   searchBib,
 } from "./pynakes";
@@ -150,6 +151,38 @@ export async function previewEdits(
     });
   }
   return { ok: true, entries };
+}
+
+/** Outcome of comparing one entry against its DOI/arXiv remote record. */
+export type CompareOutcome =
+  | {
+      ok: true;
+      source: string | null;
+      identifier: string | null;
+      fields: FieldComparison[];
+      warnings: string[];
+    }
+  | { ok: false; message: string };
+
+/** Compare one entry's fields against remote metadata (read-only). */
+export async function compareEntry(
+  command: PynakesCommand,
+  filePath: string,
+  key: string,
+  online: boolean,
+  cwd?: string,
+): Promise<CompareOutcome> {
+  const envelope = await refCompare(command, filePath, key, online, cwd);
+  if (envelope.status === "error") {
+    return { ok: false, message: envelope.message };
+  }
+  return {
+    ok: true,
+    source: envelope.source,
+    identifier: envelope.identifier,
+    fields: envelope.fields,
+    warnings: envelope.warnings.map((warning) => warning.message),
+  };
 }
 
 export interface CommitResult {

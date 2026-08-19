@@ -225,6 +225,28 @@ window.PV = window.PV || {};
         s.panelCollapsed = false;
         PV.renderPanels();
         break;
+      case "compareResult":
+        s.compareBusy = null;
+        s.compare = {
+          key: message.key,
+          source: message.source,
+          identifier: message.identifier,
+          fields: message.fields || [],
+          warnings: message.warnings || [],
+        };
+        s.panel = "compare";
+        s.panelCollapsed = false;
+        PV.renderDetail();
+        PV.renderPanels();
+        break;
+      case "compareError":
+        s.compareBusy = null;
+        s.compare = { key: message.key, error: message.message };
+        s.panel = "compare";
+        s.panelCollapsed = false;
+        PV.renderDetail();
+        PV.renderPanels();
+        break;
       case "conflict": {
         s.panel = "diff";
         s.panelCollapsed = false;

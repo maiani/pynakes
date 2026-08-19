@@ -18,6 +18,7 @@ import type {
   GroupsTreeEnvelope,
   InspectEnvelope,
   LintEnvelope,
+  RefCompareEnvelope,
   RefEditEnvelope,
   SearchEnvelope,
 } from "./model";
@@ -120,13 +121,21 @@ async function runJson<T>(command: PynakesCommand, args: string[], cwd?: string)
   return parsed as T;
 }
 
-/** Every entry with its fields, plus encoding, metadata, and duplicate keys. */
+/**
+ * Every entry with its fields, plus encoding, metadata, and duplicate keys.
+ *
+ * `--display` asks the engine for a `display` view per entry — title fields
+ * with LaTeX markup and braces cleaned to plain text, and `author`/`editor`
+ * split into individual, cleaned names — so the view never has to parse
+ * BibTeX/LaTeX itself. It is read-only presentation data, never staged or
+ * written back.
+ */
 export function inspectBib(
   command: PynakesCommand,
   filePath: string,
   cwd?: string,
 ): Promise<InspectEnvelope> {
-  return runJson<InspectEnvelope>(command, ["inspect", filePath], cwd);
+  return runJson<InspectEnvelope>(command, ["inspect", filePath, "--display"], cwd);
 }
 
 /** The declared group hierarchy from the file's metadata. */
@@ -236,6 +245,28 @@ export function refEdit(
   cwd?: string,
 ): Promise<RefEditEnvelope> {
   return runJson<RefEditEnvelope>(command, refEditArgs(filePath, request, dryRun), cwd);
+}
+
+/**
+ * Compare one entry's fields against its DOI/arXiv remote record (read-only).
+ *
+ * `online` gates the network call and is decided by the extension host from
+ * the `pynakes.allowOnlineLookups` setting, never by the webview — matching
+ * pynakes' own explicit-network-access policy. Without it the engine still
+ * runs (offline) and reports why nothing could be compared.
+ */
+export function refCompare(
+  command: PynakesCommand,
+  filePath: string,
+  key: string,
+  online: boolean,
+  cwd?: string,
+): Promise<RefCompareEnvelope> {
+  const args = ["ref", "compare", key, filePath];
+  if (online) {
+    args.push("--online");
+  }
+  return runJson<RefCompareEnvelope>(command, args, cwd);
 }
 
 /** Engine version string, or `undefined` when it cannot be determined. */

@@ -834,6 +834,48 @@ body.resizing * {
   color: var(--vscode-descriptionForeground);
 }
 
+/* Compare with remote ------------------------------------------ */
+
+.compare-table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0 10px;
+}
+
+.compare-row {
+  display: grid;
+  grid-template-columns: 1.4em 9em 1fr 1fr;
+  align-items: start;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+  font-size: 0.92em;
+}
+
+.compare-row input[type="checkbox"] {
+  margin-top: 3px;
+}
+
+.compare-field-name {
+  color: var(--vscode-descriptionForeground);
+  font-weight: 600;
+}
+
+.compare-local,
+.compare-remote {
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.compare-local {
+  color: var(--vscode-gitDecoration-deletedResourceForeground, #f14c4c);
+}
+
+.compare-remote {
+  color: var(--vscode-gitDecoration-addedResourceForeground, #487e02);
+}
+
 /* Commit bar -------------------------------------------------- */
 
 .commit-bar {

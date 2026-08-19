@@ -51,6 +51,10 @@ window.PV = window.PV || {};
     diff: null,
     notice: null,
     visible: [],
+    /** Last "Compare with remote" result or error, for the entry it was run on. */
+    compare: null,
+    /** Citation key currently awaiting a compare response, or null. */
+    compareBusy: null,
   };
 
   PV.persist = () => {

@@ -40,6 +40,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   query, and an empty query with no `--where` is rejected rather than silently
   matching the whole library.
 
+- The detail pane gained a "Compare with remote" action per entry: it fetches
+  the entry's DOI (or arXiv id, absent a DOI) via the engine's new `ref
+  compare`, and shows a field-by-field local-vs-remote table in a new
+  "Compare" panel tab. Nothing is written automatically — checking a field and
+  choosing "Apply selected" stages it through the existing field-edit path, so
+  it goes through the normal preview/diff/commit flow like any manual edit.
+  Network access is opt-in via the new `pynakes.allowOnlineLookups` setting
+  (off by default); without it, compare still runs but reports that online
+  lookups are disabled rather than silently doing nothing.
+
 ### Fixed
 
 - The documented idiom for a predicate-only search, `pynakes search . --where

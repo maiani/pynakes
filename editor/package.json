@@ -114,6 +114,12 @@
           "default": true,
           "markdownDescription": "Show `lint` findings in the bibliography view: a severity marker per row and a findings panel. Findings are advisory and never change the file.",
           "scope": "window"
+        },
+        "pynakes.allowOnlineLookups": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Allow the bibliography view's \"Compare with remote\" action to fetch metadata from DOI/arXiv providers over the network (`ref compare --online`). Off by default, matching pynakes' own explicit-network-access policy; comparing without it runs fully offline and reports that online lookups are disabled.",
+          "scope": "window"
         }
       }
     }

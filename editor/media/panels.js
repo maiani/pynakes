@@ -147,6 +147,104 @@ window.PV = window.PV || {};
     }
   }
 
+  function renderCompare(target) {
+    const compare = PV.state.compare;
+    if (!compare) {
+      const hint = document.createElement("p");
+      hint.className = "hint";
+      hint.textContent = 'Select an entry and choose "Compare with remote" to see this.';
+      target.appendChild(hint);
+      return;
+    }
+
+    const heading = document.createElement("h4");
+    heading.textContent = compare.key;
+    target.appendChild(heading);
+
+    if (compare.error) {
+      const note = document.createElement("p");
+      note.className = "diff-warning";
+      note.textContent = compare.error;
+      target.appendChild(note);
+      return;
+    }
+
+    if (compare.source) {
+      const source = document.createElement("p");
+      source.className = "hint";
+      source.textContent = "Compared against " + compare.source + ":" + compare.identifier;
+      target.appendChild(source);
+    }
+
+    for (const warning of compare.warnings || []) {
+      const note = document.createElement("p");
+      note.className = "diff-warning";
+      note.textContent = warning.message;
+      target.appendChild(note);
+    }
+
+    if (compare.fields.length === 0) {
+      if (!compare.warnings || compare.warnings.length === 0) {
+        const hint = document.createElement("p");
+        hint.className = "hint";
+        hint.textContent = "No differing fields.";
+        target.appendChild(hint);
+      }
+      return;
+    }
+
+    const table = document.createElement("div");
+    table.className = "compare-table";
+    const checkboxes = [];
+    for (const field of compare.fields) {
+      const row = document.createElement("div");
+      row.className = "compare-row";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      // A field the entry lacks entirely defaults to accepted; a genuine
+      // conflict (both sides have a value) defaults to unchecked, so a
+      // remote value never silently overwrites curated local data.
+      checkbox.checked = field.local === null;
+      checkboxes.push({ field, checkbox });
+
+      const name = document.createElement("span");
+      name.className = "compare-field-name";
+      name.textContent = field.field;
+
+      const local = document.createElement("span");
+      local.className = "compare-local";
+      local.textContent = field.local ?? "(missing)";
+
+      const remote = document.createElement("span");
+      remote.className = "compare-remote";
+      remote.textContent = field.remote;
+
+      row.append(checkbox, name, local, remote);
+      table.appendChild(row);
+    }
+    target.appendChild(table);
+
+    const apply = document.createElement("button");
+    apply.type = "button";
+    apply.className = "button primary";
+    apply.textContent = "Apply selected";
+    apply.addEventListener("click", () => {
+      for (const { field, checkbox } of checkboxes) {
+        if (checkbox.checked) {
+          PV.post({
+            type: "stageField",
+            key: compare.key,
+            field: field.field,
+            value: field.remote,
+            base: field.local,
+          });
+        }
+      }
+    });
+    target.appendChild(apply);
+  }
+
   function diffLineClass(line) {
     if (line.startsWith("+++") || line.startsWith("---")) {
       return "diff-file";
@@ -185,6 +283,7 @@ window.PV = window.PV || {};
     tabs.replaceChildren(
       tabButton("findings", "Findings", findingCount),
       tabButton("diff", "Staged diff", s.counts.fields || null),
+      tabButton("compare", "Compare", null),
       collapseToggle(),
     );
 
@@ -192,6 +291,8 @@ window.PV = window.PV || {};
     target.className = "panel-content";
     if (s.panel === "diff") {
       renderDiff(target);
+    } else if (s.panel === "compare") {
+      renderCompare(target);
     } else {
       renderFindings(target);
     }
