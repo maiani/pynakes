@@ -1,0 +1,137 @@
+{
+  "name": "pynakes-vscode",
+  "displayName": "Pynakes",
+  "description": "Browse BibTeX/BibLaTeX bibliographies in VS Code, powered by the pynakes engine.",
+  "version": "0.0.1",
+  "publisher": "pynakes",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andreamaiani/pynakes.git",
+    "directory": "editor"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "bibtex",
+    "biblatex",
+    "bibliography",
+    "citations",
+    "latex"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "pynakes.bibliography",
+        "displayName": "Pynakes Bibliography",
+        "selector": [
+          {
+            "filenamePattern": "*.bib"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "commands": [
+      {
+        "command": "pynakes.openBibliography",
+        "title": "Open Bibliography",
+        "category": "Pynakes"
+      },
+      {
+        "command": "pynakes.refreshBibliography",
+        "title": "Refresh Bibliography View",
+        "category": "Pynakes"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "pynakes.openBibliography",
+          "when": "resourceExtname == .bib",
+          "group": "navigation@20"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "pynakes.openBibliography",
+          "when": "resourceExtname == .bib",
+          "group": "1_open@20"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Pynakes",
+      "properties": {
+        "pynakes.executable": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Command used to invoke the pynakes engine. Leave empty to use the bundled engine, or an installed pynakes when it is newer. Setting this overrides discovery entirely; pair it with `#pynakes.executableArgs#` when it names a Python interpreter.",
+          "scope": "machine-overridable"
+        },
+        "pynakes.executableArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Arguments inserted before every pynakes subcommand. Set to `[\"-m\", \"pynakes\"]` when `#pynakes.executable#` is a Python interpreter.",
+          "scope": "machine-overridable"
+        },
+        "pynakes.engine": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "bundled",
+            "installed"
+          ],
+          "enumDescriptions": [
+            "Use the bundled engine, unless an installed one is newer.",
+            "Always use the engine bundled with the extension.",
+            "Always use the pynakes found on PATH."
+          ],
+          "default": "auto",
+          "markdownDescription": "Which pynakes engine to run. Ignored when `#pynakes.executable#` is set.",
+          "scope": "machine-overridable"
+        },
+        "pynakes.search.fuzzy": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Start the view's search with `--fuzzy` enabled, matching misspellings and inflections by similarity. Can be toggled per search in the view.",
+          "scope": "window"
+        },
+        "pynakes.showFindings": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show `lint` findings in the bibliography view: a severity marker per row and a findings panel. Findings are advisory and never change the file.",
+          "scope": "window"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -p . --watch",
+    "pretest": "npm run compile",
+    "test": "node --test \"out/test/**/*.test.js\"",
+    "package": "npx --yes @vscode/vsce package --no-dependencies",
+    "vendor-engine": "node scripts/vendor-engine.mjs",
+    "vscode:prepublish": "npm run vendor-engine && npm run compile",
+    "package:clean": "node -e \"require('fs').rmSync('engine',{recursive:true,force:true})\" && npm run package",
+    "install-vsix": "node -e \"const p=require('./package.json');const f=p.name+'-'+p.version+'.vsix';require('node:child_process').execFileSync('code',['--install-extension',f,'--force'],{stdio:'inherit'});console.log('Installed '+f)\"",
+    "clean": "node -e \"const fs=require('fs');for (const t of ['engine','out']) fs.rmSync(t,{recursive:true,force:true});for (const f of fs.readdirSync('.')) if (f.endsWith('.vsix')) fs.rmSync(f)\""
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.7.0"
+  }
+}

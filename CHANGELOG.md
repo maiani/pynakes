@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+
+- `editor/` — a VS Code / Open VSX extension companion. It opens a `.bib` file
+  as a sortable, filterable entry table with a field detail pane, browses the
+  declared group hierarchy, runs the engine's own search, surfaces lint findings
+  per entry, and stages field edits for review as an exact diff before commit.
+  It flags duplicate citation keys, reports encoding, line ending, `@string`
+  count and which metadata namespaces the file carries, follows the text buffer
+  rather than the file on disk, and jumps from a row to the entry's declaration
+  in the source. Linked-material state and TeX citation navigation are not
+  implemented. The client holds no bibliography implementation of its own: every
+  value it displays comes from the engine's JSON envelope, and every change
+  leaves through `ref edit`. It is not published to either marketplace, is
+  excluded from the Python sdist and wheel, and has its own Node toolchain —
+  see [editor/README.md](editor/README.md).
+
+- `pixi.toml` at the repository root provides the toolchain the VS Code
+  extension needs — Node plus a Python pinned to 3.11, the floor of
+  `requires-python` and the version CI builds with — so
+  `pixi run build-extension` produces an installable
+  `editor/pynakes-vscode-<version>.vsix` on a machine set up for neither.
+  `install-extension`, `test-extension`, and `clean-extension` round out the
+  set. This is additive: the pip workflow remains how the engine is developed.
+
+- `search` accepts an empty query, selecting entries by `--where` predicate
+  alone: `pynakes search "" refs.bib --where 'doi missing'` answers "which
+  entries are missing this field" with no text match involved. This is the
+  read-only path for the shared selector grammar, which until now was reachable
+  only from commands that write. Predicate-only results report no matched fields
+  and stay in file order, since relevance ranking needs terms to rank by. The
+  query argument remains required, so a lone path can never be taken for a
+  query, and an empty query with no `--where` is rejected rather than silently
+  matching the whole library.
+
+### Fixed
+
+- The documented idiom for a predicate-only search, `pynakes search . --where
+  '...'`, was quietly lossy: `.` is a real search term, so the results were
+  restricted to entries whose text happened to contain a period, and entries
+  without one were dropped from answers like `--where 'abstract missing'`. The
+  guides now use the empty query added above.
+
+- The test suite imported whichever copy of pynakes was installed in the
+  environment rather than the working tree, because nothing put `src/` on the
+  import path and a non-editable install shadows it. A green run therefore said
+  nothing about the source under test. `pythonpath = ["src"]` fixes it, so
+  `pynakes` now resolves to `src/pynakes` during a test run.
+
+### Added
+
+- `editor/` now bundles the engine, so the extension needs a Python 3.11+
+  interpreter but no pynakes install. `npm run vendor-engine` builds the engine
+  and its dependencies into `editor/engine/` (generated, git-ignored, shipped
+  only inside the VSIX); every runtime dependency is a pure-Python
+  `py3-none-any` wheel, so one universal bundle covers every platform with no
+  per-platform build and nothing to code-sign. An engine the user installed
+  themselves is preferred when its version is strictly newer than the bundled
+  one, so upgrading pynakes takes effect without an extension release. The
+  interpreter is taken from the Python extension's selection, then a workspace
+  virtual environment, then `PATH`; `pynakes.executable` still overrides
+  everything and `pynakes.engine` can force `bundled` or `installed`.
+
 ## [0.6.0] - 2026-08-18
 ### Added
 

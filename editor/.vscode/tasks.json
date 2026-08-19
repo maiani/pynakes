@@ -1,0 +1,25 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "script": "compile",
+      "problemMatcher": "$tsc",
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "type": "npm",
+      "script": "watch",
+      "isBackground": true,
+      "problemMatcher": "$tsc-watch",
+      "group": "build"
+    },
+    {
+      "label": "vendor engine",
+      "detail": "Rebuild engine/ from the pynakes source tree, so F5 runs the bundled engine.",
+      "type": "npm",
+      "script": "vendor-engine",
+      "problemMatcher": []
+    }
+  ]
+}

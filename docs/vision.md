@@ -76,3 +76,39 @@ trustworthy, version-controllable layer a larger AI-assisted research system can
 build on. Compatibility with the tools it grew from — JabRef, and the
 BibTeX/BibLaTeX it speaks natively — is a guarantee it keeps along the way, not
 the boundary of what it aims to be.
+
+## Graphical clients and their scope
+
+The engine expects more than one graphical client above it, and the line between
+them is **scope**, not feature count.
+
+The **VS Code extension** in [editor/](https://github.com/maiani/pynakes/tree/main/editor)
+is the GUI for a bibliography that belongs to something you are editing — a
+paper, a thesis, a repository. That framing is not a product preference; the host
+imposes it. A custom text editor in VS Code owns exactly one document as the
+source of truth, with the buffer, dirty state, external-change events, and undo
+all keyed to it. There is no document for a whole library to hang from, so the
+extension is at home with a project's bibliography and structurally unsuited to
+being a library browser.
+
+**Bimas** (working name) is the planned standalone application for the other
+scope: exploring a generic library that belongs to no particular project and
+outlives any workspace. It is not a fallback in case the extension proves too
+confining. It exists because library scope is somewhere the extension cannot
+follow.
+
+Single file versus many files is a frequent *symptom* of that boundary, not the
+boundary itself. A personal master library is often one `.bib` — one file, and
+still squarely library-scoped. Scanning citations across a paper's sources spans
+one `.bib` and many `.tex` files — many files, and squarely project-scoped. Sort
+clients by whose bibliography it is, not by how many files are open.
+
+The boundary is also permeable in one direction. A project-scoped client may
+freely *read* library-scoped things: compare a paper's bibliography against a
+master library, or import an entry from it. What it does not do is own or curate
+them.
+
+Both clients stay thin consumers of the same JSON envelope, with no BibTeX
+parser, metadata schema, or source of truth of their own. That is what makes two
+clients affordable — and it is also why the envelope has to be pinned and
+versioned before the second one exists, rather than after.

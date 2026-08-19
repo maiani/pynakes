@@ -120,11 +120,17 @@ dmypy.json
 
 # IDE
 .vscode/
+# ...but the VS Code extension companion commits its own debug configuration.
+!/editor/.vscode/
 .idea/
 *.swp
 *.swo
 *~
 .DS_Store
 
+# Pixi materializes its environments here; the lock file is committed.
+.pixi/
+
 # Project specific
 .agent-eval-runs/
+spikes/

@@ -1,0 +1,48 @@
+# Pixi manifest for developer tasks whose toolchain is not pip-installable —
+# principally building the VS Code extension, which needs Node and a Python
+# 3.11+ interpreter available together.
+#
+# This does not replace the pip workflow in AGENTS.md: `pip install -e
+# ".[dev,docs]"` is still how the engine is developed and tested, and `pytest` /
+# `ruff` are run that way. Pixi is here so that producing an installable `.vsix`
+# is one command on a machine that has neither Node nor a new enough Python.
+
+[workspace]
+name = "pynakes"
+version = "0.6.0"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64", "osx-64", "win-64"]
+
+[dependencies]
+# Builds, tests, and packages the extension.
+nodejs = ">=20"
+# `vendor-engine` runs `pip wheel` against this repository to build the engine
+# bundle that ships inside the VSIX. Pinned to the floor of `requires-python`,
+# which is also what CI builds the bundle with: the wheels are pure-Python and
+# universal, but resolving them on a newer interpreter can pick different
+# versions, and a bundle should not depend on which Python happened to build it.
+python = "3.11.*"
+pip = "*"
+
+[tasks.build-extension]
+description = "Build the VS Code extension into an installable .vsix"
+cmd = "npm install --no-audit --no-fund && npm run package"
+cwd = "editor"
+
+[tasks.install-extension]
+description = "Build the extension, then install it into VS Code"
+# `code` comes from the host, not from this environment: installing into the
+# editor you actually run is the point, so it is deliberately not a dependency.
+cmd = "npm run install-vsix"
+cwd = "editor"
+depends-on = ["build-extension"]
+
+[tasks.test-extension]
+description = "Compile the extension and run its unit tests"
+cmd = "npm install --no-audit --no-fund && npm test"
+cwd = "editor"
+
+[tasks.clean-extension]
+description = "Remove the vendored engine, compiled output, and packaged .vsix"
+cmd = "npm run clean"
+cwd = "editor"
