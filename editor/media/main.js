@@ -24,6 +24,9 @@ window.PV = window.PV || {};
     panelBody: document.getElementById("panel-body"),
     commitBar: document.getElementById("commit-bar"),
     headers: document.querySelectorAll("th[data-col]"),
+    sidebarSplitter: document.getElementById("sidebar-splitter"),
+    detailSplitter: document.getElementById("detail-splitter"),
+    panelSplitter: document.getElementById("panel-splitter"),
   };
 
   PV.tableInit({
@@ -39,6 +42,14 @@ window.PV = window.PV || {};
     tabs: elements.panelTabs,
     body: elements.panelBody,
     bar: elements.commitBar,
+  });
+  PV.layoutInit({
+    sidebar: elements.groups,
+    detail: elements.detail,
+    panel: elements.panel,
+    sidebarSplitter: elements.sidebarSplitter,
+    detailSplitter: elements.detailSplitter,
+    panelSplitter: elements.panelSplitter,
   });
 
   elements.query.value = PV.state.search.query;
@@ -246,6 +257,23 @@ window.PV = window.PV || {};
         s.panelCollapsed = false;
         PV.renderDetail();
         PV.renderPanels();
+        break;
+      case "keyRenamed":
+        s.renameBusy = null;
+        if (s.selectedKey === message.oldKey) {
+          s.selectedKey = message.newKey;
+          PV.persist();
+        }
+        notify("success", "Renamed " + message.oldKey + " to " + message.newKey + ".");
+        break;
+      case "renameKeyCancelled":
+        s.renameBusy = null;
+        PV.renderDetail();
+        break;
+      case "renameKeyError":
+        s.renameBusy = null;
+        notify("error", "Rename failed: " + message.message);
+        PV.renderDetail();
         break;
       case "conflict": {
         s.panel = "diff";

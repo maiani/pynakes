@@ -58,6 +58,7 @@ window.PV = window.PV || {};
   PV.renderGroups = () => {
     const s = PV.state;
     container.classList.toggle("collapsed", s.sidebarCollapsed);
+    PV.applyPaneSizes();
     const fragment = document.createDocumentFragment();
 
     const heading = document.createElement("div");

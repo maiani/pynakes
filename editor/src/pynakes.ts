@@ -17,6 +17,7 @@ import type {
   GroupsListEnvelope,
   GroupsTreeEnvelope,
   InspectEnvelope,
+  KeysRenameEnvelope,
   LintEnvelope,
   RefCompareEnvelope,
   RefEditEnvelope,
@@ -115,7 +116,7 @@ async function runJson<T>(command: PynakesCommand, args: string[], cwd?: string)
     );
   }
   const status = (parsed as { status?: string })?.status;
-  if (status !== "success" && status !== "error") {
+  if (status !== "success" && status !== "error" && status !== "conflict") {
     throw new PynakesProtocolError(`${label} returned an unrecognized envelope.`, text.slice(0, 2000));
   }
   return parsed as T;
@@ -248,12 +249,14 @@ export function refEdit(
 }
 
 /**
- * Compare one entry's fields against its DOI/arXiv remote record (read-only).
+ * Compare one entry's fields against another reference (read-only).
  *
- * `online` gates the network call and is decided by the extension host from
- * the `pynakes.allowOnlineLookups` setting, never by the webview — matching
- * pynakes' own explicit-network-access policy. Without it the engine still
- * runs (offline) and reports why nothing could be compared.
+ * With `withKey`, compares against another entry already in the library —
+ * no network access. Otherwise compares against a fetched DOI/arXiv remote
+ * record; `online` gates that network call and is decided by the extension
+ * host from the `pynakes.allowOnlineLookups` setting, never by the webview —
+ * matching pynakes' own explicit-network-access policy. Without it the
+ * engine still runs (offline) and reports why nothing could be compared.
  */
 export function refCompare(
   command: PynakesCommand,
@@ -261,12 +264,29 @@ export function refCompare(
   key: string,
   online: boolean,
   cwd?: string,
+  withKey?: string,
 ): Promise<RefCompareEnvelope> {
   const args = ["ref", "compare", key, filePath];
-  if (online) {
+  if (withKey) {
+    args.push("--with", withKey);
+  } else if (online) {
     args.push("--online");
   }
   return runJson<RefCompareEnvelope>(command, args, cwd);
+}
+
+/**
+ * Rename one citation key, rewriting matching `\cite{...}` keys in any TeX
+ * sources the library's `tex-sources` metadata names.
+ */
+export function keysRename(
+  command: PynakesCommand,
+  filePath: string,
+  oldKey: string,
+  newKey: string,
+  cwd?: string,
+): Promise<KeysRenameEnvelope> {
+  return runJson<KeysRenameEnvelope>(command, ["keys", "rename", filePath, oldKey, newKey], cwd);
 }
 
 /** Engine version string, or `undefined` when it cannot be determined. */

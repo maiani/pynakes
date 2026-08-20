@@ -40,15 +40,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   query, and an empty query with no `--where` is rejected rather than silently
   matching the whole library.
 
-- The detail pane gained a "Compare with remote" action per entry: it fetches
-  the entry's DOI (or arXiv id, absent a DOI) via the engine's new `ref
-  compare`, and shows a field-by-field local-vs-remote table in a new
-  "Compare" panel tab. Nothing is written automatically — checking a field and
-  choosing "Apply selected" stages it through the existing field-edit path, so
-  it goes through the normal preview/diff/commit flow like any manual edit.
-  Network access is opt-in via the new `pynakes.allowOnlineLookups` setting
-  (off by default); without it, compare still runs but reports that online
-  lookups are disabled rather than silently doing nothing.
+- The detail pane gained a "Compare with remote" action, next to an entry's
+  `doi` or `eprint` field: it fetches that identifier's DOI/arXiv record via
+  the engine's new `ref compare` and shows a three-column Local / Other /
+  Merged table in a new "Compare" panel tab, word-level diff highlighting
+  differing spans within each field. The merged column defaults to the local
+  value on a genuine conflict (never silently overwritten) or the other side
+  when the field is missing locally, is freely editable, and has "use local" /
+  "use other" shortcuts. Nothing is written automatically — "Apply merged"
+  stages each field through the existing field-edit path, so it goes through
+  the normal preview/diff/commit flow like any manual edit. Network access is
+  controlled by the new `pynakes.allowOnlineLookups` setting (on by default);
+  with it off, compare still runs but reports that online lookups are
+  disabled rather than silently doing nothing.
+- All panes (the groups sidebar, the detail pane, and the bottom findings/diff
+  panel) are now resizable by dragging their border, the same way table
+  columns already were; each dragged size is remembered per workspace.
+- The detail pane's citation key is now editable: renaming it runs the
+  engine's `keys rename`, which also rewrites matching `\cite{...}` keys in
+  any linked TeX sources. Asks for confirmation first, since (unlike a field
+  edit) it can touch files beyond the `.bib` itself; refuses if the entry has
+  pending staged changes, since those are keyed by the old citation key.
+- Icon buttons (undo/remove a field, collapse toggles) are bigger, with a
+  wider hit target and hover highlight — mainly to make the new "Compare with
+  remote" and merge-table shortcut buttons comfortable to click.
 
 ### Fixed
 

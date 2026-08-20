@@ -20,6 +20,7 @@ import {
   compareEntry,
   previewEdits,
   readLibrary,
+  renameEntryKey,
   runSearch,
   type LibraryRead,
 } from "./library";
@@ -71,6 +72,8 @@ interface ViewMessage {
   /** The value a staged change was made against; null when the field was absent. */
   base?: string | null;
   entryType?: string;
+  /** The requested new citation key, for `renameKey`. */
+  newKey?: string;
   query?: string;
   where?: string;
   fuzzy?: boolean;
@@ -457,6 +460,11 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
           await this.compareRemote(document, panel, message.key);
         }
         return;
+      case "renameKey":
+        if (message.key && message.newKey) {
+          await this.renameKey(document, panel, message.key, message.newKey);
+        }
+        return;
       case "commit":
         await this.commit(document, panel);
         return;
@@ -568,6 +576,80 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       });
     } finally {
       await mirror?.release();
+    }
+  }
+
+  // -- citation key rename ----------------------------------------------------
+
+  /**
+   * Rename one citation key, after reconciling the buffer and an explicit
+   * approval. Unlike a field edit this also rewrites any linked TeX
+   * `\cite{...}` keys, a wider blast radius that warrants asking first —
+   * the same confirmation `commit` uses before writing.
+   */
+  private async renameKey(
+    document: vscode.TextDocument,
+    panel: vscode.WebviewPanel,
+    oldKey: string,
+    newKey: string,
+  ): Promise<void> {
+    const trimmed = newKey.trim();
+    if (!trimmed || trimmed === oldKey) {
+      return;
+    }
+    // The staging map is keyed by the entry's current citation key; renaming
+    // out from under a pending field/type edit would orphan it.
+    if (this.stagingFor(document).entries[oldKey]) {
+      void panel.webview.postMessage({
+        type: "renameKeyError",
+        key: oldKey,
+        message: "Discard or apply this entry's pending changes before renaming its key.",
+      });
+      return;
+    }
+    if (document.uri.scheme !== "file") {
+      void panel.webview.postMessage({
+        type: "renameKeyError",
+        key: oldKey,
+        message: "This document is not a local file, so it cannot be written.",
+      });
+      return;
+    }
+    if (!(await this.reconcileBuffer(document))) {
+      void panel.webview.postMessage({
+        type: "renameKeyError",
+        key: oldKey,
+        message: "Rename cancelled: the file still has unsaved changes.",
+      });
+      return;
+    }
+
+    const approval = await vscode.window.showWarningMessage(
+      `Rename citation key "${oldKey}" to "${trimmed}"?`,
+      {
+        modal: true,
+        detail: "Updates the entry and rewrites matching \\cite{...} keys in any linked TeX sources.",
+      },
+      "Rename",
+    );
+    if (approval !== "Rename") {
+      void panel.webview.postMessage({ type: "renameKeyCancelled", key: oldKey });
+      return;
+    }
+
+    try {
+      const command = await resolveCommand(document.uri);
+      const cwd = this.workingDirectory(document);
+      const filePath = document.uri.fsPath;
+      const outcome = await renameEntryKey(command, filePath, oldKey, trimmed, cwd);
+      if (!outcome.ok) {
+        void panel.webview.postMessage({ type: "renameKeyError", key: oldKey, message: outcome.message });
+        return;
+      }
+      void panel.webview.postMessage({ type: "keyRenamed", oldKey, newKey: outcome.new });
+      await this.load(document, panel);
+    } catch (error) {
+      void panel.webview.postMessage(await this.describeFailure(error, document));
     }
   }
 

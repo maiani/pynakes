@@ -48,6 +48,10 @@ window.PV = window.PV || {};
     // Column widths in pixels, by column position. Empty means the stylesheet
     // decides; the first drag snapshots the current layout so nothing jumps.
     columnWidths: Array.isArray(persisted.columnWidths) ? persisted.columnWidths : [],
+    // Pane sizes in pixels. `null` means the stylesheet decides.
+    sidebarWidth: typeof persisted.sidebarWidth === "number" ? persisted.sidebarWidth : null,
+    detailWidth: typeof persisted.detailWidth === "number" ? persisted.detailWidth : null,
+    panelHeight: typeof persisted.panelHeight === "number" ? persisted.panelHeight : null,
     diff: null,
     notice: null,
     visible: [],
@@ -55,6 +59,8 @@ window.PV = window.PV || {};
     compare: null,
     /** Citation key currently awaiting a compare response, or null. */
     compareBusy: null,
+    /** Citation key currently awaiting a rename response, or null. */
+    renameBusy: null,
   };
 
   PV.persist = () => {
@@ -72,6 +78,9 @@ window.PV = window.PV || {};
       panel: s.panel,
       panelCollapsed: s.panelCollapsed,
       columnWidths: s.columnWidths,
+      sidebarWidth: s.sidebarWidth,
+      detailWidth: s.detailWidth,
+      panelHeight: s.panelHeight,
     });
   };
 

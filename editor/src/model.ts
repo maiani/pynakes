@@ -345,12 +345,12 @@ export interface RefEditSuccess {
   diff?: string;
 }
 
-/** One field where `ref compare`'s remote record disagrees with the local entry. */
+/** One field where the other side of a `ref compare` disagrees with the local entry. */
 export interface FieldComparison {
   field: string;
   /** `null` when the entry has no value for this field at all. */
   local: string | null;
-  remote: string;
+  other: string;
 }
 
 export interface RefCompareWarning {
@@ -365,8 +365,10 @@ export interface RefCompareSuccess {
   file: string;
   online: boolean;
   key: string;
-  /** `"doi"` or `"arxiv"`; `null` when nothing could be compared. */
+  /** `"doi"` or `"arxiv"` for a fetched remote record, `"local"` for another
+   * entry in the library; `null` when nothing could be compared. */
   source: string | null;
+  /** That source's DOI, arXiv id, or citation key, respectively. */
   identifier: string | null;
   fields: FieldComparison[];
   warnings: RefCompareWarning[];
@@ -375,3 +377,30 @@ export interface RefCompareSuccess {
 export type RefCompareEnvelope = RefCompareSuccess | InspectError;
 
 export type RefEditEnvelope = RefEditSuccess | InspectError;
+
+/** What `keys rename` reports. */
+export interface KeysRenameSuccess {
+  status: "success";
+  action: "keys_rename";
+  file: string;
+  dry_run: boolean;
+  modified: boolean;
+  modified_entries: number;
+  warnings: { type: string; message: string }[];
+  old: string;
+  new: string;
+  /** `\cite{...}` occurrences rewritten across linked TeX sources. */
+  source_occurrences: number;
+  diff?: string;
+}
+
+/** The new key is already taken, or the old one is ambiguous (a duplicate). */
+export interface KeysRenameConflict {
+  status: "conflict";
+  error: string;
+  message: string;
+  key?: string;
+  options: { id: string; description: string }[];
+}
+
+export type KeysRenameEnvelope = KeysRenameSuccess | KeysRenameConflict | InspectError;

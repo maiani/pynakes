@@ -107,18 +107,22 @@ body {
 }
 
 .icon-button {
-  padding: 0 4px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 3px 7px;
   color: var(--vscode-descriptionForeground);
   background: none;
   border: none;
+  border-radius: 3px;
   font-family: inherit;
-  font-size: 0.85em;
+  font-size: 1em;
+  line-height: 1;
   cursor: pointer;
 }
 
 .icon-button:hover {
   color: var(--vscode-foreground);
-  text-decoration: underline;
+  background-color: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
 }
 
 /* Collapse/expand toggles for the groups column and the bottom panel: a
@@ -129,11 +133,11 @@ body {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border-radius: 3px;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1;
 }
 
@@ -219,7 +223,6 @@ body {
   min-width: 0;
   padding: 6px 0 10px;
   overflow: auto;
-  border-right: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
   background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
 }
 
@@ -247,12 +250,37 @@ body {
   min-width: 0;
   padding: 10px 12px;
   overflow: auto;
-  border-left: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
   background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
 }
 
+/* A splitter is a flex sibling between two panes, so it both draws the
+   divider line these panes used to draw themselves and gives dragging a
+   dedicated hit target wider than a 1px border would. */
+.pane-splitter {
+  flex: 0 0 4px;
+  min-width: 0;
+  cursor: col-resize;
+  background-color: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+}
+
+.pane-splitter:hover {
+  background-color: var(--vscode-focusBorder);
+}
+
+.pane-splitter-horizontal {
+  cursor: row-resize;
+}
+
+/* Keep the resize cursor while dragging, even outside the handle. */
+body.resizing-row,
+body.resizing-row * {
+  cursor: row-resize !important;
+  user-select: none;
+}
+
 @media (max-width: 900px) {
-  .sidebar {
+  .sidebar,
+  #sidebar-splitter {
     display: none;
   }
 }
@@ -265,8 +293,6 @@ body {
   .detail {
     flex: 0 0 auto;
     max-height: 45%;
-    border-left: none;
-    border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
   }
 }
 
@@ -530,12 +556,27 @@ body.resizing * {
 
 /* Detail pane ------------------------------------------------------------ */
 
-.detail-header h2 {
+.detail-key {
+  display: block;
+  width: 100%;
   margin: 0;
+  padding: 2px 4px;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
   font-family: var(--vscode-editor-font-family);
   font-size: 1.05em;
   font-weight: 600;
-  word-break: break-all;
+}
+
+.detail-key:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.detail-key:disabled {
+  opacity: 0.6;
 }
 
 .detail-type-row {
@@ -591,6 +632,9 @@ body.resizing * {
 
 .field-actions {
   grid-area: actions;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .field-value {
@@ -712,7 +756,6 @@ body.resizing * {
   flex: 0 0 34%;
   flex-direction: column;
   min-height: 0;
-  border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
 }
 
 .panel.collapsed {
@@ -834,46 +877,96 @@ body.resizing * {
   color: var(--vscode-descriptionForeground);
 }
 
-/* Compare with remote ------------------------------------------ */
+/* Compare ------------------------------------------------------- */
 
 .compare-table {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
   margin: 6px 0 10px;
+  overflow-x: auto;
 }
 
 .compare-row {
   display: grid;
-  grid-template-columns: 1.4em 9em 1fr 1fr;
+  grid-template-columns: 7em 1fr 1fr 1fr;
   align-items: start;
   gap: 8px;
-  padding: 3px 0;
+  min-width: 640px;
+  padding: 6px 0;
   border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
   font-size: 0.92em;
 }
 
-.compare-row input[type="checkbox"] {
-  margin-top: 3px;
+.compare-header {
+  padding-bottom: 4px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.8em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
 }
 
 .compare-field-name {
+  padding-top: 4px;
   color: var(--vscode-descriptionForeground);
   font-weight: 600;
-}
-
-.compare-local,
-.compare-remote {
   word-break: break-word;
+}
+
+.compare-value {
+  padding: 3px 6px;
+  overflow-wrap: anywhere;
   white-space: pre-wrap;
+  background-color: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.1));
+  border-radius: 2px;
 }
 
-.compare-local {
-  color: var(--vscode-gitDecoration-deletedResourceForeground, #f14c4c);
+.compare-value.compare-missing {
+  color: var(--vscode-descriptionForeground);
+  background: none;
+  font-style: italic;
 }
 
-.compare-remote {
-  color: var(--vscode-gitDecoration-addedResourceForeground, #487e02);
+.diff-word-add {
+  border-radius: 2px;
+  background-color: var(--vscode-diffEditor-insertedTextBackground, rgba(72, 126, 2, 0.25));
+}
+
+.diff-word-del {
+  border-radius: 2px;
+  background-color: var(--vscode-diffEditor-removedTextBackground, rgba(241, 76, 76, 0.2));
+  text-decoration: line-through;
+}
+
+.compare-merged-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.compare-merged-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.compare-merged-value {
+  width: 100%;
+  min-height: 1.8em;
+  padding: 3px 6px;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  font-family: inherit;
+  font-size: inherit;
+  resize: vertical;
+}
+
+.compare-merged-value:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
 }
 
 /* Commit bar -------------------------------------------------- */

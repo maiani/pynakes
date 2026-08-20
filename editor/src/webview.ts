@@ -24,7 +24,15 @@ const COLUMNS: Array<{ id: string; label: string; className: string }> = [
  * not extend to statically imported modules under this CSP, and `strict-dynamic`
  * would loosen it more than this view needs.
  */
-const SCRIPTS = ["state.js", "table.js", "groups.js", "detail.js", "panels.js", "main.js"];
+const SCRIPTS = [
+  "state.js",
+  "table.js",
+  "groups.js",
+  "detail.js",
+  "panels.js",
+  "layout.js",
+  "main.js",
+];
 
 /** Build the full HTML document for one bibliography view. */
 export function renderShell(webview: vscode.Webview, extensionUri: vscode.Uri): string {
@@ -79,6 +87,7 @@ export function renderShell(webview: vscode.Webview, extensionUri: vscode.Uri): 
 <div id="notice" class="notice" hidden></div>
 <main class="layout">
   <nav id="groups" class="sidebar" aria-label="Groups"></nav>
+  <div id="sidebar-splitter" class="pane-splitter" title="Drag to resize; double-click to reset"></div>
   <section class="center">
     <div class="table-pane">
       <table class="entries" aria-label="Bibliography entries">
@@ -87,11 +96,13 @@ export function renderShell(webview: vscode.Webview, extensionUri: vscode.Uri): 
       </table>
       <p id="empty" class="empty" hidden></p>
     </div>
+    <div id="panel-splitter" class="pane-splitter pane-splitter-horizontal" title="Drag to resize; double-click to reset"></div>
     <section id="panel" class="panel" aria-label="Findings and staged changes">
       <div id="panel-tabs" class="panel-tabs" role="tablist"></div>
       <div id="panel-body" class="panel-body"></div>
     </section>
   </section>
+  <div id="detail-splitter" class="pane-splitter" title="Drag to resize; double-click to reset"></div>
   <aside id="detail" class="detail" aria-label="Entry details"></aside>
 </main>
 <div id="commit-bar" class="commit-bar" hidden></div>

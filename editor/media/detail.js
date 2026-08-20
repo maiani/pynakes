@@ -59,7 +59,16 @@ window.PV = window.PV || {};
     );
   }
 
-  function fieldEditor(row, field) {
+  /** The field whose "Compare with remote" button resolves the entry's identifier: `doi` if present, else `eprint`. */
+  function compareTargetField(row) {
+    const names = PV.fieldNames(row);
+    if (names.includes("doi")) {
+      return "doi";
+    }
+    return names.includes("eprint") ? "eprint" : null;
+  }
+
+  function fieldEditor(row, field, showCompare) {
     const base = row.fields[field] ?? null;
     const staged = PV.stagedField(row.key, field);
     const value = PV.effectiveValue(row, field);
@@ -107,6 +116,23 @@ window.PV = window.PV || {};
 
     const actions = document.createElement("span");
     actions.className = "field-actions";
+    if (showCompare) {
+      const comparing = PV.state.compareBusy === row.key;
+      const compare = document.createElement("button");
+      compare.type = "button";
+      compare.className = "icon-button";
+      compare.textContent = comparing ? "…" : "⇄";
+      compare.disabled = comparing;
+      compare.title = comparing
+        ? "Comparing…"
+        : "Compare with remote: fetch DOI/arXiv metadata and compare it field by field";
+      compare.addEventListener("click", () => {
+        PV.state.compareBusy = row.key;
+        PV.renderDetail();
+        PV.post({ type: "compareRemote", key: row.key });
+      });
+      actions.appendChild(compare);
+    }
     if (staged) {
       const revert = document.createElement("button");
       revert.type = "button";
@@ -186,8 +212,34 @@ window.PV = window.PV || {};
     const head = document.createElement("div");
     head.className = "detail-header";
 
-    const title = document.createElement("h2");
-    title.textContent = row.key;
+    const renaming = PV.state.renameBusy === row.key;
+    const title = document.createElement("input");
+    title.type = "text";
+    title.className = "detail-key";
+    title.value = row.key;
+    title.spellcheck = false;
+    title.disabled = renaming;
+    title.title = "Citation key";
+    title.addEventListener("blur", () => {
+      const value = title.value.trim();
+      if (!value || value === row.key) {
+        title.value = row.key;
+        return;
+      }
+      PV.state.renameBusy = row.key;
+      PV.renderDetail();
+      PV.post({ type: "renameKey", key: row.key, newKey: value });
+    });
+    title.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        title.blur();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        title.value = row.key;
+        title.blur();
+      }
+    });
     head.appendChild(title);
 
     const typeRow = document.createElement("div");
@@ -220,19 +272,7 @@ window.PV = window.PV || {};
     copy.type = "button";
     copy.textContent = "Copy key";
     copy.addEventListener("click", () => PV.post({ type: "copyKey", key: row.key }));
-    const compare = document.createElement("button");
-    compare.className = "button";
-    compare.type = "button";
-    const comparing = PV.state.compareBusy === row.key;
-    compare.textContent = comparing ? "Comparing…" : "Compare with remote";
-    compare.disabled = comparing;
-    compare.title = "Fetch DOI/arXiv metadata and compare it field by field";
-    compare.addEventListener("click", () => {
-      PV.state.compareBusy = row.key;
-      PV.renderDetail();
-      PV.post({ type: "compareRemote", key: row.key });
-    });
-    actions.append(reveal, copy, compare);
+    actions.append(reveal, copy);
     if (PV.entryStaged(row.key)) {
       const discard = document.createElement("button");
       discard.className = "button";
@@ -302,10 +342,11 @@ window.PV = window.PV || {};
       return;
     }
 
+    const compareField = compareTargetField(row);
     const fields = document.createElement("div");
     fields.className = "fields";
     for (const field of orderedFields(row)) {
-      fields.appendChild(fieldEditor(row, field));
+      fields.appendChild(fieldEditor(row, field, field === compareField));
     }
 
     container.replaceChildren(header(row), fields, addFieldRow(row), membership(row));

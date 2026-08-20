@@ -6,7 +6,14 @@
  */
 
 import { buildGroupTree, groupsByEntry, indexLint, type GroupNode, type LintIndex } from "./insights";
-import type { EntryRow, FieldComparison, InspectError, RefEditPlanEntry, Summary } from "./model";
+import type {
+  EntryRow,
+  FieldComparison,
+  InspectError,
+  RefCompareWarning,
+  RefEditPlanEntry,
+  Summary,
+} from "./model";
 import { summarize, toRows } from "./model";
 import {
   type PynakesCommand,
@@ -15,6 +22,7 @@ import {
   groupsList,
   groupsTree,
   inspectBib,
+  keysRename,
   lintBib,
   refCompare,
   refEdit,
@@ -153,26 +161,32 @@ export async function previewEdits(
   return { ok: true, entries };
 }
 
-/** Outcome of comparing one entry against its DOI/arXiv remote record. */
+/** Outcome of comparing one entry against another reference. */
 export type CompareOutcome =
   | {
       ok: true;
       source: string | null;
       identifier: string | null;
       fields: FieldComparison[];
-      warnings: string[];
+      warnings: RefCompareWarning[];
     }
   | { ok: false; message: string };
 
-/** Compare one entry's fields against remote metadata (read-only). */
+/**
+ * Compare one entry's fields against another reference (read-only).
+ *
+ * Pass `withKey` to compare against another local entry instead of fetching
+ * a remote record.
+ */
 export async function compareEntry(
   command: PynakesCommand,
   filePath: string,
   key: string,
   online: boolean,
   cwd?: string,
+  withKey?: string,
 ): Promise<CompareOutcome> {
-  const envelope = await refCompare(command, filePath, key, online, cwd);
+  const envelope = await refCompare(command, filePath, key, online, cwd, withKey);
   if (envelope.status === "error") {
     return { ok: false, message: envelope.message };
   }
@@ -181,7 +195,7 @@ export async function compareEntry(
     source: envelope.source,
     identifier: envelope.identifier,
     fields: envelope.fields,
-    warnings: envelope.warnings.map((warning) => warning.message),
+    warnings: envelope.warnings,
   };
 }
 
@@ -218,4 +232,33 @@ export async function commitEdits(
     warnings.push(...(envelope.warnings ?? []));
   }
   return { applied, warnings };
+}
+
+/** Outcome of renaming one citation key. */
+export type RenameKeyOutcome =
+  | { ok: true; old: string; new: string; sourceOccurrences: number }
+  | { ok: false; message: string };
+
+/**
+ * Rename one citation key, rewriting matching `\cite{...}` keys in any linked
+ * TeX sources. The engine itself refuses a target key that already exists or
+ * a source key that is ambiguous (a duplicate) — both surface here as `ok: false`.
+ */
+export async function renameEntryKey(
+  command: PynakesCommand,
+  filePath: string,
+  oldKey: string,
+  newKey: string,
+  cwd?: string,
+): Promise<RenameKeyOutcome> {
+  const envelope = await keysRename(command, filePath, oldKey, newKey, cwd);
+  if (envelope.status !== "success") {
+    return { ok: false, message: envelope.message };
+  }
+  return {
+    ok: true,
+    old: envelope.old,
+    new: envelope.new,
+    sourceOccurrences: envelope.source_occurrences,
+  };
 }
