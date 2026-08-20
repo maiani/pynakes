@@ -50,6 +50,12 @@ def normalize(
         "--term",
         help="Additional exact title term to brace-protect; can be repeated",
     ),
+    drop_field: list[str] | None = typer.Option(
+        None,
+        "--drop-field",
+        help="Field to remove from every entry (e.g. abstract); can be repeated. "
+        "Off by default; combines with any normalize-drop-fields metadata key",
+    ),
     author_style: str = typer.Option(
         "metadata",
         "--author-style",
@@ -130,6 +136,7 @@ def normalize(
             title_protection,
             title_field,
             term,
+            drop_field,
             author_style,
             journal_style,
             journal_source,
@@ -181,6 +188,7 @@ def _build_normalize_options(
     title_protection: str,
     title_field: list[str] | None,
     term: list[str] | None,
+    drop_field: list[str] | None,
     author_style: str,
     journal_style: str,
     journal_source: str,
@@ -197,6 +205,7 @@ def _build_normalize_options(
         protect_titles=_optional_bool(title_protection),
         title_fields=title_field,
         protected_terms=term,
+        drop_fields=drop_field,
         author_style=author_style,
         journal_style=journal_style,
         journal_source=journal_source,

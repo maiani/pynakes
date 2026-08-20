@@ -45,7 +45,7 @@ class TestTopLevelHelp:
         out = _plain_cli_output(result.output)
         # The group name sits in its own table column; the description column
         # ends with "→ <subcommands>".
-        assert "→ add, import, show, edit, remove" in out
+        assert "→ add, import, show, edit, compare, remove" in out
         assert "→ fetch, check" in out
         assert "→ combine, split, batch" in out
         assert "→ list, add, remove, clear, scan" in out
@@ -545,6 +545,45 @@ class TestInspectAndLint:
         # raw fields lack booktitle; resolved view inherits it from the parent.
         assert "booktitle" not in child["fields"]
         assert child["resolved_fields"]["booktitle"] == "Proc"
+
+    def test_inspect_json_omits_display_by_default(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(app, ["inspect", str(bib), "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert all("display" not in e for e in data["entries"])
+
+    def test_inspect_json_display_cleans_titles_and_splits_names(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{A,\n"
+            "  title   = {The {DNA} Helix},\n"
+            "  author  = {Watson, James and {Crick and Sons}},\n"
+            "  year    = {1953}\n"
+            "}\n"
+        )
+        result = runner.invoke(app, ["inspect", str(bib), "--display", "--json"])
+        assert result.exit_code == 0, result.output
+        entry = json.loads(result.output)["entries"][0]
+        # A brace-protected "and" inside a name must survive the split, then
+        # lose its braces only once cleaned as its own name.
+        assert entry["display"]["title"] == "The DNA Helix"
+        assert entry["display"]["author"] == ["Watson, James", "Crick and Sons"]
+
+    def test_inspect_json_display_uses_resolved_fields_when_both_given(
+        self, tmp_path: Path
+    ) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@proceedings{p, title = {The {Proc}eedings}, year = {2020}}\n\n"
+            "@inproceedings{c, crossref = {p}, title = {Paper}, author = {A, B}}\n"
+        )
+        result = runner.invoke(app, ["inspect", str(bib), "--resolved", "--display", "--json"])
+        assert result.exit_code == 0, result.output
+        child = next(e for e in json.loads(result.output)["entries"] if e["key"] == "c")
+        # booktitle only exists on the resolved view; display must clean that
+        # inherited value, not silently fall back to the entry's own fields.
+        assert child["display"]["booktitle"] == "The Proceedings"
 
     def test_inspect_json_annotates_pinax_materials(self, tmp_path: Path) -> None:
         files = tmp_path / "refs.files"
@@ -2715,6 +2754,17 @@ class TestNormalizeCommand:
         data = json.loads(result.output)
         assert data["operations"]["journals"] == 0
         assert "journal = {Nature Machine Intelligence}" in bib.read_text()
+
+    def test_normalize_drop_field_removes_field_across_library(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {Paper},\n  abstract = {A long summary.}\n}\n")
+
+        result = runner.invoke(app, ["normalize", str(bib), "--drop-field", "abstract", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["operations"]["dropped_fields"] == 1
+        assert "abstract" not in bib.read_text()
 
     def test_normalize_repairs_bare_month_name(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"

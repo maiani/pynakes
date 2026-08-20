@@ -53,6 +53,7 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     # Native default citation-key pattern, aliasing JabRef's ``keypatterndefault``.
     "key-pattern": CATEGORY_CITATION_KEY,
     "normalize-protected-terms": CATEGORY_NORMALIZATION,
+    "normalize-drop-fields": CATEGORY_NORMALIZATION,
     "normalize-journal-source": CATEGORY_NORMALIZATION,
     "normalize-journal-table": CATEGORY_NORMALIZATION,
     "normalize-ltwa-table": CATEGORY_NORMALIZATION,

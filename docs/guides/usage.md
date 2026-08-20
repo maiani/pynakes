@@ -116,11 +116,21 @@ Inspect a `.bib` file.
 pynakes inspect                           # auto-detects one .bib file
 pynakes inspect refs.bib
 pynakes inspect refs.bib --json
+pynakes inspect refs.bib --resolved --json    # + crossref/xdata-inherited fields
+pynakes inspect refs.bib --display --json     # + human-readable title/author view
 ```
 
 JSON output includes file encoding, line ending, entries, duplicate keys, and
 structured JabRef library metadata under `jabref_metadata`. Use `lint` for
 validation findings.
+
+`--display` adds a `display` object per entry: title-family fields
+(`title`/`booktitle`/`maintitle`/`subtitle`) with LaTeX markup and braces
+cleaned to plain text, and `author`/`editor` split into individual, cleaned
+names (`["Watson, James", "Crick and Sons"]` rather than a raw
+`Watson, James and {Crick and Sons}` string). It is a presentation projection
+for a UI to render — never a value to edit or write back; combine with
+`--resolved` to clean the inherited view instead of the entry's own fields.
 
 ## lint
 
@@ -707,6 +717,17 @@ To expand abbreviated titles back to full names, use `--journal-style full`.
 To check journal-title conformance without modifying the file, set
 `normalize-journal-style` metadata and run `pynakes lint refs.bib`.
 
+To always strip a field — `abstract` is the common case — across every entry,
+use `--drop-field` (repeatable) or persist it as `normalize-drop-fields`
+metadata:
+
+```bash
+pynakes normalize refs.bib --drop-field abstract
+```
+
+Off by default, like journal-style conversion: dropping a field is opinionated
+and not reversible, so it only runs for fields named explicitly.
+
 Normalization preferences live in metadata. pynakes-specific settings (no
 JabRef equivalent) go in `pynakes-meta`, under the `normalize-` key prefix.
 pynakes writes them as one consolidated block, one `key: value` line per setting
@@ -720,6 +741,7 @@ normalize-protect-titles: false
 normalize-identifier-case: false
 normalize-keys: true
 normalize-protected-terms: Proceedings,OpenAI
+normalize-drop-fields: abstract
 }
 ```
 
@@ -955,6 +977,31 @@ pynakes enrich refs.bib --online --published --dry-run --diff
 preprint published-version workflow: on `verify` it reports (read-only) preprints
 that now have a published version; on `enrich` it promotes them — preserving the
 preprint identifier and adding the published DOI/journal metadata.
+
+For a single entry, `ref compare` shows every field where the local value
+differs from (or is missing versus) another reference, without writing
+anything. That other reference is either a fetched DOI/arXiv provider record:
+
+```bash
+pynakes ref compare Smith2024 refs.bib --online --json
+```
+
+or another entry already in the library, compared with no network access —
+useful for reviewing a candidate duplicate pair before merging:
+
+```bash
+pynakes ref compare Smith2024 --with Smith2024b refs.bib --json
+```
+
+Review the reported fields, then apply the ones you want with `ref edit`:
+
+```bash
+pynakes ref edit Smith2024 refs.bib --field number=10 --field volume=120
+```
+
+Against a remote record, `ref compare` prefers the entry's DOI (existing, or
+found in a local URL); absent a resolvable DOI it falls back to an arXiv id
+(`eprint`).
 
 ## Best Practices
 

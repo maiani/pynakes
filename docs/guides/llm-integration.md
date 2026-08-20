@@ -15,7 +15,8 @@ contract. For command-by-command tutorials, see the [usage guide](usage.md).
 ## Automation behavior
 
 - **Explicit network access.** Network use is limited to `ref import`, `asset
-  fetch`, `ref import --fetch`, `verify --online`, and `enrich --online`.
+  fetch`, `ref import --fetch`, `verify --online`, `enrich --online`, and
+  `ref compare --online`.
 - **Reviewable edits.** Ordinary modifying commands support `--dry-run` and
   `--diff`. The maintenance operation `asset check --fix` is the exception: it
   writes directly and can retain the prior manifest with `--backup`.
@@ -96,6 +97,16 @@ its operation vocabulary through `capabilities`.
   `ref show --keys k1,k2,… [--abstract]` to triage a candidate set in one call
   instead of one invocation per key.
 - Use `ref edit <key>` for a multi-field patch to one reference.
+- Use `ref compare <key> --online` to check one reference's DOI (or, absent a
+  DOI, its arXiv id) against provider metadata, or `ref compare <key> --with
+  <other-key>` to compare it against another entry already in the library
+  (e.g. a candidate duplicate) with no network access. Either way it's
+  read-only and reports only the fields where a non-empty value on the other
+  side differs from the local one — review the `fields` list, then apply the
+  ones you want with `ref edit <key> --field name=value` (repeatable). Use
+  `enrich --online` and `verify --online` instead for whole-library,
+  always-fill or always-report operations; `ref compare` is for one entry at a
+  time with a human choosing per field.
 - Use `fields` with `--where` for bulk field operations over a selection. The
   same selector works on `search`, `format`, and the corpus operations, so
   scope a set once — `'year >= 2025 and doi missing'` — and reuse the

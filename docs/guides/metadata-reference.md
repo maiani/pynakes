@@ -56,6 +56,7 @@ to find the operation module that owns a key.
 | `normalize-protect-titles` | normalization | Boolean; default `true` for `normalize`; `lint` checks it when stored | `normalize`, `lint` | — |
 | `normalize-title-fields` | normalization | List; default `title,booktitle,maintitle,subtitle` | `normalize`, `lint` | — |
 | `normalize-protected-terms` | normalization | List of case-sensitive terms | `normalize`, `lint` | — |
+| `normalize-drop-fields` | normalization | List of field names to remove from every entry; default none (off) | `normalize` | — |
 | `normalize-author-style` | normalization | `jabref`, `conservative`, or `none` | `normalize` | — |
 | `normalize-journal-style` | normalization | `abbreviated`, `full`, or `none` (default) | `normalize`, `lint` | — |
 | `normalize-journal-source` | normalization | `jabref` (bundled JabRef lists, default) or `none` (rule-based only) | `normalize`, `lint` | — |

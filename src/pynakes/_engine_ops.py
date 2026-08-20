@@ -98,6 +98,48 @@ class BibliographyOperations:
         """Check preprint entries for published metadata without modifying."""
         return integrity_ops.check_published(self.lib, online=online, cache_dir=cache_dir)
 
+    def compare_entry_with_remote(
+        self,
+        key: str,
+        *,
+        online: bool = False,
+        cache_dir: str | Path | None = None,
+    ) -> integrity_ops.EntryComparisonReport:
+        """Compare one entry's fields against its DOI/arXiv remote record.
+
+        Read-only: for a caller to review and apply only the fields they
+        choose, e.g. through :meth:`edit_entry`. Raises ``KeyError`` when the
+        key is absent and ``ValueError`` when it's duplicated; callers must
+        not guess which physical duplicate to compare.
+        """
+        matches = self.lib.entries.get_all(key)
+        if not matches:
+            raise KeyError(key)
+        if len(matches) != 1:
+            raise ValueError(f"Citation key {key!r} is duplicated; repair duplicates first")
+        return integrity_ops.compare_entry_with_remote(
+            matches[0], online=online, cache_dir=cache_dir
+        )
+
+    def compare_entries(self, key: str, other_key: str) -> integrity_ops.EntryComparisonReport:
+        """Compare two local entries' fields, for manual review.
+
+        Read-only, no network access. Raises ``KeyError`` when either key is
+        absent and ``ValueError`` when either is duplicated; callers must not
+        guess which physical duplicate to compare.
+        """
+        matches = self.lib.entries.get_all(key)
+        if not matches:
+            raise KeyError(key)
+        if len(matches) != 1:
+            raise ValueError(f"Citation key {key!r} is duplicated; repair duplicates first")
+        other_matches = self.lib.entries.get_all(other_key)
+        if not other_matches:
+            raise KeyError(other_key)
+        if len(other_matches) != 1:
+            raise ValueError(f"Citation key {other_key!r} is duplicated; repair duplicates first")
+        return integrity_ops.compare_entries(matches[0], other_matches[0])
+
     # --- field operations ------------------------------------------------
 
     def _where(self, where: str | QueryFilter) -> QueryFilter:

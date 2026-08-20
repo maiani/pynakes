@@ -13,6 +13,7 @@ from pynakes.cli_commands import (
     add,
     batch,
     capabilities,
+    compare,
     convert,
     dedupe,
     edit,
@@ -99,6 +100,7 @@ add.register(ref_app)
 import_ref.register(ref_app)
 show.register(ref_app)
 edit.register(ref_app)
+compare.register(ref_app)
 remove.register(ref_app)
 
 # tex: linked TeX sources (add/list/remove/clear) + scan (formerly `used`)

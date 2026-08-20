@@ -65,6 +65,7 @@ class NormalizeOptions:
     protect_titles: bool | None = None
     title_fields: list[str] | None = None
     protected_terms: list[str] | None = None
+    drop_fields: list[str] | None = None
     author_style: str | None = None
     journal_style: str | None = None
     journal_source: str | None = None
@@ -89,6 +90,7 @@ class NormalizeResult:
     """
 
     title_fields: dict[str, int] = field(default_factory=dict)
+    dropped_fields: int = 0
     authors: int = 0
     journals: int = 0
     dois: int = 0
@@ -108,6 +110,7 @@ class NormalizeResult:
         """Return the per-domain change counts as a single JSON-friendly dict."""
         return {
             "title_fields": dict(self.title_fields),
+            "dropped_fields": self.dropped_fields,
             "authors": self.authors,
             "journals": self.journals,
             "dois": self.dois,
@@ -162,6 +165,23 @@ def _resolve_terms(lib: BibFile, option: list[str] | None) -> list[str]:
     terms = list(option or [])
     terms.extend(metadata_list(metadata_value(lib, "normalize-protected-terms")))
     return terms
+
+
+def _resolve_drop_fields(lib: BibFile, option: list[str] | None) -> list[str]:
+    """Field names to strip from every entry: CLI-given plus the library's own list.
+
+    Off by default (empty), like ``journal_style``: dropping a field is
+    opinionated and not reversible, so it only runs for fields named
+    explicitly, either via ``--drop-field`` or a persisted
+    ``normalize-drop-fields`` metadata key (e.g. to always strip ``abstract``).
+    """
+    names = list(option or [])
+    names.extend(metadata_list(metadata_value(lib, "normalize-drop-fields")))
+    seen: list[str] = []
+    for name in names:
+        if name not in seen:
+            seen.append(name)
+    return seen
 
 
 def resolve_format_metadata(lib: BibFile, option: bool | None) -> bool:
@@ -271,6 +291,9 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
         doi_default = save_actions.has(_DOI_SAVE_ACTION, ("doi",))
     else:
         author_default, doi_default = "jabref", True
+
+    for drop_field in _resolve_drop_fields(lib, opts.drop_fields):
+        result.dropped_fields += field_ops.clear_field(lib, drop_field)
 
     if _resolve_bool(lib, opts.protect_titles, "protect-titles", True):
         terms = _resolve_terms(lib, opts.protected_terms)

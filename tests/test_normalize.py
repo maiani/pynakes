@@ -70,6 +70,7 @@ def test_normalize_library_runs_standard_pass() -> None:
     assert entry.fields["doi"] == "10.5555/ABC"
     assert report.operations == {
         "title_fields": {"title": 1},
+        "dropped_fields": 0,
         "authors": 1,
         "journals": 0,
         "dois": 1,
@@ -320,6 +321,54 @@ def test_normalize_library_cli_options_override_metadata() -> None:
 
     assert lib.entries["A"].fields["title"] == "DNA repair"
     assert lib.entries["A"].fields["journal"] == "Nat. Mach. Intell."
+
+
+def test_normalize_leaves_fields_untouched_when_no_drop_fields_configured() -> None:
+    lib = parse_bib("@article{A,\n  title = {Paper},\n  abstract = {A long summary.}\n}\n")
+
+    report = normalize_library(lib)
+
+    assert lib.entries["A"].fields["abstract"] == "A long summary."
+    assert report.dropped_fields == 0
+
+
+def test_normalize_drop_fields_removes_configured_fields() -> None:
+    lib = parse_bib(
+        "@article{A,\n  title = {Paper},\n  abstract = {A long summary.},\n  note = {x}\n}\n"
+        "@article{B,\n  title = {Other},\n  abstract = {Another summary.}\n}\n"
+    )
+
+    report = normalize_library(lib, NormalizeOptions(drop_fields=["abstract"]))
+
+    assert "abstract" not in lib.entries["A"].fields
+    assert "abstract" not in lib.entries["B"].fields
+    assert lib.entries["A"].fields["note"] == "x"
+    assert report.dropped_fields == 2
+
+
+def test_normalize_drop_fields_reads_metadata_key() -> None:
+    lib = parse_bib(
+        "@comment{pynakes-meta: normalize-drop-fields:abstract,note;}\n"
+        "@article{A,\n  title = {Paper},\n  abstract = {Summary},\n  note = {x}\n}\n"
+    )
+
+    report = normalize_library(lib)
+
+    assert "abstract" not in lib.entries["A"].fields
+    assert "note" not in lib.entries["A"].fields
+    assert report.dropped_fields == 2
+
+
+def test_normalize_drop_fields_combines_cli_and_metadata() -> None:
+    lib = parse_bib(
+        "@comment{pynakes-meta: normalize-drop-fields:abstract;}\n"
+        "@article{A,\n  title = {Paper},\n  abstract = {Summary},\n  note = {x}\n}\n"
+    )
+
+    normalize_library(lib, NormalizeOptions(drop_fields=["note"]))
+
+    assert "abstract" not in lib.entries["A"].fields
+    assert "note" not in lib.entries["A"].fields
 
 
 def test_normalize_library_author_style_conservative_override() -> None:

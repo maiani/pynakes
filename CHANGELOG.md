@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `inspect --display` adds a `display` object per entry: title-family fields
+  cleaned of LaTeX markup and braces (`latex_to_plain_text`), and
+  `author`/`editor` split into individual, cleaned names via the existing
+  brace-aware `split_name_list` rather than a raw `A and {B and C}` string.
+  Names are split before cleaning, so a brace-protected `{Smith and Sons}`
+  survives as one name instead of being cut in two. It is a read-only
+  presentation view for a UI to render, not a value to write back; combine
+  with `--resolved` to clean the crossref/xdata-inherited view instead of the
+  entry's own fields.
+- `ref compare <key>` reports every field where the local entry differs from
+  (or lacks a value present in) another reference — read-only, so a caller
+  can review the differences and apply only the fields they choose via
+  `ref edit <key> --field name=value`. That other reference is either a
+  fetched DOI/arXiv provider record (`--online`, preferring the entry's DOI
+  and falling back to arXiv), or another entry already in the library
+  (`--with <other-key>`, no network access — e.g. reviewing a candidate
+  duplicate pair before merging). `pynakes.integrity.compare_entry_with_remote()`/
+  `compare_entries()` and `Bibliography.compare_entry_with_remote()`/
+  `compare_entries()` are the underlying engine entry points. Complements the
+  existing whole-library, always-fill `enrich` and read-only `verify` for a
+  one-entry, human-in-the-loop workflow.
+- `normalize --drop-field NAME` (repeatable) removes a field from every entry
+  — e.g. `--drop-field abstract` to strip abstracts on every normalize pass.
+  Off by default, like journal-style conversion: dropping a field is
+  opinionated and not reversible, so it only runs for fields named explicitly,
+  either via the flag or a persisted `normalize-drop-fields` metadata key
+  (the two combine). Reported as `dropped_fields` in the normalize report.
+
 ## [0.6.1] - 2026-08-18
 
 ### Added

@@ -296,6 +296,8 @@ def get_capabilities() -> dict:
             "check_published_preprints",
             "backfill_arxiv_ids",
             "enrich_metadata",
+            "compare_entry_with_remote",
+            "compare_entries",
             "normalize_library",
             "format_bibliography",
             "convert_to_biblatex",
@@ -336,8 +338,8 @@ def get_capabilities() -> dict:
             "init": "Create a new .bib library, optionally seeded with a metadata profile (--pinax for pinax mode)",
             "inspect": "Inspect a .bib file structure",
             "lint": "Validate entries and report issues",
-            "ref": "Create, show, edit, import, and remove individual references "
-            "(add, show, edit, import, remove)",
+            "ref": "Create, show, edit, compare, import, and remove individual references "
+            "(add, show, edit, compare, import, remove)",
             "groups": "Manage entry groups and group hierarchy "
             "(list, list-entries, add-entry, remove-entry, tree, add-group, "
             "remove-group, rename-group, move-group, update-group)",

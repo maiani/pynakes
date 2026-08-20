@@ -9,7 +9,12 @@ from pynakes import integrity
 from pynakes.bibtex_parser import parse_bib
 from pynakes.cli import app
 from pynakes.identity import entry_arxiv_id
-from pynakes.integrity import enrich_library, verify_library
+from pynakes.integrity import (
+    compare_entries,
+    compare_entry_with_remote,
+    enrich_library,
+    verify_library,
+)
 from pynakes.providers._http import ProviderFetchError
 from pynakes.providers.metadata import doi, openalex, semantic_scholar
 from pynakes.providers.repositories import arxiv
@@ -108,6 +113,154 @@ def test_enrich_library_fills_missing_doi_from_url_and_provider_fields(monkeypat
     assert lib.entries["A"].fields["doi"] == "10.5555/example"
     assert lib.entries["A"].fields["journal"] == "Journal of Tests"
     assert lib.entries["A"].fields["year"] == "2024"
+
+
+def test_compare_entry_with_remote_lists_differing_and_missing_fields(monkeypatch) -> None:
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
+    lib = parse_bib(
+        "@article{A,\n"
+        "  author = {Someone Else},\n"
+        "  title = {A Correct Title},\n"
+        "  doi = {10.5555/EXAMPLE}\n"
+        "}\n"
+    )
+
+    report = compare_entry_with_remote(lib.entries["A"], online=True)
+
+    assert report.source == "doi"
+    assert report.identifier == "10.5555/EXAMPLE"
+    by_field = {c.field: c for c in report.fields}
+    # Matching title is not reported; differing author and missing fields are.
+    assert "title" not in by_field
+    assert by_field["author"].local == "Someone Else"
+    assert by_field["author"].other == "John Smith"
+    assert by_field["journal"].local is None
+    assert by_field["journal"].other == "Journal of Tests"
+    # Same DOI differing only in case is not reported as a difference.
+    assert "doi" not in by_field
+    assert report.warnings == []
+
+
+def test_compare_entry_with_remote_falls_back_to_arxiv(monkeypatch) -> None:
+    monkeypatch.setattr(arxiv, "fetch_atom", lambda identifier: ARXIV_XML)
+    lib = parse_bib(
+        "@misc{A,\n  title = {An old title},\n  eprint = {2301.00001},\n"
+        "  archiveprefix = {arXiv}\n}\n"
+    )
+
+    report = compare_entry_with_remote(lib.entries["A"], online=True)
+
+    assert report.source == "arxiv"
+    assert report.identifier == "2301.00001"
+    by_field = {c.field: c for c in report.fields}
+    assert by_field["title"].other == "A preprint"
+    assert by_field["doi"].other == "10.5555/published"
+    assert by_field["journal"].other == "Journal of Published Tests 12, 34"
+
+
+def test_compare_entry_with_remote_offline_warns_without_fetching(monkeypatch) -> None:
+    def fail_fetch(d: str) -> str:
+        raise AssertionError("should not fetch when offline")
+
+    monkeypatch.setattr(doi, "fetch_bibtex", fail_fetch)
+    lib = parse_bib("@article{A,\n  title = {T},\n  doi = {10.5555/example}\n}\n")
+
+    report = compare_entry_with_remote(lib.entries["A"], online=False)
+
+    assert report.fields == []
+    assert report.warnings[0]["type"] == "offline"
+
+
+def test_compare_entry_with_remote_reports_no_identifier() -> None:
+    lib = parse_bib("@article{A,\n  title = {T},\n  author = {X}\n}\n")
+
+    report = compare_entry_with_remote(lib.entries["A"], online=True)
+
+    assert report.source is None
+    assert report.warnings[0]["type"] == "no_identifier"
+
+
+def test_compare_entries_lists_differing_and_missing_fields() -> None:
+    lib = parse_bib(
+        "@article{A,\n"
+        "  author = {Someone Else},\n"
+        "  title = {A Correct Title}\n"
+        "}\n"
+        "@article{B,\n"
+        "  author = {John Smith},\n"
+        "  title = {A Correct Title},\n"
+        "  journal = {Journal of Tests}\n"
+        "}\n"
+    )
+
+    report = compare_entries(lib.entries["A"], lib.entries["B"])
+
+    assert report.key == "A"
+    assert report.source == "local"
+    assert report.identifier == "B"
+    by_field = {c.field: c for c in report.fields}
+    assert "title" not in by_field
+    assert by_field["author"].local == "Someone Else"
+    assert by_field["author"].other == "John Smith"
+    assert by_field["journal"].local is None
+    assert by_field["journal"].other == "Journal of Tests"
+    assert report.warnings == []
+
+
+def test_ref_compare_with_cli_json(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@article{A,\n  author = {Someone Else},\n  title = {A Correct Title}\n}\n"
+        "@article{B,\n  author = {John Smith},\n  title = {A Correct Title}\n}\n"
+    )
+
+    result = runner.invoke(app, ["ref", "compare", "A", "--with", "B", str(bib), "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["status"] == "success"
+    assert data["source"] == "local"
+    assert data["identifier"] == "B"
+    fields = {f["field"]: f for f in data["fields"]}
+    assert fields["author"]["local"] == "Someone Else"
+    assert fields["author"]["other"] == "John Smith"
+    # Read-only: the file on disk is untouched.
+    assert "Someone Else" in bib.read_text()
+
+
+def test_ref_compare_with_and_online_conflict(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{A,\n  title = {T}\n}\n@article{B,\n  title = {U}\n}\n")
+
+    result = runner.invoke(
+        app, ["ref", "compare", "A", "--with", "B", "--online", str(bib), "--json"]
+    )
+
+    assert result.exit_code == 1
+    data = json.loads(result.output)
+    assert data["status"] == "error"
+
+
+def test_ref_compare_cli_json(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@article{A,\n  author = {Someone Else},\n  title = {A Correct Title},\n"
+        "  doi = {10.5555/example}\n}\n"
+    )
+
+    result = runner.invoke(app, ["ref", "compare", "A", str(bib), "--online", "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["status"] == "success"
+    assert data["source"] == "doi"
+    fields = {f["field"] for f in data["fields"]}
+    assert "author" in fields
+    assert "journal" in fields
+    # Read-only: the file on disk is untouched.
+    assert "doi = {10.5555/example}" in bib.read_text()
+    assert "journal" not in bib.read_text()
 
 
 def test_verify_cli_strict_exits_one_with_json(monkeypatch, tmp_path: Path) -> None:

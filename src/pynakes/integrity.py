@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -182,11 +182,85 @@ class PublishedReport:
         }
 
 
+@dataclass
+class FieldComparison:
+    """One field where a local entry and the other side of a comparison disagree.
+
+    ``local`` is ``None`` when the entry has no value at all for the field
+    (a gap the other side can fill); otherwise it's the current value the
+    other one would replace. ``other`` is always non-empty — see
+    :func:`_diff_fields`.
+    """
+
+    field: str
+    local: str | None
+    other: str
+
+    def to_dict(self) -> dict[str, str | None]:
+        """Serialize the comparison to a JSON-friendly dict."""
+        return {"field": self.field, "local": self.local, "other": self.other}
+
+
+@dataclass
+class EntryComparisonReport:
+    """Per-field comparison of one entry against another reference, for manual review.
+
+    Read-only: never mutates either side. ``fields`` lists only fields where
+    the other side's value is non-empty and differs from the local one — an
+    identical field isn't worth reviewing, and a blank field on the other side
+    has nothing to offer. ``source`` identifies what the entry was compared
+    against: ``"doi"`` or ``"arxiv"`` for a fetched remote record, ``"local"``
+    for another entry already in a library; ``identifier`` is that source's DOI,
+    arXiv id, or citation key respectively.
+    """
+
+    key: str
+    source: str | None = None
+    identifier: str | None = None
+    fields: list[FieldComparison] = field(default_factory=list)
+    warnings: list[dict[str, str]] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize the comparison report to a JSON-friendly dict."""
+        return {
+            "key": self.key,
+            "source": self.source,
+            "identifier": self.identifier,
+            "fields": [comparison.to_dict() for comparison in self.fields],
+            "warnings": self.warnings,
+        }
+
+
 class MetadataFetchError(Exception):
     """Raised when authoritative metadata cannot be fetched or parsed."""
 
 
 _PREPRINT_DOI_PREFIXES = ("10.1101/", "10.21203/", "10.2139/")
+
+# Fields worth surfacing in an entry comparison. Deliberately the
+# same conservative, citation-relevant set `_missing_field_updates` fills,
+# plus `abstract` (arXiv's richest field) and `eprint` (an arXiv id worth
+# recording even when the entry was already found by DOI).
+_COMPARE_FIELDS = (
+    "title",
+    "author",
+    "editor",
+    "year",
+    "date",
+    "volume",
+    "number",
+    "pages",
+    "journal",
+    "journaltitle",
+    "publisher",
+    "isbn",
+    "doi",
+    "pmid",
+    "pmcid",
+    "eprint",
+    "abstract",
+    "url",
+)
 
 
 def verify_library(
@@ -289,6 +363,91 @@ def enrich_library(
         for field_name, value in _missing_field_updates(entry, remote):
             if set_entry_field(entry, field_name, value):
                 report.updates.append(FieldUpdate(entry.key, field_name, value))
+    return report
+
+
+def compare_entry_with_remote(
+    entry: BibEntry,
+    *,
+    online: bool = False,
+    cache_dir: str | Path | None = None,
+) -> EntryComparisonReport:
+    """Fetch remote metadata for one entry and compare it field by field.
+
+    Unlike :func:`enrich_library`, this never writes to ``entry`` — it's for
+    a caller (e.g. an interactive UI) to review the differences and apply
+    only the fields they choose, through the normal surgical field-edit path.
+    Prefers the entry's DOI (existing or inferred from a local URL); falls
+    back to an arXiv id when no DOI is available or resolvable. See
+    :func:`compare_entries` for comparing two already-local entries instead.
+    """
+    report = EntryComparisonReport(key=entry.key)
+    if not online:
+        report.warnings.append(
+            {
+                "type": "offline",
+                "key": entry.key,
+                "message": "Pass online=True (--online) to fetch remote metadata",
+            }
+        )
+        return report
+
+    doi = entry.fields.get("doi", "").strip() or _doi_from_entry_urls(entry) or ""
+    if doi:
+        try:
+            normalized = normalize_doi(doi)
+        except ValueError:
+            report.warnings.append(
+                {"type": "malformed_doi", "key": entry.key, "message": f"Malformed DOI: {doi!r}"}
+            )
+        else:
+            try:
+                remote = fetch_doi_entry(normalized, cache_dir=cache_dir)
+            except MetadataFetchError as exc:
+                report.warnings.append(
+                    {"type": "doi_unresolved", "key": entry.key, "message": str(exc)}
+                )
+            else:
+                report.source = "doi"
+                report.identifier = normalized
+                report.fields = _diff_fields(entry, remote.fields)
+                return report
+
+    arxiv_id = _entry_arxiv_id(entry)
+    if arxiv_id:
+        try:
+            remote_fields = _fetch_arxiv_fields(arxiv_id, cache_dir=cache_dir)
+        except MetadataFetchError as exc:
+            report.warnings.append(
+                {"type": "arxiv_unresolved", "key": entry.key, "message": str(exc)}
+            )
+        else:
+            report.source = "arxiv"
+            report.identifier = arxiv_id
+            report.fields = _diff_fields(entry, remote_fields)
+            return report
+
+    if not doi and not arxiv_id:
+        report.warnings.append(
+            {
+                "type": "no_identifier",
+                "key": entry.key,
+                "message": "No DOI or arXiv id found for this entry",
+            }
+        )
+    return report
+
+
+def compare_entries(entry: BibEntry, other: BibEntry) -> EntryComparisonReport:
+    """Compare two already-local entries field by field, for manual review.
+
+    Unlike :func:`compare_entry_with_remote`, both sides are entries already
+    loaded from a library — no network access, no DOI/arXiv resolution. Useful
+    for reviewing a candidate duplicate pair before merging, or any other
+    two-reference comparison where fetching a remote record doesn't apply.
+    """
+    report = EntryComparisonReport(key=entry.key, source="local", identifier=other.key)
+    report.fields = _diff_fields(entry, other.fields)
     return report
 
 
@@ -413,13 +572,9 @@ def fetch_doi_entry(doi: str, *, cache_dir: str | Path | None = None) -> BibEntr
     return entries[0]
 
 
-def fetch_arxiv_metadata(identifier: str, *, cache_dir: str | Path | None = None) -> dict[str, str]:
-    """Fetch the published DOI/journal an arXiv preprint links to, if any.
-
-    Delegates fetch/parse to :mod:`pynakes.providers.repositories.arxiv` and keeps
-    only the deterministic on-disk cache here. Returns
-    ``{"doi": ..., "journal": ...}``.
-    """
+def _fetch_arxiv_record(
+    identifier: str, *, cache_dir: str | Path | None = None
+) -> arxiv_provider.ArxivRecord:
     normalized = normalize_arxiv(identifier)
     if normalized is None:
         raise MetadataFetchError(f"Malformed arXiv identifier: {identifier!r}")
@@ -432,10 +587,39 @@ def fetch_arxiv_metadata(identifier: str, *, cache_dir: str | Path | None = None
             if path is not None:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(text, encoding="utf-8")
-        record = arxiv_provider.parse_atom(text, normalized)
+        return arxiv_provider.parse_atom(text, normalized)
     except ProviderFetchError as exc:
         raise MetadataFetchError(str(exc)) from exc
+
+
+def fetch_arxiv_metadata(identifier: str, *, cache_dir: str | Path | None = None) -> dict[str, str]:
+    """Fetch the published DOI/journal an arXiv preprint links to, if any.
+
+    Delegates fetch/parse to :mod:`pynakes.providers.repositories.arxiv` and keeps
+    only the deterministic on-disk cache here. Returns
+    ``{"doi": ..., "journal": ...}``.
+    """
+    record = _fetch_arxiv_record(identifier, cache_dir=cache_dir)
     return {"doi": record.doi, "journal": record.journal}
+
+
+def _fetch_arxiv_fields(identifier: str, *, cache_dir: str | Path | None = None) -> dict[str, str]:
+    """Fetch arXiv metadata as BibTeX-style field names, for field comparison."""
+    record = _fetch_arxiv_record(identifier, cache_dir=cache_dir)
+    fields: dict[str, str] = {"eprint": record.arxiv_id}
+    if record.title:
+        fields["title"] = record.title
+    if record.authors:
+        fields["author"] = " and ".join(record.authors)
+    if record.published:
+        fields["year"] = record.published[:4]
+    if record.doi:
+        fields["doi"] = record.doi
+    if record.journal:
+        fields["journal"] = record.journal
+    if record.summary:
+        fields["abstract"] = record.summary
+    return fields
 
 
 def _compare_entry(local: BibEntry, remote: BibEntry) -> list[IntegrityIssue]:
@@ -524,6 +708,36 @@ def _missing_field_updates(entry: BibEntry, remote: BibEntry) -> list[tuple[str,
         if value and not entry.fields.get(field_name, "").strip():
             updates.append((field_name, value))
     return updates
+
+
+def _diff_fields(entry: BibEntry, other_fields: Mapping[str, str]) -> list[FieldComparison]:
+    """List :data:`_COMPARE_FIELDS` where a non-empty ``other_fields`` value differs from local."""
+    comparisons: list[FieldComparison] = []
+    for field_name in _COMPARE_FIELDS:
+        other_value = (other_fields.get(field_name) or "").strip()
+        if not other_value:
+            continue
+        local_value = _field_value(entry, field_name).strip()
+        if local_value:
+            if field_name == "doi":
+                if _dois_equivalent(local_value, other_value):
+                    continue
+            elif local_value == other_value:
+                continue
+        comparisons.append(FieldComparison(field_name, local_value or None, other_value))
+    return comparisons
+
+
+def _dois_equivalent(left: str, right: str) -> bool:
+    """Compare two DOI strings the way DOIs actually compare: case-insensitively.
+
+    ``normalize_doi`` preserves case (round-trip fidelity for display), so
+    equality still needs an explicit case fold here.
+    """
+    try:
+        return normalize_doi(left).lower() == normalize_doi(right).lower()
+    except ValueError:
+        return left.strip().lower() == right.strip().lower()
 
 
 def _apply_published_candidate(
@@ -657,6 +871,13 @@ def _preprint_identity(entry: BibEntry) -> tuple[str, str] | None:
     url = " ".join(entry.fields.get(field, "") for field in ("url", "howpublished", "note")).lower()
     if "ssrn.com" in url:
         return "ssrn", url
+    return None
+
+
+def _entry_arxiv_id(entry: BibEntry) -> str | None:
+    identifiers = evidence_from_entry(entry).identifiers.by_kind()
+    if arxiv := identifiers.get("arxiv"):
+        return sorted(arxiv)[0]
     return None
 
 
