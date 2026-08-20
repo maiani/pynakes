@@ -44,7 +44,35 @@ src/pynakes/
   capabilities.py     machine-readable capability description
   batch.py setops.py diff.py cli.py cli_common.py cli_discovery.py
 tests/                pytest suite, conformance fixtures, and opt-in agent eval
+editor/               VS Code extension companion (TypeScript, own toolchain)
 ```
+
+`editor/` is a separate client, not part of the Python distribution: it has its
+own `npm` toolchain, is excluded from the sdist and wheel, and is not touched by
+`pytest` or `ruff check src tests`. It must stay a thin consumer of the engine's
+JSON envelope — no BibTeX parser or metadata schema of its own. See
+[editor/README.md](editor/README.md).
+
+When work on `editor/` reveals a gap in the engine — a command that does not
+exist, a value missing from an envelope, two failures the client cannot tell
+apart — close the gap in `pynakes` itself: implement it, or document the
+intended behavior. Do not work around it on the TypeScript side. A workaround
+in the client puts bibliography logic exactly where it must never live, and it
+hides a gap that every other consumer of the JSON envelope shares.
+
+`editor/` is the **project-scoped** client: a bibliography belonging to a
+document or repository being edited. VS Code hands a custom editor a single owned
+`TextDocument`, so this is imposed by the host, not chosen. Library-scoped work —
+exploring a collection that belongs to no project and outlives any workspace — is
+the future Bimas application's job, not something to grow the extension into. The
+axis is project versus library, not one file versus many: a master library is
+often a single `.bib`, and `tex ... scan` spans one `.bib` with many `.tex` files.
+The extension may *read* library-scoped things; it never owns or curates them.
+Avoid "corpus" when naming this axis — that word already denotes the multi-file
+`combine`/`split`/`batch` group. Until Bimas starts, the CLI and the extension are
+developed concurrently in this repository; a second client is what would justify
+splitting them apart. See
+[docs/vision.md](docs/vision.md#graphical-clients-and-their-scope).
 
 ## Setup & checks
 
@@ -65,7 +93,11 @@ The API reference is generated from docstrings by `mkdocstrings`
 accurate rather than hand-maintaining a symbol list.
 
 For code changes, run the test suite and both Ruff checks before considering the
-change done. Run the strict docs build when documentation or public APIs change;
+change done. Changes under `editor/` run their own checks instead
+(`npm run compile && npm test` in that directory, or `pixi run test-extension`
+from the root). `pixi.toml` provides Node plus a pinned Python 3.11 for building
+the extension — `pixi run build-extension` — and does not replace the pip
+workflow above for engine work. Run the strict docs build when documentation or public APIs change;
 run the artifact checks for packaging or release work. CI runs Python 3.11–3.13,
 the 90% coverage gate, strict docs, and wheel/sdist checks.
 
@@ -120,3 +152,6 @@ tests pass:
 - Don't claim a feature is implemented when it is a stub. Keep `capabilities`,
   README, and docs honest; keep DEVPLAN forward-looking and put completed work
   in `CHANGELOG.md`.
+- Don't work around a missing engine capability inside `editor/`. If the
+  extension needs something pynakes does not expose, add it to pynakes — see
+  the `editor/` note under [Layout](#layout).

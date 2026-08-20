@@ -1,0 +1,987 @@
+/*
+ * Styling is expressed entirely through VS Code theme variables so the view
+ * matches whatever theme the user runs, light or dark, without a palette of
+ * its own. The one exception is a group's colour, which is data from the file.
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-editor-background);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+}
+
+/* Toolbar ---------------------------------------------------------------- */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+}
+
+.filter {
+  flex: 2 1 0;
+  min-width: 0;
+  padding: 4px 8px;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.filter.where {
+  flex: 1 1 0;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.92em;
+}
+
+.filter:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.counts {
+  flex: 0 0 auto;
+  color: var(--vscode-descriptionForeground);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.button {
+  flex: 0 0 auto;
+  padding: 3px 11px;
+  color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
+  background-color: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
+  border: 1px solid var(--vscode-contrastBorder, var(--vscode-panel-border, transparent));
+  border-radius: 2px;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.button:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground));
+}
+
+.button.primary {
+  color: var(--vscode-button-foreground);
+  background-color: var(--vscode-button-background);
+}
+
+.button.primary:hover {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.button:focus-visible,
+.icon-button:focus-visible,
+.link-button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+
+.icon-button {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 3px 7px;
+  color: var(--vscode-descriptionForeground);
+  background: none;
+  border: none;
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 1em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
+/* Collapse/expand toggles for the groups column and the bottom panel: a
+   larger, fixed-size hit area shared by both so they read as one control
+   family instead of two differently sized, differently styled buttons. */
+.collapse-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 3px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.collapse-toggle:hover {
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+  text-decoration: none;
+}
+
+.link-button {
+  padding: 0;
+  color: var(--vscode-textLink-foreground);
+  background: none;
+  border: none;
+  font-family: var(--vscode-editor-font-family);
+  font-size: inherit;
+  cursor: pointer;
+}
+
+/* Banner and notice ------------------------------------------------------ */
+
+.banner[hidden],
+.notice[hidden],
+.commit-bar[hidden] {
+  display: none;
+}
+
+.banner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  background-color: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.08));
+  border-left: 3px solid var(--vscode-errorForeground, #f14c4c);
+}
+
+.banner strong {
+  color: var(--vscode-errorForeground, #f14c4c);
+}
+
+.banner p {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.92em;
+  color: var(--vscode-foreground);
+}
+
+.notice {
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  font-size: 0.95em;
+}
+
+.notice-success {
+  color: var(--vscode-testing-iconPassed, var(--vscode-foreground));
+}
+
+.notice-warning {
+  color: var(--vscode-editorWarning-foreground, var(--vscode-foreground));
+}
+
+.notice-error {
+  color: var(--vscode-errorForeground, #f14c4c);
+}
+
+.notice-info {
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Layout ----------------------------------------------------------------- */
+
+.layout {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+}
+
+.sidebar {
+  flex: 0 0 clamp(160px, 18%, 240px);
+  min-width: 0;
+  padding: 6px 0 10px;
+  overflow: auto;
+  background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
+}
+
+.sidebar.collapsed {
+  flex-basis: 28px;
+  overflow: hidden;
+}
+
+.center {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.table-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.detail {
+  flex: 0 0 clamp(250px, 28%, 380px);
+  min-width: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
+}
+
+/* A splitter is a flex sibling between two panes, so it both draws the
+   divider line these panes used to draw themselves and gives dragging a
+   dedicated hit target wider than a 1px border would. */
+.pane-splitter {
+  flex: 0 0 4px;
+  min-width: 0;
+  cursor: col-resize;
+  background-color: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+}
+
+.pane-splitter:hover {
+  background-color: var(--vscode-focusBorder);
+}
+
+.pane-splitter-horizontal {
+  cursor: row-resize;
+}
+
+/* Keep the resize cursor while dragging, even outside the handle. */
+body.resizing-row,
+body.resizing-row * {
+  cursor: row-resize !important;
+  user-select: none;
+}
+
+@media (max-width: 900px) {
+  .sidebar,
+  #sidebar-splitter {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .layout {
+    flex-direction: column;
+  }
+
+  .detail {
+    flex: 0 0 auto;
+    max-height: 45%;
+  }
+}
+
+/* Groups sidebar --------------------------------------------------------- */
+
+.sidebar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 6px 6px 10px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.85em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sidebar.collapsed .sidebar-heading {
+  justify-content: center;
+  padding: 6px 0;
+}
+
+.sidebar.collapsed .sidebar-heading-label {
+  display: none;
+}
+
+.group-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.group-row:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.group-row.selected {
+  color: var(--vscode-list-activeSelectionForeground);
+  background-color: var(--vscode-list-activeSelectionBackground);
+}
+
+.twisty {
+  flex: 0 0 14px;
+  width: 14px;
+  padding: 0;
+  color: inherit;
+  background: none;
+  border: none;
+  font-size: 0.8em;
+  cursor: pointer;
+}
+
+.twisty.empty {
+  cursor: default;
+  visibility: hidden;
+}
+
+.group-color {
+  flex: 0 0 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.group-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group-name.undeclared {
+  font-style: italic;
+  color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
+}
+
+.group-count {
+  flex: 0 0 auto;
+  color: var(--vscode-descriptionForeground);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85em;
+}
+
+.group-row.selected .group-count {
+  color: inherit;
+}
+
+/* Table ------------------------------------------------------------------ */
+
+.entries {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.entries th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 6px 10px;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  user-select: none;
+}
+
+/* The resize handle is positioned against the header cell. `sticky` already
+   establishes a containing block, so no extra `position` is needed. */
+.col-resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  z-index: 2;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.col-resize:hover {
+  background-color: var(--vscode-focusBorder);
+}
+
+/* Keep the resize cursor while dragging, even outside the handle. */
+body.resizing,
+body.resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+.entries th.col-status {
+  cursor: default;
+}
+
+.entries th:hover:not(.col-status) {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.entries th:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -2px;
+}
+
+.entries th.sorted span::after {
+  content: " ^";
+  color: var(--vscode-descriptionForeground);
+}
+
+.entries th.sorted.descending span::after {
+  content: " v";
+}
+
+.entries td {
+  padding: 3px 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--vscode-editorGroup-border, rgba(128, 128, 128, 0.14));
+}
+
+.entries tbody tr {
+  cursor: default;
+}
+
+.entries tbody tr:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.entries tbody tr.selected {
+  color: var(--vscode-list-activeSelectionForeground);
+  background-color: var(--vscode-list-activeSelectionBackground);
+}
+
+.col-status {
+  width: 3.6em;
+  padding-right: 0;
+  white-space: nowrap;
+}
+
+.col-type {
+  width: 10%;
+}
+
+.col-key {
+  width: 16%;
+  font-family: var(--vscode-editor-font-family);
+}
+
+.col-author {
+  width: 17%;
+}
+
+.col-title {
+  width: 28%;
+}
+
+.col-year {
+  width: 7%;
+  font-variant-numeric: tabular-nums;
+}
+
+.col-venue {
+  width: 15%;
+}
+
+.staged-dot {
+  color: var(--vscode-gitDecoration-modifiedResourceForeground, var(--vscode-charts-blue, #3794ff));
+  font-size: 0.8em;
+}
+
+.severity {
+  margin-left: 4px;
+  font-size: 0.85em;
+}
+
+.severity-error {
+  color: var(--vscode-errorForeground, #f14c4c);
+}
+
+.severity-warning {
+  color: var(--vscode-editorWarning-foreground, #cca700);
+}
+
+.severity-info {
+  color: var(--vscode-descriptionForeground);
+}
+
+.type-badge {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-radius: 8px;
+  color: var(--vscode-badge-foreground);
+  background-color: var(--vscode-badge-background);
+  font-size: 0.85em;
+}
+
+.dup-badge {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 8px;
+  color: var(--vscode-inputValidation-warningForeground, var(--vscode-foreground));
+  background-color: var(--vscode-inputValidation-warningBackground, rgba(255, 204, 0, 0.2));
+  border: 1px solid var(--vscode-inputValidation-warningBorder, transparent);
+  font-family: var(--vscode-font-family);
+  font-size: 0.8em;
+}
+
+.empty,
+.hint {
+  margin: 16px 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Detail pane ------------------------------------------------------------ */
+
+.detail-key {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 2px 4px;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 1.05em;
+  font-weight: 600;
+}
+
+.detail-key:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.detail-key:disabled {
+  opacity: 0.6;
+}
+
+.detail-type-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 4px 0 0;
+}
+
+.detail-at {
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family);
+}
+
+.detail-type {
+  width: 12em;
+  padding: 1px 4px;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: inherit;
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 12px;
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "name actions" "value value";
+  gap: 2px 6px;
+  align-items: center;
+}
+
+.field-name {
+  grid-area: name;
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.85em;
+}
+
+.field-actions {
+  grid-area: actions;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.field-value {
+  grid-area: value;
+  width: 100%;
+  padding: 3px 6px;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.92em;
+  resize: vertical;
+}
+
+.field-value:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.field-row.staged .field-name {
+  color: var(--vscode-gitDecoration-modifiedResourceForeground, var(--vscode-charts-blue, #3794ff));
+  font-weight: 600;
+}
+
+.field-row.staged .field-value {
+  border-color: var(--vscode-gitDecoration-modifiedResourceForeground, var(--vscode-charts-blue, #3794ff));
+}
+
+.field-row.cleared .field-name {
+  text-decoration: line-through;
+  color: var(--vscode-gitDecoration-deletedResourceForeground, var(--vscode-errorForeground, #f14c4c));
+}
+
+.field-cleared-note {
+  grid-area: value;
+  color: var(--vscode-gitDecoration-deletedResourceForeground, var(--vscode-errorForeground, #f14c4c));
+  font-size: 0.9em;
+}
+
+.detail-type.staged {
+  border-color: var(--vscode-gitDecoration-modifiedResourceForeground, var(--vscode-charts-blue, #3794ff));
+}
+
+.add-field {
+  display: flex;
+  gap: 4px;
+  margin: 12px 0;
+}
+
+.add-field-name {
+  flex: 1 1 6em;
+  min-width: 0;
+}
+
+.add-field-value {
+  flex: 2 1 8em;
+  min-width: 0;
+}
+
+.add-field input {
+  padding: 3px 6px;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.9em;
+}
+
+.detail-section {
+  margin-top: 14px;
+}
+
+.detail-section h3 {
+  margin: 0 0 4px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.85em;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip {
+  padding: 0 6px;
+  border-radius: 8px;
+  background-color: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  font-size: 0.85em;
+}
+
+.finding {
+  margin: 2px 0;
+  font-size: 0.92em;
+}
+
+.finding-error {
+  color: var(--vscode-errorForeground, #f14c4c);
+}
+
+.finding-warning {
+  color: var(--vscode-editorWarning-foreground, #cca700);
+}
+
+.finding-info {
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Bottom panel ----------------------------------------------------------- */
+
+.panel {
+  display: flex;
+  flex: 0 0 34%;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.panel.collapsed {
+  flex: 0 0 auto;
+}
+
+.panel.collapsed .panel-body {
+  display: none;
+}
+
+.panel-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px 0;
+}
+
+.panel-toggle {
+  margin-left: auto;
+}
+
+.tab {
+  padding: 3px 10px;
+  color: var(--vscode-descriptionForeground);
+  background: none;
+  border: none;
+  border-bottom: 1px solid transparent;
+  font-family: inherit;
+  font-size: 0.92em;
+  cursor: pointer;
+}
+
+.tab.active {
+  color: var(--vscode-foreground);
+  border-bottom-color: var(--vscode-focusBorder);
+}
+
+.panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 10px 10px;
+}
+
+.finding-group,
+.diff-group {
+  margin-bottom: 10px;
+}
+
+.finding-group h4,
+.diff-group h4 {
+  margin: 6px 0 3px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.85em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.diff-group h4 {
+  font-family: var(--vscode-editor-font-family);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.finding-row {
+  display: flex;
+  gap: 8px;
+  padding: 1px 0;
+  font-size: 0.92em;
+}
+
+.finding-severity {
+  flex: 0 0 4.5em;
+  font-size: 0.85em;
+  text-transform: uppercase;
+}
+
+.finding-file {
+  flex: 0 0 auto;
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+
+.finding-message {
+  flex: 1 1 auto;
+  color: var(--vscode-foreground);
+}
+
+.diff-warning {
+  margin: 2px 0;
+  color: var(--vscode-editorWarning-foreground, #cca700);
+  font-size: 0.9em;
+}
+
+.diff {
+  margin: 0;
+  padding: 6px 8px;
+  overflow-x: auto;
+  background-color: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.1));
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+
+.diff-add {
+  color: var(--vscode-gitDecoration-addedResourceForeground, #487e02);
+}
+
+.diff-del {
+  color: var(--vscode-gitDecoration-deletedResourceForeground, #f14c4c);
+}
+
+.diff-hunk {
+  color: var(--vscode-textLink-foreground);
+}
+
+.diff-file {
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Compare ------------------------------------------------------- */
+
+.compare-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 6px 0 10px;
+  overflow-x: auto;
+}
+
+.compare-row {
+  display: grid;
+  grid-template-columns: 7em 1fr 1fr 1fr;
+  align-items: start;
+  gap: 8px;
+  min-width: 640px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+  font-size: 0.92em;
+}
+
+.compare-header {
+  padding-bottom: 4px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.8em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+}
+
+.compare-field-name {
+  padding-top: 4px;
+  color: var(--vscode-descriptionForeground);
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.compare-value {
+  padding: 3px 6px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  background-color: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.1));
+  border-radius: 2px;
+}
+
+.compare-value.compare-missing {
+  color: var(--vscode-descriptionForeground);
+  background: none;
+  font-style: italic;
+}
+
+.diff-word-add {
+  border-radius: 2px;
+  background-color: var(--vscode-diffEditor-insertedTextBackground, rgba(72, 126, 2, 0.25));
+}
+
+.diff-word-del {
+  border-radius: 2px;
+  background-color: var(--vscode-diffEditor-removedTextBackground, rgba(241, 76, 76, 0.2));
+  text-decoration: line-through;
+}
+
+.compare-merged-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.compare-merged-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.compare-merged-value {
+  width: 100%;
+  min-height: 1.8em;
+  padding: 3px 6px;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  font-family: inherit;
+  font-size: inherit;
+  resize: vertical;
+}
+
+.compare-merged-value:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+/* Commit bar -------------------------------------------------- */
+
+.commit-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  background-color: var(--vscode-editorWidget-background, var(--vscode-sideBar-background));
+}
+
+.commit-summary {
+  flex: 1 1 auto;
+  color: var(--vscode-gitDecoration-modifiedResourceForeground, var(--vscode-foreground));
+}
+

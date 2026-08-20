@@ -40,6 +40,59 @@ jobs:
       - name: Build docs
         run: mkdocs build --strict
 
+  editor:
+    name: Editor extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: editor/package-lock.json
+
+      # The floor from pyproject's requires-python, so the bundle is proven
+      # against the oldest interpreter the engine claims to support rather than
+      # only against whatever is newest on the runner.
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Node dependencies
+        working-directory: editor
+        run: npm ci
+
+      - name: Compile
+        working-directory: editor
+        run: npm run compile
+
+      - name: Run tests
+        working-directory: editor
+        run: npm test
+
+      - name: Vendor the engine
+        working-directory: editor
+        run: node scripts/vendor-engine.mjs
+
+      # The vendored tree is generated and must never be committed; a missing
+      # ignore rule would otherwise add ~1200 files to the repository unnoticed.
+      - name: Check the vendored engine stays out of git
+        run: git check-ignore --quiet editor/engine
+
+      # End-to-end through the bundle: the path a user with no pynakes install
+      # takes, exercising the generated launcher rather than the developer's own
+      # installed engine.
+      - name: Smoke-test the bundled engine
+        run: |
+          python -P editor/engine/pynakes_launcher.py --version
+          python -P editor/engine/pynakes_launcher.py \
+            inspect tests/fixtures/biblatex_sample.bib --json > /dev/null
+
   package:
     name: Distribution
     runs-on: ubuntu-latest
