@@ -128,7 +128,7 @@
     "compile": "tsc -p .",
     "watch": "tsc -p . --watch",
     "pretest": "npm run compile",
-    "test": "node --test \"out/test/**/*.test.js\"",
+    "test": "node --require ./scripts/test-vscode-stub.cjs --test \"out/test/**/*.test.js\"",
     "package": "npx --yes @vscode/vsce package --no-dependencies",
     "vendor-engine": "node scripts/vendor-engine.mjs",
     "vscode:prepublish": "npm run vendor-engine && npm run compile",

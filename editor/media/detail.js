@@ -59,13 +59,10 @@ window.PV = window.PV || {};
     );
   }
 
-  /** The field whose "Compare with remote" button resolves the entry's identifier: `doi` if present, else `eprint`. */
-  function compareTargetField(row) {
+  /** Which fields get a "Compare with remote" button: `doi` and/or `eprint`, whichever the entry has. */
+  function compareTargetFields(row) {
     const names = PV.fieldNames(row);
-    if (names.includes("doi")) {
-      return "doi";
-    }
-    return names.includes("eprint") ? "eprint" : null;
+    return ["doi", "eprint"].filter((name) => names.includes(name));
   }
 
   function fieldEditor(row, field, showCompare) {
@@ -342,11 +339,11 @@ window.PV = window.PV || {};
       return;
     }
 
-    const compareField = compareTargetField(row);
+    const compareFields = compareTargetFields(row);
     const fields = document.createElement("div");
     fields.className = "fields";
     for (const field of orderedFields(row)) {
-      fields.appendChild(fieldEditor(row, field, field === compareField));
+      fields.appendChild(fieldEditor(row, field, compareFields.includes(field)));
     }
 
     container.replaceChildren(header(row), fields, addFieldRow(row), membership(row));

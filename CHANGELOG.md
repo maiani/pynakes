@@ -40,19 +40,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   query, and an empty query with no `--where` is rejected rather than silently
   matching the whole library.
 
-- The detail pane gained a "Compare with remote" action, next to an entry's
-  `doi` or `eprint` field: it fetches that identifier's DOI/arXiv record via
-  the engine's new `ref compare` and shows a three-column Local / Other /
-  Merged table in a new "Compare" panel tab, word-level diff highlighting
-  differing spans within each field. The merged column defaults to the local
+- The detail pane gained a "Compare with remote" action, next to each of an
+  entry's `doi` and `eprint` fields (both, when both are present): it fetches
+  that identifier's DOI/arXiv record via the engine's new `ref compare` and
+  shows a three-column Local / Other / Merged table in a new "Compare" panel
+  tab, word-level diff highlighting differing spans within each field.
+  Clicking a Local or Other cell selects that value into the Merged column,
+  which is also freely editable; the merged column defaults to the local
   value on a genuine conflict (never silently overwritten) or the other side
-  when the field is missing locally, is freely editable, and has "use local" /
-  "use other" shortcuts. Nothing is written automatically — "Apply merged"
-  stages each field through the existing field-edit path, so it goes through
-  the normal preview/diff/commit flow like any manual edit. Network access is
-  controlled by the new `pynakes.allowOnlineLookups` setting (on by default);
-  with it off, compare still runs but reports that online lookups are
-  disabled rather than silently doing nothing.
+  when the field is missing locally. Nothing is written automatically —
+  "Apply merged" stages each field through the existing field-edit path, so
+  it goes through the normal preview/diff/commit flow like any manual edit.
+  Network access is controlled by the new `pynakes.allowOnlineLookups`
+  setting (on by default); with it off, compare still runs but reports that
+  online lookups are disabled rather than silently doing nothing.
 - All panes (the groups sidebar, the detail pane, and the bottom findings/diff
   panel) are now resizable by dragging their border, the same way table
   columns already were; each dragged size is remembered per workspace.
@@ -63,7 +64,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pending staged changes, since those are keyed by the old citation key.
 - Icon buttons (undo/remove a field, collapse toggles) are bigger, with a
   wider hit target and hover highlight — mainly to make the new "Compare with
-  remote" and merge-table shortcut buttons comfortable to click.
+  remote" buttons comfortable to click.
+- `editor/src/test/cliContract.test.ts` runs the real engine (not a mock)
+  against a temp `.bib` file, checking argument order and envelope shapes for
+  `ref edit`, `ref compare --with`, and `keys rename` — the client's other
+  tests are pure and would not have caught either of two real regressions
+  from this session: a renamed envelope key (`FieldComparison.remote` ->
+  `.other`) and a wrong argument order for `keys rename`. Requires a
+  `python3` that can import this repo's `src/pynakes`; skips itself with a
+  clear reason otherwise, so `npm test` still works for editor-only
+  contributors without a Python setup.
 - `editor/` now bundles the engine, so the extension needs a Python 3.11+
   interpreter but no pynakes install. `npm run vendor-engine` builds the engine
   and its dependencies into `editor/engine/` (generated, git-ignored, shipped

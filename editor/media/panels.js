@@ -342,43 +342,48 @@ window.PV = window.PV || {};
       name.textContent = field.field;
       row.appendChild(name);
 
-      row.appendChild(compareValueCell(field.local, field.other));
-      row.appendChild(compareValueCell(field.other, field.local));
+      const localCell = compareValueCell(field.local, field.other);
+      const otherCell = compareValueCell(field.other, field.local);
+      row.append(localCell, otherCell);
 
       const mergedCell = document.createElement("div");
       mergedCell.className = "compare-merged-cell";
       const value = document.createElement("textarea");
       value.className = "compare-merged-value";
       value.rows = 1;
-      // A field the entry lacks entirely defaults to the other side, filling
-      // the gap; a genuine conflict (both sides have a value) defaults to the
-      // local one, so a remote value never silently overwrites curated data.
-      value.value = field.local ?? field.other;
       value.spellcheck = false;
       merged.push({ field, value });
 
-      const actions = document.createElement("span");
-      actions.className = "compare-merged-actions";
-      const useLocal = document.createElement("button");
-      useLocal.type = "button";
-      useLocal.className = "icon-button";
-      useLocal.textContent = "⇦";
-      useLocal.title = "Use the local value";
-      useLocal.disabled = field.local === null;
-      useLocal.addEventListener("click", () => {
-        value.value = field.local ?? "";
-      });
-      const useOther = document.createElement("button");
-      useOther.type = "button";
-      useOther.className = "icon-button";
-      useOther.textContent = "⇨";
-      useOther.title = "Use the " + compareOtherLabel(compare).toLowerCase() + " value";
-      useOther.addEventListener("click", () => {
-        value.value = field.other;
-      });
-      actions.append(useLocal, useOther);
+      // Clicking a value cell selects it for the merged result — the
+      // highlighted cell always shows which side the merged value currently
+      // matches, staying in sync with manual edits to the merged text too.
+      const syncSelection = () => {
+        localCell.classList.toggle(
+          "compare-selected",
+          field.local !== null && value.value === field.local,
+        );
+        otherCell.classList.toggle("compare-selected", value.value === field.other);
+      };
+      const select = (text) => {
+        value.value = text;
+        syncSelection();
+      };
+      if (field.local !== null) {
+        localCell.classList.add("compare-selectable");
+        localCell.title = "Click to keep the local value";
+        localCell.addEventListener("click", () => select(field.local));
+      }
+      otherCell.classList.add("compare-selectable");
+      otherCell.title = "Click to keep the " + compareOtherLabel(compare).toLowerCase() + " value";
+      otherCell.addEventListener("click", () => select(field.other));
+      value.addEventListener("input", syncSelection);
 
-      mergedCell.append(actions, value);
+      // A field the entry lacks entirely defaults to the other side, filling
+      // the gap; a genuine conflict (both sides have a value) defaults to the
+      // local one, so a remote value never silently overwrites curated data.
+      select(field.local ?? field.other);
+
+      mergedCell.appendChild(value);
       row.appendChild(mergedCell);
       table.appendChild(row);
     }

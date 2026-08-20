@@ -920,6 +920,7 @@ body.resizing * {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   background-color: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.1));
+  border: 1px solid transparent;
   border-radius: 2px;
 }
 
@@ -927,6 +928,18 @@ body.resizing * {
   color: var(--vscode-descriptionForeground);
   background: none;
   font-style: italic;
+}
+
+.compare-value.compare-selectable {
+  cursor: pointer;
+}
+
+.compare-value.compare-selectable:hover {
+  border-color: var(--vscode-panel-border, rgba(128, 128, 128, 0.5));
+}
+
+.compare-value.compare-selected {
+  border-color: var(--vscode-focusBorder);
 }
 
 .diff-word-add {
@@ -944,11 +957,6 @@ body.resizing * {
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-.compare-merged-actions {
-  display: flex;
-  gap: 2px;
 }
 
 .compare-merged-value {
