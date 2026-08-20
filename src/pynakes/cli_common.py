@@ -2,7 +2,6 @@
 
 import functools
 import json
-import os
 import sys
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
@@ -454,13 +453,13 @@ def _metadata_key_completer(ctx, incomplete):
     return items
 
 
-def _metadata_cache_dir(file: str, cache_dir: str | None, online: bool) -> str | None:
-    if cache_dir is not None:
-        return cache_dir
-    if not online:
-        return None
-    file_path = Path(os.path.abspath(os.fspath(Path(file).expanduser())))
-    return str(file_path.parent / ".pynakes-cache")
+_CACHE_FILE_OPTION = typer.Option(
+    None,
+    "--cache-file",
+    help="Keep provider responses in a reusable cache file at this path (safe to "
+    "delete or .gitignore). Omit it and nothing is written to disk: responses "
+    "are reused for this run only",
+)
 
 
 # --- read-only checks (single- or multi-file) ------------------------------

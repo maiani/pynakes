@@ -47,7 +47,7 @@ pynakes normalize refs.bib
 - Field rename/move/append/clear and title-capitalization protection
 - DOI import via DOI resolver BibTeX content negotiation
 - Deduplication and conservative merge workflows
-- Integrity/enrichment workflows with opt-in cached provider lookups
+- Integrity/enrichment workflows with opt-in online provider lookups
 - JabRef linked-file validation through `asset check`
 - AUX/TeX citation analysis with used/unused/missing reporting
 - Daily `normalize` routine:

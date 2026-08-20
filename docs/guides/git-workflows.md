@@ -118,12 +118,26 @@ jobs:
 ```
 
 To verify entries against authoritative DOI metadata (network access required),
-add an online step. Provider responses are cached deterministically next to the
-file, so commit the cache to keep CI runs reproducible and fast:
+add an online step. Nothing is cached to disk unless you pass `--cache-file`, so a
+plain online step leaves no artifact in the checkout:
 
 ```yaml
       - name: Verify references online
         run: pynakes verify **/*.bib --online --strict
+```
+
+To make repeat runs fast and easy on the providers, point `--cache-file` at a
+path and let the runner cache it. Commit it instead if you want the comparison
+itself pinned — but remember that a committed cache freezes what "authoritative
+metadata" means until you refresh it:
+
+```yaml
+      - uses: actions/cache@v4
+        with:
+          path: .pynakes-cache
+          key: pynakes-provider-cache
+      - name: Verify references online
+        run: pynakes verify **/*.bib --online --strict --cache-file .pynakes-cache
 ```
 
 ## Tips

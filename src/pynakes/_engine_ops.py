@@ -84,26 +84,26 @@ class BibliographyOperations:
         self,
         *,
         online: bool = False,
-        cache_dir: str | Path | None = None,
+        cache_file: str | Path | None = None,
     ) -> integrity_ops.VerifyReport:
         """Verify entries against authoritative metadata without modifying."""
-        return integrity_ops.verify_library(self.lib, online=online, cache_dir=cache_dir)
+        return integrity_ops.verify_library(self.lib, online=online, cache_file=cache_file)
 
     def published_check(
         self,
         *,
         online: bool = False,
-        cache_dir: str | Path | None = None,
+        cache_file: str | Path | None = None,
     ) -> integrity_ops.PublishedReport:
         """Check preprint entries for published metadata without modifying."""
-        return integrity_ops.check_published(self.lib, online=online, cache_dir=cache_dir)
+        return integrity_ops.check_published(self.lib, online=online, cache_file=cache_file)
 
     def compare_entry_with_remote(
         self,
         key: str,
         *,
         online: bool = False,
-        cache_dir: str | Path | None = None,
+        cache_file: str | Path | None = None,
     ) -> integrity_ops.EntryComparisonReport:
         """Compare one entry's fields against its DOI/arXiv remote record.
 
@@ -118,7 +118,7 @@ class BibliographyOperations:
         if len(matches) != 1:
             raise ValueError(f"Citation key {key!r} is duplicated; repair duplicates first")
         return integrity_ops.compare_entry_with_remote(
-            matches[0], online=online, cache_dir=cache_dir
+            matches[0], online=online, cache_file=cache_file
         )
 
     def compare_entries(self, key: str, other_key: str) -> integrity_ops.EntryComparisonReport:
@@ -497,24 +497,24 @@ class BibliographyOperations:
         self,
         *,
         online: bool = False,
-        cache_dir: str | Path | None = None,
+        cache_file: str | Path | None = None,
     ) -> integrity_ops.EnrichReport:
         """Conservatively fill missing metadata in memory."""
-        report = integrity_ops.enrich_library(self.lib, online=online, cache_dir=cache_dir)
+        report = integrity_ops.enrich_library(self.lib, online=online, cache_file=cache_file)
         return report
 
     def apply_published(
         self,
         *,
         online: bool = False,
-        cache_dir: str | Path | None = None,
+        cache_file: str | Path | None = None,
     ) -> integrity_ops.PublishedReport:
         """Apply conservative published-version metadata updates in memory."""
         report = integrity_ops.check_published(
             self.lib,
             online=online,
             apply=True,
-            cache_dir=cache_dir,
+            cache_file=cache_file,
         )
         return report
 
@@ -548,7 +548,7 @@ class BibliographyOperations:
         published_pdf_fetcher: Callable[[str], bytes] | None = None,
         supplement_url_fetcher: Callable[[str], tuple[str, ...]] | None = None,
         supplement_pdf_fetcher: Callable[[str], bytes] | None = None,
-        cache_dir: str | Path | None = None,
+        cache_file: str | Path | None = None,
         progress: FetchProgress | None = None,
         access: str = "open",
     ) -> dict:
@@ -566,7 +566,7 @@ class BibliographyOperations:
             published_pdf_fetcher: Injectable published PDF bytes fetcher.
             supplement_url_fetcher: Injectable supplement URL resolver.
             supplement_pdf_fetcher: Injectable supplement PDF bytes fetcher.
-            cache_dir: Optional provider-response cache directory.
+            cache_file: Optional path to a provider-response cache file.
             progress: Optional callback receiving fetch progress events.
             access: Published-material access mode: ``open`` or ``institutional``.
 
@@ -603,7 +603,7 @@ class BibliographyOperations:
             published_pdf_fetcher=published_pdf_fetcher,
             supplement_url_fetcher=supplement_url_fetcher,
             supplement_pdf_fetcher=supplement_pdf_fetcher,
-            cache_dir=cache_dir,
+            cache_file=cache_file,
             progress=progress,
             access=access,
         )

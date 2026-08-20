@@ -9,13 +9,18 @@ import hashlib
 import json
 import os
 import shutil
-import tempfile
-import uuid
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+from pynakes._filestore_atomic import (
+    _atomic_replace_dir,
+    _atomic_write_bytes,
+    _process_alive,
+    _remove_path,
+)
 from pynakes._text_utils import strip_meta_terminator
 from pynakes.metadata import metadata_value
 from pynakes.model import BibEntry, BibFile
@@ -28,6 +33,9 @@ SUPPLEMENT_SUFFIX = ".supplement"
 ERRATUM_SUFFIX = ".erratum"
 MANIFEST_DIR = ".pinax"
 MANIFEST_FILE = "manifest.json"
+# In-flight temporary files live under MANIFEST_DIR rather than beside the
+# materials, so an interrupted write cannot litter the user's files directory.
+TEMP_DIR = "tmp"
 MANIFEST_VERSION = 1
 ARTIFACT_KINDS = (
     "published_pdf",
@@ -36,7 +44,6 @@ ARTIFACT_KINDS = (
     "supplement_pdf",
     "erratum_pdf",
 )
-_FILESYSTEM_ERRORS = (OSError, shutil.Error)
 
 
 @dataclass(frozen=True)
@@ -196,18 +203,85 @@ class FileStore:
         self.root.mkdir(parents=True, exist_ok=True)
         return self.root
 
+    @property
+    def scratch_root(self) -> Path:
+        """Return the directory that holds in-flight temporary files."""
+        return self.root / MANIFEST_DIR / TEMP_DIR
+
+    @contextmanager
+    def scratch(self) -> Iterator[Path]:
+        """Yield this process's scratch directory, releasing it when empty.
+
+        Temporary files stage here instead of beside the materials, so a write
+        interrupted by a signal leaves nothing in the files directory the user
+        looks at. Scratch directories owned by processes that have since exited
+        are swept on entry, which makes a killed run self-healing rather than
+        permanently messy — nothing accumulates across runs.
+        """
+        root = self.scratch_root
+        root.mkdir(parents=True, exist_ok=True)
+        self.sweep_scratch()
+        mine = root / str(os.getpid())
+        mine.mkdir(exist_ok=True)
+        try:
+            yield mine
+        finally:
+            self._release_scratch()
+
+    def sweep_scratch(self) -> list[Path]:
+        """Remove scratch directories belonging to processes that have exited.
+
+        Concurrent pynakes processes each own a directory named for their pid,
+        so sweeping never touches another live run's in-flight files.
+        """
+        root = self.scratch_root
+        if not root.is_dir():
+            return []
+        current = str(os.getpid())
+        removed: list[Path] = []
+        for item in sorted(root.iterdir(), key=lambda entry: entry.name):
+            if item.name == current:
+                continue
+            if item.name.isdigit() and _process_alive(int(item.name)):
+                continue
+            _remove_path(item)
+            removed.append(item)
+        return removed
+
+    def _release_scratch(self) -> None:
+        """Drop this process's scratch directory, and its empty parents.
+
+        Nested users (an extraction staging its tree inside the same directory)
+        leave it non-empty, so ``rmdir`` refusing is the expected outcome and
+        the outermost caller performs the actual cleanup.
+        """
+        for path in (
+            self.scratch_root / str(os.getpid()),
+            self.scratch_root,
+            self.root / MANIFEST_DIR,
+        ):
+            try:
+                path.rmdir()
+            except OSError:
+                return
+
+    def _atomic_write(self, path: Path, data: bytes) -> None:
+        """Write ``path`` atomically, staging through the contained scratch dir."""
+        with self.scratch() as scratch:
+            _atomic_write_bytes(path, data, scratch)
+
     def write_preprint_pdf(self, key: str, data: bytes) -> Path:
         """Atomically write the arXiv preprint PDF bytes for ``key``."""
         path = self.paths_for(key).preprint_pdf
         self.ensure_root()
-        _atomic_write_bytes(path, data, self.root)
+        self._atomic_write(path, data)
         return path
 
     def write_published_pdf(self, key: str, data: bytes) -> Path:
         """Atomically write the published (version-of-record) PDF for ``key``."""
         path = self.paths_for(key).published_pdf
         self.ensure_root()
-        _atomic_write_bytes(path, data, self.root)
+        self._atomic_write(path, data)
         return path
 
     def write_preprint_source(self, key: str, source_dir: str | Path) -> Path:
@@ -217,21 +291,22 @@ class FileStore:
             raise ValueError(f"source_dir is not a directory: {source}")
         target = self.paths_for(key).preprint_source
         self.ensure_root()
-        _atomic_replace_dir(source, target, self.root)
+        with self.scratch() as scratch:
+            _atomic_replace_dir(source, target, scratch)
         return target
 
     def write_supplement_pdf(self, key: str, data: bytes) -> Path:
         """Atomically write the supplementary-material PDF for ``key``."""
         path = self.paths_for(key).supplement_pdf
         self.ensure_root()
-        _atomic_write_bytes(path, data, self.root)
+        self._atomic_write(path, data)
         return path
 
     def write_erratum_pdf(self, key: str, data: bytes) -> Path:
         """Atomically write the erratum/corrected PDF for ``key``."""
         path = self.paths_for(key).erratum_pdf
         self.ensure_root()
-        _atomic_write_bytes(path, data, self.root)
+        self._atomic_write(path, data)
         return path
 
     @property
@@ -261,7 +336,7 @@ class FileStore:
         if backup and target.exists():
             shutil.copy2(target, Path(str(target) + ".bak"))
         text = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
-        _atomic_write_bytes(target, text.encode("utf-8"), target.parent)
+        self._atomic_write(target, text.encode("utf-8"))
 
     def preprint_canonical(self, key: str) -> bool:
         """Return whether ``key`` selects preprint material as canonical."""
@@ -876,40 +951,3 @@ def _classify_material_path(path: Path) -> tuple[str, str] | None:
     if stem.endswith(ERRATUM_SUFFIX):
         return stem[: -len(ERRATUM_SUFFIX)], "erratum_pdf"
     return None
-
-
-def _atomic_write_bytes(path: Path, data: bytes, root: Path) -> None:
-    tmp = tempfile.NamedTemporaryFile(
-        prefix=f".{path.name}.",
-        suffix=".tmp",
-        dir=root,
-        delete=False,
-    )
-    tmp_path = Path(tmp.name)
-    try:
-        with tmp:
-            tmp.write(data)
-            tmp.flush()
-        tmp_path.replace(path)
-    except _FILESYSTEM_ERRORS:
-        tmp_path.unlink(missing_ok=True)
-        raise
-
-
-def _atomic_replace_dir(source: Path, target: Path, root: Path) -> None:
-    backup = root / f".{target.name}.old-{uuid.uuid4().hex}"
-    had_target = target.exists()
-    if had_target:
-        target.replace(backup)
-    try:
-        source.replace(target)
-    except _FILESYSTEM_ERRORS:
-        if had_target and backup.exists() and not target.exists():
-            backup.replace(target)
-        raise
-    else:
-        if had_target:
-            if backup.is_dir():
-                shutil.rmtree(backup)
-            else:
-                backup.unlink(missing_ok=True)

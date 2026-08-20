@@ -31,7 +31,7 @@ These constraints apply across operation modules, interfaces, and releases:
 7. **Keep the file authoritative.** In-memory state is a derived working view;
    there is no database or persistent sidecar state of record.
 8. **Make side effects explicit.** Network access requires an online command or
-   option, and provider responses can be cached.
+   option, and provider responses can be cached when `--cache-file` asks for it.
 
 ## Domain vocabulary and core concepts
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -12,6 +11,7 @@ from urllib.request import Request as _UrllibRequest
 import httpx
 
 from pynakes import __version__
+from pynakes.provider_cache import open_cache
 
 USER_AGENT = f"pynakes/{__version__} (+https://github.com/maiani/pynakes)"
 
@@ -41,19 +41,6 @@ def iter_strings(value: object) -> list[str]:
             strings.extend(iter_strings(nested))
         return strings
     return []
-
-
-def cache_path(
-    cache_dir: str | Path | None,
-    namespace: str,
-    identifier: str,
-    suffix: str = ".json",
-) -> Path | None:
-    """Return a deterministic provider cache path, or ``None`` when caching is disabled."""
-    if cache_dir is None:
-        return None
-    digest = hashlib.sha256(identifier.lower().encode("utf-8")).hexdigest()
-    return Path(cache_dir) / namespace / f"{digest}{suffix}"
 
 
 def fetch_bytes(
@@ -173,15 +160,15 @@ def fetch_json(
     namespace: str,
     identifier: str,
     provider: str,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
     opener: Callable[..., object] | None = None,
     timeout: float = 15.0,
 ) -> dict | None:
     """Fetch a provider JSON object with deterministic cache support."""
-    path = cache_path(cache_dir, namespace, identifier, ".json")
-    if path is not None and path.exists():
-        text = path.read_text(encoding="utf-8", errors="replace")
-    else:
+    cache = open_cache(cache_file)
+    cached = cache.get(namespace, identifier, "json")
+    text = cached
+    if text is None:
         text = _fetch_text(
             url, provider=provider, identifier=identifier, opener=opener, timeout=timeout
         )
@@ -194,9 +181,8 @@ def fetch_json(
         raise ProviderFetchError(
             f"{provider} returned invalid JSON for DOI {identifier!r}: {exc}"
         ) from exc
-    if path is not None and not path.exists():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")
+    if cached is None:
+        cache.put(namespace, identifier, "json", text)
     return data if isinstance(data, dict) else None
 
 

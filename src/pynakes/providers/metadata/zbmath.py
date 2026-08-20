@@ -77,7 +77,7 @@ def _envelope(payload: object) -> dict | None:
 def fetch_document_record(
     identifier: str,
     *,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
     urlopen: Callable[..., object] | None = None,
 ) -> dict | None:
     """Fetch a zbMATH document record, public and unauthenticated."""
@@ -87,7 +87,7 @@ def fetch_document_record(
         namespace="zbmath",
         identifier=normalized,
         provider=PROVIDER_NAME,
-        cache_dir=cache_dir,
+        cache_file=cache_file,
         opener=urlopen,
     )
     return _envelope(data)

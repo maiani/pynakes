@@ -6,8 +6,8 @@ import typer
 
 from pynakes.cli_commands._reference import unique_entries, unique_entry
 from pynakes.cli_common import (
+    _CACHE_FILE_OPTION,
     InvalidInputError,
-    _metadata_cache_dir,
     _resolve_input_bib,
     _safe,
     bib_file_argument,
@@ -28,9 +28,7 @@ def compare(
         "--online",
         help="Fetch DOI/arXiv provider metadata (required to compare against a remote record)",
     ),
-    cache_dir: str | None = typer.Option(
-        None, "--cache-dir", help="Directory for deterministic provider-response cache"
-    ),
+    cache_file: str | None = _CACHE_FILE_OPTION,
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Compare one reference's fields against another reference (read-only).
@@ -56,8 +54,7 @@ def compare(
         report = coll.compare_entries(entry.key, other.key)
     else:
         entry = unique_entry(coll, key, json_output, action="ref_compare")
-        cache = _metadata_cache_dir(file, cache_dir, online)
-        report = coll.compare_entry_with_remote(entry.key, online=online, cache_dir=cache)
+        report = coll.compare_entry_with_remote(entry.key, online=online, cache_file=cache_file)
 
     if json_output:
         typer.echo(

@@ -472,7 +472,7 @@ def run_fetch_loop(
     published_pdf_fetcher: Callable[[str], bytes] | None = None,
     supplement_url_fetcher: Callable[[str], tuple[str, ...]] | None = None,
     supplement_pdf_fetcher: Callable[[str], bytes] | None = None,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
     progress: FetchProgress | None = None,
     access: str = "open",
 ) -> tuple[list[dict], list[dict], list[dict]]:
@@ -634,7 +634,7 @@ def run_fetch_loop(
                     url_resolver=published_url_fetcher,
                     institutional_url_resolver=institutional_url_fetcher,
                     pdf_fetcher=published_pdf_fetcher,
-                    cache_dir=cache_dir,
+                    cache_file=cache_file,
                     progress=progress,
                     access=access,  # type: ignore[arg-type]
                 )

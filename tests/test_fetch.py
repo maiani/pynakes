@@ -302,7 +302,7 @@ def test_openalex_oa_pdf_url_returns_none_when_no_oa(tmp_path: Path) -> None:
 
 
 def test_openalex_oa_pdf_url_uses_cache(tmp_path: Path) -> None:
-    cache_dir = tmp_path / "cache"
+    cache_file = tmp_path / "cache"
     calls: list[int] = []
 
     def fake_urlopen(request: object, timeout: float = 30.0) -> _FakeResponse:
@@ -310,20 +310,20 @@ def test_openalex_oa_pdf_url_uses_cache(tmp_path: Path) -> None:
         return _FakeResponse(_OPENALEX_WITH_OA)
 
     url1 = openalex_oa_pdf_url(
-        "10.1103/PhysRevLett.100.123456", urlopen=fake_urlopen, cache_dir=cache_dir
+        "10.1103/PhysRevLett.100.123456", urlopen=fake_urlopen, cache_file=cache_file
     )
     assert url1 == "https://example.com/paper.pdf"
     assert len(calls) == 1
 
     url2 = openalex_oa_pdf_url(
-        "10.1103/PhysRevLett.100.123456", urlopen=fake_urlopen, cache_dir=cache_dir
+        "10.1103/PhysRevLett.100.123456", urlopen=fake_urlopen, cache_file=cache_file
     )
     assert url2 == "https://example.com/paper.pdf"
     assert len(calls) == 1  # served from cache, no second call
 
 
 def test_openalex_oa_pdf_url_does_not_cache_invalid_json(tmp_path: Path) -> None:
-    cache_dir = tmp_path / "cache"
+    cache_file = tmp_path / "cache"
 
     def fake_urlopen(request: object, timeout: float = 30.0) -> _FakeResponse:
         return _FakeResponse(b"<html>not json</html>")
@@ -332,10 +332,10 @@ def test_openalex_oa_pdf_url_does_not_cache_invalid_json(tmp_path: Path) -> None
         openalex_oa_pdf_url(
             "10.1103/PhysRevLett.100.123456",
             urlopen=fake_urlopen,
-            cache_dir=cache_dir,
+            cache_file=cache_file,
         )
 
-    assert not list(cache_dir.rglob("*.json"))
+    assert not list(cache_file.rglob("*.json"))
 
 
 _CROSSREF_WITH_PDF = json.dumps(

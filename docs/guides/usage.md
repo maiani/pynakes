@@ -560,7 +560,7 @@ pynakes ref import 10.5555/example refs.bib --key ManualKey2026
 pynakes ref import 10.5555/example refs.bib --key-source provider
 pynakes ref import 10.5555/example refs.bib --allow-duplicate
 pynakes ref import arXiv:2301.00001 refs.bib --fetch
-pynakes ref import 10.5555/example refs.bib --fetch --cache-dir .pynakes-cache
+pynakes ref import 10.5555/example refs.bib --fetch --cache-file .pynakes-cache
 ```
 
 Each identifier is fetched through its matching provider. By default
@@ -961,8 +961,11 @@ conflict rather than overwritten.
 ## verify / enrich
 
 Integrity and enrichment commands never use the network unless `--online` is
-passed. Online provider responses are cached beside the `.bib` file by default,
-or in `--cache-dir` when supplied.
+passed, and never write a cache to disk unless `--cache-file` is passed. Within a
+single run, provider responses are reused from memory — the same DOI is looked up
+once no matter how many entries carry it — and discarded when the command exits.
+Pass `--cache-file PATH` to keep them for later runs; see
+[Caching provider responses](#caching-provider-responses).
 
 ```bash
 pynakes verify --online --strict --json        # auto-detects one .bib file
@@ -973,35 +976,26 @@ pynakes enrich refs.bib --online --published --dry-run --diff
 ```
 
 `verify --strict` exits with code `1` when warnings or errors are reported.
-`enrich` only fills missing fields. The `--published` flag folds in the
-preprint published-version workflow: on `verify` it reports (read-only) preprints
-that now have a published version; on `enrich` it promotes them — preserving the
-preprint identifier and adding the published DOI/journal metadata.
 
-For a single entry, `ref compare` shows every field where the local value
-differs from (or is missing versus) another reference, without writing
-anything. That other reference is either a fetched DOI/arXiv provider record:
+### Caching provider responses
 
-```bash
-pynakes ref compare Smith2024 refs.bib --online --json
-```
-
-or another entry already in the library, compared with no network access —
-useful for reviewing a candidate duplicate pair before merging:
+Nothing is cached to disk unless you ask for it. Every command that can go
+online — `verify`, `enrich`, `ref compare`, `ref import --fetch`, `asset fetch` —
+accepts `--cache-file PATH`, and only that flag creates a cache. Without it, an
+online run leaves the directory holding your `.bib` exactly as it found it.
 
 ```bash
-pynakes ref compare Smith2024 --with Smith2024b refs.bib --json
+pynakes verify refs.bib --online --cache-file .pynakes-cache
 ```
 
-Review the reported fields, then apply the ones you want with `ref edit`:
+The cache is one file: newline-delimited JSON, one record per provider response,
+identifiers in plain text so it stays readable and greppable. A single
+`.gitignore` line covers it and `rm` removes it — a missing cache only costs
+refetches, so there is nothing to manage and no command to learn.
 
-```bash
-pynakes ref edit Smith2024 refs.bib --field number=10 --field volume=120
-```
-
-Against a remote record, `ref compare` prefers the entry's DOI (existing, or
-found in a local URL); absent a resolvable DOI it falls back to an arXiv id
-(`eprint`).
+No record ever expires. Provider metadata does change, which is why `verify
+--online` exists at all, so treat a cache as a snapshot you chose to keep: delete
+it when you want a genuinely fresh comparison.
 
 ## Best Practices
 

@@ -45,7 +45,7 @@ _ENTRY_TYPES = {
 def fetch_doi_by_alternative_id(
     alternative_id: str,
     *,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
     urlopen: Callable[..., object] | None = None,
 ) -> str | None:
     """Resolve a publisher-assigned alternative id to its DOI, or ``None``.
@@ -66,7 +66,7 @@ def fetch_doi_by_alternative_id(
         namespace="crossref-alternative-id",
         identifier=value,
         provider="CrossRef",
-        cache_dir=cache_dir,
+        cache_file=cache_file,
         opener=urlopen,
     )
     if data is None:
@@ -91,7 +91,7 @@ def fetch_doi_by_alternative_id(
 def fetch_work_by_doi(
     doi: str,
     *,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
     urlopen: Callable[..., object] | None = None,
 ) -> dict | None:
     """Fetch a CrossRef work record by DOI, using a deterministic cache when provided."""
@@ -102,7 +102,7 @@ def fetch_work_by_doi(
         namespace="crossref",
         identifier=normalized,
         provider="CrossRef",
-        cache_dir=cache_dir,
+        cache_file=cache_file,
         opener=urlopen,
     )
     if data is None:
@@ -144,11 +144,11 @@ def _clean_url(raw: object) -> str | None:
 def oa_pdf_url_for_doi(
     doi: str,
     *,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
     urlopen: Callable[..., object] | None = None,
 ) -> str | None:
     """Resolve a DOI to an open-access PDF URL via CrossRef, or ``None``."""
-    work = fetch_work_by_doi(doi, cache_dir=cache_dir, urlopen=urlopen)
+    work = fetch_work_by_doi(doi, cache_file=cache_file, urlopen=urlopen)
     if work is None:
         return None
     return oa_pdf_url_from_work(work)

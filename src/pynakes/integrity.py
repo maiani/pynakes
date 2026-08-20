@@ -19,7 +19,8 @@ from pynakes.identity import evidence_from_entry
 from pynakes.keys import _first_author_last_name
 from pynakes.metadata import library_dialect
 from pynakes.model import BibEntry, BibFile
-from pynakes.providers._http import ProviderFetchError, cache_path
+from pynakes.provider_cache import open_cache
+from pynakes.providers._http import ProviderFetchError
 from pynakes.providers.identity import resolve_arxiv_id_for_doi
 from pynakes.providers.metadata import doi as doi_provider
 from pynakes.providers.repositories import arxiv as arxiv_provider
@@ -267,7 +268,7 @@ def verify_library(
     lib: BibFile,
     *,
     online: bool = False,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
 ) -> VerifyReport:
     """Verify DOI-backed entries against provider metadata.
 
@@ -308,7 +309,7 @@ def verify_library(
             continue
 
         try:
-            remote = fetch_doi_entry(normalized, cache_dir=cache_dir)
+            remote = fetch_doi_entry(normalized, cache_file=cache_file)
         except MetadataFetchError as exc:
             issue_type = (
                 "provider_error"
@@ -329,7 +330,7 @@ def enrich_library(
     lib: BibFile,
     *,
     online: bool = False,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
 ) -> EnrichReport:
     """Fill missing fields from local DOI URLs and DOI provider metadata."""
     report = EnrichReport()
@@ -354,7 +355,7 @@ def enrich_library(
             continue
 
         try:
-            remote = fetch_doi_entry(normalized, cache_dir=cache_dir)
+            remote = fetch_doi_entry(normalized, cache_file=cache_file)
         except MetadataFetchError as exc:
             report.warnings.append(
                 {"type": "doi_unresolved", "key": entry.key, "message": str(exc)}
@@ -370,7 +371,7 @@ def compare_entry_with_remote(
     entry: BibEntry,
     *,
     online: bool = False,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
 ) -> EntryComparisonReport:
     """Fetch remote metadata for one entry and compare it field by field.
 
@@ -402,7 +403,7 @@ def compare_entry_with_remote(
             )
         else:
             try:
-                remote = fetch_doi_entry(normalized, cache_dir=cache_dir)
+                remote = fetch_doi_entry(normalized, cache_file=cache_file)
             except MetadataFetchError as exc:
                 report.warnings.append(
                     {"type": "doi_unresolved", "key": entry.key, "message": str(exc)}
@@ -416,7 +417,7 @@ def compare_entry_with_remote(
     arxiv_id = _entry_arxiv_id(entry)
     if arxiv_id:
         try:
-            remote_fields = _fetch_arxiv_fields(arxiv_id, cache_dir=cache_dir)
+            remote_fields = _fetch_arxiv_fields(arxiv_id, cache_file=cache_file)
         except MetadataFetchError as exc:
             report.warnings.append(
                 {"type": "arxiv_unresolved", "key": entry.key, "message": str(exc)}
@@ -456,7 +457,7 @@ def check_published(
     *,
     online: bool = False,
     apply: bool = False,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
     openalex_fetcher: Callable[[str], dict | None] | None = None,
     semantic_scholar_fetcher: Callable[[str], dict | None] | None = None,
 ) -> PublishedReport:
@@ -472,7 +473,7 @@ def check_published(
                     report,
                     apply=apply,
                     dialect=dialect,
-                    cache_dir=cache_dir,
+                    cache_file=cache_file,
                     openalex_fetcher=openalex_fetcher,
                     semantic_scholar_fetcher=semantic_scholar_fetcher,
                 )
@@ -518,7 +519,7 @@ def check_published(
             continue
 
         try:
-            arxiv = fetch_arxiv_metadata(identifier, cache_dir=cache_dir)
+            arxiv = fetch_arxiv_metadata(identifier, cache_file=cache_file)
         except MetadataFetchError as exc:
             report.warnings.append(
                 {"type": "preprint_lookup_failed", "key": entry.key, "message": str(exc)}
@@ -542,28 +543,24 @@ def check_published(
     return report
 
 
-def fetch_doi_entry(doi: str, *, cache_dir: str | Path | None = None) -> BibEntry:
+def fetch_doi_entry(doi: str, *, cache_file: str | Path | None = None) -> BibEntry:
     """Fetch DOI BibTeX metadata, using a deterministic cache when provided."""
     normalized = normalize_doi(doi)
-    path = cache_path(cache_dir, "doi", normalized, ".bib")
-    if path is not None and path.exists():
-        text = path.read_text(encoding="utf-8", errors="replace")
-    else:
+    cache = open_cache(cache_file)
+    text = cache.get("doi", normalized, "bib")
+    if text is None:
         try:
             text = doi_provider.fetch_bibtex(normalized)
         except ProviderFetchError as exc:
             raise MetadataFetchError(
                 f"Could not fetch DOI {normalized!r} via doi.org content negotiation: {exc}"
             ) from exc
-        if path is not None:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(text, encoding="utf-8")
+        cache.put("doi", normalized, "bib", text)
 
     try:
         entries = parse_bib(text).entries.values()
     except ParseError as exc:
-        if path is not None and path.exists():
-            path.unlink(missing_ok=True)
+        cache.drop("doi", normalized, "bib")
         raise MetadataFetchError(
             f"Provider returned invalid BibTeX for {normalized}: {exc}"
         ) from exc
@@ -573,39 +570,37 @@ def fetch_doi_entry(doi: str, *, cache_dir: str | Path | None = None) -> BibEntr
 
 
 def _fetch_arxiv_record(
-    identifier: str, *, cache_dir: str | Path | None = None
+    identifier: str, *, cache_file: str | Path | None = None
 ) -> arxiv_provider.ArxivRecord:
     normalized = normalize_arxiv(identifier)
     if normalized is None:
         raise MetadataFetchError(f"Malformed arXiv identifier: {identifier!r}")
-    path = cache_path(cache_dir, "arxiv", normalized, ".xml")
+    cache = open_cache(cache_file)
     try:
-        if path is not None and path.exists():
-            text = path.read_text(encoding="utf-8", errors="replace")
-        else:
+        text = cache.get("arxiv", normalized, "xml")
+        if text is None:
             text = arxiv_provider.fetch_atom(normalized)
-            if path is not None:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(text, encoding="utf-8")
+            cache.put("arxiv", normalized, "xml", text)
         return arxiv_provider.parse_atom(text, normalized)
     except ProviderFetchError as exc:
         raise MetadataFetchError(str(exc)) from exc
 
 
-def fetch_arxiv_metadata(identifier: str, *, cache_dir: str | Path | None = None) -> dict[str, str]:
+def fetch_arxiv_metadata(
+    identifier: str, *, cache_file: str | Path | None = None
+) -> dict[str, str]:
     """Fetch the published DOI/journal an arXiv preprint links to, if any.
 
     Delegates fetch/parse to :mod:`pynakes.providers.repositories.arxiv` and keeps
-    only the deterministic on-disk cache here. Returns
-    ``{"doi": ..., "journal": ...}``.
+    only the cache lookup here. Returns ``{"doi": ..., "journal": ...}``.
     """
-    record = _fetch_arxiv_record(identifier, cache_dir=cache_dir)
+    record = _fetch_arxiv_record(identifier, cache_file=cache_file)
     return {"doi": record.doi, "journal": record.journal}
 
 
-def _fetch_arxiv_fields(identifier: str, *, cache_dir: str | Path | None = None) -> dict[str, str]:
+def _fetch_arxiv_fields(identifier: str, *, cache_file: str | Path | None = None) -> dict[str, str]:
     """Fetch arXiv metadata as BibTeX-style field names, for field comparison."""
-    record = _fetch_arxiv_record(identifier, cache_dir=cache_dir)
+    record = _fetch_arxiv_record(identifier, cache_file=cache_file)
     fields: dict[str, str] = {"eprint": record.arxiv_id}
     if record.title:
         fields["title"] = record.title
@@ -766,7 +761,7 @@ def _check_doi_to_arxiv_backfill(
     *,
     apply: bool,
     dialect: str,
-    cache_dir: str | Path | None,
+    cache_file: str | Path | None,
     openalex_fetcher: Callable[[str], dict | None] | None,
     semantic_scholar_fetcher: Callable[[str], dict | None] | None,
 ) -> None:
@@ -781,7 +776,7 @@ def _check_doi_to_arxiv_backfill(
     try:
         arxiv_id = resolve_arxiv_id_for_doi(
             normalized,
-            cache_dir=cache_dir,
+            cache_file=cache_file,
             openalex_fetcher=openalex_fetcher,
             semantic_scholar_fetcher=semantic_scholar_fetcher,
         )

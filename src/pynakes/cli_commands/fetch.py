@@ -22,10 +22,10 @@ from rich.progress import (
 from pynakes.cli_commands._fetch_report import fetch_report_lines
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    _CACHE_FILE_OPTION,
     RunParams,
     _emit_error,
     _finish_mod,
-    _metadata_cache_dir,
     _resolve_input_bib,
     _safe,
     bib_file_argument,
@@ -158,9 +158,7 @@ def fetch(
         False, "--dry-run", help="Show what would be fetched without downloading"
     ),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
-    cache_dir: str | None = typer.Option(
-        None, "--cache-dir", help="Directory for deterministic provider-response cache"
-    ),
+    cache_file: str | None = _CACHE_FILE_OPTION,
     access: FetchAccess = typer.Option(
         FetchAccess.OPEN,
         "--access",
@@ -214,13 +212,12 @@ def fetch(
         else None
     )
 
-    cache = _metadata_cache_dir(file, cache_dir, True)
     if params.json_output:
         report = coll.fetch_materials(
             target=target,
             policy=policy,
             dry_run=params.dry_run,
-            cache_dir=cache,
+            cache_file=cache_file,
             access=access.value,
         )
     else:
@@ -229,7 +226,7 @@ def fetch(
                 target=target,
                 policy=policy,
                 dry_run=params.dry_run,
-                cache_dir=cache,
+                cache_file=cache_file,
                 progress=progress,
                 access=access.value,
             )

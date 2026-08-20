@@ -5,7 +5,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from pynakes import integrity
+from pynakes import integrity, provider_cache
 from pynakes.bibtex_parser import parse_bib
 from pynakes.cli import app
 from pynakes.identity import entry_arxiv_id
@@ -415,7 +415,7 @@ def test_check_published_backfills_arxiv_for_biblatex_doi_entry() -> None:
 
 def test_enrich_published_cli_backfills_arxiv_from_openalex(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
-    monkeypatch.setattr(openalex, "fetch_work_by_doi", lambda doi, cache_dir=None: OPENALEX_WORK)
+    monkeypatch.setattr(openalex, "fetch_work_by_doi", lambda doi, cache_file=None: OPENALEX_WORK)
     bib = tmp_path / "refs.bib"
     original = (
         "@article{PublishedFirst,\n"
@@ -448,12 +448,12 @@ def test_enrich_published_cli_backfills_arxiv_from_semantic_scholar(
 ) -> None:
     monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
     monkeypatch.setattr(
-        openalex, "fetch_work_by_doi", lambda doi, cache_dir=None: OPENALEX_WORK_WITHOUT_ARXIV
+        openalex, "fetch_work_by_doi", lambda doi, cache_file=None: OPENALEX_WORK_WITHOUT_ARXIV
     )
     monkeypatch.setattr(
         semantic_scholar,
         "fetch_paper_by_doi",
-        lambda doi, cache_dir=None: SEMANTIC_SCHOLAR_PAPER,
+        lambda doi, cache_file=None: SEMANTIC_SCHOLAR_PAPER,
     )
     bib = tmp_path / "refs.bib"
     original = (
@@ -477,3 +477,81 @@ def test_enrich_published_cli_backfills_arxiv_from_semantic_scholar(
     assert "+  eprint = {2402.00002}" in data["diff"]
     assert {"key": "PublishedFirst", "field": "eprint", "value": "2402.00002"} in data["updates"]
     assert bib.read_text() == original
+
+
+def test_a_run_asks_a_provider_about_one_doi_only_once(monkeypatch) -> None:
+    # This is what opt-in caching rests on: with no --cache-dir the responses
+    # are memoized for the process, so repeats inside a run cost nothing and
+    # nothing is written to disk.
+    calls: list[str] = []
+
+    def counting_fetch(identifier: str) -> str:
+        calls.append(identifier)
+        return PROVIDER_BIBTEX
+
+    monkeypatch.setattr(doi, "fetch_bibtex", counting_fetch)
+
+    for _ in range(3):
+        integrity.fetch_doi_entry("10.5555/example")
+
+    assert calls == ["10.5555/example"]
+
+
+def test_duplicate_dois_in_one_library_cost_a_single_lookup(monkeypatch) -> None:
+    calls: list[str] = []
+
+    def counting_fetch(identifier: str) -> str:
+        calls.append(identifier)
+        return PROVIDER_BIBTEX
+
+    monkeypatch.setattr(doi, "fetch_bibtex", counting_fetch)
+    lib = parse_bib(
+        "@article{A, author = {John Smith}, title = {T}, year = {2024},\n"
+        "  doi = {10.5555/example}}\n"
+        "@article{B, author = {John Smith}, title = {T}, year = {2024},\n"
+        "  doi = {10.5555/EXAMPLE}}\n"
+    )
+
+    verify_library(lib, online=True)
+
+    assert calls == ["10.5555/example"]
+
+
+def test_an_online_run_writes_nothing_without_a_cache_dir(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@article{euclid1482elements, author = {Euclid}, title = {Elements},\n"
+        "  year = {1482}, doi = {10.5555/elements}}\n"
+    )
+
+    result = runner.invoke(app, ["verify", str(bib), "--online", "--json"])
+
+    assert result.exit_code == 0
+    assert sorted(item.name for item in tmp_path.iterdir()) == ["refs.bib"]
+
+
+def test_an_online_run_reuses_an_opted_in_cache_across_runs(monkeypatch, tmp_path: Path) -> None:
+    calls: list[str] = []
+
+    def counting_fetch(identifier: str) -> str:
+        calls.append(identifier)
+        return PROVIDER_BIBTEX
+
+    monkeypatch.setattr(doi, "fetch_bibtex", counting_fetch)
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@article{euclid1482elements, author = {Euclid}, title = {Elements},\n"
+        "  year = {1482}, doi = {10.5555/elements}}\n"
+    )
+    cache_file = tmp_path / "responses"
+
+    for _ in range(2):
+        provider_cache.reset_instances()  # each CLI invocation is its own process
+        result = runner.invoke(
+            app, ["verify", str(bib), "--online", "--cache-file", str(cache_file), "--json"]
+        )
+        assert result.exit_code == 0
+
+    assert calls == ["10.5555/elements"]
+    assert cache_file.is_file()

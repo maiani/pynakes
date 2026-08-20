@@ -8,11 +8,11 @@ from pynakes import importer as importer_ops
 from pynakes.cli_commands._fetch_report import fetch_report_lines
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    _CACHE_FILE_OPTION,
     RunParams,
     _emit_conflict,
     _emit_error,
     _finish_mod,
-    _metadata_cache_dir,
     _resolve_input_bib,
     _safe,
     _verb,
@@ -43,9 +43,7 @@ def import_reference(
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
-    cache_dir: str | None = typer.Option(
-        None, "--cache-dir", help="Directory for deterministic provider-response cache"
-    ),
+    cache_file: str | None = _CACHE_FILE_OPTION,
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Import a reference from a supported identifier or URL."""
@@ -131,11 +129,10 @@ def import_reference(
     fetch_report = None
     if fetch:
         try:
-            cache = _metadata_cache_dir(file, cache_dir, True)
             fetch_report = coll.fetch_materials(
                 target=entry.key,
                 dry_run=params.dry_run,
-                cache_dir=cache,
+                cache_file=cache_file,
             )
         except ValueError as exc:
             _emit_error(json_output, "InvalidInput", str(exc))

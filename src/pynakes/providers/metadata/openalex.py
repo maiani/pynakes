@@ -27,7 +27,7 @@ _ID_RE = re.compile(r"^[Ww](\d+)$")
 def fetch_work_by_doi(
     doi: str,
     *,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
     urlopen: Callable[..., object] | None = None,
 ) -> dict | None:
     """Fetch an OpenAlex work by DOI, using a deterministic cache when provided."""
@@ -38,7 +38,7 @@ def fetch_work_by_doi(
         namespace="openalex",
         identifier=normalized,
         provider="OpenAlex",
-        cache_dir=cache_dir,
+        cache_file=cache_file,
         opener=urlopen,
     )
 
@@ -46,11 +46,11 @@ def fetch_work_by_doi(
 def oa_pdf_url_for_doi(
     doi: str,
     *,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
     urlopen: Callable[..., object] | None = None,
 ) -> str | None:
     """Resolve a DOI to an open-access PDF URL via OpenAlex, or ``None``."""
-    work = fetch_work_by_doi(doi, cache_dir=cache_dir, urlopen=urlopen)
+    work = fetch_work_by_doi(doi, cache_file=cache_file, urlopen=urlopen)
     if work is None:
         return None
     return oa_pdf_url_from_work(work)
@@ -137,7 +137,7 @@ def record_url(identifier: str) -> str:
 def fetch_work_by_id(
     work_id: str,
     *,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
     urlopen: Callable[..., object] | None = None,
 ) -> dict | None:
     """Fetch an OpenAlex work by its native id, using a deterministic cache when provided."""
@@ -148,7 +148,7 @@ def fetch_work_by_id(
         namespace="openalex-id",
         identifier=normalized,
         provider=PROVIDER_NAME,
-        cache_dir=cache_dir,
+        cache_file=cache_file,
         opener=urlopen,
     )
 

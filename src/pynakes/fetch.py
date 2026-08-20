@@ -225,7 +225,10 @@ def download_arxiv_materials(
             source_bytes = source_fetcher(arxiv_id)
         store.ensure_root()
         try:
-            with tempfile.TemporaryDirectory(prefix=f".{key}.source.", dir=store.root) as tmp:
+            with (
+                store.scratch() as scratch,
+                tempfile.TemporaryDirectory(prefix=f"{key}.source.", dir=scratch) as tmp,
+            ):
                 extracted = Path(tmp) / "source"
                 extracted.mkdir()
                 extract_arxiv_source(source_bytes, extracted)
@@ -267,7 +270,7 @@ def openalex_oa_pdf_url(
     doi: str,
     *,
     urlopen: Callable[..., object] | None = None,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
 ) -> str | None:
     """Resolve a DOI to an open-access PDF URL via OpenAlex.
 
@@ -275,12 +278,12 @@ def openalex_oa_pdf_url(
     available; returns ``None`` when there is no resolvable OA copy.
 
     ``urlopen`` is injectable for testing (same signature as
-    ``urllib.request.urlopen``). Results are cached under ``cache_dir`` when
+    ``urllib.request.urlopen``). Results are cached under ``cache_file`` when
     provided, following the same deterministic SHA256 digest pattern as
     :mod:`pynakes.integrity`.
     """
     try:
-        return openalex.oa_pdf_url_for_doi(doi, cache_dir=cache_dir, urlopen=urlopen)
+        return openalex.oa_pdf_url_for_doi(doi, cache_file=cache_file, urlopen=urlopen)
     except (ProviderFetchError, ValueError) as exc:
         raise PublishedPdfFetchError(str(exc)) from exc
 
@@ -289,14 +292,14 @@ def crossref_oa_pdf_url(
     doi: str,
     *,
     urlopen: Callable[..., object] | None = None,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
 ) -> str | None:
     """Resolve a DOI to an open-access PDF URL via CrossRef.
 
     Used as a fallback when ``openalex_oa_pdf_url`` returns ``None``.
     """
     try:
-        return crossref.oa_pdf_url_for_doi(doi, cache_dir=cache_dir, urlopen=urlopen)
+        return crossref.oa_pdf_url_for_doi(doi, cache_file=cache_file, urlopen=urlopen)
     except (ProviderFetchError, ValueError) as exc:
         raise PublishedPdfFetchError(str(exc)) from exc
 
@@ -388,7 +391,7 @@ def download_published_material(
     institutional_url_resolver: FetchPublishedPdfUrl | None = None,
     pdf_fetcher: Callable[[str], bytes] | None = None,
     url_validator: UrlPdfValidator | None = None,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
     fetched_date: str | None = None,
     progress: FetchProgress | None = None,
     access: FetchAccess = "open",
@@ -415,8 +418,8 @@ def download_published_material(
         raise ValueError(f"Unknown fetch access mode: {access!r}")
     resolver = url_resolver or (
         lambda d: (
-            openalex_oa_pdf_url(d, cache_dir=cache_dir)
-            or crossref_oa_pdf_url(d, cache_dir=cache_dir)
+            openalex_oa_pdf_url(d, cache_file=cache_file)
+            or crossref_oa_pdf_url(d, cache_file=cache_file)
         )
     )
     candidates: list[tuple[str, FetchAccess]] = []

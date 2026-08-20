@@ -13,7 +13,7 @@ from pynakes.providers.metadata import openalex, semantic_scholar
 def resolve_arxiv_id_for_doi(
     doi: str,
     *,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
     openalex_fetcher: Callable[[str], dict | None] | None = None,
     semantic_scholar_fetcher: Callable[[str], dict | None] | None = None,
 ) -> str | None:
@@ -22,7 +22,7 @@ def resolve_arxiv_id_for_doi(
     openalex_error: ProviderFetchError | None = None
     try:
         if openalex_fetcher is None:
-            work = openalex.fetch_work_by_doi(normalized, cache_dir=cache_dir)
+            work = openalex.fetch_work_by_doi(normalized, cache_file=cache_file)
         else:
             work = openalex_fetcher(normalized)
         if work is not None:
@@ -34,7 +34,7 @@ def resolve_arxiv_id_for_doi(
 
     try:
         if semantic_scholar_fetcher is None:
-            paper = semantic_scholar.fetch_paper_by_doi(normalized, cache_dir=cache_dir)
+            paper = semantic_scholar.fetch_paper_by_doi(normalized, cache_file=cache_file)
         else:
             paper = semantic_scholar_fetcher(normalized)
     except ProviderFetchError as exc:

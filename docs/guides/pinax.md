@@ -122,7 +122,15 @@ refs.files/                       ← pinax-files-dir, declared in pynakes-meta
   darwin1859.erratum.pdf          ← corrected version: <citekey>.erratum.pdf
   .pinax/
     manifest.json                 ← provenance sidecar (see Provenance manifest)
+    tmp/                          ← in-flight writes only; absent when idle
 ```
+
+Nothing but materials and `.pinax/` ever appears here. Temporary files staged
+during a download or a manifest update live under `.pinax/tmp/<pid>/`, and each
+write first removes scratch belonging to processes that have exited — so an
+interrupted `asset fetch` leaves nothing for you to clean up, and two pynakes
+runs against the same directory never disturb each other. When no write is in
+flight, `.pinax/tmp/` does not exist.
 
 Two version classes share each citation key. The **published** version of record
 carries a `.published` label; the **preprint** (arXiv) carries a `.preprint` label
@@ -425,9 +433,9 @@ a preprint exists, backfills the arXiv id.
   shared identifier helpers. When OpenAlex has the work but not the arXiv
   location, the resolver falls back to Semantic Scholar's `externalIds.ArXiv`.
 - **Network boundary.** Behind `--online`, provider fetchers are injectable
-  exactly like `importer.fetch_arxiv_atom`, with the same deterministic on-disk
-  cache (`integrity._cache_path`). The default test suite never touches the
-  network.
+  exactly like `importer.fetch_arxiv_atom`, and share the one cache seam
+  (`provider_cache.open_cache`), which memoizes in process and writes a file only
+  when `--cache-file` names one. The default test suite never touches the network.
 - **Fields written**, dialect-aware (via `library_dialect`), through the
   surgical `editing.set_entry_field` and never overwriting an existing value:
   - biblatex → `eprint = {<id>}`, `eprinttype = {arxiv}`
@@ -588,7 +596,7 @@ checklist.
    `FileStore` atomic writers for the preprint PDF and the extracted source.
    Unit-tested with fixtures, no real network. *(Implemented.)*
 3. **The `asset fetch` command.** `pynakes asset fetch [target] [file]
-    [--dry-run] [--cache-dir DIR] [--json]`, with what-to-download governed by
+    [--dry-run] [--cache-file PATH] [--json]`, with what-to-download governed by
     the `pinax-fetch-policy` metadata key;
     `Bibliography.ensure_files_dir` + `fetch_materials`; the zero-config default
    `pinax-files-dir`; the JSON envelope; registration in `cli.py` and

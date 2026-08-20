@@ -12,7 +12,6 @@ from typer.testing import CliRunner
 from pynakes import __version__
 from pynakes import importer as importer_ops
 from pynakes.cli import app
-from pynakes.cli_common import _metadata_cache_dir
 from pynakes.providers.records import ReferenceMetadata
 from pynakes.providers.repositories import ssrn
 
@@ -247,19 +246,6 @@ class TestFormatCommand:
         payload = json.loads(result.output)
         assert payload["error"] == "InvalidInput"
         assert path.read_text() == "@article{A,title={T}}\n"
-
-
-def test_default_metadata_cache_dir_anchors_symlinked_bib_at_link_path(tmp_path: Path) -> None:
-    real_dir = tmp_path / "real"
-    link_dir = tmp_path / "linked"
-    real_dir.mkdir()
-    link_dir.mkdir()
-    real_bib = real_dir / "refs.bib"
-    real_bib.write_text("@article{A, title = {T}}\n")
-    link_bib = link_dir / "refs.bib"
-    link_bib.symlink_to(real_bib)
-
-    assert _metadata_cache_dir(str(link_bib), None, True) == str(link_dir / ".pynakes-cache")
 
 
 def test_verb_past_tense_handles_verbs_not_ending_in_e() -> None:
@@ -1355,7 +1341,7 @@ class TestImportCommand:
                 "10.5555/provider",
                 str(bib),
                 "--fetch",
-                "--cache-dir",
+                "--cache-file",
                 str(cache),
                 "--json",
             ],

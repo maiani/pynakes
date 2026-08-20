@@ -26,7 +26,7 @@ _ENTRY_TYPES = {"journalarticle": "article", "conference": "inproceedings"}
 def fetch_paper_by_doi(
     doi: str,
     *,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
     urlopen: Callable[..., object] | None = None,
 ) -> dict | None:
     """Fetch Semantic Scholar paper metadata by DOI."""
@@ -37,7 +37,7 @@ def fetch_paper_by_doi(
         namespace="semantic_scholar",
         identifier=normalized,
         provider="Semantic Scholar",
-        cache_dir=cache_dir,
+        cache_file=cache_file,
         opener=urlopen,
     )
 
@@ -58,7 +58,7 @@ def record_url(identifier: str) -> str:
 def fetch_paper_by_id(
     paper_id: str,
     *,
-    cache_dir: str | Path | None = None,
+    cache_file: str | Path | None = None,
     urlopen: Callable[..., object] | None = None,
 ) -> dict | None:
     """Fetch Semantic Scholar paper metadata by its native 40-hex paper id.
@@ -73,7 +73,7 @@ def fetch_paper_by_id(
         namespace="semantic-scholar-id",
         identifier=normalized,
         provider=PROVIDER_NAME,
-        cache_dir=cache_dir,
+        cache_file=cache_file,
         opener=urlopen,
     )
 

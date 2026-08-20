@@ -8,11 +8,11 @@ import typer
 
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    _CACHE_FILE_OPTION,
     CheckOutcome,
     RunParams,
     _entries,
     _finish_mod,
-    _metadata_cache_dir,
     _resolve_input_bib,
     _run_checks,
     _safe,
@@ -25,11 +25,14 @@ from pynakes.engine import Bibliography
 
 
 def _verify_one(
-    file: str, online: bool, cache_dir: str | None, strict: bool, published: bool
+    file: str,
+    online: bool,
+    cache_file: str | None,
+    strict: bool,
+    published: bool,
 ) -> CheckOutcome:
     coll = Bibliography.open(file)
-    cache = _metadata_cache_dir(file, cache_dir, online)
-    report = coll.verify(online=online, cache_dir=cache)
+    report = coll.verify(online=online, cache_file=cache_file)
     result = {
         "status": "success",
         "action": "verify",
@@ -50,7 +53,7 @@ def _verify_one(
     if published:
         # Read-only preprint check, folded in from the former `published` command.
         # Informational only: it never affects the --strict gate.
-        preprints = coll.published_check(online=online, cache_dir=cache)
+        preprints = coll.published_check(online=online, cache_file=cache_file)
         result["preprints"] = {
             "checked": preprints.checked,
             "published": preprints.published,
@@ -84,9 +87,7 @@ def verify(
         help="Also report preprints that now have a published version available "
         "(read-only; informational, does not affect --strict)",
     ),
-    cache_dir: str | None = typer.Option(
-        None, "--cache-dir", help="Directory for deterministic provider-response cache"
-    ),
+    cache_file: str | None = _CACHE_FILE_OPTION,
     strict: bool = typer.Option(False, "--strict", help="Exit 1 if warnings or errors are found"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
@@ -98,7 +99,7 @@ def verify(
     _run_checks(
         files,
         "verify",
-        lambda f: _verify_one(f, online, cache_dir, strict, published),
+        lambda f: _verify_one(f, online, cache_file, strict, published),
         json_output,
         strict,
     )
@@ -117,9 +118,7 @@ def enrich(
         help="Also promote preprints to their published version, writing the "
         "published DOI/journal when one is available (use with --online)",
     ),
-    cache_dir: str | None = typer.Option(
-        None, "--cache-dir", help="Directory for deterministic provider-response cache"
-    ),
+    cache_file: str | None = _CACHE_FILE_OPTION,
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
@@ -134,8 +133,7 @@ def enrich(
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     coll = Bibliography.open(file)
-    cache = _metadata_cache_dir(file, cache_dir, online)
-    report = coll.enrich(online=online, cache_dir=cache)
+    report = coll.enrich(online=online, cache_file=cache_file)
     updates = list(report.updates)
     warnings = list(report.warnings)
     extra: dict[str, object] = {}
@@ -144,7 +142,7 @@ def enrich(
         f"  field_updates={report.changed_fields}",
     ]
     if published:
-        preprints = coll.apply_published(online=online, cache_dir=cache)
+        preprints = coll.apply_published(online=online, cache_file=cache_file)
         updates += preprints.updates
         warnings += preprints.warnings
         extra["preprints"] = {

@@ -113,7 +113,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   either via the flag or a persisted `normalize-drop-fields` metadata key
   (the two combine). Reported as `dropped_fields` in the normalize report.
 
+### Changed
+
+- **Provider-response caching is now opt-in, and the cache is one file.** Online
+  commands (`verify`, `enrich`, `ref compare`, `ref import --fetch`,
+  `asset fetch`) used to write a `.pynakes-cache/` directory beside the `.bib` by
+  default, one sha256-named file per identifier — so a single `verify --online`
+  over a few hundred entries left a few hundred files in the user's folder,
+  unasked for and never pruned. Now nothing reaches disk unless the renamed
+  `--cache-file PATH` says so, and what it writes is a single newline-delimited
+  JSON file with identifiers in plain text: readable, greppable, covered by one
+  `.gitignore` line, removable with one `rm`. Responses are memoized for the life
+  of the process regardless, which is where most of the benefit was — one run asks
+  a provider about a given DOI once, however many entries carry it. This matches
+  the rule the project already applies to the network: explicit or not at all.
+
+  **Breaking.** `--cache-dir` is now `--cache-file` and takes a file path; a
+  directory is rejected rather than written into. The `cache_dir=` keyword on the
+  `Bibliography`, `integrity`, `fetch`, and provider APIs is likewise
+  `cache_file=`. Nothing reads the old cache layout: delete any
+  `.pynakes-cache/` directory a previous release left behind, which costs only
+  refetches.
+
+  No record expires. A cache is a snapshot the caller chose to keep, and provider
+  metadata does change, so a long-lived cache should be deleted rather than
+  trusted indefinitely; this is now stated in the docs.
+
 ### Fixed
+
+- Pinax material writes no longer leave debris in the files directory. Temporary
+  files staged during a PDF write, an arXiv source extraction, or a manifest
+  update were created beside the materials themselves and cleaned up only on the
+  success and `OSError` paths — so interrupting `asset fetch`, the slowest and
+  most network-bound command in the tool, left `.<key>.published.pdf.<rand>.tmp`
+  and `.<key>.source.<rand>/` in the user's folder permanently, with nothing to
+  sweep them. Temporaries now stage under `.pinax/tmp/<pid>/`, and each write
+  first removes scratch belonging to processes that have exited, so a killed run
+  is self-healing and concurrent runs never disturb each other. A write that
+  fails, or a store that never had a manifest, leaves no `.pinax` directory
+  behind at all.
 
 - The documented idiom for a predicate-only search, `pynakes search . --where
   '...'`, was quietly lossy: `.` is a real search term, so the results were

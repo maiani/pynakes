@@ -1,10 +1,12 @@
 """Shared fixtures for the pynakes test suite."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
+
+from pynakes import provider_cache
 
 
 @pytest.fixture
@@ -30,3 +32,16 @@ def copy_fixture(fixtures_dir: Path) -> Callable[[str, Path], Path]:
         return dest
 
     return _copy
+
+
+@pytest.fixture(autouse=True)
+def _isolated_provider_cache() -> Iterator[None]:
+    """Forget memoized provider-cache instances between tests.
+
+    A real CLI invocation is a fresh process, so sharing one instance per path
+    is correct there. In-process tests reuse the interpreter, so a test that
+    writes a cache file directly must not see an earlier test's loaded copy.
+    """
+    provider_cache.reset_instances()
+    yield
+    provider_cache.reset_instances()

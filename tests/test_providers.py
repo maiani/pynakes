@@ -7,8 +7,9 @@ from pathlib import Path
 import httpx
 import pytest
 
+from pynakes.provider_cache import open_cache
 from pynakes.providers import identity, publisher
-from pynakes.providers._http import ProviderFetchError, cache_path
+from pynakes.providers._http import ProviderFetchError
 from pynakes.providers.metadata import openalex, semantic_scholar
 from pynakes.providers.records import ReferenceMetadata
 from pynakes.providers.registry import get_import_provider
@@ -219,23 +220,28 @@ def test_resolve_arxiv_id_for_doi_returns_none_when_providers_have_no_match() ->
 
 
 def test_fetch_openalex_work_reads_deterministic_cache(tmp_path: Path) -> None:
-    path = cache_path(tmp_path, "openalex", "10.5555/published-first", ".json")
-    assert path is not None
-    path.parent.mkdir(parents=True)
-    path.write_text(json.dumps(OPENALEX_WORK), encoding="utf-8")
+    cache_file = tmp_path / ".pynakes-cache"
+    cache = open_cache(cache_file)
+    assert cache is not None
+    cache.put("openalex", "10.5555/published-first", "json", json.dumps(OPENALEX_WORK))
 
-    work = openalex.fetch_work_by_doi("10.5555/published-first", cache_dir=tmp_path)
+    work = openalex.fetch_work_by_doi("10.5555/published-first", cache_file=cache_file)
 
     assert work == OPENALEX_WORK
 
 
 def test_fetch_semantic_scholar_paper_reads_deterministic_cache(tmp_path: Path) -> None:
-    path = cache_path(tmp_path, "semantic_scholar", "10.5555/published-first", ".json")
-    assert path is not None
-    path.parent.mkdir(parents=True)
-    path.write_text(json.dumps(SEMANTIC_SCHOLAR_PAPER), encoding="utf-8")
+    cache_file = tmp_path / ".pynakes-cache"
+    cache = open_cache(cache_file)
+    assert cache is not None
+    cache.put(
+        "semantic_scholar",
+        "10.5555/published-first",
+        "json",
+        json.dumps(SEMANTIC_SCHOLAR_PAPER),
+    )
 
-    paper = semantic_scholar.fetch_paper_by_doi("10.5555/published-first", cache_dir=tmp_path)
+    paper = semantic_scholar.fetch_paper_by_doi("10.5555/published-first", cache_file=cache_file)
 
     assert paper == SEMANTIC_SCHOLAR_PAPER
 
