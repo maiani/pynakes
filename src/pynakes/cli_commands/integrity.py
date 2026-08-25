@@ -17,6 +17,7 @@ from pynakes.cli_commands._rich_progress import RichProgressBase
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     _CACHE_FILE_OPTION,
+    _CONCURRENCY_OPTION,
     CheckOutcome,
     RunParams,
     _entries,
@@ -66,13 +67,16 @@ def _verify_one(
     strict: bool,
     published: bool,
     json_output: bool,
+    concurrency: int,
 ) -> CheckOutcome:
     coll = Bibliography.open(file)
     if online and not json_output:
         with _RichIntegrityProgress("Verifying") as progress:
-            report = coll.verify(online=online, cache_file=cache_file, progress=progress)
+            report = coll.verify(
+                online=online, cache_file=cache_file, progress=progress, concurrency=concurrency
+            )
     else:
-        report = coll.verify(online=online, cache_file=cache_file)
+        report = coll.verify(online=online, cache_file=cache_file, concurrency=concurrency)
     result = {
         "status": "success",
         "action": "verify",
@@ -96,10 +100,15 @@ def _verify_one(
         if online and not json_output:
             with _RichIntegrityProgress("Checking preprints") as progress:
                 preprints = coll.published_check(
-                    online=online, cache_file=cache_file, progress=progress
+                    online=online,
+                    cache_file=cache_file,
+                    progress=progress,
+                    concurrency=concurrency,
                 )
         else:
-            preprints = coll.published_check(online=online, cache_file=cache_file)
+            preprints = coll.published_check(
+                online=online, cache_file=cache_file, concurrency=concurrency
+            )
         result["preprints"] = {
             "checked": preprints.checked,
             "published": preprints.published,
@@ -134,6 +143,7 @@ def verify(
         "(read-only; informational, does not affect --strict)",
     ),
     cache_file: str | None = _CACHE_FILE_OPTION,
+    concurrency: int = _CONCURRENCY_OPTION,
     strict: bool = typer.Option(False, "--strict", help="Exit 1 if warnings or errors are found"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
@@ -145,7 +155,7 @@ def verify(
     _run_checks(
         files,
         "verify",
-        lambda f: _verify_one(f, online, cache_file, strict, published, json_output),
+        lambda f: _verify_one(f, online, cache_file, strict, published, json_output, concurrency),
         json_output,
         strict,
     )
@@ -165,6 +175,7 @@ def enrich(
         "published DOI/journal when one is available (use with --online)",
     ),
     cache_file: str | None = _CACHE_FILE_OPTION,
+    concurrency: int = _CONCURRENCY_OPTION,
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
@@ -181,9 +192,11 @@ def enrich(
     coll = Bibliography.open(file)
     if online and not json_output:
         with _RichIntegrityProgress("Enriching") as progress:
-            report = coll.enrich(online=online, cache_file=cache_file, progress=progress)
+            report = coll.enrich(
+                online=online, cache_file=cache_file, progress=progress, concurrency=concurrency
+            )
     else:
-        report = coll.enrich(online=online, cache_file=cache_file)
+        report = coll.enrich(online=online, cache_file=cache_file, concurrency=concurrency)
     updates = list(report.updates)
     warnings = list(report.warnings)
     extra: dict[str, object] = {}
@@ -195,10 +208,15 @@ def enrich(
         if online and not json_output:
             with _RichIntegrityProgress("Checking preprints") as progress:
                 preprints = coll.apply_published(
-                    online=online, cache_file=cache_file, progress=progress
+                    online=online,
+                    cache_file=cache_file,
+                    progress=progress,
+                    concurrency=concurrency,
                 )
         else:
-            preprints = coll.apply_published(online=online, cache_file=cache_file)
+            preprints = coll.apply_published(
+                online=online, cache_file=cache_file, concurrency=concurrency
+            )
         updates += preprints.updates
         warnings += preprints.warnings
         extra["preprints"] = {

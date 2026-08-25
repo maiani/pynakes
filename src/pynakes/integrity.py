@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
+from typing import TypeVar
 
 from pynakes._identifiers import (
     doi_from_text,
@@ -273,28 +275,89 @@ def _emit_progress(progress: EntryProgress | None, event: EntryProgressEvent) ->
         progress(event)
 
 
+_JobItem = TypeVar("_JobItem")
+_JobResult = TypeVar("_JobResult")
+
+
+def _map_concurrently(
+    items: list[_JobItem], fn: Callable[[_JobItem], _JobResult], *, concurrency: int
+) -> list[_JobResult]:
+    """Apply ``fn`` to each item, computing up to ``concurrency`` at once.
+
+    Returns results in the same order as ``items`` regardless of completion
+    order. Every caller uses this only for the network fetch itself — result
+    application (report ordering, entry mutation, progress events) stays a
+    separate, single-threaded pass over ``items`` in original order, so
+    parallelizing the network never introduces the unstable ordering this
+    project otherwise avoids in its core logic.
+    """
+    if not items:
+        return []
+    if concurrency <= 1 or len(items) <= 1:
+        return [fn(item) for item in items]
+    with ThreadPoolExecutor(max_workers=min(concurrency, len(items))) as executor:
+        return list(executor.map(fn, items))
+
+
+def _verify_fetch_job(args: tuple[str, str | Path | None]) -> BibEntry | MetadataFetchError:
+    normalized, cache_file = args
+    try:
+        return fetch_doi_entry(normalized, cache_file=cache_file)
+    except MetadataFetchError as exc:
+        return exc
+
+
 def verify_library(
     lib: BibFile,
     *,
     online: bool = False,
     cache_file: str | Path | None = None,
     progress: EntryProgress | None = None,
+    concurrency: int = 1,
 ) -> VerifyReport:
     """Verify DOI-backed entries against provider metadata.
 
     Network access is never implicit. With ``online=False``, DOI entries are
-    only syntax-checked and reported as unchecked.
+    only syntax-checked and reported as unchecked. ``concurrency`` bounds how
+    many DOI lookups run at once; report ordering and progress events always
+    follow the library's own entry order regardless of fetch completion order.
     """
     report = VerifyReport()
-    entry_total = len(lib.entries)
-    for index, entry in enumerate(lib.entries.values(), start=1):
-        _emit_progress(progress, EntryProgressEvent(entry.key, index, entry_total))
+    entries = list(lib.entries.values())
+    entry_total = len(entries)
+
+    # kind in {"no_doi", "malformed", "offline", "fetch"}; data carries the
+    # DOI text needed to finish that entry once fetch results are in.
+    plan: list[tuple[str, str | None]] = []
+    fetch_positions: list[int] = []
+    fetch_jobs: list[tuple[str, str | Path | None]] = []
+
+    for pos, entry in enumerate(entries):
         doi = entry.fields.get("doi", "").strip()
         if not doi:
+            plan.append(("no_doi", None))
             continue
         try:
             normalized = normalize_doi(doi)
         except ValueError:
+            plan.append(("malformed", doi))
+            continue
+        if not online:
+            plan.append(("offline", normalized))
+            continue
+        plan.append(("fetch", doi))
+        fetch_positions.append(pos)
+        fetch_jobs.append((normalized, cache_file))
+
+    fetch_results = _map_concurrently(fetch_jobs, _verify_fetch_job, concurrency=concurrency)
+    result_by_pos = dict(zip(fetch_positions, fetch_results))
+
+    for index, entry in enumerate(entries, start=1):
+        _emit_progress(progress, EntryProgressEvent(entry.key, index, entry_total))
+        kind, data = plan[index - 1]
+        if kind == "no_doi":
+            continue
+        if kind == "malformed":
             report.issues.append(
                 IntegrityIssue(
                     "malformed_doi",
@@ -302,12 +365,11 @@ def verify_library(
                     f"Entry {entry.key!r} has a malformed DOI",
                     entry.key,
                     "doi",
-                    actual=doi,
+                    actual=data,
                 )
             )
             continue
-
-        if not online:
+        if kind == "offline":
             report.issues.append(
                 IntegrityIssue(
                     "doi_not_checked",
@@ -315,27 +377,59 @@ def verify_library(
                     "Pass --online to verify this DOI against provider metadata",
                     entry.key,
                     "doi",
-                    actual=normalized,
+                    actual=data,
                 )
             )
             continue
 
-        try:
-            remote = fetch_doi_entry(normalized, cache_file=cache_file)
-        except MetadataFetchError as exc:
+        result = result_by_pos[index - 1]
+        if isinstance(result, MetadataFetchError):
             issue_type = (
                 "provider_error"
-                if isinstance(exc.__cause__, ProviderFetchError)
+                if isinstance(result.__cause__, ProviderFetchError)
                 else "doi_unresolved"
             )
             report.issues.append(
-                IntegrityIssue(issue_type, "error", str(exc), entry.key, "doi", actual=doi)
+                IntegrityIssue(issue_type, "error", str(result), entry.key, "doi", actual=data)
             )
             continue
 
         report.checked += 1
-        report.issues.extend(_compare_entry(entry, remote))
+        report.issues.extend(_compare_entry(entry, result))
     return report
+
+
+@dataclass
+class _EnrichFetchResult:
+    """Result of one entry's remote-metadata fetch, for the sequential apply pass."""
+
+    remote: BibEntry | None = None
+    warnings: list[dict[str, str]] = field(default_factory=list)
+
+
+def _enrich_fetch_job(
+    args: tuple[str, str | None, str, str | Path | None],
+) -> _EnrichFetchResult:
+    normalized, journal, key, cache_file = args
+    result = _EnrichFetchResult()
+    if preferred_metadata_provider(journal) == "aps":
+        try:
+            result.remote = aps_provider.fetch_entry(normalized, journal, cache_file=cache_file)
+        except ProviderFetchError as exc:
+            result.warnings.append(
+                {
+                    "type": "preferred_provider_unresolved",
+                    "key": key,
+                    "message": f"Could not fetch APS Harvest metadata for DOI "
+                    f"{normalized!r}: {exc}",
+                }
+            )
+    if result.remote is None:
+        try:
+            result.remote = fetch_doi_entry(normalized, cache_file=cache_file)
+        except MetadataFetchError as exc:
+            result.warnings.append({"type": "doi_unresolved", "key": key, "message": str(exc)})
+    return result
 
 
 def enrich_library(
@@ -344,12 +438,25 @@ def enrich_library(
     online: bool = False,
     cache_file: str | Path | None = None,
     progress: EntryProgress | None = None,
+    concurrency: int = 1,
 ) -> EnrichReport:
-    """Fill missing fields from local DOI URLs and DOI provider metadata."""
+    """Fill missing fields from local DOI URLs and DOI provider metadata.
+
+    ``concurrency`` bounds how many remote lookups run at once; field updates
+    are still applied in the library's own entry order regardless of fetch
+    completion order, so the result is identical to a serial run either way.
+    """
     report = EnrichReport()
-    entry_total = len(lib.entries)
-    for index, entry in enumerate(lib.entries.values(), start=1):
-        _emit_progress(progress, EntryProgressEvent(entry.key, index, entry_total))
+    entries = list(lib.entries.values())
+    entry_total = len(entries)
+
+    # kind in {"no_doi", "malformed", "offline", "fetch"}; data carries the
+    # DOI text for a warning message, unused otherwise.
+    plan: list[tuple[str, str | None]] = []
+    fetch_positions: list[int] = []
+    fetch_jobs: list[tuple[str, str | None, str, str | Path | None]] = []
+
+    for pos, entry in enumerate(entries):
         doi = entry.fields.get("doi", "").strip()
         if not doi:
             inferred = _doi_from_entry_urls(entry)
@@ -358,46 +465,41 @@ def enrich_library(
                 doi = inferred
 
         if not doi:
+            plan.append(("no_doi", None))
             continue
         try:
             normalized = normalize_doi(doi)
         except ValueError:
-            report.warnings.append(
-                {"type": "malformed_doi", "key": entry.key, "message": f"Malformed DOI: {doi!r}"}
-            )
+            plan.append(("malformed", doi))
             continue
         if not online:
+            plan.append(("offline", None))
             continue
 
-        remote = None
-        provider = preferred_metadata_provider(
-            entry.fields.get("journal") or entry.fields.get("journaltitle")
-        )
-        if provider == "aps":
-            try:
-                remote = aps_provider.fetch_entry(
-                    normalized,
-                    entry.fields.get("journal") or entry.fields.get("journaltitle"),
-                    cache_file=cache_file,
-                )
-            except ProviderFetchError as exc:
-                report.warnings.append(
-                    {
-                        "type": "preferred_provider_unresolved",
-                        "key": entry.key,
-                        "message": f"Could not fetch APS Harvest metadata for DOI "
-                        f"{normalized!r}: {exc}",
-                    }
-                )
-        if remote is None:
-            try:
-                remote = fetch_doi_entry(normalized, cache_file=cache_file)
-            except MetadataFetchError as exc:
-                report.warnings.append(
-                    {"type": "doi_unresolved", "key": entry.key, "message": str(exc)}
-                )
-                continue
-        for field_name, value in _missing_field_updates(entry, remote):
+        plan.append(("fetch", None))
+        journal = entry.fields.get("journal") or entry.fields.get("journaltitle")
+        fetch_positions.append(pos)
+        fetch_jobs.append((normalized, journal, entry.key, cache_file))
+
+    fetch_results = _map_concurrently(fetch_jobs, _enrich_fetch_job, concurrency=concurrency)
+    result_by_pos = dict(zip(fetch_positions, fetch_results))
+
+    for index, entry in enumerate(entries, start=1):
+        _emit_progress(progress, EntryProgressEvent(entry.key, index, entry_total))
+        kind, data = plan[index - 1]
+        if kind in ("no_doi", "offline"):
+            continue
+        if kind == "malformed":
+            report.warnings.append(
+                {"type": "malformed_doi", "key": entry.key, "message": f"Malformed DOI: {data!r}"}
+            )
+            continue
+
+        result = result_by_pos[index - 1]
+        report.warnings.extend(result.warnings)
+        if result.remote is None:
+            continue
+        for field_name, value in _missing_field_updates(entry, result.remote):
             if set_entry_field(entry, field_name, value):
                 report.updates.append(FieldUpdate(entry.key, field_name, value))
     return report
@@ -488,6 +590,110 @@ def compare_entries(entry: BibEntry, other: BibEntry) -> EntryComparisonReport:
     return report
 
 
+def _backfill_job(
+    args: tuple[
+        str,
+        str | Path | None,
+        Callable[[str], dict | None] | None,
+        Callable[[str], dict | None] | None,
+    ],
+) -> str | None | ProviderFetchError:
+    normalized, cache_file, openalex_fetcher, semantic_scholar_fetcher = args
+    try:
+        return resolve_arxiv_id_for_doi(
+            normalized,
+            cache_file=cache_file,
+            openalex_fetcher=openalex_fetcher,
+            semantic_scholar_fetcher=semantic_scholar_fetcher,
+        )
+    except ProviderFetchError as exc:
+        return exc
+
+
+def _finish_doi_to_arxiv_backfill(
+    entry: BibEntry,
+    normalized: str,
+    result: str | None | ProviderFetchError,
+    report: PublishedReport,
+    *,
+    apply: bool,
+    dialect: str,
+) -> None:
+    if isinstance(result, ProviderFetchError):
+        report.warnings.append(
+            {"type": "doi_to_arxiv_lookup_failed", "key": entry.key, "message": str(result)}
+        )
+        return
+
+    if result is None:
+        report.candidates.append(
+            PublishedCandidate(
+                entry.key,
+                "doi",
+                normalized,
+                "not_found",
+                doi=normalized,
+                message="No arXiv id found in OpenAlex or Semantic Scholar",
+            )
+        )
+        return
+
+    candidate = PublishedCandidate(
+        entry.key,
+        "doi",
+        normalized,
+        "arxiv_found",
+        doi=normalized,
+        arxiv_id=result,
+        message="arXiv identity found",
+    )
+    report.candidates.append(candidate)
+    if apply:
+        _apply_arxiv_backfill_candidate(entry, candidate, report, dialect)
+
+
+def _arxiv_check_job(
+    args: tuple[str, str | Path | None],
+) -> dict[str, str] | MetadataFetchError:
+    identifier, cache_file = args
+    try:
+        return fetch_arxiv_metadata(identifier, cache_file=cache_file)
+    except MetadataFetchError as exc:
+        return exc
+
+
+def _finish_arxiv_check(
+    entry: BibEntry,
+    source: str,
+    identifier: str,
+    result: dict[str, str] | MetadataFetchError,
+    report: PublishedReport,
+    *,
+    apply: bool,
+) -> None:
+    if isinstance(result, MetadataFetchError):
+        report.warnings.append(
+            {"type": "preprint_lookup_failed", "key": entry.key, "message": str(result)}
+        )
+        return
+
+    status = "published" if result.get("doi") or result.get("journal") else "not_found"
+    candidate = PublishedCandidate(
+        entry.key,
+        source,
+        identifier,
+        status,
+        doi=result.get("doi"),
+        journal=result.get("journal"),
+        message="Published metadata found"
+        if status == "published"
+        else "No published metadata found",
+    )
+    report.candidates.append(candidate)
+    if apply and status == "published":
+        _apply_published_candidate(entry, candidate, report)
+
+
 def check_published(
     lib: BibFile,
     *,
@@ -497,26 +703,54 @@ def check_published(
     openalex_fetcher: Callable[[str], dict | None] | None = None,
     semantic_scholar_fetcher: Callable[[str], dict | None] | None = None,
     progress: EntryProgress | None = None,
+    concurrency: int = 1,
 ) -> PublishedReport:
-    """Detect preprints and optionally apply published DOI/journal metadata."""
+    """Detect preprints and optionally apply published DOI/journal metadata.
+
+    ``concurrency`` bounds how many arXiv/backfill lookups run at once;
+    candidates, warnings, and applied updates are still produced in the
+    library's own entry order regardless of fetch completion order.
+    """
     report = PublishedReport()
     dialect = library_dialect(lib)
-    entry_total = len(lib.entries)
-    for index, entry in enumerate(lib.entries.values(), start=1):
-        _emit_progress(progress, EntryProgressEvent(entry.key, index, entry_total))
+    entries = list(lib.entries.values())
+    entry_total = len(entries)
+
+    # kind in {"noop", "done", "backfill", "arxiv"}. "done" entries were
+    # already fully resolved (no network involved) during this first pass.
+    plan: list[tuple[str, object]] = []
+    backfill_positions: list[int] = []
+    backfill_jobs: list[
+        tuple[
+            str,
+            str | Path | None,
+            Callable[[str], dict | None] | None,
+            Callable[[str], dict | None] | None,
+        ]
+    ] = []
+    arxiv_positions: list[int] = []
+    arxiv_jobs: list[tuple[str, str | Path | None]] = []
+
+    for pos, entry in enumerate(entries):
         preprint = _preprint_identity(entry)
         if preprint is None:
-            if online:
-                _check_doi_to_arxiv_backfill(
-                    entry,
-                    report,
-                    apply=apply,
-                    dialect=dialect,
-                    cache_file=cache_file,
-                    openalex_fetcher=openalex_fetcher,
-                    semantic_scholar_fetcher=semantic_scholar_fetcher,
-                )
+            doi = entry.fields.get("doi", "").strip()
+            normalized = None
+            if online and doi:
+                try:
+                    normalized = normalize_doi(doi)
+                except ValueError:
+                    normalized = None
+            if normalized is None:
+                plan.append(("noop", None))
+                continue
+            plan.append(("backfill", normalized))
+            backfill_positions.append(pos)
+            backfill_jobs.append(
+                (normalized, cache_file, openalex_fetcher, semantic_scholar_fetcher)
+            )
             continue
+
         source, identifier = preprint
         existing_doi = entry.fields.get("doi", "").strip()
         existing_journal = _journal(entry)
@@ -533,6 +767,7 @@ def check_published(
             report.candidates.append(candidate)
             if apply:
                 _apply_published_candidate(entry, candidate, report)
+            plan.append(("done", None))
             continue
         if not online:
             report.candidates.append(
@@ -544,6 +779,7 @@ def check_published(
                     message="Pass --online to check authoritative preprint metadata",
                 )
             )
+            plan.append(("done", None))
             continue
         if source != "arxiv":
             report.candidates.append(
@@ -555,30 +791,31 @@ def check_published(
                     message="Online published-version lookup currently supports arXiv metadata",
                 )
             )
+            plan.append(("done", None))
             continue
 
-        try:
-            arxiv = fetch_arxiv_metadata(identifier, cache_file=cache_file)
-        except MetadataFetchError as exc:
-            report.warnings.append(
-                {"type": "preprint_lookup_failed", "key": entry.key, "message": str(exc)}
+        plan.append(("arxiv", (source, identifier)))
+        arxiv_positions.append(pos)
+        arxiv_jobs.append((identifier, cache_file))
+
+    backfill_results = _map_concurrently(backfill_jobs, _backfill_job, concurrency=concurrency)
+    backfill_by_pos = dict(zip(backfill_positions, backfill_results))
+    arxiv_results = _map_concurrently(arxiv_jobs, _arxiv_check_job, concurrency=concurrency)
+    arxiv_by_pos = dict(zip(arxiv_positions, arxiv_results))
+
+    for index, entry in enumerate(entries, start=1):
+        _emit_progress(progress, EntryProgressEvent(entry.key, index, entry_total))
+        pos = index - 1
+        kind, data = plan[pos]
+        if kind in ("noop", "done"):
+            continue
+        if kind == "backfill":
+            _finish_doi_to_arxiv_backfill(
+                entry, data, backfill_by_pos[pos], report, apply=apply, dialect=dialect
             )
             continue
-        status = "published" if arxiv.get("doi") or arxiv.get("journal") else "not_found"
-        candidate = PublishedCandidate(
-            entry.key,
-            source,
-            identifier,
-            status,
-            doi=arxiv.get("doi"),
-            journal=arxiv.get("journal"),
-            message="Published metadata found"
-            if status == "published"
-            else "No published metadata found",
-        )
-        report.candidates.append(candidate)
-        if apply and status == "published":
-            _apply_published_candidate(entry, candidate, report)
+        source, identifier = data
+        _finish_arxiv_check(entry, source, identifier, arxiv_by_pos[pos], report, apply=apply)
     return report
 
 
@@ -794,64 +1031,6 @@ def _apply_published_candidate(
     ):
         if set_entry_type(entry, "article"):
             report.updates.append(FieldUpdate(entry.key, "type", "article"))
-
-
-def _check_doi_to_arxiv_backfill(
-    entry: BibEntry,
-    report: PublishedReport,
-    *,
-    apply: bool,
-    dialect: str,
-    cache_file: str | Path | None,
-    openalex_fetcher: Callable[[str], dict | None] | None,
-    semantic_scholar_fetcher: Callable[[str], dict | None] | None,
-) -> None:
-    doi = entry.fields.get("doi", "").strip()
-    if not doi:
-        return
-    try:
-        normalized = normalize_doi(doi)
-    except ValueError:
-        return
-
-    try:
-        arxiv_id = resolve_arxiv_id_for_doi(
-            normalized,
-            cache_file=cache_file,
-            openalex_fetcher=openalex_fetcher,
-            semantic_scholar_fetcher=semantic_scholar_fetcher,
-        )
-    except ProviderFetchError as exc:
-        report.warnings.append(
-            {"type": "doi_to_arxiv_lookup_failed", "key": entry.key, "message": str(exc)}
-        )
-        return
-
-    if arxiv_id is None:
-        report.candidates.append(
-            PublishedCandidate(
-                entry.key,
-                "doi",
-                normalized,
-                "not_found",
-                doi=normalized,
-                message="No arXiv id found in OpenAlex or Semantic Scholar",
-            )
-        )
-        return
-
-    candidate = PublishedCandidate(
-        entry.key,
-        "doi",
-        normalized,
-        "arxiv_found",
-        doi=normalized,
-        arxiv_id=arxiv_id,
-        message="arXiv identity found",
-    )
-    report.candidates.append(candidate)
-    if apply:
-        _apply_arxiv_backfill_candidate(entry, candidate, report, dialect)
 
 
 def _apply_arxiv_backfill_candidate(

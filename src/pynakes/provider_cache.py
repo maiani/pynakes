@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+import threading
 from pathlib import Path
 
 CACHE_FORMATS = ("json", "bib", "xml")
@@ -88,63 +89,70 @@ class ProviderCache:
         self.path = path
         self._records: dict[_RecordKey, dict[str, str]] = {}
         self._lines = 0
+        self._lock = threading.Lock()
         self._load()
 
     # --- lookup -----------------------------------------------------------
 
     def get(self, namespace: str, identifier: str, fmt: str = "json") -> str | None:
         """Return the cached body for one identifier, or ``None`` when absent."""
-        record = self._records.get((namespace, identifier.lower(), _check_format(fmt)))
-        return None if record is None else record["body"]
+        with self._lock:
+            record = self._records.get((namespace, identifier.lower(), _check_format(fmt)))
+            return None if record is None else record["body"]
 
     def put(self, namespace: str, identifier: str, fmt: str, body: str) -> None:
         """Store one provider response, superseding any earlier copy."""
         key = (namespace, identifier.lower(), _check_format(fmt))
-        existing = self._records.get(key)
-        if existing is not None and existing["body"] == body:
-            return
-        record = {"namespace": namespace, "id": identifier, "format": fmt, "body": body}
-        self._records[key] = record
-        self._append(record)
+        with self._lock:
+            existing = self._records.get(key)
+            if existing is not None and existing["body"] == body:
+                return
+            record = {"namespace": namespace, "id": identifier, "format": fmt, "body": body}
+            self._records[key] = record
+            self._append(record)
 
     def drop(self, namespace: str, identifier: str, fmt: str) -> bool:
         """Forget one cached response; returns whether anything was cached."""
         key = (namespace, identifier.lower(), _check_format(fmt))
-        if self._records.pop(key, None) is None:
-            return False
-        self._compact()
-        return True
+        with self._lock:
+            if self._records.pop(key, None) is None:
+                return False
+            self._compact()
+            return True
 
     # --- maintenance ------------------------------------------------------
 
     def stats(self) -> dict[str, object]:
         """Describe what this cache currently holds."""
-        by_namespace: dict[str, int] = {}
-        for namespace, _, _ in self._records:
-            by_namespace[namespace] = by_namespace.get(namespace, 0) + 1
-        on_disk = self.path is not None and self.path.is_file()
-        return {
-            "path": None if self.path is None else str(self.path),
-            "exists": on_disk,
-            "records": len(self._records),
-            "bytes": self.path.stat().st_size if on_disk else 0,
-            "namespaces": dict(sorted(by_namespace.items())),
-        }
+        with self._lock:
+            by_namespace: dict[str, int] = {}
+            for namespace, _, _ in self._records:
+                by_namespace[namespace] = by_namespace.get(namespace, 0) + 1
+            on_disk = self.path is not None and self.path.is_file()
+            return {
+                "path": None if self.path is None else str(self.path),
+                "exists": on_disk,
+                "records": len(self._records),
+                "bytes": self.path.stat().st_size if on_disk else 0,
+                "namespaces": dict(sorted(by_namespace.items())),
+            }
 
     def clear(self) -> int:
         """Remove the cache file, returning how many records it held."""
-        removed = len(self._records)
-        self._records.clear()
-        self._lines = 0
-        if self.path is not None:
-            self.path.unlink(missing_ok=True)
-        return removed
+        with self._lock:
+            removed = len(self._records)
+            self._records.clear()
+            self._lines = 0
+            if self.path is not None:
+                self.path.unlink(missing_ok=True)
+            return removed
 
     def compact(self) -> int:
         """Rewrite the file with one line per live record; returns lines saved."""
-        saved = self._lines - len(self._records)
-        self._compact()
-        return max(saved, 0)
+        with self._lock:
+            saved = self._lines - len(self._records)
+            self._compact()
+            return max(saved, 0)
 
     # --- storage ----------------------------------------------------------
 
@@ -204,6 +212,7 @@ def _atomic_write_text(path: Path, text: str) -> None:
 # --- process-wide instances -------------------------------------------------
 
 _INSTANCES: dict[Path | None, ProviderCache] = {}
+_INSTANCES_LOCK = threading.Lock()
 
 
 def open_cache(location: str | Path | None) -> ProviderCache:
@@ -214,15 +223,20 @@ def open_cache(location: str | Path | None) -> ProviderCache:
     once and still leaves the user's folder untouched.
 
     Instances are memoized per path, so a single ``--online`` run reads a cache
-    file once no matter how many identifiers it looks up.
+    file once no matter how many identifiers it looks up — including when
+    those lookups run concurrently across worker threads (see
+    ``verify``/``enrich``'s ``--concurrency``): construction and every access
+    below are guarded by locks, since :class:`ProviderCache` itself has no
+    notion of a single caller.
     """
     path = None if location is None else Path(location).expanduser()
     if path is not None and path.is_dir():
         raise ValueError(f"Provider cache path is a directory, not a file: {path}")
-    cache = _INSTANCES.get(path)
-    if cache is None:
-        cache = ProviderCache(path)
-        _INSTANCES[path] = cache
+    with _INSTANCES_LOCK:
+        cache = _INSTANCES.get(path)
+        if cache is None:
+            cache = ProviderCache(path)
+            _INSTANCES[path] = cache
     return cache
 
 

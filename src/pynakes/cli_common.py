@@ -461,6 +461,15 @@ _CACHE_FILE_OPTION = typer.Option(
     "are reused for this run only",
 )
 
+_CONCURRENCY_OPTION = typer.Option(
+    8,
+    "--concurrency",
+    "-j",
+    min=1,
+    help="Number of provider lookups to run at once during an --online pass "
+    "(result ordering and applied updates are unaffected)",
+)
+
 
 # --- read-only checks (single- or multi-file) ------------------------------
 

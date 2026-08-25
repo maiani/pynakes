@@ -88,10 +88,15 @@ class BibliographyOperations:
         online: bool = False,
         cache_file: str | Path | None = None,
         progress: EntryProgress | None = None,
+        concurrency: int = 1,
     ) -> integrity_ops.VerifyReport:
         """Verify entries against authoritative metadata without modifying."""
         return integrity_ops.verify_library(
-            self.lib, online=online, cache_file=cache_file, progress=progress
+            self.lib,
+            online=online,
+            cache_file=cache_file,
+            progress=progress,
+            concurrency=concurrency,
         )
 
     def published_check(
@@ -100,10 +105,15 @@ class BibliographyOperations:
         online: bool = False,
         cache_file: str | Path | None = None,
         progress: EntryProgress | None = None,
+        concurrency: int = 1,
     ) -> integrity_ops.PublishedReport:
         """Check preprint entries for published metadata without modifying."""
         return integrity_ops.check_published(
-            self.lib, online=online, cache_file=cache_file, progress=progress
+            self.lib,
+            online=online,
+            cache_file=cache_file,
+            progress=progress,
+            concurrency=concurrency,
         )
 
     def compare_entry_with_remote(
@@ -514,10 +524,15 @@ class BibliographyOperations:
         online: bool = False,
         cache_file: str | Path | None = None,
         progress: EntryProgress | None = None,
+        concurrency: int = 1,
     ) -> integrity_ops.EnrichReport:
         """Conservatively fill missing metadata in memory."""
         report = integrity_ops.enrich_library(
-            self.lib, online=online, cache_file=cache_file, progress=progress
+            self.lib,
+            online=online,
+            cache_file=cache_file,
+            progress=progress,
+            concurrency=concurrency,
         )
         return report
 
@@ -527,6 +542,7 @@ class BibliographyOperations:
         online: bool = False,
         cache_file: str | Path | None = None,
         progress: EntryProgress | None = None,
+        concurrency: int = 1,
     ) -> integrity_ops.PublishedReport:
         """Apply conservative published-version metadata updates in memory."""
         report = integrity_ops.check_published(
@@ -535,6 +551,7 @@ class BibliographyOperations:
             apply=True,
             cache_file=cache_file,
             progress=progress,
+            concurrency=concurrency,
         )
         return report
 

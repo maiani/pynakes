@@ -1,5 +1,6 @@
 """Provider-response cache tests."""
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -195,3 +196,36 @@ class TestLocationResolution:
 
         with pytest.raises(ValueError, match="Unsupported provider cache format"):
             cache.get("doi", "10.5555/example", "csv")
+
+
+class TestConcurrency:
+    """``verify``/``enrich --concurrency`` can call into one cache from several threads."""
+
+    def test_concurrent_puts_do_not_corrupt_the_file(self, tmp_path: Path) -> None:
+        # 200 puts against a compaction threshold this low (see
+        # _COMPACT_FACTOR/_COMPACT_SLACK) guarantees several compactions —
+        # the file-rewriting path most exposed to a missing lock — happen
+        # while other threads are still appending.
+        path = tmp_path / ".pynakes-cache"
+        cache = ProviderCache(path)
+
+        def store(index: int) -> None:
+            cache.put("doi", f"10.5555/example-{index}", "bib", f"@article{{a{index}}}")
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            list(executor.map(store, range(200)))
+
+        reloaded = ProviderCache(path)
+        for index in range(200):
+            assert reloaded.get("doi", f"10.5555/example-{index}", "bib") == f"@article{{a{index}}}"
+
+    def test_concurrent_open_cache_returns_one_shared_instance(self, tmp_path: Path) -> None:
+        path = tmp_path / ".pynakes-cache"
+
+        def open_it(_: int) -> ProviderCache:
+            return open_cache(path)
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            instances = list(executor.map(open_it, range(16)))
+
+        assert len({id(instance) for instance in instances}) == 1

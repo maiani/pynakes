@@ -986,6 +986,12 @@ pynakes enrich refs.bib --online --published --dry-run --diff
 
 `verify --strict` exits with code `1` when warnings or errors are reported.
 
+An `--online` pass looks up entries concurrently — `-j/--concurrency N`
+(default 8) controls how many provider lookups run at once. Output is
+identical at any concurrency: reports, applied field updates, and the
+progress bar all follow the library's own entry order, not fetch completion
+order.
+
 ### Caching provider responses
 
 Nothing is cached to disk unless you ask for it. Every command that can go

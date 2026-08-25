@@ -1,6 +1,7 @@
 """Tests for integrity verification and enrichment."""
 
 import json
+import threading
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -11,6 +12,7 @@ from pynakes.cli import app
 from pynakes.cli_commands.integrity import _RichIntegrityProgress
 from pynakes.identity import entry_arxiv_id
 from pynakes.integrity import (
+    _map_concurrently,
     check_published,
     compare_entries,
     compare_entry_with_remote,
@@ -108,6 +110,41 @@ def test_verify_library_separates_provider_errors(monkeypatch) -> None:
     assert report.errors == 1
     assert report.issues[0].type == "provider_error"
     assert report.issues[0].field == "doi"
+
+
+def test_verify_library_reports_malformed_doi() -> None:
+    lib = parse_bib("@article{A,\n  title = {T},\n  doi = {not a doi}\n}\n")
+
+    report = verify_library(lib, online=True)
+
+    assert report.checked == 0
+    assert report.issues[0].type == "malformed_doi"
+    assert report.issues[0].key == "A"
+
+
+def test_verify_library_reports_offline_dois_as_info() -> None:
+    lib = parse_bib("@article{A,\n  title = {T},\n  doi = {10.5555/example}\n}\n")
+
+    report = verify_library(lib, online=False)
+
+    assert report.checked == 0
+    assert report.issues[0].type == "doi_not_checked"
+    assert report.issues[0].severity == "info"
+
+
+def test_enrich_library_reports_malformed_doi(monkeypatch) -> None:
+    def fail_fetch(d: str) -> str:
+        raise AssertionError("should not fetch a malformed DOI")
+
+    monkeypatch.setattr(doi, "fetch_bibtex", fail_fetch)
+    lib = parse_bib("@article{A,\n  title = {T},\n  doi = {not a doi}\n}\n")
+
+    report = enrich_library(lib, online=True)
+
+    assert report.updates == []
+    assert report.warnings == [
+        {"type": "malformed_doi", "key": "A", "message": "Malformed DOI: 'not a doi'"}
+    ]
 
 
 def test_enrich_library_fills_missing_doi_from_url_and_provider_fields(monkeypatch) -> None:
@@ -708,3 +745,110 @@ def test_verify_online_json_skips_progress_bar(monkeypatch, tmp_path: Path) -> N
 
     assert result.exit_code == 0, result.output
     assert constructed == []
+
+
+def test_map_concurrently_runs_jobs_on_multiple_threads() -> None:
+    # A barrier only releases once every job has arrived, so this can only
+    # complete if all four jobs are genuinely running at once — a serial
+    # fallback would deadlock the barrier and fail the test via timeout.
+    barrier = threading.Barrier(4, timeout=5)
+    seen_threads: set[int] = set()
+    lock = threading.Lock()
+
+    def job(item: int) -> int:
+        with lock:
+            seen_threads.add(threading.get_ident())
+        barrier.wait()
+        return item * 2
+
+    results = _map_concurrently(list(range(4)), job, concurrency=4)
+
+    assert results == [0, 2, 4, 6]
+    assert len(seen_threads) == 4
+
+
+def test_map_concurrently_serial_for_concurrency_one() -> None:
+    calls: list[int] = []
+
+    results = _map_concurrently([1, 2, 3], lambda item: calls.append(item) or item, concurrency=1)
+
+    assert results == [1, 2, 3]
+    assert calls == [1, 2, 3]
+
+
+def test_verify_library_concurrency_preserves_result_order(monkeypatch) -> None:
+    bibtex_by_doi = {
+        "10.5555/aaa": "@article{r,\n  title = {Title A},\n  doi = {10.5555/aaa}\n}\n",
+        "10.5555/bbb": "@article{r,\n  title = {Title B},\n  doi = {10.5555/bbb}\n}\n",
+        "10.5555/ccc": "@article{r,\n  title = {Title C},\n  doi = {10.5555/ccc}\n}\n",
+    }
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: bibtex_by_doi[d])
+    lib = parse_bib(
+        "@article{A, title = {Title A}, doi = {10.5555/aaa}}\n"
+        "@article{B, title = {Wrong Title}, doi = {10.5555/bbb}}\n"
+        "@article{C, title = {Title C}, doi = {10.5555/ccc}}\n"
+    )
+
+    report = verify_library(lib, online=True, concurrency=4)
+
+    assert report.checked == 3
+    assert [issue.key for issue in report.issues] == ["B"]
+
+
+def test_enrich_library_concurrency_preserves_result_order(monkeypatch) -> None:
+    bibtex_by_doi = {
+        "10.5555/aaa": "@article{r,\n  author = {Author A},\n  doi = {10.5555/aaa}\n}\n",
+        "10.5555/bbb": "@article{r,\n  author = {Author B},\n  doi = {10.5555/bbb}\n}\n",
+        "10.5555/ccc": "@article{r,\n  author = {Author C},\n  doi = {10.5555/ccc}\n}\n",
+    }
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: bibtex_by_doi[d])
+    lib = parse_bib(
+        "@article{A, doi = {10.5555/aaa}}\n"
+        "@article{B, doi = {10.5555/bbb}}\n"
+        "@article{C, doi = {10.5555/ccc}}\n"
+    )
+
+    enrich_library(lib, online=True, concurrency=4)
+
+    assert lib.entries["A"].fields["author"] == "Author A"
+    assert lib.entries["B"].fields["author"] == "Author B"
+    assert lib.entries["C"].fields["author"] == "Author C"
+
+
+def test_check_published_concurrency_preserves_result_order(monkeypatch) -> None:
+    def fake_fetch_atom(identifier: str) -> str:
+        return ARXIV_XML.replace("10.5555/published", f"10.5555/{identifier}")
+
+    monkeypatch.setattr(arxiv, "fetch_atom", fake_fetch_atom)
+    lib = parse_bib(
+        "@misc{A, eprint = {2401.00001}, archiveprefix = {arXiv}}\n"
+        "@misc{B, eprint = {2401.00002}, archiveprefix = {arXiv}}\n"
+        "@misc{C, eprint = {2401.00003}, archiveprefix = {arXiv}}\n"
+    )
+
+    report = check_published(lib, online=True, concurrency=4)
+
+    by_key = {c.key: c for c in report.candidates}
+    assert by_key["A"].doi == "10.5555/2401.00001"
+    assert by_key["B"].doi == "10.5555/2401.00002"
+    assert by_key["C"].doi == "10.5555/2401.00003"
+
+
+def test_verify_cli_accepts_concurrency_option(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{A, doi = {10.5555/example}}\n@article{B, doi = {10.5555/example}}\n")
+
+    result = runner.invoke(app, ["verify", str(bib), "--online", "-j", "4", "--json"])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["checked"] == 2
+
+
+def test_verify_cli_rejects_zero_concurrency(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{A, doi = {10.5555/example}}\n")
+
+    result = runner.invoke(app, ["verify", str(bib), "--concurrency", "0"])
+
+    assert result.exit_code != 0

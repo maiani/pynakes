@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   feedback even while most entries have no DOI to look up. Suppressed for
   `--json` output and non-terminal stderr, same as `asset fetch`.
 
+- `verify`, `enrich`, and their folded-in `--published` preprint check now run
+  provider lookups concurrently instead of one DOI/arXiv fetch at a time.
+  `-j/--concurrency N` (default 8) controls how many run at once; report
+  ordering, applied field updates, and progress-bar events are unaffected —
+  they always follow the library's own entry order, never fetch completion
+  order, so a run's output is identical regardless of concurrency.
+
 - `keys usage <key> --path <dir>` scans `.tex` sources directly for
   `\cite`-family macros citing one key, reporting each occurrence's file and
   line. It takes no `.bib` file and never consults `tex-sources` metadata, so
