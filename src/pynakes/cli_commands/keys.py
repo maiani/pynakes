@@ -13,6 +13,7 @@ from pynakes.cli_common import (
     _BACKUP_OPTION,
     CheckOutcome,
     RunParams,
+    _emit,
     _emit_conflict,
     _emit_error,
     _entries,
@@ -28,6 +29,7 @@ from pynakes.engine import Bibliography, ExternalModificationError
 from pynakes.io import save_plain_text
 from pynakes.usage import (
     extract_keys_from_tex,
+    find_key_usages,
     iter_tex_files,
     rename_citation_keys_in_tex,
     resolve_existing_tex_sources,
@@ -469,9 +471,49 @@ def keys_rename(
     )
 
 
+def keys_usage(
+    key: str = typer.Argument(..., help="Citation key to search for"),
+    path: list[str] = typer.Option(
+        ...,
+        "--path",
+        help="One or more .tex files or directories to scan (repeatable)",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Scan TeX sources directly for \\cite-family citations of one key.
+
+    Unlike `tex scan`/`used scan`, this takes no .bib file and never consults
+    'tex-sources' metadata: it scans exactly the given --path directory or
+    file(s), so a rename's blast radius can be checked over sources that were
+    never registered with `tex add` — frozen snapshots, generated diffs, or
+    any other .tex the library does not track.
+    """
+    keys_ops.validate_key(key)
+    matches, scanned = find_key_usages(key, path)
+
+    human = [f"Scanned {len(scanned)} .tex file(s) for citations of {key!r}."]
+    if matches:
+        for m in matches:
+            human.append(f"  {m.path}:{m.line}: {m.text}")
+    else:
+        human.append("  No citations found.")
+
+    result = {
+        "status": "success",
+        "action": "keys_usage",
+        "key": key,
+        "paths": list(path),
+        "scanned": scanned,
+        "count": len(matches),
+        "matches": [m.to_dict() for m in matches],
+    }
+    _emit(json_output, result, human)
+
+
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
     app.command("check")(_safe(keys_check))
     app.command("generate")(_safe(keys_generate))
     app.command("repair")(_safe(keys_repair))
     app.command("rename")(_safe(keys_rename))
+    app.command("usage")(_safe(keys_usage))

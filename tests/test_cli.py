@@ -2494,6 +2494,102 @@ class TestKeysCommand:
         assert "now ambiguous" not in result.output
 
 
+class TestKeysUsageCommand:
+    def test_finds_citations_without_a_bib_file(self, tmp_path: Path) -> None:
+        tex = tmp_path / "paper.tex"
+        tex.write_text(r"\cite{Smith2020}" "\n" r"\citep{Smith2020,Brown2022}" "\n")
+
+        result = runner.invoke(app, ["keys", "usage", "Smith2020", "--path", str(tex), "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["status"] == "success"
+        assert data["key"] == "Smith2020"
+        assert data["count"] == 2
+        assert [m["line"] for m in data["matches"]] == [1, 2]
+        assert data["matches"][0]["text"] == r"\cite{Smith2020}"
+        assert data["matches"][1]["text"] == r"\citep{Smith2020,Brown2022}"
+
+    def test_ignores_commented_out_citations(self, tmp_path: Path) -> None:
+        tex = tmp_path / "paper.tex"
+        tex.write_text(r"% \cite{Smith2020}" "\n" r"\cite{Brown2022}" "\n")
+
+        result = runner.invoke(app, ["keys", "usage", "Smith2020", "--path", str(tex), "--json"])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["count"] == 0
+
+    def test_scans_a_directory_recursively(self, tmp_path: Path) -> None:
+        sub = tmp_path / "chapters"
+        sub.mkdir()
+        (tmp_path / "paper.tex").write_text(r"\cite{Smith2020}" "\n")
+        (sub / "intro.tex").write_text(r"\cite{Smith2020}" "\n")
+
+        result = runner.invoke(
+            app, ["keys", "usage", "Smith2020", "--path", str(tmp_path), "--json"]
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["count"] == 2
+        assert len(data["scanned"]) == 2
+
+    def test_does_not_require_tex_sources_metadata_or_registration(self, tmp_path: Path) -> None:
+        # A frozen snapshot or generated diff pynakes never tracked via `tex
+        # add` must still be scannable directly.
+        frozen = tmp_path / "frozen-snapshot.tex"
+        frozen.write_text(r"\cite{Smith2020}" "\n")
+
+        result = runner.invoke(app, ["keys", "usage", "Smith2020", "--path", str(frozen), "--json"])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["count"] == 1
+
+    def test_no_matches_reports_zero_count(self, tmp_path: Path) -> None:
+        tex = tmp_path / "paper.tex"
+        tex.write_text(r"\cite{Brown2022}" "\n")
+
+        result = runner.invoke(app, ["keys", "usage", "Smith2020", "--path", str(tex), "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["count"] == 0
+        assert data["matches"] == []
+
+    def test_missing_path_reports_file_not_found(self, tmp_path: Path) -> None:
+        result = runner.invoke(
+            app, ["keys", "usage", "Smith2020", "--path", str(tmp_path / "missing.tex"), "--json"]
+        )
+
+        assert result.exit_code == 1, result.output
+        assert json.loads(result.output)["error"] == "FileNotFound"
+
+    def test_missing_path_option_is_a_structured_error(self, tmp_path: Path) -> None:
+        result = runner.invoke(app, ["keys", "usage", "Smith2020", "--json"])
+
+        assert result.exit_code == 1, result.output
+        assert json.loads(result.output)["error"] == "UsageError"
+
+    def test_invalid_key_is_a_structured_error(self, tmp_path: Path) -> None:
+        tex = tmp_path / "paper.tex"
+        tex.write_text(r"\cite{Smith2020}" "\n")
+
+        result = runner.invoke(app, ["keys", "usage", "bad key", "--path", str(tex), "--json"])
+
+        assert result.exit_code == 1, result.output
+        assert json.loads(result.output)["error"] == "InvalidInput"
+
+    def test_human_output_lists_each_occurrence(self, tmp_path: Path) -> None:
+        tex = tmp_path / "paper.tex"
+        tex.write_text(r"\cite{Smith2020}" "\n")
+
+        result = runner.invoke(app, ["keys", "usage", "Smith2020", "--path", str(tex)])
+
+        assert result.exit_code == 0, result.output
+        assert "paper.tex:1" in result.output
+        assert r"\cite{Smith2020}" in result.output
+
+
 class TestFieldsCommand:
     def test_set_replaces_field_on_matching_references(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")

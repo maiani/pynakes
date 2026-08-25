@@ -2,6 +2,7 @@
 
 from pynakes.providers.metadata import (
     acl_anthology,
+    aps,
     crossref,
     dblp,
     doi,
@@ -14,6 +15,7 @@ from pynakes.providers.metadata import (
 
 __all__ = [
     "acl_anthology",
+    "aps",
     "crossref",
     "dblp",
     "doi",

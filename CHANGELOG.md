@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 
+- `enrich --online` now consults a journal-preferred metadata-source registry
+  before DOI content negotiation. The initial APS rules use the documented APS
+  Harvest API to recover the publisher's article identifier (`pages`) and page
+  count (`numpages`) for Physical Review journals. It works automatically from
+  an APS-authorized institutional network; `PYNAKES_APS_API_TOKEN` optionally
+  supplies an APS-issued bearer token elsewhere, and a denied request falls
+  back to DOI content negotiation.
+
+- `verify --online` and `enrich --online` now render a Rich progress bar over
+  the entries being checked, mirroring `asset fetch`'s: a spinner, a bar over
+  the whole entry queue, and the current key, so a large library gives visible
+  feedback even while most entries have no DOI to look up. Suppressed for
+  `--json` output and non-terminal stderr, same as `asset fetch`.
+
+- `keys usage <key> --path <dir>` scans `.tex` sources directly for
+  `\cite`-family macros citing one key, reporting each occurrence's file and
+  line. It takes no `.bib` file and never consults `tex-sources` metadata, so
+  it covers sources `tex add` deliberately does not track (frozen snapshots,
+  generated diffs) — the lookup an agent needs to check a rename's blast
+  radius before committing to it.
+
 - `normalize --keys on` now stops before committing when a declared
   `tex-sources` file is missing, with a structured `MissingTexSource` error
   that names the sources and explains the safe resolution. Pass `--force` to

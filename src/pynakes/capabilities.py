@@ -344,7 +344,8 @@ def get_capabilities() -> dict:
             "groups": "Manage entry groups and group hierarchy "
             "(list, list-entries, add-entry, remove-entry, tree, add-group, "
             "remove-group, rename-group, move-group, update-group)",
-            "keys": "Generate, check, rename, and repair citation keys",
+            "keys": "Generate, check, rename, repair citation keys, and look up "
+            "raw-TeX-source citations of one key (usage)",
             "fields": "Bulk-edit fields across matching references "
             "(set, rename, move, append, clear, protect-title)",
             "dedupe": "Detect and conservatively merge duplicate works",

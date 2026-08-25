@@ -75,6 +75,7 @@ _FIELD_ORDER: dict[str, list[str]] = {
         "volume",
         "number",
         "pages",
+        "numpages",
         "month",
         "doi",
         "url",

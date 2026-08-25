@@ -19,10 +19,13 @@ from pynakes.identity import evidence_from_entry
 from pynakes.keys import _first_author_last_name
 from pynakes.metadata import library_dialect
 from pynakes.model import BibEntry, BibFile
+from pynakes.progress import EntryProgress, EntryProgressEvent
 from pynakes.provider_cache import open_cache
 from pynakes.providers._http import ProviderFetchError
 from pynakes.providers.identity import resolve_arxiv_id_for_doi
+from pynakes.providers.metadata import aps as aps_provider
 from pynakes.providers.metadata import doi as doi_provider
+from pynakes.providers.preferred_metadata import preferred_metadata_provider
 from pynakes.providers.repositories import arxiv as arxiv_provider
 
 
@@ -254,6 +257,7 @@ _COMPARE_FIELDS = (
     "journal",
     "journaltitle",
     "publisher",
+    "numpages",
     "isbn",
     "doi",
     "pmid",
@@ -264,11 +268,17 @@ _COMPARE_FIELDS = (
 )
 
 
+def _emit_progress(progress: EntryProgress | None, event: EntryProgressEvent) -> None:
+    if progress is not None:
+        progress(event)
+
+
 def verify_library(
     lib: BibFile,
     *,
     online: bool = False,
     cache_file: str | Path | None = None,
+    progress: EntryProgress | None = None,
 ) -> VerifyReport:
     """Verify DOI-backed entries against provider metadata.
 
@@ -276,7 +286,9 @@ def verify_library(
     only syntax-checked and reported as unchecked.
     """
     report = VerifyReport()
-    for entry in lib.entries.values():
+    entry_total = len(lib.entries)
+    for index, entry in enumerate(lib.entries.values(), start=1):
+        _emit_progress(progress, EntryProgressEvent(entry.key, index, entry_total))
         doi = entry.fields.get("doi", "").strip()
         if not doi:
             continue
@@ -331,10 +343,13 @@ def enrich_library(
     *,
     online: bool = False,
     cache_file: str | Path | None = None,
+    progress: EntryProgress | None = None,
 ) -> EnrichReport:
     """Fill missing fields from local DOI URLs and DOI provider metadata."""
     report = EnrichReport()
-    for entry in lib.entries.values():
+    entry_total = len(lib.entries)
+    for index, entry in enumerate(lib.entries.values(), start=1):
+        _emit_progress(progress, EntryProgressEvent(entry.key, index, entry_total))
         doi = entry.fields.get("doi", "").strip()
         if not doi:
             inferred = _doi_from_entry_urls(entry)
@@ -354,13 +369,34 @@ def enrich_library(
         if not online:
             continue
 
-        try:
-            remote = fetch_doi_entry(normalized, cache_file=cache_file)
-        except MetadataFetchError as exc:
-            report.warnings.append(
-                {"type": "doi_unresolved", "key": entry.key, "message": str(exc)}
-            )
-            continue
+        remote = None
+        provider = preferred_metadata_provider(
+            entry.fields.get("journal") or entry.fields.get("journaltitle")
+        )
+        if provider == "aps":
+            try:
+                remote = aps_provider.fetch_entry(
+                    normalized,
+                    entry.fields.get("journal") or entry.fields.get("journaltitle"),
+                    cache_file=cache_file,
+                )
+            except ProviderFetchError as exc:
+                report.warnings.append(
+                    {
+                        "type": "preferred_provider_unresolved",
+                        "key": entry.key,
+                        "message": f"Could not fetch APS Harvest metadata for DOI "
+                        f"{normalized!r}: {exc}",
+                    }
+                )
+        if remote is None:
+            try:
+                remote = fetch_doi_entry(normalized, cache_file=cache_file)
+            except MetadataFetchError as exc:
+                report.warnings.append(
+                    {"type": "doi_unresolved", "key": entry.key, "message": str(exc)}
+                )
+                continue
         for field_name, value in _missing_field_updates(entry, remote):
             if set_entry_field(entry, field_name, value):
                 report.updates.append(FieldUpdate(entry.key, field_name, value))
@@ -460,11 +496,14 @@ def check_published(
     cache_file: str | Path | None = None,
     openalex_fetcher: Callable[[str], dict | None] | None = None,
     semantic_scholar_fetcher: Callable[[str], dict | None] | None = None,
+    progress: EntryProgress | None = None,
 ) -> PublishedReport:
     """Detect preprints and optionally apply published DOI/journal metadata."""
     report = PublishedReport()
     dialect = library_dialect(lib)
-    for entry in lib.entries.values():
+    entry_total = len(lib.entries)
+    for index, entry in enumerate(lib.entries.values(), start=1):
+        _emit_progress(progress, EntryProgressEvent(entry.key, index, entry_total))
         preprint = _preprint_identity(entry)
         if preprint is None:
             if online:
@@ -683,6 +722,8 @@ def _missing_field_updates(entry: BibEntry, remote: BibEntry) -> list[tuple[str,
         "volume",
         "number",
         "pages",
+        "numpages",
+        "month",
         "publisher",
         "isbn",
         "url",

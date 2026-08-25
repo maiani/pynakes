@@ -5,7 +5,15 @@ retaining the stable CLI contract.
 """
 
 import typer
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 
+from pynakes.cli_commands._rich_progress import RichProgressBase
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     _CACHE_FILE_OPTION,
@@ -20,8 +28,35 @@ from pynakes.cli_common import (
     bib_file_argument,
 )
 from pynakes.engine import Bibliography
+from pynakes.progress import EntryProgressEvent
 
 # --- integrity / enrichment -------------------------------------------------
+
+
+class _RichIntegrityProgress(RichProgressBase):
+    """Render an online verify/enrich pass's entry-by-entry progress to stderr.
+
+    Mirrors ``asset fetch``'s ``_RichFetchProgress``, scaled down to one task
+    (there is no per-artifact byte count to track here): a spinner, a bar over
+    the whole entry queue, and the current key in the description.
+    """
+
+    def __init__(self, description: str) -> None:
+        super().__init__(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+        )
+        self._description = description
+        self._task_id: object = None
+
+    def __call__(self, event: EntryProgressEvent) -> None:
+        description = f"{self._description}: {event.key}"
+        if self._task_id is None:
+            self._task_id = self._progress.add_task(description, total=event.entry_total)
+        self._progress.update(self._task_id, completed=event.entry_index, description=description)
 
 
 def _verify_one(
@@ -30,9 +65,14 @@ def _verify_one(
     cache_file: str | None,
     strict: bool,
     published: bool,
+    json_output: bool,
 ) -> CheckOutcome:
     coll = Bibliography.open(file)
-    report = coll.verify(online=online, cache_file=cache_file)
+    if online and not json_output:
+        with _RichIntegrityProgress("Verifying") as progress:
+            report = coll.verify(online=online, cache_file=cache_file, progress=progress)
+    else:
+        report = coll.verify(online=online, cache_file=cache_file)
     result = {
         "status": "success",
         "action": "verify",
@@ -53,7 +93,13 @@ def _verify_one(
     if published:
         # Read-only preprint check, folded in from the former `published` command.
         # Informational only: it never affects the --strict gate.
-        preprints = coll.published_check(online=online, cache_file=cache_file)
+        if online and not json_output:
+            with _RichIntegrityProgress("Checking preprints") as progress:
+                preprints = coll.published_check(
+                    online=online, cache_file=cache_file, progress=progress
+                )
+        else:
+            preprints = coll.published_check(online=online, cache_file=cache_file)
         result["preprints"] = {
             "checked": preprints.checked,
             "published": preprints.published,
@@ -99,7 +145,7 @@ def verify(
     _run_checks(
         files,
         "verify",
-        lambda f: _verify_one(f, online, cache_file, strict, published),
+        lambda f: _verify_one(f, online, cache_file, strict, published, json_output),
         json_output,
         strict,
     )
@@ -133,7 +179,11 @@ def enrich(
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     coll = Bibliography.open(file)
-    report = coll.enrich(online=online, cache_file=cache_file)
+    if online and not json_output:
+        with _RichIntegrityProgress("Enriching") as progress:
+            report = coll.enrich(online=online, cache_file=cache_file, progress=progress)
+    else:
+        report = coll.enrich(online=online, cache_file=cache_file)
     updates = list(report.updates)
     warnings = list(report.warnings)
     extra: dict[str, object] = {}
@@ -142,7 +192,13 @@ def enrich(
         f"  field_updates={report.changed_fields}",
     ]
     if published:
-        preprints = coll.apply_published(online=online, cache_file=cache_file)
+        if online and not json_output:
+            with _RichIntegrityProgress("Checking preprints") as progress:
+                preprints = coll.apply_published(
+                    online=online, cache_file=cache_file, progress=progress
+                )
+        else:
+            preprints = coll.apply_published(online=online, cache_file=cache_file)
         updates += preprints.updates
         warnings += preprints.warnings
         extra["preprints"] = {

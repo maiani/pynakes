@@ -27,7 +27,8 @@ URL resolvers.
 
 | Provider / source | Kind | Identifier or URL path | Metadata import | Asset fetch |
 | --- | --- | --- | --- | --- |
-| DOI content negotiation | Identifier resolver | DOI, `doi.org` URL | **Covered** | DOI PDF pipeline |
+| DOI content negotiation | Identifier resolver | DOI, `doi.org` URL | **Covered**; universal `enrich --online` fallback when no journal-preferred source is available | DOI PDF pipeline |
+| APS Harvest API | Publisher metadata | APS Physical Review journal + DOI | **Covered** as the preferred `enrich --online` source when the caller's network is APS-authorized; `PYNAKES_APS_API_TOKEN` may supply an APS-issued bearer token | — |
 | arXiv | Preprint server | arXiv id, `arxiv.org` URL | **Covered** | **Native PDF + source**; DOI PDF pipeline when a DOI is present |
 | PubMed / PubMed Central | Bibliographic index / full-text archive | PMID, PMCID, `pubmed.ncbi.nlm.nih.gov`, `pmc.ncbi.nlm.nih.gov` | **Covered** | DOI PDF pipeline only; no PMC-native fetch |
 | Europe PMC | Biomedical index / archive | Europe PMC source/id or article URL | **Covered** | DOI PDF pipeline only; no Europe-PMC-native fetch |

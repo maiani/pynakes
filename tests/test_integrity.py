@@ -8,15 +8,18 @@ from typer.testing import CliRunner
 from pynakes import integrity, provider_cache
 from pynakes.bibtex_parser import parse_bib
 from pynakes.cli import app
+from pynakes.cli_commands.integrity import _RichIntegrityProgress
 from pynakes.identity import entry_arxiv_id
 from pynakes.integrity import (
+    check_published,
     compare_entries,
     compare_entry_with_remote,
     enrich_library,
     verify_library,
 )
+from pynakes.progress import EntryProgressEvent
 from pynakes.providers._http import ProviderFetchError
-from pynakes.providers.metadata import doi, openalex, semantic_scholar
+from pynakes.providers.metadata import aps, doi, openalex, semantic_scholar
 from pynakes.providers.repositories import arxiv
 
 runner = CliRunner()
@@ -28,6 +31,16 @@ PROVIDER_BIBTEX = """@article{provider,
   year = {2024},
   doi = {10.5555/example},
   url = {https://example.test/paper}
+}
+"""
+
+APS_BIBTEX = """@article{1bmy-6yp4,
+  journal = {Phys. Rev. B},
+  issue = {8},
+  pages = {L080507},
+  numpages = {7},
+  month = {Aug},
+  doi = {10.1103/1bmy-6yp4}
 }
 """
 
@@ -113,6 +126,38 @@ def test_enrich_library_fills_missing_doi_from_url_and_provider_fields(monkeypat
     assert lib.entries["A"].fields["doi"] == "10.5555/example"
     assert lib.entries["A"].fields["journal"] == "Journal of Tests"
     assert lib.entries["A"].fields["year"] == "2024"
+
+
+def test_enrich_prefers_aps_metadata_and_adds_page_count(monkeypatch) -> None:
+    monkeypatch.setattr(
+        aps,
+        "fetch_metadata",
+        lambda _doi, _journal, **_kwargs: aps.ReferenceMetadata(
+            provider="American Physical Society",
+            entry_type="article",
+            fields={"number": "8", "pages": "L080507", "numpages": "7", "month": "Aug"},
+        ),
+    )
+    doi_calls: list[str] = []
+    monkeypatch.setattr(
+        doi, "fetch_bibtex", lambda value: doi_calls.append(value) or PROVIDER_BIBTEX
+    )
+    lib = parse_bib(
+        "@article{Levitan_2026,\n  journal = {Physical Review B},\n  doi = {10.1103/1bmy-6yp4}\n}\n"
+    )
+
+    report = enrich_library(lib, online=True)
+
+    assert doi_calls == []
+    assert {(update.field, update.value) for update in report.updates} >= {
+        ("pages", "L080507"),
+        ("numpages", "7"),
+        ("month", "Aug"),
+    }
+    entry = lib.entries["Levitan_2026"]
+    assert entry.fields["number"] == "8"
+    assert entry.fields["pages"] == "L080507"
+    assert entry.fields["numpages"] == "7"
 
 
 def test_compare_entry_with_remote_lists_differing_and_missing_fields(monkeypatch) -> None:
@@ -555,3 +600,111 @@ def test_an_online_run_reuses_an_opted_in_cache_across_runs(monkeypatch, tmp_pat
 
     assert calls == ["10.5555/elements"]
     assert cache_file.is_file()
+
+
+def test_verify_library_reports_progress_for_every_entry(monkeypatch) -> None:
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
+    lib = parse_bib("@article{A, doi = {10.5555/example}}\n@article{B, title = {No DOI here}}\n")
+    events: list[EntryProgressEvent] = []
+
+    verify_library(lib, online=True, progress=events.append)
+
+    assert [(e.key, e.entry_index, e.entry_total) for e in events] == [
+        ("A", 1, 2),
+        ("B", 2, 2),
+    ]
+
+
+def test_enrich_library_reports_progress_for_every_entry(monkeypatch) -> None:
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
+    lib = parse_bib("@article{A, doi = {10.5555/example}}\n@article{B, title = {No DOI here}}\n")
+    events: list[EntryProgressEvent] = []
+
+    enrich_library(lib, online=True, progress=events.append)
+
+    assert [(e.key, e.entry_index, e.entry_total) for e in events] == [
+        ("A", 1, 2),
+        ("B", 2, 2),
+    ]
+
+
+def test_check_published_reports_progress_for_every_entry() -> None:
+    lib = parse_bib(
+        "@article{A, eprint = {2401.00001}, archiveprefix = {arXiv}}\n"
+        "@article{B, title = {Not a preprint}}\n"
+    )
+    events: list[EntryProgressEvent] = []
+
+    check_published(lib, progress=events.append)
+
+    assert [(e.key, e.entry_index, e.entry_total) for e in events] == [
+        ("A", 1, 2),
+        ("B", 2, 2),
+    ]
+
+
+def test_rich_integrity_progress_tracks_entries() -> None:
+    class FakeProgress:
+        def __init__(self) -> None:
+            self.next_id = 0
+            self.tasks: list[tuple[str, int | None]] = []
+            self.updated: list[tuple[object, dict[str, object]]] = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def add_task(self, description: str, *, total: int | None):
+            self.next_id += 1
+            self.tasks.append((description, total))
+            return self.next_id
+
+        def update(self, task_id: object, **kwargs: object) -> None:
+            self.updated.append((task_id, kwargs))
+
+    progress = _RichIntegrityProgress("Verifying")
+    fake = FakeProgress()
+    progress._progress = fake  # type: ignore[assignment]
+
+    assert progress.__enter__() is progress
+    progress(EntryProgressEvent("Smith2020", 1, 2))
+    progress(EntryProgressEvent("Doe2021", 2, 2))
+    assert progress.__exit__(None, None, None) is False
+
+    assert fake.tasks == [("Verifying: Smith2020", 2)]
+    assert fake.updated == [
+        (1, {"completed": 1, "description": "Verifying: Smith2020"}),
+        (1, {"completed": 2, "description": "Verifying: Doe2021"}),
+    ]
+
+
+def test_verify_online_shows_progress_bar_not_json(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
+    seen: list[EntryProgressEvent] = []
+    monkeypatch.setattr(_RichIntegrityProgress, "__call__", lambda self, event: seen.append(event))
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{A, doi = {10.5555/example}}\n")
+
+    result = runner.invoke(app, ["verify", str(bib), "--online"])
+
+    assert result.exit_code == 0, result.output
+    assert [e.key for e in seen] == ["A"]
+
+
+def test_verify_online_json_skips_progress_bar(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
+    constructed = []
+    monkeypatch.setattr(
+        _RichIntegrityProgress,
+        "__init__",
+        lambda self, description: constructed.append(description),
+    )
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{A, doi = {10.5555/example}}\n")
+
+    result = runner.invoke(app, ["verify", str(bib), "--online", "--json"])
+
+    assert result.exit_code == 0, result.output
+    assert constructed == []

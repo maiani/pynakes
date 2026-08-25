@@ -5,14 +5,11 @@ Downloads arXiv materials (PDF and source) into the configured Pinax directory.
 
 from enum import Enum
 from pathlib import Path
-from types import TracebackType
 
 import typer
-from rich.console import Console
 from rich.progress import (
     BarColumn,
     DownloadColumn,
-    Progress,
     SpinnerColumn,
     TextColumn,
     TimeElapsedColumn,
@@ -20,6 +17,7 @@ from rich.progress import (
 )
 
 from pynakes.cli_commands._fetch_report import fetch_report_lines
+from pynakes.cli_commands._rich_progress import RichProgressBase
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     _CACHE_FILE_OPTION,
@@ -49,35 +47,19 @@ class FetchAccess(str, Enum):
     INSTITUTIONAL = "institutional"
 
 
-class _RichFetchProgress:
+class _RichFetchProgress(RichProgressBase):
     """Render Pinax fetch progress to stderr for human CLI runs."""
 
     def __init__(self) -> None:
-        console = Console(stderr=True)
-        self._progress = Progress(
+        super().__init__(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             DownloadColumn(),
             TransferSpeedColumn(),
             TimeElapsedColumn(),
-            console=console,
-            transient=True,
-            disable=not console.is_terminal,
         )
         self._tasks: dict[tuple[str, FetchArtifact], object] = {}
-
-    def __enter__(self) -> "_RichFetchProgress":
-        self._progress.__enter__()
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> bool | None:
-        return self._progress.__exit__(exc_type, exc, traceback)
 
     def __call__(self, event: FetchProgressEvent) -> None:
         if event.kind == "fail" and event.artifact is None:

@@ -170,6 +170,7 @@ _CITEKEY_ARGS: dict[tuple[str, ...], str] = {
     ("ref", "remove"): "citekeys",
     ("asset", "fetch"): "target",
     ("keys", "rename"): "old",
+    ("keys", "usage"): "key",
     ("groups", "add-entry"): "key",
     ("groups", "remove-entry"): "key",
 }

@@ -286,6 +286,8 @@ pynakes keys generate refs.bib --all --dry-run --diff
 pynakes keys repair --dry-run --diff              # auto-detects one .bib file
 pynakes keys repair refs.bib --dry-run --diff
 pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/ --dry-run --diff
+
+pynakes keys usage OldKey2020 --path paper.tex --path chapters/ --json
 ```
 
 Generated keys default to `AuthorYearTitle`. JabRef metadata is honored when
@@ -325,6 +327,13 @@ configured.
 recognized TeX citation commands in the supplied `.tex` files/directories. It
 does not edit commented-out citations, and it exits with conflict if the target
 key already exists.
+
+`keys usage` is a read-only lookup: given a key and one or more `--path`
+files/directories, it reports every `\cite`-family occurrence (file and line)
+that cites that key, and takes neither a `.bib` file nor `tex-sources`
+metadata. Use it to check a rename's blast radius over `.tex` that is not, and
+may never be, registered with `tex add` — a frozen snapshot, a generated diff,
+someone else's copy of the manuscript.
 
 ### Linked TeX sources
 

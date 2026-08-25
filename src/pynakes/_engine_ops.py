@@ -36,6 +36,7 @@ from pynakes.lint import LintIssue
 from pynakes.lint import lint as lint_lib
 from pynakes.metadata import FetchPolicy
 from pynakes.model import BibEntry, QueryFilter
+from pynakes.progress import EntryProgress
 from pynakes.usage import tex_sources_from_metadata, validate_tex_sources
 
 
@@ -86,18 +87,24 @@ class BibliographyOperations:
         *,
         online: bool = False,
         cache_file: str | Path | None = None,
+        progress: EntryProgress | None = None,
     ) -> integrity_ops.VerifyReport:
         """Verify entries against authoritative metadata without modifying."""
-        return integrity_ops.verify_library(self.lib, online=online, cache_file=cache_file)
+        return integrity_ops.verify_library(
+            self.lib, online=online, cache_file=cache_file, progress=progress
+        )
 
     def published_check(
         self,
         *,
         online: bool = False,
         cache_file: str | Path | None = None,
+        progress: EntryProgress | None = None,
     ) -> integrity_ops.PublishedReport:
         """Check preprint entries for published metadata without modifying."""
-        return integrity_ops.check_published(self.lib, online=online, cache_file=cache_file)
+        return integrity_ops.check_published(
+            self.lib, online=online, cache_file=cache_file, progress=progress
+        )
 
     def compare_entry_with_remote(
         self,
@@ -506,9 +513,12 @@ class BibliographyOperations:
         *,
         online: bool = False,
         cache_file: str | Path | None = None,
+        progress: EntryProgress | None = None,
     ) -> integrity_ops.EnrichReport:
         """Conservatively fill missing metadata in memory."""
-        report = integrity_ops.enrich_library(self.lib, online=online, cache_file=cache_file)
+        report = integrity_ops.enrich_library(
+            self.lib, online=online, cache_file=cache_file, progress=progress
+        )
         return report
 
     def apply_published(
@@ -516,6 +526,7 @@ class BibliographyOperations:
         *,
         online: bool = False,
         cache_file: str | Path | None = None,
+        progress: EntryProgress | None = None,
     ) -> integrity_ops.PublishedReport:
         """Apply conservative published-version metadata updates in memory."""
         report = integrity_ops.check_published(
@@ -523,6 +534,7 @@ class BibliographyOperations:
             online=online,
             apply=True,
             cache_file=cache_file,
+            progress=progress,
         )
         return report
 

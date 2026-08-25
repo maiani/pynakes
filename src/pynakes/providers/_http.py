@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as _UrllibRequest
@@ -163,6 +163,7 @@ def fetch_json(
     cache_file: str | Path | None = None,
     opener: Callable[..., object] | None = None,
     timeout: float = 15.0,
+    headers: Mapping[str, str] | None = None,
 ) -> dict | None:
     """Fetch a provider JSON object with deterministic cache support."""
     cache = open_cache(cache_file)
@@ -170,7 +171,12 @@ def fetch_json(
     text = cached
     if text is None:
         text = _fetch_text(
-            url, provider=provider, identifier=identifier, opener=opener, timeout=timeout
+            url,
+            provider=provider,
+            identifier=identifier,
+            opener=opener,
+            timeout=timeout,
+            headers=headers,
         )
         if text is None:
             return None
@@ -193,10 +199,15 @@ def _fetch_text(
     identifier: str,
     opener: Callable[..., object] | None,
     timeout: float,
+    headers: Mapping[str, str] | None,
 ) -> str | None:
     if opener is None:
-        return _fetch_text_httpx(url, provider=provider, identifier=identifier, timeout=timeout)
-    request = _UrllibRequest(url, headers={"User-Agent": USER_AGENT})
+        return _fetch_text_httpx(
+            url, provider=provider, identifier=identifier, timeout=timeout, headers=headers
+        )
+    request_headers = {"User-Agent": USER_AGENT}
+    request_headers.update(headers or {})
+    request = _UrllibRequest(url, headers=request_headers)
     try:
         with opener(request, timeout=timeout) as response:  # type: ignore[arg-type]
             return response.read().decode("utf-8", errors="replace")
@@ -217,10 +228,14 @@ def _fetch_text_httpx(
     provider: str,
     identifier: str,
     timeout: float,
+    headers: Mapping[str, str] | None,
 ) -> str | None:
-    headers = {"User-Agent": USER_AGENT}
+    request_headers = {"User-Agent": USER_AGENT}
+    request_headers.update(headers or {})
     try:
-        with httpx.Client(follow_redirects=True, timeout=timeout, headers=headers) as client:
+        with httpx.Client(
+            follow_redirects=True, timeout=timeout, headers=request_headers
+        ) as client:
             response = client.get(url)
             if response.status_code == 404:
                 return None

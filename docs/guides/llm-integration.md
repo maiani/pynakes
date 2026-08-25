@@ -117,6 +117,11 @@ its operation vocabulary through `capabilities`.
 - Use `format` for layout only and `normalize` for bibliographic conventions.
 - Use `keys rename` when a key change must also update TeX citations; use
   `keys generate` to apply the configured key pattern.
+- Before renaming a key, check its blast radius with
+  `keys usage <key> --path <dir>`: a read-only `.tex` scan for `\cite`-family
+  macros citing that key. It takes no `.bib` file and ignores `tex-sources`
+  metadata, so it also covers sources `tex add` was never pointed at — a
+  frozen snapshot, a generated diff, a collaborator's copy.
 
 `ref show` and `ref edit` require the key to identify exactly one entry. If it
 is duplicated, repair the duplicate keys or select entries with a bulk

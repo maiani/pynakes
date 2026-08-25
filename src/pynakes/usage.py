@@ -12,6 +12,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+from pynakes._text_utils import _line_number
 from pynakes.editing import append_delimited_field, splice_into_text
 from pynakes.groups import GROUPS_DELIM as _GROUPS_DELIM
 from pynakes.groups import GROUPS_JOIN as _GROUPS_JOIN
@@ -20,9 +21,11 @@ from pynakes.model import BibFile
 
 __all__ = [
     "UsageReport",
+    "KeyUsageMatch",
     "extract_keys_from_aux",
     "extract_keys_from_tex",
     "collect_cited_keys",
+    "find_key_usages",
     "iter_tex_files",
     "rename_citation_key_in_tex",
     "rename_citation_keys_in_tex",
@@ -235,6 +238,49 @@ def collect_cited_keys(paths: Iterable[str]) -> tuple[set[str], bool, list[str]]
                 keys.add(key)
 
     return keys, include_all, scanned
+
+
+@dataclass
+class KeyUsageMatch:
+    """One ``\\cite``-family macro occurrence citing a specific key."""
+
+    path: str
+    line: int
+    text: str
+
+    def to_dict(self) -> dict:
+        """Serialize the match to a JSON-friendly dict for CLI output."""
+        return {"path": self.path, "line": self.line, "text": self.text}
+
+
+def find_key_usages(key: str, paths: Iterable[str]) -> tuple[list[KeyUsageMatch], list[str]]:
+    """Scan ``.tex`` files under ``paths`` for citations of ``key``.
+
+    Unlike :func:`collect_cited_keys`, this needs no ``.bib`` file and never
+    consults ``tex-sources`` metadata: it scans exactly the given files or
+    directories, so a caller can check one key's blast radius over sources
+    ``tex add`` deliberately does not track (frozen snapshots, generated
+    diffs) without registering them first.
+
+    Returns ``(matches, scanned)``, where ``scanned`` lists every ``.tex`` file
+    examined, matched or not.
+    """
+    matches: list[KeyUsageMatch] = []
+    scanned: list[str] = []
+    for tex_path in iter_tex_files(paths):
+        scanned.append(str(tex_path))
+        text = tex_path.read_text(encoding="utf-8", errors="replace")
+        cleaned = _strip_tex_comments(text)
+        for match in _TEX_CITE_RE.finditer(cleaned):
+            if key in _split_keys(match.group(1)):
+                matches.append(
+                    KeyUsageMatch(
+                        path=str(tex_path),
+                        line=_line_number(cleaned, match.start()),
+                        text=match.group(0).strip(),
+                    )
+                )
+    return matches, scanned
 
 
 def iter_tex_files(paths: Iterable[str]) -> list[Path]:
