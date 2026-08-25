@@ -89,6 +89,20 @@ def _editor_last_names(entry: BibEntry) -> list[str]:
     return _last_names_for(entry, "editor")
 
 
+def _lacks_key_material(entry: BibEntry) -> bool:
+    """Return whether an entry has neither an author/editor nor a title.
+
+    A physics paper's ``@misc{SM, note = {See Supplemental Material...}}``
+    placeholder — cited so the bibliography numbers it, never meant to be
+    described — is the common case: there is nothing here to build a
+    meaningful ``AuthorYearTitle``-style key from. Generating one anyway
+    produces ``Anon`` plus empty marker separators (``Anon__``), replacing a
+    key someone chose on purpose with noise. Skipped the same way
+    :data:`_STRUCTURAL_ENTRY_TYPES` entries are: the existing key is kept.
+    """
+    return not _author_last_names(entry) and not entry.fields.get("title", "").strip()
+
+
 def _first_author_last_name(entry: BibEntry) -> str:
     names = _author_last_names(entry)
     return names[0] if names else "Anon"
@@ -421,17 +435,31 @@ def unique_key(candidate: str, taken: set[str]) -> str:
     return f"{candidate}{chr(suffix)}"
 
 
+def is_key_regeneration_exempt(entry: BibEntry) -> bool:
+    """Return whether ``entry`` should keep its key rather than being regenerated.
+
+    True for structural containers (:data:`_STRUCTURAL_ENTRY_TYPES`) and for
+    entries with no author/editor or title (see :func:`_lacks_key_material`).
+    Shared with :mod:`pynakes.lint`'s citation-key-pattern check, which must
+    exempt the same entries — otherwise it recomputes the same key from
+    scratch and reports the entry's real, deliberately-kept key as a
+    "mismatch" against the noise ``planned_regenerated_keys`` was built to
+    avoid generating in the first place.
+    """
+    return entry.type.lower() in _STRUCTURAL_ENTRY_TYPES or _lacks_key_material(entry)
+
+
 def planned_regenerated_keys(lib: BibFile) -> list[tuple[BibEntry, str]]:
-    """Return the deterministic citation key each non-structural entry would receive.
+    """Return the deterministic citation key each eligible entry would receive.
 
     Collisions among generated keys are disambiguated with letter suffixes
-    (``Smith2020``, ``Smith2020a``, ...). Structural entries retain their
-    existing keys because other entries may refer to them.
+    (``Smith2020``, ``Smith2020a``, ...). Entries exempted by
+    :func:`is_key_regeneration_exempt` retain their existing keys instead.
     """
     planned: list[tuple[BibEntry, str]] = []
     taken: set[str] = set()
     for entry in lib.entries.values():
-        if entry.type.lower() in _STRUCTURAL_ENTRY_TYPES:
+        if is_key_regeneration_exempt(entry):
             taken.add(entry.key)
             continue
         new_key = unique_key(generate_key(entry, lib), taken)
@@ -449,7 +477,8 @@ def regenerate_keys(lib: BibFile) -> list[tuple[str, str]]:
 
     Structural entries whose type is in :data:`_STRUCTURAL_ENTRY_TYPES` (e.g.
     ``@xdata``) are skipped: they are referenced by key from other entries and
-    renaming them would silently break those references.
+    renaming them would silently break those references. Entries with no
+    author/editor or title are skipped too — see :func:`_lacks_key_material`.
     """
     renames: list[tuple[str, str]] = []
     for entry, new_key in planned_regenerated_keys(lib):
@@ -465,7 +494,9 @@ def regenerate_key(lib: BibFile, key: str) -> tuple[str, str] | None:
     The selected entry's current key is excluded from collision detection, so a
     key that already matches the preferred pattern is a no-op. Other entries
     retain their keys; a collision with one of them receives the usual letter
-    suffix. Returns the applied ``(old, new)`` rename, or ``None`` for a no-op.
+    suffix. Returns the applied ``(old, new)`` rename, or ``None`` for a no-op
+    — including when the entry has no author/editor or title to generate a
+    meaningful key from (see :func:`_lacks_key_material`).
     """
     validate_key(key)
     matches = lib.entries.get_all(key)
@@ -475,6 +506,8 @@ def regenerate_key(lib: BibFile, key: str) -> tuple[str, str] | None:
         raise ValueError(f"Cannot regenerate duplicated key {key!r}; repair duplicates first")
 
     entry = matches[0]
+    if _lacks_key_material(entry):
+        return None
     new_key = unique_key(generate_key(entry, lib), set(lib.entries.keys()) - {key})
     if not rename_entry_key(entry, new_key):
         return None

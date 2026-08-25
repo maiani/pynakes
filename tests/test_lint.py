@@ -53,6 +53,20 @@ def test_key_pattern_expectation_uses_the_generation_collision_suffix() -> None:
     ]
 
 
+def test_key_pattern_check_exempts_entries_with_no_author_or_title() -> None:
+    # A Supplemental Material placeholder has nothing to build a key from;
+    # flagging its real key as a "mismatch" against a recomputed "Anon__"
+    # would just be the same noise `keys generate` was fixed to not produce.
+    lib = parse_bib(
+        "@comment{pynakes-meta: key-pattern: [auth]_[year]_[veryshorttitle];}\n"
+        "@misc{SM, note = {See Supplemental Material at [URL] for details.}}\n"
+    )
+
+    issues = [issue for issue in lint(lib) if issue.type == "citation_key_pattern_mismatch"]
+
+    assert issues == []
+
+
 def test_flags_empty_citation_key() -> None:
     # An entry with no key must surface as an error, not be silently dropped.
     lib = parse_bib("@article{,\n  author = {Bob White},\n  title = {No Key}\n}\n")

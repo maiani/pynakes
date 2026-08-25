@@ -463,3 +463,40 @@ class TestRegenerate:
 
         out = write_bib(lib)
         assert "xdata = {pub}" in out
+
+    def test_regenerate_skips_entries_with_no_author_or_title(self) -> None:
+        # A Supplemental Material placeholder — cited so the bibliography
+        # numbers it, never meant to be described — has nothing to build an
+        # AuthorYearTitle key from. Regenerating it anyway produced "Anon__".
+        src = (
+            "@misc{SM, note = {See Supplemental Material at [URL] for details.}}\n"
+            "@book{old, title = {T}, author = {Doe, J.}, year = {2020}}\n"
+        )
+        lib = parse_bib(src)
+        renames = regenerate_keys(lib)
+        renamed_keys = {old for old, _ in renames}
+        assert "SM" not in renamed_keys
+        assert lib.entries["SM"].key == "SM"
+        assert any(new == "Doe2020T" for _, new in renames)
+
+    def test_regenerate_key_is_a_no_op_for_an_entry_with_no_author_or_title(self) -> None:
+        lib = parse_bib("@misc{SM, note = {See Supplemental Material at [URL].}}\n")
+
+        assert regenerate_key(lib, "SM") is None
+        assert lib.entries["SM"].key == "SM"
+
+    def test_regenerate_still_applies_when_only_title_is_missing(self) -> None:
+        # Author/year alone is enough to build a meaningful key from — only
+        # missing *both* author and title marks an entry as unnamable.
+        lib = parse_bib("@misc{old, author = {Doe, J.}, year = {2020}}\n")
+
+        renames = regenerate_keys(lib)
+
+        assert renames == [("old", "Doe2020")]
+
+    def test_regenerate_still_applies_when_only_author_is_missing(self) -> None:
+        lib = parse_bib("@misc{old, title = {Supplemental Material}, year = {2020}}\n")
+
+        renames = regenerate_keys(lib)
+
+        assert renames == [("old", "Anon2020Supplemental")]

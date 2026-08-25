@@ -41,6 +41,7 @@ from pynakes.journals import (
 from pynakes.keys import (
     UnsupportedCitationKeyPatternError,
     generate_key_from_pattern,
+    is_key_regeneration_exempt,
     planned_regenerated_keys,
 )
 from pynakes.metadata import (
@@ -446,6 +447,7 @@ def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
                 journal_sources,
                 fields,
                 expected_key=expected_keys.get(id(entry)),
+                key_pattern_exempt=is_key_regeneration_exempt(entry),
             )
         )
 
@@ -798,13 +800,23 @@ def _lint_entry(
 
 
 def _lint_key_pattern(
-    entry: BibEntry, lib: BibFile, expected_key: str | None = None
+    entry: BibEntry,
+    lib: BibFile,
+    expected_key: str | None = None,
+    *,
+    exempt: bool = False,
 ) -> list[LintIssue]:
     """Check the entry's citation key against the configured key pattern.
 
     Uses the native-first :func:`pynakes.metadata.library_key_pattern`, so a
     pynakes ``key-pattern`` takes precedence over a JabRef ``keypattern_*``.
+    ``exempt`` entries (see :func:`pynakes.keys.is_key_regeneration_exempt`)
+    are never checked: ``keys generate`` would not touch their key either, so
+    flagging a "mismatch" here would just report the entry's real key as
+    wrong against a pattern it was never going to receive.
     """
+    if exempt:
+        return []
     pattern = library_key_pattern(lib, entry.type)
     if not pattern:
         return []
@@ -918,12 +930,14 @@ def _lint_profile_entry(
     journal_sources: JournalSources | None,
     fields: dict[str, str] | None = None,
     expected_key: str | None = None,
+    *,
+    key_pattern_exempt: bool = False,
 ) -> list[LintIssue]:
     """Check one entry against persisted preferences without changing it."""
     if fields is None:
         fields = entry.fields
     return (
-        _lint_key_pattern(entry, lib, expected_key)
+        _lint_key_pattern(entry, lib, expected_key, exempt=key_pattern_exempt)
         + _lint_consistency(entry, lib, profile, fields)
         + _lint_journal_style(entry, fields, profile, journal_sources)
     )

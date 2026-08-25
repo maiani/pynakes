@@ -179,6 +179,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `keys generate` no longer mangles entries with no author/editor or title —
+  e.g. a physics paper's `@misc{SM, note = {See Supplemental Material...}}`
+  placeholder, cited only so the bibliography numbers it. There is nothing to
+  build an `AuthorYearTitle`-style key from, so it previously produced
+  `Anon__`-style noise from the empty pieces; such entries now keep their
+  existing key, the same way `@xdata` containers already do. `lint`'s
+  citation-key-pattern check is exempt for the same entries, so it no longer
+  reports their real key as a "mismatch" against the noise it would have
+  generated.
+
 - Pinax material writes no longer leave debris in the files directory. Temporary
   files staged during a PDF write, an arXiv source extraction, or a manifest
   update were created beside the materials themselves and cleaned up only on the
