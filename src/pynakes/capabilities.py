@@ -29,6 +29,7 @@ _ERROR_CODES = {
         "exit_code": 1,
         "codes": {
             "FileNotFound": "A given file does not exist.",
+            "MissingTexSource": "normalize key regeneration found a missing linked TeX source; pass --force to proceed without rewriting it.",
             "FileExists": "init: the target .bib already exists (pass --force to overwrite).",
             "ParseError": "A .bib or source file could not be parsed (includes 'line').",
             "InvalidInput": "An argument, option, or predicate was invalid.",

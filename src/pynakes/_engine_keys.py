@@ -7,9 +7,12 @@ result. Do not import this module directly; use ``pynakes.engine``.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pynakes import keys as key_ops
 from pynakes.io import save_plain_text
 from pynakes.usage import (
+    MissingTexSourcesError,
     iter_tex_files,
     rename_citation_keys_in_tex,
     tex_sources_from_metadata,
@@ -46,18 +49,25 @@ class BibliographyKeys:
         self._stage_pinax_renames([(old, new)] if count else [])
         return count
 
-    def _rewrite_tex_for_renames(self, renames: list[tuple[str, str]]) -> int:
+    def _rewrite_tex_for_renames(
+        self, renames: list[tuple[str, str]], *, allow_missing_sources: bool = False
+    ) -> int:
         """Rewrite linked TeX files, mapping citation keys per *renames*.
 
         Returns total occurrence count across all rewritten files.
         Skips silently when the library has no ``tex-sources`` metadata or
-        ``self.path`` is not set.
+        ``self.path`` is not set. Missing declared sources stop the rename
+        unless ``allow_missing_sources`` is explicitly set.
         """
         if self.path is None or not renames:
             return 0
         sources = tex_sources_from_metadata(self.lib, self.path.parent)
         if not sources:
             return 0
+        missing = [source for source in sources if not Path(source).exists()]
+        if missing and not allow_missing_sources:
+            raise MissingTexSourcesError(missing)
+        sources = [source for source in sources if Path(source).exists()]
         total = 0
         for tex_path in iter_tex_files(sources):
             before = tex_path.read_text(encoding="utf-8", errors="replace")

@@ -18,6 +18,7 @@ from pynakes.cli_common import (
     bib_file_argument,
 )
 from pynakes.engine import Bibliography
+from pynakes.usage import MissingTexSourcesError
 
 # --- normalize -------------------------------------------------------------
 
@@ -114,6 +115,11 @@ def normalize(
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
     backup: bool = _BACKUP_OPTION,
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Regenerate keys despite missing linked TeX sources; those sources are not rewritten",
+    ),
 ) -> None:
     """Normalize entries: titles, authors, journals, DOIs, identifier case, and ordering.
 
@@ -149,7 +155,15 @@ def normalize(
             sort_by,
         )
         coll = Bibliography.open(file)
-        report = coll.normalize(options)
+        report = coll.normalize(options, force_key_renames=force)
+    except MissingTexSourcesError as exc:
+        _emit_error(
+            json_output,
+            "MissingTexSource",
+            str(exc),
+            sources=exc.sources,
+            hint="Restore/remove the declared sources, or rerun with --force.",
+        )
     except ValueError as exc:
         _emit_error(json_output, "InvalidNormalizeOption", str(exc))
 

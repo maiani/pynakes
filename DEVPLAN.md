@@ -43,6 +43,20 @@ nor this client. See
   and the extension evolve together in this repository, so an engine gap and its
   client consumer can land in one reviewable change. A second client is what
   would justify splitting them apart.
+- **Cited-key usage lookup without registration** — `keys usage <key> --path
+  <dir>`: a raw TeX-source scan for `\cite`-family macros referencing a key,
+  requiring no `tex add` registration first. Surfaced by editor work: an agent
+  assessing the blast radius of a rename needs this over files `tex add`
+  deliberately does not manage — frozen snapshots, generated diffs — not only
+  the tracked set.
+- **Mirrored-bibliography rename propagation** — pynakes treats every `.bib` in
+  isolation, but a common layout keeps a superset bibliography (e.g.
+  `bibliography/`) and a working subset copy (e.g. `manuscript/`) that must
+  track it; renaming a key in the superset has no way to propagate to the
+  mirror today. Needs a declared mirror relationship (naming still open —
+  avoid overloading "corpus") and a propagation step for `keys rename` (and any
+  other key-changing operation) once that relationship exists.
+-- Commands like `pynakes enrich --online` and similar don't have progress bar. We should add one like in fetch, either active by default or with an option 
 
 **Done when**: the extension covers project-scoped browsing, search, lint,
 groups, linked-material state, TeX navigation, and staged edits with

@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 
+- `normalize --keys on` now stops before committing when a declared
+  `tex-sources` file is missing, with a structured `MissingTexSource` error
+  that names the sources and explains the safe resolution. Pass `--force` to
+  update citation keys while deliberately leaving unavailable sources
+  unrevised; the normalize report records them as warnings.
+
 - `editor/` — a VS Code / Open VSX extension companion. It opens a `.bib` file
   as a sortable, filterable entry table with a field detail pane, browses the
   declared group hierarchy, runs the engine's own search, surfaces lint findings
@@ -114,6 +120,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (the two combine). Reported as `dropped_fields` in the normalize report.
 
 ### Changed
+
+- Lint's citation-key remediation hint now names `normalize --keys on`, and
+  collision-prone key-pattern findings report the same deterministic suffix
+  (`…a`, `…b`, ...) that normalization will assign.
 
 - **Provider-response caching is now opt-in, and the cache is one file.** Online
   commands (`verify`, `enrich`, `ref compare`, `ref import --fetch`,

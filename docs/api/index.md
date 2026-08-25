@@ -34,7 +34,7 @@ bib.format(
 )
 
 print(bib.change_plan())  # structured semantic summary
-print(bib.diff())         # exact textual patch
+print(bib.diff())  # exact textual patch
 
 try:
     result = bib.commit(backup=True)
@@ -84,7 +84,7 @@ left = evidence_from_entry(bib.entries["Lovelace1843"])
 right = evidence_from_entry(bib.entries["Lovelace1843Copy"])
 match = compare_work_evidence(left, right)
 
-print(match.status)   # exact, probable, conflict, or unknown
+print(match.status)  # exact, probable, conflict, or unknown
 print(match.reasons)  # inspectable evidence for the decision
 ```
 

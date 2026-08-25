@@ -36,6 +36,7 @@ from pynakes.lint import LintIssue
 from pynakes.lint import lint as lint_lib
 from pynakes.metadata import FetchPolicy
 from pynakes.model import BibEntry, QueryFilter
+from pynakes.usage import tex_sources_from_metadata, validate_tex_sources
 
 
 class BibliographyOperations:
@@ -260,8 +261,10 @@ class BibliographyOperations:
     def normalize(
         self,
         options: normalize_ops.NormalizeOptions | None = None,
+        *,
+        force_key_renames: bool = False,
     ) -> normalize_ops.NormalizeResult:
-        """Apply the configured normalization steps to the staged library in memory."""
+        """Apply configured normalization steps, optionally forcing incomplete key rewrites."""
         opts = options or normalize_ops.NormalizeOptions()
         report = normalize_ops.normalize_library(self.lib, opts)
         self._consolidate_metadata = normalize_ops.resolve_format_metadata(
@@ -274,7 +277,12 @@ class BibliographyOperations:
             self._entry_snapshot = {}
         if report.renamed_keys:
             self._stage_pinax_renames(report.renamed_keys)
-            self._rewrite_tex_for_renames(report.renamed_keys)
+            if force_key_renames and self.path is not None:
+                sources = tex_sources_from_metadata(self.lib, self.path.parent)
+                report.warnings.extend(validate_tex_sources(sources))
+            self._rewrite_tex_for_renames(
+                report.renamed_keys, allow_missing_sources=force_key_renames
+            )
         return report
 
     def convert(self, target: str) -> convert_ops.ConvertResult:

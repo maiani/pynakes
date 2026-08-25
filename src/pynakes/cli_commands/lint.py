@@ -70,7 +70,12 @@ def _fixer_hints(issues: list) -> list[str]:
     counts: dict[str, int] = {}
     for issue in issues:
         if issue.fixer is not None:
-            counts[issue.fixer] = counts.get(issue.fixer, 0) + 1
+            command = (
+                "normalize --keys on"
+                if issue.type == "citation_key_pattern_mismatch"
+                else issue.fixer
+            )
+            counts[command] = counts.get(command, 0) + 1
     return [
         f"Run `pynakes {command}` to resolve {count} of them."
         for command, count in sorted(counts.items())

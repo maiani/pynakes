@@ -41,6 +41,7 @@ from pynakes.journals import (
 from pynakes.keys import (
     UnsupportedCitationKeyPatternError,
     generate_key_from_pattern,
+    planned_regenerated_keys,
 )
 from pynakes.metadata import (
     library_dialect,
@@ -425,12 +426,28 @@ def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
 
     issues.extend(_lint_undefined_string_definitions(lib))
 
+    try:
+        expected_keys = {id(entry): key for entry, key in planned_regenerated_keys(lib)}
+    except UnsupportedCitationKeyPatternError:
+        # `_lint_key_pattern` reports the unsupported pattern per affected
+        # entry. Do not let that one profile error prevent the remaining lint
+        # checks from running.
+        expected_keys = {}
     for entry in lib.entries.values():
         fields = lib.resolved_fields(entry)
         issues.extend(_lint_duplicate_fields(entry))
         issues.extend(_lint_undefined_string_references(entry, lib))
         issues.extend(_lint_entry(entry, fields, dialect=dialect))
-        issues.extend(_lint_profile_entry(entry, lib, profile, journal_sources, fields))
+        issues.extend(
+            _lint_profile_entry(
+                entry,
+                lib,
+                profile,
+                journal_sources,
+                fields,
+                expected_key=expected_keys.get(id(entry)),
+            )
+        )
 
     issues.extend(_lint_metadata(lib))
     issues.extend(_lint_field_consistency(lib, dialect=dialect))
@@ -780,7 +797,9 @@ def _lint_entry(
 # ---------------------------------------------------------------------------
 
 
-def _lint_key_pattern(entry: BibEntry, lib: BibFile) -> list[LintIssue]:
+def _lint_key_pattern(
+    entry: BibEntry, lib: BibFile, expected_key: str | None = None
+) -> list[LintIssue]:
     """Check the entry's citation key against the configured key pattern.
 
     Uses the native-first :func:`pynakes.metadata.library_key_pattern`, so a
@@ -790,7 +809,7 @@ def _lint_key_pattern(entry: BibEntry, lib: BibFile) -> list[LintIssue]:
     if not pattern:
         return []
     try:
-        expected_key = generate_key_from_pattern(entry, pattern)
+        expected_key = expected_key or generate_key_from_pattern(entry, pattern)
     except UnsupportedCitationKeyPatternError as exc:
         return [
             LintIssue(
@@ -898,12 +917,13 @@ def _lint_profile_entry(
     profile: LintProfile,
     journal_sources: JournalSources | None,
     fields: dict[str, str] | None = None,
+    expected_key: str | None = None,
 ) -> list[LintIssue]:
     """Check one entry against persisted preferences without changing it."""
     if fields is None:
         fields = entry.fields
     return (
-        _lint_key_pattern(entry, lib)
+        _lint_key_pattern(entry, lib, expected_key)
         + _lint_consistency(entry, lib, profile, fields)
         + _lint_journal_style(entry, fields, profile, journal_sources)
     )

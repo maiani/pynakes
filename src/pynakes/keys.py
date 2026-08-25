@@ -421,6 +421,25 @@ def unique_key(candidate: str, taken: set[str]) -> str:
     return f"{candidate}{chr(suffix)}"
 
 
+def planned_regenerated_keys(lib: BibFile) -> list[tuple[BibEntry, str]]:
+    """Return the deterministic citation key each non-structural entry would receive.
+
+    Collisions among generated keys are disambiguated with letter suffixes
+    (``Smith2020``, ``Smith2020a``, ...). Structural entries retain their
+    existing keys because other entries may refer to them.
+    """
+    planned: list[tuple[BibEntry, str]] = []
+    taken: set[str] = set()
+    for entry in lib.entries.values():
+        if entry.type.lower() in _STRUCTURAL_ENTRY_TYPES:
+            taken.add(entry.key)
+            continue
+        new_key = unique_key(generate_key(entry, lib), taken)
+        taken.add(new_key)
+        planned.append((entry, new_key))
+    return planned
+
+
 def regenerate_keys(lib: BibFile) -> list[tuple[str, str]]:
     """Regenerate every entry's key from its metadata.
 
@@ -433,13 +452,7 @@ def regenerate_keys(lib: BibFile) -> list[tuple[str, str]]:
     renaming them would silently break those references.
     """
     renames: list[tuple[str, str]] = []
-    taken: set[str] = set()
-    for entry in lib.entries.values():
-        if entry.type.lower() in _STRUCTURAL_ENTRY_TYPES:
-            taken.add(entry.key)
-            continue
-        new_key = unique_key(generate_key(entry, lib), taken)
-        taken.add(new_key)
+    for entry, new_key in planned_regenerated_keys(lib):
         old_key = entry.key
         if rename_entry_key(entry, new_key):
             renames.append((old_key, new_key))

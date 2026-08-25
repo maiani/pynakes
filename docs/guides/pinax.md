@@ -255,8 +255,8 @@ The lifecycle object does not change.
 
 ```python
 bib = Bibliography.open("refs.bib")
-if bib.files:                       # truthy ⇔ this bibliography is a pinax
-    report = bib.fetch_materials("alvarez2019")   # download into pinax-files-dir
+if bib.files:  # truthy ⇔ this bibliography is a pinax
+    report = bib.fetch_materials("alvarez2019")  # download into pinax-files-dir
 ```
 
 The mechanics stay out of the text engine: path computation, scanning, and moves

@@ -4135,6 +4135,59 @@ class TestLintCategories:
 
         assert "Run `pynakes format` to resolve 3 of them." in result.output
 
+    def test_key_pattern_hint_enables_key_normalization(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta: key-pattern: [auth]_[year];}\n"
+            "@article{Old, author = {Jane Doe}, year = {2024}, title = {Study}}\n"
+        )
+
+        result = runner.invoke(app, ["lint", str(bib)])
+
+        assert "Run `pynakes normalize --keys on` to resolve 1 of them." in result.output
+
+    def test_key_normalization_stops_with_actionable_error(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        original = (
+            "@comment{pynakes-meta:\n"
+            "key-pattern: [auth]_[year]\n"
+            "tex-sources: missing.tex\n"
+            "}\n"
+            "@article{Old, author = {Jane Doe}, year = {2024}, title = {Study}}\n"
+        )
+        bib.write_text(original)
+
+        result = runner.invoke(app, ["normalize", str(bib), "--keys", "on", "--json"])
+
+        assert result.exit_code == 1, result.output
+        data = json.loads(result.output)
+        assert data["error"] == "MissingTexSource"
+        assert data["sources"] == [str(tmp_path / "missing.tex")]
+        assert "--force" in data["message"]
+        assert bib.read_text() == original
+
+    def test_force_key_normalization_skips_missing_tex_sources(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@comment{pynakes-meta:\n"
+            "key-pattern: [auth]_[year]\n"
+            "tex-sources: missing.tex\n"
+            "}\n"
+            "@article{Old, author = {Jane Doe}, year = {2024}, title = {Study}}\n"
+        )
+
+        result = runner.invoke(app, ["normalize", str(bib), "--keys", "on", "--force", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["operations"]["keys"] == 1
+        assert data["warnings"][-1] == {
+            "type": "missing_tex_source",
+            "message": f"TeX source {str(tmp_path / 'missing.tex')!r} not found",
+            "path": str(tmp_path / "missing.tex"),
+        }
+        assert "@article{doe_2024," in bib.read_text()
+
     def test_category_filter_narrows_the_report(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text(self.MIXED)

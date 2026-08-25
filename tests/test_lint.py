@@ -36,6 +36,23 @@ def test_detects_duplicate_keys() -> None:
     assert dupes[0].key == "A"
 
 
+def test_key_pattern_expectation_uses_the_generation_collision_suffix() -> None:
+    lib = parse_bib(
+        "@comment{pynakes-meta: key-pattern: [auth]_[year];}\n"
+        "@article{First, author = {Jane Doe}, year = {2024}, title = {One}}\n"
+        "@article{Second, author = {Jane Doe}, year = {2024}, title = {Two}}\n"
+    )
+
+    issues = [issue for issue in lint(lib) if issue.type == "citation_key_pattern_mismatch"]
+
+    assert [issue.message for issue in issues] == [
+        "Entry 'First' does not match configured citation-key pattern '[auth]_[year]'; "
+        "expected 'doe_2024'",
+        "Entry 'Second' does not match configured citation-key pattern '[auth]_[year]'; "
+        "expected 'doe_2024a'",
+    ]
+
+
 def test_flags_empty_citation_key() -> None:
     # An entry with no key must surface as an error, not be silently dropped.
     lib = parse_bib("@article{,\n  author = {Bob White},\n  title = {No Key}\n}\n")

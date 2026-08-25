@@ -40,6 +40,25 @@ __all__ = [
 TEX_SOURCES_KEY = "tex-sources"
 
 
+class MissingTexSourcesError(FileNotFoundError):
+    """Linked TeX sources prevent a citation-key rename.
+
+    Citation keys are ordinarily rewritten in every declared TeX source at the
+    same time.  Callers may opt in to proceeding without unavailable sources,
+    but the default is to stop before committing a bibliography whose citations
+    could no longer match its keys.
+    """
+
+    def __init__(self, sources: list[str]) -> None:
+        self.sources = sources
+        listed = ", ".join(repr(source) for source in sources)
+        super().__init__(
+            "Cannot rename citation keys because declared TeX source(s) are missing: "
+            f"{listed}. Restore or remove them, or pass --force to update the bibliography "
+            "without rewriting those sources."
+        )
+
+
 def tex_sources_from_metadata(lib: BibFile, base_dir: str | Path) -> list[str]:
     """Resolve the ``tex-sources`` metadata list to paths under ``base_dir``.
 
