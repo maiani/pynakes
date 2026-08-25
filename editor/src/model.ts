@@ -92,12 +92,6 @@ export interface Summary {
   pynakesKeys: string[];
 }
 
-/** What the extension posts to the webview on a successful read. */
-export interface RenderPayload {
-  rows: EntryRow[];
-  summary: Summary;
-}
-
 /** Fields consulted for the venue column, in precedence order. */
 const VENUE_FIELDS = [
   "journaltitle",
@@ -230,11 +224,6 @@ export function summarize(envelope: InspectSuccess): Summary {
   };
 }
 
-/** Build the message payload for a successful read. */
-export function toRenderPayload(envelope: InspectSuccess): RenderPayload {
-  return { rows: toRows(envelope), summary: summarize(envelope) };
-}
-
 // ---------------------------------------------------------------------------
 // Envelopes for the other engine reads and for the one write path.
 // ---------------------------------------------------------------------------
@@ -328,6 +317,8 @@ export interface RefEditPlanEntry {
   change: string;
   key: string;
   fields?: Record<string, { old: string | null; new: string | null }>;
+  /** Present when the entry type changed. */
+  type?: { old: string; new: string };
 }
 
 export interface RefEditSuccess {

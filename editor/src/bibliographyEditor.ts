@@ -13,7 +13,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { resolveEngine } from "./engineDiscovery";
+import { resolveEngine, type ResolvedEngine } from "./engineDiscovery";
 import type { Summary } from "./model";
 import {
   commitEdits,
@@ -25,10 +25,10 @@ import {
   type LibraryRead,
 } from "./library";
 import {
+  type PynakesCommand,
   PynakesProtocolError,
   PynakesUnavailableError,
   describeCommand,
-  resolveCommand,
 } from "./pynakes";
 import {
   discardEntry,
@@ -53,6 +53,22 @@ interface TempMirror {
   source: string;
   /** Removes the mirror, if one was created. */
   release(): Promise<void>;
+}
+
+/** Settings the view honors, re-read on every render so changes apply live. */
+interface ViewSettings {
+  /** Initial state of the search box's fuzzy toggle. */
+  fuzzy: boolean;
+  /** Whether per-row severity markers and the findings panel are shown. */
+  showFindings: boolean;
+}
+
+/** Everything an engine read needs besides the webview it reports to. */
+interface MirrorContext {
+  engine: ResolvedEngine;
+  command: PynakesCommand;
+  cwd: string | undefined;
+  source: string;
 }
 
 /** What the status bar item reports about one open bibliography. */
@@ -84,6 +100,9 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
 
   /** Refresh callbacks for every live view, driven by the refresh command. */
   private readonly liveViews = new Set<() => void>();
+
+  /** Every open panel, so a closing one can hand the status bar to a sibling. */
+  private readonly openPanels = new Set<vscode.WebviewPanel>();
 
   /** Pending edits per document, surviving webview disposal. */
   private readonly staging = new Map<string, StagingState>();
@@ -153,6 +172,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
     };
 
     this.liveViews.add(load);
+    this.openPanels.add(panel);
     const subscriptions: vscode.Disposable[] = [
       vscode.workspace.onDidChangeTextDocument((event) => {
         const sameDocument = event.document.uri.toString() === document.uri.toString();
@@ -172,6 +192,13 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
           scheduleLoad();
         }
       }),
+      // Staged edits describe one document's content; once it is gone they
+      // could never be applied, so they go with it.
+      vscode.workspace.onDidCloseTextDocument((closed) => {
+        if (closed.uri.toString() === document.uri.toString()) {
+          this.staging.delete(document.uri.toString());
+        }
+      }),
       panel.webview.onDidReceiveMessage((message: ViewMessage) => {
         void this.handleMessage(document, panel, message);
       }),
@@ -181,8 +208,9 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
 
     panel.onDidDispose(() => {
       disposed = true;
+      this.openPanels.delete(panel);
       this.statusByPanel.delete(panel);
-      this.statusItem.hide();
+      this.repointStatusBar();
       if (pending) {
         clearTimeout(pending);
       }
@@ -195,14 +223,40 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
 
   // -- reading --------------------------------------------------------------
 
-  /** Read the document through the engine and hand the result to the view. */
-  private async load(document: vscode.TextDocument, panel: vscode.WebviewPanel): Promise<void> {
+  /**
+   * Run one engine read against the document's current text.
+   *
+   * Resolves the engine, mirrors the buffer when it has unsaved changes, and
+   * releases the mirror afterwards whatever the outcome. A thrown error becomes
+   * an `engineError` message unless `reportFailure` reshapes it first — the
+   * hook `compareRemote` uses to keep its failures scoped to one entry rather
+   * than blanking the whole view.
+   */
+  private async withMirror(
+    document: vscode.TextDocument,
+    panel: vscode.WebviewPanel,
+    body: (ctx: MirrorContext) => Promise<void>,
+    reportFailure: (
+      failure: Record<string, unknown>,
+    ) => Record<string, unknown> = (failure) => failure,
+  ): Promise<void> {
     let mirror: TempMirror | undefined;
     try {
-      const command = await resolveCommand(document.uri);
+      const engine = await resolveEngine(document.uri);
       const cwd = this.workingDirectory(document);
       mirror = await this.sourceFor(document);
-      const result = await readLibrary(command, mirror.source, cwd);
+      await body({ engine, command: engine.command, cwd, source: mirror.source });
+    } catch (error) {
+      void panel.webview.postMessage(reportFailure(await this.describeFailure(error, document)));
+    } finally {
+      await mirror?.release();
+    }
+  }
+
+  /** Read the document through the engine and hand the result to the view. */
+  private async load(document: vscode.TextDocument, panel: vscode.WebviewPanel): Promise<void> {
+    await this.withMirror(document, panel, async ({ engine, command, cwd, source }) => {
+      const result = await readLibrary(command, source, cwd);
       if (!result.ok) {
         void panel.webview.postMessage({
           type: "parseError",
@@ -212,7 +266,6 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         });
         return;
       }
-      const engine = await resolveEngine(document.uri);
       this.statusByPanel.set(panel, {
         summary: result.read.summary,
         findings: result.read.lint?.counts,
@@ -235,12 +288,9 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         },
         dirty: document.isDirty,
         staging: this.stagingFor(document),
+        settings: this.viewSettings(document),
       });
-    } catch (error) {
-      void panel.webview.postMessage(await this.describeFailure(error, document));
-    } finally {
-      await mirror?.release();
-    }
+    });
   }
 
   /** Point the shared status bar item at this view, or hide it. */
@@ -313,6 +363,30 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       groupsByEntry: read.groupsByEntry,
       lint: read.lint,
       warnings: read.warnings,
+    };
+  }
+
+  /**
+   * Hand the status bar to whichever other bibliography view is active, or
+   * hide it when there is none — a closing panel must not blank the item a
+   * sibling view is still using.
+   */
+  private repointStatusBar(): void {
+    for (const panel of this.openPanels) {
+      if (panel.active && this.statusByPanel.get(panel)) {
+        this.syncStatusBar(panel);
+        return;
+      }
+    }
+    this.statusItem.hide();
+  }
+
+  /** The webview-facing settings for one document. */
+  private viewSettings(document: vscode.TextDocument): ViewSettings {
+    const config = vscode.workspace.getConfiguration("pynakes", document.uri);
+    return {
+      fuzzy: config.get<boolean>("search.fuzzy", false),
+      showFindings: config.get<boolean>("showFindings", true),
     };
   }
 
@@ -505,14 +579,10 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       void panel.webview.postMessage({ type: "searchCleared" });
       return;
     }
-    let mirror: TempMirror | undefined;
-    try {
-      const command = await resolveCommand(document.uri);
-      const cwd = this.workingDirectory(document);
-      mirror = await this.sourceFor(document);
+    await this.withMirror(document, panel, async ({ command, cwd, source }) => {
       const outcome = await runSearch(
         command,
-        mirror.source,
+        source,
         { query, where, fuzzy: message.fuzzy },
         cwd,
       );
@@ -521,11 +591,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
           ? { type: "searchResult", keys: outcome.keys, ranked: outcome.ranked, count: outcome.count }
           : { type: "searchError", message: outcome.message },
       );
-    } catch (error) {
-      void panel.webview.postMessage(await this.describeFailure(error, document));
-    } finally {
-      await mirror?.release();
-    }
+    });
   }
 
   // -- compare with remote ---------------------------------------------------
@@ -534,9 +600,10 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
    * Compare one entry against its DOI/arXiv remote record (read-only).
    *
    * The network gate lives here, not in the webview: `online` is decided
-   * from the `pynakes.allowOnlineLookups` setting for this document, so a
-   * user who never opted in never triggers a network call, matching
-   * pynakes' own explicit-network-access policy.
+   * from the `pynakes.allowOnlineLookups` setting for this document (on by
+   * default; disabling it keeps compare fully offline), so whether a click
+   * may reach the network is a setting decision, never something the view
+   * can grant itself.
    */
   private async compareRemote(
     document: vscode.TextDocument,
@@ -545,38 +612,34 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
   ): Promise<void> {
     const online = vscode.workspace
       .getConfiguration("pynakes", document.uri)
-      .get<boolean>("allowOnlineLookups", false);
-    let mirror: TempMirror | undefined;
-    try {
-      const command = await resolveCommand(document.uri);
-      const cwd = this.workingDirectory(document);
-      mirror = await this.sourceFor(document);
-      const outcome = await compareEntry(command, mirror.source, key, online, cwd);
-      void panel.webview.postMessage(
-        outcome.ok
-          ? {
-              type: "compareResult",
-              key,
-              source: outcome.source,
-              identifier: outcome.identifier,
-              fields: outcome.fields,
-              warnings: outcome.warnings,
-            }
-          : { type: "compareError", key, message: outcome.message },
-      );
-    } catch (error) {
+      .get<boolean>("allowOnlineLookups", true);
+    await this.withMirror(
+      document,
+      panel,
+      async ({ command, cwd, source }) => {
+        const outcome = await compareEntry(command, source, key, online, cwd);
+        void panel.webview.postMessage(
+          outcome.ok
+            ? {
+                type: "compareResult",
+                key,
+                source: outcome.source,
+                identifier: outcome.identifier,
+                fields: outcome.fields,
+                warnings: outcome.warnings,
+              }
+            : { type: "compareError", key, message: outcome.message },
+        );
+      },
       // A compare failure is scoped to one entry, not the whole view, so it
       // is reported through `compareError` rather than the generic
       // `engineError` path other reads use (which blanks the table).
-      const failure = await this.describeFailure(error, document);
-      void panel.webview.postMessage({
+      (failure) => ({
         type: "compareError",
         key,
         message: typeof failure.message === "string" ? failure.message : "Compare failed.",
-      });
-    } finally {
-      await mirror?.release();
-    }
+      }),
+    );
   }
 
   // -- citation key rename ----------------------------------------------------
@@ -638,7 +701,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
     }
 
     try {
-      const command = await resolveCommand(document.uri);
+      const { command } = await resolveEngine(document.uri);
       const cwd = this.workingDirectory(document);
       const filePath = document.uri.fsPath;
       const outcome = await renameEntryKey(command, filePath, oldKey, trimmed, cwd);
@@ -670,12 +733,8 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       void panel.webview.postMessage({ type: "diff", entries: [] });
       return;
     }
-    let mirror: TempMirror | undefined;
-    try {
-      const command = await resolveCommand(document.uri);
-      const cwd = this.workingDirectory(document);
-      mirror = await this.sourceFor(document);
-      const result = await previewEdits(command, mirror.source, toRequests(state), cwd);
+    await this.withMirror(document, panel, async ({ command, cwd, source }) => {
+      const result = await previewEdits(command, source, toRequests(state), cwd);
       if (!result.ok) {
         void panel.webview.postMessage({
           type: "commitError",
@@ -691,11 +750,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
           warnings: entry.warnings,
         })),
       });
-    } catch (error) {
-      void panel.webview.postMessage(await this.describeFailure(error, document));
-    } finally {
-      await mirror?.release();
-    }
+    });
   }
 
   /**
@@ -730,7 +785,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
 
     const requests = toRequests(state);
     try {
-      const command = await resolveCommand(document.uri);
+      const { command } = await resolveEngine(document.uri);
       const cwd = this.workingDirectory(document);
       const filePath = document.uri.fsPath;
 

@@ -172,11 +172,12 @@ export interface StagingConflict {
  * The engine reports the current value of every field it would change. When
  * that disagrees with the base a change was staged against, the file moved
  * underneath the editor and committing would silently overwrite the newer
- * value, so the caller must refuse rather than write.
+ * value, so the caller must refuse rather than write. A pending entry-type
+ * change is checked the same way against the plan's reported type.
  *
- * A field the plan omits is not a conflict: the engine leaves out fields that
- * already hold the requested value, which means the intended change is simply
- * already in place.
+ * A change the plan omits is not a conflict: the engine leaves out fields that
+ * already hold the requested value (and unchanged types), which means the
+ * intended change is simply already in place.
  */
 export function findConflicts(
   entry: StagedEntry,
@@ -191,6 +192,18 @@ export function findConflicts(
     }
     if (change.old !== staged.base) {
       conflicts.push({ key: entry.key, field, expected: staged.base, actual: change.old });
+    }
+  }
+  // The engine compares types case-insensitively, so the base must too.
+  const plannedType = plan?.type;
+  if (entry.entryType && plannedType) {
+    if (plannedType.old.trim().toLowerCase() !== entry.entryType.base.trim().toLowerCase()) {
+      conflicts.push({
+        key: entry.key,
+        field: "@type",
+        expected: entry.entryType.base,
+        actual: plannedType.old,
+      });
     }
   }
   return conflicts;

@@ -143,3 +143,43 @@ test("adding a field conflicts when the file already gave it a value", () => {
     { key: "Euler1748", field: "note", expected: null, actual: "Added by someone else" },
   ]);
 });
+
+test("a staged type change conflicts when the file's type moved underneath", () => {
+  const state = stageType(emptyStaging(), "Franklin1953", "article", "misc");
+
+  const conflicts = findConflicts(state.entries.Franklin1953, {
+    change: "modified",
+    key: "Franklin1953",
+    fields: {},
+    type: { old: "online", new: "article" },
+  });
+
+  assert.deepEqual(conflicts, [
+    { key: "Franklin1953", field: "@type", expected: "misc", actual: "online" },
+  ]);
+});
+
+test("a staged type change accepts a case-insensitive match with the plan", () => {
+  // The engine compares types case-insensitively, so `Misc` in the file must
+  // not read as a conflict against a base of `misc`.
+  const state = stageType(emptyStaging(), "Franklin1953", "article", "misc");
+
+  assert.deepEqual(
+    findConflicts(state.entries.Franklin1953, {
+      change: "modified",
+      key: "Franklin1953",
+      fields: {},
+      type: { old: "Misc", new: "article" },
+    }),
+    [],
+  );
+});
+
+test("a type change the plan omits is not a conflict", () => {
+  const state = stageType(emptyStaging(), "Franklin1953", "book", "article");
+
+  assert.deepEqual(
+    findConflicts(state.entries.Franklin1953, { change: "modified", key: "Franklin1953", fields: {} }),
+    [],
+  );
+});

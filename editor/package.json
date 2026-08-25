@@ -118,7 +118,7 @@
         "pynakes.allowOnlineLookups": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Allow the bibliography view's \"Compare with remote\" action to fetch metadata from DOI/arXiv providers over the network (`ref compare --online`). Disable to keep comparisons fully offline; without it, compare still runs but reports that online lookups are disabled instead of fetching anything.",
+          "markdownDescription": "Allow the bibliography view's \"Compare with remote\" action to fetch metadata from DOI/arXiv providers over the network (`ref compare --online`). On by default; disable to keep comparisons fully offline — compare still runs but reports that online lookups are disabled instead of fetching anything.",
           "scope": "window"
         }
       }

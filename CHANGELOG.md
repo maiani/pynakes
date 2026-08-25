@@ -220,6 +220,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   virtual environment, then `PATH`; `pynakes.executable` still overrides
   everything and `pynakes.engine` can force `bundled` or `installed`.
 
+#### Changed
+
+- `pynakes.search.fuzzy` and `pynakes.showFindings` are now honored. Both were
+  declared but read by nothing: the fuzzy toggle started from persisted view
+  state alone (it now seeds from the setting on first open, and a toggle made
+  in the view still persists over it), and lint markers were shown regardless
+  of the setting (the severity markers per row and the findings panel tab now
+  both disappear with it). Setting changes reach an open view live, like
+  everything else it re-reads.
+
+#### Fixed
+
+- Sorting a column descending put blank values first: blanks were sorted last
+  ascending and the whole order was then reversed, contradicting the rule that
+  gaps never lead. Direction now lives inside the comparator.
+- Engine discovery kept a single memoized resolution keyed on settings, so two
+  open bibliographies in different workspace folders evicted each other's entry
+  and re-probed — respawning version probes — on every read. Resolutions are
+  cached per key instead.
+- A pending entry-type change was never checked against the dry-run plan at
+  commit time, unlike field edits, so a type changed elsewhere could be
+  silently overwritten; the commit is now refused with the other conflicts.
+- Staged changes are dropped when their document closes, where they previously
+  lingered for the session.
+- Closing one bibliography view no longer hides the status bar item while a
+  sibling view is still active.
+
 ## [0.6.1] - 2026-08-18
 
 ### Added

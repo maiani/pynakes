@@ -443,9 +443,13 @@ window.PV = window.PV || {};
     const s = PV.state;
     panelEl.classList.toggle("collapsed", s.panelCollapsed);
     PV.applyPaneSizes();
-    const findingCount = s.lint ? s.lint.counts.total : null;
+    const showFindings = s.showFindings !== false;
+    if (!showFindings && s.panel === "findings") {
+      s.panel = "diff";
+    }
+    const findingCount = showFindings && s.lint ? s.lint.counts.total : null;
     tabs.replaceChildren(
-      tabButton("findings", "Findings", findingCount),
+      ...(showFindings ? [tabButton("findings", "Findings", findingCount)] : []),
       tabButton("diff", "Staged diff", s.counts.fields || null),
       tabButton("compare", "Compare", null),
       collapseToggle(),

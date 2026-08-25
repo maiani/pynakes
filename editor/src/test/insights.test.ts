@@ -2,14 +2,8 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  buildGroupTree,
-  flattenGroups,
-  groupKeys,
-  groupsByEntry,
-  indexLint,
-  worseSeverity,
-} from "../insights.js";
+import { buildGroupTree, groupsByEntry, indexLint, worseSeverity } from "../insights.js";
+import type { GroupNode } from "../insights.js";
 import type { GroupsTreeNode, LintSuccess } from "../model.js";
 
 function node(name: string, parent = "", extra: Partial<GroupsTreeNode> = {}): GroupsTreeNode {
@@ -52,7 +46,19 @@ test("groupKeys collects an entire subtree", () => {
     { Physics: ["Newton1687"], Optics: ["Huygens1690"] },
   );
 
-  assert.deepEqual(groupKeys(roots[0]).sort(), ["Huygens1690", "Newton1687"]);
+  // The webview keeps its own copy of this walk (media/state.js); here it only
+  // pins the shape the sidebar counts depend on.
+  const keys = new Set<string>();
+  const walk = (current: GroupNode): void => {
+    for (const key of current.keys) {
+      keys.add(key);
+    }
+    for (const child of current.children) {
+      walk(child);
+    }
+  };
+  walk(roots[0]);
+  assert.deepEqual([...keys].sort(), ["Huygens1690", "Newton1687"]);
 });
 
 test("a group only entries mention is surfaced as undeclared", () => {
@@ -87,23 +93,23 @@ test("a node naming a missing parent still appears, as a root", () => {
 test("a parent cycle does not hang the projection", () => {
   const roots = buildGroupTree([node("A", "B"), node("B", "A")], {});
 
-  // Whatever the arrangement, flattening must terminate and lose nothing.
-  const names = flattenGroups(roots, new Set()).map((group) => group.name);
+  // Whatever the arrangement, walking the tree must terminate and lose
+  // nothing — the sidebar flattens exactly this way.
+  const names: string[] = [];
+  const walk = (nodes: GroupNode[], seen: Set<GroupNode>): void => {
+    for (const group of nodes) {
+      if (seen.has(group)) {
+        return;
+      }
+      seen.add(group);
+      names.push(group.name);
+      walk(group.children, seen);
+      seen.delete(group);
+    }
+  };
+  walk(roots, new Set());
   assert.ok(names.includes("A") || names.includes("B"));
   assert.ok(names.length <= 2);
-});
-
-test("flattenGroups honors collapsed subtrees", () => {
-  const roots = buildGroupTree([node("All"), node("Physics", "All")], {});
-
-  assert.deepEqual(
-    flattenGroups(roots, new Set()).map((group) => group.name),
-    ["All", "Physics"],
-  );
-  assert.deepEqual(
-    flattenGroups(roots, new Set(["All"])).map((group) => group.name),
-    ["All"],
-  );
 });
 
 function lint(issues: LintSuccess["issues"], counts: Partial<LintSuccess> = {}): LintSuccess {

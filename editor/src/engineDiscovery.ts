@@ -85,8 +85,19 @@ interface EngineCandidate {
   version: string;
 }
 
-/** Cached resolution, invalidated by any change to the settings it depends on. */
-let cache: { key: string; resolved: Promise<ResolvedEngine> } | undefined;
+/**
+ * Cached resolutions, keyed on the settings they depend on.
+ *
+ * Probing costs a process spawn per candidate and the view reads on every
+ * keystroke burst, so this must not re-probe per read. A map rather than a
+ * single slot: two open bibliographies resolving to different workspace
+ * folders would otherwise evict each other's entry and re-probe — several
+ * spawns — on every read. Keys are (settings, folder) pairs, bounded by how
+ * many distinct configurations are actually in use. Keying on the settings
+ * themselves invalidates an entry on a configuration change without this
+ * module having to own a listener and its disposal.
+ */
+const cache = new Map<string, Promise<ResolvedEngine>>();
 
 /** Read the settings that decide which engine runs. */
 function readSettings(scope?: vscode.Uri): EngineSettings {
@@ -98,37 +109,24 @@ function readSettings(scope?: vscode.Uri): EngineSettings {
   };
 }
 
-/**
- * Resolve the engine invocation for a document.
- *
- * Async by contract: the discovery chain probes candidates and reads their
- * versions, and callers must not have to change when it does.
- */
-export async function resolveCommand(scope?: vscode.Uri): Promise<PynakesCommand> {
-  return (await resolveEngine(scope)).command;
+/** Discard every memoized resolution, so the next read probes again. */
+export function resetEngineDiscovery(): void {
+  cache.clear();
 }
 
 /**
  * Resolve the engine and the reasoning behind the choice, memoized per settings.
- *
- * Probing costs a process spawn per candidate and the view reads on every
- * keystroke burst, so this must not re-probe per read. Keying the cache on the
- * settings themselves invalidates it on a configuration change without this
- * module having to own a listener and its disposal.
  */
 export function resolveEngine(scope?: vscode.Uri): Promise<ResolvedEngine> {
   const settings = readSettings(scope);
   const folder = scope ? vscode.workspace.getWorkspaceFolder(scope)?.uri.fsPath : undefined;
   const key = JSON.stringify({ settings, folder });
-  if (cache?.key !== key) {
-    cache = { key, resolved: selectEngine(settings, folder) };
+  let resolved = cache.get(key);
+  if (!resolved) {
+    resolved = selectEngine(settings, folder);
+    cache.set(key, resolved);
   }
-  return cache.resolved;
-}
-
-/** Discard the memoized resolution, so the next read probes again. */
-export function resetEngineDiscovery(): void {
-  cache = undefined;
+  return resolved;
 }
 
 async function selectEngine(

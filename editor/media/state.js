@@ -31,12 +31,15 @@ window.PV = window.PV || {};
     search: {
       query: typeof persisted.query === "string" ? persisted.query : "",
       where: typeof persisted.where === "string" ? persisted.where : "",
-      fuzzy: Boolean(persisted.fuzzy),
+      // null until the first render delivers the pynakes.search.fuzzy setting;
+      // a persisted boolean (the user toggled it) always wins over the setting.
+      fuzzy: typeof persisted.fuzzy === "boolean" ? persisted.fuzzy : null,
       keys: null,
       ranked: false,
       error: null,
       busy: false,
     },
+    showFindings: true,
     selectedGroup: persisted.selectedGroup || null,
     collapsedGroups: new Set(Array.isArray(persisted.collapsed) ? persisted.collapsed : []),
     sidebarCollapsed: Boolean(persisted.sidebarCollapsed),
@@ -178,24 +181,25 @@ window.PV = window.PV || {};
       rows.sort((a, b) => (position.get(a.key) ?? 0) - (position.get(b.key) ?? 0));
     } else if (s.sortColumn !== "index") {
       const read = SORTABLE[s.sortColumn];
+      // Direction lives in the comparator rather than a post-sort reverse, so
+      // the blank-last rule below holds for both directions.
+      const descending = s.sortDescending;
       rows.sort((a, b) => {
         const left = read(a);
         const right = read(b);
+        if (!left || !right) {
+          // Blanks sort last regardless of direction, so gaps never lead.
+          if (left === right) {
+            return a.index - b.index;
+          }
+          return left ? -1 : 1;
+        }
         if (left === right) {
           return a.index - b.index;
         }
-        // Blanks sort last regardless of direction, so gaps never lead.
-        if (!left) {
-          return 1;
-        }
-        if (!right) {
-          return -1;
-        }
-        return left < right ? -1 : 1;
+        const ordered = left < right ? -1 : 1;
+        return descending ? -ordered : ordered;
       });
-      if (s.sortDescending) {
-        rows.reverse();
-      }
     } else {
       rows.sort((a, b) => a.index - b.index);
     }

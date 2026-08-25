@@ -114,36 +114,6 @@ function assignDepth(nodes: GroupNode[], depth: number, seen: Set<GroupNode>): v
   }
 }
 
-/** Flatten the tree in display order, honoring which groups are collapsed. */
-export function flattenGroups(roots: GroupNode[], collapsed: ReadonlySet<string>): GroupNode[] {
-  const rows: GroupNode[] = [];
-  const walk = (nodes: GroupNode[]): void => {
-    for (const node of nodes) {
-      rows.push(node);
-      if (!collapsed.has(node.name)) {
-        walk(node.children);
-      }
-    }
-  };
-  walk(roots);
-  return rows;
-}
-
-/** Every citation key in a group or any of its descendants. */
-export function groupKeys(node: GroupNode): string[] {
-  const keys = new Set<string>();
-  const walk = (current: GroupNode): void => {
-    for (const key of current.keys) {
-      keys.add(key);
-    }
-    for (const child of current.children) {
-      walk(child);
-    }
-  };
-  walk(node);
-  return [...keys];
-}
-
 const SEVERITY_RANK: Record<LintSeverity, number> = { error: 3, warning: 2, info: 1 };
 
 /** Lint findings arranged for per-row markers and a grouped panel. */

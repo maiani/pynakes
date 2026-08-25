@@ -183,6 +183,15 @@ window.PV = window.PV || {};
         s.dirty = message.dirty;
         s.staging = message.staging || { entries: {} };
         s.counts = countStaged(s.staging);
+        if (message.settings) {
+          s.showFindings = message.settings.showFindings !== false;
+          if (s.search.fuzzy === null && typeof message.settings.fuzzy === "boolean") {
+            // First render: seed the toggle from the setting. Afterwards the
+            // user's own toggle (persisted) decides.
+            s.search.fuzzy = message.settings.fuzzy;
+            elements.fuzzy.checked = s.search.fuzzy;
+          }
+        }
         if (s.selectedKey && !s.rows.some((row) => row.key === s.selectedKey)) {
           s.selectedKey = null;
         }

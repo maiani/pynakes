@@ -25,7 +25,6 @@ import type {
 } from "./model";
 
 export type { PynakesCommand } from "./engineDiscovery";
-export { resolveCommand } from "./engineDiscovery";
 
 /** Output JSON for a large library is well past `execFile`'s 1 MB default. */
 const MAX_BUFFER = 64 * 1024 * 1024;
@@ -254,9 +253,9 @@ export function refEdit(
  * With `withKey`, compares against another entry already in the library —
  * no network access. Otherwise compares against a fetched DOI/arXiv remote
  * record; `online` gates that network call and is decided by the extension
- * host from the `pynakes.allowOnlineLookups` setting, never by the webview —
- * matching pynakes' own explicit-network-access policy. Without it the
- * engine still runs (offline) and reports why nothing could be compared.
+ * host from the `pynakes.allowOnlineLookups` setting (on by default), never
+ * by the webview. Without it the engine still runs (offline) and reports why
+ * nothing could be compared.
  */
 export function refCompare(
   command: PynakesCommand,
