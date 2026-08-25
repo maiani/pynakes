@@ -6,7 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-### Added
+
+### CLI
+
+#### Added
 
 - `enrich --online` now consults a journal-preferred metadata-source registry
   before DOI content negotiation. The initial APS rules use the documented APS
@@ -42,6 +45,113 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   update citation keys while deliberately leaving unavailable sources
   unrevised; the normalize report records them as warnings.
 
+- `search` accepts an empty query, selecting entries by `--where` predicate
+  alone: `pynakes search "" refs.bib --where 'doi missing'` answers "which
+  entries are missing this field" with no text match involved. This is the
+  read-only path for the shared selector grammar, which until now was reachable
+  only from commands that write. Predicate-only results report no matched fields
+  and stay in file order, since relevance ranking needs terms to rank by. The
+  query argument remains required, so a lone path can never be taken for a
+  query, and an empty query with no `--where` is rejected rather than silently
+  matching the whole library.
+
+- `inspect --display` adds a `display` object per entry: title-family fields
+  cleaned of LaTeX markup and braces (`latex_to_plain_text`), and
+  `author`/`editor` split into individual, cleaned names via the existing
+  brace-aware `split_name_list` rather than a raw `A and {B and C}` string.
+  Names are split before cleaning, so a brace-protected `{Smith and Sons}`
+  survives as one name instead of being cut in two. It is a read-only
+  presentation view for a UI to render, not a value to write back; combine
+  with `--resolved` to clean the crossref/xdata-inherited view instead of the
+  entry's own fields.
+- `ref compare <key>` reports every field where the local entry differs from
+  (or lacks a value present in) another reference — read-only, so a caller
+  can review the differences and apply only the fields they choose via
+  `ref edit <key> --field name=value`. That other reference is either a
+  fetched DOI/arXiv provider record (`--online`, preferring the entry's DOI
+  and falling back to arXiv), or another entry already in the library
+  (`--with <other-key>`, no network access — e.g. reviewing a candidate
+  duplicate pair before merging). `pynakes.integrity.compare_entry_with_remote()`/
+  `compare_entries()` and `Bibliography.compare_entry_with_remote()`/
+  `compare_entries()` are the underlying engine entry points. Complements the
+  existing whole-library, always-fill `enrich` and read-only `verify` for a
+  one-entry, human-in-the-loop workflow.
+- `normalize --drop-field NAME` (repeatable) removes a field from every entry
+  — e.g. `--drop-field abstract` to strip abstracts on every normalize pass.
+  Off by default, like journal-style conversion: dropping a field is
+  opinionated and not reversible, so it only runs for fields named explicitly,
+  either via the flag or a persisted `normalize-drop-fields` metadata key
+  (the two combine). Reported as `dropped_fields` in the normalize report.
+
+#### Changed
+
+- Lint's citation-key remediation hint now names `normalize --keys on`, and
+  collision-prone key-pattern findings report the same deterministic suffix
+  (`…a`, `…b`, ...) that normalization will assign.
+
+- **Provider-response caching is now opt-in, and the cache is one file.** Online
+  commands (`verify`, `enrich`, `ref compare`, `ref import --fetch`,
+  `asset fetch`) used to write a `.pynakes-cache/` directory beside the `.bib` by
+  default, one sha256-named file per identifier — so a single `verify --online`
+  over a few hundred entries left a few hundred files in the user's folder,
+  unasked for and never pruned. Now nothing reaches disk unless the renamed
+  `--cache-file PATH` says so, and what it writes is a single newline-delimited
+  JSON file with identifiers in plain text: readable, greppable, covered by one
+  `.gitignore` line, removable with one `rm`. Responses are memoized for the life
+  of the process regardless, which is where most of the benefit was — one run asks
+  a provider about a given DOI once, however many entries carry it. This matches
+  the rule the project already applies to the network: explicit or not at all.
+
+  **Breaking.** `--cache-dir` is now `--cache-file` and takes a file path; a
+  directory is rejected rather than written into. The `cache_dir=` keyword on the
+  `Bibliography`, `integrity`, `fetch`, and provider APIs is likewise
+  `cache_file=`. Nothing reads the old cache layout: delete any
+  `.pynakes-cache/` directory a previous release left behind, which costs only
+  refetches.
+
+  No record expires. A cache is a snapshot the caller chose to keep, and provider
+  metadata does change, so a long-lived cache should be deleted rather than
+  trusted indefinitely; this is now stated in the docs.
+
+#### Fixed
+
+- `keys generate` no longer mangles entries with no author/editor or title —
+  e.g. a physics paper's `@misc{SM, note = {See Supplemental Material...}}`
+  placeholder, cited only so the bibliography numbers it. There is nothing to
+  build an `AuthorYearTitle`-style key from, so it previously produced
+  `Anon__`-style noise from the empty pieces; such entries now keep their
+  existing key, the same way `@xdata` containers already do. `lint`'s
+  citation-key-pattern check is exempt for the same entries, so it no longer
+  reports their real key as a "mismatch" against the noise it would have
+  generated.
+
+- Pinax material writes no longer leave debris in the files directory. Temporary
+  files staged during a PDF write, an arXiv source extraction, or a manifest
+  update were created beside the materials themselves and cleaned up only on the
+  success and `OSError` paths — so interrupting `asset fetch`, the slowest and
+  most network-bound command in the tool, left `.<key>.published.pdf.<rand>.tmp`
+  and `.<key>.source.<rand>/` in the user's folder permanently, with nothing to
+  sweep them. Temporaries now stage under `.pinax/tmp/<pid>/`, and each write
+  first removes scratch belonging to processes that have exited, so a killed run
+  is self-healing and concurrent runs never disturb each other. A write that
+  fails, or a store that never had a manifest, leaves no `.pinax` directory
+  behind at all.
+
+- The documented idiom for a predicate-only search, `pynakes search . --where
+  '...'`, was quietly lossy: `.` is a real search term, so the results were
+  restricted to entries whose text happened to contain a period, and entries
+  without one were dropped from answers like `--where 'abstract missing'`. The
+  guides now use the empty query added above.
+- The test suite imported whichever copy of pynakes was installed in the
+  environment rather than the working tree, because nothing put `src/` on the
+  import path and a non-editable install shadows it. A green run therefore said
+  nothing about the source under test. `pythonpath = ["src"]` fixes it, so
+  `pynakes` now resolves to `src/pynakes` during a test run.
+
+### Editor
+
+#### Added
+
 - `editor/` — a VS Code / Open VSX extension companion. It opens a `.bib` file
   as a sortable, filterable entry table with a field detail pane, browses the
   declared group hierarchy, runs the engine's own search, surfaces lint findings
@@ -63,16 +173,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `editor/pynakes-vscode-<version>.vsix` on a machine set up for neither.
   `install-extension`, `test-extension`, and `clean-extension` round out the
   set. This is additive: the pip workflow remains how the engine is developed.
-
-- `search` accepts an empty query, selecting entries by `--where` predicate
-  alone: `pynakes search "" refs.bib --where 'doi missing'` answers "which
-  entries are missing this field" with no text match involved. This is the
-  read-only path for the shared selector grammar, which until now was reachable
-  only from commands that write. Predicate-only results report no matched fields
-  and stay in file order, since relevance ranking needs terms to rank by. The
-  query argument remains required, so a lone path can never be taken for a
-  query, and an empty query with no `--where` is rejected rather than silently
-  matching the whole library.
 
 - The detail pane gained a "Compare with remote" action, next to each of an
   entry's `doi` and `eprint` fields (both, when both are present): it fetches
@@ -119,98 +219,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   interpreter is taken from the Python extension's selection, then a workspace
   virtual environment, then `PATH`; `pynakes.executable` still overrides
   everything and `pynakes.engine` can force `bundled` or `installed`.
-- `inspect --display` adds a `display` object per entry: title-family fields
-  cleaned of LaTeX markup and braces (`latex_to_plain_text`), and
-  `author`/`editor` split into individual, cleaned names via the existing
-  brace-aware `split_name_list` rather than a raw `A and {B and C}` string.
-  Names are split before cleaning, so a brace-protected `{Smith and Sons}`
-  survives as one name instead of being cut in two. It is a read-only
-  presentation view for a UI to render, not a value to write back; combine
-  with `--resolved` to clean the crossref/xdata-inherited view instead of the
-  entry's own fields.
-- `ref compare <key>` reports every field where the local entry differs from
-  (or lacks a value present in) another reference — read-only, so a caller
-  can review the differences and apply only the fields they choose via
-  `ref edit <key> --field name=value`. That other reference is either a
-  fetched DOI/arXiv provider record (`--online`, preferring the entry's DOI
-  and falling back to arXiv), or another entry already in the library
-  (`--with <other-key>`, no network access — e.g. reviewing a candidate
-  duplicate pair before merging). `pynakes.integrity.compare_entry_with_remote()`/
-  `compare_entries()` and `Bibliography.compare_entry_with_remote()`/
-  `compare_entries()` are the underlying engine entry points. Complements the
-  existing whole-library, always-fill `enrich` and read-only `verify` for a
-  one-entry, human-in-the-loop workflow.
-- `normalize --drop-field NAME` (repeatable) removes a field from every entry
-  — e.g. `--drop-field abstract` to strip abstracts on every normalize pass.
-  Off by default, like journal-style conversion: dropping a field is
-  opinionated and not reversible, so it only runs for fields named explicitly,
-  either via the flag or a persisted `normalize-drop-fields` metadata key
-  (the two combine). Reported as `dropped_fields` in the normalize report.
-
-### Changed
-
-- Lint's citation-key remediation hint now names `normalize --keys on`, and
-  collision-prone key-pattern findings report the same deterministic suffix
-  (`…a`, `…b`, ...) that normalization will assign.
-
-- **Provider-response caching is now opt-in, and the cache is one file.** Online
-  commands (`verify`, `enrich`, `ref compare`, `ref import --fetch`,
-  `asset fetch`) used to write a `.pynakes-cache/` directory beside the `.bib` by
-  default, one sha256-named file per identifier — so a single `verify --online`
-  over a few hundred entries left a few hundred files in the user's folder,
-  unasked for and never pruned. Now nothing reaches disk unless the renamed
-  `--cache-file PATH` says so, and what it writes is a single newline-delimited
-  JSON file with identifiers in plain text: readable, greppable, covered by one
-  `.gitignore` line, removable with one `rm`. Responses are memoized for the life
-  of the process regardless, which is where most of the benefit was — one run asks
-  a provider about a given DOI once, however many entries carry it. This matches
-  the rule the project already applies to the network: explicit or not at all.
-
-  **Breaking.** `--cache-dir` is now `--cache-file` and takes a file path; a
-  directory is rejected rather than written into. The `cache_dir=` keyword on the
-  `Bibliography`, `integrity`, `fetch`, and provider APIs is likewise
-  `cache_file=`. Nothing reads the old cache layout: delete any
-  `.pynakes-cache/` directory a previous release left behind, which costs only
-  refetches.
-
-  No record expires. A cache is a snapshot the caller chose to keep, and provider
-  metadata does change, so a long-lived cache should be deleted rather than
-  trusted indefinitely; this is now stated in the docs.
-
-### Fixed
-
-- `keys generate` no longer mangles entries with no author/editor or title —
-  e.g. a physics paper's `@misc{SM, note = {See Supplemental Material...}}`
-  placeholder, cited only so the bibliography numbers it. There is nothing to
-  build an `AuthorYearTitle`-style key from, so it previously produced
-  `Anon__`-style noise from the empty pieces; such entries now keep their
-  existing key, the same way `@xdata` containers already do. `lint`'s
-  citation-key-pattern check is exempt for the same entries, so it no longer
-  reports their real key as a "mismatch" against the noise it would have
-  generated.
-
-- Pinax material writes no longer leave debris in the files directory. Temporary
-  files staged during a PDF write, an arXiv source extraction, or a manifest
-  update were created beside the materials themselves and cleaned up only on the
-  success and `OSError` paths — so interrupting `asset fetch`, the slowest and
-  most network-bound command in the tool, left `.<key>.published.pdf.<rand>.tmp`
-  and `.<key>.source.<rand>/` in the user's folder permanently, with nothing to
-  sweep them. Temporaries now stage under `.pinax/tmp/<pid>/`, and each write
-  first removes scratch belonging to processes that have exited, so a killed run
-  is self-healing and concurrent runs never disturb each other. A write that
-  fails, or a store that never had a manifest, leaves no `.pinax` directory
-  behind at all.
-
-- The documented idiom for a predicate-only search, `pynakes search . --where
-  '...'`, was quietly lossy: `.` is a real search term, so the results were
-  restricted to entries whose text happened to contain a period, and entries
-  without one were dropped from answers like `--where 'abstract missing'`. The
-  guides now use the empty query added above.
-- The test suite imported whichever copy of pynakes was installed in the
-  environment rather than the working tree, because nothing put `src/` on the
-  import path and a non-editable install shadows it. A green run therefore said
-  nothing about the source under test. `pythonpath = ["src"]` fixes it, so
-  `pynakes` now resolves to `src/pynakes` during a test run.
 
 ## [0.6.1] - 2026-08-18
 
