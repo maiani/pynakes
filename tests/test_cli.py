@@ -640,6 +640,7 @@ class TestInspectAndLint:
             "message": "Entry 'A' field 'month' references undefined BibTeX string name 'june'",
             "key": "A",
             "field": "month",
+            "line": 1,
         }
 
     def test_lint_strict_fails_metadata_profile_deviations(self, tmp_path: Path) -> None:

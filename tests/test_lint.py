@@ -907,3 +907,104 @@ def test_consistency_ignores_publisher_decoration(decoration: str) -> None:
     lib = parse_bib(entries + sparse)
 
     assert _consistency(lint(lib)) == []
+
+
+# ---------------------------------------------------------------------------
+# Source-line locations
+# ---------------------------------------------------------------------------
+
+
+def test_parser_records_entry_and_metadata_block_lines() -> None:
+    lib = parse_bib(
+        "@comment{pynakes-meta: dialect: biblatex;}\n"
+        "\n"
+        "@Article{Newton1687,\n"
+        "  author = {Isaac Newton},\n"
+        "  title = {Principia},\n"
+        "}\n"
+        "\n"
+        "@book{Euler1748, title={Introductio}}\n"
+    )
+
+    entry_lines = {entry.key: entry.start_line for entry in lib.entries.values()}
+    assert entry_lines == {"Newton1687": 3, "Euler1748": 8}
+    assert all(block.start_line == 1 for block in lib.pynakes_metadata_blocks)
+
+
+def test_entries_built_in_memory_have_no_line() -> None:
+    assert BibEntry(key="A", type="article", fields={}).start_line is None
+
+
+def test_lint_reports_the_declaring_entry_line() -> None:
+    lib = parse_bib(
+        "@article{First,\n"
+        "  author = {A. Author},\n"
+        "  title = {One},\n"
+        "  journal = {J},\n"
+        "  year = {2020}\n"
+        "}\n"
+        "\n"
+        "@article{Second,\n"
+        "  title = {Two}\n"
+        "}\n"
+    )
+
+    issues = [
+        issue
+        for issue in lint(lib)
+        if issue.type == "missing_required_field" and issue.key == "Second"
+    ]
+
+    assert issues
+    assert all(issue.line == 8 for issue in issues)
+
+
+def test_duplicate_key_finding_points_at_the_first_occurrence() -> None:
+    lib = parse_bib("@article{A, title={One}}\n\n\n@article{A, title={Two}}\n")
+
+    (dupe,) = [issue for issue in lint(lib) if issue.type == "duplicate_key"]
+
+    assert dupe.line == 1
+
+
+def test_metadata_finding_keeps_its_comment_line_over_a_colliding_citation_key() -> None:
+    # An entry is deliberately keyed exactly like the unknown metadata key: the
+    # block's own line must win, never the entry-line lookup.
+    lib = parse_bib(
+        "@article{unfamiliar-key,\n  author = {A},\n  title = {T},\n  journal = {J},\n"
+        "  year = {2020}\n}\n"
+        "\n"
+        "@comment{pynakes-meta: unfamiliar-key: whatever;}\n"
+    )
+
+    (issue,) = [i for i in lint(lib) if i.type == "unknown_metadata_key"]
+
+    assert issue.key == "unfamiliar-key"
+    assert issue.line == 8
+
+
+def test_line_numbers_survive_crlf_files() -> None:
+    lib = parse_bib(
+        "@article{First,\r\n  author = {A},\r\n  title = {T},\r\n  journal = {J},\r\n"
+        "  year = {2020}\r\n}\r\n\r\n@book{Second, title={T}}\r\n"
+    )
+
+    entry_lines = {entry.key: entry.start_line for entry in lib.entries.values()}
+    assert entry_lines == {"First": 1, "Second": 8}
+    missing = [i for i in lint(lib) if i.type == "missing_required_field" and i.key == "Second"]
+    assert missing
+    assert all(i.line == 8 for i in missing)
+
+
+def test_issue_to_dict_includes_line() -> None:
+    issue = LintIssue("missing_required_field", "error", "m", key="A", field="author", line=12)
+
+    assert issue.to_dict()["line"] == 12
+
+
+def test_file_level_findings_have_no_line() -> None:
+    lib = parse_bib("")
+
+    (empty,) = [issue for issue in lint(lib) if issue.type == "no_entries"]
+
+    assert empty.line is None

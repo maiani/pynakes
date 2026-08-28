@@ -48,8 +48,13 @@ empty and giving only a predicate answers set questions such as
 `year >= 2020 and doi missing`.
 
 **Findings.** `lint` results as a severity marker per row and a panel grouped by
-category; clicking a finding selects its entry. Advisory only — the view never
-applies a fix on its own.
+category; clicking a finding selects its entry. They are also published as
+native diagnostics, so the same findings appear in VS Code's **Problems** panel
+(and as squiggles in any text editor showing the file), each placed at its
+entry's declaration line by the engine. Advisory only — the view never applies a
+fix on its own. The `pynakes.showFindings` setting gates both views of the
+findings at once; a failed re-read clears Problems along with the view rather
+than leaving stale entries behind.
 
 **Edit, review, then commit.** Fields are editable in the detail pane, along with
 the entry type; fields can be added and removed. Nothing is written when you
@@ -175,8 +180,9 @@ npm run vendor-engine  # build the bundled engine into engine/ (git-ignored)
 npm run package        # .vsix, vendoring and compiling first
 ```
 
-Press `F5` with this directory as the workspace root to launch an extension
-development host.
+Press `F5` to launch an extension development host. This works both with this
+directory open as the workspace root and with the repository root open — the
+root carries its own `.vscode/launch.json` pointing at `editor/`.
 
 `npm run package` needs no preparation: `vsce` runs the `vscode:prepublish`
 script, which vendors the engine and compiles before packaging, so a VSIX can

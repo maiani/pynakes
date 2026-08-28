@@ -14,7 +14,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { resolveEngine, type ResolvedEngine } from "./engineDiscovery";
-import type { Summary } from "./model";
+import { lintDiagnostics, type LintIndex } from "./insights";
+import type { LintSeverity, Summary } from "./model";
 import {
   commitEdits,
   compareEntry,
@@ -47,6 +48,13 @@ import { renderShell } from "./webview";
 
 /** Coalesce bursts of keystrokes into a single engine read. */
 const REFRESH_DEBOUNCE_MS = 250;
+
+/** Engine finding severities onto VS Code's diagnostic scale. */
+const DIAGNOSTIC_SEVERITY: Record<LintSeverity, vscode.DiagnosticSeverity> = {
+  error: vscode.DiagnosticSeverity.Error,
+  warning: vscode.DiagnosticSeverity.Warning,
+  info: vscode.DiagnosticSeverity.Information,
+};
 
 interface TempMirror {
   /** Path pynakes should read. */
@@ -117,10 +125,21 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
    */
   private readonly statusByPanel = new WeakMap<vscode.WebviewPanel, StatusDetails>();
 
+  /**
+   * The engine's lint findings, published as native diagnostics so they also
+   * appear in VS Code's Problems panel (and as squiggles in any text editor
+   * showing the same file). One collection for the whole extension; per-file
+   * entries are set on every read and cleared when a read fails or the file
+   * closes, so Problems can never report what the view no longer does.
+   */
+  private readonly diagnostics: vscode.DiagnosticCollection;
+
   private constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly statusItem: vscode.StatusBarItem,
-  ) {}
+  ) {
+    this.diagnostics = vscode.languages.createDiagnosticCollection("pynakes");
+  }
 
   public static register(context: vscode.ExtensionContext): vscode.Disposable {
     const statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -143,7 +162,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         refresh();
       }
     });
-    return vscode.Disposable.from(registration, refreshCommand, statusItem);
+    return vscode.Disposable.from(registration, refreshCommand, statusItem, provider.diagnostics);
   }
 
   public async resolveCustomTextEditor(
@@ -192,11 +211,12 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
           scheduleLoad();
         }
       }),
-      // Staged edits describe one document's content; once it is gone they
-      // could never be applied, so they go with it.
+      // Staged edits and published findings describe one document's content;
+      // once it is gone they could never apply, so they go with it.
       vscode.workspace.onDidCloseTextDocument((closed) => {
         if (closed.uri.toString() === document.uri.toString()) {
           this.staging.delete(document.uri.toString());
+          this.diagnostics.delete(document.uri);
         }
       }),
       panel.webview.onDidReceiveMessage((message: ViewMessage) => {
@@ -247,6 +267,9 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       mirror = await this.sourceFor(document);
       await body({ engine, command: engine.command, cwd, source: mirror.source });
     } catch (error) {
+      // A failed read leaves the previous findings pointing into content the
+      // engine could no longer read; Problems must go quiet with the view.
+      this.diagnostics.delete(document.uri);
       void panel.webview.postMessage(reportFailure(await this.describeFailure(error, document)));
     } finally {
       await mirror?.release();
@@ -258,6 +281,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
     await this.withMirror(document, panel, async ({ engine, command, cwd, source }) => {
       const result = await readLibrary(command, source, cwd);
       if (!result.ok) {
+        this.diagnostics.delete(document.uri);
         void panel.webview.postMessage({
           type: "parseError",
           error: result.error.error,
@@ -266,6 +290,8 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         });
         return;
       }
+      const settings = this.viewSettings(document);
+      this.publishDiagnostics(document, result.read.lint, settings.showFindings);
       this.statusByPanel.set(panel, {
         summary: result.read.summary,
         findings: result.read.lint?.counts,
@@ -288,9 +314,43 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         },
         dirty: document.isDirty,
         staging: this.stagingFor(document),
-        settings: this.viewSettings(document),
+        settings,
       });
     });
+  }
+
+  /**
+   * Publish (or withdraw) one file's findings as native diagnostics.
+   *
+   * The same `pynakes.showFindings` setting that gates the in-view markers
+   * gates Problems, so the two can never disagree. Ranges are whole lines:
+   * the engine locates a finding at its entry's declaration, which is all a
+   * squiggle needs to be useful.
+   */
+  private publishDiagnostics(
+    document: vscode.TextDocument,
+    lint: LintIndex | null,
+    showFindings: boolean,
+  ): void {
+    if (!showFindings || !lint) {
+      this.diagnostics.delete(document.uri);
+      return;
+    }
+    // Clamp rather than trust: the buffer may have moved on since the engine
+    // read its mirror, and `lineAt` would throw on a stale out-of-range line.
+    const lastLine = Math.max(0, document.lineCount - 1);
+    const diagnostics = lintDiagnostics(lint.issues).map((item) => {
+      const line = Math.min(item.line, lastLine);
+      const diagnostic = new vscode.Diagnostic(
+        document.lineAt(line).range,
+        item.message,
+        DIAGNOSTIC_SEVERITY[item.severity],
+      );
+      diagnostic.source = "pynakes";
+      diagnostic.code = item.code;
+      return diagnostic;
+    });
+    this.diagnostics.set(document.uri, diagnostics);
   }
 
   /** Point the shared status bar item at this view, or hide it. */

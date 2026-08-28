@@ -2,13 +2,14 @@
 
 Reports issues as a flat list of :class:`LintIssue` objects, each tagged with a
 severity (``error``, ``warning``, or ``info``), a category, the offending entry
-key, and a message. Checks: duplicate keys, missing required fields (by entry
-type), undefined BibTeX string references, cross-entry field consistency (a
-field most entries of a type define but some omit), malformed or missing DOIs,
-malformed JabRef ``groups`` formatting, noncanonical entry-type / field-name
-casing, unresolved journal titles, metadata-comment schema drift (unknown
-pynakes keys, invalid values, duplicate blocks), and deviations from the
-library's stored metadata profile.
+key, and a message, plus the source line of the finding's entry or metadata
+block when the library was parsed from text. Checks: duplicate keys, missing
+required fields (by entry type), undefined BibTeX string references, cross-entry
+field consistency (a field most entries of a type define but some omit),
+malformed or missing DOIs, malformed JabRef ``groups`` formatting, noncanonical
+entry-type / field-name casing, unresolved journal titles, metadata-comment
+schema drift (unknown pynakes keys, invalid values, duplicate blocks), and
+deviations from the library's stored metadata profile.
 
 ``lint`` only diagnoses; it never rewrites a library. The category of a finding
 names which command resolves it — ``normalize`` for content conventions and
@@ -337,6 +338,18 @@ def issue_category(issue_type: str) -> LintCategory:
     return ISSUE_CATEGORIES.get(issue_type, "correctness")
 
 
+# Findings whose ``key`` names a metadata setting or an on-disk file rather
+# than a citation key, so the entry-line lookup must never apply to them.
+_LINE_EXEMPT_TYPES = frozenset(
+    {
+        "unknown_metadata_key",
+        "invalid_metadata_value",
+        "duplicate_metadata_block",
+        "missing_tex_source",
+    }
+)
+
+
 @dataclass
 class LintIssue:
     """A single validation finding."""
@@ -346,6 +359,10 @@ class LintIssue:
     message: str
     key: str | None = None
     field: str | None = None
+    #: One-based source line of the finding's entry or metadata block, when the
+    #: library was parsed from text and the check could locate it; ``None``
+    #: otherwise (file-level findings, in-memory libraries).
+    line: int | None = None
 
     @property
     def category(self) -> LintCategory:
@@ -367,6 +384,7 @@ class LintIssue:
             "message": self.message,
             "key": self.key,
             "field": self.field,
+            "line": self.line,
         }
 
 
@@ -422,6 +440,7 @@ def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
                 "error",
                 f"Citation key {key!r} appears {len(indices)} times (entry {line_refs})",
                 key=key,
+                line=lib.entries.values()[indices[0]].start_line,
             )
         )
 
@@ -455,6 +474,20 @@ def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
     issues.extend(_lint_field_consistency(lib, dialect=dialect))
     if base_dir is not None:
         issues.extend(_lint_tex_sources(lib, base_dir))
+
+    # Locate entry-level findings that could not stamp themselves. The first
+    # occurrence of a key wins: with duplicates the finding already names the
+    # instance indices in its message, and one line is enough to navigate by.
+    # Metadata findings carry their block's line (their keys name metadata
+    # settings, which may collide with citation keys) and tex-source findings
+    # are about files on disk, so both are exempt here.
+    first_line_by_key: dict[str, int] = {}
+    for entry in lib.entries.values():
+        if entry.start_line is not None and entry.key not in first_line_by_key:
+            first_line_by_key[entry.key] = entry.start_line
+    for issue in issues:
+        if issue.line is None and issue.key and issue.type not in _LINE_EXEMPT_TYPES:
+            issue.line = first_line_by_key.get(issue.key)
     return issues
 
 
@@ -499,6 +532,7 @@ def _lint_metadata(lib: BibFile) -> list[LintIssue]:
                         "pynakes key schema",
                         key=block.key,
                         field=block.key,
+                        line=block.start_line,
                     )
                 )
             continue
@@ -514,6 +548,7 @@ def _lint_metadata(lib: BibFile) -> list[LintIssue]:
                     f"value: {exc}",
                     key=block.key,
                     field=block.key,
+                    line=block.start_line,
                 )
             )
 
@@ -528,6 +563,7 @@ def _lint_metadata(lib: BibFile) -> list[LintIssue]:
                     "the path preserves them but the effective metadata is ambiguous",
                     key=key,
                     field=key,
+                    line=blocks[0].start_line,
                 )
             )
 

@@ -15,7 +15,7 @@ from pynakes.cli_common import (
     _safe,
 )
 from pynakes.engine import Bibliography
-from pynakes.lint import CATEGORY_FIXERS, is_profile_issue
+from pynakes.lint import CATEGORY_FIXERS, LintIssue, is_profile_issue
 from pynakes.lint import lint as lint_lib
 
 # --- lint ------------------------------------------------------------------
@@ -47,10 +47,7 @@ def _lint_one(file: str, categories: set[str] | None = None) -> CheckOutcome:
     if not issues:
         human = [f"{file}: no issues found."]
     else:
-        human = [
-            f"  [{issue.severity}] {f'{issue.key}: ' if issue.key else ''}{issue.message}"
-            for issue in issues
-        ]
+        human = [f"  {_format_issue(issue)}" for issue in issues]
         human.append(
             f"{len(issues)} issue(s): {errors} error(s), {warnings} warning(s), {infos} info."
         )
@@ -63,6 +60,15 @@ def _lint_one(file: str, categories: set[str] | None = None) -> CheckOutcome:
         failed=errors > 0 or any(is_profile_issue(issue) for issue in issues),
         summary={"issues": len(issues), "errors": errors, "warnings": warnings, "info": infos},
     )
+
+
+def _format_issue(issue: LintIssue) -> str:
+    """Render one finding for human output: ``[sev] key (line N): message``."""
+    location = issue.key or ""
+    if issue.line is not None:
+        location = f"{location} (line {issue.line})" if location else f"line {issue.line}"
+    prefix = f"[{issue.severity}] "
+    return f"{prefix}{location}: {issue.message}" if location else f"{prefix}{issue.message}"
 
 
 def _fixer_hints(issues: list) -> list[str]:

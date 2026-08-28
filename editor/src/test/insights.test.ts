@@ -2,7 +2,13 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildGroupTree, groupsByEntry, indexLint, worseSeverity } from "../insights.js";
+import {
+  buildGroupTree,
+  groupsByEntry,
+  indexLint,
+  lintDiagnostics,
+  worseSeverity,
+} from "../insights.js";
 import type { GroupNode } from "../insights.js";
 import type { GroupsTreeNode, LintSuccess } from "../model.js";
 
@@ -165,6 +171,42 @@ test("worseSeverity ranks error above warning above info", () => {
   assert.equal(worseSeverity("info", "warning"), "warning");
   assert.equal(worseSeverity("error", "warning"), "error");
   assert.equal(worseSeverity("info", "info"), "info");
+});
+
+test("lintDiagnostics converts one-based lines to zero-based", () => {
+  const items = lintDiagnostics([
+    { type: "missing_required_field", severity: "error", category: "correctness", fixer: null, message: "m1", key: "A", field: "author", line: 3 },
+    { type: "no_entries", severity: "warning", category: "correctness", fixer: null, message: "m2" },
+    { type: "missing_doi", severity: "info", category: "consistency", fixer: null, message: "m3", key: "B", line: null },
+  ]);
+
+  assert.deepEqual(items, [
+    { severity: "error", message: "m1", code: "missing_required_field", line: 2 },
+    // File-level findings (no line, or an explicit null) land on the first line.
+    { severity: "warning", message: "m2", code: "no_entries", line: 0 },
+    { severity: "info", message: "m3", code: "missing_doi", line: 0 },
+  ]);
+});
+
+test("indexLint keeps the flat report-order issue list for diagnostics", () => {
+  const issues = [
+    { type: "missing_doi", severity: "info", category: "consistency", fixer: null, message: "a", key: "A" },
+    { type: "encoding", severity: "warning", category: "file", fixer: null, message: "b", key: null },
+  ] as const;
+  const index = indexLint({
+    status: "success",
+    action: "lint",
+    file: "refs.bib",
+    issue_count: issues.length,
+    errors: 0,
+    warnings: 1,
+    info: 1,
+    by_category: {},
+    issues: [...issues],
+  });
+
+  assert.equal(index.issues.length, 2);
+  assert.deepEqual(lintDiagnostics(index.issues).map((item) => item.message), ["a", "b"]);
 });
 
 test("groupsByEntry inverts membership and sorts each entry's groups", () => {

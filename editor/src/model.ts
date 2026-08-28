@@ -275,6 +275,8 @@ export interface LintIssue {
   /** Absent or null for findings about the file rather than one entry. */
   key?: string | null;
   field?: string | null;
+  /** One-based source line, when the engine could locate the finding. */
+  line?: number | null;
 }
 
 export interface LintSuccess {

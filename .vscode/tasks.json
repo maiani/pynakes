@@ -1,0 +1,30 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "editor: compile",
+      "type": "npm",
+      "script": "compile",
+      "problemMatcher": "$tsc",
+      "group": { "kind": "build", "isDefault": true },
+      "options": { "cwd": "${workspaceFolder}/editor" }
+    },
+    {
+      "label": "editor: watch",
+      "type": "npm",
+      "script": "watch",
+      "isBackground": true,
+      "problemMatcher": "$tsc-watch",
+      "group": "build",
+      "options": { "cwd": "${workspaceFolder}/editor" }
+    },
+    {
+      "label": "editor: vendor engine",
+      "detail": "Rebuild editor/engine/ from the pynakes source tree, so F5 runs the bundled engine.",
+      "type": "npm",
+      "script": "vendor-engine",
+      "problemMatcher": [],
+      "options": { "cwd": "${workspaceFolder}/editor" }
+    }
+  ]
+}

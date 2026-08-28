@@ -116,7 +116,7 @@ function assignDepth(nodes: GroupNode[], depth: number, seen: Set<GroupNode>): v
 
 const SEVERITY_RANK: Record<LintSeverity, number> = { error: 3, warning: 2, info: 1 };
 
-/** Lint findings arranged for per-row markers and a grouped panel. */
+/** Lint findings arranged for per-row markers, a grouped panel, and Problems. */
 export interface LintIndex {
   /** Findings that name an entry, keyed by citation key. */
   byKey: Record<string, LintIssue[]>;
@@ -126,6 +126,8 @@ export interface LintIndex {
   fileLevel: LintIssue[];
   /** Findings grouped by category, in descending count order. */
   byCategory: Array<{ category: string; issues: LintIssue[] }>;
+  /** Every finding, in report order — the feed for native diagnostics. */
+  issues: LintIssue[];
   counts: { errors: number; warnings: number; info: number; total: number };
 }
 
@@ -164,6 +166,7 @@ export function indexLint(envelope: LintSuccess): LintIndex {
     worstByKey,
     fileLevel,
     byCategory,
+    issues: envelope.issues,
     counts: {
       errors: envelope.errors,
       warnings: envelope.warnings,
@@ -171,6 +174,32 @@ export function indexLint(envelope: LintSuccess): LintIndex {
       total: envelope.issue_count,
     },
   };
+}
+
+/** One finding shaped for the Problems panel, with a zero-based line. */
+export interface LintDiagnosticItem {
+  severity: LintSeverity;
+  message: string;
+  /** The finding type, shown as the diagnostic's code. */
+  code: string;
+  /** Zero-based line; findings without one land on the first line. */
+  line: number;
+}
+
+/**
+ * Project findings onto native-diagnostics input.
+ *
+ * The engine reports one-based lines (or none for file-level findings); VS
+ * Code wants zero-based ranges, so that conversion — the classic off-by-one —
+ * happens exactly here and nowhere else.
+ */
+export function lintDiagnostics(issues: LintIssue[]): LintDiagnosticItem[] {
+  return issues.map((issue) => ({
+    severity: issue.severity,
+    message: issue.message,
+    code: issue.type,
+    line: Math.max(0, (issue.line ?? 1) - 1),
+  }));
 }
 
 /** Group membership per entry, for the detail pane. */

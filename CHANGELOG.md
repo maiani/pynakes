@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Added
 
+- `lint` findings now carry source locations. Each issue in the JSON envelope
+  gains a `line` field — the one-based line of the finding's `@type{key,`
+  declaration or metadata `@comment` block, `null` for file-level findings and
+  in-memory libraries — and the human-readable output names it too
+  (`[error] key (line 12): ...`). The parser records the declaration line of
+  every entry and metadata block (`start_line` on `BibEntry` /
+  `MetadataBlock`), so duplicate keys resolve to the exact instance rather
+  than a best-effort text scan. Graphical clients can turn findings into
+  native diagnostics without locating entries themselves.
+
 - `enrich --online` now consults a journal-preferred metadata-source registry
   before DOI content negotiation. The initial APS rules use the documented APS
   Harvest API to recover the publisher's article identifier (`pages`) and page
@@ -188,6 +198,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Network access is controlled by the new `pynakes.allowOnlineLookups`
   setting (on by default); with it off, compare still runs but reports that
   online lookups are disabled rather than silently doing nothing.
+- The view's findings are now published as native VS Code diagnostics, so they
+  appear in the Problems panel — and as squiggles in any text editor showing
+  the same `.bib` file — in addition to the in-view severity markers and the
+  findings panel. Each diagnostic sits at the finding's entry declaration line,
+  located by the engine's new per-issue `line` field rather than any client-side
+  scanning. `pynakes.showFindings` gates both presentations together, and a
+  failed re-read (parse error, engine unavailable) clears the published set so
+  Problems can never outlive what the view shows.
+
 - All panes (the groups sidebar, the detail pane, and the bottom findings/diff
   panel) are now resizable by dragging their border, the same way table
   columns already were; each dragged size is remembered per workspace.

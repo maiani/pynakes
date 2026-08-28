@@ -127,13 +127,14 @@ def parse_bib(text: str) -> BibFile:
             _record_comment(
                 raw_block,
                 body,
+                line_num,
                 raw_comments,
                 jabref_metadata_blocks,
                 pynakes_metadata_blocks,
             )
             layout.append((gap, "comment", comment_index))
         else:
-            entry = _parse_entry(entry_type, body, raw_block)
+            entry = _parse_entry(entry_type, body, raw_block, line_num)
             if entry.key in entries:
                 logger.info(
                     "Duplicate citation key %r (line %d); preserving both entries",
@@ -173,7 +174,7 @@ _TOP_LEVEL_HEADER = re.compile(
 )
 
 
-def _parse_entry(entry_type: str, body: str, raw_content: str) -> BibEntry:
+def _parse_entry(entry_type: str, body: str, raw_content: str, start_line: int) -> BibEntry:
     """Parse an entry body after its outer delimiter has been scanned."""
     key_part, fields_part = _split_once_top_level(_strip_tex_comments(body), ",")
     key = key_part.strip()
@@ -184,6 +185,7 @@ def _parse_entry(entry_type: str, body: str, raw_content: str) -> BibEntry:
         fields=fields,
         field_expressions=dict(fields),
         raw_content=raw_content,
+        start_line=start_line,
     )
 
 
@@ -230,6 +232,7 @@ def parse_raw_string_definition(raw: str) -> tuple[str, str] | None:
 def _record_comment(
     raw_comment: str,
     body: str,
+    start_line: int,
     raw_comments: list[str],
     jabref_metadata_blocks: list[MetadataBlock],
     pynakes_metadata_blocks: list[MetadataBlock],
@@ -242,6 +245,7 @@ def _record_comment(
         raw=raw_comment,
         comment_index=comment_index,
     ):
+        block.start_line = start_line
         if block.namespace == "pynakes":
             pynakes_metadata_blocks.append(block)
         else:

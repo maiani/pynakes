@@ -119,8 +119,11 @@ dmypy.json
 .pyre/
 
 # IDE
-.vscode/
-# ...but the VS Code extension companion commits its own debug configuration.
+.vscode/*
+# ...but the VS Code extension companion commits its own debug configuration,
+# and the repo root carries the same launch/tasks for root-workspace sessions.
+!/.vscode/launch.json
+!/.vscode/tasks.json
 !/editor/.vscode/
 .idea/
 *.swp

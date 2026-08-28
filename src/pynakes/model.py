@@ -156,6 +156,9 @@ class MetadataBlock:
     known: bool = False
     category: str = "unknown"
     namespace: str = "jabref"  # "jabref" | "pynakes"
+    #: One-based source line of the ``@comment`` that declared this block, set
+    #: by the parser; ``None`` for blocks constructed in memory.
+    start_line: int | None = None
 
     @property
     def normalized_value(self) -> str:
@@ -204,6 +207,9 @@ class BibEntry:
     raw_content: str | None = None
     raw_comments: list[str] = field(default_factory=list)
     modified: bool = False
+    #: One-based source line of the ``@type{key,`` declaration, set by the
+    #: parser; ``None`` for entries constructed in memory.
+    start_line: int | None = None
 
     def resolve(self, lookup: Lookup) -> dict[str, str]:
         """Return own fields with BibLaTeX inheritance applied.
