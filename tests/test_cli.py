@@ -308,6 +308,33 @@ class TestUsedCommand:
         assert set(data["report"]["used"]) == {"Smith2020", "Brown2022"}
         assert "Missing2099" in data["report"]["missing"]
 
+    def test_report_json_locates_every_citation(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Smith2020,\n  title = {T}\n}\n@article{Unused2019,\n  title = {U}\n}\n"
+        )
+        tex = tmp_path / "paper.tex"
+        tex.write_text(
+            "Intro.\n"
+            r"See~\cite{Smith2020} and \citep{Missing2099}." + "\n"
+            r"Again \cite{Smith2020}." + "\n"
+        )
+
+        result = runner.invoke(app, ["tex", "scan", str(bib), str(tex), "--json"])
+
+        assert result.exit_code == 0, result.output
+        usages = json.loads(result.output)["report"]["usages"]
+        # Every cited key is located, including one no entry declares — the
+        # client turns that into "undefined citation" without scanning itself.
+        assert sorted(usages) == ["Missing2099", "Smith2020"]
+        assert [(m["line"], m["column"], m["macro"]) for m in usages["Smith2020"]] == [
+            (2, 5, "cite"),
+            (3, 7, "cite"),
+        ]
+        assert usages["Smith2020"][0]["path"] == str(tex)
+        # An entry cited nowhere has no occurrences at all.
+        assert "Unused2019" not in usages
+
     def test_dry_run_does_not_modify(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         original = (FIXTURES / "simple.bib").read_text()

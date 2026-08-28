@@ -931,6 +931,18 @@ def test_parser_records_entry_and_metadata_block_lines() -> None:
     assert all(block.start_line == 1 for block in lib.pynakes_metadata_blocks)
 
 
+def test_parser_records_the_line_of_an_entry_starting_mid_line() -> None:
+    # Two blocks sharing a line: the second entry's line is the line it is on,
+    # not the following one.
+    lib = parse_bib(
+        "@article{Newton1687, title={Principia}} @book{Euler1748, title={Introductio}}\n"
+        "@misc{Gauss1801, title={Disquisitiones}}\n"
+    )
+
+    entry_lines = {entry.key: entry.start_line for entry in lib.entries.values()}
+    assert entry_lines == {"Newton1687": 1, "Euler1748": 1, "Gauss1801": 2}
+
+
 def test_entries_built_in_memory_have_no_line() -> None:
     assert BibEntry(key="A", type="article", fields={}).start_line is None
 

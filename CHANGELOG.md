@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Added
 
+- `tex scan --json` now locates every citation. The report gains a `usages`
+  object mapping each cited key to its occurrences — one
+  `{path, line, column, text, macro}` per `\cite`-family macro naming it —
+  collected in the same single pass over each source that already answered
+  *which* keys are cited. Keys cited but **missing** from the library are
+  included, since a citation with no entry behind it is the one most worth
+  locating, and an entry cited nowhere simply has no occurrences. This is the
+  whole-library citation index `keys usage` could only answer one key at a
+  time: a client marking cited/uncited entries, listing undefined citations, or
+  jumping from an entry to the `\cite` that motivates it now needs one call
+  rather than one subprocess per key, each re-reading every `.tex`.
+  `pynakes.usage.collect_citation_occurrences()` is the engine entry point and
+  is now the module's only citation scanner — `collect_cited_keys()` and
+  `find_key_usages()` are projections of it, so the cite-macro pattern, comment
+  stripping, and position arithmetic are defined once.
+
 - `lint` findings now carry source locations. Each issue in the JSON envelope
   gains a `line` field — the one-based line of the finding's `@type{key,`
   declaration or metadata `@comment` block, `null` for file-level findings and
@@ -124,6 +140,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   trusted indefinitely; this is now stated in the docs.
 
 #### Fixed
+
+- Source line numbers were reported one too high for anything starting
+  mid-line, because the shared helper counted the lines its prefix *spanned*
+  rather than the newlines before the position. It affected `lint`'s new
+  per-issue `line` and the parser's `start_line` whenever a second `@entry`
+  shared a line with the previous block's closing brace, and it would have
+  affected every `\cite` in running text.
 
 - `keys generate` no longer mangles entries with no author/editor or title —
   e.g. a physics paper's `@misc{SM, note = {See Supplemental Material...}}`

@@ -810,6 +810,14 @@ Export only cited entries:
 pynakes tex scan refs.bib paper.tex --out cited-only.bib
 ```
 
+With `--json`, the report's `usages` object locates every citation: each cited
+key maps to its occurrences, one `{path, line, column, text, macro}` per
+`\cite`-family macro that names it. Keys **missing** from the library are in
+there too — a cited key with no entry is the one most worth locating — while an
+entry cited nowhere simply has no occurrences. This is the whole-library
+counterpart to [`keys usage`](#keys), which locates one key at a time
+without needing a `.bib` file at all.
+
 ## combine
 
 Union several `.bib` files into one. Inputs are read-only; the combined file is

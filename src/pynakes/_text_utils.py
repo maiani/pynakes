@@ -148,8 +148,18 @@ def _line_end(text: str, start: int) -> int:
 
 
 def _line_number(text: str, position: int) -> int:
-    """Return the one-based line number at *position* for any line ending."""
-    return len(text[:position].splitlines()) + 1
+    """Return the one-based line number at *position* for any line ending.
+
+    Counts the lines *before* the position rather than the lines the prefix
+    spans, so a position in the middle of a line reports that line and not the
+    next one — which matters wherever a match can start mid-line: a second
+    ``@entry`` sharing a line with the previous block's closing brace, or a
+    ``\\cite`` in running text.
+    """
+    prefix = text[:position]
+    if not prefix:
+        return 1
+    return len(prefix.splitlines()) + (1 if prefix.endswith(("\n", "\r")) else 0)
 
 
 def strip_meta_terminator(value: str) -> str:

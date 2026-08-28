@@ -25,7 +25,7 @@ from pynakes.engine import Bibliography
 from pynakes.io import save_text
 from pynakes.usage import (
     analyze_usage,
-    collect_cited_keys,
+    collect_citation_occurrences,
     resolve_existing_tex_sources,
     subset_library,
     tag_with_group,
@@ -72,8 +72,14 @@ def used(
             "No sources given and no 'tex-sources' metadata to fall back to",
         )
         return
-    cited, include_all, scanned = collect_cited_keys(resolved_sources)
-    report = analyze_usage(coll.lib, cited, include_all=include_all, sources=scanned)
+    occurrences, include_all, scanned = collect_citation_occurrences(resolved_sources)
+    report = analyze_usage(
+        coll.lib,
+        set(occurrences),
+        include_all=include_all,
+        sources=scanned,
+        usages=occurrences,
+    )
 
     tagged = 0
     tag_field = None

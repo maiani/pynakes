@@ -9,7 +9,7 @@ export a subset library containing only the cited entries.
 
 import re
 from collections.abc import Iterable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from pynakes._text_utils import _line_number
@@ -25,6 +25,7 @@ __all__ = [
     "extract_keys_from_aux",
     "extract_keys_from_tex",
     "collect_cited_keys",
+    "collect_citation_occurrences",
     "find_key_usages",
     "iter_tex_files",
     "rename_citation_key_in_tex",
@@ -122,6 +123,10 @@ _TEX_CITE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# The leading command name of a matched citation macro, for reporting which
+# macro cited a key (``cite``, ``citep``, ``textcite``, ...).
+_MACRO_NAME_RE = re.compile(r"\\([a-zA-Z]+)")
+
 _KEYWORDS_DELIM = ","
 _KEYWORDS_JOIN = ", "
 
@@ -136,6 +141,13 @@ class UsageReport:
     cited_count: int
     sources: list[str]
     include_all: bool = False
+    usages: dict[str, list["KeyUsageMatch"]] = field(default_factory=dict)
+    """Every citation occurrence, keyed by the citation key it cites.
+
+    Covers keys in ``missing`` as well as those in ``used``: a key cited by a
+    source but absent from the library is exactly the one a caller most needs
+    to locate.  Empty when occurrences were not collected.
+    """
 
     def to_dict(self) -> dict:
         """Serialize the usage report to a JSON-friendly dict for CLI output."""
@@ -146,6 +158,9 @@ class UsageReport:
             "cited_count": self.cited_count,
             "sources": list(self.sources),
             "include_all": self.include_all,
+            "usages": {
+                key: [match.to_dict() for match in matches] for key, matches in self.usages.items()
+            },
         }
 
 
@@ -212,6 +227,92 @@ def _iter_source_files(paths: Iterable[str]) -> Iterator[Path]:
             raise FileNotFoundError(f"Source not found: {path_str}")
 
 
+@dataclass
+class KeyUsageMatch:
+    """One ``\\cite``-family macro occurrence citing a specific key."""
+
+    path: str
+    line: int
+    text: str
+    column: int = 1
+    """One-based column of the macro's leading backslash on its line."""
+    macro: str = ""
+    """The citing command's name without its backslash (``cite``, ``citep``, ...)."""
+
+    def to_dict(self) -> dict:
+        """Serialize the match to a JSON-friendly dict for CLI output."""
+        return {
+            "path": self.path,
+            "line": self.line,
+            "text": self.text,
+            "column": self.column,
+            "macro": self.macro,
+        }
+
+
+def _iter_text_occurrences(text: str, path: Path) -> Iterator[tuple[str, KeyUsageMatch]]:
+    """Yield ``(key, occurrence)`` for every citation in one source file's text.
+
+    The single citation scanner in this module: every caller that needs
+    locations goes through it, so the cite-macro pattern, the ``.aux``
+    ``\\citation`` pattern, comment stripping, and position arithmetic are
+    defined once.  ``.aux`` files are read with the generated-citation pattern;
+    anything else is treated as TeX source with its line comments stripped
+    first — which preserves the line and column of everything left, since only
+    text from an unescaped ``%`` to the end of its line is removed.
+    """
+    is_aux = path.suffix.lower() == ".aux"
+    scanned = text if is_aux else _strip_tex_comments(text)
+    pattern = _AUX_CITATION_RE if is_aux else _TEX_CITE_RE
+    for match in pattern.finditer(scanned):
+        raw = match.group(0)
+        name = _MACRO_NAME_RE.match(raw)
+        line_start = scanned.rfind("\n", 0, match.start()) + 1
+        for key in _split_keys(match.group(1)):
+            yield (
+                key,
+                KeyUsageMatch(
+                    path=str(path),
+                    line=_line_number(scanned, match.start()),
+                    text=raw.strip(),
+                    column=match.start() - line_start + 1,
+                    macro=name.group(1) if name else "",
+                ),
+            )
+
+
+def collect_citation_occurrences(
+    paths: Iterable[str],
+) -> tuple[dict[str, list[KeyUsageMatch]], bool, list[str]]:
+    """Locate every citation in a set of sources, keyed by citation key.
+
+    One pass over each file answers both "which keys are cited" and "where is
+    each one cited", so a caller wanting locations for a whole library never
+    re-reads a source per key.
+
+    Returns:
+        ``(occurrences, include_all, scanned)``.  ``occurrences`` maps each
+        cited key to its occurrences in scan order; ``include_all`` is True if
+        a ``\\nocite{*}`` was seen (meaning every entry counts as used), and
+        ``scanned`` is the list of files actually read.  A ``\\nocite{*}``
+        records no occurrence of its own, since ``*`` is not a citation key.
+    """
+    occurrences: dict[str, list[KeyUsageMatch]] = {}
+    include_all = False
+    scanned: list[str] = []
+
+    for path in _iter_source_files(paths):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        scanned.append(str(path))
+        for key, occurrence in _iter_text_occurrences(text, path):
+            if key == "*":
+                include_all = True
+            else:
+                occurrences.setdefault(key, []).append(occurrence)
+
+    return occurrences, include_all, scanned
+
+
 def collect_cited_keys(paths: Iterable[str]) -> tuple[set[str], bool, list[str]]:
     """Collect cited keys from a set of .tex/.aux files and/or directories.
 
@@ -220,37 +321,8 @@ def collect_cited_keys(paths: Iterable[str]) -> tuple[set[str], bool, list[str]]
         ``\\nocite{*}`` was seen (meaning every entry counts as used), and
         ``scanned`` is the list of files actually read.
     """
-    keys: set[str] = set()
-    include_all = False
-    scanned: list[str] = []
-
-    for path in _iter_source_files(paths):
-        text = path.read_text(encoding="utf-8", errors="replace")
-        if path.suffix.lower() == ".aux":
-            found = extract_keys_from_aux(text)
-        else:
-            found = extract_keys_from_tex(text)
-        scanned.append(str(path))
-        for key in found:
-            if key == "*":
-                include_all = True
-            else:
-                keys.add(key)
-
-    return keys, include_all, scanned
-
-
-@dataclass
-class KeyUsageMatch:
-    """One ``\\cite``-family macro occurrence citing a specific key."""
-
-    path: str
-    line: int
-    text: str
-
-    def to_dict(self) -> dict:
-        """Serialize the match to a JSON-friendly dict for CLI output."""
-        return {"path": self.path, "line": self.line, "text": self.text}
+    occurrences, include_all, scanned = collect_citation_occurrences(paths)
+    return set(occurrences), include_all, scanned
 
 
 def find_key_usages(key: str, paths: Iterable[str]) -> tuple[list[KeyUsageMatch], list[str]]:
@@ -260,7 +332,9 @@ def find_key_usages(key: str, paths: Iterable[str]) -> tuple[list[KeyUsageMatch]
     consults ``tex-sources`` metadata: it scans exactly the given files or
     directories, so a caller can check one key's blast radius over sources
     ``tex add`` deliberately does not track (frozen snapshots, generated
-    diffs) without registering them first.
+    diffs) without registering them first.  It also scans ``.tex`` sources
+    only, where :func:`collect_citation_occurrences` also reads generated
+    ``.aux`` files.
 
     Returns ``(matches, scanned)``, where ``scanned`` lists every ``.tex`` file
     examined, matched or not.
@@ -270,16 +344,11 @@ def find_key_usages(key: str, paths: Iterable[str]) -> tuple[list[KeyUsageMatch]
     for tex_path in iter_tex_files(paths):
         scanned.append(str(tex_path))
         text = tex_path.read_text(encoding="utf-8", errors="replace")
-        cleaned = _strip_tex_comments(text)
-        for match in _TEX_CITE_RE.finditer(cleaned):
-            if key in _split_keys(match.group(1)):
-                matches.append(
-                    KeyUsageMatch(
-                        path=str(tex_path),
-                        line=_line_number(cleaned, match.start()),
-                        text=match.group(0).strip(),
-                    )
-                )
+        matches.extend(
+            occurrence
+            for cited, occurrence in _iter_text_occurrences(text, tex_path)
+            if cited == key
+        )
     return matches, scanned
 
 
@@ -403,8 +472,14 @@ def analyze_usage(
     cited_keys: set[str],
     include_all: bool = False,
     sources: list[str] | None = None,
+    usages: dict[str, list[KeyUsageMatch]] | None = None,
 ) -> UsageReport:
-    """Compare a library's entries against the set of cited keys."""
+    """Compare a library's entries against the set of cited keys.
+
+    ``usages`` optionally carries the citation occurrences behind
+    ``cited_keys`` — from :func:`collect_citation_occurrences` — and is passed
+    through to the report unchanged.
+    """
     bib_keys = list(dict.fromkeys(lib.entries.keys()))  # unique, order-preserving
     bib_set = set(bib_keys)
 
@@ -424,6 +499,7 @@ def analyze_usage(
         cited_count=len(cited_keys),
         sources=sources or [],
         include_all=include_all,
+        usages=usages or {},
     )
 
 
