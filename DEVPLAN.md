@@ -23,11 +23,62 @@ nor this client. See
 
 - **The extension** — a VS Code / Open VSX client in `editor/`, distributed as a
   `.vsix`. It browses one bibliography as an entry table, shows the declared
-  group hierarchy, runs the engine's search, surfaces lint findings, and stages
-  field edits for review as an exact diff before commit. Still to build:
-  linked-material (Pinax) state, navigation between TeX citations and entries,
-  and surfacing the single-bibliography analysis reports once those land in
-  v0.8.
+  group hierarchy, runs the engine's search, surfaces lint findings as in-view
+  markers and native diagnostics, and stages field edits for review as an exact
+  diff before commit. The three items below are what remains before it earns the
+  milestone; surfacing the single-bibliography analysis reports waits on v0.8.
+- **Citation integration (TeX ↔ entries)** — the capability that makes this
+  client project-scoped rather than a second bibliography browser. Everything
+  shipped so far is scope-neutral: a standalone GUI could offer it and Bimas
+  will, whereas only a client living inside the editor can connect an entry to
+  the `\cite` that motivates it. It is also what the
+  [cite-as-you-write rejection](#deliberately-out-of-scope) promises in place of
+  JabRef's daemon, so leaving it unbuilt leaves that rejection unearned.
+
+  *Engine first*: there is no whole-library citation index. `tex scan --json`
+  reports `used`/`unused`/`missing` key **sets** with no locations, and
+  `keys usage KEY --path` locates one key at a time while taking no `.bib`. A
+  view needs `key → [{path, line, column, text, macro}]` for every key, and
+  located occurrences for the *missing* ones too — the actionable half — from a
+  single pass over each source. Looping `keys usage` per key would be N
+  subprocesses each re-reading every `.tex`, precisely the client-side workaround
+  the thin-client rule forbids. Extend `tex scan --json` with those occurrences
+  rather than adding a second scanner: `usage.py` already holds the cite-macro
+  regex, the comment stripping, and the per-key matcher.
+
+  *Client then*: a cited/uncited marker per row; `Cited` / `Uncited` /
+  `Undefined` filters (the second answers *what can this manuscript's
+  bibliography drop*, the third *what must be imported*); a "cited at" list in
+  the detail pane that jumps to the `.tex` line; the reverse jump from a
+  `\cite{key}` under the cursor to its entry, offering `ref import` when the key
+  resolves to nothing; and undefined citations published as diagnostics on the
+  `.tex` file, reusing the path built for lint findings. It also makes the
+  existing citation-key rename trustworthy — the blast radius becomes visible
+  before the rename is approved.
+- **Linked-material (Pinax) state, and opening a material** — the table says
+  nothing today about whether an entry's PDF is on disk, and clicking a file
+  cannot open it. Both facts already exist in the envelope: `asset check --json`
+  returns every BibLaTeX `file`-field link with an absolute `resolved_path` and a
+  status (`ok`/`missing`/`wrong_type`/`unresolved`), plus — for a library
+  declaring `pinax-files-dir` — a `pinax` section giving each key's deterministic
+  material paths with a presence boolean per kind. So this is client work with no
+  engine gap: a material marker per row, the per-kind list in the detail pane,
+  opening a resolved path in VS Code or the OS handler, and `asset fetch` offered
+  for a missing one under the same explicit-network rule the CLI keeps.
+
+  The discipline that matters here: the client must never *construct* a material
+  path. `<key><suffix>.pdf` is the Pinax layout, and rebuilding it in TypeScript
+  would put the store's addressing scheme in two places — a thin-client violation
+  that breaks silently the moment the layout moves. Paths come from the envelope
+  or the material is not shown; a path the envelope does not carry is engine work.
+- **Entry and group mutation** — adding and removing whole entries (`ref add`,
+  `ref import` by DOI/arXiv/URL, `ref remove`), editing group membership, and
+  resolving a duplicate pair through `dedupe merge`. No engine gap: each command
+  already supports `--dry-run --diff`, so each drops into the existing
+  preview-and-commit flow. Ranked after the two items above because a user can
+  fall back to one terminal line meanwhile, which is not true of anything the
+  editor context uniquely enables — but an editor that cannot add a reference is
+  not the client this milestone describes, so it ships inside it.
 - **Distribution without a pynakes install** — the extension bundles the engine,
   so it needs a Python 3.11+ interpreter but no `pip install`. Every runtime
   dependency is a pure-Python wheel, so one universal build covers every
@@ -52,10 +103,12 @@ nor this client. See
   other key-changing operation) once that relationship exists.
 
 **Done when**: the extension covers project-scoped browsing, search, lint,
-groups, linked-material state, TeX navigation, and staged edits with
-diff-and-approve; it is published as a `.vsix`; every gap it surfaced was closed
-in the engine rather than worked around in the client; its checks run in CI;
-CHANGELOG updated; version bumped to 0.7.0.
+groups, and staged edits with diff-and-approve; citation navigation in both
+directions over an engine-provided citation index; linked-material state, with a
+click that opens the material; and adding, removing, and grouping entries. It is
+published as a `.vsix`; every gap it surfaced was closed in the engine rather
+than worked around in the client; its checks run in CI; CHANGELOG updated;
+version bumped to 0.7.0.
 
 ---
 
