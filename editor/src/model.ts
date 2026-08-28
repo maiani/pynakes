@@ -397,3 +397,108 @@ export interface KeysRenameConflict {
 }
 
 export type KeysRenameEnvelope = KeysRenameSuccess | KeysRenameConflict | InspectError;
+
+// ---------------------------------------------------------------------------
+// The bibliography's neighbours: the TeX sources that cite it, and the
+// materials it points to. Both describe files *around* the `.bib`, which is
+// why they are read from the saved file at its real location — see
+// `readNeighbours` in `library.ts`.
+// ---------------------------------------------------------------------------
+
+/** One `\cite`-family occurrence, as `tex scan --json` locates it. */
+export interface CitationOccurrence {
+  path: string;
+  /** One-based line within that file. */
+  line: number;
+  /** One-based column of the macro's leading backslash. */
+  column: number;
+  /** The whole matched macro, e.g. `\citep[see][]{A,B}`. */
+  text: string;
+  /** The citing command's name without its backslash: `cite`, `citep`, ... */
+  macro: string;
+}
+
+export interface TexScanReport {
+  used: string[];
+  unused: string[];
+  /** Cited keys no entry declares. */
+  missing: string[];
+  cited_count: number;
+  /** Source files actually read. */
+  sources: string[];
+  /** True when a `\nocite{*}` makes every entry count as used. */
+  include_all: boolean;
+  /** Every occurrence, keyed by the citation key it cites. */
+  usages: Record<string, CitationOccurrence[]>;
+}
+
+export interface TexScanSuccess {
+  status: "success";
+  action: "used";
+  file: string;
+  report: TexScanReport;
+}
+
+export type TexScanEnvelope = TexScanSuccess | InspectError;
+
+/** One attachment parsed from an entry's BibLaTeX `file` field. */
+export interface LinkedFile {
+  entry_key: string;
+  field: string;
+  index: number;
+  description: string | null;
+  /** The path as the field stores it. */
+  path: string;
+  /** The descriptor's type word, e.g. `PDF` or `directory`. */
+  kind: string | null;
+  /** Absolute path the engine resolved it to, or `null` when it found none. */
+  resolved_path: string | null;
+  status: "ok" | "missing" | "wrong_type" | "unresolved";
+}
+
+/** Deterministic Pinax material paths for one citation key. */
+export interface MaterialPaths {
+  key: string;
+  published_pdf: string;
+  preprint_pdf: string;
+  preprint_source: string;
+  supplement_pdf: string;
+  erratum_pdf: string;
+}
+
+/** Which of one entry's deterministic material paths exist on disk. */
+export interface MaterialPresence {
+  key: string;
+  paths: MaterialPaths;
+  published_pdf: boolean;
+  preprint_pdf: boolean;
+  preprint_source: boolean;
+  supplement_pdf: boolean;
+  erratum_pdf: boolean;
+  any_present: boolean;
+}
+
+export interface PinaxScan {
+  root: string;
+  entries: MaterialPresence[];
+  /** Material-shaped files whose citation key is not in the library. */
+  orphans: Array<{ key: string; kind: string; path: string }>;
+  drift: Array<Record<string, string>>;
+}
+
+export interface AssetCheckSuccess {
+  status: "success";
+  action: "files_check";
+  file: string;
+  checked: number;
+  ok: number;
+  missing: number;
+  wrong_type: number;
+  unresolved: number;
+  files: LinkedFile[];
+  issues: LinkedFile[];
+  /** Present only when the library declares `pinax-files-dir`. */
+  pinax?: PinaxScan;
+}
+
+export type AssetCheckEnvelope = AssetCheckSuccess | InspectError;

@@ -12,6 +12,7 @@ window.PV = window.PV || {};
     query: document.getElementById("query"),
     where: document.getElementById("where"),
     fuzzy: document.getElementById("fuzzy"),
+    uncited: document.getElementById("uncited"),
     counts: document.getElementById("counts"),
     banner: document.getElementById("banner"),
     notice: document.getElementById("notice"),
@@ -61,6 +62,13 @@ window.PV = window.PV || {};
   elements.query.value = PV.state.search.query;
   elements.where.value = PV.state.search.where;
   elements.fuzzy.checked = PV.state.search.fuzzy;
+  elements.uncited.checked = PV.state.uncitedOnly;
+
+  elements.uncited.addEventListener("change", () => {
+    PV.state.uncitedOnly = elements.uncited.checked;
+    PV.persist();
+    PV.renderTable();
+  });
 
   let searchTimer;
   function requestSearch() {
@@ -183,6 +191,8 @@ window.PV = window.PV || {};
         s.groups = message.payload.groups || [];
         s.groupsByEntry = message.payload.groupsByEntry || {};
         s.lint = message.payload.lint || null;
+        s.citations = message.payload.citations || null;
+        s.materials = message.payload.materials || null;
         s.warnings = message.payload.warnings || [];
         s.engine = message.engine;
         s.dirty = message.dirty;

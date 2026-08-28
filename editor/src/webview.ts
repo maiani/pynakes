@@ -81,6 +81,9 @@ export function renderShell(webview: vscode.Webview, extensionUri: vscode.Uri): 
   <label class="toggle" title="Also match misspellings and inflections by similarity">
     <input id="fuzzy" type="checkbox"> fuzzy
   </label>
+  <label class="toggle" title="Show only entries no linked TeX source cites">
+    <input id="uncited" type="checkbox"> uncited
+  </label>
   <span id="counts" class="counts" aria-live="polite"></span>
 </header>
 <div id="banner" class="banner" hidden></div>

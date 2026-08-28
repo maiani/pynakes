@@ -1033,3 +1033,56 @@ body.resizing * {
   color: var(--vscode-gitDecoration-modifiedResourceForeground, var(--vscode-foreground));
 }
 
+
+/* Citation and material state: per-row markers, and the detail-pane lists. */
+.uncited-mark {
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.7;
+}
+
+.material-mark {
+  color: var(--vscode-charts-blue, var(--vscode-textLink-foreground));
+}
+
+.material-mark.material-broken {
+  color: var(--vscode-editorWarning-foreground);
+}
+
+.material,
+.citation {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+  padding: 1px 0;
+}
+
+.material-note {
+  color: var(--vscode-editorWarning-foreground);
+  font-size: 0.9em;
+}
+
+.citation-macro {
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.9em;
+}
+
+/* A text-like button for a path that opens something. */
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--vscode-textLink-foreground);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.link-button:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.link-button:disabled {
+  color: var(--vscode-descriptionForeground);
+  cursor: default;
+}

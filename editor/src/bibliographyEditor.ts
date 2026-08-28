@@ -14,7 +14,13 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { resolveEngine, type ResolvedEngine } from "./engineDiscovery";
-import { lintDiagnostics, type LintIndex } from "./insights";
+import {
+  citationDiagnostics,
+  lintDiagnostics,
+  type CitationIndex,
+  type LintIndex,
+  type MaterialIndex,
+} from "./insights";
 import type { LintSeverity, Summary } from "./model";
 import {
   commitEdits,
@@ -101,6 +107,11 @@ interface ViewMessage {
   query?: string;
   where?: string;
   fuzzy?: boolean;
+  /** Absolute path, for `openMaterial` and `openCitation`. */
+  path?: string;
+  /** One-based position within that file, for `openCitation`. */
+  line?: number;
+  column?: number;
 }
 
 export class BibliographyEditorProvider implements vscode.CustomTextEditorProvider {
@@ -134,11 +145,31 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
    */
   private readonly diagnostics: vscode.DiagnosticCollection;
 
+  /**
+   * Undefined citations, published against the `.tex` files that make them.
+   *
+   * A separate collection from the lint findings because it describes different
+   * files: a citation with no entry behind it is a problem in the source that
+   * cites it, so that is where the squiggle belongs. Keeping it separate also
+   * means clearing one can never silently drop the other.
+   */
+  private readonly citationDiagnostics: vscode.DiagnosticCollection;
+
+  /**
+   * Paths the engine reported for the file currently shown in each panel.
+   *
+   * `openMaterial` and `openCitation` open a path the webview names, and the
+   * webview is the least trustworthy part of this extension — so a path is
+   * opened only when the last read actually reported it.
+   */
+  private readonly openablePaths = new WeakMap<vscode.WebviewPanel, Set<string>>();
+
   private constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly statusItem: vscode.StatusBarItem,
   ) {
     this.diagnostics = vscode.languages.createDiagnosticCollection("pynakes");
+    this.citationDiagnostics = vscode.languages.createDiagnosticCollection("pynakes-citations");
   }
 
   public static register(context: vscode.ExtensionContext): vscode.Disposable {
@@ -162,7 +193,13 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         refresh();
       }
     });
-    return vscode.Disposable.from(registration, refreshCommand, statusItem, provider.diagnostics);
+    return vscode.Disposable.from(
+      registration,
+      refreshCommand,
+      statusItem,
+      provider.diagnostics,
+      provider.citationDiagnostics,
+    );
   }
 
   public async resolveCustomTextEditor(
@@ -217,6 +254,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         if (closed.uri.toString() === document.uri.toString()) {
           this.staging.delete(document.uri.toString());
           this.diagnostics.delete(document.uri);
+          this.citationDiagnostics.clear();
         }
       }),
       panel.webview.onDidReceiveMessage((message: ViewMessage) => {
@@ -270,6 +308,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       // A failed read leaves the previous findings pointing into content the
       // engine could no longer read; Problems must go quiet with the view.
       this.diagnostics.delete(document.uri);
+      this.citationDiagnostics.clear();
       void panel.webview.postMessage(reportFailure(await this.describeFailure(error, document)));
     } finally {
       await mirror?.release();
@@ -279,9 +318,10 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
   /** Read the document through the engine and hand the result to the view. */
   private async load(document: vscode.TextDocument, panel: vscode.WebviewPanel): Promise<void> {
     await this.withMirror(document, panel, async ({ engine, command, cwd, source }) => {
-      const result = await readLibrary(command, source, cwd);
+      const result = await readLibrary(command, source, cwd, this.neighbourPath(document));
       if (!result.ok) {
         this.diagnostics.delete(document.uri);
+        this.citationDiagnostics.clear();
         void panel.webview.postMessage({
           type: "parseError",
           error: result.error.error,
@@ -292,6 +332,8 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       }
       const settings = this.viewSettings(document);
       this.publishDiagnostics(document, result.read.lint, settings.showFindings);
+      this.publishCitationDiagnostics(result.read.citations, settings.showFindings);
+      this.openablePaths.set(panel, collectOpenablePaths(result.read.citations, result.read.materials));
       this.statusByPanel.set(panel, {
         summary: result.read.summary,
         findings: result.read.lint?.counts,
@@ -422,8 +464,56 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       groups: read.groups,
       groupsByEntry: read.groupsByEntry,
       lint: read.lint,
+      citations: read.citations,
+      materials: read.materials,
       warnings: read.warnings,
     };
+  }
+
+  /**
+   * The document's real path on disk, for the reads about its neighbours.
+   *
+   * A dirty buffer is mirrored to a temporary file for every other read, but
+   * `tex-sources`, `pinax-files-dir`, and relative `file` paths all resolve
+   * from the `.bib`'s own directory — from a temp directory they resolve to
+   * nothing. A document with no path on disk (never saved, or not a local
+   * file) has no neighbours to read.
+   */
+  private neighbourPath(document: vscode.TextDocument): string | undefined {
+    return document.uri.scheme === "file" ? document.uri.fsPath : undefined;
+  }
+
+  /**
+   * Publish (or withdraw) undefined citations as diagnostics on the `.tex`
+   * files that make them.
+   *
+   * Gated by the same `pynakes.showFindings` setting as the lint findings: both
+   * are advisory validation, and a user who turned findings off did not ask for
+   * one kind to keep reporting. The whole collection is replaced on every read,
+   * so a citation that has since been resolved cannot linger.
+   */
+  private publishCitationDiagnostics(
+    citations: CitationIndex | null,
+    showFindings: boolean,
+  ): void {
+    this.citationDiagnostics.clear();
+    if (!showFindings || !citations) {
+      return;
+    }
+    for (const file of citationDiagnostics(citations)) {
+      const diagnostics = file.items.map((item) => {
+        const start = new vscode.Position(item.line, item.column);
+        const diagnostic = new vscode.Diagnostic(
+          new vscode.Range(start, start.translate(0, item.length)),
+          item.message,
+          vscode.DiagnosticSeverity.Warning,
+        );
+        diagnostic.source = "pynakes";
+        diagnostic.code = "undefined-citation";
+        return diagnostic;
+      });
+      this.citationDiagnostics.set(vscode.Uri.file(file.path), diagnostics);
+    }
   }
 
   /**
@@ -620,6 +710,12 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         return;
       case "openSettings":
         await vscode.commands.executeCommand("workbench.action.openSettings", "pynakes");
+        return;
+      case "openMaterial":
+        await this.openMaterial(panel, message.path);
+        return;
+      case "openCitation":
+        await this.openCitation(panel, message.path, message.line, message.column);
         return;
       default:
         return;
@@ -964,6 +1060,85 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
 
   // -- navigation -----------------------------------------------------------
 
+  /**
+   * Open one of an entry's materials.
+   *
+   * Handed to the operating system rather than opened in VS Code: a material is
+   * a PDF or a source archive, and the editor has no viewer for either. A
+   * directory is revealed in the file manager instead of "opened".
+   */
+  private async openMaterial(panel: vscode.WebviewPanel, target?: string): Promise<void> {
+    const resolved = this.resolveOpenable(panel, target);
+    if (!resolved) {
+      return;
+    }
+    const uri = vscode.Uri.file(resolved);
+    let isDirectory = false;
+    try {
+      isDirectory = (await vscode.workspace.fs.stat(uri)).type === vscode.FileType.Directory;
+    } catch {
+      void vscode.window.showWarningMessage(
+        `${path.basename(resolved)} is no longer there. Re-read the file to refresh its materials.`,
+      );
+      return;
+    }
+    if (isDirectory) {
+      await vscode.commands.executeCommand("revealFileInOS", uri);
+      return;
+    }
+    await vscode.env.openExternal(uri);
+  }
+
+  /** Open a `.tex` source at one `\cite` occurrence. */
+  private async openCitation(
+    panel: vscode.WebviewPanel,
+    target?: string,
+    line?: number,
+    column?: number,
+  ): Promise<void> {
+    const resolved = this.resolveOpenable(panel, target);
+    if (!resolved) {
+      return;
+    }
+    let document: vscode.TextDocument;
+    try {
+      document = await vscode.workspace.openTextDocument(vscode.Uri.file(resolved));
+    } catch {
+      void vscode.window.showWarningMessage(`Could not open ${path.basename(resolved)}.`);
+      return;
+    }
+    // The engine reports one-based positions, and the source may have been
+    // edited since it read them, so both are clamped rather than trusted.
+    const row = Math.min(Math.max(0, (line ?? 1) - 1), Math.max(0, document.lineCount - 1));
+    const text = document.lineAt(row);
+    const col = Math.min(Math.max(0, (column ?? 1) - 1), text.text.length);
+    const position = new vscode.Position(row, col);
+    const selection = new vscode.Range(position, position);
+    const editor = await vscode.window.showTextDocument(document, {
+      viewColumn: vscode.ViewColumn.Beside,
+      preview: false,
+      selection,
+    });
+    editor.revealRange(selection, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+  }
+
+  /**
+   * Accept a path from the webview only when the last read reported it.
+   *
+   * The webview is this extension's least trustworthy input, and both open
+   * actions hand a path to the operating system, so the path has to have come
+   * from the engine rather than merely arrived in a message.
+   */
+  private resolveOpenable(panel: vscode.WebviewPanel, target?: string): string | undefined {
+    if (target && this.openablePaths.get(panel)?.has(target)) {
+      return target;
+    }
+    void vscode.window.showWarningMessage(
+      "That file is not one this bibliography reported. Re-read the file and try again.",
+    );
+    return undefined;
+  }
+
   /** Open the source text beside the view, at the entry's declaration. */
   private async revealEntry(document: vscode.TextDocument, key: string): Promise<void> {
     const pattern = new RegExp(`@[A-Za-z]+\\s*[{(]\\s*${escapeRegExp(key)}\\s*,`);
@@ -980,6 +1155,32 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       void vscode.window.showWarningMessage(`Could not locate "${key}" in the source text.`);
     }
   }
+}
+
+/**
+ * Every path the view may ask to open: citation sources and existing materials.
+ *
+ * Built from the engine's own output, so the check in `resolveOpenable` accepts
+ * exactly what this read reported and nothing else.
+ */
+function collectOpenablePaths(
+  citations: CitationIndex | null,
+  materials: MaterialIndex | null,
+): Set<string> {
+  const paths = new Set<string>();
+  for (const occurrences of Object.values(citations?.byKey ?? {})) {
+    for (const occurrence of occurrences) {
+      paths.add(occurrence.path);
+    }
+  }
+  for (const list of Object.values(materials?.byKey ?? {})) {
+    for (const material of list) {
+      if (material.path) {
+        paths.add(material.path);
+      }
+    }
+  }
+  return paths;
 }
 
 function escapeRegExp(value: string): string {

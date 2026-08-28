@@ -277,6 +277,12 @@ window.PV = window.PV || {};
     return head;
   }
 
+  /** Last two path segments, enough to tell one source from another. */
+  function shortPath(value) {
+    const parts = String(value).split(/[\\/]/).filter(Boolean);
+    return parts.slice(-2).join("/");
+  }
+
   function membership(row) {
     const groups = PV.state.groupsByEntry?.[row.key] || [];
     const issues = PV.state.lint?.byKey?.[row.key] || [];
@@ -297,6 +303,86 @@ window.PV = window.PV || {};
         list.appendChild(chip);
       }
       section.appendChild(list);
+      fragment.appendChild(section);
+    }
+
+    const materials = PV.materialsOf(row.key);
+    if (materials.length > 0) {
+      const section = document.createElement("div");
+      section.className = "detail-section";
+      const heading = document.createElement("h3");
+      heading.textContent = "Materials";
+      section.appendChild(heading);
+      for (const material of materials) {
+        const line = document.createElement("div");
+        line.className = "material" + (material.present ? "" : " material-missing");
+
+        const open = document.createElement("button");
+        open.type = "button";
+        open.className = "link-button";
+        open.textContent = material.label;
+        open.disabled = !material.present || !material.path;
+        open.title = material.present
+          ? "Open " + material.path
+          : material.path
+            ? "Not on disk: " + material.path
+            : "The engine could not resolve this link to a path";
+        // The path came from the engine and travels back unchanged; the client
+        // never builds a material path of its own.
+        open.addEventListener("click", () =>
+          PV.post({ type: "openMaterial", path: material.path }),
+        );
+        line.appendChild(open);
+
+        if (!material.present) {
+          const note = document.createElement("span");
+          note.className = "material-note";
+          note.textContent = material.status === "wrong_type" ? "wrong type" : "missing";
+          line.appendChild(note);
+        }
+        section.appendChild(line);
+      }
+      fragment.appendChild(section);
+    }
+
+    const cites = PV.citationsOf(row.key);
+    if (PV.state.citations) {
+      const section = document.createElement("div");
+      section.className = "detail-section";
+      const heading = document.createElement("h3");
+      heading.textContent = cites.length > 0 ? "Cited at (" + cites.length + ")" : "Citations";
+      section.appendChild(heading);
+      if (cites.length === 0) {
+        const note = document.createElement("p");
+        note.className = "hint";
+        note.textContent = PV.state.citations.includeAll
+          ? "A \\nocite{*} in the sources cites every entry."
+          : "No linked TeX source cites this entry.";
+        section.appendChild(note);
+      }
+      for (const cite of cites) {
+        const line = document.createElement("div");
+        line.className = "citation";
+        const open = document.createElement("button");
+        open.type = "button";
+        open.className = "link-button";
+        open.textContent = shortPath(cite.path) + ":" + cite.line;
+        open.title = cite.text + "\n" + cite.path;
+        open.addEventListener("click", () =>
+          PV.post({
+            type: "openCitation",
+            path: cite.path,
+            line: cite.line,
+            column: cite.column,
+          }),
+        );
+        line.appendChild(open);
+        const macro = document.createElement("span");
+        macro.className = "citation-macro";
+        macro.textContent = "\\" + cite.macro;
+        line.appendChild(macro);
+        section.appendChild(line);
+      }
       fragment.appendChild(section);
     }
 

@@ -212,6 +212,24 @@ window.PV = window.PV || {};
         mark.title = issues.map((issue) => `${issue.severity}: ${issue.message}`).join("\n");
         status.appendChild(mark);
       }
+      if (s.citations && !PV.isCited(row.key)) {
+        const uncited = document.createElement("span");
+        uncited.className = "uncited-mark";
+        uncited.textContent = "○";
+        uncited.title = "No linked TeX source cites this entry";
+        status.appendChild(uncited);
+      }
+      const materials = PV.materialsOf(row.key);
+      if (materials.length > 0) {
+        const mark = document.createElement("span");
+        const broken = materials.some((material) => !material.present);
+        mark.className = "material-mark" + (broken ? " material-broken" : "");
+        mark.textContent = "🗎";
+        mark.title = materials
+          .map((material) => material.label + (material.present ? "" : " — missing"))
+          .join("\n");
+        status.appendChild(mark);
+      }
       tr.appendChild(status);
 
       const type = document.createElement("td");

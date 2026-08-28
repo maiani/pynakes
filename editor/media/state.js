@@ -23,6 +23,10 @@ window.PV = window.PV || {};
     groups: [],
     groupsByEntry: {},
     lint: null,
+    /** Citation occurrences per key, from the linked TeX sources. */
+    citations: null,
+    /** Materials per key, with whether each is on disk. */
+    materials: null,
     engine: null,
     warnings: [],
     dirty: false,
@@ -40,6 +44,8 @@ window.PV = window.PV || {};
       busy: false,
     },
     showFindings: true,
+    /** When set, the table shows only entries no linked TeX source cites. */
+    uncitedOnly: Boolean(persisted.uncitedOnly),
     selectedGroup: persisted.selectedGroup || null,
     collapsedGroups: new Set(Array.isArray(persisted.collapsed) ? persisted.collapsed : []),
     sidebarCollapsed: Boolean(persisted.sidebarCollapsed),
@@ -90,6 +96,7 @@ window.PV = window.PV || {};
       sortColumn: s.sortColumn,
       sortDescending: s.sortDescending,
       panelCollapsed: s.panelCollapsed,
+      uncitedOnly: s.uncitedOnly,
       dock: s.dock,
       paneDock: s.paneDock,
       columnWidths: s.columnWidths,
@@ -132,6 +139,28 @@ window.PV = window.PV || {};
 
   /** The pending change for one field, or undefined. */
   PV.stagedField = (key, field) => PV.state.staging.entries?.[key]?.fields?.[field];
+
+  /**
+   * True when a linked TeX source cites this key.
+   *
+   * A `\nocite{*}` cites everything, so it makes every entry cited. With no
+   * citation read at all (no linked sources, or an unsaved new file) nothing is
+   * known, which is not the same as uncited — callers check `state.citations`
+   * before showing either.
+   */
+  PV.isCited = (key) => {
+    const index = PV.state.citations;
+    if (!index) {
+      return false;
+    }
+    return index.includeAll || (index.byKey?.[key] || []).length > 0;
+  };
+
+  /** Where this key is cited, in scan order. */
+  PV.citationsOf = (key) => PV.state.citations?.byKey?.[key] || [];
+
+  /** The materials this entry points to, present ones first. */
+  PV.materialsOf = (key) => PV.state.materials?.byKey?.[key] || [];
 
   /** True when the entry has any pending change. */
   PV.entryStaged = (key) => Boolean(PV.state.staging.entries?.[key]);
@@ -190,6 +219,9 @@ window.PV = window.PV || {};
     if (s.search.keys) {
       const allowed = new Set(s.search.keys);
       rows = rows.filter((row) => allowed.has(row.key));
+    }
+    if (s.uncitedOnly && s.citations) {
+      rows = rows.filter((row) => !PV.isCited(row.key));
     }
     if (s.selectedGroup) {
       const node = PV.findGroup(s.selectedGroup);

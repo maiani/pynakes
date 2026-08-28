@@ -5,7 +5,17 @@
  * Knows nothing about VS Code: it takes a resolved command and a file path.
  */
 
-import { buildGroupTree, groupsByEntry, indexLint, type GroupNode, type LintIndex } from "./insights";
+import {
+  buildGroupTree,
+  groupsByEntry,
+  indexCitations,
+  indexLint,
+  indexMaterials,
+  type CitationIndex,
+  type GroupNode,
+  type LintIndex,
+  type MaterialIndex,
+} from "./insights";
 import type {
   EntryRow,
   FieldComparison,
@@ -19,6 +29,7 @@ import {
   type PynakesCommand,
   type RefEditRequest,
   type SearchOptions,
+  assetCheck,
   groupsList,
   groupsTree,
   inspectBib,
@@ -27,6 +38,7 @@ import {
   refCompare,
   refEdit,
   searchBib,
+  texScan,
 } from "./pynakes";
 
 /** Everything the view needs about a bibliography. */
@@ -37,6 +49,10 @@ export interface LibraryRead {
   /** Group names per citation key, for the detail pane. */
   groupsByEntry: Record<string, string[]>;
   lint: LintIndex | null;
+  /** What the linked TeX sources cite, when any are declared and readable. */
+  citations: CitationIndex | null;
+  /** Which of each entry's materials are on disk, when any are linked. */
+  materials: MaterialIndex | null;
   /** Non-fatal problems with the supplementary reads. */
   warnings: string[];
 }
@@ -48,21 +64,36 @@ export type LibraryReadResult =
 /**
  * Read a bibliography.
  *
- * `inspect` is authoritative: if it fails, there is no view to show. The group
- * and lint reads are supplementary, so a failure there degrades to a warning
- * and an otherwise working table rather than an error page. All four run
- * concurrently — they are independent reads of the same immutable file.
+ * `inspect` is authoritative: if it fails, there is no view to show. Every
+ * other read is supplementary, so a failure there degrades to a warning and an
+ * otherwise working table rather than an error page. They all run concurrently
+ * — independent reads of a file nothing is writing.
+ *
+ * `neighbourPath` is where the citation and material reads look, and it is
+ * deliberately not `filePath`. Those two reads are about the files *around* the
+ * bibliography — the `.tex` sources that cite it, the PDFs it points to — and
+ * every path leading to them (`tex-sources`, `pinax-files-dir`, a relative
+ * `file` field) is resolved by the engine relative to the `.bib`'s own
+ * directory. A buffer with unsaved changes is read through a mirror in a
+ * temporary directory, where all of those would resolve to nothing and the view
+ * would claim a library has no sources and no materials. So the caller passes
+ * the document's real path on disk, and omits it when the document has none
+ * (never saved, or not a local file) — the cost being that unsaved edits to a
+ * `file` field or to `tex-sources` are not reflected until the file is saved.
  */
 export async function readLibrary(
   command: PynakesCommand,
   filePath: string,
   cwd?: string,
+  neighbourPath?: string,
 ): Promise<LibraryReadResult> {
-  const [inspected, tree, list, lint] = await Promise.all([
+  const [inspected, tree, list, lint, scan, assets] = await Promise.all([
     inspectBib(command, filePath, cwd),
     groupsTree(command, filePath, cwd),
     groupsList(command, filePath, cwd),
     lintBib(command, filePath, cwd),
+    neighbourPath ? texScan(command, neighbourPath, cwd) : undefined,
+    neighbourPath ? assetCheck(command, neighbourPath, cwd) : undefined,
   ]);
 
   if (inspected.status === "error") {
@@ -80,6 +111,15 @@ export async function readLibrary(
   if (lint.status === "error") {
     warnings.push(`Validation unavailable: ${lint.message}`);
   }
+  // A library that declares no TeX sources is the ordinary case, not a problem
+  // to report: the engine says `NoSources` and the view simply shows no
+  // citation state. Anything else went wrong and is worth saying out loud.
+  if (scan?.status === "error" && scan.error !== "NoSources") {
+    warnings.push(`Citations unavailable: ${scan.message}`);
+  }
+  if (assets?.status === "error") {
+    warnings.push(`Material state unavailable: ${assets.message}`);
+  }
 
   return {
     ok: true,
@@ -89,6 +129,8 @@ export async function readLibrary(
       groups: buildGroupTree(tree.status === "success" ? tree.tree : [], membership),
       groupsByEntry: list.status === "success" ? groupsByEntry(list) : {},
       lint: lint.status === "success" ? indexLint(lint) : null,
+      citations: scan?.status === "success" ? indexCitations(scan) : null,
+      materials: assets?.status === "success" ? indexMaterials(assets) : null,
       warnings,
     },
   };

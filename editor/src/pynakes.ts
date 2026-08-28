@@ -14,6 +14,7 @@ import { execFile } from "node:child_process";
 import type { PynakesCommand } from "./engineDiscovery";
 import { extractVersion } from "./version";
 import type {
+  AssetCheckEnvelope,
   GroupsListEnvelope,
   GroupsTreeEnvelope,
   InspectEnvelope,
@@ -22,6 +23,7 @@ import type {
   RefCompareEnvelope,
   RefEditEnvelope,
   SearchEnvelope,
+  TexScanEnvelope,
 } from "./model";
 
 export type { PynakesCommand } from "./engineDiscovery";
@@ -163,6 +165,36 @@ export function lintBib(
   cwd?: string,
 ): Promise<LintEnvelope> {
   return runJson<LintEnvelope>(command, ["lint", filePath], cwd);
+}
+
+/**
+ * Which entries the linked TeX sources cite, and where each citation is.
+ *
+ * Scans the sources the library's `tex-sources` metadata names. A library that
+ * declares none is an error envelope (`NoSources`), not an empty report — the
+ * caller decides whether that is worth reporting.
+ */
+export function texScan(
+  command: PynakesCommand,
+  filePath: string,
+  cwd?: string,
+): Promise<TexScanEnvelope> {
+  return runJson<TexScanEnvelope>(command, ["tex", "scan", filePath], cwd);
+}
+
+/**
+ * Linked-file and Pinax material state: which of an entry's files exist.
+ *
+ * Read-only without `--strict`, so issues come back in the envelope rather than
+ * as a non-zero exit. Every path in the result is resolved by the engine; the
+ * client never constructs one.
+ */
+export function assetCheck(
+  command: PynakesCommand,
+  filePath: string,
+  cwd?: string,
+): Promise<AssetCheckEnvelope> {
+  return runJson<AssetCheckEnvelope>(command, ["asset", "check", filePath], cwd);
 }
 
 /** Options mirroring the flags `search` actually accepts. */

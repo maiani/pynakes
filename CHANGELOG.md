@@ -221,6 +221,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Network access is controlled by the new `pynakes.allowOnlineLookups`
   setting (on by default); with it off, compare still runs but reports that
   online lookups are disabled rather than silently doing nothing.
+- The view now shows which entries the manuscript cites, and where. With
+  `tex-sources` declared, entries nothing cites carry a `○` marker and a
+  new **uncited** toggle narrows the table to them; an entry's **Cited at**
+  list opens the `.tex` file at that `\cite`, positioned by the engine's
+  per-occurrence line and column. Citations naming a key no entry declares are
+  published as diagnostics on the `.tex` file that makes them, so an undefined
+  citation appears in Problems where it was typed rather than as a note about
+  the bibliography. All of it comes from the engine's new `tex scan --json`
+  citation index; the client scans nothing itself.
+
+- Entries with linked files now carry a `🗎` marker, and the detail pane
+  lists each material by kind — published PDF, preprint, source, supplement,
+  erratum for a Pinax store, plus any BibLaTeX `file`-field link — marking a
+  missing or wrong-type link rather than hiding it. Clicking one opens it with
+  the operating system's handler; a directory is revealed in the file manager.
+  Every path comes from `asset check --json`: the client never constructs
+  `<key><suffix>.pdf` itself, since that is the Pinax store's addressing
+  scheme and belongs in one place. A path the view asks to open is opened only
+  when the last read actually reported it.
+
+  Both reads take the document's real path on disk rather than the temporary
+  mirror used for an unsaved buffer, because `tex-sources`, `pinax-files-dir`,
+  and relative `file` paths all resolve from the `.bib`'s own directory — from a
+  temp directory they resolve to nothing, and the view would report a library
+  with no sources and no materials. The cost, noted in the README, is that an
+  unsaved edit to `tex-sources` or to a `file` field is not reflected until the
+  file is saved.
+
 - The view's findings are now published as native VS Code diagnostics, so they
   appear in the Problems panel — and as squiggles in any text editor showing
   the same `.bib` file — in addition to the in-view severity markers and the

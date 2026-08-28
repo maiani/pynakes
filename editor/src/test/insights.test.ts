@@ -4,13 +4,22 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildGroupTree,
+  citationDiagnostics,
   groupsByEntry,
+  indexCitations,
   indexLint,
+  indexMaterials,
+  isCited,
   lintDiagnostics,
   worseSeverity,
 } from "../insights.js";
 import type { GroupNode } from "../insights.js";
-import type { GroupsTreeNode, LintSuccess } from "../model.js";
+import type {
+  AssetCheckSuccess,
+  GroupsTreeNode,
+  LintSuccess,
+  TexScanSuccess,
+} from "../model.js";
 
 function node(name: string, parent = "", extra: Partial<GroupsTreeNode> = {}): GroupsTreeNode {
   return {
@@ -219,4 +228,218 @@ test("groupsByEntry inverts membership and sorts each entry's groups", () => {
 
   assert.deepEqual(byEntry.Newton1687, ["Mechanics", "Optics"]);
   assert.deepEqual(byEntry.Huygens1690, ["Waves"]);
+});
+
+// --- citations -------------------------------------------------------------
+
+function scan(report: Partial<TexScanSuccess["report"]>): TexScanSuccess {
+  return {
+    status: "success",
+    action: "used",
+    file: "refs.bib",
+    report: {
+      used: [],
+      unused: [],
+      missing: [],
+      cited_count: 0,
+      sources: ["paper.tex"],
+      include_all: false,
+      usages: {},
+      ...report,
+    },
+  };
+}
+
+function occurrence(path: string, line: number, column = 1, macro = "cite") {
+  return { path, line, column, macro, text: "\\cite{K}" };
+}
+
+test("indexCitations keeps occurrences per key and sorts undefined citations", () => {
+  const index = indexCitations(
+    scan({
+      used: ["Newton1687"],
+      missing: ["Zeta", "Alpha"],
+      cited_count: 3,
+      usages: {
+        Newton1687: [occurrence("paper.tex", 12), occurrence("intro.tex", 3, 5, "citep")],
+        Zeta: [occurrence("paper.tex", 20)],
+        Alpha: [occurrence("paper.tex", 21)],
+      },
+    }),
+  );
+
+  assert.deepEqual(index.undefinedKeys, ["Alpha", "Zeta"]);
+  assert.equal(index.byKey.Newton1687.length, 2);
+  assert.deepEqual(index.sources, ["paper.tex"]);
+  assert.equal(index.citedCount, 3);
+});
+
+test("isCited reads the occurrence map, not the report's used list", () => {
+  // The rows come from the buffer while the scan reads the saved file, so an
+  // unsaved new entry must not be called "cited" or "uncited" by the engine's
+  // own partition of a library it read at a different moment.
+  const index = indexCitations(scan({ used: [], usages: { Newton1687: [occurrence("p.tex", 1)] } }));
+
+  assert.equal(isCited(index, "Newton1687"), true);
+  assert.equal(isCited(index, "Euler1748"), false);
+  assert.equal(isCited(null, "Newton1687"), false);
+});
+
+test("a nocite star makes every entry cited", () => {
+  const index = indexCitations(scan({ include_all: true }));
+
+  assert.equal(isCited(index, "AnythingAtAll"), true);
+});
+
+test("citationDiagnostics groups undefined citations by file with zero-based positions", () => {
+  const index = indexCitations(
+    scan({
+      missing: ["Missing2099"],
+      usages: {
+        Missing2099: [occurrence("b.tex", 7, 3), occurrence("a.tex", 2, 1)],
+      },
+    }),
+  );
+
+  const files = citationDiagnostics(index);
+
+  assert.deepEqual(
+    files.map((file) => file.path),
+    ["a.tex", "b.tex"],
+  );
+  const item = files[1].items[0];
+  assert.equal(item.line, 6);
+  assert.equal(item.column, 2);
+  assert.equal(item.length, "\\cite{K}".length);
+  assert.match(item.message, /Missing2099/);
+});
+
+test("a cited key that exists is not a diagnostic", () => {
+  const index = indexCitations(
+    scan({ used: ["Newton1687"], usages: { Newton1687: [occurrence("a.tex", 1)] } }),
+  );
+
+  assert.deepEqual(citationDiagnostics(index), []);
+});
+
+// --- materials -------------------------------------------------------------
+
+function paths(key: string, root = "/w/refs.files") {
+  return {
+    key,
+    published_pdf: `${root}/${key}.published.pdf`,
+    preprint_pdf: `${root}/${key}.preprint.pdf`,
+    preprint_source: `${root}/${key}.source`,
+    supplement_pdf: `${root}/${key}.supplement.pdf`,
+    erratum_pdf: `${root}/${key}.erratum.pdf`,
+  };
+}
+
+test("indexMaterials lists only the Pinax materials that exist", () => {
+  const envelope: AssetCheckSuccess = {
+    status: "success",
+    action: "files_check",
+    file: "refs.bib",
+    checked: 0,
+    ok: 0,
+    missing: 0,
+    wrong_type: 0,
+    unresolved: 0,
+    files: [],
+    issues: [],
+    pinax: {
+      root: "/w/refs.files",
+      entries: [
+        {
+          key: "Newton1687",
+          paths: paths("Newton1687"),
+          published_pdf: true,
+          preprint_pdf: false,
+          preprint_source: true,
+          supplement_pdf: false,
+          erratum_pdf: false,
+          any_present: true,
+        },
+        {
+          key: "Euler1748",
+          paths: paths("Euler1748"),
+          published_pdf: false,
+          preprint_pdf: false,
+          preprint_source: false,
+          supplement_pdf: false,
+          erratum_pdf: false,
+          any_present: false,
+        },
+      ],
+      orphans: [{ key: "Ghost", kind: "published_pdf", path: "/w/refs.files/Ghost.published.pdf" }],
+      drift: [],
+    },
+  };
+
+  const index = indexMaterials(envelope);
+
+  assert.deepEqual(
+    index.byKey.Newton1687.map((material) => [material.kind, material.path, material.present]),
+    [
+      ["published_pdf", "/w/refs.files/Newton1687.published.pdf", true],
+      ["preprint_source", "/w/refs.files/Newton1687.source", true],
+    ],
+  );
+  // An entry whose store holds nothing has no materials, not five absent ones.
+  assert.equal(index.byKey.Euler1748, undefined);
+  assert.equal(index.pinaxRoot, "/w/refs.files");
+  assert.equal(index.orphanCount, 1);
+});
+
+test("indexMaterials keeps a broken file-field link, marked not present", () => {
+  const envelope: AssetCheckSuccess = {
+    status: "success",
+    action: "files_check",
+    file: "refs.bib",
+    checked: 2,
+    ok: 1,
+    missing: 1,
+    wrong_type: 0,
+    unresolved: 0,
+    issues: [],
+    files: [
+      {
+        entry_key: "Newton1687",
+        field: "file",
+        index: 0,
+        description: "Principia",
+        path: "pdfs/principia.pdf",
+        kind: "PDF",
+        resolved_path: "/w/pdfs/principia.pdf",
+        status: "ok",
+      },
+      {
+        entry_key: "Euler1748",
+        field: "file",
+        index: 0,
+        description: null,
+        path: "pdfs/gone.pdf",
+        kind: null,
+        resolved_path: null,
+        status: "missing",
+      },
+    ],
+  };
+
+  const index = indexMaterials(envelope);
+
+  assert.deepEqual(index.byKey.Newton1687[0], {
+    kind: "pdf",
+    label: "Principia",
+    path: "/w/pdfs/principia.pdf",
+    present: true,
+    origin: "file",
+    status: "ok",
+  });
+  const broken = index.byKey.Euler1748[0];
+  assert.equal(broken.present, false);
+  assert.equal(broken.path, null);
+  assert.equal(broken.label, "Linked file");
+  assert.equal(index.brokenCount, 1);
+  assert.equal(index.pinaxRoot, null);
 });

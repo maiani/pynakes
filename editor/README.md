@@ -85,8 +85,34 @@ file to agree. When `files.autoSave` is on, the buffer is saved for you, because
 that is what the editor would do moments later anyway. With autosave off, saving
 is your decision, so it is asked for rather than assumed.
 
-Not yet: linked-material (Pinax) state, TeX citation navigation, adding and
-removing whole entries, group editing, and duplicate merging.
+**Citations, and the sources that make them.** When the library declares
+`tex-sources`, the engine's citation index says which entries the manuscript
+actually cites. Entries nothing cites carry a `○` marker, and the **uncited**
+toggle narrows the table to them — the "what can this bibliography drop"
+question. An entry's **Cited at** list opens the `.tex` file at that `\cite`,
+and citations naming a key no entry declares are published as diagnostics *on
+the source file that makes them*, so an undefined citation appears where it was
+typed. Nothing is guessed locally: every occurrence's file, line, and column
+comes from `tex scan --json`.
+
+**Materials.** Entries whose linked files exist carry a `🗎` marker, and the
+detail pane lists them by kind — published PDF, preprint, source, supplement,
+erratum for a Pinax store, plus any BibLaTeX `file`-field link — with a missing
+or wrong-type link marked rather than hidden. Clicking one opens it with the
+operating system's handler (a directory is revealed in the file manager
+instead). The client never *builds* a material path: `<key><suffix>.pdf` is the
+Pinax store's addressing scheme, and every path shown here came from
+`asset check --json`.
+
+These two reads are about the files *around* the bibliography, so they read the
+`.bib` as saved, at its real location — `tex-sources`, `pinax-files-dir`, and a
+relative `file` path all resolve from the `.bib`'s own directory, and the
+temporary mirror used for an unsaved buffer has neither. The cost is that an
+unsaved edit to a `file` field or to `tex-sources` is not reflected until you
+save.
+
+Not yet: adding and removing whole entries, group editing, and duplicate
+merging.
 
 ## Scope: this client is project-scoped
 
@@ -169,7 +195,7 @@ To make it the default for `.bib`:
 ```
 
 In the view: type to search, click a column header to sort, click a group to
-filter, `↑`/`↓` to move between entries, `Enter` or a double-click to open the
+filter, click a material or a citation to open it, `↑`/`↓` to move between entries, `Enter` or a double-click to open the
 entry's declaration in the source text, `Ctrl`/`Cmd`+`F` to focus the search box.
 
 ## Developing
