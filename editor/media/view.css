@@ -161,7 +161,9 @@ body {
 
 .banner[hidden],
 .notice[hidden],
-.commit-bar[hidden] {
+.commit-bar[hidden],
+.pane-dock[hidden],
+.pane-splitter[hidden] {
   display: none;
 }
 
@@ -245,12 +247,41 @@ body {
   overflow: auto;
 }
 
-.detail {
-  flex: 0 0 clamp(250px, 28%, 380px);
+/* A dock is a relocatable pane container — the right dock (default home of the
+   entry editor) and the bottom dock (default home of findings and the diff).
+   It is only rendered when it holds at least one pane, and a dock with a single
+   pane shows it directly without a tab row. */
+.pane-dock {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  padding: 10px 12px;
-  overflow: auto;
+  min-height: 0;
+}
+
+.right-dock {
+  flex: 0 0 clamp(250px, 28%, 380px);
   background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
+}
+
+/*
+ * The right dock's body gets the editor's breathing room (it renders direct
+ * content, not a panel), while the bottom dock renders findings/diff that read
+ * best against a full-width panel.
+ */
+.right-dock .pane-body {
+  padding: 10px 12px;
+}
+
+.bottom-dock {
+  flex: 0 0 34%;
+}
+
+.bottom-dock.collapsed {
+  flex: 0 0 auto;
+}
+
+.bottom-dock.collapsed .pane-body {
+  display: none;
 }
 
 /* A splitter is a flex sibling between two panes, so it both draws the
@@ -290,7 +321,7 @@ body.resizing-row * {
     flex-direction: column;
   }
 
-  .detail {
+  .right-dock {
     flex: 0 0 auto;
     max-height: 45%;
   }
@@ -749,31 +780,40 @@ body.resizing * {
   color: var(--vscode-descriptionForeground);
 }
 
-/* Bottom panel ----------------------------------------------------------- */
+/* Panes --------------------------------------------------------- */
 
-.panel {
+.pane-tabs {
   display: flex;
-  flex: 0 0 34%;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.panel.collapsed {
   flex: 0 0 auto;
-}
-
-.panel.collapsed .panel-body {
-  display: none;
-}
-
-.panel-tabs {
-  display: flex;
   align-items: center;
-  gap: 2px;
   padding: 4px 8px 0;
 }
 
+.pane-tabs-inner {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.pane-tab-holder {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.pane-move {
+  margin-left: -6px;
+  padding: 0 2px;
+  min-width: 18px;
+  min-height: 20px;
+  font-size: 0.9em;
+}
+
 .panel-toggle {
+  flex: 0 0 auto;
   margin-left: auto;
 }
 
@@ -793,7 +833,7 @@ body.resizing * {
   border-bottom-color: var(--vscode-focusBorder);
 }
 
-.panel-body {
+.pane-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;

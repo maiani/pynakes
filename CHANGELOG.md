@@ -241,6 +241,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Changed
 
+- The view's panes — the entry editor, Findings, Staged diff, and Compare — are
+  now relocatable between two docks: the right dock (where the editor normally
+  sits) and the bottom dock (where findings and the diff live). A pane moves via
+  the small arrow beside its tab, and a dock holding more than one pane shows a
+  tab row to choose among them. Its location and the active tab per dock are
+  remembered per workspace, so the editor can live at the bottom as an "Edit"
+  tab or stack with the diff on the right, whichever suits the task.
 - `pynakes.search.fuzzy` and `pynakes.showFindings` are now honored. Both were
   declared but read by nothing: the fuzzy toggle started from persisted view
   state alone (it now seeds from the setting on first open, and a toggle made

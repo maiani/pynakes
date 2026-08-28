@@ -46,7 +46,18 @@ window.PV = window.PV || {};
     selectedKey: persisted.selectedKey || null,
     sortColumn: persisted.sortColumn || "index",
     sortDescending: Boolean(persisted.sortDescending),
-    panel: persisted.panel || "findings",
+    // Which pane is active in each dock ("right" / "bottom").
+    dock: {
+      right: typeof persisted.dock?.right === "string" ? persisted.dock.right : "edit",
+      bottom: typeof persisted.dock?.bottom === "string" ? persisted.dock.bottom : "findings",
+    },
+    // Where each relocatable pane currently lives: "right" or "bottom".
+    paneDock: {
+      edit: persisted.paneDock?.edit || "right",
+      findings: persisted.paneDock?.findings || "bottom",
+      diff: persisted.paneDock?.diff || "bottom",
+      compare: persisted.paneDock?.compare || "bottom",
+    },
     panelCollapsed: Boolean(persisted.panelCollapsed),
     // Column widths in pixels, by column position. Empty means the stylesheet
     // decides; the first drag snapshots the current layout so nothing jumps.
@@ -78,8 +89,9 @@ window.PV = window.PV || {};
       selectedKey: s.selectedKey,
       sortColumn: s.sortColumn,
       sortDescending: s.sortDescending,
-      panel: s.panel,
       panelCollapsed: s.panelCollapsed,
+      dock: s.dock,
+      paneDock: s.paneDock,
       columnWidths: s.columnWidths,
       sidebarWidth: s.sidebarWidth,
       detailWidth: s.detailWidth,
@@ -141,6 +153,18 @@ window.PV = window.PV || {};
       names.add(field);
     }
     return [...names];
+  };
+
+  /**
+   * Bring a pane to the front in whichever dock it currently lives, expanding
+   * that dock. The pane itself does not move — `PV.relocatePane` does that.
+   */
+  PV.showPane = (pane) => {
+    const loc = PV.state.paneDock[pane] || "bottom";
+    PV.state.dock[loc] = pane;
+    PV.state.panelCollapsed = false;
+    PV.persist();
+    PV.renderDocks();
   };
 
   const SORTABLE = {

@@ -97,13 +97,16 @@ export function renderShell(webview: vscode.Webview, extensionUri: vscode.Uri): 
       <p id="empty" class="empty" hidden></p>
     </div>
     <div id="panel-splitter" class="pane-splitter pane-splitter-horizontal" title="Drag to resize; double-click to reset"></div>
-    <section id="panel" class="panel" aria-label="Findings and staged changes">
-      <div id="panel-tabs" class="panel-tabs" role="tablist"></div>
-      <div id="panel-body" class="panel-body"></div>
+    <section id="bottom-dock" class="pane-dock bottom-dock" aria-label="Bottom panes">
+      <div id="bottom-tabs" class="pane-tabs" role="tablist"></div>
+      <div id="bottom-body" class="pane-body"></div>
     </section>
   </section>
   <div id="detail-splitter" class="pane-splitter" title="Drag to resize; double-click to reset"></div>
-  <aside id="detail" class="detail" aria-label="Entry details"></aside>
+  <aside id="right-dock" class="pane-dock right-dock" aria-label="Entry editing and other panes">
+    <div id="right-tabs" class="pane-tabs" role="tablist"></div>
+    <div id="right-body" class="pane-body"></div>
+  </aside>
 </main>
 <div id="commit-bar" class="commit-bar" hidden></div>
 ${scripts}

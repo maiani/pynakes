@@ -13,12 +13,12 @@ window.PV = window.PV || {};
   const MIN_PANE = 120;
   const MIN_PANEL_HEIGHT = 80;
 
-  let sidebar, detail, panelEl;
+  let sidebar, rightDock, bottomDock;
 
   PV.layoutInit = (elements) => {
     sidebar = elements.sidebar;
-    detail = elements.detail;
-    panelEl = elements.panel;
+    rightDock = elements.detail;
+    bottomDock = elements.panel;
 
     PV.applyPaneSizes();
 
@@ -32,7 +32,7 @@ window.PV = window.PV || {};
     installSplitter(elements.detailSplitter, {
       axis: "x",
       sign: -1,
-      measure: () => detail.getBoundingClientRect().width,
+      measure: () => rightDock.getBoundingClientRect().width,
       get: () => PV.state.detailWidth,
       set: (value) => (PV.state.detailWidth = value),
     });
@@ -40,7 +40,7 @@ window.PV = window.PV || {};
       axis: "y",
       sign: -1,
       min: MIN_PANEL_HEIGHT,
-      measure: () => panelEl.getBoundingClientRect().height,
+      measure: () => bottomDock.getBoundingClientRect().height,
       get: () => PV.state.panelHeight,
       set: (value) => (PV.state.panelHeight = value),
     });
@@ -56,8 +56,8 @@ window.PV = window.PV || {};
     const s = PV.state;
     sidebar.style.flexBasis =
       !s.sidebarCollapsed && typeof s.sidebarWidth === "number" ? s.sidebarWidth + "px" : "";
-    detail.style.flexBasis = typeof s.detailWidth === "number" ? s.detailWidth + "px" : "";
-    panelEl.style.flexBasis =
+    rightDock.style.flexBasis = typeof s.detailWidth === "number" ? s.detailWidth + "px" : "";
+    bottomDock.style.flexBasis =
       !s.panelCollapsed && typeof s.panelHeight === "number" ? s.panelHeight + "px" : "";
   };
 

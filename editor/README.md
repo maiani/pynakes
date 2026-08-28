@@ -57,7 +57,10 @@ findings at once; a failed re-read clears Problems along with the view rather
 than leaving stale entries behind.
 
 **Edit, review, then commit.** Fields are editable in the detail pane, along with
-the entry type; fields can be added and removed. Nothing is written when you
+the entry type; fields can be added and removed. The panes are relocatable: Edit,
+Findings, the staged diff, and Compare each live in either the right dock or the
+bottom dock, moved by the arrow beside their tab, and stack as tabs when one dock
+holds more than one. Nothing is written when you
 type. Edits accumulate as pending changes, **Preview** shows the engine's exact
 unified diff, and committing asks for explicit confirmation with that diff on
 screen. Two properties matter:

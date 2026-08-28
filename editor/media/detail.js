@@ -23,17 +23,12 @@ window.PV = window.PV || {};
 
   const STAGE_DEBOUNCE_MS = 300;
 
-  let container;
   const timers = new Map();
 
-  PV.detailInit = (element) => {
-    container = element;
-  };
-
   /** True while the user is typing in this pane, so a re-render would interrupt. */
-  function hasFocus() {
+  function hasFocus(target) {
     const active = document.activeElement;
-    return Boolean(active && container.contains(active) && active !== container);
+    return Boolean(active && target.contains(active) && active !== target);
   }
 
   function orderedFields(row) {
@@ -125,7 +120,7 @@ window.PV = window.PV || {};
         : "Compare with remote: fetch DOI/arXiv metadata and compare it field by field";
       compare.addEventListener("click", () => {
         PV.state.compareBusy = row.key;
-        PV.renderDetail();
+        PV.renderDocks();
         PV.post({ type: "compareRemote", key: row.key });
       });
       actions.appendChild(compare);
@@ -224,7 +219,7 @@ window.PV = window.PV || {};
         return;
       }
       PV.state.renameBusy = row.key;
-      PV.renderDetail();
+      PV.renderDocks();
       PV.post({ type: "renameKey", key: row.key, newKey: value });
     });
     title.addEventListener("keydown", (event) => {
@@ -322,9 +317,9 @@ window.PV = window.PV || {};
     return fragment;
   }
 
-  PV.renderDetail = (options) => {
+  PV.renderEditBody = (target, options) => {
     // Re-rendering while a field is focused would move the caret or drop it.
-    if (options?.preserveFocus && hasFocus()) {
+    if (options?.preserveFocus && hasFocus(target)) {
       return;
     }
     const s = PV.state;
@@ -335,7 +330,7 @@ window.PV = window.PV || {};
       const hint = document.createElement("p");
       hint.className = "hint";
       hint.textContent = "Select an entry to see and edit its fields.";
-      container.replaceChildren(hint);
+      target.replaceChildren(hint);
       return;
     }
 
@@ -346,6 +341,9 @@ window.PV = window.PV || {};
       fields.appendChild(fieldEditor(row, field, compareFields.includes(field)));
     }
 
-    container.replaceChildren(header(row), fields, addFieldRow(row), membership(row));
+    target.replaceChildren(header(row), fields, addFieldRow(row), membership(row));
   };
+
+  /** Render the Edit pane wherever it currently lives. */
+  PV.renderDetail = (options) => PV.renderDocks(options);
 })(window.PV);

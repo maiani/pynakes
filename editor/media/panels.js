@@ -1,6 +1,12 @@
 // @ts-check
 /**
- * The bottom panel — lint findings and the staged diff — plus the commit bar.
+ * The relocatable panes: Edit, Findings, the staged diff, and Compare.
+ *
+ * Each pane lives in one of two docks — the right dock (where the entry editor
+ * usually sits) or the bottom dock (where findings and the diff usually sit) —
+ * and can be moved between them. A dock holding more than one pane gets a tab
+ * row to choose among them; a move button beside each tab relocates that pane
+ * to the other dock.
  *
  * The diff shown here is the engine's own unified diff, never reconstructed
  * locally, so what the user approves is exactly what `ref edit` will write.
@@ -10,37 +16,159 @@ window.PV = window.PV || {};
 (function (PV) {
   "use strict";
 
-  let panelEl;
-  let tabs;
-  let body;
-  let bar;
-
-  PV.panelsInit = (elements) => {
-    panelEl = elements.panel;
-    tabs = elements.tabs;
-    body = elements.body;
-    bar = elements.bar;
-
-    tabs.addEventListener("click", (event) => {
-      const tab = event.target.closest("[data-panel]");
-      if (!tab) {
-        return;
-      }
-      PV.state.panel = tab.dataset.panel;
-      PV.state.panelCollapsed = false;
-      PV.persist();
-      PV.renderPanels();
-    });
+  /** Pane definitions: canonical order and their labels. */
+  const PANE_ORDER = ["edit", "findings", "diff", "compare"];
+  const PANE_LABEL = {
+    edit: "Edit",
+    findings: "Findings",
+    diff: "Staged diff",
+    compare: "Compare",
   };
 
-  function tabButton(id, label, count) {
+  const els = {};
+
+  PV.panelsInit = (elements) => {
+    els.dock = {
+      right: {
+        root: elements.rightDock,
+        tabs: elements.rightTabs,
+        body: elements.rightBody,
+        splitter: elements.detailSplitter,
+      },
+      bottom: {
+        root: elements.bottomDock,
+        tabs: elements.bottomTabs,
+        body: elements.bottomBody,
+        splitter: elements.panelSplitter,
+      },
+    };
+    els.commitBar = elements.bar;
+  };
+
+  /** Panes living in a dock, in canonical order (findings drops out when disabled). */
+  function panesIn(loc) {
+    return PANE_ORDER.filter(
+      (pane) =>
+        PV.state.paneDock[pane] === loc &&
+        !(pane === "findings" && PV.state.showFindings === false),
+    );
+  }
+
+  /** The dock a pane currently lives in. */
+  function locationOf(pane) {
+    return PV.state.paneDock[pane] === "right" ? "right" : "bottom";
+  }
+
+  function tabCount(pane) {
+    const s = PV.state;
+    if (pane === "findings") {
+      return s.showFindings !== false && s.lint ? s.lint.counts.total : null;
+    }
+    if (pane === "diff") {
+      return s.counts.fields || null;
+    }
+    return null;
+  }
+
+  /** A tab button selecting `pane`, plus a button that moves it to the other dock. */
+  function paneTab(pane) {
+    const fragment = document.createDocumentFragment();
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "tab" + (PV.state.panel === id ? " active" : "");
-    button.dataset.panel = id;
-    button.textContent = count === null ? label : label + " (" + count + ")";
-    return button;
+    button.className = "tab";
+    button.dataset.pane = pane;
+    const count = tabCount(pane);
+    button.textContent = count === null ? PANE_LABEL[pane] : PANE_LABEL[pane] + " (" + count + ")";
+    button.addEventListener("click", () => {
+      PV.state.dock[locationOf(pane)] = pane;
+      PV.persist();
+      PV.renderDocks();
+    });
+    fragment.appendChild(button);
+
+    const move = document.createElement("button");
+    move.type = "button";
+    move.className = "icon-button pane-move";
+    const other = locationOf(pane) === "right" ? "bottom" : "right";
+    move.textContent = locationOf(pane) === "right" ? "▾" : "▸";
+    move.title = "Move this pane to the " + (other === "right" ? "right" : "bottom");
+    move.addEventListener("click", () => relocatePane(pane, other));
+    fragment.appendChild(move);
+    return fragment;
   }
+
+  /** Relocate a pane to the other dock and show it there. */
+  function relocatePane(pane, to) {
+    const s = PV.state;
+    s.paneDock[pane] = to;
+    s.dock[to] = pane;
+    PV.persist();
+    PV.renderDocks();
+  }
+
+  function renderDock(loc, options) {
+    const s = PV.state;
+    const dock = els.dock[loc];
+    const panes = panesIn(loc);
+    const hasPanes = panes.length > 0;
+    dock.root.hidden = !hasPanes;
+    dock.splitter.hidden = !hasPanes;
+    if (!hasPanes) {
+      dock.tabs.replaceChildren();
+      dock.body.replaceChildren();
+      return;
+    }
+
+    const active = panes.includes(s.dock[loc]) ? s.dock[loc] : panes[0];
+    s.dock[loc] = active;
+
+    dock.root.classList.toggle("collapsed", loc === "bottom" && s.panelCollapsed);
+
+    const tabs = document.createElement("div");
+    tabs.className = "pane-tabs-inner";
+    for (const pane of panes) {
+      const holder = document.createElement("span");
+      holder.className = "pane-tab-holder" + (pane === active ? " active" : "");
+      const tab = paneTab(pane);
+      holder.appendChild(tab);
+      tab.querySelector(".tab").classList.add("active");
+      tabs.appendChild(holder);
+    }
+
+    if (loc === "bottom") {
+      tabs.appendChild(collapseToggle());
+    }
+    dock.tabs.replaceChildren(tabs);
+
+    const target = document.createElement("div");
+    target.className = "pane-content";
+    renderPane(active, target, options);
+    dock.body.replaceChildren(target);
+  }
+
+  /** Render one pane's content into `target`. */
+  function renderPane(pane, target, options) {
+    if (pane === "findings") {
+      return renderFindings(target);
+    }
+    if (pane === "diff") {
+      return renderDiff(target);
+    }
+    if (pane === "compare") {
+      return renderCompare(target);
+    }
+    if (pane === "edit") {
+      return PV.renderEditBody(target, options);
+    }
+    return undefined;
+  }
+
+  PV.renderDocks = (options) => {
+    PV.applyPaneSizes();
+    renderDock("right", options);
+    renderDock("bottom", options);
+    renderCommitBar();
+  };
 
   function renderFindings(target) {
     const lint = PV.state.lint;
@@ -434,46 +562,15 @@ window.PV = window.PV || {};
     button.addEventListener("click", () => {
       PV.state.panelCollapsed = !PV.state.panelCollapsed;
       PV.persist();
-      PV.renderPanels();
+      PV.renderDocks();
     });
     return button;
   }
-
-  PV.renderPanels = () => {
-    const s = PV.state;
-    panelEl.classList.toggle("collapsed", s.panelCollapsed);
-    PV.applyPaneSizes();
-    const showFindings = s.showFindings !== false;
-    if (!showFindings && s.panel === "findings") {
-      s.panel = "diff";
-    }
-    const findingCount = showFindings && s.lint ? s.lint.counts.total : null;
-    tabs.replaceChildren(
-      ...(showFindings ? [tabButton("findings", "Findings", findingCount)] : []),
-      tabButton("diff", "Staged diff", s.counts.fields || null),
-      tabButton("compare", "Compare", null),
-      collapseToggle(),
-    );
-
-    const target = document.createElement("div");
-    target.className = "panel-content";
-    if (s.panel === "diff") {
-      renderDiff(target);
-    } else if (s.panel === "compare") {
-      renderCompare(target);
-    } else {
-      renderFindings(target);
-    }
-    body.replaceChildren(target);
-
-    renderCommitBar();
-  };
-
   function renderCommitBar() {
     const s = PV.state;
     if (s.counts.fields === 0) {
-      bar.hidden = true;
-      bar.replaceChildren();
+      els.commitBar.hidden = true;
+      els.commitBar.replaceChildren();
       return;
     }
 
@@ -491,7 +588,7 @@ window.PV = window.PV || {};
     preview.className = "button";
     preview.textContent = "Preview";
     preview.addEventListener("click", () => {
-      PV.state.panel = "diff";
+      PV.state.dock[locationOf("diff")] = "diff";
       PV.state.panelCollapsed = false;
       PV.persist();
       PV.post({ type: "preview" });
@@ -509,13 +606,13 @@ window.PV = window.PV || {};
     commit.textContent = "Apply";
     commit.title = "Show the diff and ask for confirmation before writing";
     commit.addEventListener("click", () => {
-      PV.state.panel = "diff";
+      PV.state.dock[locationOf("diff")] = "diff";
       PV.state.panelCollapsed = false;
       PV.persist();
       PV.post({ type: "commit" });
     });
 
-    bar.replaceChildren(summary, preview, discard, commit);
-    bar.hidden = false;
+    els.commitBar.replaceChildren(summary, preview, discard, commit);
+    els.commitBar.hidden = false;
   }
 })(window.PV);

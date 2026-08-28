@@ -18,10 +18,12 @@ window.PV = window.PV || {};
     groups: document.getElementById("groups"),
     rows: document.getElementById("rows"),
     empty: document.getElementById("empty"),
-    detail: document.getElementById("detail"),
-    panel: document.getElementById("panel"),
-    panelTabs: document.getElementById("panel-tabs"),
-    panelBody: document.getElementById("panel-body"),
+    rightDock: document.getElementById("right-dock"),
+    rightTabs: document.getElementById("right-tabs"),
+    rightBody: document.getElementById("right-body"),
+    bottomDock: document.getElementById("bottom-dock"),
+    bottomTabs: document.getElementById("bottom-tabs"),
+    bottomBody: document.getElementById("bottom-body"),
     commitBar: document.getElementById("commit-bar"),
     headers: document.querySelectorAll("th[data-col]"),
     sidebarSplitter: document.getElementById("sidebar-splitter"),
@@ -36,17 +38,21 @@ window.PV = window.PV || {};
     counts: elements.counts,
   });
   PV.groupsInit(elements.groups);
-  PV.detailInit(elements.detail);
   PV.panelsInit({
-    panel: elements.panel,
-    tabs: elements.panelTabs,
-    body: elements.panelBody,
+    rightDock: elements.rightDock,
+    rightTabs: elements.rightTabs,
+    rightBody: elements.rightBody,
+    bottomDock: elements.bottomDock,
+    bottomTabs: elements.bottomTabs,
+    bottomBody: elements.bottomBody,
+    detailSplitter: elements.detailSplitter,
+    panelSplitter: elements.panelSplitter,
     bar: elements.commitBar,
   });
   PV.layoutInit({
     sidebar: elements.groups,
-    detail: elements.detail,
-    panel: elements.panel,
+    detail: elements.rightDock,
+    panel: elements.bottomDock,
     sidebarSplitter: elements.sidebarSplitter,
     detailSplitter: elements.detailSplitter,
     panelSplitter: elements.panelSplitter,
@@ -69,7 +75,7 @@ window.PV = window.PV || {};
       s.error = null;
       s.busy = false;
       PV.renderTable();
-      PV.renderPanels();
+      PV.renderDocks();
       return;
     }
     s.busy = true;
@@ -163,8 +169,7 @@ window.PV = window.PV || {};
   function renderAll() {
     PV.renderGroups();
     PV.renderTable();
-    PV.renderDetail();
-    PV.renderPanels();
+    PV.renderDocks();
   }
 
   window.addEventListener("message", (event) => {
@@ -213,9 +218,8 @@ window.PV = window.PV || {};
         s.staging = message.staging || { entries: {} };
         s.counts = message.counts || countStaged(s.staging);
         // Keep the caret where it is if the user is still typing in a field.
-        PV.renderDetail({ preserveFocus: true });
+        PV.renderDocks({ preserveFocus: true });
         PV.renderTable();
-        PV.renderPanels();
         break;
       case "searchResult":
         s.search.keys = message.keys;
@@ -223,7 +227,6 @@ window.PV = window.PV || {};
         s.search.error = null;
         s.search.busy = false;
         PV.renderTable();
-        PV.renderPanels();
         clearNotice();
         break;
       case "searchCleared":
@@ -241,9 +244,7 @@ window.PV = window.PV || {};
         break;
       case "diff":
         s.diff = message.entries;
-        s.panel = "diff";
-        s.panelCollapsed = false;
-        PV.renderPanels();
+        PV.showPane("diff");
         break;
       case "compareResult":
         s.compareBusy = null;
@@ -254,18 +255,12 @@ window.PV = window.PV || {};
           fields: message.fields || [],
           warnings: message.warnings || [],
         };
-        s.panel = "compare";
-        s.panelCollapsed = false;
-        PV.renderDetail();
-        PV.renderPanels();
+        PV.showPane("compare");
         break;
       case "compareError":
         s.compareBusy = null;
         s.compare = { key: message.key, error: message.message };
-        s.panel = "compare";
-        s.panelCollapsed = false;
-        PV.renderDetail();
-        PV.renderPanels();
+        PV.showPane("compare");
         break;
       case "keyRenamed":
         s.renameBusy = null;
@@ -277,16 +272,14 @@ window.PV = window.PV || {};
         break;
       case "renameKeyCancelled":
         s.renameBusy = null;
-        PV.renderDetail();
+        PV.renderDocks();
         break;
       case "renameKeyError":
         s.renameBusy = null;
         notify("error", "Rename failed: " + message.message);
-        PV.renderDetail();
+        PV.renderDocks();
         break;
       case "conflict": {
-        s.panel = "diff";
-        s.panelCollapsed = false;
         const detail = message.conflicts
           .map(
             (conflict) =>
@@ -296,7 +289,7 @@ window.PV = window.PV || {};
           )
           .join("\n");
         showBanner("error", message.message, detail, null);
-        PV.renderPanels();
+        PV.showPane("diff");
         break;
       }
       case "committed":
@@ -307,7 +300,7 @@ window.PV = window.PV || {};
             (message.applied.length === 1 ? " entry" : " entries") +
             (message.warnings.length ? " — " + message.warnings.join("; ") : ""),
         );
-        PV.renderPanels();
+        PV.renderDocks();
         break;
       case "commitCancelled":
         notify("info", "Apply cancelled. Nothing was written.");
