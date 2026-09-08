@@ -216,6 +216,16 @@ def test_crossref_metadata_maps_container_volume_issue_and_pages() -> None:
     assert metadata.identifier("doi") == "10.5555/ancient.geometry.1"
 
 
+def test_crossref_uses_article_number_when_page_is_absent() -> None:
+    work = dict(CROSSREF_WORK["message"])
+    work.pop("page")
+    work["article-number"] = "L180501"
+
+    metadata = crossref.metadata_from_work(work, "10.5555/ancient.geometry.1", "bibtex")
+
+    assert metadata.fields["pages"] == "L180501"
+
+
 @pytest.mark.parametrize(
     "crossref_type,entry_type",
     [

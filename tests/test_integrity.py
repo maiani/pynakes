@@ -21,7 +21,7 @@ from pynakes.integrity import (
 )
 from pynakes.progress import EntryProgressEvent
 from pynakes.providers._http import ProviderFetchError
-from pynakes.providers.metadata import aps, doi, openalex, semantic_scholar
+from pynakes.providers.metadata import aps, crossref, doi, openalex, semantic_scholar
 from pynakes.providers.repositories import arxiv
 
 runner = CliRunner()
@@ -52,7 +52,7 @@ ARXIV_XML = """<?xml version="1.0" encoding="UTF-8"?>
     <id>http://arxiv.org/abs/2301.00001v2</id>
     <title>A preprint</title>
     <arxiv:doi>10.5555/published</arxiv:doi>
-    <arxiv:journal_ref>Journal of Published Tests 12, 34</arxiv:journal_ref>
+    <arxiv:journal_ref>Journal of Published Tests 12, 34 (2024)</arxiv:journal_ref>
   </entry>
 </feed>
 """
@@ -197,6 +197,31 @@ def test_enrich_prefers_aps_metadata_and_adds_page_count(monkeypatch) -> None:
     assert entry.fields["numpages"] == "7"
 
 
+def test_enrich_supplements_missing_article_number_from_crossref(monkeypatch) -> None:
+    provider_bibtex = PROVIDER_BIBTEX.replace(
+        "  year = {2024},", "  year = {2024},\n  volume = {12},"
+    )
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda _doi: provider_bibtex)
+    monkeypatch.setattr(
+        crossref,
+        "fetch_work_by_doi",
+        lambda _doi, cache_file=None: {
+            "title": ["A Correct Title"],
+            "container-title": ["Journal of Tests"],
+            "volume": "12",
+            "article-number": "345678",
+            "DOI": "10.5555/example",
+            "type": "journal-article",
+            "published": {"date-parts": [[2024]]},
+        },
+    )
+    lib = parse_bib("@article{A, volume = {12}, doi = {10.5555/example}}\n")
+
+    enrich_library(lib, online=True)
+
+    assert lib.entries["A"].fields["pages"] == "345678"
+
+
 def test_compare_entry_with_remote_lists_differing_and_missing_fields(monkeypatch) -> None:
     monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
     lib = parse_bib(
@@ -223,6 +248,16 @@ def test_compare_entry_with_remote_lists_differing_and_missing_fields(monkeypatc
     assert report.warnings == []
 
 
+def test_compare_treats_full_and_abbreviated_journal_titles_as_equivalent() -> None:
+    lib = parse_bib(
+        "@article{A, journal = {Phys. Rev. B}}\n@article{B, journal = {Physical Review B}}\n"
+    )
+
+    report = compare_entries(lib.entries["A"], lib.entries["B"])
+
+    assert report.fields == []
+
+
 def test_compare_entry_with_remote_falls_back_to_arxiv(monkeypatch) -> None:
     monkeypatch.setattr(arxiv, "fetch_atom", lambda identifier: ARXIV_XML)
     lib = parse_bib(
@@ -237,7 +272,9 @@ def test_compare_entry_with_remote_falls_back_to_arxiv(monkeypatch) -> None:
     by_field = {c.field: c for c in report.fields}
     assert by_field["title"].other == "A preprint"
     assert by_field["doi"].other == "10.5555/published"
-    assert by_field["journal"].other == "Journal of Published Tests 12, 34"
+    assert by_field["journal"].other == "Journal of Published Tests"
+    assert by_field["volume"].other == "12"
+    assert by_field["pages"].other == "34"
 
 
 def test_compare_entry_with_remote_offline_warns_without_fetching(monkeypatch) -> None:
@@ -416,10 +453,42 @@ def test_enrich_published_cli_uses_arxiv_metadata(monkeypatch, tmp_path: Path) -
     assert data["modified"] is True
     assert data["preprints"]["published"] == 1
     assert "+  doi = {10.5555/published}" in data["diff"]
-    assert "+  journal = {Journal of Published Tests 12, 34}" in data["diff"]
+    assert "+  journal = {Journal of Published Tests}" in data["diff"]
+    assert "+  volume = {12}" in data["diff"]
+    assert "+  pages = {34}" in data["diff"]
+    assert "-  year = {2023}" in data["diff"]
+    assert "+  year = {2024}" in data["diff"]
     assert "-@misc{Preprint," in data["diff"]
     assert "+@article{Preprint," in data["diff"]
     assert bib.read_text() == original
+
+
+def test_published_promotion_replaces_arxiv_doi_but_keeps_eprint(monkeypatch) -> None:
+    monkeypatch.setattr(arxiv, "fetch_atom", lambda identifier: ARXIV_XML)
+    lib = parse_bib(
+        "@misc{Preprint,\n"
+        "  eprint = {2301.00001},\n"
+        "  archiveprefix = {arXiv},\n"
+        "  url = {https://arxiv.org/abs/2301.00001},\n"
+        "  abstract = {Useful preprint abstract},\n"
+        "  doi = {10.48550/ARXIV.2301.00001},\n"
+        "  year = {2023}\n"
+        "}\n"
+    )
+
+    check_published(lib, online=True, apply=True)
+
+    entry = lib.entries["Preprint"]
+    assert entry.type == "article"
+    assert entry.fields["doi"] == "10.5555/published"
+    assert entry.fields["journal"] == "Journal of Published Tests"
+    assert entry.fields["volume"] == "12"
+    assert entry.fields["pages"] == "34"
+    assert entry.fields["year"] == "2024"
+    assert entry.fields["eprint"] == "2301.00001"
+    assert entry.fields["archiveprefix"] == "arXiv"
+    assert entry.fields["url"] == "https://arxiv.org/abs/2301.00001"
+    assert entry.fields["abstract"] == "Useful preprint abstract"
 
 
 def test_check_published_promotes_preprint_with_existing_published_metadata() -> None:

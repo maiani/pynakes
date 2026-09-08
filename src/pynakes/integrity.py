@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -18,6 +19,7 @@ from pynakes._text_utils import _normalize_text, entry_year
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.editing import set_entry_field, set_entry_type
 from pynakes.identity import evidence_from_entry
+from pynakes.journals import _journal_titles_equivalent
 from pynakes.keys import _first_author_last_name
 from pynakes.metadata import library_dialect
 from pynakes.model import BibEntry, BibFile
@@ -26,6 +28,7 @@ from pynakes.provider_cache import open_cache
 from pynakes.providers._http import ProviderFetchError
 from pynakes.providers.identity import resolve_arxiv_id_for_doi
 from pynakes.providers.metadata import aps as aps_provider
+from pynakes.providers.metadata import crossref as crossref_provider
 from pynakes.providers.metadata import doi as doi_provider
 from pynakes.providers.preferred_metadata import preferred_metadata_provider
 from pynakes.providers.repositories import arxiv as arxiv_provider
@@ -139,6 +142,7 @@ class PublishedCandidate:
     doi: str | None = None
     journal: str | None = None
     arxiv_id: str | None = None
+    metadata: dict[str, str] = field(default_factory=dict)
     message: str = ""
 
     def to_dict(self) -> dict[str, object]:
@@ -429,6 +433,25 @@ def _enrich_fetch_job(
             result.remote = fetch_doi_entry(normalized, cache_file=cache_file)
         except MetadataFetchError as exc:
             result.warnings.append({"type": "doi_unresolved", "key": key, "message": str(exc)})
+    if (
+        result.remote is not None
+        and result.remote.fields.get("volume")
+        and not (result.remote.fields.get("pages") or result.remote.fields.get("eid"))
+    ):
+        try:
+            work = crossref_provider.fetch_work_by_doi(normalized, cache_file=cache_file)
+            if work:
+                structured = crossref_provider.metadata_from_work(work, normalized, "bibtex")
+                for field_name, value in structured.fields.items():
+                    result.remote.fields.setdefault(field_name, value)
+        except ProviderFetchError as exc:
+            result.warnings.append(
+                {
+                    "type": "crossref_supplement_unresolved",
+                    "key": key,
+                    "message": f"Could not supplement DOI {normalized!r} from Crossref: {exc}",
+                }
+            )
     return result
 
 
@@ -685,6 +708,7 @@ def _finish_arxiv_check(
         status,
         doi=result.get("doi"),
         journal=result.get("journal"),
+        metadata=result,
         message="Published metadata found"
         if status == "published"
         else "No published metadata found",
@@ -865,13 +889,30 @@ def _fetch_arxiv_record(
 def fetch_arxiv_metadata(
     identifier: str, *, cache_file: str | Path | None = None
 ) -> dict[str, str]:
-    """Fetch the published DOI/journal an arXiv preprint links to, if any.
+    """Fetch publication metadata an arXiv preprint links to, if any.
 
     Delegates fetch/parse to :mod:`pynakes.providers.repositories.arxiv` and keeps
-    only the cache lookup here. Returns ``{"doi": ..., "journal": ...}``.
+    only the cache lookup here. A conventional arXiv journal reference is split
+    into journal, volume, pages, and year rather than stored wholesale as a
+    journal title.
     """
     record = _fetch_arxiv_record(identifier, cache_file=cache_file)
-    return {"doi": record.doi, "journal": record.journal}
+    fields = {"doi": record.doi}
+    fields.update(_parse_journal_reference(record.journal))
+    return fields
+
+
+def _parse_journal_reference(value: str) -> dict[str, str]:
+    """Parse the common arXiv ``journal_ref`` shape conservatively."""
+    clean = " ".join(value.split()).rstrip(".")
+    match = re.fullmatch(
+        r"(?P<journal>.+?)\s+(?P<volume>[^\s,]+),\s*"
+        r"(?P<pages>[^\s,]+)(?:\s*\((?P<year>\d{4})\))?",
+        clean,
+    )
+    if match is None:
+        return {"journal": clean} if clean else {}
+    return {name: part for name, part in match.groupdict().items() if part}
 
 
 def _fetch_arxiv_fields(identifier: str, *, cache_file: str | Path | None = None) -> dict[str, str]:
@@ -887,7 +928,7 @@ def _fetch_arxiv_fields(identifier: str, *, cache_file: str | Path | None = None
     if record.doi:
         fields["doi"] = record.doi
     if record.journal:
-        fields["journal"] = record.journal
+        fields.update(_parse_journal_reference(record.journal))
     if record.summary:
         fields["abstract"] = record.summary
     return fields
@@ -995,6 +1036,9 @@ def _diff_fields(entry: BibEntry, other_fields: Mapping[str, str]) -> list[Field
             if field_name == "doi":
                 if _dois_equivalent(local_value, other_value):
                     continue
+            elif field_name in {"journal", "journaltitle"}:
+                if _journal_titles_equivalent(local_value, other_value):
+                    continue
             elif local_value == other_value:
                 continue
         comparisons.append(FieldComparison(field_name, local_value or None, other_value))
@@ -1016,7 +1060,8 @@ def _dois_equivalent(left: str, right: str) -> bool:
 def _apply_published_candidate(
     entry: BibEntry, candidate: PublishedCandidate, report: PublishedReport
 ) -> None:
-    if candidate.doi and not entry.fields.get("doi"):
+    existing_doi = _field_value(entry, "doi").strip()
+    if candidate.doi and (not existing_doi or _doi_is_arxiv(existing_doi)):
         try:
             value = normalize_doi(candidate.doi)
         except ValueError:
@@ -1026,11 +1071,27 @@ def _apply_published_candidate(
     if candidate.journal and not _journal(entry):
         if set_entry_field(entry, "journal", candidate.journal):
             report.updates.append(FieldUpdate(entry.key, "journal", candidate.journal))
+    for field_name in ("volume", "number", "pages", "numpages"):
+        value = candidate.metadata.get(field_name, "").strip()
+        if value and not _field_value(entry, field_name).strip():
+            if set_entry_field(entry, field_name, value):
+                report.updates.append(FieldUpdate(entry.key, field_name, value))
+    published_year = candidate.metadata.get("year", "").strip()
+    if published_year and _field_value(entry, "year").strip() != published_year:
+        if set_entry_field(entry, "year", published_year):
+            report.updates.append(FieldUpdate(entry.key, "year", published_year))
     if entry.type.lower() in {"misc", "online", "unpublished"} and (
         candidate.doi or candidate.journal
     ):
         if set_entry_type(entry, "article"):
             report.updates.append(FieldUpdate(entry.key, "type", "article"))
+
+
+def _doi_is_arxiv(value: str) -> bool:
+    try:
+        return normalize_doi(value).lower().startswith("10.48550/arxiv.")
+    except ValueError:
+        return False
 
 
 def _apply_arxiv_backfill_candidate(

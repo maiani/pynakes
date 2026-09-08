@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Online enrichment now falls back to structured Crossref metadata when DOI
+  BibTeX omits an article number, maps Crossref's `article-number` to BibTeX
+  `pages`, and removes inline APS markup without discarding its text.
+- Published-preprint promotion now parses conventional arXiv journal references
+  into journal, volume, pages, and year; replaces an arXiv DOI with the published
+  DOI; and retains `eprint` and `archiveprefix` provenance fields.
+- Reference comparison now recognizes known full and abbreviated journal titles
+  as equivalent instead of reporting a false metadata mismatch.
+
 ### CLI
 
 #### Added

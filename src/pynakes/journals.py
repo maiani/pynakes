@@ -27,6 +27,7 @@ import csv
 import re
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
+from functools import lru_cache
 from pathlib import Path
 
 from pynakes._text_utils import _normalize_text
@@ -428,6 +429,24 @@ def _lookup_expansion(title: str, sources: JournalSources) -> tuple[str, str] | 
     if mapping:
         return mapping.title, mapping.source
     return None
+
+
+@lru_cache(maxsize=1)
+def _equivalence_sources() -> JournalSources:
+    """Load the built-in lookup used for non-mutating comparisons once."""
+    return builtin_sources()
+
+
+def _journal_titles_equivalent(left: str, right: str) -> bool:
+    """Return whether two values are full/abbreviated forms of one journal."""
+    sources = _equivalence_sources()
+
+    def canonical(value: str) -> str:
+        key = _journal_key(value)
+        mapping = sources.title_mappings.get(key) or sources.abbreviated_mappings.get(key)
+        return _journal_key(mapping.title) if mapping is not None else key
+
+    return canonical(left) == canonical(right)
 
 
 def _word_abbreviation(word: str, sources: JournalSources) -> str | None:

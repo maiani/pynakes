@@ -191,7 +191,7 @@ def metadata_from_work(work: dict, identifier: str, dialect: str) -> ReferenceMe
         fields["volume"] = volume
     if issue := clean_text(work.get("issue")):
         fields["number"] = issue
-    if pages := clean_text(work.get("page")):
+    if pages := clean_text(work.get("page") or work.get("article-number")):
         fields["pages"] = pages
 
     doi = clean_text(work.get("DOI")) or identifier

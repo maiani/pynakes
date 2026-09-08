@@ -9,6 +9,7 @@ website export endpoint.
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import quote
@@ -140,9 +141,20 @@ def _set_nested(fields: dict[str, str], field: str, article: dict, *path: str) -
 
 
 def _set_value(fields: dict[str, str], field: str, value: object) -> None:
-    clean = clean_text(str(value)) if isinstance(value, (str, int)) else ""
+    if isinstance(value, str):
+        clean = _clean_aps_text(value)
+    elif isinstance(value, int):
+        clean = str(value)
+    else:
+        clean = ""
     if clean:
         fields[field] = clean
+
+
+def _clean_aps_text(value: str) -> str:
+    """Remove embedded APS markup while preserving its inline text."""
+    compact = re.sub(r">\s+<", "><", value)
+    return clean_text(re.sub(r"<[^>]+>", "", compact))
 
 
 def _set_date_fields(fields: dict[str, str], value: object) -> None:

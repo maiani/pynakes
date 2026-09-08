@@ -36,6 +36,22 @@ def test_aps_metadata_preserves_article_id_and_page_count() -> None:
     assert metadata.fields["author"] == "Levitan, Benjamin A."
 
 
+def test_aps_metadata_strips_inline_mathml_without_losing_text() -> None:
+    metadata = aps.fetch_metadata(
+        "10.1103/example",
+        "Physical Review Letters",
+        fetcher=lambda _doi: {
+            "title": {
+                "value": ("Altermagnetism in <math><mrow><mi>Mn</mi><mi>Te</mi></mrow></math>")
+            },
+            "identifiers": {"doi": "10.1103/example"},
+        },
+    )
+
+    assert metadata is not None
+    assert metadata.fields["title"] == "Altermagnetism in MnTe"
+
+
 def test_harvest_uses_institutional_access_without_token(monkeypatch) -> None:
     captured: dict[str, object] = {}
 
