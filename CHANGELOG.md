@@ -7,6 +7,151 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Editor
+
+#### Added
+
+- `editor/` — a VS Code / Open VSX extension companion. It opens a `.bib` file
+  as a sortable, filterable entry table with a field detail pane, browses the
+  declared group hierarchy, runs the engine's own search, surfaces lint findings
+  per entry, and stages field edits for review as an exact diff before commit.
+  It flags duplicate citation keys, reports encoding, line ending, `@string`
+  count and which metadata namespaces the file carries, follows the text buffer
+  rather than the file on disk, and jumps from a row to the entry's declaration
+  in the source. Linked-material state and TeX citation navigation are not
+  implemented. The client holds no bibliography implementation of its own: every
+  value it displays comes from the engine's JSON envelope, and every change
+  leaves through `ref edit`. It is not published to either marketplace, is
+  excluded from the Python sdist and wheel, and has its own Node toolchain —
+  see [editor/README.md](editor/README.md).
+
+- `pixi.toml` at the repository root provides the toolchain the VS Code
+  extension needs — Node plus a Python pinned to 3.11, the floor of
+  `requires-python` and the version CI builds with — so
+  `pixi run build-extension` produces an installable
+  `editor/pynakes-vscode-<version>.vsix` on a machine set up for neither.
+  `install-extension`, `test-extension`, and `clean-extension` round out the
+  set. This is additive: the pip workflow remains how the engine is developed.
+
+- The detail pane gained a "Compare with remote" action, next to each of an
+  entry's `doi` and `eprint` fields (both, when both are present): it fetches
+  that identifier's DOI/arXiv record via the engine's new `ref compare` and
+  shows a three-column Local / Other / Merged table in a new "Compare" panel
+  tab, word-level diff highlighting differing spans within each field.
+  Clicking a Local or Other cell selects that value into the Merged column,
+  which is also freely editable; the merged column defaults to the local
+  value on a genuine conflict (never silently overwritten) or the other side
+  when the field is missing locally. Nothing is written automatically —
+  "Apply merged" stages each field through the existing field-edit path, so
+  it goes through the normal preview/diff/commit flow like any manual edit.
+  Network access is controlled by the new `pynakes.allowOnlineLookups`
+  setting (on by default); with it off, compare still runs but reports that
+  online lookups are disabled rather than silently doing nothing.
+- The view now shows which entries the manuscript cites, and where. With
+  `tex-sources` declared, entries nothing cites carry a `○` marker and a
+  new **uncited** toggle narrows the table to them; an entry's **Cited at**
+  list opens the `.tex` file at that `\cite`, positioned by the engine's
+  per-occurrence line and column. Citations naming a key no entry declares are
+  published as diagnostics on the `.tex` file that makes them, so an undefined
+  citation appears in Problems where it was typed rather than as a note about
+  the bibliography. All of it comes from the engine's new `tex scan --json`
+  citation index; the client scans nothing itself.
+
+- Entries with linked files now carry a `🗎` marker, and the detail pane
+  lists each material by kind — published PDF, preprint, source, supplement,
+  erratum for a Pinax store, plus any BibLaTeX `file`-field link — marking a
+  missing or wrong-type link rather than hiding it. Clicking one opens it with
+  the operating system's handler; a directory is revealed in the file manager.
+  Every path comes from `asset check --json`: the client never constructs
+  `<key><suffix>.pdf` itself, since that is the Pinax store's addressing
+  scheme and belongs in one place. A path the view asks to open is opened only
+  when the last read actually reported it.
+
+  Both reads take the document's real path on disk rather than the temporary
+  mirror used for an unsaved buffer, because `tex-sources`, `pinax-files-dir`,
+  and relative `file` paths all resolve from the `.bib`'s own directory — from a
+  temp directory they resolve to nothing, and the view would report a library
+  with no sources and no materials. The cost, noted in the README, is that an
+  unsaved edit to `tex-sources` or to a `file` field is not reflected until the
+  file is saved.
+
+- The view's findings are now published as native VS Code diagnostics, so they
+  appear in the Problems panel — and as squiggles in any text editor showing
+  the same `.bib` file — in addition to the in-view severity markers and the
+  findings panel. Each diagnostic sits at the finding's entry declaration line,
+  located by the engine's new per-issue `line` field rather than any client-side
+  scanning. `pynakes.showFindings` gates both presentations together, and a
+  failed re-read (parse error, engine unavailable) clears the published set so
+  Problems can never outlive what the view shows.
+
+- All panes (the groups sidebar, the detail pane, and the bottom findings/diff
+  panel) are now resizable by dragging their border, the same way table
+  columns already were; each dragged size is remembered per workspace.
+- The detail pane's citation key is now editable: renaming it runs the
+  engine's `keys rename`, which also rewrites matching `\cite{...}` keys in
+  any linked TeX sources. Asks for confirmation first, since (unlike a field
+  edit) it can touch files beyond the `.bib` itself; refuses if the entry has
+  pending staged changes, since those are keyed by the old citation key.
+- Icon buttons (undo/remove a field, collapse toggles) are bigger, with a
+  wider hit target and hover highlight — mainly to make the new "Compare with
+  remote" buttons comfortable to click.
+- `editor/src/test/cliContract.test.ts` runs the real engine (not a mock)
+  against a temp `.bib` file, checking argument order and envelope shapes for
+  `ref edit`, `ref compare --with`, and `keys rename` — the client's other
+  tests are pure and would not have caught either of two real regressions
+  from this session: a renamed envelope key (`FieldComparison.remote` ->
+  `.other`) and a wrong argument order for `keys rename`. Requires a
+  `python3` that can import this repo's `src/pynakes`; skips itself with a
+  clear reason otherwise, so `npm test` still works for editor-only
+  contributors without a Python setup.
+- `editor/` now bundles the engine, so the extension needs a Python 3.11+
+  interpreter but no pynakes install. `npm run vendor-engine` builds the engine
+  and its dependencies into `editor/engine/` (generated, git-ignored, shipped
+  only inside the VSIX); every runtime dependency is a pure-Python
+  `py3-none-any` wheel, so one universal bundle covers every platform with no
+  per-platform build and nothing to code-sign. An engine the user installed
+  themselves is preferred when its version is strictly newer than the bundled
+  one, so upgrading pynakes takes effect without an extension release. The
+  interpreter is taken from the Python extension's selection, then a workspace
+  virtual environment, then `PATH`; `pynakes.executable` still overrides
+  everything and `pynakes.engine` can force `bundled` or `installed`.
+
+#### Changed
+
+- The view's panes — the entry editor, Findings, Staged diff, and Compare — are
+  now relocatable between two docks: the right dock (where the editor normally
+  sits) and the bottom dock (where findings and the diff live). A pane moves via
+  the small arrow beside its tab, and a dock holding more than one pane shows a
+  tab row to choose among them. Its location and the active tab per dock are
+  remembered per workspace, so the editor can live at the bottom as an "Edit"
+  tab or stack with the diff on the right, whichever suits the task.
+- `pynakes.search.fuzzy` and `pynakes.showFindings` are now honored. Both were
+  declared but read by nothing: the fuzzy toggle started from persisted view
+  state alone (it now seeds from the setting on first open, and a toggle made
+  in the view still persists over it), and lint markers were shown regardless
+  of the setting (the severity markers per row and the findings panel tab now
+  both disappear with it). Setting changes reach an open view live, like
+  everything else it re-reads.
+
+#### Fixed
+
+- Sorting a column descending put blank values first: blanks were sorted last
+  ascending and the whole order was then reversed, contradicting the rule that
+  gaps never lead. Direction now lives inside the comparator.
+- Engine discovery kept a single memoized resolution keyed on settings, so two
+  open bibliographies in different workspace folders evicted each other's entry
+  and re-probed — respawning version probes — on every read. Resolutions are
+  cached per key instead.
+- A pending entry-type change was never checked against the dry-run plan at
+  commit time, unlike field edits, so a type changed elsewhere could be
+  silently overwritten; the commit is now refused with the other conflicts.
+- Staged changes are dropped when their document closes, where they previously
+  lingered for the session.
+- Closing one bibliography view no longer hides the status bar item while a
+  sibling view is still active.
+
+## [0.6.2] - 2026-09-14
+
 ### Fixed
 
 - Online enrichment now falls back to structured Crossref metadata when DOI
@@ -296,149 +441,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that had already drifted apart in casing. They now come from
   `pynakes.entry_types.eprint_fields()`, so one work imported by arXiv id or by
   its DOI lands with identically-spelled fields.
-
-### Editor
-
-#### Added
-
-- `editor/` — a VS Code / Open VSX extension companion. It opens a `.bib` file
-  as a sortable, filterable entry table with a field detail pane, browses the
-  declared group hierarchy, runs the engine's own search, surfaces lint findings
-  per entry, and stages field edits for review as an exact diff before commit.
-  It flags duplicate citation keys, reports encoding, line ending, `@string`
-  count and which metadata namespaces the file carries, follows the text buffer
-  rather than the file on disk, and jumps from a row to the entry's declaration
-  in the source. Linked-material state and TeX citation navigation are not
-  implemented. The client holds no bibliography implementation of its own: every
-  value it displays comes from the engine's JSON envelope, and every change
-  leaves through `ref edit`. It is not published to either marketplace, is
-  excluded from the Python sdist and wheel, and has its own Node toolchain —
-  see [editor/README.md](editor/README.md).
-
-- `pixi.toml` at the repository root provides the toolchain the VS Code
-  extension needs — Node plus a Python pinned to 3.11, the floor of
-  `requires-python` and the version CI builds with — so
-  `pixi run build-extension` produces an installable
-  `editor/pynakes-vscode-<version>.vsix` on a machine set up for neither.
-  `install-extension`, `test-extension`, and `clean-extension` round out the
-  set. This is additive: the pip workflow remains how the engine is developed.
-
-- The detail pane gained a "Compare with remote" action, next to each of an
-  entry's `doi` and `eprint` fields (both, when both are present): it fetches
-  that identifier's DOI/arXiv record via the engine's new `ref compare` and
-  shows a three-column Local / Other / Merged table in a new "Compare" panel
-  tab, word-level diff highlighting differing spans within each field.
-  Clicking a Local or Other cell selects that value into the Merged column,
-  which is also freely editable; the merged column defaults to the local
-  value on a genuine conflict (never silently overwritten) or the other side
-  when the field is missing locally. Nothing is written automatically —
-  "Apply merged" stages each field through the existing field-edit path, so
-  it goes through the normal preview/diff/commit flow like any manual edit.
-  Network access is controlled by the new `pynakes.allowOnlineLookups`
-  setting (on by default); with it off, compare still runs but reports that
-  online lookups are disabled rather than silently doing nothing.
-- The view now shows which entries the manuscript cites, and where. With
-  `tex-sources` declared, entries nothing cites carry a `○` marker and a
-  new **uncited** toggle narrows the table to them; an entry's **Cited at**
-  list opens the `.tex` file at that `\cite`, positioned by the engine's
-  per-occurrence line and column. Citations naming a key no entry declares are
-  published as diagnostics on the `.tex` file that makes them, so an undefined
-  citation appears in Problems where it was typed rather than as a note about
-  the bibliography. All of it comes from the engine's new `tex scan --json`
-  citation index; the client scans nothing itself.
-
-- Entries with linked files now carry a `🗎` marker, and the detail pane
-  lists each material by kind — published PDF, preprint, source, supplement,
-  erratum for a Pinax store, plus any BibLaTeX `file`-field link — marking a
-  missing or wrong-type link rather than hiding it. Clicking one opens it with
-  the operating system's handler; a directory is revealed in the file manager.
-  Every path comes from `asset check --json`: the client never constructs
-  `<key><suffix>.pdf` itself, since that is the Pinax store's addressing
-  scheme and belongs in one place. A path the view asks to open is opened only
-  when the last read actually reported it.
-
-  Both reads take the document's real path on disk rather than the temporary
-  mirror used for an unsaved buffer, because `tex-sources`, `pinax-files-dir`,
-  and relative `file` paths all resolve from the `.bib`'s own directory — from a
-  temp directory they resolve to nothing, and the view would report a library
-  with no sources and no materials. The cost, noted in the README, is that an
-  unsaved edit to `tex-sources` or to a `file` field is not reflected until the
-  file is saved.
-
-- The view's findings are now published as native VS Code diagnostics, so they
-  appear in the Problems panel — and as squiggles in any text editor showing
-  the same `.bib` file — in addition to the in-view severity markers and the
-  findings panel. Each diagnostic sits at the finding's entry declaration line,
-  located by the engine's new per-issue `line` field rather than any client-side
-  scanning. `pynakes.showFindings` gates both presentations together, and a
-  failed re-read (parse error, engine unavailable) clears the published set so
-  Problems can never outlive what the view shows.
-
-- All panes (the groups sidebar, the detail pane, and the bottom findings/diff
-  panel) are now resizable by dragging their border, the same way table
-  columns already were; each dragged size is remembered per workspace.
-- The detail pane's citation key is now editable: renaming it runs the
-  engine's `keys rename`, which also rewrites matching `\cite{...}` keys in
-  any linked TeX sources. Asks for confirmation first, since (unlike a field
-  edit) it can touch files beyond the `.bib` itself; refuses if the entry has
-  pending staged changes, since those are keyed by the old citation key.
-- Icon buttons (undo/remove a field, collapse toggles) are bigger, with a
-  wider hit target and hover highlight — mainly to make the new "Compare with
-  remote" buttons comfortable to click.
-- `editor/src/test/cliContract.test.ts` runs the real engine (not a mock)
-  against a temp `.bib` file, checking argument order and envelope shapes for
-  `ref edit`, `ref compare --with`, and `keys rename` — the client's other
-  tests are pure and would not have caught either of two real regressions
-  from this session: a renamed envelope key (`FieldComparison.remote` ->
-  `.other`) and a wrong argument order for `keys rename`. Requires a
-  `python3` that can import this repo's `src/pynakes`; skips itself with a
-  clear reason otherwise, so `npm test` still works for editor-only
-  contributors without a Python setup.
-- `editor/` now bundles the engine, so the extension needs a Python 3.11+
-  interpreter but no pynakes install. `npm run vendor-engine` builds the engine
-  and its dependencies into `editor/engine/` (generated, git-ignored, shipped
-  only inside the VSIX); every runtime dependency is a pure-Python
-  `py3-none-any` wheel, so one universal bundle covers every platform with no
-  per-platform build and nothing to code-sign. An engine the user installed
-  themselves is preferred when its version is strictly newer than the bundled
-  one, so upgrading pynakes takes effect without an extension release. The
-  interpreter is taken from the Python extension's selection, then a workspace
-  virtual environment, then `PATH`; `pynakes.executable` still overrides
-  everything and `pynakes.engine` can force `bundled` or `installed`.
-
-#### Changed
-
-- The view's panes — the entry editor, Findings, Staged diff, and Compare — are
-  now relocatable between two docks: the right dock (where the editor normally
-  sits) and the bottom dock (where findings and the diff live). A pane moves via
-  the small arrow beside its tab, and a dock holding more than one pane shows a
-  tab row to choose among them. Its location and the active tab per dock are
-  remembered per workspace, so the editor can live at the bottom as an "Edit"
-  tab or stack with the diff on the right, whichever suits the task.
-- `pynakes.search.fuzzy` and `pynakes.showFindings` are now honored. Both were
-  declared but read by nothing: the fuzzy toggle started from persisted view
-  state alone (it now seeds from the setting on first open, and a toggle made
-  in the view still persists over it), and lint markers were shown regardless
-  of the setting (the severity markers per row and the findings panel tab now
-  both disappear with it). Setting changes reach an open view live, like
-  everything else it re-reads.
-
-#### Fixed
-
-- Sorting a column descending put blank values first: blanks were sorted last
-  ascending and the whole order was then reversed, contradicting the rule that
-  gaps never lead. Direction now lives inside the comparator.
-- Engine discovery kept a single memoized resolution keyed on settings, so two
-  open bibliographies in different workspace folders evicted each other's entry
-  and re-probed — respawning version probes — on every read. Resolutions are
-  cached per key instead.
-- A pending entry-type change was never checked against the dry-run plan at
-  commit time, unlike field edits, so a type changed elsewhere could be
-  silently overwritten; the commit is now refused with the other conflicts.
-- Staged changes are dropped when their document closes, where they previously
-  lingered for the session.
-- Closing one bibliography view no longer hides the status bar item while a
-  sibling view is still active.
 
 ## [0.6.1] - 2026-08-18
 
