@@ -1020,3 +1020,51 @@ def test_file_level_findings_have_no_line() -> None:
     (empty,) = [issue for issue in lint(lib) if issue.type == "no_entries"]
 
     assert empty.line is None
+
+
+# --- the consistency heuristic respects alternative locators ----------------
+
+
+def _article_library(count: int, with_pages: int, extra: str = "") -> str:
+    """A library of `count` articles, the first `with_pages` carrying a range."""
+    return "".join(
+        "@article{K%d, author={Euler}, title={A Memoir}, journal={Acta}, year={17%02d}%s%s}\n"
+        % (i, i, ", pages={1--2}" if i < with_pages else "", extra)
+        for i in range(count)
+    )
+
+
+def test_missing_pages_is_not_reported_when_the_entry_has_a_doi() -> None:
+    # Physical Review and many others issue article numbers, not page ranges,
+    # so this finding was unactionable noise on a modern library.
+    issues = lint(parse_bib(_article_library(24, 16, extra=", doi={10.5555/x}")))
+
+    assert [i for i in issues if i.field == "pages" and i.type == "inconsistent_field"] == []
+
+
+def test_missing_pages_is_still_reported_when_nothing_else_locates_the_work() -> None:
+    issues = lint(parse_bib(_article_library(24, 16)))
+
+    found = [i for i in issues if i.field == "pages" and i.type == "inconsistent_field"]
+    assert len(found) == 8
+    assert found[0].severity == "info"
+
+
+def test_an_article_number_also_satisfies_the_pages_expectation() -> None:
+    issues = lint(parse_bib(_article_library(24, 16, extra=", articleno={012345}")))
+
+    assert [i for i in issues if i.field == "pages" and i.type == "inconsistent_field"] == []
+
+
+def test_other_consistency_findings_are_unaffected() -> None:
+    # Only `pages` has a recognized alternative; a missing `volume` still reads
+    # as a gap.
+    text = "".join(
+        "@article{K%d, author={Euler}, title={A Memoir}, journal={Acta}, year={17%02d}%s}\n"
+        % (i, i, ", volume={3}" if i < 16 else "")
+        for i in range(24)
+    )
+
+    issues = lint(parse_bib(text))
+
+    assert [i for i in issues if i.field == "volume" and i.type == "inconsistent_field"]

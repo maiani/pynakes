@@ -1,5 +1,7 @@
 """Human-readable formatting for Pinax fetch reports."""
 
+from pynakes.fetch_progress import WOULD_FETCH
+
 
 def fetch_report_lines(
     report: dict,
@@ -12,7 +14,13 @@ def fetch_report_lines(
     for item in report["fetched"]:
         lines.append(_fetched_line(item))
     for item in report["skipped"]:
-        lines.append(f"{skipped_prefix} {item['key']} ({item['reason']}).")
+        # A dry run files its planned work under ``skipped`` so the JSON shape
+        # is the same either way, but "Skipped X (would fetch)" reads as two
+        # contradictory claims. Say what the run would do instead.
+        if item["reason"] == WOULD_FETCH:
+            lines.append(f"Would fetch {item['key']}.")
+        else:
+            lines.append(f"{skipped_prefix} {item['key']} ({item['reason']}).")
     for item in report["failed"]:
         lines.append(f"{failed_prefix} {item['key']} ({item['error']}).")
     return lines

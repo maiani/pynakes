@@ -200,10 +200,7 @@ def enrich(
     updates = list(report.updates)
     warnings = list(report.warnings)
     extra: dict[str, object] = {}
-    human = [
-        f"{_verb('enrich', params, 'Enriched')} {report.changed_entries} {_entries(report.changed_entries)}.",
-        f"  field_updates={report.changed_fields}",
-    ]
+    detail: list[str] = []
     if published:
         if online and not json_output:
             with _RichIntegrityProgress("Checking preprints") as progress:
@@ -222,9 +219,30 @@ def enrich(
         extra["preprints"] = {
             "checked": preprints.checked,
             "published": preprints.published,
+            "promoted": preprints.promoted,
+            "linked": preprints.linked,
             "updates": [update.to_dict() for update in preprints.updates],
         }
-        human.append(f"  promoted {preprints.changed_entries} preprint(s) to a published version")
+        # Two opposite directions of travel, counted apart. Reporting the
+        # backfill as a promotion described the reverse of what it does.
+        if preprints.promoted:
+            detail.append(
+                f"  promoted {preprints.promoted} "
+                f"{_entries(preprints.promoted)} from preprint to published"
+            )
+        if preprints.linked:
+            detail.append(
+                f"  added arXiv preprint provenance to {preprints.linked} published "
+                f"{_entries(preprints.linked)}"
+            )
+    # Counted over every update this command applied, preprint work included, so
+    # the dry-run summary matches both the diff below it and the JSON envelope.
+    changed_entries = len({update.key for update in updates})
+    human = [
+        f"{_verb('enrich', params, 'Enriched')} {changed_entries} {_entries(changed_entries)}.",
+        f"  field_updates={len(updates)}",
+        *detail,
+    ]
     _finish_mod(
         file,
         "enrich",

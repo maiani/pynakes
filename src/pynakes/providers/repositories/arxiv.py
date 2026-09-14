@@ -9,7 +9,14 @@ from urllib.parse import quote
 
 from pynakes._calendar import MONTH_NUM_TO_ABBR
 from pynakes._identifiers import normalize_arxiv
-from pynakes.providers._http import DownloadProgress, ProviderFetchError, fetch_bytes, fetch_text
+from pynakes.entry_types import eprint_fields, preprint_entry_type
+from pynakes.providers._http import (
+    DEFAULT_TIMEOUT,
+    DownloadProgress,
+    ProviderFetchError,
+    fetch_bytes,
+    fetch_text,
+)
 from pynakes.providers.records import ReferenceMetadata
 
 BASE_URL = "https://arxiv.org"
@@ -66,7 +73,7 @@ class ArxivRecord:
 _ATOM_NS = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
 
 
-def fetch_atom(identifier: str, timeout: float = 15.0) -> str:
+def fetch_atom(identifier: str, timeout: float = DEFAULT_TIMEOUT) -> str:
     """Fetch arXiv Atom XML for ``identifier``. Split out so tests can stub it."""
     return fetch_text(atom_url(identifier), timeout=timeout, label=identifier)
 
@@ -132,10 +139,11 @@ def metadata_from_record(
                 fields["year"] = year
             if month in MONTH_NUM_TO_ABBR:
                 fields["month"] = MONTH_NUM_TO_ABBR[month]
-    fields["eprint"] = record.arxiv_id
-    fields["eprinttype" if biblatex else "archivePrefix"] = "arxiv" if biblatex else "arXiv"
+    names = eprint_fields(dialect)
+    fields[names.eprint] = record.arxiv_id
+    fields[names.archive] = names.archive_value
     if record.primary_class:
-        fields["eprintclass" if biblatex else "primaryClass"] = record.primary_class
+        fields[names.eprint_class] = record.primary_class
     fields["url"] = abs_url(record.arxiv_id)
     if record.doi:
         fields["doi"] = record.doi
@@ -149,7 +157,7 @@ def metadata_from_record(
         identifiers["doi"] = record.doi
     return ReferenceMetadata(
         provider="arXiv",
-        entry_type="online" if biblatex else "misc",
+        entry_type=preprint_entry_type(dialect),
         fields=fields,
         identifiers=identifiers,
     )

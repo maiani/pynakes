@@ -315,6 +315,7 @@ def get_capabilities() -> dict:
             "normalize_journals",
             "normalize_authors",
             "normalize_dois",
+            "normalize_pages",
             "import_reference",
             "search_library",
             "detect_used_citations",

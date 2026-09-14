@@ -14,6 +14,7 @@ from pynakes.importer import (
     DuplicateArxivError,
     DuplicateDOIError,
     UnsupportedIdentifierError,
+    arxiv_doi,
     canonical_doi,
     entry_from_bibtex,
     existing_keys_for_arxiv,
@@ -28,6 +29,7 @@ from pynakes.importer import (
     resolve_identifier,
 )
 from pynakes.model import BibFile
+from pynakes.providers._http import ProviderFetchError
 
 ARXIV_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
@@ -433,3 +435,80 @@ def test_prepare_imported_reference_dispatches_by_type() -> None:
     )
     assert kind == ARXIV
     assert entry.type == "misc"
+
+
+# --- arXiv fallback to the registered DataCite DOI --------------------------
+
+# What DataCite returns for an arXiv deposit's DOI, which is a different host
+# from arXiv's own API and therefore has its own rate limits.
+ARXIV_VIA_DATACITE = """@misc{https://doi.org/10.48550/arxiv.2301.00001,
+  doi = {10.48550/ARXIV.2301.00001},
+  url = {https://arxiv.org/abs/2301.00001},
+  author = {Lovelace, Ada and Turing, Alan},
+  keywords = {Machine Learning (cs.LG), FOS: Computer sciences},
+  title = {A Deep Test of arXiv Import},
+  publisher = {arXiv},
+  year = {2023}
+}
+"""
+
+
+def _throttled(identifier: str) -> str:
+    raise ProviderFetchError(f"Server returned HTTP 429 for {identifier}")
+
+
+def test_arxiv_import_falls_back_to_the_datacite_doi_when_arxiv_is_throttled() -> None:
+    # Every arXiv id has a deterministic DOI served by a different host, and
+    # pynakes already knows how to import it — so a throttled arXiv API need
+    # not mean a failed import.
+    entry = prepare_imported_arxiv(
+        parse_bib(""),
+        "2301.00001",
+        fetcher=_throttled,
+        doi_fetcher=lambda doi: ARXIV_VIA_DATACITE,
+    )
+
+    assert entry.type == "misc"
+    assert entry.fields["eprint"] == "2301.00001"
+    assert entry.fields["archivePrefix"] == "arXiv"
+    assert entry.fields["doi"] == "10.48550/arXiv.2301.00001"
+
+
+def test_arxiv_fallback_is_not_attempted_for_an_injected_fetcher_alone() -> None:
+    # A caller supplying its own transport keeps control of what is contacted;
+    # nothing here may reach for a second network route on its own.
+    with pytest.raises(ArxivImportError, match="429"):
+        prepare_imported_arxiv(parse_bib(""), "2301.00001", fetcher=_throttled)
+
+
+def test_arxiv_failure_names_the_doi_route_in_the_error() -> None:
+    # When both routes fail the message must still point at the workaround.
+    with pytest.raises(ArxivImportError, match=r"10\.48550/arXiv\.2301\.00001"):
+        prepare_imported_arxiv(
+            parse_bib(""),
+            "2301.00001",
+            fetcher=_throttled,
+            doi_fetcher=_throttled,
+        )
+
+
+def test_arxiv_doi_is_derived_not_looked_up() -> None:
+    assert arxiv_doi("2301.00001") == "10.48550/arXiv.2301.00001"
+    assert arxiv_doi("quant-ph/9807006") == "10.48550/arXiv.quant-ph/9807006"
+
+
+def test_arxiv_id_and_its_doi_import_to_the_same_shape() -> None:
+    # One work, two routes: the entry must not depend on which was taken.
+    by_id = prepare_imported_arxiv(
+        parse_bib(""), "2301.00001", fetcher=lambda identifier: ARXIV_ATOM
+    )
+    by_doi = prepare_imported_arxiv(
+        parse_bib(""),
+        "2301.00001",
+        fetcher=_throttled,
+        doi_fetcher=lambda doi: ARXIV_VIA_DATACITE,
+    )
+
+    assert by_id.type == by_doi.type
+    for name in ("eprint", "archivePrefix", "primaryClass"):
+        assert by_id.fields[name] == by_doi.fields[name], name

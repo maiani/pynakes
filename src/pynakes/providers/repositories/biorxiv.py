@@ -7,6 +7,7 @@ from collections.abc import Callable
 from urllib.parse import quote
 
 from pynakes._identifiers import normalize_doi
+from pynakes.entry_types import eprint_fields
 from pynakes.providers._common import repository_metadata
 from pynakes.providers._http import ProviderFetchError, fetch_text
 from pynakes.providers.metadata import doi as doi_provider
@@ -83,11 +84,11 @@ def fetch_metadata(
         text = fetch_text(url, accept="application/json", label=f"{server} {normalized}")
         return parse_json(text, normalized, server=server, dialect=dialect)
     except ProviderFetchError:
-        metadata = doi_provider.fetch_metadata(normalized)
+        metadata = doi_provider.fetch_metadata(normalized, dialect=dialect)
         metadata.provider = server
-        metadata.fields["eprint"] = normalized
-        archive_field = "eprinttype" if dialect.lower() == "biblatex" else "archivePrefix"
-        metadata.fields[archive_field] = server
+        names = eprint_fields(dialect, archive=server)
+        metadata.fields[names.eprint] = normalized
+        metadata.fields[names.archive] = names.archive_value
         metadata.fields.setdefault("url", content_url(normalized, server=server))
         metadata.identifiers[server] = normalized
         return metadata

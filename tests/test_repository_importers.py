@@ -242,7 +242,7 @@ def test_biorxiv_falls_back_to_doi_metadata(
     monkeypatch.setattr(
         biorxiv.doi_provider,
         "fetch_metadata",
-        lambda doi: ReferenceMetadata(
+        lambda doi, dialect="bibtex": ReferenceMetadata(
             provider="doi.org",
             entry_type="article",
             fields={

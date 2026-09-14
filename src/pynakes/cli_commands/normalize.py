@@ -88,6 +88,11 @@ def normalize(
         "--doi-normalization",
         help="metadata, on, or off",
     ),
+    page_normalization: str = typer.Option(
+        "metadata",
+        "--pages",
+        help="Rewrite page ranges to start--end (metadata, on, or off)",
+    ),
     key_normalization: str = typer.Option(
         "metadata",
         "--keys",
@@ -149,6 +154,7 @@ def normalize(
             journal_table,
             ltwa_table,
             doi_normalization,
+            page_normalization,
             key_normalization,
             identifier_case,
             metadata_formatting,
@@ -179,7 +185,7 @@ def normalize(
         "  "
         f"titles={sum(report.title_fields.values())}, "
         f"authors={report.authors}, journals={report.journals}, dois={report.dois}, "
-        f"months={report.months}, "
+        f"pages={report.pages}, months={report.months}, "
         f"entry_types={report.entry_types}, field_names={report.field_names}, "
         f"keys={report.keys}"
         f"{sort_detail}",
@@ -209,6 +215,7 @@ def _build_normalize_options(
     journal_table: str | None,
     ltwa_table: str | None,
     doi_normalization: str,
+    page_normalization: str,
     key_normalization: str,
     identifier_case: str,
     metadata_formatting: str,
@@ -226,6 +233,7 @@ def _build_normalize_options(
         journal_table=journal_table,
         ltwa_table=ltwa_table,
         normalize_dois=_optional_bool(doi_normalization),
+        normalize_pages=_optional_bool(page_normalization),
         normalize_keys=_optional_bool(key_normalization),
         identifier_case=_optional_bool(identifier_case),
         format_metadata=_optional_bool(metadata_formatting),

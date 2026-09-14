@@ -6,7 +6,8 @@ from urllib.parse import quote
 
 from pynakes._identifiers import normalize_doi
 from pynakes.bibtex_parser import ParseError, parse_bib
-from pynakes.providers._http import ProviderFetchError, fetch_text
+from pynakes.providers._http import DEFAULT_TIMEOUT, ProviderFetchError, fetch_text
+from pynakes.providers.metadata._negotiated import refine
 from pynakes.providers.records import ReferenceMetadata
 
 BASE_URL = "https://doi.org"
@@ -18,7 +19,7 @@ def content_url(doi: str) -> str:
     return f"{BASE_URL}/{quote(normalized, safe='/')}"
 
 
-def fetch_bibtex(doi: str, timeout: float = 15.0) -> str:
+def fetch_bibtex(doi: str, timeout: float = DEFAULT_TIMEOUT) -> str:
     """Fetch BibTeX metadata for ``doi`` via DOI content negotiation.
 
     Raises :class:`~pynakes.providers._http.ProviderFetchError` on HTTP or
@@ -33,8 +34,15 @@ def fetch_bibtex(doi: str, timeout: float = 15.0) -> str:
     )
 
 
-def parse_bibtex(text: str, doi: str | None = None) -> ReferenceMetadata:
-    """Normalize provider BibTeX into a shared metadata record."""
+def parse_bibtex(
+    text: str, doi: str | None = None, *, dialect: str = "bibtex"
+) -> ReferenceMetadata:
+    """Normalize provider BibTeX into a shared metadata record.
+
+    The registrar's BibTeX is repaired on the way through — see
+    :mod:`pynakes.providers.metadata._negotiated` — so an import never yields
+    an entry that fails pynakes' own ``lint``.
+    """
     try:
         entries = parse_bib(text).entries.values()
     except ParseError as exc:
@@ -58,17 +66,22 @@ def parse_bibtex(text: str, doi: str | None = None) -> ReferenceMetadata:
             fields["doi"] = normalized
             identifiers["doi"] = normalized
 
-    return ReferenceMetadata(
-        provider="doi.org",
-        entry_type=entry.type,
-        fields=fields,
-        field_expressions=field_expressions,
-        identifiers=identifiers,
-        provider_key=entry.key,
+    return refine(
+        ReferenceMetadata(
+            provider="doi.org",
+            entry_type=entry.type,
+            fields=fields,
+            field_expressions=field_expressions,
+            identifiers=identifiers,
+            provider_key=entry.key,
+        ),
+        dialect=dialect,
     )
 
 
-def fetch_metadata(doi: str, timeout: float = 15.0) -> ReferenceMetadata:
-    """Fetch and normalize DOI metadata."""
+def fetch_metadata(
+    doi: str, timeout: float = DEFAULT_TIMEOUT, *, dialect: str = "bibtex"
+) -> ReferenceMetadata:
+    """Fetch and normalize DOI metadata for the target ``dialect``."""
     normalized = normalize_doi(doi)
-    return parse_bibtex(fetch_bibtex(normalized, timeout=timeout), normalized)
+    return parse_bibtex(fetch_bibtex(normalized, timeout=timeout), normalized, dialect=dialect)

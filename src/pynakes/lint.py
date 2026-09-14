@@ -207,6 +207,17 @@ _CONSISTENCY_DECORATION_FIELDS = frozenset(
     }
 )
 
+# Fields whose absence is not a gap when the entry carries an equivalent.
+# A modern article is located by DOI or article number, not by a page range —
+# Physical Review and many others stopped issuing page ranges altogether — so
+# reporting its missing ``pages`` is noise the reader cannot act on. The
+# finding still fires for an entry with no locator at all, which is the case
+# where a missing page range genuinely leaves the reference incomplete.
+_CONSISTENCY_ALTERNATIVES: dict[str, frozenset[str]] = {
+    "pages": frozenset({"articleno", "artnum", "eid", "numpages", "doi"}),
+}
+
+
 # Profile findings remain warnings for interactive use, but ``lint --strict``
 # treats them as a failed conformance gate. Metadata drift belongs here too: an
 # unknown ``pynakes-meta`` key, a value the key's grammar rejects, or duplicate
@@ -644,17 +655,21 @@ def _lint_field_consistency(lib: BibFile, *, dialect: str = "bibtex") -> list[Li
 
         for entry, fields in zip(entries, resolved):
             for name in sorted(majority):
-                if not fields.get(name, "").strip():
-                    issues.append(
-                        LintIssue(
-                            "inconsistent_field",
-                            "info",
-                            f"{etype} entry {entry.key!r} is missing field {name!r}, which "
-                            f"{present_counts[name]} of {total} {etype} entries define",
-                            key=entry.key,
-                            field=name,
-                        )
+                if fields.get(name, "").strip():
+                    continue
+                alternatives = _CONSISTENCY_ALTERNATIVES.get(name, frozenset())
+                if any(fields.get(alt, "").strip() for alt in alternatives):
+                    continue
+                issues.append(
+                    LintIssue(
+                        "inconsistent_field",
+                        "info",
+                        f"{etype} entry {entry.key!r} is missing field {name!r}, which "
+                        f"{present_counts[name]} of {total} {etype} entries define",
+                        key=entry.key,
+                        field=name,
                     )
+                )
 
     return issues
 

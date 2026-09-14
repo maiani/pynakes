@@ -16,7 +16,7 @@ from pynakes.editing import (
     set_entry_type,
 )
 from pynakes.fields import TITLE_FIELDS
-from pynakes.formatters import FIELD_FORMATTERS
+from pynakes.formatters import FIELD_FORMATTERS, normalize_page_numbers
 from pynakes.keys import regenerate_keys as _regenerate_keys
 from pynakes.metadata import metadata_bool, metadata_list, metadata_value
 from pynakes.metadata.jabref import (
@@ -32,6 +32,7 @@ from pynakes.model import BibEntry, BibFile, MetadataBlock
 # JabRef saveActions formatter keys mapped to pynakes normalization concerns.
 # ``normalize_names`` is handled via the author-style path.
 _DOI_SAVE_ACTION = "clean_up_doi"
+_PAGES_SAVE_ACTION = "normalize_page_numbers"
 
 # Normalize settings live under the ``normalize-`` key prefix.
 METADATA_PREFIX = "normalize-"
@@ -72,6 +73,7 @@ class NormalizeOptions:
     journal_table: str | None = None
     ltwa_table: str | None = None
     normalize_dois: bool | None = None
+    normalize_pages: bool | None = None
     normalize_keys: bool | None = None
     identifier_case: bool | None = None
     format_metadata: bool | None = None
@@ -94,6 +96,7 @@ class NormalizeResult:
     authors: int = 0
     journals: int = 0
     dois: int = 0
+    pages: int = 0
     months: int = 0
     save_action_fields: int = 0
     entry_types: int = 0
@@ -114,6 +117,7 @@ class NormalizeResult:
             "authors": self.authors,
             "journals": self.journals,
             "dois": self.dois,
+            "pages": self.pages,
             "months": self.months,
             "save_action_fields": self.save_action_fields,
             "entry_types": self.entry_types,
@@ -217,6 +221,31 @@ def normalize_dois(lib: BibFile) -> tuple[int, list[dict[str, str]]]:
     return count, warnings
 
 
+def normalize_pages(lib: BibFile) -> int:
+    """Rewrite page ranges to BibTeX's ``start--end``, returning the count changed.
+
+    Crossref hands out ranges punctuated with a Unicode en-dash (``1052–1055``).
+    It renders under UTF-8 + ``inputenc`` but breaks under 8-bit ``bibtex`` with
+    some styles, and — being visually near-identical to a hyphen — it survives
+    review and propagates. Delegates to the JabRef-compatible
+    :func:`~pynakes.formatters.normalize_page_numbers`, which leaves anything
+    that is not a simple range alone, so an article number or a
+    ``7,41,73--97`` list is untouched.
+
+    On by default, unlike journal-style conversion: ``--`` is the format's own
+    convention for the same value, not an editorial preference.
+    """
+    count = 0
+    for entry in lib.entries.values():
+        value = entry.fields.get("pages")
+        if not value:
+            continue
+        normalized = normalize_page_numbers(value)
+        if normalized != value and set_entry_field(entry, "pages", normalized):
+            count += 1
+    return count
+
+
 def normalize_month_macros(lib: BibFile) -> int:
     """Normalize bare month names and standard macros to canonical BibTeX.
 
@@ -289,8 +318,13 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
     if save_actions is not None and save_actions.enabled:
         author_default = "jabref" if save_actions.has("normalize_names", NAME_FIELDS) else "none"
         doi_default = save_actions.has(_DOI_SAVE_ACTION, ("doi",))
+        # A file whose own saveActions already run ``normalize_page_numbers``
+        # owns that step: the built-in pass would apply the identical formatter
+        # first and leave the configured one nothing to do, which is double
+        # work and a misleading ``save_action_fields`` count.
+        pages_default = not save_actions.has(_PAGES_SAVE_ACTION, ("pages",))
     else:
-        author_default, doi_default = "jabref", True
+        author_default, doi_default, pages_default = "jabref", True, True
 
     for drop_field in _resolve_drop_fields(lib, opts.drop_fields):
         result.dropped_fields += field_ops.clear_field(lib, drop_field)
@@ -310,6 +344,9 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
     if _resolve_bool(lib, opts.normalize_dois, "dois", doi_default):
         result.dois, doi_warnings = normalize_dois(lib)
         result.warnings.extend(doi_warnings)
+
+    if _resolve_bool(lib, opts.normalize_pages, "pages", pages_default):
+        result.pages = normalize_pages(lib)
 
     # Journal abbreviation/expansion is *off* by default: it is opinionated and
     # not reversible without the right table, so it runs only when a style is

@@ -35,6 +35,8 @@ src/pynakes/
   authors.py journals.py normalize.py
   importer.py         resolve + import references by DOI / arXiv id or supported URL
   integrity.py        verify / enrich / published (opt-in --online lookups)
+  _integrity_*.py     integrity report types and the published-check half
+  entry_types.py      container/eprint field naming per entry type + dialect
   metadata/           jabref-meta + pynakes-meta parsing, schemas, safe updates
   filestore.py        Pinax paths, manifests, validation, and material transactions
   fetch.py providers/ explicit network-backed material and metadata providers

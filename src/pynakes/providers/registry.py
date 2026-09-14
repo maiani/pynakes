@@ -53,9 +53,8 @@ def _load_doi(
     dialect: str,
     fetcher: RawMetadataFetcher | None,
 ) -> ReferenceMetadata:
-    del dialect
     text = fetcher(identifier) if fetcher is not None else doi.fetch_bibtex(identifier)
-    return doi.parse_bibtex(text, identifier)
+    return doi.parse_bibtex(text, identifier, dialect=dialect)
 
 
 def _client_loader(module: object, **fixed: object) -> MetadataLoader:

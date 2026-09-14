@@ -698,6 +698,7 @@ Default behavior:
 - protect capitalization in title-like fields
 - normalize author/editor lists in JabRef style
 - normalize DOI values
+- rewrite page ranges to `start--end`
 - lowercase entry types and field names
 - leave journal titles unchanged unless a journal style is configured
 
@@ -709,9 +710,18 @@ pynakes normalize refs.bib --journal-style none
 pynakes normalize refs.bib --journal-style full
 pynakes normalize refs.bib --title-protection off
 pynakes normalize refs.bib --doi-normalization off
+pynakes normalize refs.bib --pages off
 pynakes normalize refs.bib --identifier-case off
 pynakes normalize refs.bib --keys on
 ```
+
+Page ranges are rewritten to BibTeX's `start--end`: a Unicode en-dash
+(`1052–1055`, which is what Crossref hands out) or a single hyphen becomes
+`--`, and `p.`/`pp.` prefixes are stripped. A value that is not a simple range
+— an article number, or a list like `7,41,73--97` — is left alone. This runs by
+default, unlike journal-style conversion, because `--` is the format's own
+convention for the same value rather than an editorial preference. Turn it off
+with `--pages off` or `normalize-pages: false`.
 
 Journal source tables:
 
@@ -749,6 +759,7 @@ normalize-journal-style: none
 normalize-protect-titles: false
 normalize-identifier-case: false
 normalize-keys: true
+normalize-pages: true
 normalize-protected-terms: Proceedings,OpenAI
 normalize-drop-fields: abstract
 }

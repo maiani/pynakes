@@ -30,8 +30,9 @@ from pynakes.identity import (
     find_exact_matches,
 )
 from pynakes.keys import UnsupportedCitationKeyPatternError, generate_key, unique_key
+from pynakes.metadata import library_dialect
 from pynakes.model import BibEntry, BibFile
-from pynakes.providers._http import ProviderFetchError
+from pynakes.providers._http import DEFAULT_TIMEOUT, ProviderFetchError
 from pynakes.providers.metadata import (
     acl_anthology,
     crossref,
@@ -313,7 +314,7 @@ def resolve_identifier(value: str) -> tuple[str, str]:
     )
 
 
-def fetch_bibtex_for_doi(doi: str, timeout: float = 15.0) -> str:
+def fetch_bibtex_for_doi(doi: str, timeout: float = DEFAULT_TIMEOUT) -> str:
     """Fetch BibTeX metadata for ``doi`` via DOI content negotiation.
 
     Thin domain wrapper over :func:`pynakes.providers.metadata.doi.fetch_bibtex` that
@@ -378,7 +379,7 @@ def imported_entry_identifier(entry: BibEntry, kind: str) -> str:
     return primary.value if primary is not None else entry.key
 
 
-def fetch_arxiv_atom(identifier: str, timeout: float = 15.0) -> str:
+def fetch_arxiv_atom(identifier: str, timeout: float = DEFAULT_TIMEOUT) -> str:
     """Fetch arXiv Atom XML for ``identifier``. Split out so tests can stub it.
 
     Thin domain wrapper over :func:`pynakes.providers.repositories.arxiv.fetch_atom` that
@@ -452,6 +453,7 @@ def prepare_imported_entry(
     lib: BibFile,
     doi: str,
     *,
+    dialect: str | None = None,
     key: str | None = None,
     key_source: str = "generated",
     allow_duplicate_doi: bool = False,
@@ -476,7 +478,9 @@ def prepare_imported_entry(
     if fetcher is None:
         fetcher = fetch_bibtex_for_doi
     try:
-        metadata = get_import_provider(DOI).load(normalized, "bibtex", fetcher)
+        metadata = get_import_provider(DOI).load(
+            normalized, dialect or library_dialect(lib), fetcher
+        )
     except ProviderFetchError as exc:
         raise DOIImportError(str(exc)) from exc
     entry = entry_from_metadata(metadata)
@@ -484,6 +488,29 @@ def prepare_imported_entry(
 
     _assign_key(entry, lib, key=key, key_source=key_source, provider_key=provider_key)
     return entry
+
+
+def arxiv_doi(identifier: str) -> str:
+    """Return the DataCite DOI arXiv registers for ``identifier``.
+
+    arXiv deposits every submission under ``10.48550/arXiv.<id>``, so this is a
+    derivation rather than a lookup: no network access, and the result is the
+    same string arXiv's own landing page advertises.
+    """
+    return f"10.48550/arXiv.{identifier}"
+
+
+def _arxiv_metadata_via_doi(identifier: str, fetcher: FetchBibTeX | None, dialect: str):
+    """Fetch arXiv metadata through DataCite, or ``None`` if that route fails too."""
+    try:
+        return get_import_provider(DOI).load(arxiv_doi(identifier), dialect, fetcher)
+    except (ProviderFetchError, ValueError):
+        return None
+
+
+def _arxiv_error_message(message: str, identifier: str) -> str:
+    """Name the DOI route in the failure, so the workaround is in the error itself."""
+    return f"{message}. The same work is registered as DOI {arxiv_doi(identifier)}"
 
 
 def prepare_imported_arxiv(
@@ -495,11 +522,21 @@ def prepare_imported_arxiv(
     key_source: str = "generated",
     allow_duplicate: bool = False,
     fetcher: FetchArxivAtom | None = None,
+    doi_fetcher: FetchBibTeX | None = None,
 ) -> BibEntry:
     """Fetch and prepare an arXiv entry for appending to ``lib``.
 
     No PDFs or linked files are downloaded — only Atom metadata. The library is
     not modified.
+
+    When arXiv's own API cannot answer — it throttles aggressively, and a busy
+    period shows up as HTTP 429 or a read timeout — the same work is fetched
+    from its registered DataCite DOI instead (see :func:`arxiv_doi`). That is a
+    different host with different rate limits, so a throttled arXiv does not
+    have to mean a failed import. The fallback runs when pynakes is doing the
+    fetching itself (no injected ``fetcher``) or when ``doi_fetcher`` is given
+    explicitly, so a caller that supplies its own transport keeps full control
+    over what is contacted.
     """
     if key_source not in KEY_SOURCES:
         raise ValueError(
@@ -513,12 +550,17 @@ def prepare_imported_arxiv(
         if duplicate_keys:
             raise DuplicateArxivError(normalized, duplicate_keys)
 
+    may_fall_back = fetcher is None or doi_fetcher is not None
     if fetcher is None:
         fetcher = fetch_arxiv_atom
     try:
         metadata = get_import_provider(ARXIV).load(normalized, dialect, fetcher)
     except ProviderFetchError as exc:
-        raise ArxivImportError(str(exc)) from exc
+        metadata = None
+        if may_fall_back:
+            metadata = _arxiv_metadata_via_doi(normalized, doi_fetcher, dialect)
+        if metadata is None:
+            raise ArxivImportError(_arxiv_error_message(str(exc), normalized)) from exc
     entry = entry_from_metadata(metadata)
     # arXiv feeds carry no provider citation key, so "provider" falls back to
     # generation.
@@ -552,11 +594,13 @@ def prepare_imported_reference(
             key_source=key_source,
             allow_duplicate=allow_duplicate,
             fetcher=arxiv_fetcher,
+            doi_fetcher=doi_fetcher,
         )
     elif kind == DOI:
         entry = prepare_imported_entry(
             lib,
             normalized,
+            dialect=dialect,
             key=key,
             key_source=key_source,
             allow_duplicate_doi=allow_duplicate,

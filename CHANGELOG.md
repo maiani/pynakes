@@ -18,9 +18,101 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reference comparison now recognizes known full and abbreviated journal titles
   as equivalent instead of reporting a false metadata mismatch.
 
+- `enrich` no longer writes a `journal` field into entry types that cannot
+  carry one. DOI content negotiation renders a book chapter's container title
+  into `journal` whatever the work actually is, so copying it across put a book
+  title into the one field only `@article` styles read — and re-added a
+  `journal` a user had deliberately cleared in favour of `booktitle`, leaving
+  the two redundant. A provider's container title is now routed by the *local*
+  entry's type: `journal`/`journaltitle` for article-like types, `booktitle`
+  for chapters and proceedings papers, and dropped for a `@book` or `@misc`
+  whose own title is the container. An entry that already records a container
+  under any spelling is left alone. Promotion to `@article` now happens before
+  the container is written, so a preprint gaining its published journal still
+  receives it. `pynakes.entry_types.container_field()` is the single decision
+  point.
+
+- Provider requests now retry a throttle, a transient server error, or a read
+  timeout instead of surfacing the first one as a permanent failure. HTTP 429 —
+  which is a request to slow down, not a refusal — along with 500/502/503/504
+  and network timeouts are retried up to three attempts with deterministic
+  backoff (no jitter, so behavior stays reproducible), honoring `Retry-After`
+  in both its documented forms and clamping an absurd value rather than
+  blocking the run. A genuinely permanent failure such as 404 is not retried,
+  and the final error still reports what actually went wrong. The default read
+  timeout rises from 15s to 30s: a loaded provider answers slowly long before
+  it answers not at all, and a timeout costs a whole import.
+
+- `ref import arXiv:<id>` now falls back to the work's registered DataCite DOI
+  when arXiv's own API cannot answer. Every arXiv id has a deterministic DOI
+  (`10.48550/arXiv.<id>`) served by a different host with different rate
+  limits, and pynakes already knew how to import it, so a throttled arXiv no
+  longer has to mean a failed import. When both routes fail the error names the
+  DOI, putting the workaround in the message. A caller supplying its own
+  fetcher keeps full control over what is contacted.
+
+- Reference import now repairs the BibTeX registrars actually return, so an
+  import never yields an entry that fails pynakes' own `lint`:
+  - arXiv deposits get one entry type. DataCite renders some as `@article` and
+    others as `@misc` from the same DOI prefix, and the `@article` form has no
+    journal to supply, so it linted as an error the user did nothing to cause.
+    Every arXiv record is now `@misc` (`@online` in BibLaTeX) with
+    `eprint`/`archivePrefix`/`primaryClass` recovered from the identifier that
+    was already in the DOI, and its upper-cased DOI restored to canonical form.
+  - Crossref subtypes it renders `@misc` are recovered from evidence already in
+    the record: a reference book becomes `@book`, and a chapter — which arrives
+    with its book title in `journal` — becomes `@incollection` with a
+    `booktitle`.
+  - Repeated keywords are dropped (DataCite repeats `FOS: Physical sciences`
+    verbatim in every arXiv record) and en-dash page ranges are rewritten.
+  All of it is derived from fields the record already carries, so refinement
+  costs no extra request and stays offline and deterministic. Each recovered
+  type is one the target dialect can actually satisfy with the fields present:
+  a chapter with no editor becomes `@inbook` rather than `@incollection` in
+  BibLaTeX, which requires an editor Crossref rarely supplies.
+
+- DOI import now follows the library's own dialect. It was the one import route
+  that assumed BibTeX, which went unnoticed while DOI imports emitted no
+  dialect-specific fields; a BibLaTeX library importing an arXiv DOI now gets
+  `@online` with `eprinttype`/`eprintclass` rather than BibTeX's spellings.
+
+- `enrich`'s summary now counts every update the command applied. With
+  `--published` the human summary described only the enrichment half while the
+  JSON envelope and the printed diff covered both, so a dry run — the review
+  gate — under-reported the change about to be made. The two directions of
+  travel are now also counted apart: promoting a preprint to its published
+  version, and adding arXiv provenance to an already-published entry. The
+  latter was previously reported as "promoted N preprint(s) to a published
+  version", which described the reverse of what happened. `verify`/`enrich`
+  `--published` reports gain `promoted` and `linked` counts.
+
+- Page ranges are normalized to BibTeX's `start--end` by default. Crossref
+  hands out ranges punctuated with a Unicode en-dash; it renders under UTF-8 +
+  `inputenc` but breaks 8-bit `bibtex` with some styles and is invisible in a
+  diff, so it propagated silently. A value that is not a simple range — an
+  article number, or a list like `7,41,73--97` — is left alone, and a library
+  whose own JabRef `saveActions` already run `normalize_page_numbers` keeps
+  owning that step rather than having it applied twice.
+
+- `lint`'s cross-entry consistency check no longer reports a missing `pages` on
+  an entry that carries a DOI, article number, or page count. Modern journals
+  issue article numbers rather than page ranges, so the finding was
+  correct-by-convention noise that buried real findings on a mixed library. It
+  still fires where nothing else locates the work, which is where a missing
+  page range genuinely leaves the reference incomplete.
+
+- `asset fetch --dry-run` now says `Would fetch <key>.` instead of
+  `Skipped <key> (would fetch).`, which made two contradictory claims at once
+  and was unskimmable over a long queue. Genuine no-action cases keep their
+  "Skipped" wording.
+
 ### CLI
 
 #### Added
+
+- `normalize --pages on|off|metadata` controls page-range normalization, also
+  settable as `normalize-pages` metadata. On by default: `--` is the format's
+  own convention for the same value, not an editorial preference.
 
 - `tex scan --json` now locates every citation. The report gains a `usages`
   object mapping each cited key to its occurrences — one
@@ -191,6 +283,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   import path and a non-editable install shadows it. A green run therefore said
   nothing about the source under test. `pythonpath = ["src"]` fixes it, so
   `pynakes` now resolves to `src/pynakes` during a test run.
+
+### Internal
+
+- `integrity.py` is split into `_integrity_common.py` (report types and the
+  field accessors all three operations share) and `_integrity_published.py`
+  (preprint detection, promotion, and arXiv backfill), with `integrity.py`
+  remaining the single public import site. It had grown past the 1000-line
+  ceiling; each module is now under 550 lines.
+- Eprint provenance field naming (`archivePrefix`/`primaryClass` in BibTeX,
+  `eprinttype`/`eprintclass` in BibLaTeX) had three independent definitions
+  that had already drifted apart in casing. They now come from
+  `pynakes.entry_types.eprint_fields()`, so one work imported by arXiv id or by
+  its DOI lands with identically-spelled fields.
 
 ### Editor
 

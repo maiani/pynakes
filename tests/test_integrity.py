@@ -921,3 +921,144 @@ def test_verify_cli_rejects_zero_concurrency(tmp_path: Path) -> None:
     result = runner.invoke(app, ["verify", str(bib), "--concurrency", "0"])
 
     assert result.exit_code != 0
+
+
+# --- container fields follow the entry type ---------------------------------
+
+CHAPTER_REMOTE = """@misc{remote,
+  author = {Gauss, Carl Friedrich},
+  title = {On Congruences},
+  journal = {Disquisitiones Arithmeticae},
+  pages = {3--56},
+  doi = {10.5555/chapter}
+}
+"""
+
+
+def test_enrich_does_not_write_journal_into_an_inproceedings(monkeypatch) -> None:
+    # DOI content negotiation renders a chapter's container into `journal`
+    # regardless of the work's type. Copying it across put a book title into a
+    # field only @article styles read.
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: CHAPTER_REMOTE)
+    lib = parse_bib("@inproceedings{A,\n  title = {A talk},\n  doi = {10.5555/chapter}\n}\n")
+
+    enrich_library(lib, online=True)
+
+    entry = lib.entries["A"]
+    assert "journal" not in entry.fields
+    assert entry.fields["booktitle"] == "Disquisitiones Arithmeticae"
+
+
+def test_enrich_leaves_a_deliberate_booktitle_alone(monkeypatch) -> None:
+    # The reported regression: a user sets booktitle and clears journal, and
+    # enrich puts journal straight back, now redundant with booktitle.
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: CHAPTER_REMOTE)
+    lib = parse_bib(
+        "@incollection{A,\n  title = {On Congruences},\n"
+        "  booktitle = {Disquisitiones Arithmeticae},\n  doi = {10.5555/chapter}\n}\n"
+    )
+
+    enrich_library(lib, online=True)
+
+    assert "journal" not in lib.entries["A"].fields
+
+
+def test_enrich_writes_no_container_for_a_book(monkeypatch) -> None:
+    # A monograph's own title is the container; there is nowhere for a remote
+    # container title to go.
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: CHAPTER_REMOTE)
+    lib = parse_bib("@book{A,\n  title = {Collected Works},\n  doi = {10.5555/chapter}\n}\n")
+
+    enrich_library(lib, online=True)
+
+    entry = lib.entries["A"]
+    assert "journal" not in entry.fields
+    assert "booktitle" not in entry.fields
+
+
+def test_enrich_still_fills_journal_on_an_article(monkeypatch) -> None:
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
+    lib = parse_bib("@article{A,\n  title = {T},\n  doi = {10.5555/example}\n}\n")
+
+    enrich_library(lib, online=True)
+
+    assert lib.entries["A"].fields["journal"] == "Journal of Tests"
+
+
+def test_enrich_uses_journaltitle_for_a_biblatex_library(monkeypatch) -> None:
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
+    lib = parse_bib(
+        "@comment{pynakes-meta: dialect:biblatex;}\n\n"
+        "@article{A,\n  title = {T},\n  doi = {10.5555/example}\n}\n"
+    )
+
+    enrich_library(lib, online=True)
+
+    assert lib.entries["A"].fields["journaltitle"] == "Journal of Tests"
+
+
+# --- enrich's summary counts what enrich did --------------------------------
+
+
+def test_enrich_summary_counts_include_preprint_work(monkeypatch, tmp_path: Path) -> None:
+    # The dry run is the review gate, so under-reporting is the wrong direction
+    # to be wrong in: the human summary must agree with the JSON envelope and
+    # with the diff printed beneath it.
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
+    monkeypatch.setattr(openalex, "fetch_work_by_doi", lambda doi, cache_file=None: OPENALEX_WORK)
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@article{PublishedFirst,\n"
+        "  author = {Ada Lovelace},\n"
+        "  title = {A Published First Test},\n"
+        "  doi = {10.5555/published-first},\n"
+        "  year = {2024}\n"
+        "}\n"
+    )
+
+    human = runner.invoke(app, ["enrich", str(bib), "--published", "--online", "--dry-run"])
+    payload = runner.invoke(
+        app, ["enrich", str(bib), "--published", "--online", "--dry-run", "--json"]
+    )
+    data = json.loads(payload.output)
+
+    assert human.exit_code == 0, human.output
+    assert f"Would enrich {data['modified_entries']} " in human.output
+    assert f"field_updates={len(data['updates'])}" in human.output
+
+
+def test_enrich_describes_an_arxiv_backfill_as_a_link_not_a_promotion(
+    monkeypatch, tmp_path: Path
+) -> None:
+    # The entry was already published; it gained eprint provenance pointing at
+    # its preprint. Calling that a promotion described the reverse.
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
+    monkeypatch.setattr(openalex, "fetch_work_by_doi", lambda doi, cache_file=None: OPENALEX_WORK)
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@article{PublishedFirst,\n"
+        "  author = {Ada Lovelace},\n"
+        "  title = {A Published First Test},\n"
+        "  doi = {10.5555/published-first},\n"
+        "  year = {2024}\n"
+        "}\n"
+    )
+
+    result = runner.invoke(app, ["enrich", str(bib), "--published", "--online", "--dry-run"])
+
+    assert "added arXiv preprint provenance to 1 published entry" in result.output
+    assert "promoted" not in result.output
+
+
+def test_published_report_counts_promotions_and_links_apart() -> None:
+    lib = parse_bib(
+        "@misc{Preprint,\n  title = {A preprint},\n  eprint = {2301.00001},\n"
+        "  archiveprefix = {arXiv},\n  doi = {10.5555/published},\n"
+        "  journal = {Journal of Tests}\n}\n"
+    )
+
+    report = check_published(lib, apply=True)
+
+    assert report.promoted == 1
+    assert report.linked == 0
+    assert report.to_dict()["promoted"] == 1

@@ -74,6 +74,7 @@ def test_normalize_library_runs_standard_pass() -> None:
         "authors": 1,
         "journals": 0,
         "dois": 1,
+        "pages": 0,
         "months": 0,
         "save_action_fields": 0,
         "entry_types": 0,
@@ -450,3 +451,51 @@ def test_saveactions_malformed_doi_warns_and_short_doi_is_unsupported() -> None:
     warning_types = [warning["type"] for warning in report.warnings if isinstance(warning, dict)]
     assert "invalid_doi" in warning_types
     assert "unsupported_save_action_formatter" in warning_types
+
+
+# --- page ranges ------------------------------------------------------------
+
+
+def test_normalize_rewrites_unicode_dash_page_ranges() -> None:
+    # Crossref hands out ranges punctuated with U+2013. It renders under UTF-8
+    # but breaks 8-bit bibtex with some styles, and is invisible in a diff.
+    lib = parse_bib("@article{A, pages = {1052–1055}}\n@article{B, pages = {865—942}}\n")
+
+    result = normalize_library(lib)
+
+    assert lib.entries["A"].fields["pages"] == "1052--1055"
+    assert lib.entries["B"].fields["pages"] == "865--942"
+    assert result.pages == 2
+
+
+def test_normalize_leaves_correct_and_non_range_page_values_alone() -> None:
+    lib = parse_bib(
+        "@article{A, pages = {4546--4563}}\n"
+        "@article{B, pages = {012345}}\n"
+        "@article{C, pages = {7,41,73--97}}\n"
+    )
+
+    result = normalize_library(lib)
+
+    assert lib.entries["A"].fields["pages"] == "4546--4563"
+    assert lib.entries["B"].fields["pages"] == "012345"
+    assert lib.entries["C"].fields["pages"] == "7,41,73--97"
+    assert result.pages == 0
+
+
+def test_normalize_pages_can_be_turned_off() -> None:
+    lib = parse_bib("@article{A, pages = {1052–1055}}\n")
+
+    normalize_library(lib, NormalizeOptions(normalize_pages=False))
+
+    assert lib.entries["A"].fields["pages"] == "1052–1055"
+
+
+def test_normalize_pages_honors_a_stored_metadata_preference() -> None:
+    lib = parse_bib(
+        "@comment{pynakes-meta: normalize-pages:false;}\n\n@article{A, pages = {1052–1055}}\n"
+    )
+
+    normalize_library(lib)
+
+    assert lib.entries["A"].fields["pages"] == "1052–1055"

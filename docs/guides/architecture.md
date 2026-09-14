@@ -266,13 +266,15 @@ against every process crash, operating-system failure, or storage failure.
 | fetch.py | arXiv material URL construction, injectable PDF/source byte fetchers, safe source archive extraction, and FileStore installation. |
 | metadata/ (core.py, schema.py, jabref.py) | Structured top-level metadata, layered by dependency direction: `core` is the namespace-neutral comment engine (parse/format/set/remove/consolidate); `schema` is pynakes' own canonical key registry and native reads, JabRef-unaware; `jabref` is the compatibility adapter — JabRef's key tables and value grammars, the JabRef group parsers/serializers (`parse_jabref_grouping`, `format_jabref_grouping`, `parse_jabref_groups_lines`), owner/namespace arbitration, and fallback-aware accessors (`library_dialect`, `library_sort_order`). Domain code depends on `schema`'s concepts through `jabref`'s accessors, never on JabRef's literal keys. See the [JabRef compatibility guide](jabref-compatibility.md). |
 | journals.py | Exact title/ISSN mapping plus LTWA-style journal abbreviation/expansion. |
-| normalize.py | Policy orchestration over title, author, journal, and DOI operations. |
+| normalize.py | Policy orchestration over title, author, journal, DOI, and page-range operations. |
 | convert.py | Conservative BibTeX/BibLaTeX convention conversion. |
 | files.py | Parsing and resolution/validation of BibLaTeX linked-file descriptors. |
 | usage.py | LaTeX/AUX citation extraction, library-usage analysis, tagging, and subset projection. |
 | lint.py | Local structural/semantic findings such as missing required fields, malformed DOI, groups, and duplicate keys. BibLaTeX required-field rules cite the official CTAN BibLaTeX manual, section 2.1 entry types and aliases, as their source of truth. |
 | dedupe.py | Duplicate-work clustering and conflict-first merge planning. |
-| integrity.py | Opt-in provider-backed verification, conservative enrichment, and preprint publication checks. |
+| integrity.py | Opt-in provider-backed verification and conservative enrichment; re-exports the preprint publication check. |
+| _integrity_common.py, _integrity_published.py | Integrity report types and shared field accessors; the preprint detection/promotion half of the integrity surface. |
+| entry_types.py | Which field holds a container title or eprint provenance, given the entry type and dialect. |
 | diff.py | Unified diff generation. |
 | cli.py, cli_common.py, cli_commands/ | Thin Typer application assembly, shared JSON/error/check plumbing, and one command module per command family. |
 | capabilities.py | Machine-readable declaration of the implemented CLI surface. |

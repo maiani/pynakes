@@ -10,7 +10,7 @@ from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from pathlib import Path
 
-from pynakes.fetch_progress import FetchProgress, FetchProgressEvent
+from pynakes.fetch_progress import WOULD_FETCH, FetchProgress, FetchProgressEvent
 from pynakes.metadata import FetchPolicy, metadata_value
 from pynakes.metadata import metadata_bool as _coerce_metadata_bool
 from pynakes.metadata import parse_fetch_policy as _parse_fetch_policy
@@ -568,7 +568,7 @@ def run_fetch_loop(
             continue
 
         if dry_run:
-            skipped.append({"key": key, "reason": "would fetch"})
+            skipped.append({"key": key, "reason": WOULD_FETCH})
             _emit_fetch_progress(
                 progress,
                 FetchProgressEvent(
@@ -576,7 +576,7 @@ def run_fetch_loop(
                     key=key,
                     entry_index=index,
                     entry_total=entry_total,
-                    message="would fetch",
+                    message=WOULD_FETCH,
                 ),
             )
             continue

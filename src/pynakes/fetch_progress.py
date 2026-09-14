@@ -6,6 +6,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 
+# The ``skipped`` reason a dry run records for an entry it *would* have
+# fetched. Distinct from the genuine no-action reasons ("no DOI", "materials
+# already present") so a reader can tell a plan from a non-event.
+WOULD_FETCH = "would fetch"
+
 FetchArtifact = Literal["preprint_pdf", "preprint_source", "published_pdf", "supplement_pdf"]
 FetchProgressKind = Literal[
     "entry",

@@ -625,3 +625,27 @@ def _tar_bytes(files: dict[str, bytes], *, symlinks: dict[str, str] | None = Non
             info.linkname = target
             archive.addfile(info)
     return buffer.getvalue()
+
+
+# --- human-readable fetch report wording ------------------------------------
+
+
+def test_dry_run_lines_say_what_would_happen_rather_than_skipped() -> None:
+    # "Skipped X (would fetch)" makes two contradictory claims at once; over a
+    # long queue it is unskimmable.
+    from pynakes.cli_commands._fetch_report import fetch_report_lines
+
+    report = {
+        "fetched": [],
+        "skipped": [
+            {"key": "Euler_1748_Introductio", "reason": "would fetch"},
+            {"key": "Gauss_1801_Disquisitiones", "reason": "no DOI"},
+        ],
+        "failed": [],
+    }
+
+    lines = fetch_report_lines(report)
+
+    assert lines[0] == "Would fetch Euler_1748_Introductio."
+    # A genuine no-action case keeps its "Skipped" wording.
+    assert lines[1] == "Skipped Gauss_1801_Disquisitiones (no DOI)."

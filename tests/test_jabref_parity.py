@@ -506,12 +506,28 @@ def test_normalize_applies_saveactions_field_formatters() -> None:
 
 
 def test_normalize_skips_formatters_without_saveactions() -> None:
-    # No saveActions → date/month/pages are left untouched (no pynakes-meta or
-    # flag drives them).
-    text = "@article{A,\n  title = {T},\n  pages = {1 - 2}\n}\n"
+    # No saveActions → date/month are left untouched (no pynakes-meta or flag
+    # drives them). ``pages`` is the exception: it has a built-in default step,
+    # since ``--`` is the format's own convention rather than a preference.
+    text = "@article{A,\n  title = {T},\n  date = {8.1.2015},\n  month = {December}\n}\n"
     lib = parse_bib(text)
     normalize_library(lib)
-    assert lib.entries["A"].fields["pages"] == "1 - 2"
+    assert lib.entries["A"].fields["date"] == "8.1.2015"
+    assert lib.entries["A"].fields["month"] == "December"
+
+
+def test_normalize_pages_defers_to_saveactions_when_configured() -> None:
+    # The built-in pages step and the saveAction apply the identical formatter,
+    # so a file configuring its own must not be counted (or done) twice.
+    text = (
+        "@comment{jabref-meta: saveActions:enabled;\npages[normalize_page_numbers]\n;}\n\n"
+        "@article{A,\n  title = {T},\n  pages = {1 - 2}\n}\n"
+    )
+    lib = parse_bib(text)
+    report = normalize_library(lib)
+    assert lib.entries["A"].fields["pages"] == "1--2"
+    assert report.save_action_fields == 1
+    assert report.pages == 0
 
 
 # ---------------------------------------------------------------------------
