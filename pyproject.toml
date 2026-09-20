@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pynakes"
-version = "0.6.2"
+version = "0.6.3"
 description = "Agent-friendly, round-trip-faithful BibTeX/BibLaTeX maintenance toolkit"
 readme = "README.md"
 license = "MIT"

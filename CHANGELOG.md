@@ -150,6 +150,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Closing one bibliography view no longer hides the status bar item while a
   sibling view is still active.
 
+## [0.6.3] - 2026-09-20
+
+### Added
+
+- `--key` selects entries by citation key on every command that takes
+  `--where`: `fields` (all six operations), `search`, `format`, and
+  `corpus combine`. It is comma-separated and repeatable, and exactly equivalent
+  to `--where 'key in [...]'`; giving both narrows, since they are ANDed.
+  Previously the simplest possible request — act on this one reference I can
+  name — had to be spelled through the expression grammar, and `--key` was
+  accepted only by `ref add` and `ref import`, where it names the key to
+  *assign*. So a caller who reached for it as a selector got Click's bare
+  `No such option: --key` and nothing to go on. `--key` now means "the citation
+  key" across the whole CLI, and a usage error for a near-miss spelling names
+  what that command does accept — the selector where it selects, the positional
+  citation key where it takes one. `pynakes capabilities` reports the shorthand
+  under `predicate_grammar.key_selector`.
+
+- `lint` reports a page range BibTeX does not spell that way as
+  `nonstandard_page_range` (a `content` warning, fixed by `normalize`). A raw
+  Unicode en-dash renders under UTF-8 plus `inputenc` but breaks under 8-bit
+  `bibtex` with some styles, and it is near-indistinguishable from a hyphen, so
+  it survives review and propagates once it is in the file. The finding fires
+  exactly when `normalize` would rewrite the value, so lint never reports
+  something the command it names would leave alone: an article number and a
+  list like `7,41,73--97` are not flagged.
+
+### Changed
+
+- `normalize` reports a step the library has turned off as `off` rather than
+  `0`. The two are different claims — `journals=0` means every journal title was
+  checked and none changed, while the step had in fact never run, because
+  journal-style conversion is off unless configured. There was no way to tell
+  from the output which one had happened. The human summary now names the flag
+  that turns each skipped step back on, and `--json` carries the full reason
+  under `operations.skipped`.
+
+### Fixed
+
+- Reference import no longer writes a Unicode en-dash into `pages`. The repair
+  existed but lived in the DOI content-negotiation client, so it covered only
+  the one route: every other provider — Crossref's JSON records, Europe PMC,
+  PubMed, zbMATH and the rest — still passed the registrar's own spelling
+  through, as did the Crossref supplement that `enrich` merges into an entry
+  without ever rendering it to a BibTeX entry. Page ranges are now spelled the
+  way BibTeX spells them on `ReferenceMetadata` itself, which is what every
+  import, `--fetch` and `enrich` route builds, so the format repair happens once
+  instead of per client. A lone hyphen (`231-252`, which is what Crossref
+  returns) is corrected too; an article number or a page list is left alone.
+
 ## [0.6.2] - 2026-09-14
 
 ### Fixed
