@@ -4,7 +4,13 @@ from pynakes.authors import normalize_authors, normalize_name_list
 from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.journals import normalize_journals
-from pynakes.normalize import NormalizeOptions, normalize_library, sort_entries
+from pynakes.normalize import (
+    SKIPPABLE_STEPS,
+    NormalizeOptions,
+    normalize_library,
+    skipped_step_flag,
+    sort_entries,
+)
 
 
 def test_author_list_conservative_style_normalizes_separators_and_others() -> None:
@@ -81,7 +87,46 @@ def test_normalize_library_runs_standard_pass() -> None:
         "field_names": 0,
         "keys": 0,
         "sorted_entries": 0,
+        # A step that never ran says so, so a caller can tell it apart from one
+        # that ran and changed nothing.
+        "skipped": {
+            "journals": report.skipped["journals"],
+            "keys": report.skipped["keys"],
+        },
     }
+    assert "--journal-style" in report.skipped["journals"]
+    assert "--keys" in report.skipped["keys"]
+
+
+def test_every_skippable_step_can_be_named_and_turned_back_on() -> None:
+    """A "did not run" that does not say how to make it run is only half a report."""
+    options = NormalizeOptions(
+        protect_titles=False,
+        author_style="none",
+        normalize_dois=False,
+        normalize_pages=False,
+        identifier_case=False,
+        normalize_keys=False,
+    )
+
+    report = normalize_library(parse_bib("@article{A, title = {T}}\n"), options)
+
+    assert set(report.skipped) == set(SKIPPABLE_STEPS)
+    for step, reason in report.skipped.items():
+        invocation, metadata_key = SKIPPABLE_STEPS[step]
+        assert invocation in reason
+        assert metadata_key in reason
+        assert skipped_step_flag(step).startswith("--")
+
+
+def test_normalize_reports_a_step_that_ran_but_changed_nothing_as_not_skipped() -> None:
+    """``journals=0`` must mean "checked, nothing to do" once a style is set."""
+    lib = parse_bib("@article{A,\n  journal = {Nat. Mach. Intell.}\n}\n")
+
+    report = normalize_library(lib, NormalizeOptions(journal_style="abbreviated"))
+
+    assert report.journals == 0
+    assert "journals" not in report.skipped
 
 
 def test_normalize_repairs_and_canonicalizes_bare_month_names_surgically() -> None:

@@ -18,6 +18,7 @@ from pynakes.cli_common import (
     bib_file_argument,
 )
 from pynakes.engine import Bibliography
+from pynakes.normalize import skipped_step_flag
 from pynakes.usage import MissingTexSourcesError
 
 # --- normalize -------------------------------------------------------------
@@ -180,16 +181,31 @@ def normalize(
         sort_detail = f", sorted_by=[{order}]"
     else:
         sort_detail = ""
+    # A step that never ran reports ``off`` rather than ``0``: the two are not
+    # the same claim, and the steps that are off by default (journal style, key
+    # regeneration) are precisely the ones a reader would otherwise take as
+    # "checked, nothing to do".
+    counts = [
+        ("titles", sum(report.title_fields.values()), "titles"),
+        ("authors", report.authors, "authors"),
+        ("journals", report.journals, "journals"),
+        ("dois", report.dois, "dois"),
+        ("pages", report.pages, "pages"),
+        ("months", report.months, None),
+        ("entry_types", report.entry_types, "identifier_case"),
+        ("field_names", report.field_names, "identifier_case"),
+        ("keys", report.keys, "keys"),
+    ]
+    summary = ", ".join(
+        f"{label}={'off' if step in report.skipped else count}" for label, count, step in counts
+    )
     human = [
         f"{_verb('normalize', params)} entries.",
-        "  "
-        f"titles={sum(report.title_fields.values())}, "
-        f"authors={report.authors}, journals={report.journals}, dois={report.dois}, "
-        f"pages={report.pages}, months={report.months}, "
-        f"entry_types={report.entry_types}, field_names={report.field_names}, "
-        f"keys={report.keys}"
-        f"{sort_detail}",
+        f"  {summary}{sort_detail}",
     ]
+    if report.skipped:
+        off = ", ".join(f"{step} ({skipped_step_flag(step)})" for step in report.skipped)
+        human.append(f'  not run: {off}. Those read "off" above, not zero.')
     if report.warnings:
         human.append(f"  {len(report.warnings)} warning(s).")
 

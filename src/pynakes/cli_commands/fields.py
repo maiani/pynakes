@@ -16,6 +16,8 @@ from pynakes.cli_common import (
     _verb,
     bib_file_argument,
     build_where_filter,
+    key_option,
+    parse_key_selector,
     where_option,
 )
 from pynakes.engine import Bibliography
@@ -48,6 +50,7 @@ def fields_rename(
     old: str = typer.Argument(..., help="Existing field name"),
     new: str = typer.Argument(..., help="New field name"),
     where: str | None = where_option(),
+    key: list[str] | None = key_option(),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
@@ -56,13 +59,13 @@ def fields_rename(
     """Rename a field across matching references."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    flt = build_where_filter(where)
+    flt = build_where_filter(where, keys=key)
     _run_field_op(
         file,
         "fields_rename",
         lambda coll: coll.rename_field(old, new, flt),
         params,
-        {"old": old, "new": new, "where": where},
+        {"old": old, "new": new, "where": where, "keys": parse_key_selector(key)},
         f"{_verb('rename', params)} field {old!r} to {new!r}",
     )
 
@@ -72,6 +75,7 @@ def fields_set(
     field: str = typer.Argument(..., help="Field name"),
     value: str = typer.Argument(..., help="Replacement value"),
     where: str | None = where_option(),
+    key: list[str] | None = key_option(),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
@@ -80,13 +84,13 @@ def fields_set(
     """Set or replace a field on matching references."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    flt = build_where_filter(where)
+    flt = build_where_filter(where, keys=key)
     _run_field_op(
         file,
         "fields_set",
         lambda coll: coll.set_field(field, value, flt),
         params,
-        {"field": field, "value": value, "where": where},
+        {"field": field, "value": value, "where": where, "keys": parse_key_selector(key)},
         f"{_verb('set', params, 'Set')} field {field!r}",
     )
 
@@ -96,6 +100,7 @@ def fields_move(
     old: str = typer.Argument(..., help="Existing field name"),
     new: str = typer.Argument(..., help="Target field name"),
     where: str | None = where_option(),
+    key: list[str] | None = key_option(),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
@@ -104,13 +109,13 @@ def fields_move(
     """Move a field on matching references, without replacing the target."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    flt = build_where_filter(where)
+    flt = build_where_filter(where, keys=key)
     _run_field_op(
         file,
         "fields_move",
         lambda coll: coll.move_field(old, new, flt),
         params,
-        {"old": old, "new": new, "where": where},
+        {"old": old, "new": new, "where": where, "keys": parse_key_selector(key)},
         f"{_verb('move', params)} field {old!r} to {new!r}",
     )
 
@@ -120,6 +125,7 @@ def fields_append(
     field: str = typer.Argument(..., help="Field name"),
     value: str = typer.Argument(..., help="Value to append"),
     where: str | None = where_option(),
+    key: list[str] | None = key_option(),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
@@ -128,13 +134,13 @@ def fields_append(
     """Append a value to a delimited field on matching references."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    flt = build_where_filter(where)
+    flt = build_where_filter(where, keys=key)
     _run_field_op(
         file,
         "fields_append",
         lambda coll: coll.append_field(field, value, flt),
         params,
-        {"field": field, "value": value, "where": where},
+        {"field": field, "value": value, "where": where, "keys": parse_key_selector(key)},
         f"{_verb('append', params, 'Appended')} {value!r} to field {field!r}",
     )
 
@@ -143,6 +149,7 @@ def fields_clear(
     file: str | None = bib_file_argument(),
     field: str = typer.Argument(..., help="Field name to remove"),
     where: str | None = where_option(),
+    key: list[str] | None = key_option(),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
@@ -151,13 +158,13 @@ def fields_clear(
     """Remove a field from matching references."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    flt = build_where_filter(where)
+    flt = build_where_filter(where, keys=key)
     _run_field_op(
         file,
         "fields_clear",
         lambda coll: coll.clear_field(field, flt),
         params,
-        {"field": field, "where": where},
+        {"field": field, "where": where, "keys": parse_key_selector(key)},
         f"{_verb('clear', params, 'Cleared')} field {field!r}",
     )
 
@@ -169,6 +176,7 @@ def fields_protect_title(
         None, "--term", help="Additional exact term to brace-protect"
     ),
     where: str | None = where_option(),
+    key: list[str] | None = key_option(),
     backup: bool = _BACKUP_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
@@ -177,14 +185,14 @@ def fields_protect_title(
     """Brace-protect capitalization-sensitive tokens in title-like fields."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    flt = build_where_filter(where)
+    flt = build_where_filter(where, keys=key)
     terms = term or []
     _run_field_op(
         file,
         "fields_protect_title",
         lambda coll: coll.protect_title(field, flt, terms),
         params,
-        {"field": field, "terms": terms, "where": where},
+        {"field": field, "terms": terms, "where": where, "keys": parse_key_selector(key)},
         f"{_verb('protect', params, 'Protected')} capitalization in field {field!r}",
     )
 

@@ -64,13 +64,20 @@ _ERROR_CODES = {
 # description cannot drift from the parser.
 _PREDICATE_GRAMMAR = {
     "used_by": [
-        "fields (--where)",
-        "search (--where)",
-        "format (--where)",
-        "corpus combine (--where)",
+        "fields (--where, --key)",
+        "search (--where, --key)",
+        "format (--where, --key)",
+        "corpus combine (--where, --key)",
         "corpus split (--to)",
         "batch (fields.* where)",
     ],
+    "key_selector": (
+        "--key selects by citation key without the expression grammar: "
+        "comma-separated, repeatable, equivalent to --where 'key in [...]'. "
+        "Every command taking --where takes it, and giving both narrows (they "
+        "are ANDed). On ref add and ref import, which create an entry rather "
+        "than select one, --key names the key to assign."
+    ),
     "bucket_predicates_used_by": ["corpus split (--to)"],
     **WHERE_GRAMMAR,
 }

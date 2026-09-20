@@ -29,6 +29,62 @@ def _is_shell_completion() -> bool:
     return bool(os.environ.get("_PYNAKES_COMPLETE"))
 
 
+#: Selector options whose absence is worth explaining rather than merely
+#: reporting. ``--key`` is the one that bites: it means "the key to assign" on
+#: the commands that create an entry, so reaching for it as a selector is a
+#: reasonable guess, and Click's bare "No such option" leaves nowhere to go.
+_SELECTOR_ALIASES = {"--key", "--keys", "--citekey", "--citation-key", "--entry"}
+
+
+def _selector_hint(exc: click.UsageError) -> str | None:
+    """Return the selector advice for an unknown option, when one applies.
+
+    Click's ``NoSuchOption`` says only that the option does not exist. When the
+    option the caller reached for is a citation-key selector, the useful reply
+    names what this command does accept — ``--key`` where it is a selector,
+    ``--where`` where the command takes only the expression grammar, and the
+    positional citation key where it takes neither.
+    """
+    option = getattr(exc, "option_name", None)
+    if option not in _SELECTOR_ALIASES:
+        return None
+    if getattr(exc, "possibilities", None):
+        # Click found a near-miss of its own; two pieces of advice in one
+        # message is worse than the better one alone.
+        return None
+    command = getattr(exc.ctx, "command", None)
+    accepted = {
+        name
+        for param in getattr(command, "params", [])
+        if param.param_type_name == "option"
+        for name in param.opts
+    }
+    if "--where" in accepted:
+        # ``--key`` is defined alongside every ``--where``, so arriving here
+        # means a near-miss spelling of it.
+        return "this command selects entries with --key or --where"
+    arguments = [
+        param.name
+        for param in getattr(command, "params", [])
+        if param.param_type_name == "argument"
+    ]
+    if any(name in {"key", "citekey", "citekeys"} for name in arguments):
+        return "this command takes the citation key as a positional argument"
+    return None
+
+
+def _annotate_usage_error(exc: click.UsageError) -> None:
+    """Append selector advice to a usage error in place, when any applies.
+
+    The message is rewritten on the exception itself so both routes out of this
+    group — Click's own usage text for a human, and the JSON envelope — carry
+    the same advice without either having to know about the other.
+    """
+    hint = _selector_hint(exc)
+    if hint and hint not in str(exc.message):
+        exc.message = f"{exc.message} ({hint})"
+
+
 def _report_missing_bib(json_output: bool, candidates: list[Path]) -> None:
     """Report the real cause when a leading ``.bib`` was omitted and undetectable.
 
@@ -310,6 +366,7 @@ class AutoBibGroup(TyperGroup):
         try:
             return super().main(args=args, prog_name=prog_name, **extra)
         except (click.UsageError, TyperUsageError) as exc:
+            _annotate_usage_error(exc)
             if json_output:
                 _emit_error(True, "UsageError", exc.format_message())
             raise
@@ -321,6 +378,7 @@ class AutoBibGroup(TyperGroup):
         try:
             return super().invoke(ctx)
         except (click.UsageError, TyperUsageError) as exc:
+            _annotate_usage_error(exc)
             if not ctx.meta.get(_JSON_META_KEY, False):
                 raise  # Humans keep Click's usage text and exit code 2.
             _emit_error(True, "UsageError", exc.format_message())

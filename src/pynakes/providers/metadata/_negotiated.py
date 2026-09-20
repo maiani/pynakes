@@ -15,7 +15,10 @@ against live DOIs:
 * arXiv records repeat a keyword verbatim (``FOS: Physical sciences`` twice)
   and none carry ``eprint``/``archiveprefix``, though the arXiv id is right
   there in the DOI.
-* Page ranges keep Unicode en-dashes where BibTeX wants ``--``.
+
+(Page ranges arrive with Unicode en-dashes here too, but that is not specific
+to the registrars: :class:`~pynakes.providers.records.ReferenceMetadata`
+repairs it for every provider.)
 
 Everything here is derived from fields the record already carries, so refining
 an import costs no extra request and stays deterministic and offline — the
@@ -35,7 +38,6 @@ from pynakes.entry_types import (
     is_biblatex,
     preprint_entry_type,
 )
-from pynakes.formatters import normalize_page_numbers
 from pynakes.providers.records import ReferenceMetadata
 
 ARXIV_DOI_PREFIX = "10.48550/arxiv."
@@ -48,7 +50,6 @@ _CATEGORY = re.compile(r"\(([a-z-]+(?:\.[A-Za-z-]+)?)\)")
 def refine(metadata: ReferenceMetadata, *, dialect: str = "bibtex") -> ReferenceMetadata:
     """Return ``metadata`` with registrar quirks repaired, in place."""
     _dedupe_keywords(metadata.fields)
-    _normalize_pages(metadata.fields, metadata.field_expressions)
     if _is_arxiv(metadata):
         _refine_arxiv(metadata, dialect=dialect)
     else:
@@ -76,22 +77,6 @@ def _dedupe_keywords(fields: dict[str, str]) -> None:
         if cleaned and cleaned not in seen:
             seen.append(cleaned)
     fields["keywords"] = ", ".join(seen)
-
-
-def _normalize_pages(fields: dict[str, str], expressions: dict[str, str]) -> None:
-    """Rewrite en/em-dash page ranges to BibTeX's ``--``.
-
-    Crossref renders ``3–56`` with U+2013. It survives UTF-8 + ``inputenc`` but
-    breaks under 8-bit ``bibtex`` with some styles, and is invisible in a diff,
-    so it propagates silently once imported.
-    """
-    value = fields.get("pages", "")
-    if not value:
-        return
-    normalized = normalize_page_numbers(value)
-    if normalized != value:
-        fields["pages"] = normalized
-        expressions["pages"] = f"{{{normalized}}}"
 
 
 # --- arXiv deposits ---------------------------------------------------------

@@ -25,6 +25,8 @@ from pynakes.cli_common import (
     _safe,
     _verb,
     build_where_filter,
+    key_option,
+    parse_key_selector,
     where_option,
 )
 from pynakes.diff import generate_diff
@@ -103,6 +105,10 @@ def combine(
     where: str | None = where_option(
         "Keep only the entries matching this selector in the combined output"
     ),
+    key: list[str] | None = key_option(
+        "Keep only these citation keys in the combined output: comma-separated, "
+        "repeatable. Narrows --where when both are given"
+    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would change without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff of the output"),
     backup: bool = _BACKUP_OPTION,
@@ -115,7 +121,7 @@ def combine(
     one command rather than a combine-then-prune script.
     """
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    selector = build_where_filter(where)
+    selector = build_where_filter(where, keys=key)
     named_inputs = _load_inputs(inputs)
     pinax_sources = _entry_sources(named_inputs)
     merged = merge_libraries(named_inputs, dedupe=dedupe)
@@ -201,6 +207,7 @@ def combine(
         inputs=merged.inputs,
         dedupe=dedupe,
         where=where,
+        keys=parse_key_selector(key),
         entries=entries,
         pinax_materials=pinax_materials,
     )

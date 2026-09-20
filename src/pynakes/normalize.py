@@ -108,6 +108,13 @@ class NormalizeResult:
     sort_entries_count: int = 0
     sort_criteria: list[tuple[str, bool]] = field(default_factory=list)
 
+    #: Steps that did not run, mapped to why — so a caller can tell "ran and
+    #: changed nothing" from "never ran". A count of ``0`` alone cannot say
+    #: which, and the steps that are off by default (journal style, key
+    #: regeneration) are exactly the ones a reader is most likely to
+    #: misread as "checked, nothing to do".
+    skipped: dict[str, str] = field(default_factory=dict)
+
     @property
     def operations(self) -> dict[str, object]:
         """Return the per-domain change counts as a single JSON-friendly dict."""
@@ -124,7 +131,38 @@ class NormalizeResult:
             "field_names": self.field_names,
             "keys": self.keys,
             "sorted_entries": self.sort_entries_count,
+            "skipped": dict(self.skipped),
         }
+
+
+#: Every step a library can turn off, mapped to the CLI invocation that turns
+#: it on and the metadata key that configures it. A report's ``skipped`` reason
+#: and the CLI's summary are both built from this, so a step cannot end up
+#: described one way in the human output and another in the envelope.
+SKIPPABLE_STEPS: dict[str, tuple[str, str]] = {
+    "titles": ("--title-protection on", "normalize-protect-titles"),
+    "authors": ("--author-style jabref", "normalize-author-style"),
+    "journals": ("--journal-style abbreviated|full", "normalize-journal-style"),
+    "dois": ("--doi-normalization on", "normalize-dois"),
+    "pages": ("--pages on", "normalize-pages"),
+    "identifier_case": ("--identifier-case on", "normalize-identifier-case"),
+    "keys": ("--keys on", "normalize-keys"),
+}
+
+
+def skipped_step_flag(step: str) -> str:
+    """Return the bare CLI flag that turns ``step`` on, for a compact summary."""
+    return SKIPPABLE_STEPS[step][0].split()[0]
+
+
+def _record_skip(result: NormalizeResult, step: str, state: str) -> None:
+    """Record that ``step`` did not run, and how to make it run.
+
+    ``state`` says why in the library's own terms; the advice is appended from
+    :data:`SKIPPABLE_STEPS` so every skipped step points somewhere actionable.
+    """
+    invocation, metadata_key = SKIPPABLE_STEPS[step]
+    result.skipped[step] = f"{state}; set {invocation} or the {metadata_key} metadata key"
 
 
 def _normalize_setting(lib: BibFile, name: str) -> str | None:
@@ -335,18 +373,31 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
             changed = field_ops.protect_title_capitalization(lib, field=field, terms=terms)
             if changed:
                 result.title_fields[field] = changed
+    else:
+        _record_skip(result, "titles", "title protection is off")
 
     author_style = _resolve_choice(
         lib, opts.author_style, "author-style", author_ops.AUTHOR_STYLES, author_default
     )
     result.authors = author_ops.normalize_authors(lib, author_style)
+    if author_style == "none":
+        _record_skip(result, "authors", "author style is 'none'")
 
     if _resolve_bool(lib, opts.normalize_dois, "dois", doi_default):
         result.dois, doi_warnings = normalize_dois(lib)
         result.warnings.extend(doi_warnings)
+    else:
+        _record_skip(result, "dois", "DOI normalization is off")
 
     if _resolve_bool(lib, opts.normalize_pages, "pages", pages_default):
         result.pages = normalize_pages(lib)
+    elif not pages_default:
+        result.skipped["pages"] = (
+            "the library's own JabRef saveActions already run normalize_page_numbers "
+            "on pages, so the built-in pass would have nothing left to do"
+        )
+    else:
+        _record_skip(result, "pages", "page normalization is off")
 
     # Journal abbreviation/expansion is *off* by default: it is opinionated and
     # not reversible without the right table, so it runs only when a style is
@@ -368,6 +419,12 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
     journal_result = journal_ops.normalize_journals(lib, journal_style, journal_sources)
     result.journals = journal_result.changed
     result.warnings.extend(journal_ops.unknown_journal_warnings(journal_result.unknown))
+    if journal_style == "none":
+        _record_skip(
+            result,
+            "journals",
+            "no journal style is configured, so journal titles were left as they are",
+        )
 
     # Apply the remaining JabRef saveActions field formatters (date/month/pages)
     # exactly where the file configures them. There is no pynakes-meta or CLI
@@ -384,6 +441,8 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
 
     if _resolve_bool(lib, opts.identifier_case, "identifier-case", True):
         result.entry_types, result.field_names = normalize_identifier_case(lib)
+    else:
+        _record_skip(result, "identifier_case", "identifier-case normalization is off")
 
     criteria = _resolve_sort_criteria(lib, opts.sort_by)
     if criteria:
@@ -400,6 +459,8 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
             if len(renames) > 5:
                 details += f" (and {len(renames) - 5} more)"
             result.warnings.append(f"Regenerated {len(renames)} key(s): {details}")
+    else:
+        _record_skip(result, "keys", "citation keys are never regenerated unless asked")
 
     return result
 

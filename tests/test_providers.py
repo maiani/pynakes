@@ -54,6 +54,37 @@ def test_reference_metadata_normalizes_names_and_serializes_copies() -> None:
     assert metadata.to_dict()["fields"] == {"title": "Test"}
 
 
+@pytest.mark.parametrize(
+    "supplied,expected",
+    [
+        ("2446\u20132449", "2446--2449"),  # Crossref and friends render U+2013
+        ("2446\u20142449", "2446--2449"),  # em-dash
+        ("231-252", "231--252"),  # a lone hyphen is not BibTeX's range either
+        ("pp. 12--34", "12--34"),
+        ("e0123456", "e0123456"),  # an article number is not a range
+        ("7,41,73--97", "7,41,73--97"),  # a page list is not a simple range
+    ],
+)
+def test_reference_metadata_spells_page_ranges_the_way_bibtex_does(
+    supplied: str, expected: str
+) -> None:
+    """Every provider builds one of these, so the repair belongs here, not per-client.
+
+    A raw en-dash renders under UTF-8 plus inputenc but breaks 8-bit bibtex with
+    some styles, and is near-indistinguishable from a hyphen in review.
+    """
+    metadata = ReferenceMetadata(
+        provider="Example", entry_type="article", fields={"pages": supplied}
+    )
+
+    assert metadata.fields["pages"] == expected
+    if supplied != expected:
+        # The expression is what the writer emits, so it has to move too.
+        assert metadata.field_expressions["pages"] == f"{{{expected}}}"
+    else:
+        assert "pages" not in metadata.field_expressions
+
+
 def test_import_provider_registry_loads_normalized_doi_metadata() -> None:
     provider = get_import_provider("doi")
     metadata = provider.load(

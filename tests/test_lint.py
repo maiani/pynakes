@@ -335,6 +335,34 @@ def test_valid_doi_with_url_prefix_ok() -> None:
     assert "malformed_doi" not in _types(lint(lib))
 
 
+def _article(pages: str) -> str:
+    return (
+        "@article{A,\n  author={X},\n  title={T},\n  journal={J},\n  year={2020},\n"
+        f"  pages = {{{pages}}}\n}}\n"
+    )
+
+
+def test_unicode_en_dash_page_range_is_flagged() -> None:
+    """A raw en-dash renders under UTF-8 but breaks 8-bit bibtex, and hides in review."""
+    issues = lint(parse_bib(_article("2446\u20132449")))
+    finding = next(i for i in issues if i.type == "nonstandard_page_range")
+    assert finding.severity == "warning"
+    assert finding.field == "pages"
+    assert finding.category == "content"
+    assert finding.fixer == "normalize"
+    assert "2446--2449" in finding.message
+
+
+def test_single_hyphen_page_range_is_flagged() -> None:
+    assert "nonstandard_page_range" in _types(lint(parse_bib(_article("12-14"))))
+
+
+@pytest.mark.parametrize("pages", ["2446--2449", "e0123456", "7,41,73--97", "L7"])
+def test_page_values_normalize_leaves_alone_are_not_flagged(pages: str) -> None:
+    """lint must never report what the command it names would not change."""
+    assert "nonstandard_page_range" not in _types(lint(parse_bib(_article(pages))))
+
+
 def test_missing_doi_is_reported_as_advisory_for_article() -> None:
     lib = parse_bib("@article{A,\n  author={X},\n  title={T},\n  journal={J},\n  year={2020}\n}\n")
     missing = [i for i in lint(lib) if i.type == "missing_doi"]
@@ -782,6 +810,7 @@ def test_every_category_declares_whether_a_command_fixes_it() -> None:
         ("missing_required_field", "correctness", None),
         ("journal_style_mismatch", "content", "normalize"),
         ("malformed_doi", "content", "normalize"),
+        ("nonstandard_page_range", "content", "normalize"),
         ("noncanonical_entry_type_case", "layout", "format"),
         ("noncanonical_field_name_case", "layout", "format"),
         ("inconsistent_field", "consistency", None),

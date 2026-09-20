@@ -11,6 +11,8 @@ from pynakes.cli_common import (
     _safe,
     bib_file_argument,
     build_where_filter,
+    key_option,
+    parse_key_selector,
     where_option,
 )
 from pynakes.engine import Bibliography
@@ -32,6 +34,7 @@ def search(
         help="Restrict stored fields searched and returned; repeat for multiple fields",
     ),
     where: str | None = where_option(),
+    key: list[str] | None = key_option(),
     case_sensitive: bool = typer.Option(False, "--case-sensitive", help="Match case sensitively"),
     fuzzy: bool = typer.Option(
         False,
@@ -80,7 +83,7 @@ def search(
     """
     file = _resolve_input_bib(file, json_output)
     lib = Bibliography.open(file).lib
-    where_filter = build_where_filter(where)
+    where_filter = build_where_filter(where, keys=key)
     ranked = not no_rank and bool(query.strip())
     results = search_ops.search_entries(
         lib,
@@ -103,6 +106,7 @@ def search(
                     "file": file,
                     "query": query,
                     "where": where,
+                    "keys": parse_key_selector(key),
                     "where_parsed": where_filter.to_dict() if where_filter is not None else None,
                     "fields": field or [],
                     "case_sensitive": case_sensitive,

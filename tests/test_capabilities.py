@@ -149,13 +149,16 @@ class TestErrorCatalogAndGrammar:
         # belongs here, so an agent can tell where a selector is accepted.
         grammar = get_capabilities()["predicate_grammar"]
         assert grammar["used_by"] == [
-            "fields (--where)",
-            "search (--where)",
-            "format (--where)",
-            "corpus combine (--where)",
+            "fields (--where, --key)",
+            "search (--where, --key)",
+            "format (--where, --key)",
+            "corpus combine (--where, --key)",
             "corpus split (--to)",
             "batch (fields.* where)",
         ]
+        # --key is the no-grammar shorthand, so its relationship to --where has
+        # to be stated where an agent reads the selector surface.
+        assert "key in [...]" in grammar["key_selector"]
 
     def test_search_query_grammar_is_present(self) -> None:
         grammar = get_capabilities()["search_query_grammar"]

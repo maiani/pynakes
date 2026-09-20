@@ -16,7 +16,7 @@ from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography, ExternalModificationError
 from pynakes.io import save_text
 from pynakes.model import QueryFilter
-from pynakes.query import parse_query
+from pynakes.query import And, InSet, parse_query
 
 _F = TypeVar("_F", bound=Callable)
 
@@ -116,6 +116,12 @@ WHERE_HELP = (
 )
 
 
+KEY_HELP = (
+    "Select entries by citation key: comma-separated, repeatable. Shorthand for "
+    "--where 'key in \\[..]', and narrows a --where given alongside it."
+)
+
+
 def where_option(help: str = WHERE_HELP) -> typer.Option:
     """Return the shared ``--where`` entry-selector option.
 
@@ -126,18 +132,48 @@ def where_option(help: str = WHERE_HELP) -> typer.Option:
     return typer.Option(None, "--where", help=help)
 
 
-def build_where_filter(
-    where: str | None, *, cited_keys: Iterable[str] | None = None
-) -> QueryFilter:
-    """Compile a ``--where`` expression, or return ``None`` when it is unset.
+def key_option(help: str = KEY_HELP) -> typer.Option:
+    """Return the shared ``--key`` citation-key selector option.
 
-    A malformed expression raises ``ValueError``, which :func:`_safe` renders as
-    a structured exit-1 error (honoring ``--json``), so callers need no local
-    handling.
+    Selecting one known reference is the common case, and spelling it
+    ``--where 'key = smith2020'`` makes the grammar a toll on the simplest
+    request. Every command that accepts ``--where`` accepts this too, so
+    ``--key`` means "the citation key" across the whole CLI — naming the key to
+    assign on the commands that create an entry (``ref add``, ``ref import``),
+    and naming the keys to act on everywhere else.
     """
-    if where is None:
-        return None
-    return parse_query(where, cited_keys=cited_keys)
+    return typer.Option(None, "--key", help=help)
+
+
+def parse_key_selector(keys: list[str] | None) -> list[str]:
+    """Split a repeated/comma-separated ``--key`` option into citation keys."""
+    return [key for value in keys or [] for raw in value.split(",") if (key := raw.strip())]
+
+
+def build_where_filter(
+    where: str | None,
+    *,
+    keys: list[str] | None = None,
+    cited_keys: Iterable[str] | None = None,
+) -> QueryFilter:
+    """Compile the ``--where`` / ``--key`` selectors, or ``None`` when both are unset.
+
+    The two compose: ``--key`` contributes a ``key in [...]`` membership test
+    that is ANDed with ``--where``, so passing both narrows rather than
+    replaces. A malformed expression raises ``ValueError``, which :func:`_safe`
+    renders as a structured exit-1 error (honoring ``--json``), so callers need
+    no local handling.
+    """
+    selected = parse_key_selector(keys)
+    if keys and not selected:
+        # ``--key ,`` or ``--key ""`` asked for a selection and named nothing;
+        # silently selecting every entry would be the worst reading of that.
+        raise ValueError("--key needs at least one citation key")
+    parsed = parse_query(where, cited_keys=cited_keys) if where is not None else None
+    if not selected:
+        return parsed
+    membership = InSet(field="key", values=tuple(selected))
+    return membership if parsed is None else And((parsed, membership))
 
 
 @dataclass

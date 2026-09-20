@@ -2749,7 +2749,151 @@ class TestFieldsCommand:
         assert result.exit_code == 1
 
 
+class TestKeySelector:
+    """``--key`` selects by citation key wherever ``--where`` is accepted."""
+
+    def test_key_selects_one_entry_without_the_where_grammar(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(
+            app, ["fields", "set", str(bib), "note", "checked", "--key", "Smith2020", "--json"]
+        )
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["modified_entries"] == 1
+        assert data["keys"] == ["Smith2020"]
+        entries = bib.read_text().split("@")
+        noted = [entry for entry in entries if "note = {checked}" in entry]
+        assert len(noted) == 1
+        assert noted[0].startswith("article{Smith2020,")
+
+    def test_key_accepts_several_keys_comma_separated_and_repeated(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(
+            app,
+            [
+                "fields",
+                "set",
+                str(bib),
+                "note",
+                "checked",
+                "--key",
+                "Smith2020,Jones2021",
+                "--key",
+                "Brown2022",
+                "--json",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["modified_entries"] == 3
+        assert data["keys"] == ["Smith2020", "Jones2021", "Brown2022"]
+
+    def test_key_and_where_narrow_rather_than_replace(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(
+            app,
+            [
+                "fields",
+                "set",
+                str(bib),
+                "note",
+                "checked",
+                "--key",
+                "Smith2020,Jones2021",
+                "--where",
+                "type = article",
+                "--json",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["modified_entries"] == 1
+
+    def test_key_is_accepted_by_search_and_format_too(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        found = runner.invoke(app, ["search", "", str(bib), "--key", "Jones2021", "--json"])
+        assert found.exit_code == 0, found.output
+        matches = json.loads(found.output)["matches"]
+        assert [match["key"] for match in matches] == ["Jones2021"]
+
+        formatted = runner.invoke(
+            app, ["format", str(bib), "--key", "Jones2021", "--dry-run", "--json"]
+        )
+        assert formatted.exit_code == 0, formatted.output
+        assert json.loads(formatted.output)["keys"] == ["Jones2021"]
+
+    def test_unknown_key_selects_nothing_rather_than_erroring(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(
+            app, ["fields", "set", str(bib), "note", "x", "--key", "Nobody1999", "--json"]
+        )
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["modified_entries"] == 0
+
+    def test_key_on_a_command_that_cannot_select_points_at_what_it_takes(
+        self, tmp_path: Path
+    ) -> None:
+        """Click's bare "No such option" left the caller nowhere to go."""
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(app, ["ref", "edit", str(bib), "--key", "Smith2020", "--json"])
+        assert result.exit_code != 0
+        assert "positional argument" in result.output
+
+    def test_near_miss_of_the_selector_names_both_selectors(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        result = runner.invoke(
+            app, ["fields", "set", str(bib), "note", "x", "--citekey", "Smith2020", "--json"]
+        )
+        assert result.exit_code != 0
+        assert "--key" in result.output
+
+
 class TestNormalizeCommand:
+    def test_a_step_that_never_ran_reports_off_not_zero(self, tmp_path: Path) -> None:
+        """journals=0 read as "checked, nothing to do" when it meant "did not run"."""
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  journal = {Physical Review Letters}\n}\n")
+
+        result = runner.invoke(app, ["normalize", str(bib), "--dry-run"])
+
+        assert result.exit_code == 0, result.output
+        assert "journals=off" in result.output
+        assert "journals=0" not in result.output
+        assert "--journal-style" in result.output
+
+    def test_a_step_that_ran_without_changes_still_reports_zero(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  journal = {Phys. Rev. Lett.}\n}\n")
+
+        result = runner.invoke(
+            app, ["normalize", str(bib), "--journal-style", "abbreviated", "--dry-run", "--json"]
+        )
+
+        assert result.exit_code == 0, result.output
+        operations = json.loads(result.output)["operations"]
+        assert operations["journals"] == 0
+        assert "journals" not in operations["skipped"]
+
+    def test_skipped_steps_carry_their_reason_in_json(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  journal = {Physical Review Letters}\n}\n")
+
+        result = runner.invoke(app, ["normalize", str(bib), "--dry-run", "--json"])
+
+        assert result.exit_code == 0, result.output
+        skipped = json.loads(result.output)["operations"]["skipped"]
+        assert "--journal-style" in skipped["journals"]
+        assert "--keys" in skipped["keys"]
+
+    def test_normalize_rewrites_a_unicode_en_dash_page_range(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  pages = {2446\u20132449}\n}\n")
+
+        result = runner.invoke(app, ["normalize", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["operations"]["pages"] == 1
+        assert "pages = {2446--2449}" in bib.read_text()
+
     def test_normalize_dry_run_diff_json(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         original = (

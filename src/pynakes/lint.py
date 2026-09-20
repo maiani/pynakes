@@ -28,9 +28,11 @@ from pathlib import Path
 from typing import Literal
 
 from pynakes._identifiers import normalize_doi
+from pynakes._lint_required import required_field_rules
 from pynakes.bibtex_parser import parse_raw_string_definition
 from pynakes.editing import raw_field_names, raw_field_value
 from pynakes.fields import TITLE_FIELDS, title_capitalization_is_protected
+from pynakes.formatters import normalize_page_numbers
 from pynakes.identity import identity_class
 from pynakes.journals import (
     DEFAULT_JOURNAL_SOURCE,
@@ -57,97 +59,10 @@ from pynakes.metadata import (
 from pynakes.model import BibEntry, BibFile, MetadataBlock, undefined_string_references
 from pynakes.usage import tex_sources_from_metadata, validate_tex_sources
 
-RequiredRules = dict[str, list[tuple[str, ...]]]
-
-# Required fields by entry type. Each requirement is a tuple of acceptable field
-# names (any one satisfies it), to tolerate compatibility aliases such as
-# journal/journaltitle, year/date, and school/institution.
-_BIBTEX_REQUIRED: RequiredRules = {
-    "article": [("author",), ("title",), ("journal", "journaltitle"), ("year", "date")],
-    "book": [("author", "editor"), ("title",), ("publisher",), ("year", "date")],
-    "inbook": [("author", "editor"), ("title",), ("publisher",), ("year", "date")],
-    "incollection": [("author",), ("title",), ("booktitle",), ("year", "date")],
-    "inproceedings": [("author",), ("title",), ("booktitle",), ("year", "date")],
-    "conference": [("author",), ("title",), ("booktitle",), ("year", "date")],
-    "manual": [("title",)],
-    "phdthesis": [("author",), ("title",), ("school", "institution"), ("year", "date")],
-    "mastersthesis": [("author",), ("title",), ("school", "institution"), ("year", "date")],
-    "thesis": [("author",), ("title",), ("institution", "school"), ("year", "date")],
-    "techreport": [("author",), ("title",), ("institution", "school"), ("year", "date")],
-    "unpublished": [("author",), ("title",), ("note",)],
-}
-
-_BIBLATEX_REQUIRED: RequiredRules = {
-    # BibLaTeX default data model, section 2.1.1 "Entry Types".
-    # Source of truth: the official BibLaTeX manual from CTAN, section 2.1:
-    # https://mirrors.ctan.org/macros/latex/contrib/biblatex/doc/biblatex.pdf
-    "article": [("author",), ("title",), ("journaltitle", "journal"), ("year", "date")],
-    "book": [("author",), ("title",), ("year", "date")],
-    "mvbook": [("author",), ("title",), ("year", "date")],
-    "inbook": [("author",), ("title",), ("booktitle",), ("year", "date")],
-    "booklet": [("author", "editor"), ("title",), ("year", "date")],
-    "collection": [("editor",), ("title",), ("year", "date")],
-    "mvcollection": [("editor",), ("title",), ("year", "date")],
-    "incollection": [("author",), ("title",), ("editor",), ("booktitle",), ("year", "date")],
-    "dataset": [("author", "editor"), ("title",), ("year", "date")],
-    "manual": [("author", "editor"), ("title",), ("year", "date")],
-    "misc": [("author", "editor"), ("title",), ("year", "date")],
-    "online": [("author", "editor"), ("title",), ("year", "date"), ("doi", "eprint", "url")],
-    "patent": [("author",), ("title",), ("number",), ("year", "date")],
-    "periodical": [("editor",), ("title",), ("year", "date")],
-    "proceedings": [("title",), ("year", "date")],
-    "mvproceedings": [("title",), ("year", "date")],
-    "inproceedings": [("author",), ("title",), ("booktitle",), ("year", "date")],
-    "report": [("author",), ("title",), ("type",), ("institution", "school"), ("year", "date")],
-    "thesis": [("author",), ("title",), ("type",), ("institution", "school"), ("year", "date")],
-    "unpublished": [("author",), ("title",), ("year", "date")],
-}
-
-_BIBLATEX_REQUIREMENT_ALIASES: dict[str, str] = {
-    # Soft aliases from the BibLaTeX manual, section 2.1.1.
-    "bookinbook": "inbook",
-    "suppbook": "inbook",
-    "suppcollection": "incollection",
-    "suppperiodical": "article",
-    "reference": "collection",
-    "mvreference": "mvcollection",
-    "inreference": "incollection",
-    "review": "article",
-    "software": "misc",
-    # Hard aliases from the BibLaTeX manual, section 2.1.2. These are resolved by biber.
-    "conference": "inproceedings",
-    "electronic": "online",
-    "www": "online",
-}
-
-_BIBLATEX_ALIAS_REQUIRED: RequiredRules = {
-    "mastersthesis": [("author",), ("title",), ("institution", "school"), ("year", "date")],
-    "phdthesis": [("author",), ("title",), ("institution", "school"), ("year", "date")],
-    "techreport": [("author",), ("title",), ("institution", "school"), ("year", "date")],
-}
-
-# Entry types for which a missing DOI is worth a (low-severity) warning.
+# Entry types for which a missing DOI is worth a (low-severity) warning. This is
+# lint's own policy, not a requirement either format states, so it stays here
+# rather than in the spec tables.
 _DOI_EXPECTED = {"article", "inproceedings"}
-
-
-def required_field_rules(entry_type: str, dialect: str) -> tuple[tuple[str, ...], ...]:
-    """Return built-in required fields for ``entry_type`` in ``dialect``.
-
-    Each returned tuple contains interchangeable field names, any one of which
-    satisfies that requirement. The immutable result is also used by
-    interactive entry editing so prompting and lint validation share one source
-    of truth.
-
-    For BibLaTeX, derived from the official BibLaTeX manual on CTAN, section 2.1:
-    https://mirrors.ctan.org/macros/latex/contrib/biblatex/doc/biblatex.pdf
-    """
-    etype = entry_type.lower()
-    if dialect != "biblatex":
-        return tuple(_BIBTEX_REQUIRED.get(etype, []))
-    if etype in _BIBLATEX_ALIAS_REQUIRED:
-        return tuple(_BIBLATEX_ALIAS_REQUIRED[etype])
-    return tuple(_BIBLATEX_REQUIRED.get(_BIBLATEX_REQUIREMENT_ALIASES.get(etype, etype), []))
-
 
 # Fields excluded from the cross-entry consistency check: structural/reference
 # fields and JabRef-internal management fields that legitimately vary per entry.
@@ -324,6 +239,7 @@ ISSUE_CATEGORIES: dict[str, LintCategory] = {
     "journal_style_mismatch": "content",
     "malformed_doi": "content",
     "malformed_groups": "content",
+    "nonstandard_page_range": "content",
     "title_capitalization_unprotected": "content",
     "unknown_journal": "content",
     "unsupported_citation_key_pattern": "content",
@@ -770,6 +686,37 @@ def _lint_doi(entry: BibEntry, fields: dict[str, str]) -> list[LintIssue]:
     return []
 
 
+def _lint_pages(entry: BibEntry, fields: dict[str, str]) -> list[LintIssue]:
+    """Report a page range punctuated with anything but BibTeX's ``--``.
+
+    A Unicode en-dash in ``pages`` renders under UTF-8 plus ``inputenc`` and is
+    visually near-identical to a hyphen, so it survives review and propagates
+    — while breaking under 8-bit ``bibtex`` with some styles. It reaches a
+    library through an import from a provider that spells ranges that way, or
+    through a paste from a publisher page.
+
+    The finding fires exactly when ``normalize`` would rewrite the value, so
+    lint never reports something the named fix would leave alone: a single
+    hyphen (``12-14``) is flagged along with the dashes, and an article number
+    or a ``7,41,73--97`` list is not.
+    """
+    value = fields.get("pages", "")
+    if not value.strip():
+        return []
+    normalized = normalize_page_numbers(value)
+    if normalized == value:
+        return []
+    return [
+        LintIssue(
+            "nonstandard_page_range",
+            "warning",
+            f"Entry {entry.key!r} has a page range {value!r} that BibTeX spells {normalized!r}",
+            key=entry.key,
+            field="pages",
+        )
+    ]
+
+
 def _lint_groups(entry: BibEntry) -> list[LintIssue]:
     """Check the groups field for malformed semicolon-separated values."""
     groups = entry.fields.get("groups")
@@ -841,6 +788,7 @@ def _lint_entry(
     issues += _lint_empty_key(entry)
     issues += _lint_required_fields(entry, fields, dialect)
     issues += _lint_doi(entry, fields)
+    issues += _lint_pages(entry, fields)
     issues += _lint_groups(entry)
     return issues
 

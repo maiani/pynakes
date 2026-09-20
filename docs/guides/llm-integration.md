@@ -46,6 +46,8 @@ It includes:
 - `predicate_grammar`: the one selector grammar every entry-addressable
   command accepts (`fields`, `search`, `format`, `corpus combine --where`, and
   `corpus split --to`), including boolean composition and its operator table.
+  Its `key_selector` entry documents `--key`, the no-grammar shorthand for
+  selecting by citation key that every `--where` command also accepts.
 - `search_query_grammar`: term, phrase, field, fuzzy, ranking, and
   match-explanation behavior.
 - `batch_operations`: the operation vocabulary accepted by `corpus batch`.

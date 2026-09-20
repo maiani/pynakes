@@ -21,11 +21,14 @@ from pynakes.cli_common import (
     _resolve_input_bib,
     _safe,
     bib_file_argument,
+    build_where_filter,
     is_auxiliary_bib_file,
+    key_option,
+    parse_key_selector,
     where_option,
 )
 from pynakes.engine import Bibliography
-from pynakes.model import BibFile
+from pynakes.model import BibFile, QueryFilter
 
 
 class AlignmentChoice(str, Enum):
@@ -104,9 +107,14 @@ def _recursive_files(target: Path) -> list[Path]:
     )
 
 
-def _check_payload(file: str, coll: Bibliography, where: str | None = None) -> dict[str, object]:
+def _check_payload(
+    file: str,
+    coll: Bibliography,
+    where: str | None = None,
+    keys: list[str] | None = None,
+) -> dict[str, object]:
     modified = coll.is_modified
-    if where is None:
+    if where is None and not keys:
         message = "File needs formatting" if modified else "File is already formatted"
     else:
         message = (
@@ -123,6 +131,7 @@ def _check_payload(file: str, coll: Bibliography, where: str | None = None) -> d
         "modified_entries": coll.changed_entries_count() if modified else 0,
         "warnings": [],
         "where": where,
+        "keys": list(keys or []),
         "plan": coll.change_plan(),
         "message": message,
     }
@@ -135,6 +144,8 @@ def _run_recursive(
     *,
     check: bool,
     where: str | None = None,
+    keys: list[str] | None = None,
+    selector: QueryFilter = None,
 ) -> None:
     results: list[dict[str, object]] = []
     failures = 0
@@ -144,10 +155,10 @@ def _run_recursive(
         try:
             coll = Bibliography.open(path)
             layout = _layout(coll.lib, overrides)
-            coll.format(layout, where)
+            coll.format(layout, selector)
             plan = coll.change_plan()
             if check:
-                payload = _check_payload(str(path), coll, where)
+                payload = _check_payload(str(path), coll, where, keys)
                 dirty += int(bool(payload["modified"]))
             else:
                 diff_text, modified, changed = _preview_or_commit(coll, params)
@@ -161,6 +172,7 @@ def _run_recursive(
                     "modified_entries": changed,
                     "warnings": [],
                     "where": where,
+                    "keys": list(keys or []),
                     "plan": plan,
                 }
                 if params.diff and diff_text:
@@ -241,6 +253,10 @@ def format_bibliography(
         "Reformat only the entries matching this selector; the rest of the file "
         "stays byte-for-byte identical"
     ),
+    key: list[str] | None = key_option(
+        "Reformat only these citation keys: comma-separated, repeatable. Narrows "
+        "--where when both are given"
+    ),
     check: bool = typer.Option(False, "--check", help="Exit 1 when layout changes are needed"),
     to_stdout: bool = typer.Option(
         False, "--stdout", help="Write formatted bibliography to stdout"
@@ -266,7 +282,9 @@ def format_bibliography(
         )
     if file == "-" and not to_stdout:
         _emit_error(json_output, "InvalidInput", "stdin input (-) requires --stdout")
-    if where is not None:
+    selected_keys = parse_key_selector(key)
+    selector = build_where_filter(where, keys=key)
+    if selector is not None:
         whole_file = {
             "--entry-order": entry_order,
             "--block-order": block_order,
@@ -277,8 +295,9 @@ def format_bibliography(
             _emit_error(
                 json_output,
                 "InvalidInput",
-                f"--where selects entries, so it cannot be combined with the "
-                f"whole-file option(s) {', '.join(conflicting)}",
+                f"{'--where' if where is not None else '--key'} selects entries, so "
+                f"it cannot be combined with the whole-file option(s) "
+                f"{', '.join(conflicting)}",
             )
     overrides = FormatOverrides(
         indent=indent,
@@ -298,13 +317,21 @@ def format_bibliography(
         files = _recursive_files(target)
         if not files:
             _emit_error(json_output, "FileNotFound", f"No .bib files found under {target}")
-        _run_recursive(files, overrides, params, check=check, where=where)
+        _run_recursive(
+            files,
+            overrides,
+            params,
+            check=check,
+            where=where,
+            keys=selected_keys,
+            selector=selector,
+        )
         return
 
     if file == "-":
         coll = Bibliography.from_text(sys.stdin.read())
         try:
-            coll.format(_layout(coll.lib, overrides), where)
+            coll.format(_layout(coll.lib, overrides), selector)
         except FormatLintError as exc:
             _emit_error(
                 json_output,
@@ -318,7 +345,7 @@ def format_bibliography(
     resolved = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(resolved)
     try:
-        selected = coll.format(_layout(coll.lib, overrides), where)
+        selected = coll.format(_layout(coll.lib, overrides), selector)
     except FormatLintError as exc:
         _emit_error(
             json_output,
@@ -330,17 +357,26 @@ def format_bibliography(
         sys.stdout.write(coll.preview())
         return
     if check:
-        payload = _check_payload(resolved, coll, where)
+        payload = _check_payload(resolved, coll, where, selected_keys)
         _emit(json_output, payload, [f"{resolved}: {payload['message'].lower()}"])
         if payload["modified"]:
             raise typer.Exit(code=1)
         return
     human = (
         f"Formatted the layout of {selected} selected {_entries(selected)}."
-        if where is not None
+        if selector is not None
         else "Formatted bibliography layout."
     )
-    _finish_mod(resolved, "format", coll, params, [human], warnings=[], where=where)
+    _finish_mod(
+        resolved,
+        "format",
+        coll,
+        params,
+        [human],
+        warnings=[],
+        where=where,
+        keys=selected_keys,
+    )
 
 
 def register(app: typer.Typer) -> None:

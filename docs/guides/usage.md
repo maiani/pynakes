@@ -22,10 +22,9 @@ Every command that addresses a *set* of entries takes the same selector: the
 `--where` grammar. A selector written for one command is valid for the others,
 so there are no command-specific filter flags to learn.
 
-Accepted by [`fields`](#fields) (`--where`), [`search`](#search) (`--where`),
-[`format`](#format) (`--where`), [`corpus combine`](#combine) (`--where`),
-[`corpus split`](#split) (`--to` rules), and the `fields.*` operations of
-`corpus batch`.
+Accepted by [`fields`](#fields), [`search`](#search), [`format`](#format),
+[`corpus combine`](#combine), [`corpus split`](#split) (`--to` rules), and the
+`fields.*` operations of `corpus batch`.
 
 Predicates combine with `and`, `or`, and `not`; `and` binds tighter than `or`,
 and parentheses group explicitly:
@@ -84,6 +83,25 @@ field an entry does not have is false, except `!=` and `missing`, which are
 true. `corpus split --to` additionally accepts the bucket predicates `*`
 (catch-all), and `used` / `unused` against `--tex`/`--aux` sources, which
 compose with everything else (`used and year >= 2020`).
+
+### Selecting by citation key
+
+When you already know the key, `--key` says so without the grammar. It is
+comma-separated and repeatable, and every command that takes `--where` takes it:
+
+```bash
+pynakes fields set refs.bib note "checked" --key Newton1687
+pynakes fields clear refs.bib abstract --key Newton1687,Euler1748 --key Gauss1801
+```
+
+`--key X` is exactly `--where 'key in [X]'`. Passing both *narrows* — they are
+combined with `and`, so `--key Newton1687,Euler1748 --where 'type = article'`
+acts on whichever of the two is an article.
+
+On [`ref add`](#add) and [`ref import`](#import), which create an entry rather
+than select one, `--key` names the key to assign. Commands that act on exactly
+one existing reference — [`ref show` and `ref edit`](#show-and-edit),
+`ref remove` — take the citation key as a positional argument.
 
 `pynakes capabilities --json` reports this grammar under `predicate_grammar`.
 
@@ -170,7 +188,7 @@ and a **severity** ranking urgency:
 | Category | Fixed by | Severity | Examples |
 | --- | --- | --- | --- |
 | `correctness` | you decide | `error` | duplicate keys, missing required fields, undefined string references |
-| `content` | `normalize` | `warning` | journal style, malformed DOI, unprotected title case, key-pattern mismatch |
+| `content` | `normalize` | `warning` | journal style, malformed DOI, non-BibTeX page range, unprotected title case, key-pattern mismatch |
 | `layout` | `format` | `info` | mixed-case entry types and field names |
 | `consistency` | nothing — an observation | `info` | missing article DOI, a field most comparable peers define |
 | `profile` | you decide | `warning` | deviations from the library's stored lint profile |
@@ -702,6 +720,12 @@ Default behavior:
 - lowercase entry types and field names
 - leave journal titles unchanged unless a journal style is configured
 
+A step the library has turned off reports `off` rather than `0`, because the
+two are different claims: `journals=0` means "checked every journal title and
+changed none", while `journals=off` means the step never ran. The human summary
+names the flag that turns each one on, and `--json` carries the full reason
+under `operations.skipped`.
+
 Useful overrides:
 
 ```bash
@@ -721,7 +745,9 @@ Page ranges are rewritten to BibTeX's `start--end`: a Unicode en-dash
 — an article number, or a list like `7,41,73--97` — is left alone. This runs by
 default, unlike journal-style conversion, because `--` is the format's own
 convention for the same value rather than an editorial preference. Turn it off
-with `--pages off` or `normalize-pages: false`.
+with `--pages off` or `normalize-pages: false`. `lint` reports the same values
+as `nonstandard_page_range`, so a range an import or a paste introduced is
+visible before it reaches a build.
 
 Journal source tables:
 

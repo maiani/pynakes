@@ -209,7 +209,9 @@ def test_crossref_metadata_maps_container_volume_issue_and_pages() -> None:
     assert metadata.fields["journal"] == "Reports on Ancient Geometry"
     assert metadata.fields["volume"] == "2"
     assert metadata.fields["number"] == "3"
-    assert metadata.fields["pages"] == "231-252"
+    # Crossref spells the range with one hyphen; the record renders it the way
+    # BibTeX does (see ReferenceMetadata.__post_init__).
+    assert metadata.fields["pages"] == "231--252"
     assert metadata.fields["year"] == "1607"
     assert metadata.fields["doi"] == "10.5555/ancient.geometry.1"
     assert metadata.identifier("crossref") == "10.5555/ancient.geometry.1"
@@ -441,7 +443,9 @@ def test_zbmath_metadata_maps_authors_journal_and_doi() -> None:
     assert metadata.fields["journal"] == "Reports on Ancient Geometry"
     assert metadata.fields["volume"] == "2"
     assert metadata.fields["number"] == "3"
-    assert metadata.fields["pages"] == "231-252"
+    # Crossref spells the range with one hyphen; the record renders it the way
+    # BibTeX does (see ReferenceMetadata.__post_init__).
+    assert metadata.fields["pages"] == "231--252"
     assert metadata.fields["year"] == "1607"
     assert metadata.fields["doi"] == "10.5555/ancient.geometry.1"
     assert metadata.fields["url"] == "https://zbmath.org/6642421"
