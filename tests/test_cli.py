@@ -1195,6 +1195,157 @@ class TestImportCommand:
         assert "@article{Smith2024Practical," in text
         assert "doi = {10.5555/provider}" in text
 
+    def _stub_provider(self, monkeypatch, known: dict[str, str]) -> None:
+        """Resolve only the DOIs in ``known``; anything else does not exist."""
+
+        def fetch(doi: str) -> str:
+            if doi not in known:
+                raise importer_ops.ReferenceImportError(f"DOI not found: {doi}")
+            return known[doi]
+
+        monkeypatch.setattr(importer_ops, "fetch_bibtex_for_doi", fetch)
+
+    def _record(self, key: str, doi: str, title: str) -> str:
+        """One provider-shaped BibTeX record."""
+        return (
+            f"@article{{{key},\n"
+            f"  author = {{Ada Lovelace}},\n"
+            f"  title = {{{title}}},\n"
+            f"  journal = {{Notes}},\n"
+            f"  year = {{1843}},\n"
+            f"  doi = {{{doi}}}\n"
+            f"}}\n"
+        )
+
+    def test_several_identifiers_import_in_one_write(self, tmp_path: Path, monkeypatch) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        self._stub_provider(
+            monkeypatch,
+            {
+                "10.5555/one": self._record("P1", "10.5555/one", "First Work"),
+                "10.5555/two": self._record("P2", "10.5555/two", "Second Work"),
+            },
+        )
+
+        result = runner.invoke(
+            app,
+            ["ref", "import", "10.5555/one", "10.5555/two", str(bib), "--json"],
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["requested"] == 2
+        assert data["imported"] == 2
+        assert [entry["status"] for entry in data["results"]] == ["imported", "imported"]
+        text = bib.read_text()
+        assert "10.5555/one" in text
+        assert "10.5555/two" in text
+
+    def test_one_unresolvable_identifier_does_not_lose_the_others(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        """A list an assistant produced routinely names a work that does not exist."""
+        bib = _copy(tmp_path, "simple.bib")
+        self._stub_provider(
+            monkeypatch, {"10.5555/real": self._record("P1", "10.5555/real", "A Real Work")}
+        )
+
+        result = runner.invoke(
+            app,
+            ["ref", "import", "10.5555/real", "10.5555/invented", str(bib), "--json"],
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["imported"] == 1
+        assert data["failed"] == 1
+        failed = next(entry for entry in data["results"] if entry["status"] == "failed")
+        assert failed["identifier"] == "10.5555/invented"
+        assert "10.5555/real" in bib.read_text()
+
+    def test_no_identifier_resolving_is_an_error_and_writes_nothing(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        original = bib.read_text()
+        self._stub_provider(monkeypatch, {})
+
+        result = runner.invoke(app, ["ref", "import", "10.5555/a", "10.5555/b", str(bib), "--json"])
+
+        assert result.exit_code == 1
+        data = json.loads(result.output)
+        assert data["error"] == "ReferenceImportError"
+        assert len(data["results"]) == 2
+        assert bib.read_text() == original
+
+    def test_an_already_present_reference_is_skipped_not_a_conflict(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        """Exit 2 is for a question only the caller can answer; here the rest
+        of the list still has to resolve."""
+        bib = _copy(tmp_path, "simple.bib")
+        self._stub_provider(
+            monkeypatch,
+            {
+                "10.1234/nature.ml.2020": self._record(
+                    "Dup", "10.1234/nature.ml.2020", "Already Here"
+                ),
+                "10.5555/new": self._record("P1", "10.5555/new", "Brand New"),
+            },
+        )
+
+        result = runner.invoke(
+            app,
+            ["ref", "import", "10.1234/nature.ml.2020", "10.5555/new", str(bib), "--json"],
+        )
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["imported"] == 1
+        assert data["skipped"] == 1
+        skipped = next(entry for entry in data["results"] if entry["status"] == "skipped")
+        assert skipped["existing_keys"] == ["Smith2020"]
+
+    def test_identifiers_can_be_piped_one_per_line(self, tmp_path: Path, monkeypatch) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        self._stub_provider(
+            monkeypatch,
+            {
+                "10.5555/one": self._record("P1", "10.5555/one", "First Work"),
+                "10.5555/two": self._record("P2", "10.5555/two", "Second Work"),
+            },
+        )
+
+        result = runner.invoke(
+            app,
+            ["ref", "import", "-", str(bib), "--json"],
+            input="# pasted from a chat\n10.5555/one\n\n  10.5555/two  \n",
+        )
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["imported"] == 2
+
+    def test_key_is_refused_for_several_identifiers(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+
+        result = runner.invoke(
+            app, ["ref", "import", "10.5555/a", "10.5555/b", str(bib), "--key", "Mine", "--json"]
+        )
+
+        assert result.exit_code == 1
+        assert "--key" in json.loads(result.output)["message"]
+
+    def test_library_can_be_given_with_file_option(self, tmp_path: Path, monkeypatch) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+        self._stub_provider(
+            monkeypatch, {"10.5555/one": self._record("P1", "10.5555/one", "First Work")}
+        )
+
+        result = runner.invoke(app, ["ref", "import", "10.5555/one", "--file", str(bib), "--json"])
+
+        assert result.exit_code == 0, result.output
+        assert "10.5555/one" in bib.read_text()
+
     def test_add_places_entry_before_trailing_metadata(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text(

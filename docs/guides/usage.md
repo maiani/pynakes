@@ -580,6 +580,44 @@ Some platforms publish article URLs with no identifier in them at all — AIP's
 fail with advice to import the DOI printed on the article page rather than
 guessing at a match.
 
+### Importing several at once
+
+Give several identifiers, or pipe a list, and they resolve in one call and
+commit in one write:
+
+```bash
+pynakes ref import 10.5555/one arXiv:2301.00001 10.5555/two refs.bib --dry-run
+pbpaste | pynakes ref import - refs.bib --diff
+```
+
+Piped input is one identifier per line; blank lines and `#` comments are
+skipped, so a list pasted out of a chat or a notes file needs no cleaning up
+first.
+
+Each identifier is reported separately, and **one that does not resolve does not
+stop the others**:
+
+```
+Imported 6 of 8 reference(s) (1 already present, 1 unresolved).
+  10.5555/invented: Server returned HTTP 404 for 10.5555/invented
+  10.5555/known: already present as Smith2020; skipped.
+```
+
+That is the intended shape rather than a lenient one. A reference list produced
+by a conversational assistant routinely contains a plausible identifier that no
+provider has ever heard of, and telling you *which* one is the useful answer —
+stopping at the first would just hide the other seven. The write stays atomic:
+everything that resolved is staged in memory and committed once, so the file
+never holds half a list. With `--json`, `results` carries one record per
+identifier (`imported`, `skipped`, or `failed`) alongside the usual envelope.
+
+An identifier already in the library is `skipped`, not a conflict — exit 2 is
+for a question only you can answer, and here the rest of the list still has to
+resolve. Re-run that one with `--allow-duplicate` if a second copy was wanted.
+
+A single identifier keeps its existing behavior exactly: a failure is the
+command's failure, and `--key` applies to the one entry.
+
 Options:
 
 ```bash

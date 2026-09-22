@@ -8,9 +8,25 @@ stage-then-commit lifecycle to multi-operation callers.
 
 Each operation is a dict ``{"op": "<name>", ...params}``. The supported names and
 their parameters are in :data:`OPERATION_SPECS` (also surfaced in
-``capabilities``). Operations map to the deterministic, in-memory
-``Bibliography`` methods; network and conflict-prone operations (``add``,
-``dedupe merge``) are intentionally excluded.
+``capabilities``).
+
+Every operation maps to a deterministic, offline, in-memory ``Bibliography``
+method. That is the line the batch surface draws, and it is drawn there on
+purpose: a batch is previewed as one diff and approved as one decision, which
+only means anything if replaying it would do the same thing again. So
+``ref import`` stays out — it reaches the network, and what it returns depends
+on when it is asked. Use it directly, then batch what follows.
+
+An operation that *refuses* is not excluded by that rule. ``ref.add`` on a
+taken key and ``dedupe.merge`` on an irreconcilable cluster both raise, and a
+raised error aborts the batch before anything is committed, which is exactly
+the all-or-nothing guarantee rather than a violation of it.
+
+One asymmetry worth knowing: ``ref.remove`` removes the entry from the
+bibliography and leaves any Pinax materials on disk. Deleting those is a
+filesystem act, and a batch stages only in memory, so it cannot be part of the
+same atomic commit. The ``ref remove`` command deletes them by default; the
+batch operation never does.
 """
 
 from dataclasses import dataclass
@@ -40,6 +56,7 @@ class OperationSpec:
 # The supported operations, their parameters, and how each maps onto a
 # Bibliography method. Keep this the single source of truth for the batch surface.
 OPERATION_SPECS: dict[str, OperationSpec] = {
+    "fields.set": OperationSpec(("field", "value"), ("where",), "Set or replace a field"),
     "fields.rename": OperationSpec(("old", "new"), ("where",), "Rename a field"),
     "fields.move": OperationSpec(
         ("old", "new"), ("where",), "Move a field where the target is unset"
@@ -72,6 +89,22 @@ OPERATION_SPECS: dict[str, OperationSpec] = {
     ),
     "convert": OperationSpec(("to",), (), "Convert between bibtex and biblatex"),
     "metadata.set": OperationSpec(("key", "value"), ("namespace",), "Set a metadata key"),
+    "ref.add": OperationSpec(
+        ("key", "entry_type"),
+        ("fields", "allow_duplicate"),
+        "Append one manually specified entry",
+    ),
+    "ref.edit": OperationSpec(
+        ("key",),
+        ("fields", "clear_fields", "entry_type"),
+        "Patch fields or type on one uniquely identified entry",
+    ),
+    "ref.remove": OperationSpec(
+        ("key",), (), "Remove entries by citation key (Pinax materials are left on disk)"
+    ),
+    "dedupe.merge": OperationSpec(
+        (), ("keys",), "Merge duplicate clusters, or only those containing the given keys"
+    ),
 }
 
 
@@ -87,6 +120,8 @@ def _validate(spec: OperationSpec, params: dict, index: int, op: str) -> None:
 
 def _apply_one(coll: Bibliography, op: str, params: dict) -> dict:
     """Dispatch one validated operation to the bibliography; return a result dict."""
+    if op == "fields.set":
+        return {"changed": coll.set_field(params["field"], params["value"], params.get("where"))}
     if op == "fields.rename":
         return {"changed": coll.rename_field(params["old"], params["new"], params.get("where"))}
     if op == "fields.move":
@@ -124,6 +159,34 @@ def _apply_one(coll: Bibliography, op: str, params: dict) -> dict:
             params["key"], params["value"], namespace=params.get("namespace")
         )
         return {"key": update.key, "namespace": update.namespace, "created": update.created}
+    if op == "ref.add":
+        entry = coll.add_entry(
+            params["entry_type"],
+            params["key"],
+            dict(params.get("fields") or {}),
+            allow_duplicate=bool(params.get("allow_duplicate", False)),
+        )
+        return {"key": entry.key, "entry_type": entry.type}
+    if op == "ref.edit":
+        return coll.edit_entry(
+            params["key"],
+            fields=params.get("fields"),
+            clear_fields=params.get("clear_fields"),
+            entry_type=params.get("entry_type"),
+        )
+    if op == "ref.remove":
+        removed = coll.remove_entry(params["key"])
+        if not removed:
+            raise ValueError(f"No entry with citation key {params['key']!r}")
+        return {"removed": removed}
+    if op == "dedupe.merge":
+        keys = params.get("keys")
+        report = coll.dedupe_merge(list(keys) if keys else None)
+        return {
+            "merged_clusters": report.merged_clusters,
+            "removed_entries": report.removed_entry_count,
+            "field_changes": report.field_changes,
+        }
     raise NotImplementedError(f"unhandled batch operation {op!r}")
 
 

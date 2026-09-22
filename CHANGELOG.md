@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ref import` accepts several identifiers in one call, and reads them from
+  stdin with `-` (one per line, `#` comments and blank lines skipped). They
+  resolve together and commit in one write, and each is reported separately:
+  one that does not resolve no longer stops the others. That is the point
+  rather than leniency — a reference list produced by a conversational
+  assistant routinely names a work that does not exist, and identifying which
+  one is the useful answer, where stopping at the first would hide the rest.
+  An identifier already in the library is reported as skipped rather than as a
+  conflict, since exit 2 is for a question only the caller can answer and the
+  remaining identifiers still have to resolve. With `--json`, `results` carries
+  a record per identifier. A single identifier keeps its previous behavior
+  exactly, envelope included. The library may now also be named with `--file`,
+  since the identifier argument is variadic; a trailing `.bib` positional still
+  works.
+
+- `corpus batch` gained the operations its vocabulary was missing: `fields.set`
+  — the one member of the `fields` family that could not be batched, while
+  `rename`, `move`, `append`, `clear` and `protect_title` all could —  plus
+  `ref.add`, `ref.edit`, `ref.remove` and `dedupe.merge`. A batch is the right
+  shape for a set of related changes because it is previewed as one diff and
+  approved as one decision, and it could not previously express "add these two,
+  drop that one, retag the rest" at all. `ref.import` stays out deliberately: it
+  reaches the network, so what it returns depends on when it was asked, and a
+  batch that cannot be replayed to the same result is not something one approval
+  can stand for. `ref.remove` in a batch leaves Pinax materials on disk, because
+  deleting them is a filesystem act that cannot join an in-memory commit.
+
 - `dedupe merge --key` merges only the duplicate clusters containing the named
   citation keys, leaving every other cluster in the file untouched. Merging was
   all-or-nothing, which is the wrong shape for the decision it encodes: judging

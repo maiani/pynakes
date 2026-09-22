@@ -90,8 +90,36 @@ commands and their semantics.
 
 Only add `verify --online` when provider lookups are intentionally allowed.
 For several related edits, use `corpus batch`: it stages all operations in
-memory and commits them atomically, or writes nothing if one fails. Discover
-its operation vocabulary through `capabilities`.
+memory and commits them atomically, or writes nothing if one fails. This is the
+right shape for anything proposed as a set — add these two, drop that one,
+retag the rest — because it is previewed as one diff and approved as one
+decision rather than as a sequence of writes that can half-apply:
+
+```bash
+pynakes corpus batch refs.bib --dry-run --diff --json --ops '[
+  {"op": "ref.add", "key": "Newton1687", "entry_type": "book",
+   "fields": {"title": "Principia", "author": "Newton, Isaac", "year": "1687"}},
+  {"op": "ref.remove", "key": "Fabricated2021"},
+  {"op": "fields.set", "field": "keywords", "value": "to-read",
+   "where": "year >= 2024"}
+]'
+```
+
+Discover the operation vocabulary through `capabilities`; it covers the
+`fields`, `groups`, `keys`, `metadata`, `ref`, and `dedupe` families. Two
+boundaries are deliberate:
+
+- `ref.import` is **not** a batch operation. It reaches the network, so what it
+  returns depends on when it was asked, and a batch that cannot be replayed to
+  the same result is not something a single approval can stand for. Import
+  first, then batch what follows.
+- `ref.remove` in a batch leaves any Pinax materials on disk. Deleting them is a
+  filesystem act and a batch stages only in memory, so it cannot join the same
+  atomic commit. The `ref remove` command deletes them by default.
+
+An operation that refuses — `ref.add` on a taken key, `dedupe.merge` on an
+irreconcilable cluster — aborts the whole batch with nothing written, which is
+the all-or-nothing guarantee rather than an exception to it.
 
 ## Choosing the right operation
 
@@ -113,7 +141,8 @@ its operation vocabulary through `capabilities`.
   same selector works on `search`, `format`, and the corpus operations, so
   scope a set once — `'year >= 2025 and doi missing'` — and reuse the
   expression rather than filtering with `grep`.
-- Use `ref add` for a fully local, manually supplied reference.
+- Use `ref add` for a fully local, manually supplied reference, or `ref.add`
+  inside a `corpus batch` when it is one of several related changes.
 - Use `ref import` for network-backed DOI, repository, preprint, and
   working-paper metadata resolution.
 - Use `format` for layout only and `normalize` for bibliographic conventions.

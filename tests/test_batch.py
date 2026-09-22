@@ -74,12 +74,91 @@ def test_every_declared_operation_has_a_dispatch_branch() -> None:
         "normalize": {},
         "convert": {"to": "biblatex"},
         "metadata.set": {"key": "lint-required-fields", "value": "url"},
+        "fields.set": {"field": "note", "value": "checked"},
+        "ref.add": {"key": "B", "entry_type": "article"},
+        "ref.edit": {"key": "A", "fields": {"year": "2020"}},
+        "ref.remove": {"key": "A"},
+        "dedupe.merge": {},
     }
 
     assert set(operations) == set(batch_ops.OPERATION_SPECS)
     for op, params in operations.items():
         coll = Bibliography.from_text(SRC)
         apply_operations(coll, [{"op": op, **params}])
+
+
+DUPLICATE_PAIR = (
+    "@article{Alpha1,\n  author = {Ada Lovelace},\n  title = {On Engines},\n"
+    "  journal = {Notes},\n  year = {1843},\n  doi = {10.5555/engines}\n}\n\n"
+    "@article{Alpha2,\n  author = {Ada Lovelace},\n  title = {On Engines},\n"
+    "  journal = {Notes},\n  year = {1843},\n  doi = {10.5555/engines},\n"
+    "  note = {Offprint}\n}\n"
+)
+
+
+def test_fields_set_participates_in_a_batch() -> None:
+    """Every other `fields` subcommand was batchable; `set` was the one left out."""
+    coll = Bibliography.from_text(SRC)
+
+    results = apply_operations(coll, [{"op": "fields.set", "field": "year", "value": "1687"}])
+
+    assert results[0]["result"] == {"changed": 1}
+    assert coll.lib.entries["A"].fields["year"] == "1687"
+
+
+def test_entry_level_operations_compose_in_one_batch() -> None:
+    """The shape an agent proposes: add one, drop another, retag what is left."""
+    coll = Bibliography.from_text(SRC + "@article{B,\n  title = {other}\n}\n")
+
+    apply_operations(
+        coll,
+        [
+            {"op": "ref.add", "key": "C", "entry_type": "book", "fields": {"title": "New"}},
+            {"op": "ref.remove", "key": "B"},
+            {"op": "fields.set", "field": "keywords", "value": "to-read"},
+        ],
+    )
+
+    assert sorted(coll.lib.entries.keys()) == ["A", "C"]
+    assert coll.lib.entries["C"].type == "book"
+    assert coll.lib.entries["A"].fields["keywords"] == "to-read"
+    assert coll.lib.entries["C"].fields["keywords"] == "to-read"
+
+
+def test_ref_remove_of_an_unknown_key_aborts_the_batch() -> None:
+    """Silently removing nothing would let a wrong key pass for a successful batch."""
+    coll = Bibliography.from_text(SRC)
+
+    with pytest.raises(ValueError, match="Nobody1999"):
+        apply_operations(
+            coll,
+            [
+                {"op": "fields.set", "field": "note", "value": "x"},
+                {"op": "ref.remove", "key": "Nobody1999"},
+            ],
+        )
+
+
+def test_ref_add_on_a_taken_key_aborts_rather_than_appending() -> None:
+    coll = Bibliography.from_text(SRC)
+
+    with pytest.raises(ValueError):
+        apply_operations(coll, [{"op": "ref.add", "key": "A", "entry_type": "article"}])
+
+
+def test_dedupe_merge_in_a_batch_can_target_one_cluster() -> None:
+    coll = Bibliography.from_text(DUPLICATE_PAIR)
+
+    results = apply_operations(coll, [{"op": "dedupe.merge", "keys": ["Alpha2"]}])
+
+    assert results[0]["result"]["merged_clusters"] == 1
+    assert sorted(coll.lib.entries.keys()) == ["Alpha1"]
+
+
+def test_ref_import_stays_out_of_the_batch_vocabulary() -> None:
+    """A batch is approved once as one diff; replaying it must not depend on a
+    provider's answer at the time it ran."""
+    assert "ref.import" not in batch_ops.OPERATION_SPECS
 
 
 def test_declared_but_undispatched_operation_raises_not_implemented(monkeypatch) -> None:
