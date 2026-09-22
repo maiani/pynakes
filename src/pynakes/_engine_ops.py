@@ -11,7 +11,7 @@ Group-tree and key operations live in :mod:`pynakes._engine_groups` and
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 from pynakes import convert as convert_ops
@@ -466,9 +466,19 @@ class BibliographyOperations:
             was_tracked=was_tracked,
         )
 
-    def dedupe_merge(self) -> dedupe_ops.DedupeMergeReport:
-        """Merge duplicate-work clusters in memory."""
+    def dedupe_merge(self, keys: Iterable[str] | None = None) -> dedupe_ops.DedupeMergeReport:
+        """Merge duplicate-work clusters in memory.
+
+        Without ``keys`` every cluster in the library is merged. With them, only
+        the clusters containing at least one named citation key are, and the
+        rest are left exactly as they are — the "I have looked at this pair and
+        decided" case, which a whole-file merge cannot express. A key belonging
+        to no cluster raises :class:`ValueError` rather than silently merging
+        nothing, since the caller believed it named a duplicate.
+        """
         clusters = dedupe_ops.find_duplicate_clusters(self.lib)
+        if keys is not None:
+            clusters = dedupe_ops.clusters_for_keys(clusters, keys)
         pinax_materials, pinax_merges = self._plan_pinax_dedupe_materials(clusters)
         report = dedupe_ops.merge_duplicates(self.lib, clusters)
         self._removed_entries.extend(report.removed_entries)

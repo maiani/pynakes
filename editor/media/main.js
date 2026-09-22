@@ -27,6 +27,9 @@ window.PV = window.PV || {};
     bottomBody: document.getElementById("bottom-body"),
     commitBar: document.getElementById("commit-bar"),
     headers: document.querySelectorAll("th[data-col]"),
+    importEntry: document.getElementById("import-entry"),
+    addEntry: document.getElementById("add-entry"),
+    findDuplicates: document.getElementById("find-duplicates"),
     sidebarSplitter: document.getElementById("sidebar-splitter"),
     detailSplitter: document.getElementById("detail-splitter"),
     panelSplitter: document.getElementById("panel-splitter"),
@@ -63,6 +66,17 @@ window.PV = window.PV || {};
   elements.where.value = PV.state.search.where;
   elements.fuzzy.checked = PV.state.search.fuzzy;
   elements.uncited.checked = PV.state.uncitedOnly;
+
+  // The mutating actions all hand off to the extension, which prompts for what
+  // it needs and runs the change through preview-and-approve. The view never
+  // builds an entry or a group name itself.
+  elements.importEntry.addEventListener("click", () => PV.post({ type: "promptImport" }));
+  elements.addEntry.addEventListener("click", () => PV.post({ type: "promptAdd" }));
+  elements.findDuplicates.addEventListener("click", () => {
+    PV.state.duplicates = "loading";
+    PV.showPane("duplicates");
+    PV.post({ type: "findDuplicates" });
+  });
 
   elements.uncited.addEventListener("change", () => {
     PV.state.uncitedOnly = elements.uncited.checked;
@@ -271,6 +285,36 @@ window.PV = window.PV || {};
         s.compareBusy = null;
         s.compare = { key: message.key, error: message.message };
         PV.showPane("compare");
+        break;
+      case "duplicates":
+        s.duplicates = message.clusters || [];
+        PV.showPane("duplicates");
+        break;
+      case "duplicatesError":
+        s.duplicates = { error: message.message };
+        PV.showPane("duplicates");
+        break;
+      case "mutationDone":
+        notify("success", message.label + ": done.");
+        // Any write can invalidate the cluster list — a merge resolves one, a
+        // remove can empty one, an import can create one. Clearing it says
+        // "ask again" rather than showing a cluster that no longer exists.
+        s.duplicates = null;
+        if (message.select) {
+          // The reload that follows renders the table; remembering the key here
+          // means the new entry is selected as soon as it exists.
+          s.selectedKey = message.select;
+          PV.persist();
+        }
+        break;
+      case "mutationNoop":
+        notify("info", message.message);
+        break;
+      case "mutationCancelled":
+        notify("info", message.label + ": cancelled, nothing written.");
+        break;
+      case "mutationError":
+        notify("error", message.label + ": " + message.message);
         break;
       case "keyRenamed":
         s.renameBusy = null;

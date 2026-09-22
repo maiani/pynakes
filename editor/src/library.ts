@@ -17,9 +17,11 @@ import {
   type MaterialIndex,
 } from "./insights";
 import type {
+  DuplicateCluster,
   EntryRow,
   FieldComparison,
   InspectError,
+  MutationEnvelope,
   RefCompareWarning,
   RefEditPlanEntry,
   Summary,
@@ -27,16 +29,24 @@ import type {
 import { summarize, toRows } from "./model";
 import {
   type PynakesCommand,
+  type RefAddRequest,
   type RefEditRequest,
+  type RefImportRequest,
   type SearchOptions,
   assetCheck,
+  dedupeCheck,
+  dedupeMerge,
+  groupsEntry,
   groupsList,
   groupsTree,
   inspectBib,
   keysRename,
   lintBib,
+  refAdd,
   refCompare,
   refEdit,
+  refImport,
+  refRemove,
   searchBib,
   texScan,
 } from "./pynakes";
@@ -303,4 +313,141 @@ export async function renameEntryKey(
     new: envelope.new,
     sourceOccurrences: envelope.source_occurrences,
   };
+}
+
+
+// ---------------------------------------------------------------------------
+// Entry- and group-level mutations
+// ---------------------------------------------------------------------------
+
+/**
+ * One entry- or group-level change, named independently of the command that
+ * performs it.
+ *
+ * The view does not branch on the operation once it has built one of these: it
+ * previews, shows the diff, asks, and applies. Keeping the shape uniform is
+ * what makes a single approval path correct for all of them, rather than six
+ * near-copies that could drift apart in what they check before writing.
+ */
+export type Mutation =
+  | { kind: "add"; request: RefAddRequest }
+  | { kind: "import"; request: RefImportRequest }
+  | { kind: "remove"; keys: string[]; keepFiles: boolean }
+  | { kind: "group"; key: string; group: string; member: boolean }
+  /** `keys` names the cluster(s) to merge; omitted means every cluster. */
+  | { kind: "dedupeMerge"; keys?: string[] };
+
+/** A short label for the diff panel and the confirmation prompt. */
+export function describeMutation(mutation: Mutation): string {
+  switch (mutation.kind) {
+    case "add":
+      return `Add ${mutation.request.key}`;
+    case "import":
+      return `Import ${mutation.request.identifier}`;
+    case "remove":
+      return mutation.keys.length === 1
+        ? `Remove ${mutation.keys[0]}`
+        : `Remove ${mutation.keys.length} entries`;
+    case "group":
+      return mutation.member
+        ? `Add ${mutation.key} to "${mutation.group}"`
+        : `Remove ${mutation.key} from "${mutation.group}"`;
+    case "dedupeMerge":
+      return mutation.keys?.length
+        ? `Merge ${mutation.keys.join(", ")}`
+        : "Merge every duplicate";
+  }
+}
+
+function runMutation(
+  command: PynakesCommand,
+  filePath: string,
+  mutation: Mutation,
+  dryRun: boolean,
+  cwd?: string,
+): Promise<MutationEnvelope> {
+  switch (mutation.kind) {
+    case "add":
+      return refAdd(command, filePath, mutation.request, dryRun, cwd);
+    case "import":
+      return refImport(command, filePath, mutation.request, dryRun, cwd);
+    case "remove":
+      return refRemove(command, filePath, mutation.keys, mutation.keepFiles, dryRun, cwd);
+    case "group":
+      return groupsEntry(
+        command,
+        filePath,
+        mutation.key,
+        mutation.group,
+        mutation.member,
+        dryRun,
+        cwd,
+      );
+    case "dedupeMerge":
+      return dedupeMerge(command, filePath, mutation.keys, dryRun, cwd);
+  }
+}
+
+export type MutationOutcome =
+  | { ok: true; diff: string; warnings: string[]; modified: boolean; key?: string }
+  /** The engine refused and named the choices — exit 2, never guessed past. */
+  | { ok: false; conflict: true; message: string; options: { id: string; description: string }[] }
+  | { ok: false; conflict?: false; message: string };
+
+function reduce(envelope: MutationEnvelope): MutationOutcome {
+  if (envelope.status === "error") {
+    return { ok: false, message: envelope.message };
+  }
+  if (envelope.status === "conflict") {
+    return {
+      ok: false,
+      conflict: true,
+      message: envelope.message,
+      options: envelope.options ?? [],
+    };
+  }
+  return {
+    ok: true,
+    diff: envelope.diff ?? "",
+    warnings: envelope.warnings ?? [],
+    modified: envelope.modified,
+    key: envelope.key,
+  };
+}
+
+/** Preview a mutation: what it would change, written nowhere. */
+export async function previewMutation(
+  command: PynakesCommand,
+  filePath: string,
+  mutation: Mutation,
+  cwd?: string,
+): Promise<MutationOutcome> {
+  return reduce(await runMutation(command, filePath, mutation, true, cwd));
+}
+
+/** Apply a mutation that has already been previewed and approved. */
+export async function applyMutation(
+  command: PynakesCommand,
+  filePath: string,
+  mutation: Mutation,
+  cwd?: string,
+): Promise<MutationOutcome> {
+  return reduce(await runMutation(command, filePath, mutation, false, cwd));
+}
+
+export type DuplicatesOutcome =
+  | { ok: true; clusters: DuplicateCluster[]; duplicateEntries: number }
+  | { ok: false; message: string };
+
+/** Which entries the engine judges to be the same work (read-only). */
+export async function findDuplicates(
+  command: PynakesCommand,
+  filePath: string,
+  cwd?: string,
+): Promise<DuplicatesOutcome> {
+  const envelope = await dedupeCheck(command, filePath, cwd);
+  if (envelope.status === "error") {
+    return { ok: false, message: envelope.message };
+  }
+  return { ok: true, clusters: envelope.clusters, duplicateEntries: envelope.duplicate_entries };
 }

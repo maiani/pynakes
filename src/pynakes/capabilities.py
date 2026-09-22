@@ -53,7 +53,7 @@ _ERROR_CODES = {
             "DuplicateMergeKey": "combine/split --dedupe: a shared key has differing content.",
             "DedupeConflict": "dedupe merge: a cluster has irreconcilable field values.",
             "DuplicateReference": "import: the provider identity is already present.",
-            "CitationKeyConflict": "import: the chosen citation key already exists.",
+            "CitationKeyConflict": "ref add/import: the chosen citation key already exists.",
             "DuplicateCitationKey": "ref show/edit: the citation key identifies multiple entries.",
         },
     },

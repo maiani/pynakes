@@ -8,7 +8,12 @@ from typer.testing import CliRunner
 
 from pynakes.bibtex_parser import parse_bib
 from pynakes.cli import app
-from pynakes.dedupe import DedupeConflictError, find_duplicate_clusters, merge_duplicates
+from pynakes.dedupe import (
+    DedupeConflictError,
+    clusters_for_keys,
+    find_duplicate_clusters,
+    merge_duplicates,
+)
 from pynakes.engine import Bibliography
 
 runner = CliRunner()
@@ -192,6 +197,89 @@ def test_dedupe_merge_cli_dry_run_diff_json(tmp_path: Path) -> None:
     assert data["removed_entries"] == 1
     assert "-@article{B," in data["diff"]
     assert bib.read_text() == original
+
+
+TWO_CLUSTERS = (
+    "@article{Alpha1,\n  author = {Ada Lovelace},\n  title = {On Engines},\n"
+    "  journal = {Notes},\n  year = {1843},\n  doi = {10.5555/engines}\n}\n\n"
+    "@article{Alpha2,\n  author = {Ada Lovelace},\n  title = {On Engines},\n"
+    "  journal = {Notes},\n  year = {1843},\n  doi = {10.5555/engines},\n"
+    "  note = {Offprint}\n}\n\n"
+    "@article{Beta1,\n  author = {Carl Gauss},\n  title = {On Residues},\n"
+    "  journal = {Werke},\n  year = {1801},\n  doi = {10.5555/residues}\n}\n\n"
+    "@article{Beta2,\n  author = {Carl Gauss},\n  title = {On Residues},\n"
+    "  journal = {Werke},\n  year = {1801},\n  doi = {10.5555/residues},\n"
+    "  note = {Reprint}\n}\n"
+)
+
+
+def test_clusters_for_keys_selects_only_the_named_pair() -> None:
+    clusters = find_duplicate_clusters(parse_bib(TWO_CLUSTERS))
+    assert len(clusters) == 2
+
+    selected = clusters_for_keys(clusters, ["Alpha2"])
+
+    assert [[entry.key for entry in cluster.entries] for cluster in selected] == [
+        ["Alpha1", "Alpha2"]
+    ]
+
+
+def test_clusters_for_keys_rejects_a_key_in_no_cluster() -> None:
+    """Merging nothing while reporting success would hide the caller's mistake."""
+    clusters = find_duplicate_clusters(parse_bib(TWO_CLUSTERS))
+
+    with pytest.raises(ValueError, match="Nobody1999"):
+        clusters_for_keys(clusters, ["Alpha2", "Nobody1999"])
+
+
+def test_clusters_for_keys_rejects_an_empty_selection() -> None:
+    clusters = find_duplicate_clusters(parse_bib(TWO_CLUSTERS))
+
+    with pytest.raises(ValueError, match="No citation key"):
+        clusters_for_keys(clusters, ["  "])
+
+
+def test_dedupe_merge_by_key_leaves_every_other_cluster_alone(tmp_path: Path) -> None:
+    """The "I looked at this pair and decided" case a whole-file merge cannot express."""
+    bib = tmp_path / "refs.bib"
+    bib.write_text(TWO_CLUSTERS)
+
+    result = runner.invoke(app, ["dedupe", "merge", str(bib), "--key", "Alpha2", "--json"])
+    data = json.loads(result.output)
+
+    assert result.exit_code == 0, result.output
+    assert data["merged_clusters"] == 1
+    assert data["removed_entries"] == 1
+    assert data["keys"] == ["Alpha2"]
+    written = bib.read_text()
+    assert "@article{Alpha2," not in written
+    # The other duplicate pair is untouched: it was never approved.
+    assert "@article{Beta1," in written
+    assert "@article{Beta2," in written
+
+
+def test_dedupe_merge_without_key_still_merges_every_cluster(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text(TWO_CLUSTERS)
+
+    result = runner.invoke(app, ["dedupe", "merge", str(bib), "--json"])
+    data = json.loads(result.output)
+
+    assert result.exit_code == 0, result.output
+    assert data["merged_clusters"] == 2
+    assert data["keys"] == []
+
+
+def test_dedupe_merge_by_key_reports_a_key_that_names_no_duplicate(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text(TWO_CLUSTERS)
+
+    result = runner.invoke(app, ["dedupe", "merge", str(bib), "--key", "Nobody1999", "--json"])
+    data = json.loads(result.output)
+
+    assert result.exit_code == 1
+    assert data["error"] == "NoSuchDuplicate"
+    assert bib.read_text() == TWO_CLUSTERS
 
 
 def test_dedupe_merge_moves_pinax_materials_to_surviving_key(tmp_path: Path) -> None:

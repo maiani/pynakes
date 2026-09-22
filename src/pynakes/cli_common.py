@@ -388,6 +388,7 @@ def _finish_mod(
     coll: Bibliography,
     params: RunParams,
     human,
+    *,
     diff_text: str | None = None,
     warnings=None,
     modified_entries: int | None = None,
@@ -403,6 +404,12 @@ def _finish_mod(
     When ``diff_text`` is provided it is used as-is (useful for commands that
     combine multiple diffs, e.g. ``keys rename``). Otherwise the diff is
     generated from the bibliography changes.
+
+    Everything after ``human`` is keyword-only. ``diff_text`` and ``warnings``
+    are adjacent and both list-ish at a glance, and passing warnings positionally
+    put them in the ``diff`` field while dropping them from ``warnings`` — a
+    silent corruption of the envelope that ``ref remove`` shipped with. The
+    signature now refuses it.
     """
     # The plan must be read before commit, which refreshes the pristine baseline.
     plan = coll.change_plan()

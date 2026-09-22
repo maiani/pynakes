@@ -7,9 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `dedupe merge --key` merges only the duplicate clusters containing the named
+  citation keys, leaving every other cluster in the file untouched. Merging was
+  all-or-nothing, which is the wrong shape for the decision it encodes: judging
+  two records to be the same work is done one pair at a time, after looking at
+  them, and accepting every other merge in the file as the price of resolving
+  one is not a choice a reviewer should have to make. The selector is the same
+  comma-separated, repeatable `--key` the rest of the CLI takes. A key that
+  belongs to no cluster is an error rather than a silent no-op, since the caller
+  believed it named a duplicate.
+
+### Fixed
+
+- `ref remove` emitted its warnings in the `diff` field and dropped them from
+  `warnings`. It passed them into `_finish_mod`'s `diff_text` parameter
+  positionally, so `--diff` produced the warning list instead of a diff — and
+  when there were no warnings, produced nothing at all — while "citation key not
+  found; skipped" never reached the envelope any caller reads. Both halves of
+  the modifying-command contract were wrong for this one command. Everything
+  after `human` in `_finish_mod` is now keyword-only, so the mistake cannot
+  recur in the other twenty-nine callers.
+
+- `ref add` reported a citation key that already exists as an exit-1
+  `InvalidInput` error, while `ref import` reported the identical situation as
+  an exit-2 `CitationKeyConflict` with the options that resolve it. A taken key
+  is a decision for the caller — both choosing another key and appending anyway
+  are legitimate, and `ref add` has `--allow-duplicate` for the second — so it
+  is a conflict, not a malformed request. `ref add` now emits the same envelope
+  as its sibling, and a client can branch on the situation without knowing which
+  of the two commands produced it.
+
 ### Editor
 
 #### Added
+
+- The view can now change *which* entries exist, not only their fields.
+  **Import…** resolves a DOI, arXiv id, ISBN or supported URL into a new entry;
+  **New entry** appends an empty entry of a chosen type and selects it so the
+  field editor fills it in; an entry's detail pane removes it; its **Groups**
+  chips add and remove membership; and **Duplicates** lists what `dedupe check`
+  found, each cluster with the merge that resolves it. These are not staged —
+  none is a field edit — but they keep the staged editor's guarantee: the
+  engine's own `--dry-run --diff` goes to the Staged diff pane, the approval
+  dialog names what a diff cannot show (materials about to be deleted, a
+  network request already made), and approving re-runs the identical invocation
+  without `--dry-run`. An engine conflict is treated as the engine declining to
+  guess rather than as a failure: an import of a reference already held asks
+  whether to add it anyway and replays the answer, and a taken citation key
+  says so and writes nothing.
+
+- `pynakes.allowOnlineLookups` now gates every network-backed action in the
+  view rather than comparison alone. Importing by identifier reads the same
+  switch, so "no lookups" means the same thing whichever button was pressed;
+  with it off, Import says so instead of failing at the provider.
 
 - `editor/` — a VS Code / Open VSX extension companion. It opens a `.bib` file
   as a sortable, filterable entry table with a field detail pane, browses the
@@ -18,8 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   It flags duplicate citation keys, reports encoding, line ending, `@string`
   count and which metadata namespaces the file carries, follows the text buffer
   rather than the file on disk, and jumps from a row to the entry's declaration
-  in the source. Linked-material state and TeX citation navigation are not
-  implemented. The client holds no bibliography implementation of its own: every
+  in the source. The client holds no bibliography implementation of its own: every
   value it displays comes from the engine's JSON envelope, and every change
   leaves through `ref edit`. It is not published to either marketplace, is
   excluded from the Python sdist and wheel, and has its own Node toolchain —

@@ -1004,7 +1004,16 @@ Detect and conservatively merge duplicate works.
 ```bash
 pynakes dedupe check refs.bib
 pynakes dedupe merge refs.bib --dry-run --diff
+pynakes dedupe merge refs.bib --key Newton1687b        # just this pair
 ```
+
+`check` reports each cluster with the identity that matched it and the keys in
+it. `merge` folds every cluster into its first entry; `--key` narrows it to the
+clusters containing the named keys, which is the shape the decision usually has
+— you look at one pair, decide they are the same work, and resolve that one
+without accepting every other merge the file invites. The selector is the shared
+[`--key`](#selecting-by-citation-key), so it is comma-separated and repeatable.
+A key belonging to no cluster is an error rather than a silent no-op.
 
 `merge` exits with code `2` when field values disagree and cannot be safely
 resolved. In a Pinax library, `merge` also moves the duplicate entries'

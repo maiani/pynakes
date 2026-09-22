@@ -24,13 +24,18 @@ import * as path from "node:path";
 import { test } from "node:test";
 import {
   type PynakesCommand,
+  dedupeCheck,
+  dedupeMerge,
+  groupsEntry,
   groupsList,
   groupsTree,
   inspectBib,
   keysRename,
   lintBib,
+  refAdd,
   refCompare,
   refEdit,
+  refRemove,
   searchBib,
 } from "../pynakes.js";
 
@@ -142,4 +147,132 @@ test("keys rename takes FILE OLD NEW, not OLD NEW FILE", { skip }, async () => {
   const rewritten = fs.readFileSync(file, "utf-8");
   assert.match(rewritten, /@article\{NewKey2020,/);
   assert.doesNotMatch(rewritten, /@article\{OldKey2020,/);
+});
+
+// --- entry and group mutations ---------------------------------------------
+//
+// Argument *order* is what drifted before (`keys rename`), and these commands
+// each put the file in a different position: `ref add KEY FILE`,
+// `ref remove FILE KEY...`, `groups add-entry FILE KEY GROUP`. Nothing in the
+// TypeScript types can catch a wrong one, so each is run for real.
+
+test("ref add takes KEY then FILE, and writes the requested type", { skip }, async () => {
+  const file = tempBib("@article{Existing2020,\n  title = {A Paper}\n}\n");
+
+  const envelope = await refAdd(
+    command,
+    file,
+    { key: "New2024", entryType: "inproceedings", fields: { title: "Fresh Work" } },
+    false,
+  );
+  if (envelope.status !== "success") {
+    assert.fail(`ref add failed: ${JSON.stringify(envelope)}`);
+  }
+  const written = fs.readFileSync(file, "utf-8");
+  assert.match(written, /@inproceedings\{New2024,/);
+  assert.match(written, /title\s*=\s*\{Fresh Work\}/);
+  assert.match(written, /@article\{Existing2020,/);
+});
+
+test("ref add reports an existing key as a conflict rather than writing", { skip }, async () => {
+  const original = "@article{Taken2020,\n  title = {A Paper}\n}\n";
+  const file = tempBib(original);
+
+  const envelope = await refAdd(
+    command,
+    file,
+    { key: "Taken2020", entryType: "article", fields: {} },
+    false,
+  );
+
+  assert.equal(envelope.status, "conflict");
+  assert.equal(fs.readFileSync(file, "utf-8"), original);
+});
+
+test("ref remove takes FILE then the keys, and honors --dry-run", { skip }, async () => {
+  const original =
+    "@article{Keep2020,\n  title = {Kept}\n}\n\n@article{Drop2021,\n  title = {Dropped}\n}\n";
+  const file = tempBib(original);
+
+  const preview = await refRemove(command, file, ["Drop2021"], false, true);
+  if (preview.status !== "success") {
+    assert.fail(`ref remove --dry-run failed: ${JSON.stringify(preview)}`);
+  }
+  assert.equal(preview.dry_run, true);
+  assert.ok(preview.diff && preview.diff.includes("-@article{Drop2021,"));
+  assert.equal(fs.readFileSync(file, "utf-8"), original, "a dry run must write nothing");
+
+  const applied = await refRemove(command, file, ["Drop2021"], false, false);
+  assert.equal(applied.status, "success");
+  const written = fs.readFileSync(file, "utf-8");
+  assert.doesNotMatch(written, /@article\{Drop2021,/);
+  assert.match(written, /@article\{Keep2020,/);
+});
+
+test("groups add-entry and remove-entry take FILE KEY GROUP", { skip }, async () => {
+  const file = tempBib("@article{Smith2020,\n  title = {A Paper}\n}\n");
+
+  const added = await groupsEntry(command, file, "Smith2020", "Reviewed", true, false);
+  if (added.status !== "success") {
+    assert.fail(`groups add-entry failed: ${JSON.stringify(added)}`);
+  }
+  assert.match(fs.readFileSync(file, "utf-8"), /groups\s*=\s*\{Reviewed\}/);
+
+  const removed = await groupsEntry(command, file, "Smith2020", "Reviewed", false, false);
+  assert.equal(removed.status, "success");
+  assert.doesNotMatch(fs.readFileSync(file, "utf-8"), /groups\s*=\s*\{Reviewed\}/);
+});
+
+/** Two duplicate pairs, so a per-cluster merge can be told from a whole-file one. */
+const TWO_DUPLICATE_PAIRS =
+  "@article{Alpha1,\n  author = {Ada Lovelace},\n  title = {On Engines},\n" +
+  "  journal = {Notes},\n  year = {1843},\n  doi = {10.5555/engines}\n}\n\n" +
+  "@article{Alpha2,\n  author = {Ada Lovelace},\n  title = {On Engines},\n" +
+  "  journal = {Notes},\n  year = {1843},\n  doi = {10.5555/engines},\n" +
+  "  note = {Offprint}\n}\n\n" +
+  "@article{Beta1,\n  author = {Carl Gauss},\n  title = {On Residues},\n" +
+  "  journal = {Werke},\n  year = {1801},\n  doi = {10.5555/residues}\n}\n\n" +
+  "@article{Beta2,\n  author = {Carl Gauss},\n  title = {On Residues},\n" +
+  "  journal = {Werke},\n  year = {1801},\n  doi = {10.5555/residues},\n" +
+  "  note = {Reprint}\n}\n";
+
+test("dedupe check reports clusters with the keys the view renders", { skip }, async () => {
+  const file = tempBib(TWO_DUPLICATE_PAIRS);
+
+  const envelope = await dedupeCheck(command, file);
+  if (envelope.status !== "success") {
+    assert.fail(`dedupe check failed: ${JSON.stringify(envelope)}`);
+  }
+  assert.equal(envelope.cluster_count, 2);
+  const alpha = envelope.clusters.find((cluster) => cluster.keys.includes("Alpha1"));
+  assert.ok(alpha, "expected the Alpha pair to be one cluster");
+  assert.deepEqual(alpha?.keys, ["Alpha1", "Alpha2"]);
+  assert.equal(alpha?.identity.value, "10.5555/engines");
+  assert.equal(alpha?.entries[0].fields.title, "On Engines");
+});
+
+test("dedupe merge --key merges one cluster and leaves the other", { skip }, async () => {
+  const file = tempBib(TWO_DUPLICATE_PAIRS);
+
+  const envelope = await dedupeMerge(command, file, ["Alpha2"], false);
+  if (envelope.status !== "success") {
+    assert.fail(`dedupe merge --key failed: ${JSON.stringify(envelope)}`);
+  }
+  assert.equal(envelope.merged_clusters, 1);
+  assert.equal(envelope.merged[0].primary_key, "Alpha1");
+
+  const written = fs.readFileSync(file, "utf-8");
+  assert.doesNotMatch(written, /@article\{Alpha2,/);
+  assert.match(written, /@article\{Beta1,/, "an unapproved cluster must survive");
+  assert.match(written, /@article\{Beta2,/, "an unapproved cluster must survive");
+});
+
+test("dedupe merge without keys still merges every cluster", { skip }, async () => {
+  const file = tempBib(TWO_DUPLICATE_PAIRS);
+
+  const envelope = await dedupeMerge(command, file, undefined, false);
+  if (envelope.status !== "success") {
+    assert.fail(`dedupe merge failed: ${JSON.stringify(envelope)}`);
+  }
+  assert.equal(envelope.merged_clusters, 2);
 });

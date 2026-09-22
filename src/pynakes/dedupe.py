@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 from pynakes._identifiers import canonical_doi, normalize_arxiv
@@ -184,6 +185,31 @@ def find_duplicate_clusters(lib: BibFile) -> list[DuplicateCluster]:
         reason = "+".join(sorted(reasons.get(root, {"fuzzy"})))
         clusters.append(DuplicateCluster(identity, reason, cluster_entries))
     return clusters
+
+
+def clusters_for_keys(
+    clusters: list[DuplicateCluster], keys: Iterable[str]
+) -> list[DuplicateCluster]:
+    """Return the clusters containing any of ``keys``, in their original order.
+
+    This is what lets a caller merge one duplicate pair it has looked at rather
+    than every pair in the file. A key belonging to no cluster raises
+    :class:`ValueError`: the caller believed it named a duplicate, and merging
+    nothing while reporting success would hide the mistake.
+    """
+    wanted = {key.strip() for key in keys if key.strip()}
+    if not wanted:
+        raise ValueError("No citation key given to select a duplicate cluster")
+    selected = [
+        cluster for cluster in clusters if any(entry.key in wanted for entry in cluster.entries)
+    ]
+    matched = {entry.key for cluster in selected for entry in cluster.entries}
+    unmatched = sorted(wanted - matched)
+    if unmatched:
+        raise ValueError(
+            "No duplicate cluster contains " + ", ".join(repr(key) for key in unmatched)
+        )
+    return selected
 
 
 def merge_duplicates(

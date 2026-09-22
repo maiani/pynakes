@@ -85,6 +85,14 @@ export function renderShell(webview: vscode.Webview, extensionUri: vscode.Uri): 
     <input id="uncited" type="checkbox"> uncited
   </label>
   <span id="counts" class="counts" aria-live="polite"></span>
+  <span class="toolbar-actions">
+    <button id="import-entry" class="button" type="button"
+            title="Add a reference from a DOI, arXiv id, or supported URL">Import…</button>
+    <button id="add-entry" class="button" type="button"
+            title="Add an empty entry to fill in here">New entry</button>
+    <button id="find-duplicates" class="button" type="button"
+            title="Find entries the engine judges to be the same work">Duplicates</button>
+  </span>
 </header>
 <div id="banner" class="banner" hidden></div>
 <div id="notice" class="notice" hidden></div>

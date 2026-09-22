@@ -78,7 +78,7 @@ def remove(
     if material_removals:
         details["material_removals"] = material_removals
 
-    _finish_mod(file, "remove", coll, params, human, warnings, **details)
+    _finish_mod(file, "remove", coll, params, human, warnings=warnings, **details)
 
 
 def register(app: typer.Typer) -> None:

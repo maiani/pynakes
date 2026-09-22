@@ -30,7 +30,16 @@ import {
   renameEntryKey,
   runSearch,
   type LibraryRead,
+  type Mutation,
 } from "./library";
+import {
+  promptAdd,
+  promptGroup,
+  promptImport,
+  reportDuplicates,
+  runMutation,
+  type MutationHost,
+} from "./mutations";
 import {
   type PynakesCommand,
   PynakesProtocolError,
@@ -112,6 +121,10 @@ interface ViewMessage {
   /** One-based position within that file, for `openCitation`. */
   line?: number;
   column?: number;
+  /** The entry- or group-level change requested, for `mutate`. */
+  mutation?: Mutation;
+  /** Group names the view already knows about, for `promptGroup`. */
+  groups?: string[];
 }
 
 export class BibliographyEditorProvider implements vscode.CustomTextEditorProvider {
@@ -717,6 +730,29 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       case "openCitation":
         await this.openCitation(panel, message.path, message.line, message.column);
         return;
+      case "mutate":
+        if (message.mutation) {
+          await runMutation(this.mutationHost(document, panel), message.mutation);
+        }
+        return;
+      case "promptAdd":
+        await promptAdd(this.mutationHost(document, panel));
+        return;
+      case "promptImport":
+        await promptImport(this.mutationHost(document, panel));
+        return;
+      case "promptGroup":
+        if (message.key) {
+          await promptGroup(
+            this.mutationHost(document, panel),
+            message.key,
+            message.groups ?? [],
+          );
+        }
+        return;
+      case "findDuplicates":
+        await reportDuplicates(this.mutationHost(document, panel));
+        return;
       default:
         return;
     }
@@ -753,6 +789,19 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
   // -- compare with remote ---------------------------------------------------
 
   /**
+   * Whether this view may reach the network for this document.
+   *
+   * Every network-backed action reads this one place, so "no lookups" means the
+   * same thing for comparing and for importing rather than depending on which
+   * button was pressed.
+   */
+  private onlineLookupsAllowed(document: vscode.TextDocument): boolean {
+    return vscode.workspace
+      .getConfiguration("pynakes", document.uri)
+      .get<boolean>("allowOnlineLookups", true);
+  }
+
+  /**
    * Compare one entry against its DOI/arXiv remote record (read-only).
    *
    * The network gate lives here, not in the webview: `online` is decided
@@ -766,9 +815,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
     panel: vscode.WebviewPanel,
     key: string,
   ): Promise<void> {
-    const online = vscode.workspace
-      .getConfiguration("pynakes", document.uri)
-      .get<boolean>("allowOnlineLookups", true);
+    const online = this.onlineLookupsAllowed(document);
     await this.withMirror(
       document,
       panel,
@@ -870,6 +917,38 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
     } catch (error) {
       void panel.webview.postMessage(await this.describeFailure(error, document));
     }
+  }
+
+  // -- entry and group mutations --------------------------------------------
+
+  /**
+   * The slice of this provider that `mutations.ts` is allowed to use.
+   *
+   * Built per message rather than held, because every capability it exposes is
+   * already scoped to one document and one panel; handing over the provider
+   * itself would let that module reach state it has no business touching.
+   */
+  private mutationHost(
+    document: vscode.TextDocument,
+    panel: vscode.WebviewPanel,
+  ): MutationHost {
+    return {
+      document,
+      post: (message) => void panel.webview.postMessage(message),
+      stagedKeys: () => new Set(Object.keys(this.stagingFor(document).entries)),
+      reconcileBuffer: () => this.reconcileBuffer(document),
+      workingDirectory: () => this.workingDirectory(document),
+      onlineLookupsAllowed: () => this.onlineLookupsAllowed(document),
+      reload: () => this.load(document, panel),
+      describeFailure: (error) => this.describeFailure(error, document),
+      withMirror: (body, reportFailure) =>
+        this.withMirror(
+          document,
+          panel,
+          ({ command, cwd, source }) => body({ command, cwd, source }),
+          reportFailure,
+        ),
+    };
   }
 
   // -- preview and commit ---------------------------------------------------

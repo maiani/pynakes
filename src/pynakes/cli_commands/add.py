@@ -12,6 +12,7 @@ from pynakes.cli_commands._reference import (
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     RunParams,
+    _emit_conflict,
     _emit_error,
     _finish_mod,
     _resolve_input_bib,
@@ -100,7 +101,25 @@ def add(
         if interactive:
             key = prompt_citation_key()
         if key is not None and coll.entries.get_all(key) and not allow_duplicate:
-            raise ValueError(f"Citation key already exists: {key}")
+            # A taken key is a decision for the caller, not a malformed request:
+            # both continuing and choosing another key are legitimate. ``ref
+            # import`` already reports it that way, and a client cannot branch
+            # on the situation if its two siblings disagree about the shape.
+            _emit_conflict(
+                json_output,
+                "CitationKeyConflict",
+                f"Citation key already exists: {key}",
+                key=key,
+                options=[
+                    {"id": "choose_key", "description": "Retry with a different citation key"},
+                    {
+                        "id": "allow_duplicate",
+                        "description": "Retry with --allow-duplicate to add a second entry "
+                        "under this key",
+                    },
+                ],
+            )
+            return
         if interactive:
             entry_type = entry_type or prompt_entry_type("article")
             fields = prompt_required_fields(coll, entry_type, fields)

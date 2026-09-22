@@ -15,8 +15,11 @@ import type { PynakesCommand } from "./engineDiscovery";
 import { extractVersion } from "./version";
 import type {
   AssetCheckEnvelope,
+  DedupeCheckEnvelope,
+  DedupeMergeEnvelope,
   GroupsListEnvelope,
   GroupsTreeEnvelope,
+  MutationEnvelope,
   InspectEnvelope,
   KeysRenameEnvelope,
   LintEnvelope,
@@ -318,6 +321,222 @@ export function keysRename(
   cwd?: string,
 ): Promise<KeysRenameEnvelope> {
   return runJson<KeysRenameEnvelope>(command, ["keys", "rename", filePath, oldKey, newKey], cwd);
+}
+
+/**
+ * Entry- and group-level mutations.
+ *
+ * These change which entries exist, or which groups they belong to, so none of
+ * them fits the field-level staging map. What they share instead is the
+ * engine's modifying-command contract: `--dry-run --diff` previews without
+ * writing and the same invocation without it applies. The view runs every one
+ * through the same preview-then-approve path, so the diff shown is the diff
+ * that lands — the property the staged field editor already keeps.
+ *
+ * Each builder is exported separately from its runner so the argument list can
+ * be asserted in a unit test without spawning anything.
+ */
+
+/** A new entry written by hand: a key, a type, and whatever fields are known. */
+export interface RefAddRequest {
+  key: string;
+  entryType: string;
+  fields: Record<string, string>;
+}
+
+export function refAddArgs(
+  filePath: string,
+  request: RefAddRequest,
+  dryRun: boolean,
+): string[] {
+  const args = ["ref", "add", request.key, filePath, "--type", request.entryType];
+  for (const [field, value] of Object.entries(request.fields)) {
+    if (value.trim()) {
+      args.push("--field", `${field}=${value}`);
+    }
+  }
+  if (dryRun) {
+    args.push("--dry-run");
+  }
+  args.push("--diff");
+  return args;
+}
+
+export function refAdd(
+  command: PynakesCommand,
+  filePath: string,
+  request: RefAddRequest,
+  dryRun: boolean,
+  cwd?: string,
+): Promise<MutationEnvelope> {
+  return runJson<MutationEnvelope>(command, refAddArgs(filePath, request, dryRun), cwd);
+}
+
+/**
+ * An entry resolved from an identifier.
+ *
+ * This is the one view action that reaches the network, and it does so only
+ * because the user typed an identifier and asked for it — the same explicit
+ * rule the CLI keeps. `allowDuplicate` is how the caller answers the engine's
+ * exit-2 conflict when the reference is already present; it is never passed
+ * speculatively.
+ */
+export interface RefImportRequest {
+  identifier: string;
+  key?: string;
+  allowDuplicate?: boolean;
+}
+
+export function refImportArgs(
+  filePath: string,
+  request: RefImportRequest,
+  dryRun: boolean,
+): string[] {
+  const args = ["ref", "import", request.identifier, filePath];
+  if (request.key?.trim()) {
+    args.push("--key", request.key.trim());
+  }
+  if (request.allowDuplicate) {
+    args.push("--allow-duplicate");
+  }
+  if (dryRun) {
+    args.push("--dry-run");
+  }
+  args.push("--diff");
+  return args;
+}
+
+export function refImport(
+  command: PynakesCommand,
+  filePath: string,
+  request: RefImportRequest,
+  dryRun: boolean,
+  cwd?: string,
+): Promise<MutationEnvelope> {
+  return runJson<MutationEnvelope>(command, refImportArgs(filePath, request, dryRun), cwd);
+}
+
+/**
+ * Remove entries by citation key.
+ *
+ * `keepFiles` maps to `--keep-files`. The engine's default is to delete an
+ * entry's Pinax materials along with it, which is a deletion the view must
+ * name out loud before it happens rather than discover afterwards.
+ */
+export function refRemoveArgs(
+  filePath: string,
+  keys: string[],
+  keepFiles: boolean,
+  dryRun: boolean,
+): string[] {
+  const args = ["ref", "remove", filePath, ...keys];
+  if (keepFiles) {
+    args.push("--keep-files");
+  }
+  if (dryRun) {
+    args.push("--dry-run");
+  }
+  args.push("--diff");
+  return args;
+}
+
+export function refRemove(
+  command: PynakesCommand,
+  filePath: string,
+  keys: string[],
+  keepFiles: boolean,
+  dryRun: boolean,
+  cwd?: string,
+): Promise<MutationEnvelope> {
+  return runJson<MutationEnvelope>(
+    command,
+    refRemoveArgs(filePath, keys, keepFiles, dryRun),
+    cwd,
+  );
+}
+
+/** Add or remove one entry's membership of one group. */
+export function groupsEntryArgs(
+  filePath: string,
+  key: string,
+  group: string,
+  member: boolean,
+  dryRun: boolean,
+): string[] {
+  const args = [
+    "groups",
+    member ? "add-entry" : "remove-entry",
+    filePath,
+    key,
+    group,
+  ];
+  if (dryRun) {
+    args.push("--dry-run");
+  }
+  args.push("--diff");
+  return args;
+}
+
+export function groupsEntry(
+  command: PynakesCommand,
+  filePath: string,
+  key: string,
+  group: string,
+  member: boolean,
+  dryRun: boolean,
+  cwd?: string,
+): Promise<MutationEnvelope> {
+  return runJson<MutationEnvelope>(
+    command,
+    groupsEntryArgs(filePath, key, group, member, dryRun),
+    cwd,
+  );
+}
+
+/** Which entries the engine judges to be the same work (read-only). */
+export function dedupeCheck(
+  command: PynakesCommand,
+  filePath: string,
+  cwd?: string,
+): Promise<DedupeCheckEnvelope> {
+  return runJson<DedupeCheckEnvelope>(command, ["dedupe", "check", filePath], cwd);
+}
+
+/**
+ * Collapse duplicate clusters into their first entry.
+ *
+ * With `keys`, only the clusters containing one of them are merged — the
+ * per-pair decision a review actually makes. Naming the cluster by a key inside
+ * it, rather than by an index or a reconstructed description, is what keeps the
+ * merge the engine's: the view never says which entries to fold together.
+ *
+ * The engine's merge is conservative, filling only fields the survivor lacks,
+ * and it refuses outright when two copies disagree irreconcilably.
+ */
+export function dedupeMergeArgs(
+  filePath: string,
+  keys: string[] | undefined,
+  dryRun: boolean,
+): string[] {
+  const args = ["dedupe", "merge", filePath];
+  for (const key of keys ?? []) {
+    args.push("--key", key);
+  }
+  if (dryRun) {
+    args.push("--dry-run");
+  }
+  args.push("--diff");
+  return args;
+}
+
+export function dedupeMerge(
+  command: PynakesCommand,
+  filePath: string,
+  keys: string[] | undefined,
+  dryRun: boolean,
+  cwd?: string,
+): Promise<DedupeMergeEnvelope> {
+  return runJson<DedupeMergeEnvelope>(command, dedupeMergeArgs(filePath, keys, dryRun), cwd);
 }
 
 /** Engine version string, or `undefined` when it cannot be determined. */

@@ -264,7 +264,20 @@ window.PV = window.PV || {};
     copy.type = "button";
     copy.textContent = "Copy key";
     copy.addEventListener("click", () => PV.post({ type: "copyKey", key: row.key }));
-    actions.append(reveal, copy);
+    const remove = document.createElement("button");
+    remove.className = "button";
+    remove.type = "button";
+    remove.textContent = "Remove";
+    remove.title = "Remove this entry, after reviewing the diff";
+    remove.addEventListener("click", () =>
+      PV.post({
+        type: "mutate",
+        // Pinax materials go with the entry unless asked otherwise; the
+        // approval dialog says which, so the choice is never silent.
+        mutation: { kind: "remove", keys: [row.key], keepFiles: false },
+      }),
+    );
+    actions.append(reveal, copy, remove);
     if (PV.entryStaged(row.key)) {
       const discard = document.createElement("button");
       discard.className = "button";
@@ -288,23 +301,52 @@ window.PV = window.PV || {};
     const issues = PV.state.lint?.byKey?.[row.key] || [];
     const fragment = document.createDocumentFragment();
 
-    if (groups.length > 0) {
-      const section = document.createElement("div");
-      section.className = "detail-section";
-      const heading = document.createElement("h3");
-      heading.textContent = "Groups";
-      section.appendChild(heading);
-      const list = document.createElement("div");
-      list.className = "chips";
-      for (const group of groups) {
-        const chip = document.createElement("span");
-        chip.className = "chip";
-        chip.textContent = group;
-        list.appendChild(chip);
-      }
-      section.appendChild(list);
-      fragment.appendChild(section);
+    // The Groups section is always shown, unlike the others: it is the only
+    // place membership can be changed, so it has to exist for an entry that
+    // has none yet.
+    const section = document.createElement("div");
+    section.className = "detail-section";
+    const heading = document.createElement("h3");
+    heading.textContent = "Groups";
+    section.appendChild(heading);
+    const list = document.createElement("div");
+    list.className = "chips";
+    for (const group of groups) {
+      const chip = document.createElement("span");
+      chip.className = "chip chip-removable";
+      const name = document.createElement("span");
+      name.textContent = group;
+      const drop = document.createElement("button");
+      drop.className = "chip-remove";
+      drop.type = "button";
+      drop.textContent = "×";
+      drop.title = 'Remove ' + row.key + ' from "' + group + '"';
+      drop.setAttribute("aria-label", 'Remove from group "' + group + '"');
+      drop.addEventListener("click", () =>
+        PV.post({
+          type: "mutate",
+          mutation: { kind: "group", key: row.key, group, member: false },
+        }),
+      );
+      chip.append(name, drop);
+      list.appendChild(chip);
     }
+    const add = document.createElement("button");
+    add.className = "button";
+    add.type = "button";
+    add.textContent = groups.length ? "+ group" : "Add to a group";
+    add.addEventListener("click", () =>
+      PV.post({
+        type: "promptGroup",
+        key: row.key,
+        // The declared hierarchy, so the prompt can offer a pick rather than
+        // asking the name to be retyped exactly.
+        groups: PV.declaredGroupNames(),
+      }),
+    );
+    list.appendChild(add);
+    section.appendChild(list);
+    fragment.appendChild(section);
 
     const materials = PV.materialsOf(row.key);
     if (materials.length > 0) {

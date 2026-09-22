@@ -74,6 +74,15 @@ body {
   white-space: nowrap;
 }
 
+/* The mutating actions sit together at the end of the toolbar, apart from the
+   search controls: they write, the rest only filter. */
+.toolbar-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  margin-left: auto;
+}
+
 .button {
   flex: 0 0 auto;
   padding: 3px 11px;
@@ -1085,4 +1094,89 @@ body.resizing * {
 .link-button:disabled {
   color: var(--vscode-descriptionForeground);
   cursor: default;
+}
+
+/* Duplicate clusters: one block per cluster, each entry a compact row so two
+   near-identical records can be compared without scrolling between them. */
+.dup-cluster {
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+}
+
+.dup-cluster:last-child {
+  border-bottom: none;
+}
+
+.dup-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.dup-reason {
+  padding: 0 6px;
+  border-radius: 8px;
+  background-color: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  font-size: 0.85em;
+}
+
+.dup-identity {
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family, monospace);
+  overflow-wrap: anywhere;
+}
+
+.dup-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.dup-entry .dup-key {
+  flex: 0 0 auto;
+  font-family: var(--vscode-editor-font-family, monospace);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.dup-entry .dup-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-descriptionForeground);
+}
+
+.dup-survivor {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}
+
+/* A group chip gains a remove affordance only where membership is editable. */
+.chip-removable {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chip-remove {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1;
+}
+
+.chip-remove:hover {
+  opacity: 1;
 }

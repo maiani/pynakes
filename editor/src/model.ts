@@ -502,3 +502,126 @@ export interface AssetCheckSuccess {
 }
 
 export type AssetCheckEnvelope = AssetCheckSuccess | InspectError;
+
+// ---------------------------------------------------------------------------
+// Entry-level and group-level mutations.
+//
+// Unlike a field edit, these change *which* entries exist or which groups they
+// belong to, so they cannot be expressed as a staged `ref edit`. Every one of
+// them emits the engine's shared modifying-command envelope, which is what lets
+// the view run them all through one preview-and-approve path.
+// ---------------------------------------------------------------------------
+
+/** The keys every modifying command emits, whatever it changed. */
+export interface MutationSuccess {
+  status: "success";
+  action: string;
+  file: string;
+  dry_run: boolean;
+  modified: boolean;
+  modified_entries: number;
+  warnings: string[];
+  plan?: {
+    summary: Record<string, number>;
+    entries: RefEditPlanEntry[];
+  };
+  diff?: string;
+  /**
+   * The entry the command acted on, for the ones that act on exactly one:
+   * `ref add`, `ref import`, and the two `groups` entry commands. Absent from
+   * `ref remove` and `dedupe merge`, which can touch several.
+   */
+  key?: string;
+}
+
+/**
+ * A modifying command that refused because the answer is the caller's to give
+ * — an import whose reference is already present, a key already taken. The
+ * engine exits 2 and names the choices rather than picking one.
+ */
+export interface MutationConflict {
+  status: "conflict";
+  error: string;
+  message: string;
+  key?: string;
+  options: { id: string; description: string }[];
+}
+
+export type MutationEnvelope = MutationSuccess | MutationConflict | InspectError;
+
+/** `ref add`: the entry it appended. */
+export interface RefAddSuccess extends MutationSuccess {
+  key: string;
+  entry_type: string;
+  fields: Record<string, string>;
+}
+
+/** `ref import`: what was resolved, and from where. */
+export interface RefImportSuccess extends MutationSuccess {
+  key: string;
+  identifier: string;
+  identifier_kind?: string;
+  provider?: string;
+  entry_type?: string;
+}
+
+/** `ref remove`: which keys went, and whether their materials went too. */
+export interface RefRemoveSuccess extends MutationSuccess {
+  removed_keys: string[];
+  removed_count: number;
+  keep_files: boolean;
+}
+
+/** `groups add-entry` / `groups remove-entry`. */
+export interface GroupsEntrySuccess extends MutationSuccess {
+  key: string;
+  group: string;
+}
+
+/** What the engine matched a cluster on. */
+export interface DuplicateIdentity {
+  kind: string;
+  value: string | null;
+}
+
+/** One set of entries the engine judges to be the same work. */
+export interface DuplicateCluster {
+  identity: DuplicateIdentity;
+  /** Why they matched: `doi`, `arxiv`, `title`, ... */
+  reason: string;
+  entries: Array<{ key: string; type: string; fields: Record<string, string> }>;
+  keys: string[];
+}
+
+export interface DedupeCheckSuccess {
+  status: "success";
+  action: "dedupe_check";
+  file: string;
+  has_duplicates: boolean;
+  cluster_count: number;
+  duplicate_entries: number;
+  clusters: DuplicateCluster[];
+}
+
+export type DedupeCheckEnvelope = DedupeCheckSuccess | InspectError;
+
+/** One cluster `dedupe merge` collapsed, and what it took from the copies. */
+export interface MergedCluster {
+  identity: DuplicateIdentity;
+  /** The entry that survived; the others were folded into it. */
+  primary_key: string;
+  removed_keys: string[];
+  field_changes: Record<string, string>;
+  type_changed: string | null;
+}
+
+export interface DedupeMergeSuccess extends MutationSuccess {
+  action: "dedupe_merge";
+  clusters: DuplicateCluster[];
+  merged: MergedCluster[];
+  merged_clusters: number;
+  removed_entries: number;
+  field_changes: number;
+}
+
+export type DedupeMergeEnvelope = DedupeMergeSuccess | InspectError;

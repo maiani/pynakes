@@ -17,12 +17,13 @@ window.PV = window.PV || {};
   "use strict";
 
   /** Pane definitions: canonical order and their labels. */
-  const PANE_ORDER = ["edit", "findings", "diff", "compare"];
+  const PANE_ORDER = ["edit", "findings", "diff", "compare", "duplicates"];
   const PANE_LABEL = {
     edit: "Edit",
     findings: "Findings",
     diff: "Staged diff",
     compare: "Compare",
+    duplicates: "Duplicates",
   };
 
   const els = {};
@@ -66,6 +67,9 @@ window.PV = window.PV || {};
     }
     if (pane === "diff") {
       return s.counts.fields || null;
+    }
+    if (pane === "duplicates") {
+      return Array.isArray(s.duplicates) ? s.duplicates.length || null : null;
     }
     return null;
   }
@@ -156,6 +160,9 @@ window.PV = window.PV || {};
     }
     if (pane === "compare") {
       return renderCompare(target);
+    }
+    if (pane === "duplicates") {
+      return renderDuplicates(target);
     }
     if (pane === "edit") {
       return PV.renderEditBody(target, options);
@@ -271,6 +278,101 @@ window.PV = window.PV || {};
         pre.appendChild(span);
       }
       section.appendChild(pre);
+      target.appendChild(section);
+    }
+  }
+
+  /**
+   * Duplicate clusters, each with the merge that would resolve it.
+   *
+   * Merging is offered per cluster rather than for the file, because deciding
+   * that two records are the same work is a judgement made one pair at a time.
+   * The engine's `dedupe merge --key` is what makes that possible; without it
+   * the only choice would be every merge or none.
+   */
+  function renderDuplicates(target) {
+    const duplicates = PV.state.duplicates;
+    if (duplicates === null) {
+      const hint = document.createElement("p");
+      hint.className = "hint";
+      hint.textContent = "Choose Duplicates in the toolbar to look for repeated works.";
+      target.appendChild(hint);
+      return;
+    }
+    if (duplicates === "loading") {
+      const hint = document.createElement("p");
+      hint.className = "hint";
+      hint.textContent = "Looking for duplicates…";
+      target.appendChild(hint);
+      return;
+    }
+    if (!Array.isArray(duplicates)) {
+      const problem = document.createElement("p");
+      problem.className = "hint";
+      problem.textContent = duplicates.error;
+      target.appendChild(problem);
+      return;
+    }
+    if (duplicates.length === 0) {
+      const hint = document.createElement("p");
+      hint.className = "hint";
+      hint.textContent = "No duplicate works found.";
+      target.appendChild(hint);
+      return;
+    }
+
+    for (const cluster of duplicates) {
+      const section = document.createElement("div");
+      section.className = "dup-cluster";
+
+      const head = document.createElement("div");
+      head.className = "dup-head";
+      const reason = document.createElement("span");
+      reason.className = "dup-reason";
+      reason.textContent = cluster.reason;
+      head.appendChild(reason);
+      const identity = document.createElement("span");
+      identity.className = "dup-identity";
+      identity.textContent = cluster.identity?.value || "matched by title";
+      head.appendChild(identity);
+      section.appendChild(head);
+
+      for (const [index, entry] of (cluster.entries || []).entries()) {
+        const line = document.createElement("div");
+        line.className = "dup-entry";
+        const key = document.createElement("span");
+        key.className = "dup-key";
+        key.textContent = entry.key;
+        key.title = "Select this entry";
+        key.addEventListener("click", () => PV.select(entry.key));
+        line.appendChild(key);
+        const title = document.createElement("span");
+        title.className = "dup-title";
+        title.textContent = entry.fields?.title || "";
+        line.appendChild(title);
+        if (index === 0) {
+          const survivor = document.createElement("span");
+          survivor.className = "dup-survivor";
+          survivor.textContent = "keeps";
+          line.appendChild(survivor);
+        }
+        section.appendChild(line);
+      }
+
+      const merge = document.createElement("button");
+      merge.className = "button";
+      merge.type = "button";
+      merge.textContent = "Merge this pair";
+      merge.title = "Fold the copies into the first entry, after reviewing the diff";
+      merge.addEventListener("click", () => {
+        PV.post({
+          type: "mutate",
+          // The cluster is named by a key inside it, so the engine re-finds it
+          // rather than the view describing a merge it cannot perform.
+          mutation: { kind: "dedupeMerge", keys: cluster.keys },
+        });
+      });
+      section.appendChild(merge);
       target.appendChild(section);
     }
   }

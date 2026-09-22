@@ -1618,15 +1618,44 @@ class TestAddCommand:
         assert result.exit_code == 0, result.output
         assert "@article{Manual2026," in bib.read_text()
 
-    def test_add_manual_entry_rejects_existing_key(self, tmp_path: Path) -> None:
+    def test_add_manual_entry_reports_an_existing_key_as_a_conflict(self, tmp_path: Path) -> None:
+        """A taken key is the caller's decision, and `ref import` already says so."""
         bib = _copy(tmp_path, "simple.bib")
+        original = bib.read_text()
 
         result = runner.invoke(
             app, ["ref", "add", "Smith2020", str(bib), "--field", "title=X", "--json"]
         )
 
-        assert result.exit_code == 1, result.output
-        assert json.loads(result.output)["error"] == "InvalidInput"
+        assert result.exit_code == 2, result.output
+        data = json.loads(result.output)
+        assert data["status"] == "conflict"
+        assert data["error"] == "CitationKeyConflict"
+        assert data["key"] == "Smith2020"
+        assert {option["id"] for option in data["options"]} == {"choose_key", "allow_duplicate"}
+        assert bib.read_text() == original
+
+    def test_add_manual_entry_honours_the_conflict_option_it_offers(self, tmp_path: Path) -> None:
+        bib = _copy(tmp_path, "simple.bib")
+
+        result = runner.invoke(
+            app,
+            [
+                "ref",
+                "add",
+                "Smith2020",
+                str(bib),
+                "--field",
+                "title=X",
+                "--allow-duplicate",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        # Duplicate citation keys are tolerated, not an error: the option the
+        # conflict offered does exactly what it says.
+        assert bib.read_text().count("@article{Smith2020,") == 2
 
     def test_add_manual_entry_rejects_bad_field_assignment(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")

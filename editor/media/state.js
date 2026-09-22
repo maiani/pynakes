@@ -63,6 +63,7 @@ window.PV = window.PV || {};
       findings: persisted.paneDock?.findings || "bottom",
       diff: persisted.paneDock?.diff || "bottom",
       compare: persisted.paneDock?.compare || "bottom",
+      duplicates: persisted.paneDock?.duplicates || "bottom",
     },
     panelCollapsed: Boolean(persisted.panelCollapsed),
     // Column widths in pixels, by column position. Empty means the stylesheet
@@ -75,6 +76,8 @@ window.PV = window.PV || {};
     diff: null,
     notice: null,
     visible: [],
+    /** Duplicate clusters: null before asking, "loading", a list, or {error}. */
+    duplicates: null,
     /** Last "Compare with remote" result or error, for the entry it was run on. */
     compare: null,
     /** Citation key currently awaiting a compare response, or null. */
@@ -120,6 +123,25 @@ window.PV = window.PV || {};
     };
     walk(PV.state.groups || []);
     return found;
+  };
+
+  /**
+   * Every group name in the tree, depth-first.
+   *
+   * Includes the groups only the entries mention: `buildGroupTree` keeps an
+   * undeclared group rather than dropping it, and an entry can legitimately be
+   * added to one.
+   */
+  PV.declaredGroupNames = () => {
+    const names = [];
+    const walk = (nodes) => {
+      for (const node of nodes) {
+        names.push(node.name);
+        walk(node.children || []);
+      }
+    };
+    walk(PV.state.groups || []);
+    return names;
   };
 
   /** Every key in a group and its descendants. */

@@ -3,8 +3,9 @@
 A graphical client for `.bib` files, built on the pynakes engine.
 
 > **Status: early, and not published.** It browses a bibliography, searches it,
-> shows its groups and validation findings, and can stage field edits for review
-> before writing. Nothing about its UI or settings is settled.
+> shows its groups, validation findings, citations and linked materials, and can
+> add, remove, group, merge and edit entries — each reviewed as a diff before
+> anything is written. Nothing about its UI or settings is settled.
 
 ## The one rule this client keeps
 
@@ -20,7 +21,14 @@ express, the fix goes into the engine, not into TypeScript here. That rule is
 recorded in [AGENTS.md](../AGENTS.md), and it has already been exercised — the
 engine gained a predicate-only `search` (`pynakes search "" --where 'doi
 missing'`) because the selector grammar had no read-only path, and the
-alternative would have been evaluating predicates in the client.
+alternative would have been evaluating predicates in the client. Reviewing one
+duplicate pair at a time added `dedupe merge --key`, because the alternative —
+deciding in TypeScript which entries to fold together — is the merge algorithm
+itself. Two envelope bugs surfaced the same way and were fixed in the engine:
+`ref remove --diff` emitted its warnings in the `diff` field and dropped them
+from `warnings`, and `ref add` reported a taken citation key as an exit-1
+error while `ref import` reported the identical situation as an exit-2
+conflict with options.
 
 `src/model.ts` is the only place that transforms engine output, and it only does
 display tidying: collapsing wrapped whitespace, rendering the `and` name
@@ -58,12 +66,12 @@ than leaving stale entries behind.
 
 **Edit, review, then commit.** Fields are editable in the detail pane, along with
 the entry type; fields can be added and removed. The panes are relocatable: Edit,
-Findings, the staged diff, and Compare each live in either the right dock or the
-bottom dock, moved by the arrow beside their tab, and stack as tabs when one dock
-holds more than one. Nothing is written when you
-type. Edits accumulate as pending changes, **Preview** shows the engine's exact
-unified diff, and committing asks for explicit confirmation with that diff on
-screen. Two properties matter:
+Findings, the staged diff, Compare, and Duplicates each live in either the right
+dock or the bottom dock, moved by the arrow beside their tab, and stack as tabs
+when one dock holds more than one. Nothing is written when you type. Edits
+accumulate as pending changes, **Preview** shows the engine's exact unified diff,
+and committing asks for explicit confirmation with that diff on screen. Two
+properties matter:
 
 - *The diff you approve is the diff that lands.* It is the engine's own diff from
   `ref edit --dry-run --diff`, never reconstructed here, and the commit reuses
@@ -95,6 +103,22 @@ the source file that makes them*, so an undefined citation appears where it was
 typed. Nothing is guessed locally: every occurrence's file, line, and column
 comes from `tex scan --json`.
 
+**Add, remove, group, merge.** The toolbar's **Import…** resolves a DOI, arXiv
+id, ISBN or supported URL into a new entry; **New entry** adds an empty one of a
+chosen type and selects it so the field editor can fill it in; **Duplicates**
+lists the clusters `dedupe check` finds, each with the merge that resolves it.
+An entry's detail pane removes it, and its **Groups** chips add and remove
+membership. Every one of these goes through the same path: the engine's own
+`--dry-run --diff` lands in the Staged diff pane, the approval dialog names what
+the diff cannot show — materials that would be deleted, a network request that
+was made — and approving re-runs the identical invocation without `--dry-run`.
+Nothing here is staged, because none of it is a field edit; what it shares with
+the field editor is that the diff you approve is the diff that lands.
+
+A conflict is the engine declining to guess rather than a failure. Importing a
+reference the library already holds asks whether to add it anyway and replays
+the answer; a citation key already taken says so and writes nothing.
+
 **Materials.** Entries whose linked files exist carry a `🗎` marker, and the
 detail pane lists them by kind — published PDF, preprint, source, supplement,
 erratum for a Pinax store, plus any BibLaTeX `file`-field link — with a missing
@@ -111,8 +135,9 @@ temporary mirror used for an unsaved buffer has neither. The cost is that an
 unsaved edit to a `file` field or to `tex-sources` is not reflected until you
 save.
 
-Not yet: adding and removing whole entries, group editing, and duplicate
-merging.
+Not yet: editing the group *hierarchy* itself — adding, renaming, moving or
+removing a group node — which is a different operation from an entry's
+membership of one. `groups add-group` and friends cover it at the CLI.
 
 ## Scope: this client is project-scoped
 
@@ -195,8 +220,9 @@ To make it the default for `.bib`:
 ```
 
 In the view: type to search, click a column header to sort, click a group to
-filter, click a material or a citation to open it, `↑`/`↓` to move between entries, `Enter` or a double-click to open the
-entry's declaration in the source text, `Ctrl`/`Cmd`+`F` to focus the search box.
+filter, click a material or a citation to open it, `↑`/`↓` to move between
+entries, `Enter` or a double-click to open the entry's declaration in the source
+text, `Ctrl`/`Cmd`+`F` to focus the search box.
 
 ## Developing
 
