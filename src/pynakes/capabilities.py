@@ -53,6 +53,8 @@ _ERROR_CODES = {
             "DuplicateMergeKey": "combine/split --dedupe: a shared key has differing content.",
             "DedupeConflict": "dedupe merge: a cluster has irreconcilable field values.",
             "DuplicateReference": "import: the provider identity is already present.",
+            "OnlineLookupRequired": "ref find: pass --online to allow the index query.",
+            "ProviderUnavailable": "ref find: the bibliographic index could not be reached.",
             "CitationKeyConflict": "ref add/import: the chosen citation key already exists.",
             "DuplicateCitationKey": "ref show/edit: the citation key identifies multiple entries.",
         },
@@ -347,8 +349,8 @@ def get_capabilities() -> dict:
             "init": "Create a new .bib library, optionally seeded with a metadata profile (--pinax for pinax mode)",
             "inspect": "Inspect a .bib file structure",
             "lint": "Validate entries and report issues",
-            "ref": "Create, show, edit, compare, import, and remove individual references "
-            "(add, show, edit, compare, import, remove)",
+            "ref": "Create, show, edit, compare, find, import, and remove individual "
+            "references (add, show, edit, compare, find, import, remove)",
             "groups": "Manage entry groups and group hierarchy "
             "(list, list-entries, add-entry, remove-entry, tree, add-group, "
             "remove-group, rename-group, move-group, update-group)",

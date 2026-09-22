@@ -524,6 +524,53 @@ fields as defaults; pressing Enter preserves each value. Interactive mode
 requires a terminal: supplying no change options under `--json` or headless
 stdin is an error rather than a prompt.
 
+## find
+
+Find the real records matching a reference written out in prose.
+
+```bash
+pynakes ref find "Shannon, A Mathematical Theory of Communication, Bell System Technical Journal, 1948" --online
+```
+
+```
+3 candidate(s) from crossref:
+ *1.   57.6  10.1002/j.1538-7305.1948.tb00917.x
+        A Mathematical Theory of Communication
+        C. E. Shannon · Bell System Technical Journal · 1948
+  2.   41.5  10.1002/j.1538-7305.1949.tb00928.x
+        Communication Theory of Secrecy Systems
+        C. E. Shannon · Bell System Technical Journal · 1949
+  Import one with: pynakes ref import <doi>
+```
+
+Every other way into a library starts from an identifier, which is a claim that
+can be checked: `ref import` either resolves it or does not. A reference written
+out as text carries no such claim, and this is how to ask whether one describes
+anything that exists. Read-only; import a candidate you accept by its DOI.
+
+`--online` is required, as it is for every command that reaches the network.
+`--limit` caps the candidates (5 by default), and `--cache-file` reuses answers
+across runs.
+
+A `*` marks a candidate that plainly matches — either its title occurs in the
+text you gave, or the index scored it far above the rest. When none does, the
+command says so:
+
+```
+  No candidate plainly matches the text; review before importing any.
+```
+
+That is the signal worth having when a reference arrives already written out
+rather than copied from a publisher page, which is the shape a conversational
+assistant produces — and produces just as fluently for a paper that was never
+written. Nothing in the text distinguishes the two; whether an index has ever
+heard of it does.
+
+The command stops at reporting, deliberately. An empty result means the index
+matched nothing, which is **evidence, not proof**: a genuinely obscure, very
+recent, or non-Crossref-deposited work also matches nothing. Turning that into
+a verdict would be a quality judgment the data does not support.
+
 ## import
 
 Import a reference by DOI, repository/preprint identifier, ISBN, or supported

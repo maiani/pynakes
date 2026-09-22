@@ -88,6 +88,54 @@ def fetch_doi_by_alternative_id(
     return None
 
 
+#: Fields a candidate needs to be judged against a written-out reference.
+#: Requesting only these keeps the response small and the ranking stable.
+_SEARCH_SELECT = "DOI,title,author,issued,container-title,type,score"
+
+
+def search_works(
+    query: str,
+    *,
+    rows: int = 5,
+    cache_file: str | Path | None = None,
+    urlopen: Callable[..., object] | None = None,
+) -> list[dict]:
+    """Return Crossref works matching a free-text bibliographic reference.
+
+    ``query.bibliographic`` is Crossref's own endpoint for a reference string
+    written out the way a person (or a language model) writes one — author,
+    title, venue, year, in any order and with anything missing. Its relevance
+    ``score`` is returned untouched: it is Crossref's judgement of how well the
+    record matches the text, and reinterpreting it here would invent a
+    confidence pynakes has no basis for.
+
+    An empty list means Crossref matched nothing, which is a fact about
+    Crossref's index rather than proof that the work does not exist.
+    """
+    text = query.strip()
+    if not text:
+        raise ValueError("Search text must not be empty")
+    url = (
+        f"{WORKS_QUERY_URL}?query.bibliographic={quote(text, safe='')}"
+        f"&rows={max(1, int(rows))}&select={_SEARCH_SELECT}"
+    )
+    data = fetch_json(
+        url,
+        namespace="crossref-search",
+        # The query is the cache key: the same text asked twice is the same
+        # question, and a rows count only truncates the same ranking.
+        identifier=text,
+        provider=PROVIDER_NAME,
+        cache_file=cache_file,
+        opener=urlopen,
+    )
+    if data is None:
+        return []
+    message = data.get("message")
+    items = message.get("items") if isinstance(message, dict) else None
+    return [item for item in items if isinstance(item, dict)] if isinstance(items, list) else []
+
+
 def fetch_work_by_doi(
     doi: str,
     *,

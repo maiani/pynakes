@@ -15,8 +15,8 @@ contract. For command-by-command tutorials, see the [usage guide](usage.md).
 ## Automation behavior
 
 - **Explicit network access.** Network use is limited to `ref import`, `asset
-  fetch`, `ref import --fetch`, `verify --online`, `enrich --online`, and
-  `ref compare --online`.
+  fetch`, `ref import --fetch`, `verify --online`, `enrich --online`,
+  `ref compare --online`, and `ref find --online`.
 - **Reviewable edits.** Ordinary modifying commands support `--dry-run` and
   `--diff`. The maintenance operation `asset check --fix` is the exception: it
   writes directly and can retain the prior manifest with `--backup`.
@@ -144,7 +144,14 @@ the all-or-nothing guarantee rather than an exception to it.
 - Use `ref add` for a fully local, manually supplied reference, or `ref.add`
   inside a `corpus batch` when it is one of several related changes.
 - Use `ref import` for network-backed DOI, repository, preprint, and
-  working-paper metadata resolution.
+  working-paper metadata resolution; give it several identifiers, or pipe them
+  with `-`, when a whole list has to resolve.
+- Use `ref find "<reference text>" --online` when a reference arrives written
+  out rather than as an identifier, and you need to know whether it describes
+  anything real before importing it. Read-only. It reports candidates with the
+  index's own relevance score and marks those that plainly match; it never
+  decides. Treat an empty result as evidence rather than proof — an obscure or
+  very recent work also matches nothing.
 - Use `format` for layout only and `normalize` for bibliographic conventions.
 - Use `keys rename` when a key change must also update TeX citations; use
   `keys generate` to apply the configured key pattern.

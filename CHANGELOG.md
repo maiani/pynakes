@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ref find "<reference text>" --online` resolves a reference written out in
+  prose — author, title, venue, year, in any order — to the records a
+  bibliographic index actually holds, and reports them with the index's own
+  relevance score. Read-only; a candidate is imported by its DOI.
+
+  Every other way into a library starts from an identifier, which is a claim
+  that can be checked: `ref import` either resolves it or does not, and
+  `verify --online` compares an entry against what the registrar holds. A
+  reference written out as text carries no such claim, and pynakes had no way
+  to ask whether one described anything real. That gap matters most where
+  references arrive already written out rather than copied from a publisher
+  page — the shape a conversational assistant produces, and produces just as
+  fluently for a paper that was never written.
+
+  The command marks candidates that plainly match (the title occurs in the
+  given text, or the index scored one far above the rest) and says so when none
+  does. It stops there on purpose: an empty result is evidence that the index
+  has nothing close, not proof the work is fictitious, since an obscure or very
+  recent reference also matches nothing. `pynakes.lookup` is the public API.
+
 - `ref import` accepts several identifiers in one call, and reads them from
   stdin with `-` (one per line, `#` comments and blank lines skipped). They
   resolve together and commit in one write, and each is reported separately:

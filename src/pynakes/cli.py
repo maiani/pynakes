@@ -20,6 +20,7 @@ from pynakes.cli_commands import (
     fetch,
     fields,
     files,
+    find,
     format,
     groups,
     import_ref,
@@ -101,6 +102,7 @@ import_ref.register(ref_app)
 show.register(ref_app)
 edit.register(ref_app)
 compare.register(ref_app)
+find.register(ref_app)
 remove.register(ref_app)
 
 # tex: linked TeX sources (add/list/remove/clear) + scan (formerly `used`)

@@ -34,6 +34,7 @@ src/pynakes/
   groups.py group_tree.py keys.py fields.py files.py lint.py
   authors.py journals.py normalize.py
   importer.py         resolve + import references by DOI / arXiv id or supported URL
+  lookup.py           resolve a written-out reference to records that exist
   integrity.py        verify / enrich / published (opt-in --online lookups)
   _integrity_*.py     integrity report types and the published-check half
   entry_types.py      container/eprint field naming per entry type + dialect
@@ -148,8 +149,8 @@ tests pass:
   round-trip fidelity.
 - Don't introduce time, randomness, or unstable ordering in core logic.
   Network access must remain explicit: `ref import`, `ref ... --fetch`,
-  `asset fetch`, or opt-in `--online` integrity operations. Everything else
-  stays offline and performs no hidden network I/O.
+  `asset fetch`, `ref find --online`, or opt-in `--online` integrity
+  operations. Everything else stays offline and performs no hidden network I/O.
 - Don't let a command emit a traceback — route failures through `_safe`.
 - Don't claim a feature is implemented when it is a stub. Keep `capabilities`,
   README, and docs honest; keep DEVPLAN forward-looking and put completed work
