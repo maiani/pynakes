@@ -7,157 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- `scrub` writes a public copy of a library with its private content removed —
-  the step before a `.bib` goes to arXiv, into a submission bundle, or into a
-  public repository. The input is read-only and `--out` names the copy (give it
-  the input path to scrub in place); `--check` reports and exits 1 instead of
-  writing, for a submission or CI gate.
-
-  A working library carries more than bibliographic record: reading state and
-  priorities, local filesystem paths, personal notes, the group tree that
-  organizes someone's own shelf, and the settings blocks the tooling keeps.
-  Preparing a release meant clearing fields one at a time and then deleting the
-  header blocks by hand, because no command removed a whole comment block —
-  `metadata remove` reaches one key at a time, and a hand-edited header is
-  exactly the place a private group name survives into a public file.
-
-  Three kinds of content go by default, each independently switchable: private
-  entry fields (bookkeeping, reading state, personal annotation, local paths,
-  and `groups`), every `jabref-meta`/`pynakes-meta` block, and free comments.
-  What counts as private stays the library's call — `--field` and `--keep-field`
-  adjust the set (globs allowed), `--keep-fields`/`--keep-comments`/
-  `--keep-metadata` spare a whole kind, and `scrub-fields`,
-  `scrub-keep-fields`, `scrub-comments`, and `scrub-metadata` metadata record a
-  policy once. Bibliographic content is never removed unasked: `abstract`,
-  `keywords`, and `note` stay unless named.
-
-  Removals are surgical, so everything kept is byte-for-byte identical and the
-  released copy is reviewable as a diff of its source. Chain it after `tex scan
-  --out` to release only the entries a manuscript cites. `pynakes.scrub` is the
-  public API, and `Bibliography.scrub()` stages it like any other operation.
-
-- `ref find "<reference text>" --online` resolves a reference written out in
-  prose — author, title, venue, year, in any order — to the records a
-  bibliographic index actually holds, and reports them with the index's own
-  relevance score. Read-only; a candidate is imported by its DOI.
-
-  Every other way into a library starts from an identifier, which is a claim
-  that can be checked: `ref import` either resolves it or does not, and
-  `verify --online` compares an entry against what the registrar holds. A
-  reference written out as text carries no such claim, and pynakes had no way
-  to ask whether one described anything real. That gap matters most where
-  references arrive already written out rather than copied from a publisher
-  page — the shape a conversational assistant produces, and produces just as
-  fluently for a paper that was never written.
-
-  The command marks candidates that plainly match (the title occurs in the
-  given text, or the index scored one far above the rest) and says so when none
-  does. It stops there on purpose: an empty result is evidence that the index
-  has nothing close, not proof the work is fictitious, since an obscure or very
-  recent reference also matches nothing. `pynakes.lookup` is the public API.
-
-- `ref import` accepts several identifiers in one call, and reads them from
-  stdin with `-` (one per line, `#` comments and blank lines skipped). They
-  resolve together and commit in one write, and each is reported separately:
-  one that does not resolve no longer stops the others. That is the point
-  rather than leniency — a reference list produced by a conversational
-  assistant routinely names a work that does not exist, and identifying which
-  one is the useful answer, where stopping at the first would hide the rest.
-  An identifier already in the library is reported as skipped rather than as a
-  conflict, since exit 2 is for a question only the caller can answer and the
-  remaining identifiers still have to resolve. With `--json`, `results` carries
-  a record per identifier. A single identifier keeps its previous behavior
-  exactly, envelope included. The library may now also be named with `--file`,
-  since the identifier argument is variadic; a trailing `.bib` positional still
-  works.
-
-- `corpus batch` gained the operations its vocabulary was missing: `fields.set`
-  — the one member of the `fields` family that could not be batched, while
-  `rename`, `move`, `append`, `clear` and `protect_title` all could —  plus
-  `ref.add`, `ref.edit`, `ref.remove` and `dedupe.merge`. A batch is the right
-  shape for a set of related changes because it is previewed as one diff and
-  approved as one decision, and it could not previously express "add these two,
-  drop that one, retag the rest" at all. `ref.import` stays out deliberately: it
-  reaches the network, so what it returns depends on when it was asked, and a
-  batch that cannot be replayed to the same result is not something one approval
-  can stand for. `ref.remove` in a batch leaves Pinax materials on disk, because
-  deleting them is a filesystem act that cannot join an in-memory commit.
-
-- `dedupe merge --key` merges only the duplicate clusters containing the named
-  citation keys, leaving every other cluster in the file untouched. Merging was
-  all-or-nothing, which is the wrong shape for the decision it encodes: judging
-  two records to be the same work is done one pair at a time, after looking at
-  them, and accepting every other merge in the file as the price of resolving
-  one is not a choice a reviewer should have to make. The selector is the same
-  comma-separated, repeatable `--key` the rest of the CLI takes. A key that
-  belongs to no cluster is an error rather than a silent no-op, since the caller
-  believed it named a duplicate.
-
-### Fixed
-
-- `_finish_create`, the shared file-creation envelope, always wrote UTF-8; the
-  in-place commit path has always written a library back in its own encoding.
-  It now accepts the encoding to write with, and `scrub` passes its source
-  library's, so a non-UTF-8 library's public copy is not silently transcoded.
-  The other creating commands (`init`, `corpus combine`, `corpus split`, `tex
-  scan --out`) keep their UTF-8 default; for a command with several inputs,
-  which encoding the output inherits is a decision that needs making rather
-  than assuming.
-
-- `ref remove` emitted its warnings in the `diff` field and dropped them from
-  `warnings`. It passed them into `_finish_mod`'s `diff_text` parameter
-  positionally, so `--diff` produced the warning list instead of a diff — and
-  when there were no warnings, produced nothing at all — while "citation key not
-  found; skipped" never reached the envelope any caller reads. Both halves of
-  the modifying-command contract were wrong for this one command. Everything
-  after `human` in `_finish_mod` is now keyword-only, so the mistake cannot
-  recur in the other twenty-nine callers.
-
-- `ref add` reported a citation key that already exists as an exit-1
-  `InvalidInput` error, while `ref import` reported the identical situation as
-  an exit-2 `CitationKeyConflict` with the options that resolve it. A taken key
-  is a decision for the caller — both choosing another key and appending anyway
-  are legitimate, and `ref add` has `--allow-duplicate` for the second — so it
-  is a conflict, not a malformed request. `ref add` now emits the same envelope
-  as its sibling, and a client can branch on the situation without knowing which
-  of the two commands produced it.
-
-- `asset fetch --source` failed on old single-file arXiv submissions with "not
-  a readable tar archive". arXiv's e-print endpoint serves a multi-file
-  submission as a gzipped tar, but a submission that was one file as that file
-  gzipped, with no tar around it — common among 1990s and early-2000s papers.
-  The source is now installed as that one file in `<citekey>.source/`, under the
-  name the gzip header records (`paper.tex`), or `main.tex` when the header
-  records no plain file name; a recorded path is reduced to its final
-  component, so it cannot place the file outside the source directory.
-
-  A truncated or damaged download also escaped as a bare `EOFError`, because
-  `tarfile` does not wrap it, so one bad source aborted the whole fetch run
-  instead of failing that entry. It is now an `ArxivFetchError`, reported
-  per entry like any other unreadable archive.
-
-- `ref import` of an old-style arXiv id (`<archive>/<YYMMNNN>`) failed with
-  "HTTP 406". arXiv's API front end now refuses any query string containing a slash,
-  and every old-style id has one. The import already had the route that avoids
-  it — the same work's DataCite DOI, `10.48550/arXiv.<id>`, added as a fallback
-  for a throttled arXiv — but that fallback had never run outside the tests.
-  It caught `ProviderFetchError`, while the default Atom fetcher reports failure
-  as `ArxivImportError`; the tests injected a fetcher that raised the former. It
-  now catches both, so old-style ids import through DataCite, and a throttled
-  arXiv falls back as documented.
-
-- `ref import` of a DOI for an article located by article number rather than a
-  page range, as a Physical Review article is, produced an entry with no `pages`.
-  DOI content negotiation renders Crossref's record as BibTeX, and that
-  rendering drops `article-number`; 0.6.2 taught `enrich --online` to recover
-  it from Crossref's structured record, but not `ref import`. An import whose
-  record names a volume and no page range now asks Crossref for the article
-  number too, under the same condition `enrich` uses. It is best effort: a
-  Crossref failure leaves the entry as the registrar described it rather than
-  failing the import.
-
 ### Editor
 
 #### Added
@@ -319,6 +168,159 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lingered for the session.
 - Closing one bibliography view no longer hides the status bar item while a
   sibling view is still active.
+
+## [0.6.4] - 2026-09-24
+
+### Added
+
+- `scrub` writes a public copy of a library with its private content removed —
+  the step before a `.bib` goes to arXiv, into a submission bundle, or into a
+  public repository. The input is read-only and `--out` names the copy (give it
+  the input path to scrub in place); `--check` reports and exits 1 instead of
+  writing, for a submission or CI gate.
+
+  A working library carries more than bibliographic record: reading state and
+  priorities, local filesystem paths, personal notes, the group tree that
+  organizes someone's own shelf, and the settings blocks the tooling keeps.
+  Preparing a release meant clearing fields one at a time and then deleting the
+  header blocks by hand, because no command removed a whole comment block —
+  `metadata remove` reaches one key at a time, and a hand-edited header is
+  exactly the place a private group name survives into a public file.
+
+  Three kinds of content go by default, each independently switchable: private
+  entry fields (bookkeeping, reading state, personal annotation, local paths,
+  and `groups`), every `jabref-meta`/`pynakes-meta` block, and free comments.
+  What counts as private stays the library's call — `--field` and `--keep-field`
+  adjust the set (globs allowed), `--keep-fields`/`--keep-comments`/
+  `--keep-metadata` spare a whole kind, and `scrub-fields`,
+  `scrub-keep-fields`, `scrub-comments`, and `scrub-metadata` metadata record a
+  policy once. Bibliographic content is never removed unasked: `abstract`,
+  `keywords`, and `note` stay unless named.
+
+  Removals are surgical, so everything kept is byte-for-byte identical and the
+  released copy is reviewable as a diff of its source. Chain it after `tex scan
+  --out` to release only the entries a manuscript cites. `pynakes.scrub` is the
+  public API, and `Bibliography.scrub()` stages it like any other operation.
+
+- `ref find "<reference text>" --online` resolves a reference written out in
+  prose — author, title, venue, year, in any order — to the records a
+  bibliographic index actually holds, and reports them with the index's own
+  relevance score. Read-only; a candidate is imported by its DOI.
+
+  Every other way into a library starts from an identifier, which is a claim
+  that can be checked: `ref import` either resolves it or does not, and
+  `verify --online` compares an entry against what the registrar holds. A
+  reference written out as text carries no such claim, and pynakes had no way
+  to ask whether one described anything real. That gap matters most where
+  references arrive already written out rather than copied from a publisher
+  page — the shape a conversational assistant produces, and produces just as
+  fluently for a paper that was never written.
+
+  The command marks candidates that plainly match (the title occurs in the
+  given text, or the index scored one far above the rest) and says so when none
+  does. It stops there on purpose: an empty result is evidence that the index
+  has nothing close, not proof the work is fictitious, since an obscure or very
+  recent reference also matches nothing. `pynakes.lookup` is the public API.
+
+- `ref import` accepts several identifiers in one call, and reads them from
+  stdin with `-` (one per line, `#` comments and blank lines skipped). They
+  resolve together and commit in one write, and each is reported separately:
+  one that does not resolve no longer stops the others. That is the point
+  rather than leniency — a reference list produced by a conversational
+  assistant routinely names a work that does not exist, and identifying which
+  one is the useful answer, where stopping at the first would hide the rest.
+  An identifier already in the library is reported as skipped rather than as a
+  conflict, since exit 2 is for a question only the caller can answer and the
+  remaining identifiers still have to resolve. With `--json`, `results` carries
+  a record per identifier. A single identifier keeps its previous behavior
+  exactly, envelope included. The library may now also be named with `--file`,
+  since the identifier argument is variadic; a trailing `.bib` positional still
+  works.
+
+- `corpus batch` gained the operations its vocabulary was missing: `fields.set`
+  — the one member of the `fields` family that could not be batched, while
+  `rename`, `move`, `append`, `clear` and `protect_title` all could —  plus
+  `ref.add`, `ref.edit`, `ref.remove` and `dedupe.merge`. A batch is the right
+  shape for a set of related changes because it is previewed as one diff and
+  approved as one decision, and it could not previously express "add these two,
+  drop that one, retag the rest" at all. `ref.import` stays out deliberately: it
+  reaches the network, so what it returns depends on when it was asked, and a
+  batch that cannot be replayed to the same result is not something one approval
+  can stand for. `ref.remove` in a batch leaves Pinax materials on disk, because
+  deleting them is a filesystem act that cannot join an in-memory commit.
+
+- `dedupe merge --key` merges only the duplicate clusters containing the named
+  citation keys, leaving every other cluster in the file untouched. Merging was
+  all-or-nothing, which is the wrong shape for the decision it encodes: judging
+  two records to be the same work is done one pair at a time, after looking at
+  them, and accepting every other merge in the file as the price of resolving
+  one is not a choice a reviewer should have to make. The selector is the same
+  comma-separated, repeatable `--key` the rest of the CLI takes. A key that
+  belongs to no cluster is an error rather than a silent no-op, since the caller
+  believed it named a duplicate.
+
+### Fixed
+
+- `_finish_create`, the shared file-creation envelope, always wrote UTF-8; the
+  in-place commit path has always written a library back in its own encoding.
+  It now accepts the encoding to write with, and `scrub` passes its source
+  library's, so a non-UTF-8 library's public copy is not silently transcoded.
+  The other creating commands (`init`, `corpus combine`, `corpus split`, `tex
+  scan --out`) keep their UTF-8 default; for a command with several inputs,
+  which encoding the output inherits is a decision that needs making rather
+  than assuming.
+
+- `ref remove` emitted its warnings in the `diff` field and dropped them from
+  `warnings`. It passed them into `_finish_mod`'s `diff_text` parameter
+  positionally, so `--diff` produced the warning list instead of a diff — and
+  when there were no warnings, produced nothing at all — while "citation key not
+  found; skipped" never reached the envelope any caller reads. Both halves of
+  the modifying-command contract were wrong for this one command. Everything
+  after `human` in `_finish_mod` is now keyword-only, so the mistake cannot
+  recur in the other twenty-nine callers.
+
+- `ref add` reported a citation key that already exists as an exit-1
+  `InvalidInput` error, while `ref import` reported the identical situation as
+  an exit-2 `CitationKeyConflict` with the options that resolve it. A taken key
+  is a decision for the caller — both choosing another key and appending anyway
+  are legitimate, and `ref add` has `--allow-duplicate` for the second — so it
+  is a conflict, not a malformed request. `ref add` now emits the same envelope
+  as its sibling, and a client can branch on the situation without knowing which
+  of the two commands produced it.
+
+- `asset fetch --source` failed on old single-file arXiv submissions with "not
+  a readable tar archive". arXiv's e-print endpoint serves a multi-file
+  submission as a gzipped tar, but a submission that was one file as that file
+  gzipped, with no tar around it — common among 1990s and early-2000s papers.
+  The source is now installed as that one file in `<citekey>.source/`, under the
+  name the gzip header records (`paper.tex`), or `main.tex` when the header
+  records no plain file name; a recorded path is reduced to its final
+  component, so it cannot place the file outside the source directory.
+
+  A truncated or damaged download also escaped as a bare `EOFError`, because
+  `tarfile` does not wrap it, so one bad source aborted the whole fetch run
+  instead of failing that entry. It is now an `ArxivFetchError`, reported
+  per entry like any other unreadable archive.
+
+- `ref import` of an old-style arXiv id (`<archive>/<YYMMNNN>`) failed with
+  "HTTP 406". arXiv's API front end now refuses any query string containing a slash,
+  and every old-style id has one. The import already had the route that avoids
+  it — the same work's DataCite DOI, `10.48550/arXiv.<id>`, added as a fallback
+  for a throttled arXiv — but that fallback had never run outside the tests.
+  It caught `ProviderFetchError`, while the default Atom fetcher reports failure
+  as `ArxivImportError`; the tests injected a fetcher that raised the former. It
+  now catches both, so old-style ids import through DataCite, and a throttled
+  arXiv falls back as documented.
+
+- `ref import` of a DOI for an article located by article number rather than a
+  page range, as a Physical Review article is, produced an entry with no `pages`.
+  DOI content negotiation renders Crossref's record as BibTeX, and that
+  rendering drops `article-number`; 0.6.2 taught `enrich --online` to recover
+  it from Crossref's structured record, but not `ref import`. An import whose
+  record names a volume and no page range now asks Crossref for the article
+  number too, under the same condition `enrich` uses. It is best effort: a
+  Crossref failure leaves the entry as the registrar described it rather than
+  failing the import.
 
 ## [0.6.3] - 2026-09-20
 
