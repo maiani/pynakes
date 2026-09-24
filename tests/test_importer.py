@@ -206,6 +206,74 @@ def test_prepare_imported_entry_allows_duplicate_when_requested() -> None:
     assert entry.fields["doi"] == "10.5555/provider"
 
 
+# What DOI content negotiation returns for an article located by number: the
+# BibTeX rendering of Crossref's record keeps the volume and drops the number.
+NUMBERED_ARTICLE_BIBTEX = """@article{provider-key,
+  author = {Jane Smith},
+  title = {A Numbered Article},
+  journal = {Journal of Tests},
+  volume = {12},
+  number = {3},
+  year = {2024},
+  doi = {10.5555/numbered}
+}
+"""
+
+
+def _no_crossref(doi: str) -> dict:
+    raise AssertionError(f"Crossref must not be contacted for {doi}")
+
+
+def test_doi_import_takes_the_article_number_from_crossref(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "pynakes.importer.fetch_bibtex_for_doi", lambda doi: NUMBERED_ARTICLE_BIBTEX
+    )
+    monkeypatch.setattr(
+        "pynakes.importer.fetch_crossref_work", lambda doi: {"article-number": "034501"}
+    )
+
+    entry = prepare_imported_entry(parse_bib(""), "10.5555/numbered")
+
+    assert entry.fields["pages"] == "034501"
+    assert entry.fields["volume"] == "12"
+
+
+def test_doi_import_keeps_the_record_when_crossref_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unreachable(doi: str) -> dict:
+        raise ProviderFetchError(f"Server returned HTTP 503 for {doi}")
+
+    monkeypatch.setattr(
+        "pynakes.importer.fetch_bibtex_for_doi", lambda doi: NUMBERED_ARTICLE_BIBTEX
+    )
+    monkeypatch.setattr("pynakes.importer.fetch_crossref_work", unreachable)
+
+    entry = prepare_imported_entry(parse_bib(""), "10.5555/numbered")
+
+    assert "pages" not in entry.fields
+    assert entry.fields["title"] == "A Numbered Article"
+
+
+@pytest.mark.parametrize(
+    ("bibtex", "fetcher_injected"),
+    [(NUMBERED_ARTICLE_BIBTEX, True), (PROVIDER_BIBTEX, False)],
+    ids=["injected-fetcher", "no-volume"],
+)
+def test_doi_import_asks_crossref_only_when_it_owns_the_fetch_and_lacks_pages(
+    monkeypatch: pytest.MonkeyPatch, bibtex: str, fetcher_injected: bool
+) -> None:
+    monkeypatch.setattr("pynakes.importer.fetch_bibtex_for_doi", lambda doi: bibtex)
+    monkeypatch.setattr("pynakes.importer.fetch_crossref_work", _no_crossref)
+
+    fetcher = (lambda doi: bibtex) if fetcher_injected else None
+    entry = prepare_imported_entry(parse_bib(""), "10.5555/numbered", fetcher=fetcher)
+
+    assert "pages" not in entry.fields
+
+
 def test_entry_from_bibtex_rejects_empty_and_invalid() -> None:
     with pytest.raises(DOIImportError, match="no BibTeX entries"):
         entry_from_bibtex("% just a comment\n")
@@ -472,6 +540,38 @@ def test_arxiv_import_falls_back_to_the_datacite_doi_when_arxiv_is_throttled() -
     assert entry.fields["eprint"] == "2301.00001"
     assert entry.fields["archivePrefix"] == "arXiv"
     assert entry.fields["doi"] == "10.48550/arXiv.2301.00001"
+
+
+OLD_STYLE_VIA_DATACITE = """@misc{https://doi.org/10.48550/arxiv.quant-ph/9807006,
+  doi = {10.48550/ARXIV.QUANT-PH/9807006},
+  url = {https://arxiv.org/abs/quant-ph/9807006},
+  author = {Lovelace, Ada},
+  keywords = {Quantum Physics (quant-ph), FOS: Physical sciences},
+  title = {On the Analytical Engine},
+  publisher = {arXiv},
+  year = {1998}
+}
+"""
+
+
+def test_arxiv_import_falls_back_when_the_default_fetcher_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The default Atom fetcher wraps transport failures as ArxivImportError, so
+    # a fallback guarded only by ProviderFetchError never ran outside tests that
+    # inject their own fetcher. arXiv's API front end answers every old-style
+    # id with HTTP 406, since the id puts a slash in the query string.
+    def refuse(identifier: str, timeout: float = 0) -> str:
+        raise ProviderFetchError(f"Server returned HTTP 406 for {identifier}")
+
+    monkeypatch.setattr("pynakes.providers.repositories.arxiv.fetch_atom", refuse)
+
+    entry = prepare_imported_arxiv(
+        parse_bib(""), "quant-ph/9807006", doi_fetcher=lambda doi: OLD_STYLE_VIA_DATACITE
+    )
+
+    assert entry.fields["eprint"] == "quant-ph/9807006"
+    assert entry.fields["title"] == "On the Analytical Engine"
 
 
 def test_arxiv_fallback_is_not_attempted_for_an_injected_fetcher_alone() -> None:

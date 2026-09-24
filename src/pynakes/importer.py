@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from dataclasses import replace
 
 from pynakes._identifiers import (
     canonical_doi,
@@ -326,6 +327,30 @@ def fetch_bibtex_for_doi(doi: str, timeout: float = DEFAULT_TIMEOUT) -> str:
         raise DOIImportError(str(exc)) from exc
 
 
+def fetch_crossref_work(doi: str) -> dict | None:
+    """Fetch Crossref's structured work record for ``doi``. Split out so tests can stub it."""
+    return crossref.fetch_work_by_doi(doi)
+
+
+def _with_crossref_locator(metadata: ReferenceMetadata, doi: str) -> ReferenceMetadata:
+    """Add the article number DOI BibTeX drops, from Crossref's structured record.
+
+    See :func:`~pynakes.providers.metadata.crossref.lacks_article_locator`. Best
+    effort: the import stands on the registrar's own BibTeX, so a Crossref
+    failure leaves the record as it came rather than failing the import.
+    """
+    if not crossref.lacks_article_locator(metadata.fields):
+        return metadata
+    try:
+        work = fetch_crossref_work(doi)
+    except ProviderFetchError:
+        return metadata
+    locator = crossref.article_locator(work) if work else ""
+    if not locator:
+        return metadata
+    return replace(metadata, fields={**metadata.fields, "pages": locator})
+
+
 def entry_from_bibtex(text: str) -> BibEntry:
     """Parse provider BibTeX and return the first entry."""
     try:
@@ -475,6 +500,8 @@ def prepare_imported_entry(
         if duplicate_keys:
             raise DuplicateDOIError(normalized, duplicate_keys)
 
+    # As for arXiv, a second route is only taken when pynakes does the fetching.
+    supplement = fetcher is None
     if fetcher is None:
         fetcher = fetch_bibtex_for_doi
     try:
@@ -483,6 +510,8 @@ def prepare_imported_entry(
         )
     except ProviderFetchError as exc:
         raise DOIImportError(str(exc)) from exc
+    if supplement:
+        metadata = _with_crossref_locator(metadata, normalized)
     entry = entry_from_metadata(metadata)
     provider_key = metadata.provider_key
 
@@ -555,7 +584,8 @@ def prepare_imported_arxiv(
         fetcher = fetch_arxiv_atom
     try:
         metadata = get_import_provider(ARXIV).load(normalized, dialect, fetcher)
-    except ProviderFetchError as exc:
+    except (ProviderFetchError, ArxivImportError) as exc:
+        # The default fetcher, fetch_arxiv_atom, reports failure as ArxivImportError.
         metadata = None
         if may_fall_back:
             metadata = _arxiv_metadata_via_doi(normalized, doi_fetcher, dialect)

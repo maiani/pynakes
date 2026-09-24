@@ -10,7 +10,7 @@ type) is not.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from urllib.parse import quote
 
@@ -225,6 +225,23 @@ def _date_from_work(work: dict) -> str:
     return ""
 
 
+def article_locator(work: Mapping) -> str:
+    """Return a work's page range, or its article number when it has none."""
+    return clean_text(work.get("page") or work.get("article-number"))
+
+
+def lacks_article_locator(fields: Mapping[str, str]) -> bool:
+    """Whether a record names a volume but neither a page range nor an article number.
+
+    DOI content negotiation renders Crossref metadata as BibTeX, and that
+    rendering drops ``article-number``: an article located by number rather
+    than by page range — APS, and most journals that publish continuously —
+    comes back with its volume and no ``pages``, while the structured work
+    record (:func:`fetch_work_by_doi`) still carries it.
+    """
+    return bool(fields.get("volume")) and not (fields.get("pages") or fields.get("eid"))
+
+
 def metadata_from_work(work: dict, identifier: str, dialect: str) -> ReferenceMetadata:
     """Convert a Crossref work record into normalized metadata."""
     titles = work.get("title")
@@ -239,7 +256,7 @@ def metadata_from_work(work: dict, identifier: str, dialect: str) -> ReferenceMe
         fields["volume"] = volume
     if issue := clean_text(work.get("issue")):
         fields["number"] = issue
-    if pages := clean_text(work.get("page") or work.get("article-number")):
+    if pages := article_locator(work):
         fields["pages"] = pages
 
     doi = clean_text(work.get("DOI")) or identifier

@@ -215,11 +215,7 @@ def _enrich_fetch_job(
             result.remote = fetch_doi_entry(normalized, cache_file=cache_file)
         except MetadataFetchError as exc:
             result.warnings.append({"type": "doi_unresolved", "key": key, "message": str(exc)})
-    if (
-        result.remote is not None
-        and result.remote.fields.get("volume")
-        and not (result.remote.fields.get("pages") or result.remote.fields.get("eid"))
-    ):
+    if result.remote is not None and crossref_provider.lacks_article_locator(result.remote.fields):
         try:
             work = crossref_provider.fetch_work_by_doi(normalized, cache_file=cache_file)
             if work:

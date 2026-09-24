@@ -138,6 +138,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of failing that entry. It is now an `ArxivFetchError`, reported
   per entry like any other unreadable archive.
 
+- `ref import` of an old-style arXiv id (`<archive>/<YYMMNNN>`) failed with
+  "HTTP 406". arXiv's API front end now refuses any query string containing a slash,
+  and every old-style id has one. The import already had the route that avoids
+  it — the same work's DataCite DOI, `10.48550/arXiv.<id>`, added as a fallback
+  for a throttled arXiv — but that fallback had never run outside the tests.
+  It caught `ProviderFetchError`, while the default Atom fetcher reports failure
+  as `ArxivImportError`; the tests injected a fetcher that raised the former. It
+  now catches both, so old-style ids import through DataCite, and a throttled
+  arXiv falls back as documented.
+
+- `ref import` of a DOI for an article located by article number rather than a
+  page range, as a Physical Review article is, produced an entry with no `pages`.
+  DOI content negotiation renders Crossref's record as BibTeX, and that
+  rendering drops `article-number`; 0.6.2 taught `enrich --online` to recover
+  it from Crossref's structured record, but not `ref import`. An import whose
+  record names a volume and no page range now asks Crossref for the article
+  number too, under the same condition `enrich` uses. It is best effort: a
+  Crossref failure leaves the entry as the registrar described it rather than
+  failing the import.
+
 ### Editor
 
 #### Added

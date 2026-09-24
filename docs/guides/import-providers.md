@@ -120,6 +120,16 @@ DOI content negotiation; repository-specific URLs select the repository
 client, which can retain repository identifiers and archive metadata in
 addition to the DOI.
 
+Two imports take a second route when the first comes back short. Content
+negotiation's BibTeX drops Crossref's `article-number`, so a DOI whose record
+names a volume but no page range also asks Crossref's structured record for the
+article number and stores it as `pages`, as `enrich --online` does. An arXiv id
+that arXiv's own API cannot answer — a throttled API, or an old-style
+`<archive>/<YYMMNNN>` id, which its front end refuses — is imported from the
+same work's DataCite DOI, `10.48550/arXiv.<id>`. Both apply only when pynakes
+does the fetching; a caller that injects its own fetcher keeps control of what
+is contacted.
+
 An ISBN may also be given bare when it cannot be confused with another record
 id: a hyphenated or spaced ISBN-10/ISBN-13, or a compact ISBN-13 with its
 `978`/`979` prefix. A compact ten-digit ISBN-10 needs the `ISBN:` prefix,
