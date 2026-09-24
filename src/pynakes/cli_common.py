@@ -442,6 +442,8 @@ def _finish_create(
     previous_content: str = "",
     backup: bool = False,
     warnings: list | None = None,
+    diff_label: str | None = None,
+    encoding: str = "utf-8",
     **details,
 ) -> None:
     """Write a new file and emit the standard creation-command result.
@@ -449,11 +451,16 @@ def _finish_create(
     File-creation commands (``combine``, ``split``, ``used``, ``init``) share
     this envelope: ``status, action, file, dry_run, written, warnings``, plus
     command-specific keys, and an optional ``diff`` when ``--diff`` is set.
+
+    ``diff_label`` names the file the diff describes, for a command whose
+    ``previous_content`` came from somewhere other than the output path
+    (``scrub`` diffs its source against the copy it writes). ``encoding``
+    carries a source library's own encoding into the file it derives.
     """
-    diff_text = generate_diff(previous_content, content, path) if params.diff else ""
+    diff_text = generate_diff(previous_content, content, diff_label or path) if params.diff else ""
     written = False
     if not params.dry_run:
-        result = save_text(content, path, backup=backup)
+        result = save_text(content, path, encoding=encoding, backup=backup)
         if not result.success:
             _emit_error(params.json_output, "IOError", result.error or f"Failed to write {path}")
         written = True

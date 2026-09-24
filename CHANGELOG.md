@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `scrub` writes a public copy of a library with its private content removed —
+  the step before a `.bib` goes to arXiv, into a submission bundle, or into a
+  public repository. The input is read-only and `--out` names the copy (give it
+  the input path to scrub in place); `--check` reports and exits 1 instead of
+  writing, for a submission or CI gate.
+
+  A working library carries more than bibliographic record: reading state and
+  priorities, local filesystem paths, personal notes, the group tree that
+  organizes someone's own shelf, and the settings blocks the tooling keeps.
+  Preparing a release meant clearing fields one at a time and then deleting the
+  header blocks by hand, because no command removed a whole comment block —
+  `metadata remove` reaches one key at a time, and a hand-edited header is
+  exactly the place a private group name survives into a public file.
+
+  Three kinds of content go by default, each independently switchable: private
+  entry fields (bookkeeping, reading state, personal annotation, local paths,
+  and `groups`), every `jabref-meta`/`pynakes-meta` block, and free comments.
+  What counts as private stays the library's call — `--field` and `--keep-field`
+  adjust the set (globs allowed), `--keep-fields`/`--keep-comments`/
+  `--keep-metadata` spare a whole kind, and `scrub-fields`,
+  `scrub-keep-fields`, `scrub-comments`, and `scrub-metadata` metadata record a
+  policy once. Bibliographic content is never removed unasked: `abstract`,
+  `keywords`, and `note` stay unless named.
+
+  Removals are surgical, so everything kept is byte-for-byte identical and the
+  released copy is reviewable as a diff of its source. Chain it after `tex scan
+  --out` to release only the entries a manuscript cites. `pynakes.scrub` is the
+  public API, and `Bibliography.scrub()` stages it like any other operation.
+
 - `ref find "<reference text>" --online` resolves a reference written out in
   prose — author, title, venue, year, in any order — to the records a
   bibliographic index actually holds, and reports them with the index's own
@@ -68,6 +97,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `_finish_create`, the shared file-creation envelope, always wrote UTF-8; the
+  in-place commit path has always written a library back in its own encoding.
+  It now accepts the encoding to write with, and `scrub` passes its source
+  library's, so a non-UTF-8 library's public copy is not silently transcoded.
+  The other creating commands (`init`, `corpus combine`, `corpus split`, `tex
+  scan --out`) keep their UTF-8 default; for a command with several inputs,
+  which encoding the output inherits is a decision that needs making rather
+  than assuming.
+
 - `ref remove` emitted its warnings in the `diff` field and dropped them from
   `warnings`. It passed them into `_finish_mod`'s `diff_text` parameter
   positionally, so `--diff` produced the warning list instead of a diff — and
@@ -85,6 +123,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is a conflict, not a malformed request. `ref add` now emits the same envelope
   as its sibling, and a client can branch on the situation without knowing which
   of the two commands produced it.
+
 
 ### Editor
 

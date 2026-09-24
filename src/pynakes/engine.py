@@ -26,8 +26,8 @@ from pynakes._engine_helpers import (
     SpanEdit,
     append_entry_text,
     apply_span_edits,
+    block_removal_span,
     compute_change_plan,
-    entry_removal_span,
     fingerprint,
     insert_metadata_comment,
     iter_changed_entries,
@@ -81,6 +81,9 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
     _appended_entries: list[BibEntry] = field(default_factory=list)
     _removed_entries: list[BibEntry] = field(default_factory=list)
     _consolidate_metadata: bool = False
+    #: Comment slots a scrub blanked, removed from the source with their
+    #: trailing gap so no empty block is left where they were.
+    _removed_comments: set[int] = field(default_factory=set)
     _pinax_renames: list[tuple[str, str]] = field(default_factory=list)
     _pinax_material_merges: list[tuple[str, str]] = field(default_factory=list)
     _format_layout: CanonicalLayout | None = None
@@ -248,6 +251,7 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
         self._pinax_renames.clear()
         self._pinax_material_merges.clear()
         self._consolidate_metadata = False
+        self._removed_comments.clear()
         self._format_layout = None
 
     def reset(self) -> None:
@@ -322,7 +326,9 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
         Metadata operations preserve physical comment slots: they replace a slot
         in place, blank it when removing the final key, or append a new slot.  The
         snapshot therefore lets rendering discover metadata changes without every
-        operation also maintaining a parallel text-replacement list.
+        operation also maintaining a parallel text-replacement list.  A slot a
+        scrub removed outright is deleted together with its trailing gap, so no
+        blank block is left behind where it stood.
         """
         edits: list[SpanEdit] = []
         insertions: list[str] = []
@@ -342,6 +348,8 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
                 if self._source_snapshot.complete:
                     raise RuntimeError("snapshotted comment has no pristine source span")
                 return None
+            if index in self._removed_comments:
+                span = block_removal_span(self._pristine_text, span)
             edits.append(SpanEdit(span, new))
         return edits, insertions
 
@@ -353,7 +361,7 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
                 if self._source_snapshot.complete:
                     raise RuntimeError("removed entry has no pristine source span")
                 return None
-            edits.append(SpanEdit(entry_removal_span(self._pristine_text, span), ""))
+            edits.append(SpanEdit(block_removal_span(self._pristine_text, span), ""))
         return edits
 
     def _render_text(self) -> str:

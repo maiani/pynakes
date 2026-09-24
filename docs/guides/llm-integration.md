@@ -153,6 +153,13 @@ the all-or-nothing guarantee rather than an exception to it.
   decides. Treat an empty result as evidence rather than proof — an obscure or
   very recent work also matches nothing.
 - Use `format` for layout only and `normalize` for bibliographic conventions.
+- Use `scrub` before a library leaves the author's machine — an arXiv upload, a
+  submission bundle, a public repository. It writes a copy (`--out`) without
+  private entry fields, metadata blocks, or free comments, and leaves the source
+  untouched; `--check` reports and exits `1` instead of writing. Chain it after
+  `tex scan --out` to release only the cited entries. Do not approximate it with
+  `fields clear`: that reaches the fields but not the group tree, the metadata
+  blocks, or the comments.
 - Use `keys rename` when a key change must also update TeX citations; use
   `keys generate` to apply the configured key pattern.
 - Before renaming a key, check its blast radius with
@@ -196,8 +203,9 @@ This choice belongs to the caller rather than to a pynakes operation.
 - `2`: conflict. Read and report `options`; do not retry by guessing.
 
 Gate commands may also use exit `1` for findings when `--strict` is enabled.
-`format --check` exits `1` when formatting is needed, but its JSON still has
-`status: "success"` and `modified: true`. A genuine failure has
+`format --check` exits `1` when formatting is needed, and `scrub --check` exits
+`1` when private content is present, but their JSON still has
+`status: "success"` (with `modified: true` and `clean: false` respectively). A genuine failure has
 `status: "error"` and an `error` code.
 
 Always evaluate both the process exit code and the JSON `status`.
@@ -281,10 +289,10 @@ from `capabilities.error_codes`.
 
 ### Commands that create files
 
-`init`, `corpus combine`, and `corpus split` create or project files rather
-than editing one existing library. Their envelopes therefore report fields
-such as `inputs`, `out`, `outputs`, `written`, `entries`, and `unrouted` instead
-of the ordinary single-file mutation fields. They retain the same
+`init`, `scrub`, `corpus combine`, and `corpus split` create or project files
+rather than editing one existing library. Their envelopes therefore report
+fields such as `inputs`, `out`, `outputs`, `written`, `entries`, `source`,
+`removed`, and `unrouted` instead of the ordinary single-file mutation fields. They retain the same
 `status`/exit-code rules and support `--dry-run`, `--diff`, and `--json`.
 
 For `corpus split`, inspect every output bucket and `unrouted`; warnings report

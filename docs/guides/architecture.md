@@ -268,6 +268,7 @@ against every process crash, operating-system failure, or storage failure.
 | journals.py | Exact title/ISSN mapping plus LTWA-style journal abbreviation/expansion. |
 | normalize.py | Policy orchestration over title, author, journal, DOI, and page-range operations. |
 | convert.py | Conservative BibTeX/BibLaTeX convention conversion. |
+| scrub.py | Private-content removal for a public release: the default private-field set, the library's own `scrub-*` policy, and the metadata/free-comment block classification. |
 | files.py | Parsing and resolution/validation of BibLaTeX linked-file descriptors. |
 | usage.py | LaTeX/AUX citation extraction, library-usage analysis, tagging, and subset projection. |
 | lint.py | Local structural/semantic findings such as missing required fields, malformed DOI, groups, and duplicate keys. BibLaTeX required-field rules cite the official CTAN BibLaTeX manual, section 2.1 entry types and aliases, as their source of truth. |

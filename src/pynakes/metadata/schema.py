@@ -27,6 +27,7 @@ MetadataCategory = Literal[
     "lint",
     "usage",
     "pinax",
+    "scrub",
     "unknown",
 ]
 
@@ -41,6 +42,7 @@ CATEGORY_FORMATTING: MetadataCategory = "formatting"
 CATEGORY_LINT: MetadataCategory = "lint"
 CATEGORY_USAGE: MetadataCategory = "usage"
 CATEGORY_PINAX: MetadataCategory = "pinax"
+CATEGORY_SCRUB: MetadataCategory = "scrub"
 CATEGORY_UNKNOWN: MetadataCategory = "unknown"
 
 # pynakes-owned metadata keys. These live in ``pynakes-meta`` by default because
@@ -76,6 +78,11 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     "lint-required-fields": CATEGORY_LINT,
     # Native group tree (hierarchy of StaticGroup nodes).
     "group-tree": CATEGORY_GROUPS,
+    # What `scrub` removes when preparing a public copy of this library.
+    "scrub-fields": CATEGORY_SCRUB,
+    "scrub-keep-fields": CATEGORY_SCRUB,
+    "scrub-comments": CATEGORY_SCRUB,
+    "scrub-metadata": CATEGORY_SCRUB,
 }
 
 PYNAKES_PREFIX_KEYS: dict[str, MetadataCategory] = {
@@ -159,7 +166,12 @@ def validate_metadata_value(key: str, value: str) -> None:
             )
         return
 
-    if normalized_key in {"format-trailing-comma", "format-blank-lines"}:
+    if normalized_key in {
+        "format-trailing-comma",
+        "format-blank-lines",
+        "scrub-comments",
+        "scrub-metadata",
+    }:
         if stripped.lower() not in {"true", "false", "yes", "no", "on", "off", "1", "0"}:
             raise ValueError(f"Invalid Boolean value for {normalized_key}: {stripped!r}")
         return

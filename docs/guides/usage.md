@@ -940,6 +940,65 @@ entry cited nowhere simply has no occurrences. This is the whole-library
 counterpart to [`keys usage`](#keys), which locates one key at a time
 without needing a `.bib` file at all.
 
+## scrub
+
+Write a public copy of a library with its private content removed — the step
+before a `.bib` goes to arXiv, into a submission bundle, or into a public
+repository. The input is read-only; `--out` names the copy (give it the input
+path to scrub in place).
+
+```bash
+pynakes scrub refs.bib --out arxiv/refs.bib
+pynakes scrub refs.bib --out arxiv/refs.bib --diff   # exactly what left
+```
+
+Three kinds of content are removed by default:
+
+| Kind | What goes |
+| --- | --- |
+| Private entry fields | `owner`, `timestamp`, `creationdate`, `modificationdate`, `__markedentry`, `annote`, `annotation`, `comment`, `review`, `priority`, `ranking`, `readstatus`, `relevance`, `printed`, `qualityassured`, `file`, `pdf`, `local-url`, `bdsk-file-*`, `groups` |
+| Metadata blocks | every `jabref-meta` and `pynakes-meta` comment: group tree, save configuration, selectors, `pinax-files-dir` |
+| Free comments | `@comment{...}` blocks and `%` lines that are not metadata |
+
+Bibliographic content is never removed unasked: `abstract`, `keywords`, and
+`note` stay unless you name them.
+
+What counts as private is the library's call:
+
+```bash
+# Add to the set (globs allowed), or spare something from it
+pynakes scrub refs.bib --out public.bib --field abstract --keep-field file
+
+# Keep a whole kind
+pynakes scrub refs.bib --out public.bib --keep-comments --keep-metadata
+pynakes scrub refs.bib --out public.bib --keep-fields   # blocks only
+```
+
+A library can record its own policy instead of repeating flags — see
+[`scrub-fields`, `scrub-keep-fields`, `scrub-comments`, and
+`scrub-metadata`](metadata-reference.md#pynakes-meta-keys):
+
+```bash
+pynakes metadata set refs.bib scrub-fields abstract,annote
+pynakes metadata set refs.bib scrub-keep-fields keywords
+```
+
+`--check` reports instead of writing and exits `1` when anything private is
+found, which is what a submission or CI check needs:
+
+```bash
+pynakes scrub arxiv/refs.bib --check
+```
+
+Everything not removed stays byte-for-byte identical, so the copy is reviewable
+as a diff of its source. To release only the entries a document actually cites,
+chain it after [`tex scan --out`](#tex-scan):
+
+```bash
+pynakes tex scan refs.bib paper.tex --out arxiv/refs.bib
+pynakes scrub arxiv/refs.bib --out arxiv/refs.bib
+```
+
 ## combine
 
 Union several `.bib` files into one. Inputs are read-only; the combined file is

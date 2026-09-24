@@ -67,6 +67,8 @@ with usage examples, see the [API overview](index.md).
 
 ::: pynakes.usage
 
+::: pynakes.scrub
+
 ## Set operations
 
 ::: pynakes.setops

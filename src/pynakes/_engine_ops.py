@@ -23,6 +23,7 @@ from pynakes import integrity as integrity_ops
 from pynakes import journals as journal_ops
 from pynakes import metadata as metadata_ops
 from pynakes import normalize as normalize_ops
+from pynakes import scrub as scrub_ops
 from pynakes._engine_helpers import (
     build_fetch_queue,
     metadata_fetch_policy,
@@ -300,6 +301,19 @@ class BibliographyOperations:
             self._rewrite_tex_for_renames(
                 report.renamed_keys, allow_missing_sources=force_key_renames
             )
+        return report
+
+    def scrub(self, options: scrub_ops.ScrubOptions | None = None) -> scrub_ops.ScrubReport:
+        """Stage removal of this library's private content and report what went.
+
+        Removes private entry fields, metadata blocks, and free comments per
+        ``options`` (see :mod:`pynakes.scrub`). Like every other operation this
+        only stages: :meth:`preview` renders the scrubbed text — which a release
+        copy writes elsewhere — and :meth:`commit` writes it back to the bound
+        file.
+        """
+        report = scrub_ops.scrub_library(self.lib, options)
+        self._removed_comments.update(report.removed_comment_indices)
         return report
 
     def convert(self, target: str) -> convert_ops.ConvertResult:

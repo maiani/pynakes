@@ -147,7 +147,7 @@ COMMAND_GROUPS: dict[str, list[str]] = {
     ],
     "Materials (pinax)": ["asset"],
     "Corpus (multiple files)": ["corpus"],
-    "Create": ["init"],
+    "Create": ["init", "scrub"],
 }
 
 
@@ -330,6 +330,7 @@ def get_capabilities() -> dict:
             "detect_used_citations",
             "remove_entries",
             "combine_libraries",
+            "scrub_private_content",
             "partition_library",
             "inspect_metadata",
             "update_metadata",
@@ -374,6 +375,9 @@ def get_capabilities() -> dict:
             "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "
             "formats (export/import CSL-JSON, RIS, MODS, EndNote, and export CSV)",
             "search": "Search entries by free text, phrases, or field-scoped terms",
+            "scrub": "Write a public copy with private content removed — private "
+            "entry fields, metadata blocks, and free comments (--check gates instead "
+            "of writing)",
             "asset": "Fetch and validate Pinax materials — arXiv PDF/source, "
             "open or institutionally entitled published/supplement PDF download, "
             "and linked-file checks (fetch, check)",

@@ -202,15 +202,18 @@ def append_entry_text(
     return original_text + line_ending + line_ending + entry_text + line_ending
 
 
-def entry_removal_span(pristine_text: str, span: SourceSpan) -> SourceSpan:
-    """Extend an entry span over its trailing inter-block whitespace.
+def block_removal_span(pristine_text: str, span: SourceSpan) -> SourceSpan:
+    """Extend a top-level block's span over its trailing inter-block whitespace.
 
-    Removing only the entry's own source span leaves the blank-line gap
+    Removing only the block's own source span leaves the blank-line gap
     that preceded it *and* the one that followed it back to back, doubling
     the separator. When another block follows, the span is extended over
     that trailing gap so exactly one blank-line separator remains (the one
-    that preceded the removed entry). At end of file there is no trailing
-    gap to fold away, so the entry text alone is returned unchanged.
+    that preceded the removed block). At end of file there is no trailing
+    gap to fold away, so the block text alone is returned unchanged.
+
+    Used for removed entries and for whole comment blocks a scrub drops, which
+    face the same doubled-separator problem.
     """
     end = span.end
     tail = end

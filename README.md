@@ -60,6 +60,8 @@ then:
   MODS, and EndNote; export CSV
 - **Track citation usage** — find cited, unused, and missing keys in `.tex` or
   `.aux` sources
+- **Scrub** — write a public copy without private fields, metadata blocks, or
+  comments, for an arXiv upload or a submission bundle
 - **Remove** entries with a single command
 
 All through the standardized lifecycle: load → stage → preview/diff → commit.
@@ -160,6 +162,10 @@ pynakes search mylib.bib "neural network" --json
 
 # Gate a build: fail if any .bib has errors
 pynakes lint mylib.bib chapters/*.bib --strict
+
+# Write a public copy for arXiv: no private fields, metadata blocks, or comments
+pynakes scrub mylib.bib --out arxiv/refs.bib --diff
+pynakes scrub arxiv/refs.bib --check   # exits 1 if anything private is left
 
 # Shell completion for cite keys (bash/zsh/fish)
 eval "$(pynakes --show-completion bash)"

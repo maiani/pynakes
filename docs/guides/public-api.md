@@ -39,7 +39,7 @@ covered by a backward-compatibility guarantee.
 | Bibliography operations | `pynakes.authors`, `pynakes.convert`, `pynakes.importer`, `pynakes.fields`, `pynakes.groups`, `pynakes.journals`, `pynakes.keys`, `pynakes.normalize` |
 | Whole-file formatting | `pynakes.canonical` |
 | Work-matching evidence | `pynakes.identity` |
-| Analysis and maintenance | `pynakes.dedupe`, `pynakes.files`, `pynakes.integrity`, `pynakes.lint`, `pynakes.metadata`, `pynakes.usage` |
+| Analysis and maintenance | `pynakes.dedupe`, `pynakes.files`, `pynakes.integrity`, `pynakes.lint`, `pynakes.metadata`, `pynakes.scrub`, `pynakes.usage` |
 | Selection and search | `pynakes.query`, `pynakes.search` |
 | Set operations (projections) | `pynakes.setops` |
 | Composition | `pynakes.batch` |

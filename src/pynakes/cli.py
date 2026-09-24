@@ -32,6 +32,7 @@ from pynakes.cli_commands import (
     metadata,
     normalize,
     remove,
+    scrub,
     search,
     setops,
     show,
@@ -95,6 +96,7 @@ format.register(app)
 convert.register(app)
 capabilities.register(app)
 search.register(app)
+scrub.register(app)
 
 # ref: per-entry lifecycle
 add.register(ref_app)

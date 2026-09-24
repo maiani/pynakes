@@ -78,6 +78,10 @@ to find the operation module that owns a key.
 | `lint-required-fields-<entrytype>` | lint | Extra fields required on one entry type | `lint` | — |
 | `tex-sources` | usage | List of TeX files or directories, relative to the `.bib` file | `keys`, `tex scan` | — |
 | `group-tree` | groups | Pipe-delimited group hierarchy; aliases JabRef's `grouping` (read native-first) — see [Grouping](#grouping) | `groups tree`/`add-group`/`remove-group`/`rename-group`/`move-group`/`update-group` | `grouping` / `groupsTree` / `groups:N...` |
+| `scrub-fields` | scrub | List of extra field names/globs `scrub` removes, on top of its default private set | `scrub` | — |
+| `scrub-keep-fields` | scrub | List of field names/globs `scrub` keeps despite that set (`*` keeps every field) | `scrub` | — |
+| `scrub-comments` | scrub | Boolean; default `true` — whether `scrub` removes free comment blocks | `scrub` | — |
+| `scrub-metadata` | scrub | Boolean; default `true` — whether `scrub` removes `jabref-meta`/`pynakes-meta` blocks | `scrub` | — |
 | `pinax-files-dir` | pinax | Path to the Pinax materials directory, relative to the `.bib` file | `fetch`, `files`, engine | — |
 | `pinax-fetch-policy` | pinax | Comma-separated list of: `preprint`, `published`, `source`, `supplement`, `bestpdf` (default `bestpdf`) | `fetch` | — |
 

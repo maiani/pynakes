@@ -44,6 +44,7 @@ src/pynakes/
   interchange/       CSL-JSON, RIS, MODS, EndNote, and CSV codecs
   cli_commands/       command callbacks grouped by concern
   usage.py            cited-entry detection/tagging and TeX citation-key rewrites
+  scrub.py            private-content removal for a public release copy
   capabilities.py     machine-readable capability description
   batch.py setops.py diff.py cli.py cli_common.py cli_discovery.py
 tests/                pytest suite, conformance fixtures, and opt-in agent eval
