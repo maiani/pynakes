@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import tarfile
+import zlib
 from io import BytesIO
 from pathlib import Path
 
@@ -199,6 +200,82 @@ def test_source_extraction_reports_pdf_only_deposit(tmp_path: Path) -> None:
 
     with pytest.raises(ArxivSourceUnavailableError, match="PDF-only submission"):
         extract_arxiv_source(b"%PDF-1.5\n...binary...", target)
+
+
+def test_source_extraction_writes_single_gzipped_file_under_recorded_name(tmp_path: Path) -> None:
+    # Old single-file submissions are served as one gzipped .tex, not a tar.
+    target = tmp_path / "source"
+    tex = b"\\input harvmac\n\\title{Invariante Variationsprobleme}\n" * 20
+
+    extract_arxiv_source(_gzip_bytes(tex, name=b"noether.tex"), target)
+
+    assert [p.name for p in target.iterdir()] == ["noether.tex"]
+    assert (target / "noether.tex").read_bytes() == tex
+
+
+@pytest.mark.parametrize(
+    ("recorded", "written"),
+    [
+        (None, "main.tex"),
+        (b"../../escape.tex", "escape.tex"),
+        (b"C:\\papers\\noether.tex", "noether.tex"),
+        (b"..", "main.tex"),
+        (b".hidden.tex", "main.tex"),
+        (b"two words.tex", "main.tex"),
+    ],
+)
+def test_single_file_source_keeps_only_a_plain_recorded_name(
+    tmp_path: Path, recorded: bytes | None, written: str
+) -> None:
+    target = tmp_path / "work" / "source"
+
+    extract_arxiv_source(_gzip_bytes(b"\\bye\n", name=recorded, extra=b"xx"), target)
+
+    assert [p.name for p in target.iterdir()] == [written]
+    assert not (tmp_path / "escape.tex").exists()
+    assert not (tmp_path / "work" / "escape.tex").exists()
+
+
+def test_download_arxiv_materials_installs_single_file_source(tmp_path: Path) -> None:
+    store = FileStore(root=tmp_path / "refs.files", bib_path=tmp_path / "refs.bib")
+
+    result = download_arxiv_materials(
+        store,
+        "Noether1918",
+        "2101.00001",
+        pdf=False,
+        source_fetcher=lambda arxiv_id: _gzip_bytes(b"\\bye\n", name=b"noether.tex"),
+    )
+
+    assert result.source_path == tmp_path / "refs.files" / "Noether1918.source"
+    assert result.source_unavailable is False
+    assert (result.source_path / "noether.tex").read_bytes() == b"\\bye\n"
+    manifest = json.loads((tmp_path / "refs.files" / ".pinax" / "manifest.json").read_text())
+    assert manifest["files"]["Noether1918"]["preprint_source"]["source"] == (
+        "https://arxiv.org/e-print/2101.00001"
+    )
+
+
+def test_source_extraction_reports_truncated_archive(tmp_path: Path) -> None:
+    # tarfile lets EOFError escape a cut-off gzip stream; it must surface as a
+    # per-entry ArxivFetchError rather than abort the whole fetch run.
+    archive = _tar_bytes({"paper.tex": bytes(range(256)) * 400})
+
+    with pytest.raises(ArxivFetchError, match="truncated or corrupt"):
+        extract_arxiv_source(archive[: len(archive) // 2], tmp_path / "source")
+
+
+def test_source_extraction_reports_corrupt_single_file(tmp_path: Path) -> None:
+    data = bytearray(_gzip_bytes(b"\\bye\n" * 200, name=b"noether.tex"))
+    data[-8] ^= 0xFF  # break the CRC in the gzip trailer
+
+    with pytest.raises(ArxivFetchError, match="not a readable gzip file"):
+        extract_arxiv_source(bytes(data), tmp_path / "source")
+
+
+def test_source_extraction_rejects_bytes_that_are_neither_tar_nor_gzip(tmp_path: Path) -> None:
+    with pytest.raises(ArxivFetchError, match="not a readable tar archive"):
+        extract_arxiv_source(b"<html>Service unavailable</html>", tmp_path / "source")
 
 
 def test_download_arxiv_materials_pdf_only_source_keeps_pdf(tmp_path: Path) -> None:
@@ -625,6 +702,20 @@ def _tar_bytes(files: dict[str, bytes], *, symlinks: dict[str, str] | None = Non
             info.linkname = target
             archive.addfile(info)
     return buffer.getvalue()
+
+
+def _gzip_bytes(payload: bytes, *, name: bytes | None, extra: bytes = b"") -> bytes:
+    """Build a gzip member by hand so the header can record any name (RFC 1952)."""
+    flags = (0x04 if extra else 0) | (0x08 if name is not None else 0)
+    header = b"\x1f\x8b\x08" + bytes([flags]) + b"\0\0\0\0\x00\x03"
+    if extra:
+        header += len(extra).to_bytes(2, "little") + extra
+    if name is not None:
+        header += name + b"\0"
+    compressor = zlib.compressobj(9, zlib.DEFLATED, -15)
+    body = compressor.compress(payload) + compressor.flush()
+    trailer = zlib.crc32(payload).to_bytes(4, "little") + len(payload).to_bytes(4, "little")
+    return header + body + trailer
 
 
 # --- human-readable fetch report wording ------------------------------------

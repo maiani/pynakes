@@ -7,9 +7,12 @@ deterministic. The CLI layer decides when online fetching is allowed.
 
 from __future__ import annotations
 
+import gzip
+import re
 import shutil
 import tarfile
 import tempfile
+import zlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from io import BytesIO
@@ -30,6 +33,12 @@ FetchArxivBytes = Callable[[str], bytes]
 FetchPublishedPdfUrl = Callable[[str], str | None]
 UrlPdfValidator = Callable[[str], bool]
 FetchAccess = Literal["open", "institutional"]
+
+_GZIP_MAGIC = b"\x1f\x8b"
+_GZIP_FEXTRA = 0x04
+_GZIP_FNAME = 0x08
+_PLAIN_FILE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*")
+_SINGLE_FILE_FALLBACK = "main.tex"
 
 
 class ArxivFetchError(Exception):
@@ -588,7 +597,13 @@ def _access_error_reason(exc: Exception) -> str | None:
 
 
 def extract_arxiv_source(data: bytes, target_dir: str | Path) -> Path:
-    """Safely extract an arXiv source tar archive into ``target_dir``.
+    """Safely extract an arXiv source bundle into ``target_dir``.
+
+    The e-print endpoint serves a multi-file submission as a gzipped tar, and an
+    old single-file submission as that one file gzipped, with no tar around it.
+    A tar is extracted member by member; a single file is written under the name
+    its gzip header records, or ``main.tex`` when the header records no plain
+    file name.
 
     Raises :class:`ArxivSourceUnavailableError` when the e-print endpoint
     returned a PDF instead of a source bundle (a PDF-only submission has no
@@ -604,7 +619,14 @@ def extract_arxiv_source(data: bytes, target_dir: str | Path) -> Path:
     target.mkdir(parents=True, exist_ok=True)
     root = target.resolve(strict=False)
     try:
-        with tarfile.open(fileobj=BytesIO(data), mode="r:*") as archive:
+        try:
+            archive = tarfile.open(fileobj=BytesIO(data), mode="r:*")
+        except tarfile.ReadError:
+            if not data.startswith(_GZIP_MAGIC):
+                raise
+            _write_single_file_source(data, root)
+            return target
+        with archive:
             members = archive.getmembers()
             for member in members:
                 _validate_tar_member(member, root)
@@ -612,7 +634,36 @@ def extract_arxiv_source(data: bytes, target_dir: str | Path) -> Path:
                 _extract_validated_member(archive, member, root)
     except tarfile.TarError as exc:
         raise ArxivFetchError("arXiv source archive is not a readable tar archive") from exc
+    except (EOFError, zlib.error) as exc:
+        # tarfile lets these escape from a truncated or damaged gzip stream.
+        raise ArxivFetchError("arXiv source archive is truncated or corrupt") from exc
     return target
+
+
+def _write_single_file_source(data: bytes, root: Path) -> None:
+    try:
+        payload = gzip.decompress(data)
+    except (OSError, EOFError, zlib.error) as exc:
+        raise ArxivFetchError("arXiv source file is not a readable gzip file") from exc
+    (root / _gzip_member_name(data)).write_bytes(payload)
+
+
+def _gzip_member_name(data: bytes) -> str:
+    """Return the file name an already-validated gzip header records (RFC 1952).
+
+    Only the final path component is kept, and only when it is a plain name,
+    so a recorded name can never place the file outside the source directory;
+    otherwise the file is ``main.tex``.
+    """
+    flags = data[3]
+    if not flags & _GZIP_FNAME:
+        return _SINGLE_FILE_FALLBACK
+    start = 10
+    if flags & _GZIP_FEXTRA:
+        start += 2 + int.from_bytes(data[10:12], "little")
+    recorded = data[start : data.index(b"\0", start)].decode("latin-1")
+    name = re.split(r"[\\/]", recorded)[-1]
+    return name if _PLAIN_FILE_NAME.fullmatch(name) else _SINGLE_FILE_FALLBACK
 
 
 def _normalize_or_raise(identifier: str) -> str:

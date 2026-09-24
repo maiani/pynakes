@@ -321,7 +321,9 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
 - **Atomic writes.** A download lands in a temporary name inside `pinax-files-dir` and
   is atomically renamed into place; a partial download never leaves a half-file
   under a citation key. Source tarballs extract safely (no path traversal, no
-  symlinks) into `<citekey>.source/`.
+  symlinks) into `<citekey>.source/`. An old single-file submission, which
+  arXiv serves as one gzipped file rather than a tarball, lands there as that
+  file, under the name its gzip header records (`main.tex` when it records none).
 - **Bytes only, never extraction.** `asset fetch` retrieves and stores files. It does
   **not** parse PDF content — that is [deferred](#deliberately-deferred).
 - **Graceful gaps.** `asset fetch` stores only what exists and never errors on a gap.

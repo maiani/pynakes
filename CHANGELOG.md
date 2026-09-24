@@ -124,6 +124,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as its sibling, and a client can branch on the situation without knowing which
   of the two commands produced it.
 
+- `asset fetch --source` failed on old single-file arXiv submissions with "not
+  a readable tar archive". arXiv's e-print endpoint serves a multi-file
+  submission as a gzipped tar, but a submission that was one file as that file
+  gzipped, with no tar around it — common among 1990s and early-2000s papers.
+  The source is now installed as that one file in `<citekey>.source/`, under the
+  name the gzip header records (`paper.tex`), or `main.tex` when the header
+  records no plain file name; a recorded path is reduced to its final
+  component, so it cannot place the file outside the source directory.
+
+  A truncated or damaged download also escaped as a bare `EOFError`, because
+  `tarfile` does not wrap it, so one bad source aborted the whole fetch run
+  instead of failing that entry. It is now an `ArxivFetchError`, reported
+  per entry like any other unreadable archive.
 
 ### Editor
 
