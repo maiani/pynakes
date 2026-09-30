@@ -12,69 +12,340 @@ Completed work is recorded in [CHANGELOG.md](CHANGELOG.md) and the git log.
 
 ## Road to 1.0
 
-### v0.7 — Project-scoped editor
+### v0.7 — CLI beta, editor alpha
 
-The first graphical client, and the milestone that turns the JSON envelope from
-a documented contract into a load-bearing one by giving it a consumer that is
-not a human at a terminal. Scope is a bibliography belonging to a document or
-repository being edited; library-scoped exploration is neither this milestone
-nor this client. See
-[Graphical clients and their scope](docs/vision.md#graphical-clients-and-their-scope).
+v0.7.0 moves the **CLI** to beta: its command syntax, options, JSON envelope,
+exit codes, and error codes become a contract that changes only through a
+documented deprecation. The **VS Code editor** ships alongside it as an
+**alpha** pre-release — usable, with no compatibility promise of its own, and a
+consumer of nothing but the beta envelope. The Python API keeps its current
+status — the intended public surface in
+[docs/guides/public-api.md](docs/guides/public-api.md), with breaking changes
+documented but not deprecated — until 1.0 pins it.
 
-- **The extension** — a VS Code / Open VSX client in `editor/`, distributed as a
-  `.vsix`. It browses one bibliography as an entry table, shows the declared
-  group hierarchy, runs the engine's search, surfaces lint findings as in-view
-  markers and native diagnostics, and stages field edits for review as an exact
-  diff before commit, alongside citation navigation, linked-material state, and
-  entry-level mutation. The two items below are what remains before it earns the
-  milestone; surfacing the single-bibliography analysis reports waits on v0.8.
-- **Group *hierarchy* editing** — the entry table can now put an entry into a
-  group and take it out again, but the tree itself is still read-only in the
-  view: a group node cannot be added, renamed, moved, or removed there. No
-  engine gap — `groups add-group`, `rename-group`, `move-group`,
-  `remove-group`, and `update-group` all exist with `--dry-run --diff` — so this
-  is the sidebar growing the same preview-and-approve path the entry actions
-  already use. Ranked last of the remaining work because membership, not
-  hierarchy, is what a project bibliography changes week to week.
-- **`asset fetch` from the view** — an entry's missing material is marked, but
-  fetching it still means a terminal. The command exists and is explicitly
-  network-gated; the view needs to offer it under the same
-  `pynakes.allowOnlineLookups` switch that now covers compare and import.
-- **Distribution without a pynakes install** — the extension bundles the engine,
-  so it needs a Python 3.11+ interpreter but no `pip install`. Every runtime
-  dependency is a pure-Python wheel, so one universal build covers every
-  platform with no per-platform build matrix and nothing to code-sign. An engine
-  the user installed themselves is preferred when strictly newer than the
-  bundled copy, so upgrading pynakes does not wait on an extension release.
-- **Thin-client discipline** — no BibTeX parser, metadata schema, or source of
-  truth in the client. When the view needs something the engine does not expose,
-  the engine grows it; a workaround in TypeScript is a regression even when it
-  works. This is the constraint the milestone exists to test, and every gap it
-  surfaces is engine work.
-- **Concurrent development** — until the library-scoped client starts, the CLI
-  and the extension evolve together in this repository, so an engine gap and its
-  client consumer can land in one reviewable change. A second client is what
-  would justify splitting them apart.
-- **Mirrored-bibliography rename propagation** — pynakes treats every `.bib` in
-  isolation, but a common layout keeps a superset bibliography (e.g.
-  `bibliography/`) and a working subset copy (e.g. `manuscript/`) that must
-  track it; renaming a key in the superset has no way to propagate to the
-  mirror today. Needs a declared mirror relationship (naming still open —
-  avoid overloading "corpus") and a propagation step for `keys rename` (and any
-  other key-changing operation) once that relationship exists.
+The plan below comes from a pre-beta audit (2026-09-30) of CLI consistency,
+error paths, documentation, security, data integrity, platforms and packaging,
+and dead code. The work runs as seven stages in order, each closed by a gate.
+Stage 1 ships as a 0.6.x patch because it affects current users; every later
+stage lands in 0.7.0.
 
-Shipped so far: project-scoped browsing, search, lint as in-view markers and
-native diagnostics, the group hierarchy, staged field edits with
-diff-and-approve, citation navigation in both directions over the engine's
-citation index, linked-material state with a click that opens the material, and
-entry-level mutation — import by identifier, add, remove, group membership, and
-per-cluster duplicate merging — each previewed as the engine's own diff and
-approved before anything is written.
+#### The beta promise
 
-**Done when**: the two items above are covered as well; the extension is
-published as a `.vsix`; every gap it surfaced was closed in the engine rather
-than worked around in the client; its checks run in CI; CHANGELOG updated;
+What 0.7.0 commits to, and what every gate below tests for:
+
+- **A frozen surface, with deprecation.** From 0.7.0, removing or renaming a
+  command, option, envelope key, `action` value, exit-code meaning, or error
+  code takes one minor release in which the old form still works and emits a
+  structured warning (`{"type": "deprecated", "old": ..., "new": ...}`) before
+  it is removed. Additions may ship in any minor release; patches fix bugs only.
+- **No known data-loss bugs.** No command silently changes bytes outside the
+  entries it edits, writes an unparseable file, reports a failed write as a
+  success, or leaves a multi-file operation half-applied.
+- **No tracebacks.** Every failure is a JSON error carrying a catalogued code.
+- **Tested where advertised.** Every operating system and Python version the
+  package metadata claims runs the suite in CI, as do the declared dependency
+  floors.
+- **Docs describe the real surface**, with a command reference generated from
+  the live CLI.
+
+#### Stage 1 — Stop-ship fixes → 0.6.5
+
+The fixes are recorded in CHANGELOG under 0.6.5, each with a regression test
+that fails without it, and the shipped pre-commit hooks are now run by the test
+suite. What remains is the release itself:
+
+- Push the `v0.6.4` tag, which never reached the remote (PyPI stops at 0.6.3),
+  or retire it in favor of 0.6.5; decide the same for `v0.6.2`.
+- Tag and publish 0.6.5.
+
+**Gate 1**: 0.6.5 is on PyPI.
+
+#### Stage 2 — CI, release pipeline, platforms
+
+Done second, so every later stage is tested everywhere the beta claims to run.
+
+- **CI matrix**: Ubuntu, Windows, and macOS; Python 3.11–3.14, plus 3.15 as an
+  allowed-to-fail pre-release. Add a job that resolves the lowest declared
+  direct-dependency versions. Add the 3.14 classifier.
+- **Release workflow** (`release.yml`): run the tests against the built wheel
+  before publishing; verify the tag is on `main` and that CHANGELOG has a
+  section for the version; publish to PyPI before creating the GitHub release;
+  pin actions by commit SHA; add dependabot for actions and pip.
+- **Windows correctness**, found by reading and to be confirmed by the new
+  matrix: `init` writes without `encoding`/`newline`; `os.replace` fails while
+  JabRef, an editor, or antivirus holds the file open (retry briefly).
+- **Typing**: add mypy or pyright to CI at a recorded baseline, or drop the
+  `Typing :: Typed` classifier the package claims through `py.typed`.
+- **Dev dependencies**: declare `pyyaml` (imported by `test_gate_checks`),
+  bound `ruff` to a range, and bound `mkdocs<2`.
+- **Repository**: `SECURITY.md` with a reporting address, issue and PR
+  templates, CODEOWNERS.
+
+**Gate 2**: the full matrix is green, the lowest-dependency job included; a
+release dry run (TestPyPI or a pre-release tag) passes every new check.
+
+#### Stage 3 — Cleanup before the freeze
+
+Shrink the surface before promising it: deleting a public name costs nothing
+now and a deprecation cycle later.
+
+- **Delete** (no callers): `group_tree.add_to_group_tree` and
+  `remove_from_group_tree` (byte-identical to `groups.add_to_group` and
+  `remove_from_group`); `cli_commands.groups._tree_mod`;
+  `canonical._align_width`; `filestore.write_erratum_pdf`;
+  `acl_anthology.DOI_PREFIX`; the unused `child_type` parameter of
+  `inheritance._crossref_fields`; the `interchange.FORMATS` and
+  `metadata.library_database_type` back-compat aliases; and
+  `importer.IDENTIFIER_KINDS`, `arxiv_entry`, and `fetch_arxiv_record` (a
+  public module, so each removal gets a CHANGELOG line).
+- **Remove or fold test-only helpers** into what they wrap:
+  `keys.has_duplicate_keys`, `keys.duplicate_key_counts`,
+  `importer.extract_doi_from_journal_url`, `importer.entry_from_bibtex`,
+  `group_tree.resolve_effective_groups`, `filestore.set_preprint_canonical`,
+  `provider_cache.stats`.
+- **Decide the `Bibliography` methods the CLI never calls**: `expand_journals`
+  (no caller, no test), `import_doi` (superseded by `import_reference`, though
+  the API docs say it remains), `journals_check`, `abbreviate_journals`,
+  `rename_citekey`. Keep `from_bibfile`, which is documented, and give it a
+  test.
+- **Consolidate duplicates** into one home each: the arXiv DOI prefix (four
+  copies), an entry's arXiv id (two), title similarity (two), case-insensitive
+  field lookup (four), the `journal`/`journaltitle` container getter (five),
+  the two TeX file walkers in `usage`, the duplicated group helpers and
+  delimiters, and the thirteen read-only commands that call `json.dumps`
+  instead of the shared emitter.
+- **Rename leftover modules**: `cli_commands/used.py` implements `tex scan`;
+  `cli_commands/files.py` implements `asset check`.
+- **Split before the 1000-line cap**: move the Pinax manifest code out of
+  `filestore` (953 lines) and the arXiv section out of `importer`; find seams
+  for `canonical` (985), `lint` (942), and `metadata/jabref` (888).
+- **Fix a stale docstring**: `keys usage` still refers to a removed `used scan`.
+
+**Gate 3**: no module over 800 lines; vulture at 80% confidence reports only
+reviewed false positives; the suite and the coverage floor hold.
+
+#### Stage 4 — Freeze the surface
+
+The one deliberate batch of breaking CLI changes, so the promise starts from a
+consistent surface. Where an old form can be recognized unambiguously, it keeps
+working through 0.7.x with a `deprecated` warning and is removed in 0.8.0; where
+a flag's meaning changes, the old use fails with an error naming the
+replacement.
+
+- **One positional convention.** There are six today: library first (about 30
+  commands); operand first (`ref show/edit/compare/add`, `asset fetch`,
+  `search`); either order (`keys generate`); library only through `--file`
+  (`ref import`, `tex list/add/remove/clear`); sources as a required `--path`
+  option (`keys usage`); and several files (`lint`, `verify`, `dedupe check`,
+  `keys check`, `asset check`, `corpus combine/split`). Adopt library first,
+  plus a `--file` option on every single-library command. Stop choosing the
+  library slot by `Path.is_file()` — `tex scan paper.tex` parses the `.tex` as
+  the library — and reject a `.bib`-looking token in the wrong slot with an
+  error that says so.
+- **One meaning per flag.** `-f` is `--field` in `ref add/edit` but `--file` in
+  `ref import` and `tex`. Rename the outliers of `--to` (`convert` format vs
+  `corpus split` routing rule), `--from` (`convert` format vs `init` profile),
+  `--type` (`init` dialect vs entry type), `--keys` (`normalize` mode vs
+  `ref show` selection), `--field` (four meanings), `--force` (overwrite vs
+  ignore missing TeX), and `--published` (three meanings).
+- **One flag per concept**: `--abstract` and `--show-abstract`; `--title-field`
+  and `--field`; TeX sources given as positionals, `PATHS`, `--path`, or
+  `--tex/--aux`; `--out`, `--stdout`, and `--to` for output; `--strict` and
+  `--check` for gating; `--bestpdf`; `--keep-field` beside `--keep-fields`.
+- **Enumerated options become `click.Choice`**, so help and `capabilities` list
+  their values: `normalize` (ten options), `init --type`, `--key-source`,
+  `--namespace`, `lint --category`, `--context`.
+- **Envelope.**
+  - `action` is the command path joined by `_` (`ref_edit`, `tex_scan`,
+    `asset_check`), replacing four naming schemes that include the legacy
+    `used` and `files_check`; check modes report `check: true` rather than a
+    separate `format-check` action.
+  - `warnings` is always a list of objects: the `lint`/`verify` counts move to
+    `summary`, and `info`/`infos` settle on one spelling.
+  - `file` is always the input and written paths go in `out`/`outputs`;
+    `scrub` and `corpus combine` currently put the output in `file`.
+  - `convert` gains the modifying-command keys and honors `--diff`;
+    `capabilities` gains `status` and `action`; `tex scan --group/--keyword`
+    returns a `plan`.
+  - Every envelope reports the fingerprint of the file it read, and modifying
+    commands accept it back as a precondition (working name `--expect-sha256`),
+    so a caller's preview → approve → commit cannot overwrite an edit made in
+    between.
+- **Exit codes and errors.**
+  - Usage errors exit 1 in both output modes; outside `--json` they currently
+    exit 2, Click's default and pynakes's conflict code. Human-mode errors go to
+    stderr.
+  - Conflicts are classified consistently: an existing group and an existing
+    key are both conflicts (exit 2), and a missing group is `KeyNotFound`
+    everywhere.
+  - One central error-code enum. Catalogue the nine codes emitted but not
+    listed, reclassify `OnlineLookupRequired` and `ProviderUnavailable`
+    (catalogued as conflicts, emitted with exit 1), merge `NoTeXSources` into
+    `NoSources`, and stop emitting Python class names such as
+    `FileNotFoundError`.
+- **Overwrite policy**: an existing output file requires `--force` everywhere,
+  as `init` already does — `convert --out`, `tex scan --out`,
+  `corpus split --to`, `corpus combine --out`. An output naming one of the
+  command's inputs is refused outright since 0.6.5; requiring `--force` for
+  every other existing file waited for the freeze because it breaks scripts
+  that regenerate their outputs.
+- **Validation**: `groups move-group --parent` and `groups add-entry` refuse a
+  group that does not exist; `ref compare` without `--online` stops telling CLI
+  users to "pass online=True".
+- **Decisions to record before the gate**: whether `asset check --fix` gains
+  `--dry-run`/`--diff`; whether `keys check` stays beside `lint`'s
+  `duplicate_key` finding; whether `ref remove KEY` removes every duplicate
+  sharing that key; where `verify` and `enrich` live. `keys usage` and
+  `tex scan` both stay — neither is a subset of the other.
+
+**Gate 4**: contract tests enforce the surface instead of sampling it — a table
+test of every command's positional signature; a sweep asserting that each flag
+spelling has one meaning; an envelope-schema test over every command's `--json`
+output; a test that every emitted error code is catalogued with its exit code;
+and a `capabilities` test covering option types, choices, and error codes. The
+editor passes against the new envelope (see the editor track).
+
+#### Stage 5 — Hardening and scale
+
+- **Finish the audit.** Not yet covered: the full hostile-input matrix (deep
+  nesting, `@string` and `crossref` cycles, invalid and UTF-16 encodings, binary
+  input, a closed stdout, invalid option values); the interchange readers (RIS,
+  MODS, EndNote, CSV); symlink-following in `corpus combine`'s material copy;
+  and the JSON output of `ref import` and `asset fetch`. Any data-loss or
+  security finding ships as a 0.6.x patch without waiting for this stage.
+- **Scale.** The parser is quadratic — 8,000 entries take 25 s and 20,000 time
+  out — through whole-prefix line counting (`_text_utils._line_number`) and a
+  linear `EntryStore.__contains__`. This is v0.9's linear parser path, pulled
+  forward because real libraries are this size. Also: `normalize` loads 66,000
+  journal rows even with journal styling off (about 2.5 s per run), and
+  `format` takes 36 s on a single 2 MB field.
+- **`scrub` completeness.** `scrub --check` passes a file containing comments
+  between entries, `%` lines inside entries, JabRef `comment-<user>` fields
+  (which name the user), BibDesk and Mendeley fields (`date-added`,
+  `date-modified`, `read`, `rating`, `mendeley-*`), `localfile`,
+  `attachments`, `file://` URLs, or home-directory paths in `note`, `@string`,
+  or `@preamble`.
+- **Pinax keys as paths**: reject `:` (drive-relative on Windows), NUL, reserved
+  device names, and over-long keys; detect keys that differ only in case, which
+  share one material file on macOS and Windows.
+- **Network limits**: an overall deadline beside the per-operation timeouts,
+  a size cap on metadata responses (downloads are capped since 0.6.5),
+  http(s)-only redirects, refusal of private and loopback addresses, a warning
+  on an https → http downgrade, and an arXiv-id shape check before a URL is
+  built from one.
+- **Durability**: consider `fsync` before the replace; no write path syncs
+  today.
+- **Correctness gaps**:
+  - `keys rename` leaves `crossref`, `xdata`, and `related` pointing at the old
+    key.
+  - User-supplied values with unbalanced braces are accepted.
+  - A mostly-UTF-8 file with one bad byte silently decodes as latin-1; a UTF-16
+    file parses as zero entries.
+  - A mixed-ending file gains a CRLF at EOF, a CRLF file without a final newline
+    gains one, and a whitespace-only file becomes empty.
+  - `--backup` overwrites the previous backup.
+  - `*notes.bib` is skipped by auto-discovery with a misleading error.
+- **Property tests** for invariants the suite currently samples: whole-file
+  byte equality including CRLF, BOM, and inter-entry text; a one-field edit
+  changes one entry; commit output always parses; `format` and `normalize` are
+  idempotent; combine then split round-trips.
+- **Test hygiene**: three tests sleep 5 s in real retry backoff; the shared
+  HTTP layer (`providers/_http`) sits at 79% coverage.
+
+**Gate 5**: the hostile-input matrix runs in CI with zero tracebacks and zero
+invalid JSON; profiling shows no quadratic path in parsing, `lint`, or
+`format --check`, and a 20,000-entry library completes each (timings recorded,
+not asserted in the correctness suite); the property tests above pass.
+
+#### Stage 6 — Documentation and policy
+
+- **Policy**: the beta promise above, written into
+  [docs/guides/public-api.md](docs/guides/public-api.md); a "Breaking" and
+  "Deprecated" convention in CHANGELOG (a breaking change shipped in patch
+  0.6.2); a stable/experimental marker per command in `capabilities` and in the
+  reference.
+- **Generated reference**: build the command reference from the live Click tree
+  or `capabilities --json`, replacing the hand-maintained parts of
+  [docs/guides/usage.md](docs/guides/usage.md). It then covers what is
+  documented nowhere today: `metadata remove`, `tex list/remove/clear`,
+  `ref remove --keep-files`, `corpus batch --ops-file`, `init --agent-guide`
+  (also missing from CHANGELOG), and many options.
+- **False claims**: `asset check` does not verify checksums; default
+  `normalize` does not abbreviate journals, and the quickstart's table example
+  also needs `--journal-style abbreviated`; architecture.md says Pinax is not
+  implemented; pinax.md's `add --fetch` and "not a per-invocation flag";
+  usage.md's "`--online` is required for every command that reaches the
+  network"; the FAQ's "responses are cached"; "`asset check` repair planned".
+- **Contract docs** in [docs/guides/llm-integration.md](docs/guides/llm-integration.md):
+  the conflict example's `options` shape, the nonexistent `DuplicateDOI` code,
+  the nonexistent `out` field, and everything Stage 4 changes.
+- **Stale status**: README (twice), docs/index.md, public-api.md,
+  installation.md, faq.md (three places), pinax.md, and the `rev: v0.5.0` pin in
+  git-workflows.md.
+- **Network and privacy page**: what each online command sends and to whom
+  (`ref find` sends its free text to Crossref), the User-Agent, the `mailto` the
+  docs promise but the client never sends, and `PYNAKES_APS_API_TOKEN`.
+- **Smaller fixes**: the completion docs pass a shell name Typer ignores; the
+  mkdocs `site_url` is a placeholder and no docs deployment exists; README
+  relative links break on PyPI; the README claims conformance "verified against
+  TeX Live" while those oracle tests skip in CI; fifteen help texts show literal
+  RST double backticks; the agent-evaluation guide moves out of the user
+  navigation.
+
+**Gate 6**: `mkdocs build --strict` green; every offline shell example in the
+README, quickstart, and usage guide runs in a CI doc test; the command reference
+is generated; no document reports an alpha version or status.
+
+#### Stage 7 — Release candidate → 0.7.0
+
+- Publish `0.7.0rc1` to PyPI with the `Development Status :: 4 - Beta`
+  classifier and the README status updated.
+- Run the agent evaluation harness and dogfood the candidate on real libraries
+  (locally; nothing derived from them is committed).
+- Between the candidate and 0.7.0, fix regressions only; anything else waits for
+  0.7.1 or v0.8.
+
+**Done when**: every stage gate holds; the candidate has run without a data-loss
+or contract regression; the editor alpha is published; CHANGELOG updated;
 version bumped to 0.7.0.
+
+#### Editor track (alpha)
+
+The extension ships with 0.7.0 as an alpha: a pre-release `.vsix`, labeled alpha
+in its README and listing, with no compatibility promise of its own. It is the
+first graphical client and the consumer that makes the envelope load-bearing;
+its scope is a bibliography belonging to a document or repository being edited,
+not library-scoped exploration. See
+[Graphical clients and their scope](docs/vision.md#graphical-clients-and-their-scope).
+The track runs in parallel with the stages above.
+
+- **Move to the beta envelope in the same change as Stage 4**, so the client
+  never depends on a form the engine is deprecating — including the `tex scan`
+  `action` value it reads today.
+- **Use the precondition.** Pass the fingerprint from the preview back on
+  commit, so an edit made while the approval dialog is open is not overwritten.
+  Treat a `conflict` envelope as not applied: today only `status == "error"`
+  counts as a failure, so a conflicted staged edit is silently dropped. Commit
+  several staged entries as one `corpus batch` instead of one `ref edit` per
+  entry.
+- **Thin-client discipline** — no BibTeX parser, metadata schema, or source of
+  truth in the client. When the view needs something the engine does not
+  expose, the engine grows it; a workaround in TypeScript is a regression even
+  when it works.
+- **Concurrent development** — until the library-scoped client starts, the CLI
+  and the extension evolve together in this repository, so an engine gap and
+  its client consumer land in one reviewable change. A second client is what
+  would justify splitting them apart.
+- **Feature work that does not gate 0.7.0**: group *hierarchy* editing in the
+  sidebar (add, rename, move, remove — `groups add-group`, `rename-group`,
+  `move-group`, `remove-group`, and `update-group` already exist with
+  `--dry-run --diff`), and `asset fetch` from the view under the
+  `pynakes.allowOnlineLookups` switch that already covers compare and import.
+  Whatever is unfinished carries into v0.8.
+
+**Editor alpha gate**: the `.vsix` is published as a pre-release; its checks run
+in CI against the beta envelope; every gap it surfaced was closed in the engine
+rather than worked around in the client.
 
 ---
 
@@ -102,6 +373,14 @@ version bumped to 0.7.0.
   - **`ref import --from sibling.bib KEY`** — pull a single entry from a sibling
     library by key without first digging out its DOI (a lighter cousin of
     `corpus pick`).
+- **Mirrored-bibliography rename propagation** — pynakes treats every `.bib` in
+  isolation, but a common layout keeps a superset bibliography (e.g.
+  `bibliography/`) and a working subset copy (e.g. `manuscript/`) that must
+  track it; renaming a key in the superset has no way to propagate to the
+  mirror today. Needs a declared mirror relationship (naming still open —
+  avoid overloading "corpus") and a propagation step for `keys rename` (and any
+  other key-changing operation) once that relationship exists. Moved from v0.7,
+  where it would have added surface during the freeze.
 - **`Catalogue` (index)**: a derived, rebuildable search index (e.g. SQLite FTS)
   over the Library; strictly derived, never a competing source of truth.
 - **Single-bibliography analysis**: add a public `pynakes.analysis` API
@@ -123,28 +402,32 @@ version bumped to 0.7.0.
   size of the community whose canonical identifier is not a DOI: NASA ADS
   (bibcodes; needs a user-supplied API token), RePEc/IDEAS handles, MathSciNet
   review numbers, institutional-repository URN resolvers such as DiVA, and
-  SciELO. A cross-check against JabRef and Zotero adds zbMATH and IACR
-  (discipline identifiers), PMCID alongside the existing PubMed path, ISBN via a
-  book catalogue such as WorldCat or the Library of Congress, and title-based
-  DOI lookup — the one non-identifier entry point, which must stay explicitly
-  fuzzy and never auto-accept a single result. OpenReview is held back rather than planned: its public API answers a
-  bot challenge to non-browser clients, so importing from it would mean
-  defeating that challenge. Revisit only if a documented, key-based API path
-  appears.
+  SciELO; then ISBN coverage beyond Open Library through a catalogue such as
+  WorldCat (Google Books and the Library of Congress are out of scope, per
+  [docs/guides/import-providers.md](docs/guides/import-providers.md)).
+  OpenReview is held back rather than planned: its public API answers a bot
+  challenge to non-browser clients, so importing from it would mean defeating
+  that challenge. Revisit only if a documented, key-based API path appears.
 - **MCP server**: a thin [Model Context Protocol](https://modelcontextprotocol.io)
   companion on the pinned pynakes API, allowing agents to interrogate a personal
   corpus conversationally — "find papers by X on topic Y", "which entries are
   missing PDFs", etc. Query-only layer over the `Library`/`Catalogue`.
 - **Agent surface polish**:
-  - **Plan-and-approve workflow**: allow composing multi-step operations
-    (e.g. "dedupe these → normalize → fetch PDFs") into a single structured
-    `plan` that the user approves once.
-  - **Post-hoc change summary**: every mutating command emits a human-readable
-    and machine-parseable summary alongside the diff — "3 keys renamed,
-    12 fields normalized, 2 entries enriched" — so an agent can report what
-    happened without re-parsing the diff.
-- **`Catalogue`-backed rich query CLI**: `search` gains full-text and
-  field-scoped queries against the index, not just raw entry iteration.
+  - **Plan-and-approve workflow**: extend `corpus batch`, which already
+    previews and commits a sequence of bibliography operations as one, to
+    material and network steps (e.g. "dedupe these → normalize → fetch PDFs"),
+    so a whole multi-step plan is approved once.
+  - **Post-hoc change summary**: the change plan already counts added, removed,
+    renamed, and modified entries; add operation-level counts — "3 keys
+    renamed, 12 fields normalized, 2 entries enriched" — so an agent can report
+    what happened without re-parsing the diff.
+- **`Catalogue`-backed rich query CLI**: `search` gains full-text queries
+  against the index; its existing field-scoped terms carry over.
+- **Editor toward beta**: whatever of the v0.7 alpha feature work remains, plus
+  the library-scoped reads the `Library` makes possible. The extension may
+  *read* library-scoped things; it never owns or curates them.
+- **Deprecation removals**: the forms deprecated in 0.7.x by the surface freeze
+  are removed in 0.8.0, as the beta promise schedules.
 
 **Done when**: `Library`, `Catalogue`, single-bibliography and library-wide
 analysis, and the
@@ -159,16 +442,14 @@ version bumped to 0.8.0.
 
 Measure and improve the offline paths that become important once v0.8 can work
 across many bibliographies. Performance claims must be backed by reproducible
-results, not estimates.
+results, not estimates. The linear parser path moved to v0.7 Stage 5, because a
+single real library already reaches the sizes where it matters.
 
 - **Reproducible benchmark suite**: add generated and fixture-backed corpora at
   documented sizes; measure parse, unchanged write, lint, search, dedupe,
   canonical formatting, bulk surgical edits, Library queries, and Catalogue
   builds. Record the Python version, platform, corpus shape, and peak memory
   alongside timing results.
-- **Linear parser path**: remove repeated whole-prefix line counting and linear
-  duplicate-key membership checks during parsing while preserving duplicate
-  keys, exact source layout, and parse-error locations.
 - **Blocked identity and dedupe matching**: use the shared work-matching
   evidence from v0.6 to build candidate sets by stable identifiers and metadata
   fingerprints; do not compare every unrelated pair with fuzzy title matching.
@@ -251,11 +532,13 @@ layout-only; `asset link` and `saved-search` ship with tests and docs;
 ### v1.0 — Launch
 
 **A polished single-file maintenance engine, losslessly JabRef-compatible, with
-a pinned public API and a PyPI release.** The unit of work is one
+a pinned public API, released as 1.0.0 on PyPI.** The unit of work is one
 `Bibliography` (one `.bib`). The multi-bib `Library`, `Catalogue`, and MCP
 server ship in v0.8 as optional companions.
 
-- Stable API, semver promise.
+- Stable API, semver promise: the CLI contract, in beta since 0.7.0, and the
+  Python API both fall under the semantic-versioning policy in
+  [docs/guides/public-api.md](docs/guides/public-api.md).
 - All [core architecture invariants](docs/guides/architecture.md#core-invariants)
   intact; coverage ≥90%; `ruff` clean.
 
@@ -268,10 +551,10 @@ server ship in v0.8 as optional companions.
 The data and analysis items stay **in pynakes** as pure bib-file mechanisms.
 The remaining GUI item is a separately distributed companion tracked here
 because it exercises the pinned integration boundary. Clients divide by
-**scope**, not by feature: the project-scoped editor ships in v0.7, and what
-remains here is the library-scoped client — one serves a bibliography belonging
-to a document you are editing, the other a library belonging to no project at
-all. See
+**scope**, not by feature: the project-scoped editor ships as an alpha in v0.7,
+and what remains here is the library-scoped client — one serves a bibliography
+belonging to a document you are editing, the other a library belonging to no
+project at all. See
 [Graphical clients and their scope](docs/vision.md#graphical-clients-and-their-scope).
 
 - **Projections** — `combine` and `split` formalized as first-class **views of
