@@ -288,8 +288,8 @@ def test_format_jabref_grouping() -> None:
     ]
     result = format_jabref_grouping(nodes)
     assert "0 AllEntriesGroup:;" in result
-    assert "StaticGroup:Papers;" in result
-    assert "StaticGroup:ML;" in result
+    assert "StaticGroup:Papers\\;" in result
+    assert "StaticGroup:ML\\;" in result
 
 
 def test_jabref_grouping_round_trip() -> None:
@@ -300,8 +300,8 @@ def test_jabref_grouping_round_trip() -> None:
     nodes = parse_jabref_grouping(value)
     assert len(nodes) == 2
     result = format_jabref_grouping(nodes)
-    assert "StaticGroup:Papers;0;1;8a8a8aff;;;" in result
-    assert "StaticGroup:ML;1;1;;;;" in result
+    assert "StaticGroup:Papers\\;0\\;1\\;8a8a8aff\\;\\;\\;;" in result
+    assert "StaticGroup:ML\\;1\\;1\\;\\;\\;\\;;" in result
 
 
 def test_parse_keyword_group() -> None:
@@ -386,7 +386,7 @@ def test_format_keyword_group() -> None:
         ),
     ]
     result = format_jabref_grouping(nodes)
-    assert "KeywordGroup:ML;0;keywords;machine learning;0;,;;;" in result
+    assert "KeywordGroup:ML\\;0\\;keywords\\;machine learning\\;0\\;,\\;\\;\\;;" in result
 
 
 def test_format_search_group() -> None:
@@ -400,7 +400,7 @@ def test_format_search_group() -> None:
         ),
     ]
     result = format_jabref_grouping(nodes)
-    assert 'SearchGroup:Deep Learning;0;"deep learning";0;;;' in result
+    assert 'SearchGroup:Deep Learning\\;0\\;"deep learning"\\;0\\;\\;\\;;' in result
 
 
 def test_format_explicit_group() -> None:
@@ -415,7 +415,7 @@ def test_format_explicit_group() -> None:
         ),
     ]
     result = format_jabref_grouping(nodes)
-    assert "ExplicitGroup:Selected Papers;0;1;8a8a8aff;Smith2020;Jones2021;" in result
+    assert "ExplicitGroup:Selected Papers\\;0\\;1\\;8a8a8aff\\;Smith2020\\;Jones2021\\;;" in result
 
 
 def test_all_group_types_round_trip() -> None:
@@ -1592,3 +1592,28 @@ def test_groups_list_entries_cli_exact_matches_old_strict_semantics(tmp_path: Pa
     assert "B" in default_data["entries"]
     assert "B" not in exact_data["entries"]
     assert "A" in exact_data["entries"]
+
+
+# --- regressions: JabRef's on-disk grouping syntax ---------------------------
+
+# As JabRef 5 writes it: every group quoted a second time at the metadata
+# level, so field separators are ``\;`` and only the terminator is bare.
+JABREF_ON_DISK = (
+    "0 AllEntriesGroup:;\n"
+    r"1 StaticGroup:Physics\;0\;1\;0x8a8a8aff\;\;\;;"
+    "\n"
+    r"2 ExplicitGroup:Optics\;0\;1\;\;Euler1748\;Newton1704\;;"
+)
+
+
+def test_jabref_on_disk_grouping_round_trips_byte_for_byte() -> None:
+    nodes = parse_jabref_grouping(JABREF_ON_DISK)
+
+    assert format_jabref_grouping(nodes) == JABREF_ON_DISK
+
+
+def test_jabref_explicit_group_entries_exclude_the_terminator() -> None:
+    nodes = parse_jabref_grouping(JABREF_ON_DISK)
+
+    optics = next(node for node in nodes if node.name == "Optics")
+    assert optics.entries == ("Euler1748", "Newton1704")

@@ -55,13 +55,14 @@ def remove(
 
     material_removals: dict[str, list[str]] = {}
     if not keep_files and coll.files is not None:
+        store = coll.files
         for key in removed_keys:
-            if params.dry_run:
-                removed = coll.files._materials_paths_for(key)
-            else:
-                removed = coll.files.remove_materials(key)
-            if removed:
-                material_removals[key] = removed
+            planned = store._materials_paths_for(key)
+            if planned:
+                material_removals[key] = planned
+                # Deleted only once the entry's removal is on disk: a failed
+                # commit must not cost the materials.
+                coll.after_commit(lambda key=key: store.remove_materials(key))
 
     label = ", ".join(removed_keys)
     human = [f"{_verb('remove', params)} {total} {_entries(total)}: {label}."]

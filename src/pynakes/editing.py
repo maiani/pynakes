@@ -66,6 +66,13 @@ def _scan_value_end(raw: str, pos: int) -> int:
                     return i + 1
             elif brace_depth == 0 and char in ",})":
                 return i
+            elif brace_depth == 0 and char == "%" and not _is_escaped(raw, i):
+                # A field-level TeX comment ends a bare value; the parser
+                # ignores it, so the value stops at the last character before.
+                end = i
+                while end > pos and raw[end - 1].isspace():
+                    end -= 1
+                return end
         i += 1
     return len(raw)
 
@@ -78,50 +85,44 @@ def _next_nonspace(raw: str, pos: int) -> str | None:
     return raw[i] if i < len(raw) else None
 
 
-def _brace_depth(raw: str, pos: int) -> int:
-    """Return the nesting depth of ``raw`` at position ``pos`` (0 = top level).
-
-    Counts both ``{}`` and ``()`` pairs since BibTeX accepts both forms.
-    """
-    depth = 0
-    for ch in raw[:pos]:
-        if ch in "{(":
-            depth += 1
-        elif ch in ")}":
-            depth -= 1
-    return depth
+_ASSIGNMENT_RE = re.compile(r"\s*=\s*")
 
 
 def _find_field(raw: str, field_name: str) -> tuple[int, int, int] | None:
     """Locate a field assignment in raw entry text.
 
-    Returns ``(name_start, value_start, value_end)`` for the first real
-    assignment of ``field_name`` (one whose name begins right after the entry's
-    opening brace or a field-separating comma), or ``None`` if absent. Matching
-    is case-insensitive; the name in ``raw`` has the same length as
-    ``field_name`` because they share the same letters.
+    Returns ``(name_start, value_start, value_end)`` for the first top-level
+    assignment of ``field_name``, or ``None`` if absent. The first occurrence
+    is the one BibTeX reads when a field is repeated. Matching is
+    case-insensitive. Text inside a braced or quoted value, or inside a
+    field-level ``%`` comment, is never mistaken for an assignment.
     """
-    for m in re.finditer(re.escape(field_name) + r"\s*=\s*", raw, re.IGNORECASE):
-        # Reject matches nested inside a braced field value (depth > 1).
-        if _brace_depth(raw, m.start()) > 1:
+    wanted = field_name.lower()
+    for name_start, name_end in _raw_field_name_spans(raw):
+        if raw[name_start:name_end].lower() != wanted:
             continue
-        # Reject matches inside a value: the name must be preceded only by
-        # whitespace back to an opening delimiter or "," (i.e. it starts a
-        # field assignment).
-        k = m.start() - 1
-        while k >= 0 and raw[k] in " \t\r\n":
-            k -= 1
-        if k < 0 or raw[k] in "{(,":
-            return m.start(), m.end(), _scan_value_end(raw, m.end())
+        assignment = _ASSIGNMENT_RE.match(raw, name_end)
+        if assignment is None:
+            continue
+        value_start = assignment.end()
+        return name_start, value_start, _scan_value_end(raw, value_start)
     return None
+
+
+def _skip_comment(raw: str, i: int) -> int:
+    """Return the index of the line break that ends a ``%`` comment at ``i``."""
+    while i < len(raw) and raw[i] not in "\r\n":
+        i += 1
+    return i
 
 
 def _raw_field_name_spans(raw: str) -> list[tuple[int, int]]:
     """Return spans of field names in an entry's top-level assignments.
 
     A regex alone would also find ``name =`` text inside a braced or quoted
-    value. This small scanner stays at the entry body's top level, so it is
-    safe to use for cosmetic field-name edits and lint findings.
+    value, or in a commented-out line. This small scanner stays at the entry
+    body's top level and skips field-level ``%`` comments exactly as the
+    parser does, so it is safe to use for field edits and lint findings.
     """
     header = re.match(r"@[A-Za-z][A-Za-z0-9_:-]*\s*[{(]\s*[^,]*,", raw, re.IGNORECASE | re.DOTALL)
     if not header:
@@ -141,6 +142,9 @@ def _raw_field_name_spans(raw: str) -> list[tuple[int, int]]:
         if char == '"':
             in_quotes = True
             i += 1
+            continue
+        if char == "%" and depth == 0 and not _is_escaped(raw, i):
+            i = _skip_comment(raw, i)
             continue
         if char == "{":
             depth += 1
@@ -213,9 +217,42 @@ def set_raw_field(raw: str, field_name: str, new_value: str) -> str:
     if close is None:
         return raw
     body = raw[:close].rstrip()
-    if not body.endswith(","):
-        body += ","
+    last = _last_significant_index(body)
+    if last is not None and body[last] != ",":
+        # Put the separator straight after the last value, not at the end of
+        # the body: a trailing ``% comment`` would otherwise swallow it.
+        body = body[: last + 1] + "," + body[last + 1 :]
     return f"{body}{line_ending}  {field_name} = {{{new_value}}}{line_ending}{raw[close:]}"
+
+
+def _last_significant_index(body: str) -> int | None:
+    """Return the index of the last character the parser reads in ``body``.
+
+    ``body`` is an entry without its closing delimiter. Whitespace and
+    field-level ``%`` comments are skipped, since neither is part of a value.
+    """
+    opener = re.match(r"@[A-Za-z][A-Za-z0-9_:-]*\s*[{(]", body)
+    if opener is None:
+        return None
+    last: int | None = None
+    depth = 0
+    in_quotes = False
+    i = opener.end()
+    while i < len(body):
+        char = body[i]
+        if not in_quotes and depth == 0 and char == "%" and not _is_escaped(body, i):
+            i = _skip_comment(body, i)
+            continue
+        if char == '"' and depth == 0 and not _is_escaped(body, i):
+            in_quotes = not in_quotes
+        elif not in_quotes and char == "{":
+            depth += 1
+        elif not in_quotes and char == "}" and depth:
+            depth -= 1
+        if not char.isspace():
+            last = i
+        i += 1
+    return last
 
 
 def set_raw_field_expression(raw: str, field_name: str, expression: str) -> str:

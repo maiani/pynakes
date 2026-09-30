@@ -435,3 +435,86 @@ def test_rename_citekey_skips_tex_when_not_requested(tmp_path: Path) -> None:
     assert result["entry_renamed"] is True
     assert result["tex_occurrences"] == 0
     assert r"\cite{OldKey}" in tex.read_text()
+
+
+# --- regressions: line endings and commit validation -----------------------
+
+CRLF_LIBRARY = (
+    b"@article{Euler1748,\r\n  title = {Introductio},\r\n}\r\n"
+    b"\r\n% a note between entries\r\n\r\n"
+    b"@book{Gauss1801,\r\n  title = {Disquisitiones},\r\n}\r\n"
+)
+
+
+def _only_crlf(data: bytes) -> bool:
+    return data.count(b"\n") == data.count(b"\r\n")
+
+
+def test_open_keeps_crlf_so_an_unmodified_library_previews_byte_for_byte(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_bytes(CRLF_LIBRARY)
+
+    coll = Bibliography.open(bib)
+
+    assert coll.preview().encode() == CRLF_LIBRARY
+    assert coll.diff() == ""
+
+
+def test_edit_and_append_keep_crlf_line_endings(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_bytes(CRLF_LIBRARY)
+
+    coll = Bibliography.open(bib)
+    set_entry_field(coll.lib.entries["Euler1748"], "year", "1748")
+    coll.mark_dirty(1)
+    coll.add_entry("book", "Newton1687", {"title": "Principia"})
+    coll.commit()
+
+    data = bib.read_bytes()
+    assert _only_crlf(data)
+    assert b"% a note between entries" in data
+    assert data.index(b"Euler1748") < data.index(b"Gauss1801") < data.index(b"Newton1687")
+
+
+def test_append_to_crlf_library_keeps_every_existing_byte(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_bytes(CRLF_LIBRARY)
+
+    coll = Bibliography.open(bib)
+    coll.add_entry("book", "Newton1687", {"title": "Principia"})
+    coll.commit()
+
+    data = bib.read_bytes()
+    assert data.startswith(CRLF_LIBRARY)
+    assert _only_crlf(data)
+
+
+def test_remove_entry_from_crlf_library_touches_only_that_entry(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_bytes(CRLF_LIBRARY)
+
+    coll = Bibliography.open(bib)
+    coll.remove_entry("Gauss1801")
+    coll.commit()
+
+    data = bib.read_bytes()
+    assert _only_crlf(data)
+    assert data.startswith(b"@article{Euler1748,\r\n  title = {Introductio},\r\n}\r\n")
+    assert b"% a note between entries" in data
+    assert b"Gauss1801" not in data
+
+
+def test_commit_refuses_unparseable_text_and_leaves_the_file_alone(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    original = b"@article{Euler1748,\n  title = {Introductio}\n}\n"
+    bib.write_bytes(original)
+
+    coll = Bibliography.open(bib)
+    entry = coll.lib.entries["Euler1748"]
+    entry.raw_content = "@article{Euler1748,\n  title = {Introductio\n}\n"
+    coll.mark_dirty(1)
+
+    with pytest.raises(OSError, match="Validation failed"):
+        coll.commit()
+    assert bib.read_bytes() == original
+    assert list(tmp_path.iterdir()) == [bib]

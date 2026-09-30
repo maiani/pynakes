@@ -7,7 +7,6 @@ deterministic. The CLI layer decides when online fetching is allowed.
 
 from __future__ import annotations
 
-import gzip
 import re
 import shutil
 import tarfile
@@ -39,6 +38,12 @@ _GZIP_FEXTRA = 0x04
 _GZIP_FNAME = 0x08
 _PLAIN_FILE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*")
 _SINGLE_FILE_FALLBACK = "main.tex"
+
+# Limits on what one arXiv source bundle may unpack to. The bundle is content
+# its author controls, and a few hundred kilobytes of gzip can expand to
+# gigabytes or to hundreds of thousands of files.
+MAX_SOURCE_BYTES = 1024 * 1024 * 1024
+MAX_SOURCE_MEMBERS = 20_000
 
 
 class ArxivFetchError(Exception):
@@ -628,6 +633,7 @@ def extract_arxiv_source(data: bytes, target_dir: str | Path) -> Path:
             return target
         with archive:
             members = archive.getmembers()
+            _check_source_size(members)
             for member in members:
                 _validate_tar_member(member, root)
             for member in members:
@@ -640,12 +646,44 @@ def extract_arxiv_source(data: bytes, target_dir: str | Path) -> Path:
     return target
 
 
+def _check_source_size(members: list[tarfile.TarInfo]) -> None:
+    """Refuse a tar whose headers declare more than the source limits."""
+    if len(members) > MAX_SOURCE_MEMBERS:
+        raise ArxivFetchError(
+            f"arXiv source archive has {len(members)} members, "
+            f"more than the {MAX_SOURCE_MEMBERS} allowed"
+        )
+    if sum(member.size for member in members if member.isfile()) > MAX_SOURCE_BYTES:
+        raise ArxivFetchError(
+            f"arXiv source archive unpacks to more than {MAX_SOURCE_BYTES >> 20} MiB"
+        )
+
+
 def _write_single_file_source(data: bytes, root: Path) -> None:
+    """Decompress a single gzipped source file in bounded chunks."""
+    target = root / _gzip_member_name(data)
+    decompressor = zlib.decompressobj(wbits=31)
+    written = 0
     try:
-        payload = gzip.decompress(data)
-    except (OSError, EOFError, zlib.error) as exc:
+        with target.open("wb") as output:
+            pending = data
+            while not decompressor.eof:
+                chunk = decompressor.decompress(pending, 1 << 20)
+                pending = decompressor.unconsumed_tail
+                if not chunk and not pending:
+                    raise ArxivFetchError("arXiv source file is truncated or corrupt")
+                written += len(chunk)
+                if written > MAX_SOURCE_BYTES:
+                    raise ArxivFetchError(
+                        f"arXiv source file unpacks to more than {MAX_SOURCE_BYTES >> 20} MiB"
+                    )
+                output.write(chunk)
+    except zlib.error as exc:
+        target.unlink(missing_ok=True)
         raise ArxivFetchError("arXiv source file is not a readable gzip file") from exc
-    (root / _gzip_member_name(data)).write_bytes(payload)
+    except ArxivFetchError:
+        target.unlink(missing_ok=True)
+        raise
 
 
 def _gzip_member_name(data: bytes) -> str:

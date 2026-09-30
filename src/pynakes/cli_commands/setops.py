@@ -22,6 +22,8 @@ from pynakes.cli_common import (
     _emit_conflict,
     _entries,
     _finish_create,
+    _refuse_input_as_output,
+    _require_written,
     _safe,
     _verb,
     build_where_filter,
@@ -306,6 +308,9 @@ def split(
         cited, include_all, _scanned = collect_cited_keys(sources)
         cited_keys = set(merged.lib.entries.keys()) if include_all else cited
 
+    for rule in rules:
+        _refuse_input_as_output(params.json_output, rule.label, [*inputs, *sources])
+
     result = partition_library(merged.lib, rules, copy=copy, cited_keys=cited_keys)
 
     outputs: list[dict[str, object]] = []
@@ -336,7 +341,8 @@ def split(
         written = False
         if not params.dry_run:
             save_result = save_text(content, rule.label, backup=backup)
-            written = save_result.success
+            _require_written(params.json_output, save_result, rule.label, outputs=outputs)
+            written = True
 
         outputs.append(
             {

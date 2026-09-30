@@ -9,12 +9,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pynakes import _tex_rewrite
 from pynakes import keys as key_ops
-from pynakes.io import save_plain_text
 from pynakes.usage import (
     MissingTexSourcesError,
     iter_tex_files,
-    rename_citation_keys_in_tex,
     tex_sources_from_metadata,
 )
 
@@ -52,9 +51,11 @@ class BibliographyKeys:
     def _rewrite_tex_for_renames(
         self, renames: list[tuple[str, str]], *, allow_missing_sources: bool = False
     ) -> int:
-        """Rewrite linked TeX files, mapping citation keys per *renames*.
+        """Stage rewrites of linked TeX files, mapping citation keys per *renames*.
 
-        Returns total occurrence count across all rewritten files.
+        The files are written by the next :meth:`commit`, after the ``.bib``
+        itself, so a failure cannot leave the manuscript renamed and the
+        bibliography not. Returns the total occurrence count to be rewritten.
         Skips silently when the library has no ``tex-sources`` metadata or
         ``self.path`` is not set. Missing declared sources stop the rename
         unless ``allow_missing_sources`` is explicitly set.
@@ -68,16 +69,11 @@ class BibliographyKeys:
         if missing and not allow_missing_sources:
             raise MissingTexSourcesError(missing)
         sources = [source for source in sources if Path(source).exists()]
-        total = 0
-        for tex_path in iter_tex_files(sources):
-            before = tex_path.read_text(encoding="utf-8", errors="replace")
-            after, count = rename_citation_keys_in_tex(before, renames)
-            total += count
-            if count:
-                saved = save_plain_text(after, str(tex_path), encoding="utf-8")
-                if not saved.success:
-                    raise OSError(saved.error or f"Could not write {tex_path}")
-        return total
+        tex_files = iter_tex_files(sources)
+        _tex_rewrite.require_inside_project(tex_files, self.path)
+        rewrites = [_tex_rewrite.plan_tex_rewrite(path, renames) for path in tex_files]
+        self.stage_tex_rewrites(rewrites)
+        return sum(rewrite.occurrences for rewrite in rewrites)
 
     def rename_citekey(
         self,

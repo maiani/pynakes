@@ -169,6 +169,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Closing one bibliography view no longer hides the status bar item while a
   sibling view is still active.
 
+## [0.6.5] - 2026-09-30
+
+A stop-ship release: every fix below either damaged files, broke an install, or
+let a crafted library act outside itself. Each has a regression test.
+
+### Fixed
+
+- An edit could write a truncated, unparseable library. The field locator
+  counted braces but not quotes, so `ref edit` on an entry whose quoted value
+  contained text such as `title =` edited the inside of that value. The
+  locator now uses the same top-level scanner as the rest of the editor, which
+  also skips commented-out assignments such as `% title = {Draft}`.
+- Commits are now re-parse-validated before they replace the file, as the help
+  always said. A staged text that does not parse is refused with nothing
+  written, where the unparseable text used to reach disk.
+- Adding a field after a last field carrying a trailing `% comment` put the
+  separating comma inside the comment, so the new field was swallowed into the
+  previous value. The comma now follows the value itself.
+- A field repeated within one entry now reads as its first value, as BibTeX
+  reads it; the parser used to keep the last one while `ref edit` changed the
+  first.
+- CRLF libraries keep their line endings. Opening a library re-read it in text
+  mode, which turned CRLF into LF: `ref add` and `metadata set` then left mixed
+  line endings, `ref remove` fell back to a whole-file rewrite that dropped text
+  between entries and moved metadata blocks, `--diff` marked every line, and
+  `format` always reported a change. The library is now read once, as bytes,
+  and that one read also serves the change fingerprint, so an edit saved
+  between the parse and the fingerprint can no longer go undetected.
+- Saving keeps what the user set up at the destination. A symlinked library is
+  written through to its target instead of being replaced by a regular file;
+  the file keeps its permissions instead of the temporary file's 0600, as does
+  a `.bak`; and a read-only library is refused rather than overwritten. Pinax
+  materials keep their permissions too, but a symlinked material is still
+  replaced, never written through, since its target may lie outside the store.
+- `convert --out`, `tex scan --out`, and `corpus split --to` refuse an output
+  path that is also one of their inputs (`OutputIsInput`), which used to
+  destroy the input library or manuscript. The same three commands reported a
+  write that failed as a success, exiting 0 with "Wrote N entries"; they now
+  exit 1 with `IOError`, and `corpus split` lists the outputs already written.
+- `keys rename`, `keys generate`, and key regeneration in `normalize` rewrote
+  the TeX sources before committing the `.bib`, so a failed commit left the
+  manuscript renamed and the bibliography not. The rewrites are now staged and
+  applied after the `.bib` commit; before anything is written, every source is
+  checked to be unchanged, writable, and able to hold the new key in its
+  encoding. Through the Python API, `Bibliography.rename_citekey` likewise
+  writes its TeX sources at `commit()` rather than immediately.
+- TeX rewrites preserve the manuscript: sources were read with replacement
+  characters and written back as UTF-8 with LF, so a latin-1 `.tex` lost its
+  accented characters and a CRLF one its line endings. Only the rewritten keys
+  change now.
+- `ref remove` deleted an entry's Pinax materials before committing the `.bib`,
+  so a failed commit cost the materials and kept the entry. Materials are
+  deleted after the commit.
+- `groups` hierarchy commands wrote JabRef's `grouping` block without JabRef's
+  second level of quoting, so JabRef could not read the groups back. Group
+  fields are now separated by `\;` on disk, exactly as JabRef writes them, and
+  reading a JabRef explicit group no longer adds its terminator as a member.
+- Nothing escapes as a traceback any more: a malformed import document, a
+  structure nested too deeply, and an invalid regular expression are
+  `InvalidInput`; a duplicate-merge conflict inside `corpus batch` is the same
+  exit-2 `DedupeConflict` that `dedupe merge` reports; and anything unforeseen
+  is `InternalError`.
+- Shell completion completed the first positional argument whatever had been
+  typed: typer 0.26 and later vendor their own click, so the check for an
+  argument already given never matched.
+- The shipped `pynakes-files-check` pre-commit hook ran `pynakes files check`,
+  a command renamed in 0.5.0, and failed for everyone who enabled it. It now
+  runs `pynakes asset check`; its id is unchanged.
+- On Windows, the Pinax scratch sweep probed for live processes with
+  `os.kill(pid, 0)`, which there sends Ctrl+C rather than probing.
+
+### Security
+
+- A committed `.pinax` or `.pinax/tmp` symlink made the scratch sweep delete the
+  contents of the link's target, from `asset check --fix`, `ref remove`, or a
+  key rename. Pinax refuses symlinked bookkeeping directories, and the sweep
+  only ever removes pid-named scratch directories.
+- A library's `tex-sources` metadata could point a key rename at any `.tex`
+  file on disk. Declared sources must now lie inside the project — the
+  enclosing git work tree, or else the `.bib`'s directory; sources named on the
+  command line may still lie anywhere.
+- `@string` expansion was exponential: a few hundred bytes of chained
+  definitions hung every command. Each macro now expands once, and an
+  expansion past one million characters stays literal.
+- A regular expression in a library's JabRef key patterns ran unbounded, so a
+  crafted library could hang `lint` or `keys generate`. Patterns shaped for
+  catastrophic backtracking, and backreferences, are now treated as an
+  unrecognized modifier instead of being run.
+- Downloads and arXiv source bundles were unbounded: half a megabyte of gzip
+  could unpack to gigabytes or to hundreds of thousands of files. Downloads are
+  capped at 512 MiB, and a source bundle at 1 GiB unpacked and 20,000 files.
+
+### Changed
+
+- The minimum versions are now `typer>=0.26.0` and `rich>=13.8.0`. The previous
+  floors could not work: pynakes imported a module that exists only from typer
+  0.26, and typer 0.12 cannot read its type annotations. pynakes no longer
+  imports any private typer module.
+- New error codes `OutputIsInput` and `InternalError` are listed in
+  `capabilities`.
+
 ## [0.6.4] - 2026-09-24
 
 ### Added

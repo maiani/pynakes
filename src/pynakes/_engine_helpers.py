@@ -163,14 +163,14 @@ def metadata_fetch_policy(lib: BibFile) -> FetchPolicy:
     return _parse_fetch_policy(metadata_value(lib, "pinax-fetch-policy"))
 
 
-def read_text(path: Path, encoding: str) -> str:
-    """Read *path* as text, substituting replacement characters on error."""
-    return path.read_text(encoding=encoding, errors="replace")
+def fingerprint(path: Path, data: bytes | None = None) -> FileFingerprint:
+    """Build a ``FileFingerprint`` for the current on-disk state of *path*.
 
-
-def fingerprint(path: Path) -> FileFingerprint:
-    """Build a ``FileFingerprint`` for the current on-disk state of *path*."""
-    data = path.read_bytes()
+    Pass ``data`` when the bytes were already read, so the digest describes
+    exactly the content that was parsed.
+    """
+    if data is None:
+        data = path.read_bytes()
     stat = path.stat()
     return FileFingerprint(
         size=stat.st_size,

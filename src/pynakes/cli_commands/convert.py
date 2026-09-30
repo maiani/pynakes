@@ -19,6 +19,8 @@ from pynakes.cli_common import (
     _emit_error,
     _entries,
     _finish_mod,
+    _refuse_input_as_output,
+    _require_written,
     _resolve_input_bib,
     _safe,
     _verb,
@@ -151,8 +153,11 @@ def _emit_conversion(
 ) -> None:
     """Emit the result of an export/import: write to ``out`` or stream to stdout."""
     written = False
+    if out:
+        _refuse_input_as_output(params.json_output, out, [file])
     if out and not params.dry_run:
-        save_plain_text(content, out, backup=params.backup)
+        result = save_plain_text(content, out, backup=params.backup)
+        _require_written(params.json_output, result, out)
         written = True
 
     if params.json_output:

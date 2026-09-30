@@ -35,6 +35,10 @@ MAX_ATTEMPTS = 3
 BACKOFF_SECONDS = (1.0, 4.0)
 MAX_RETRY_AFTER = 30.0
 
+# The largest download accepted. Papers, source bundles, and supplements are far
+# smaller; the cap keeps a misbehaving or hostile server from filling memory.
+MAX_DOWNLOAD_BYTES = 512 * 1024 * 1024
+
 
 class _Transient(Exception):
     """Internal signal: this attempt failed in a way worth repeating."""
@@ -236,10 +240,19 @@ def _fetch_bytes_httpx(
                         raise _Transient(message, retry_after) from exc
                     raise error_class(message) from exc
                 total = _content_length(response)
+                too_large = (
+                    f"{display} is larger than the {MAX_DOWNLOAD_BYTES >> 20} MiB download limit"
+                )
+                if total is not None and total > MAX_DOWNLOAD_BYTES:
+                    raise error_class(too_large)
                 chunks: list[bytes] = []
+                received = 0
                 for chunk in response.iter_bytes():
                     if not chunk:
                         continue
+                    received += len(chunk)
+                    if received > MAX_DOWNLOAD_BYTES:
+                        raise error_class(too_large)
                     chunks.append(chunk)
                     if progress is not None:
                         progress(len(chunk), total)

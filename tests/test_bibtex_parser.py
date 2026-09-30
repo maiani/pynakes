@@ -514,3 +514,9 @@ class TestErrorHandling:
         """
         with pytest.raises(ParseError, match="Unmatched braces"):
             parse_bib(text)
+
+
+def test_repeated_field_keeps_first_value_like_bibtex() -> None:
+    lib = parse_bib("@article{k,\n  note = {first},\n  note = {second}\n}\n")
+
+    assert lib.entries["k"].fields["note"] == "first"

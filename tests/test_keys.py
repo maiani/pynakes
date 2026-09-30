@@ -500,3 +500,26 @@ class TestRegenerate:
         renames = regenerate_keys(lib)
 
         assert renames == [("old", "Anon2020Supplemental")]
+
+
+# --- regressions: library-supplied regexes are untrusted --------------------
+
+
+def test_backtracking_prone_key_pattern_regex_is_not_run() -> None:
+    from pynakes.keys import _regex_modifier
+
+    near_miss = "a" * 60 + "b"
+
+    assert _regex_modifier(near_miss, 'regex("(a|aa)+$","x")') is None
+
+
+def test_invalid_key_pattern_regex_is_unrecognized_not_an_error() -> None:
+    from pynakes.keys import _regex_modifier
+
+    assert _regex_modifier("Euler", 'regex("(","x")') is None
+
+
+def test_ordinary_key_pattern_regex_still_applies() -> None:
+    from pynakes.keys import _regex_modifier
+
+    assert _regex_modifier("On the Sphere", 'regex("^(On|The) ","")') == "the Sphere"

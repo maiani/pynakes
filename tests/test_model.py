@@ -3,7 +3,14 @@
 import json
 from dataclasses import asdict
 
-from pynakes.model import BibEntry, BibFile, EntryStore, MetadataBlock
+from pynakes.model import (
+    BibEntry,
+    BibFile,
+    EntryStore,
+    MetadataBlock,
+    resolve_field_value,
+    resolve_string_definitions,
+)
 
 
 class TestBibEntry:
@@ -334,3 +341,34 @@ class TestEntryCollection:
     def test_construct_from_dict(self) -> None:
         coll = EntryStore({"k": self._entry("k", "x")})
         assert coll["k"].fields["author"] == "x"
+
+
+# --- regressions: @string expansion is linear and bounded -------------------
+
+
+def _doubling_strings(levels: int) -> dict[str, str]:
+    strings = {"s0": '"ab"'}
+    strings.update({f"s{k}": f"s{k - 1} # s{k - 1}" for k in range(1, levels + 1)})
+    return strings
+
+
+def test_doubling_string_chain_expands_each_macro_once() -> None:
+    resolved = resolve_string_definitions(_doubling_strings(12))
+
+    assert resolved["s12"] == "ab" * 2**12
+
+
+def test_expansion_past_the_cap_stays_literal() -> None:
+    strings = _doubling_strings(40)
+
+    assert resolve_field_value("s40", strings) == "s40"
+    assert resolve_field_value('s40 # " tail"', strings) == 's40 # " tail"'
+    assert resolve_string_definitions(strings)["s40"] == "s39 # s39"
+
+
+def test_mutual_string_cycles_resolve_the_same_in_any_order() -> None:
+    strings = {"a": "b", "b": "a"}
+
+    assert resolve_string_definitions(strings) == {"a": "a", "b": "b"}
+    assert resolve_field_value("b", strings) == "b"
+    assert resolve_field_value("a", strings) == "a"

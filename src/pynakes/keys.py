@@ -327,12 +327,63 @@ def _regex_modifier(value: str, modifier: str) -> str | None:
     ``[a-z]``) is not supported here: ``_PATTERN_MARKER_RE`` scans the whole
     pattern for ``[marker]`` spans before modifiers are parsed, so a literal
     bracket inside this argument is misread as a marker boundary.
+
+    The pattern comes from the library's own metadata, so it is untrusted: an
+    invalid pattern, or one shaped for catastrophic backtracking, is treated as
+    an unrecognized modifier instead of being run.
     """
     match = _REGEX_MODIFIER_RE.match(modifier[len("regex") :])
     if not match:
         return None
+    pattern = match.group("pattern")
+    if _backtracking_risk(pattern):
+        return None
     replacement = re.sub(r"\$(\d+)", r"\\\1", match.group("replacement"))
-    return re.sub(match.group("pattern"), replacement, value)
+    try:
+        return re.sub(pattern, replacement, value)
+    except (re.error, IndexError):
+        return None
+
+
+def _backtracking_risk(pattern: str) -> bool:
+    """Return whether ``pattern`` repeats a group that itself repeats or branches.
+
+    ``(a+)+``, ``(a|aa)*``, and ``(\\w+\\s?)+`` are the shapes whose matching
+    time explodes exponentially on a near-miss. Python's ``re`` has no timeout,
+    so such patterns are refused outright, as are backreferences. Key-pattern
+    regexes in practice are simple substitutions and never need either.
+    """
+    group_risky: list[bool] = []
+    closed_risky = False
+    i = 0
+    while i < len(pattern):
+        char = pattern[i]
+        if char == "\\":
+            if i + 1 < len(pattern) and pattern[i + 1].isdigit():
+                return True
+            i += 2
+            closed_risky = False
+            continue
+        repeats = char in "*+" or (char == "{" and re.match(r"\{\d*,\d*\}", pattern[i:]))
+        if repeats:
+            if closed_risky:
+                return True
+            if group_risky:
+                group_risky[-1] = True
+        elif char == "|" and group_risky:
+            group_risky[-1] = True
+        if char == "(":
+            group_risky.append(False)
+        elif char == ")" and group_risky:
+            inner = group_risky.pop()
+            if group_risky and inner:
+                group_risky[-1] = True
+            closed_risky = inner
+            i += 1
+            continue
+        closed_risky = False
+        i += 1
+    return False
 
 
 def _resolve_modifier(value: str, modifier: str) -> str | None:

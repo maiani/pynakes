@@ -2,19 +2,23 @@
 
 import functools
 import json
+import os
+import re
 import sys
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TypeVar
 
+import click
 import typer
 from click.shell_completion import CompletionItem
 
 from pynakes.bibtex_parser import ParseError, parse_bib
+from pynakes.dedupe import DedupeConflictError
 from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography, ExternalModificationError
-from pynakes.io import save_text
+from pynakes.io import SaveResult, save_text
 from pynakes.model import QueryFilter
 from pynakes.query import And, InSet, parse_query
 
@@ -253,13 +257,84 @@ class InvalidInputError(ValueError):
     """
 
 
+# Click's own errors and aborts are rendered by Click itself. Typer 0.26+ raises
+# them from its vendored click, whose classes are reachable only through public
+# typer classes; on older typer these are the public click classes again.
+_CLICK_ERRORS: tuple[type[BaseException], ...] = tuple(
+    {
+        click.ClickException,
+        click.exceptions.Abort,
+        typer.Abort,
+        *(cls for cls in typer.BadParameter.__mro__ if cls.__name__ == "ClickException"),
+    }
+)
+
+
+def _same_file(a: str | Path, b: str | Path) -> bool:
+    """Return whether two paths name the same file (or would, once created)."""
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return Path(a).resolve() == Path(b).resolve()
+
+
+def _refuse_input_as_output(json_output: bool, out: str, inputs: Iterable[str | Path]) -> None:
+    """Exit with ``OutputIsInput`` when ``out`` names a file the command reads.
+
+    Writing a conversion, export, or split over one of its own inputs destroys
+    that input, so it is refused outright, before anything is written.
+    """
+    for source in inputs:
+        if _same_file(out, source):
+            _emit_error(
+                json_output,
+                "OutputIsInput",
+                f"Refusing to write {out}: it is also an input of this command",
+                file=str(out),
+            )
+
+
+def _require_written(json_output: bool, result: SaveResult, out: str, **extra) -> None:
+    """Exit with ``IOError`` when a write reported failure, instead of claiming success."""
+    if not result.success:
+        _emit_error(
+            json_output,
+            "IOError",
+            f"Could not write {out}: {result.error or 'unknown error'}",
+            file=str(out),
+            **extra,
+        )
+
+
+def _emit_dedupe_conflict(json_output: bool, exc: DedupeConflictError) -> None:
+    """Report conflicting duplicate works as an exit-2 conflict with options."""
+    _emit_conflict(
+        json_output,
+        "DedupeConflict",
+        str(exc),
+        conflicts=[conflict.to_dict() for conflict in exc.conflicts],
+        clusters=[cluster.to_dict() for cluster in exc.clusters],
+        options=[
+            {
+                "id": "manual_edit",
+                "description": "Resolve the conflicting field values manually, then retry",
+            },
+            {
+                "id": "keep_duplicates",
+                "description": "Leave these entries as separate records",
+            },
+        ],
+    )
+
+
 def _safe(fn: _F) -> _F:
-    """Turn expected failures into structured exit-1 errors instead of tracebacks.
+    """Turn every failure into a structured error instead of a traceback.
 
     Honors the agent contract: a missing/unreadable file, malformed BibTeX, or
     invalid argument is reported as ``{"status":"error",...}`` (or a plain line)
     with exit code 1. ``typer.Exit`` (including the exit-2 conflicts that
-    commands raise deliberately) passes through untouched.
+    commands raise deliberately) passes through untouched. Anything unforeseen
+    is still reported, as ``InternalError``, rather than escaping as a traceback.
     """
 
     @functools.wraps(fn)
@@ -299,6 +374,23 @@ def _safe(fn: _F) -> _F:
             _emit_error(json_output, "InvalidInput", str(exc))
         except OSError as exc:
             _emit_error(json_output, "IOError", str(exc))
+        except DedupeConflictError as exc:
+            _emit_dedupe_conflict(json_output, exc)
+        except RecursionError:
+            _emit_error(json_output, "InvalidInput", "The input is nested too deeply to process")
+        except SyntaxError as exc:
+            # A malformed import document, e.g. xml.etree.ElementTree.ParseError.
+            _emit_error(json_output, "InvalidInput", f"Could not parse the input: {exc}")
+        except re.error as exc:
+            _emit_error(json_output, "InvalidInput", f"Invalid regular expression: {exc}")
+        except _CLICK_ERRORS:
+            raise
+        except Exception as exc:  # noqa: BLE001 - last resort; never a traceback
+            _emit_error(
+                json_output,
+                "InternalError",
+                f"{type(exc).__name__}: {exc} (this is a bug in pynakes; please report it)",
+            )
 
     return wrapper
 

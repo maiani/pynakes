@@ -6,8 +6,8 @@ import os
 from pathlib import Path
 
 import click
+import typer
 from click.shell_completion import CompletionItem
-from typer._click.exceptions import UsageError as TyperUsageError
 from typer.core import TyperGroup
 
 from pynakes.cli_common import _emit_error, bib_candidates, missing_bib_message
@@ -22,6 +22,25 @@ _NO_AUTODETECT_COMMANDS = {"init"}
 # Context-meta key recording whether the caller asked for JSON output, so the
 # group can honor the JSON contract when reframing a usage error.
 _JSON_META_KEY = "pynakes_json_output"
+
+# Typer 0.26+ vendors its own click, so the usage errors and parameter sources
+# its parser produces are not the public ``click`` classes. Take typer's usage
+# error from a public typer class rather than importing its private module; on
+# older typer, which uses click itself, this is simply ``click.UsageError``.
+_TYPER_USAGE_ERROR: type[Exception] = next(
+    cls for cls in typer.BadParameter.__mro__ if cls.__name__ == "UsageError"
+)
+_USAGE_ERRORS = (click.UsageError, _TYPER_USAGE_ERROR)
+
+
+def _source_name(ctx: click.Context, param: click.Parameter) -> str | None:
+    """Return where ``param`` got its value, by name (``"COMMANDLINE"``, ...).
+
+    Compared by name because the enum comes from whichever click the running
+    typer uses, which need not be the public ``click`` module.
+    """
+    source = ctx.get_parameter_source(param.name) if param.name else None
+    return getattr(source, "name", None)
 
 
 def _is_shell_completion() -> bool:
@@ -245,7 +264,7 @@ class AutoBibGroup(TyperGroup):
         value = ctx.params.get(param.name)
         return (
             nargs == -1
-            or ctx.get_parameter_source(param.name) is not click.ParameterSource.COMMANDLINE
+            or _source_name(ctx, param) != "COMMANDLINE"
             or (nargs > 1 and isinstance(value, (tuple, list)) and len(value) < nargs)
         )
 
@@ -365,7 +384,7 @@ class AutoBibGroup(TyperGroup):
         json_output = "--json" in (args or [])
         try:
             return super().main(args=args, prog_name=prog_name, **extra)
-        except (click.UsageError, TyperUsageError) as exc:
+        except _USAGE_ERRORS as exc:
             _annotate_usage_error(exc)
             if json_output:
                 _emit_error(True, "UsageError", exc.format_message())
@@ -377,7 +396,7 @@ class AutoBibGroup(TyperGroup):
         as the test runner)."""
         try:
             return super().invoke(ctx)
-        except (click.UsageError, TyperUsageError) as exc:
+        except _USAGE_ERRORS as exc:
             _annotate_usage_error(exc)
             if not ctx.meta.get(_JSON_META_KEY, False):
                 raise  # Humans keep Click's usage text and exit code 2.

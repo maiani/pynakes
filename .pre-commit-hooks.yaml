@@ -4,7 +4,7 @@
 #
 #   repos:
 #     - repo: https://github.com/maiani/pynakes
-#       rev: v0.5.0
+#       rev: v0.6.5
 #       hooks:
 #         - id: pynakes-lint
 #         - id: pynakes-keys-check
@@ -31,9 +31,9 @@
   types: [file]
 
 - id: pynakes-files-check
-  name: pynakes files check
-  description: Fail if any JabRef linked file is missing or the wrong type.
-  entry: pynakes files check --strict
+  name: pynakes asset check
+  description: Fail if any linked file is missing or the wrong type.
+  entry: pynakes asset check --strict
   language: python
   files: \.bib$
   types: [file]

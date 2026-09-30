@@ -208,6 +208,18 @@ class FileStore:
         """Return the directory that holds in-flight temporary files."""
         return self.root / MANIFEST_DIR / TEMP_DIR
 
+    def _require_real_bookkeeping(self) -> None:
+        """Refuse a store whose ``.pinax`` bookkeeping is reached through a symlink.
+
+        Scratch sweeping deletes what it finds and the manifest is rewritten in
+        place, so either one reached through a link — a committed
+        ``.pinax/tmp -> ../../elsewhere``, say — would act on files outside the
+        store.
+        """
+        for path in (self.root / MANIFEST_DIR, self.scratch_root):
+            if path.is_symlink():
+                raise OSError(f"Refusing to use {path}: it is a symbolic link")
+
     @contextmanager
     def scratch(self) -> Iterator[Path]:
         """Yield this process's scratch directory, releasing it when empty.
@@ -219,6 +231,7 @@ class FileStore:
         permanently messy — nothing accumulates across runs.
         """
         root = self.scratch_root
+        self._require_real_bookkeeping()
         root.mkdir(parents=True, exist_ok=True)
         self.sweep_scratch()
         mine = root / str(os.getpid())
@@ -232,17 +245,19 @@ class FileStore:
         """Remove scratch directories belonging to processes that have exited.
 
         Concurrent pynakes processes each own a directory named for their pid,
-        so sweeping never touches another live run's in-flight files.
+        so sweeping never touches another live run's in-flight files. Anything
+        not named like a pid was not put there by pynakes and is left alone.
         """
+        self._require_real_bookkeeping()
         root = self.scratch_root
         if not root.is_dir():
             return []
         current = str(os.getpid())
         removed: list[Path] = []
         for item in sorted(root.iterdir(), key=lambda entry: entry.name):
-            if item.name == current:
+            if item.name == current or not item.name.isdigit():
                 continue
-            if item.name.isdigit() and _process_alive(int(item.name)):
+            if _process_alive(int(item.name)):
                 continue
             _remove_path(item)
             removed.append(item)
@@ -331,6 +346,7 @@ class FileStore:
     def write_manifest(self, manifest: dict[str, object], *, backup: bool = False) -> None:
         """Atomically write a provenance manifest."""
         manifest = _normalized_manifest(manifest)
+        self._require_real_bookkeeping()
         target = self.manifest_path
         target.parent.mkdir(parents=True, exist_ok=True)
         if backup and target.exists():

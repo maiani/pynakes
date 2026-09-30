@@ -479,7 +479,6 @@ def test_normalize_applies_saveactions_field_formatters() -> None:
         "note[latex_cleanup]\nabstract[latex_to_unicode]\nkeywords[unicode_to_latex]\n"
         "title[html_to_latex]\ncomment[html_to_unicode]\n;}\n\n"
         "@article{A,\n"
-        "  title = {T},\n"
         "  date = {8.1.2015},\n"
         "  month = {December},\n"
         "  pages = {1 - 2},\n"

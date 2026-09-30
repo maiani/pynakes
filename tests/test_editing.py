@@ -131,3 +131,44 @@ class TestEntryLevelSync:
         assert append_delimited_field(entry, "keywords", "b", ",", ", ") is False
         assert append_delimited_field(entry, "keywords", "c", ",", ", ") is True
         assert entry.fields["keywords"] == "a, b, c"
+
+
+# --- regressions: assignments hidden in quotes and comments ----------------
+
+
+def test_set_raw_field_ignores_assignment_text_inside_quoted_value() -> None:
+    raw = '@article{k, abstract = "We study x, title = y", title = {Real}}'
+
+    edited = set_raw_field(raw, "title", "New")
+
+    assert edited == '@article{k, abstract = "We study x, title = y", title = {New}}'
+
+
+def test_set_raw_field_ignores_commented_out_assignment() -> None:
+    raw = "@article{k,\n  % title = {Draft},\n  title = {Final}\n}"
+
+    edited = set_raw_field(raw, "title", "New")
+
+    assert edited == "@article{k,\n  % title = {Draft},\n  title = {New}\n}"
+
+
+def test_set_raw_field_appends_after_trailing_comment_without_swallowing_it() -> None:
+    raw = "@article{k,\n  year = 1900 % approximate\n}"
+
+    edited = set_raw_field(raw, "note", "Added")
+
+    assert edited == "@article{k,\n  year = 1900, % approximate\n  note = {Added}\n}"
+
+
+def test_set_raw_field_replaces_bare_value_before_trailing_comment() -> None:
+    raw = "@article{k,\n  year = 1900 % approximate\n}"
+
+    assert set_raw_field(raw, "year", "1901") == "@article{k,\n  year = {1901} % approximate\n}"
+
+
+def test_set_raw_field_edits_first_of_repeated_fields() -> None:
+    raw = "@article{k,\n  note = {first},\n  note = {second}\n}"
+
+    edited = set_raw_field(raw, "note", "New")
+
+    assert edited == "@article{k,\n  note = {New},\n  note = {second}\n}"

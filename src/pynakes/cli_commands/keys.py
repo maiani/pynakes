@@ -8,6 +8,7 @@ from pathlib import Path
 
 import typer
 
+from pynakes import _tex_rewrite
 from pynakes import keys as keys_ops
 from pynakes.cli_common import (
     _BACKUP_OPTION,
@@ -26,12 +27,10 @@ from pynakes.cli_common import (
 )
 from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography, ExternalModificationError
-from pynakes.io import save_plain_text
 from pynakes.usage import (
     extract_keys_from_tex,
     find_key_usages,
     iter_tex_files,
-    rename_citation_keys_in_tex,
     resolve_existing_tex_sources,
     tex_sources_from_metadata,
 )
@@ -165,7 +164,7 @@ def _rewrite_tex_sources(
     json_output: bool,
     sources: list[str] | None = None,
 ) -> tuple[list[dict], list[str], int, list[dict]]:
-    """Rewrite linked TeX citations for already-staged citation-key renames.
+    """Stage linked TeX citation rewrites for already-staged citation-key renames.
 
     With no TeX sources configured (no argument and no ``tex-sources`` metadata)
     there is simply nothing to update, so this returns a zero-update success —
@@ -190,33 +189,32 @@ def _rewrite_tex_sources(
     tex_files = iter_tex_files(resolved_sources)
     if not tex_files:
         _no_tex_sources(json_output)
+    if not sources:
+        _tex_rewrite.require_inside_project(tex_files, Path(file))
 
     if not params.dry_run and coll.externally_changed():
         if coll.path is None:
             raise ValueError("key operation requires a bound .bib file")
         raise ExternalModificationError(coll.path)
 
+    rewrites = [_tex_rewrite.plan_tex_rewrite(path, renames) for path in tex_files]
     source_changes = []
     source_diff_parts = []
-    total_source_occurrences = 0
-    for path in tex_files:
-        before = path.read_text(encoding="utf-8", errors="replace")
-        after, occurrences = rename_citation_keys_in_tex(before, renames)
-        modified = before != after
-        total_source_occurrences += occurrences
-        if modified:
-            source_diff_parts.append(generate_diff(before, after, path.name))
-            if not params.dry_run:
-                saved = save_plain_text(after, str(path), encoding="utf-8", backup=params.backup)
-                if not saved.success:
-                    raise OSError(saved.error or f"Could not write {path}")
+    for rewrite in rewrites:
+        if rewrite.modified:
+            source_diff_parts.append(
+                generate_diff(rewrite.before, rewrite.after, rewrite.path.name)
+            )
         source_changes.append(
             {
-                "path": str(path),
-                "modified": modified,
-                "occurrences": occurrences,
+                "path": str(rewrite.path),
+                "modified": rewrite.modified,
+                "occurrences": rewrite.occurrences,
             }
         )
+    # Written by the commit, after the .bib, so a failure cannot split them.
+    coll.stage_tex_rewrites(rewrites)
+    total_source_occurrences = sum(rewrite.occurrences for rewrite in rewrites)
     return source_changes, source_diff_parts, total_source_occurrences, warnings
 
 

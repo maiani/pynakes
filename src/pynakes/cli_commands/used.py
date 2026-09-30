@@ -16,6 +16,8 @@ from pynakes.cli_common import (
     _emit_error,
     _entries,
     _preview_or_commit,
+    _refuse_input_as_output,
+    _require_written,
     _resolve_input_bib,
     _safe,
     _verb,
@@ -73,6 +75,8 @@ def used(
         )
         return
     occurrences, include_all, scanned = collect_citation_occurrences(resolved_sources)
+    if out:
+        _refuse_input_as_output(json_output, out, [bib_file, *scanned])
     report = analyze_usage(
         coll.lib,
         set(occurrences),
@@ -104,7 +108,8 @@ def used(
         content = write_bib(sub)
         if not params.dry_run:
             save_result = save_text(content, out, backup=False)
-            out_written = save_result.success
+            _require_written(params.json_output, save_result, out, modified=file_modified)
+            out_written = True
 
     human = [
         f"Scanned {len(scanned)} source file(s); {report.cited_count} cited key(s).",

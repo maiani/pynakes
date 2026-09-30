@@ -626,6 +626,9 @@ def _parse_jabref_params(body: str) -> list[str]:
     """
     unescaped_idx = _find_unescaped(body, ";")
     if "\\;" in body and (unescaped_idx == -1 or unescaped_idx == len(body) - 1):
+        if unescaped_idx == len(body) - 1:
+            # The bare ``;`` ends the group; it is not one more parameter.
+            body = body[:-1]
         parts = body.split("\\;")
         return [_unescape(p) for p in parts]
     return _split_escaped(body, ";")
@@ -802,8 +805,22 @@ def format_jabref_grouping(nodes: list[GroupNode]) -> str:
             ]
             line = f"{d} StaticGroup:{';'.join(params)};"
 
-        lines.append(line)
+        lines.append(_quote_group_line(line))
     return "\n".join(lines)
+
+
+def _quote_group_line(line: str) -> str:
+    """Quote one serialized group the way JabRef writes it inside ``grouping``.
+
+    JabRef quotes every group a second time at the metadata level, so on disk
+    its field separators appear as ``\\;`` and only the terminating ``;`` is
+    bare: ``1 StaticGroup:Physics\\;0\\;1\\;0x8a8a8aff\\;\\;\\;;``. JabRef's
+    reader splits the block on bare ``;``, so a group written unquoted falls
+    apart into fragments it cannot parse, and the groups are lost.
+    """
+    # The serialized group already ends with JabRef's own trailing separator;
+    # it is quoted like the rest, and the bare terminator follows it.
+    return line.replace("\\", "\\\\").replace(";", "\\;") + ";"
 
 
 # ---------------------------------------------------------------------------

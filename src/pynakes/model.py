@@ -30,7 +30,7 @@ def resolve_field_value(value: str, strings: dict[str, str]) -> str:
     - Everything else: returned unchanged.
     """
     lookup = _string_lookup(strings)
-    return _resolve_value(value, lookup, set())
+    return _Resolver(lookup).expression(value, frozenset()).text
 
 
 def resolve_string_definitions(strings: dict[str, str]) -> dict[str, str]:
@@ -40,9 +40,9 @@ def resolve_string_definitions(strings: dict[str, str]) -> dict[str, str]:
     looking keys up case-insensitively as BibTeX requires. Cyclic references
     are left as their literal identifiers rather than causing recursion.
     """
-    lookup = _string_lookup(strings)
+    resolver = _Resolver(_string_lookup(strings))
     return {
-        key: _resolve_value(definition, lookup, {key.lower()})
+        key: resolver.expression(definition, frozenset({key.lower()})).text
         for key, definition in strings.items()
     }
 
@@ -58,35 +58,85 @@ def _string_lookup(strings: dict[str, str]) -> dict[str, tuple[str, str]]:
     return lookup
 
 
-def _resolve_value(
-    value: str,
-    lookup: dict[str, tuple[str, str]],
-    resolving: set[str],
-) -> str:
-    """Resolve one BibTeX value expression without changing source text."""
-    parts = _split_concatenation(value)
-    if len(parts) > 1:
-        return "".join(_resolve_atom(part, lookup, resolving) for part in parts)
-    return _resolve_atom(value, lookup, resolving)
+#: The longest text one ``#`` concatenation may expand to. Real values are far
+#: shorter; the cap exists because each level of ``s1 = s0 # s0`` doubles the
+#: text, so a few hundred bytes of ``@string`` definitions could otherwise
+#: expand to gigabytes. A concatenation past it stays unexpanded.
+_MAX_EXPANSION = 1_000_000
 
 
-def _resolve_atom(
-    value: str,
-    lookup: dict[str, tuple[str, str]],
-    resolving: set[str],
-) -> str:
-    atom = value.strip()
-    unwrapped = _unwrap_delimited(atom)
-    if unwrapped is not None:
-        return unwrapped
+@dataclass(frozen=True)
+class _Expansion:
+    """A resolved value plus what its result depended on.
 
-    if not _BARE_IDENTIFIER.fullmatch(atom):
-        return atom
-    definition = lookup.get(atom.lower())
-    if definition is None or atom.lower() in resolving:
-        return atom
-    key, expression = definition
-    return _resolve_value(expression, lookup, {*resolving, key.lower()})
+    ``touched`` names every macro the expansion looked up; ``cuts`` names the
+    macros it left literal because they were already being resolved higher up;
+    ``capped`` marks a value left literal because it would pass the size cap,
+    which then keeps every expression built on it literal too.
+    """
+
+    text: str
+    touched: frozenset[str] = frozenset()
+    cuts: frozenset[str] = frozenset()
+    capped: bool = False
+
+
+class _Resolver:
+    """Resolve BibTeX expressions, expanding each macro once.
+
+    Without memoization, ``s1 = s0 # s0``, ``s2 = s1 # s1``, ... re-expands every
+    level twice, which is exponential in the number of definitions. A memoized
+    expansion is reused only where it would come out the same: it must not have
+    depended on the resolution chain it was computed under, and none of the
+    macros it touched may be on the current chain (those would be cut instead).
+    """
+
+    def __init__(self, lookup: dict[str, tuple[str, str]]) -> None:
+        self._lookup = lookup
+        self._memo: dict[str, _Expansion] = {}
+
+    def expression(self, value: str, resolving: frozenset[str]) -> _Expansion:
+        """Resolve one value expression without changing source text."""
+        parts = _split_concatenation(value)
+        if len(parts) <= 1:
+            return self._atom(value, resolving)
+        texts: list[str] = []
+        touched: set[str] = set()
+        cuts: set[str] = set()
+        length = 0
+        for part in parts:
+            expansion = self._atom(part, resolving)
+            touched |= expansion.touched
+            cuts |= expansion.cuts
+            length += len(expansion.text)
+            if expansion.capped or length > _MAX_EXPANSION:
+                return _Expansion(value.strip(), frozenset(touched), frozenset(cuts), True)
+            texts.append(expansion.text)
+        return _Expansion("".join(texts), frozenset(touched), frozenset(cuts))
+
+    def _atom(self, value: str, resolving: frozenset[str]) -> _Expansion:
+        atom = value.strip()
+        unwrapped = _unwrap_delimited(atom)
+        if unwrapped is not None:
+            return _Expansion(unwrapped)
+        if not _BARE_IDENTIFIER.fullmatch(atom):
+            return _Expansion(atom)
+        name = atom.lower()
+        definition = self._lookup.get(name)
+        if definition is None:
+            return _Expansion(atom)
+        if name in resolving:
+            return _Expansion(atom, frozenset({name}), frozenset({name}))
+        cached = self._memo.get(name)
+        if cached is not None and cached.touched.isdisjoint(resolving):
+            return cached
+        _, expression = definition
+        inner = self.expression(expression, resolving | {name})
+        text = atom if inner.capped else inner.text
+        expansion = _Expansion(text, inner.touched | {name}, inner.cuts - {name}, inner.capped)
+        if not expansion.cuts:
+            self._memo[name] = expansion
+        return expansion
 
 
 def _split_concatenation(value: str) -> list[str]:

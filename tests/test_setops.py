@@ -409,7 +409,12 @@ def test_cli_split_catch_all_bucket_with_no_materials_does_not_crash(tmp_path: P
         ],
     )
 
-    assert result.exit_code == 0, result.output
+    # The unwritable bucket is reported honestly (it used to claim success
+    # with ``written: false``), as a clean error rather than a crash.
+    assert result.exit_code == 1, result.output
+    data = json.loads(result.output)
+    assert data["error"] == "IOError"
+    assert [output["file"] for output in data["outputs"]] == [ml]
     assert not (tmp_path / "no-such-dir").exists()
 
 

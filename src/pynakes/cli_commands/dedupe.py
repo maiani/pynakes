@@ -11,7 +11,7 @@ from pynakes.cli_common import (
     _BACKUP_OPTION,
     CheckOutcome,
     RunParams,
-    _emit_conflict,
+    _emit_dedupe_conflict,
     _emit_error,
     _finish_mod,
     _resolve_input_bib,
@@ -92,23 +92,7 @@ def dedupe_merge(
         _emit_error(json_output, "NoSuchDuplicate", str(exc))
         return
     except dedupe_ops.DedupeConflictError as exc:
-        _emit_conflict(
-            json_output,
-            "DedupeConflict",
-            str(exc),
-            conflicts=[conflict.to_dict() for conflict in exc.conflicts],
-            clusters=[cluster.to_dict() for cluster in exc.clusters],
-            options=[
-                {
-                    "id": "manual_edit",
-                    "description": "Resolve the conflicting field values manually, then retry",
-                },
-                {
-                    "id": "keep_duplicates",
-                    "description": "Leave these entries as separate records",
-                },
-            ],
-        )
+        _emit_dedupe_conflict(json_output, exc)
         return
 
     scope = f" selected by {len(selected)} key(s)" if selected else ""

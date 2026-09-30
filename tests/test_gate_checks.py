@@ -6,6 +6,7 @@ multi-file JSON envelope, and the shipped ``.pre-commit-hooks.yaml``.
 """
 
 import json
+import shlex
 from pathlib import Path
 
 import yaml
@@ -177,3 +178,19 @@ class TestPreCommitHooks:
             assert hook["entry"].endswith("--strict")
             assert hook["language"] == "python"
             assert hook["files"] == r"\.bib$"
+
+    def test_every_hook_entry_runs_on_a_clean_library(self, tmp_path: Path) -> None:
+        # The files-check hook once named a command renamed away in 0.5.0 and
+        # failed for every user who enabled it; run each entry for real.
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Euler1748,\n  author = {Euler, Leonhard},\n"
+            "  title = {Introductio},\n  journal = {Opera},\n  year = {1748}\n}\n"
+        )
+        hooks = yaml.safe_load((REPO_ROOT / ".pre-commit-hooks.yaml").read_text())
+        for hook in hooks:
+            argv = shlex.split(hook["entry"])[1:]
+
+            result = runner.invoke(app, [*argv, str(bib)])
+
+            assert result.exit_code == 0, (hook["id"], result.output)

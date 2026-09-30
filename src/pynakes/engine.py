@@ -12,10 +12,11 @@ Operation methods (field edits, key ops, normalization, import, …) live in
 from this module.
 """
 
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from pynakes import _tex_rewrite
 from pynakes import metadata as metadata_ops
 from pynakes._engine_groups import BibliographyGroups
 from pynakes._engine_helpers import (
@@ -31,7 +32,6 @@ from pynakes._engine_helpers import (
     fingerprint,
     insert_metadata_comment,
     iter_changed_entries,
-    read_text,
     snapshot_entries,
     snapshot_source_spans,
 )
@@ -42,7 +42,7 @@ from pynakes.bibtex_writer import write_bib
 from pynakes.canonical import CanonicalLayout, write_bib_canonical
 from pynakes.diff import generate_diff
 from pynakes.filestore import FileStore, PinaxRenameTransaction
-from pynakes.io import load_bib, save_text
+from pynakes.io import _load_source, save_text
 from pynakes.model import BibEntry, BibFile, EntryStore, QueryFilter
 
 # Re-export so ``from pynakes.engine import CommitResult, ExternalModificationError`` works.
@@ -87,13 +87,14 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
     _pinax_renames: list[tuple[str, str]] = field(default_factory=list)
     _pinax_material_merges: list[tuple[str, str]] = field(default_factory=list)
     _format_layout: CanonicalLayout | None = None
+    _tex_rewrites: list[_tex_rewrite.TexRewrite] = field(default_factory=list)
+    _after_commit: list[Callable[[], object]] = field(default_factory=list)
 
     @classmethod
     def open(cls, path: str | Path) -> "Bibliography":
         """Load a `.bib` file into a bibliography."""
         bound_path = Path(path)
-        lib = load_bib(str(bound_path))
-        pristine_text = read_text(bound_path, lib.encoding)
+        lib, pristine_text, data = _load_source(bound_path)
         source_snapshot = snapshot_source_spans(pristine_text, lib)
         coll = cls(
             lib,
@@ -101,7 +102,7 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
             _pristine_text=pristine_text,
             _entry_snapshot=snapshot_entries(lib),
             _source_snapshot=source_snapshot,
-            _fingerprint=fingerprint(bound_path),
+            _fingerprint=fingerprint(bound_path, data),
         )
         FileStore.from_metadata(coll.lib, bound_path)
         return coll
@@ -228,13 +229,25 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
         diff_text = self.diff()
         new_text = self.preview()
         modified = new_text != self._pristine_text
+        tex_rewrites = list(self._tex_rewrites)
+        after_commit = list(self._after_commit)
+        # Check every staged TeX source before touching anything, so a source
+        # that cannot be rewritten stops the commit rather than splitting it.
+        try:
+            _tex_rewrite.preflight(tex_rewrites)
+        except _tex_rewrite.TexSourceChangedError as exc:
+            raise ExternalModificationError(exc.path) from exc
         transactions: list[PinaxRenameTransaction] = []
         try:
             transactions = self._apply_pinax_renames()
             transactions.extend(self._apply_pinax_material_merges())
             if modified:
                 result = save_text(
-                    new_text, str(self.path), encoding=self.lib.encoding, backup=backup
+                    new_text,
+                    str(self.path),
+                    encoding=self.lib.encoding,
+                    backup=backup,
+                    validate=True,
                 )
                 if not result.success:
                     raise OSError(result.error or f"Could not write {self.path}")
@@ -243,7 +256,24 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
                 transaction.rollback()
             raise
         self._refresh_from_text(new_text, fingerprint=fingerprint(self.path))
+        # The .bib is committed; the manuscript follows it, never the reverse.
+        _tex_rewrite.apply(tex_rewrites, backup=backup)
+        for action in after_commit:
+            action()
         return CommitResult(changed_entries, diff_text, modified)
+
+    def after_commit(self, action: Callable[[], object]) -> None:
+        """Run ``action`` once the next commit has written the ``.bib``.
+
+        For side effects that must follow the bibliography rather than precede
+        it, such as deleting the materials of a removed entry: if the commit
+        fails, they never happen.
+        """
+        self._after_commit.append(action)
+
+    def stage_tex_rewrites(self, rewrites: list[_tex_rewrite.TexRewrite]) -> None:
+        """Stage TeX source rewrites to be applied after the next commit."""
+        self._tex_rewrites.extend(rewrite for rewrite in rewrites if rewrite.modified)
 
     def _clear_staged_edits(self) -> None:
         self._appended_entries.clear()
@@ -253,6 +283,8 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
         self._consolidate_metadata = False
         self._removed_comments.clear()
         self._format_layout = None
+        self._tex_rewrites.clear()
+        self._after_commit.clear()
 
     def reset(self) -> None:
         """Discard staged edits and restore the pristine in-memory library."""
@@ -269,13 +301,13 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
             raise ValueError("reload requires a bound path")
         if self.is_dirty and not force:
             raise ValueError("cannot reload a dirty bibliography without force=True")
-        lib = load_bib(str(self.path))
+        lib, text, data = _load_source(self.path)
         FileStore.from_metadata(lib, self.path)
         self.lib = lib
-        self._pristine_text = read_text(self.path, self.lib.encoding)
+        self._pristine_text = text
         self._entry_snapshot = snapshot_entries(self.lib)
         self._source_snapshot = snapshot_source_spans(self._pristine_text, self.lib)
-        self._fingerprint = fingerprint(self.path)
+        self._fingerprint = fingerprint(self.path, data)
         self._clear_staged_edits()
 
     def _refresh_from_text(self, text: str, fingerprint: FileFingerprint | None = None) -> None:

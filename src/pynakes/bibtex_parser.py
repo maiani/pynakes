@@ -190,12 +190,16 @@ def _parse_entry(entry_type: str, body: str, raw_content: str, start_line: int) 
 
 
 def _parse_fields(content: str) -> dict[str, str]:
-    """Extract field assignments, respecting nested braces and quoted values."""
+    """Extract field assignments, respecting nested braces and quoted values.
+
+    A repeated field keeps its first value, as BibTeX does ("I'm ignoring
+    ...'s extra field"); the surgical editors also address the first one.
+    """
     fields: dict[str, str] = {}
     for part in _split_top_level(content, ","):
         name, value = _split_once_top_level(part, "=")
         field_name = name.strip().lower()
-        if field_name:
+        if field_name and field_name not in fields:
             fields[field_name] = value.strip() if value is not None else ""
     return fields
 

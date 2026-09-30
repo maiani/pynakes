@@ -222,3 +222,28 @@ def test_a_retry_after_already_in_the_past_does_not_wait(monkeypatch) -> None:
     fetch_bytes("https://example.test", opener=opener, sleep=slept.append)
 
     assert slept == [0.0]
+
+
+def test_httpx_transport_refuses_a_declared_oversized_download(monkeypatch) -> None:
+    monkeypatch.setattr("pynakes.providers._http.MAX_DOWNLOAD_BYTES", 1024)
+    _mock_httpx_client(
+        monkeypatch,
+        lambda request: httpx.Response(
+            200, headers={"Content-Length": "4096"}, content=b"x" * 4096
+        ),
+    )
+
+    with pytest.raises(ProviderFetchError, match="download limit"):
+        fetch_bytes("https://example.test/paper.pdf", sleep=lambda _s: None)
+
+
+def test_httpx_transport_stops_an_undeclared_oversized_download(monkeypatch) -> None:
+    monkeypatch.setattr("pynakes.providers._http.MAX_DOWNLOAD_BYTES", 1024)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=iter([b"x" * 600, b"x" * 600, b"x" * 600]))
+
+    _mock_httpx_client(monkeypatch, handler)
+
+    with pytest.raises(ProviderFetchError, match="download limit"):
+        fetch_bytes("https://example.test/paper.pdf", sleep=lambda _s: None)

@@ -8,9 +8,12 @@ has since exited.
 
 import os
 import shutil
+import sys
 import tempfile
 import uuid
 from pathlib import Path
+
+from pynakes._atomic import match_mode
 
 _FILESYSTEM_ERRORS = (OSError, shutil.Error)
 
@@ -23,6 +26,9 @@ def _process_alive(pid: int) -> bool:
     """
     if pid <= 0:
         return False
+    if sys.platform == "win32":
+        # On Windows, os.kill(pid, 0) is not a probe: signal 0 is CTRL_C_EVENT.
+        return _windows_process_alive(pid)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -30,6 +36,27 @@ def _process_alive(pid: int) -> bool:
     except OSError:
         return True
     return True
+
+
+def _windows_process_alive(pid: int) -> bool:
+    """Ask Windows whether ``pid`` is running, without signalling it."""
+    import ctypes
+
+    process_query_limited_information = 0x1000
+    error_access_denied = 5
+    still_active = 259
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+    handle = kernel32.OpenProcess(process_query_limited_information, False, pid)
+    if not handle:
+        # Denied means it exists but belongs to someone else: not ours to sweep.
+        return ctypes.get_last_error() == error_access_denied  # type: ignore[attr-defined]
+    try:
+        exit_code = ctypes.c_ulong()
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+            return True
+        return exit_code.value == still_active
+    finally:
+        kernel32.CloseHandle(handle)
 
 
 def _remove_path(path: Path) -> None:
@@ -55,6 +82,9 @@ def _atomic_write_bytes(path: Path, data: bytes, root: Path) -> None:
         with tmp:
             tmp.write(data)
             tmp.flush()
+        # Keep the material's permissions. A symlinked material is replaced,
+        # never written through: its target may lie outside the store.
+        match_mode(tmp_path, path)
         tmp_path.replace(path)
     except _FILESYSTEM_ERRORS:
         tmp_path.unlink(missing_ok=True)

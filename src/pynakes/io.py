@@ -1,10 +1,12 @@
 """I/O operations for BibTeX files with atomic writes and backups."""
 
+import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from shutil import copyfile
+from shutil import copyfile, copymode
 
+from pynakes._atomic import match_mode, replacement_target
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.model import BibFile
@@ -33,6 +35,7 @@ def _write_backup(path: Path) -> str:
         staged_backup = Path(tmp.name)
     try:
         copyfile(path, staged_backup)
+        copymode(path, staged_backup)
         staged_backup.replace(backup_path)
     finally:
         staged_backup.unlink(missing_ok=True)
@@ -68,16 +71,26 @@ def load_bib(file_path: str) -> BibFile:
         FileNotFoundError: If file doesn't exist
         ParseError: If BibTeX is malformed
     """
+    return _load_source(file_path)[0]
+
+
+def _load_source(file_path: str | Path) -> tuple[BibFile, str, bytes]:
+    """Load a library with the exact text and bytes it was parsed from.
+
+    One read serves the parse, the pristine text, and the change fingerprint,
+    so a save landing in between cannot slip past the concurrency check.
+    """
     path = Path(file_path)
 
     if not path.exists():
         raise FileNotFoundError(f"File not found: {file_path}")
 
-    text, encoding = _decode_bytes(path.read_bytes())
+    data = path.read_bytes()
+    text, encoding = _decode_bytes(data)
 
     lib = parse_bib(text)
     lib.encoding = encoding
-    return lib
+    return lib, text, data
 
 
 def save_bib(lib: BibFile, file_path: str, backup: bool = True, atomic: bool = True) -> SaveResult:
@@ -128,9 +141,19 @@ def save_text(
     against every process, operating-system, or storage failure.
     """
     path = Path(file_path)
+    # Replace a symlink's target rather than the link itself.
+    target = replacement_target(path)
     backup_path = None
-    original_exists = path.exists()
+    original_exists = target.exists()
     tmp_path: Path | None = None
+
+    if original_exists and not os.access(target, os.W_OK):
+        return SaveResult(
+            success=False,
+            file_path=file_path,
+            backup_path=None,
+            error=f"{file_path} is read-only; nothing was written",
+        )
 
     try:
         if atomic:
@@ -138,7 +161,7 @@ def save_text(
             # final rename is guaranteed to be on the same filesystem.
             with tempfile.NamedTemporaryFile(
                 mode="w",
-                dir=path.parent,
+                dir=target.parent,
                 delete=False,
                 encoding=encoding,
                 newline="",
@@ -162,8 +185,10 @@ def save_text(
             if backup and original_exists:
                 backup_path = _write_backup(path)
 
-            # Atomic swap: on POSIX this is a single syscall.
-            tmp_path.replace(path)
+            # Atomic swap: on POSIX this is a single syscall. The replacement
+            # keeps the destination's permissions, not the temp file's 0600.
+            match_mode(tmp_path, target)
+            tmp_path.replace(target)
             tmp_path = None
         else:
             # Non-atomic write — preserve a copied backup first if requested.

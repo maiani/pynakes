@@ -34,6 +34,8 @@ _ERROR_CODES = {
             "ParseError": "A .bib or source file could not be parsed (includes 'line').",
             "InvalidInput": "An argument, option, or predicate was invalid.",
             "IOError": "A read or write failed.",
+            "OutputIsInput": "convert/tex scan/corpus split: the output path is also an input.",
+            "InternalError": "An unexpected failure inside pynakes (a bug; please report it).",
             "NoSources": "tex scan: no sources given and no 'tex-sources' metadata to use.",
             "InvalidNamespace": "metadata set: namespace was not 'jabref' or 'pynakes'.",
             "InvalidNormalizeOption": "normalize: an option value was not allowed.",

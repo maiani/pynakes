@@ -33,6 +33,8 @@ import tempfile
 import threading
 from pathlib import Path
 
+from pynakes._atomic import match_mode
+
 CACHE_FORMATS = ("json", "bib", "xml")
 
 # Compaction fires once the file carries more than this multiple of the live
@@ -203,6 +205,7 @@ def _atomic_write_text(path: Path, text: str) -> None:
         with tmp:
             tmp.write(text)
             tmp.flush()
+        match_mode(tmp_path, path)
         tmp_path.replace(path)
     except OSError:
         tmp_path.unlink(missing_ok=True)

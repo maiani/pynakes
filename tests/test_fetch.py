@@ -740,3 +740,47 @@ def test_dry_run_lines_say_what_would_happen_rather_than_skipped() -> None:
     assert lines[0] == "Would fetch Euler_1748_Introductio."
     # A genuine no-action case keeps its "Skipped" wording.
     assert lines[1] == "Skipped Gauss_1801_Disquisitiones (no DOI)."
+
+
+# --- regressions: a source bundle cannot unpack without bound ---------------
+
+
+def test_tar_source_over_the_size_limit_is_refused_before_extraction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("pynakes.fetch.MAX_SOURCE_BYTES", 1024)
+    target = tmp_path / "src"
+
+    with pytest.raises(ArxivFetchError, match="unpacks to more than"):
+        extract_arxiv_source(_tar_bytes({"main.tex": b"x" * 4096}), target)
+
+    assert list(target.iterdir()) == []
+
+
+def test_tar_source_with_too_many_members_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("pynakes.fetch.MAX_SOURCE_MEMBERS", 3)
+    files = {f"part{i}.tex": b"x" for i in range(5)}
+
+    with pytest.raises(ArxivFetchError, match="members"):
+        extract_arxiv_source(_tar_bytes(files), tmp_path / "src")
+
+
+def test_single_file_source_over_the_size_limit_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("pynakes.fetch.MAX_SOURCE_BYTES", 1024)
+    target = tmp_path / "src"
+
+    with pytest.raises(ArxivFetchError, match="unpacks to more than"):
+        extract_arxiv_source(_gzip_bytes(b"x" * (4 << 20), name=b"noether.tex"), target)
+
+    assert list(target.iterdir()) == []
+
+
+def test_truncated_single_file_source_is_an_arxiv_error(tmp_path: Path) -> None:
+    data = _gzip_bytes(b"\\documentclass{article}\n" * 400, name=b"noether.tex")
+
+    with pytest.raises(ArxivFetchError):
+        extract_arxiv_source(data[: len(data) // 2], tmp_path / "src")
