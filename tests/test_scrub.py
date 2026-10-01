@@ -60,7 +60,7 @@ CLEAN = """@article{darwin1859,
 
 def _bib(tmp_path: Path, name: str, text: str) -> Path:
     path = tmp_path / name
-    path.write_text(text)
+    path.write_text(text, encoding="utf-8", newline="")  # exact bytes on Windows too
     return path
 
 

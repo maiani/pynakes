@@ -29,14 +29,17 @@ def test_tex_sources_from_metadata_resolves_relative_to_base() -> None:
         "@comment{pynakes-meta: tex-sources:paper.tex, sections/;}\n@article{A,\n  title = {T}\n}\n"
     )
 
-    assert tex_sources_from_metadata(lib, "/proj") == ["/proj/paper.tex", "/proj/sections"]
+    assert tex_sources_from_metadata(lib, "/proj") == [
+        str(Path("/proj/paper.tex")),
+        str(Path("/proj/sections")),
+    ]
 
 
 def test_tex_sources_from_metadata_absolute_kept_and_legacy_alias() -> None:
     lib = parse_bib(
         "@comment{pynakes-meta: tex-sources:/abs/main.tex;}\n@article{A,\n  title = {T}\n}\n"
     )
-    assert tex_sources_from_metadata(lib, "/proj") == ["/abs/main.tex"]
+    assert tex_sources_from_metadata(lib, "/proj") == [str(Path("/abs/main.tex"))]
 
 
 def test_tex_sources_from_metadata_absent_is_empty() -> None:
