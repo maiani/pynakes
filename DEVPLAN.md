@@ -58,22 +58,19 @@ it or leave it unpushed.
 
 #### Stage 2 — CI, release pipeline, platforms
 
-Done second, so every later stage is tested everywhere the beta claims to run.
+Done: every later stage is now tested everywhere the beta claims to run.
 The work is recorded in CHANGELOG under Unreleased: Python 3.12 as the floor, the
 three-OS matrix with 3.15 allowed to fail, a lowest-dependency job, release
 checks and wheel tests before publishing, PyPI before the GitHub release,
 dependabot, the two Windows fixes, and mypy at a recorded baseline (the
 `[[tool.mypy.overrides]]` list in `pyproject.toml`, to shrink and never grow).
 Actions are referenced by major version tag, by choice, rather than pinned by
-commit SHA. What remains is proving it:
+commit SHA. Running the release workflow by hand is a dry run; its TestPyPI
+option needs a `testpypi` environment and a trusted publisher on test.pypi.org
+first.
 
-- Run the new matrix and fix what Windows and macOS turn up.
-- Dry-run the release workflow by hand (`workflow_dispatch`): every check and
-  the wheel tests, nothing published. TestPyPI needs a `testpypi` environment
-  and a trusted publisher on test.pypi.org before its option can be used.
-
-**Gate 2**: the full matrix is green, the lowest-dependency job included; a
-release dry run passes every new check.
+**Gate 2** (met, 2026-10-01): the full matrix is green, the lowest-dependency
+job included; a release dry run passed every new check.
 
 #### Stage 3 — Cleanup before the freeze
 
