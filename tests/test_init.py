@@ -6,7 +6,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from pynakes.cli import app
-from pynakes.initialize import apply_overrides, collect_profile, render_library
+from pynakes.initialize import apply_overrides, collect_profile, render_agents_md, render_library
 from pynakes.io import load_bib
 from pynakes.model import BibFile
 
@@ -203,7 +203,12 @@ def test_init_new_pinax_writes_agent_guide(tmp_path: Path) -> None:
     assert data["pinax"] is True
     assert data["agent_guide"] == str(tmp_path / "AGENTS.md")
     assert (tmp_path / "library.files").is_dir()
-    assert "library.bib" in (tmp_path / "AGENTS.md").read_text()
+    # Byte-exact on every platform: UTF-8 (the template is not ASCII) and LF,
+    # not the locale's code page and CRLF a bare write_text gives on Windows.
+    written = (tmp_path / "AGENTS.md").read_bytes()
+    assert written == render_agents_md("library").encode("utf-8")
+    assert b"\r\n" not in written
+    assert "library.bib" in written.decode("utf-8")
 
 
 def test_init_converts_existing_library_to_pinax_idempotently(tmp_path: Path) -> None:

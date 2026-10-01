@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from shutil import copyfile, copymode
 
-from pynakes._atomic import match_mode, replacement_target
+from pynakes._atomic import match_mode, replace_file, replacement_target
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.model import BibFile
@@ -36,7 +36,7 @@ def _write_backup(path: Path) -> str:
     try:
         copyfile(path, staged_backup)
         copymode(path, staged_backup)
-        staged_backup.replace(backup_path)
+        replace_file(staged_backup, backup_path)
     finally:
         staged_backup.unlink(missing_ok=True)
     return str(backup_path)
@@ -188,7 +188,7 @@ def save_text(
             # Atomic swap: on POSIX this is a single syscall. The replacement
             # keeps the destination's permissions, not the temp file's 0600.
             match_mode(tmp_path, target)
-            tmp_path.replace(target)
+            replace_file(tmp_path, target)
             tmp_path = None
         else:
             # Non-atomic write — preserve a copied backup first if requested.

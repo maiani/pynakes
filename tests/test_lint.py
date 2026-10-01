@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import pynakes.lint as lint_module
 from pynakes.bibtex_parser import parse_bib
 from pynakes.identity import identity_class
 from pynakes.lint import (
@@ -764,7 +765,7 @@ def test_custom_biblatex_entry_type_and_field_names_produce_no_errors() -> None:
 def test_every_emitted_issue_type_has_a_category() -> None:
     # Parses lint.py so a newly added check cannot silently inherit the
     # correctness fallback: every LintIssue type must be mapped explicitly.
-    source = Path(__file__).resolve().parents[1] / "src" / "pynakes" / "lint.py"
+    source = Path(lint_module.__file__)  # the imported module, so a wheel install works too
     tree = ast.parse(source.read_text(encoding="utf-8"))
     emitted = {
         node.args[0].value
@@ -784,7 +785,7 @@ def test_every_emitted_issue_type_has_a_category() -> None:
 
 
 def test_every_emitted_severity_is_declared() -> None:
-    source = Path(__file__).resolve().parents[1] / "src" / "pynakes" / "lint.py"
+    source = Path(lint_module.__file__)  # the imported module, so a wheel install works too
     tree = ast.parse(source.read_text(encoding="utf-8"))
     severities = {
         node.args[1].value

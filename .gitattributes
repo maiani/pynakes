@@ -1,0 +1,4 @@
+# Bibliography files are test data for a round-trip-faithful tool: check them
+# out byte-for-byte on every platform, never with CRLF translation.
+*.bib -text
+tests/fixtures/** -text

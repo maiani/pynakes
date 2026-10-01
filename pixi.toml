@@ -1,6 +1,6 @@
 # Pixi manifest for developer tasks whose toolchain is not pip-installable —
 # principally building the VS Code extension, which needs Node and a Python
-# 3.11+ interpreter available together.
+# 3.12+ interpreter available together.
 #
 # This does not replace the pip workflow in AGENTS.md: `pip install -e
 # ".[dev,docs]"` is still how the engine is developed and tested, and `pytest` /
@@ -21,7 +21,7 @@ nodejs = ">=20"
 # which is also what CI builds the bundle with: the wheels are pure-Python and
 # universal, but resolving them on a newer interpreter can pick different
 # versions, and a bundle should not depend on which Python happened to build it.
-python = "3.11.*"
+python = "3.12.*"
 pip = "*"
 
 [tasks.build-extension]

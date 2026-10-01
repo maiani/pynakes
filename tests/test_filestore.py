@@ -2,6 +2,7 @@
 
 import json
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -447,6 +448,8 @@ class TestScratchOwnership:
         def denied(pid: int, signal: int) -> None:
             raise PermissionError("not yours")
 
+        # The POSIX probe; Windows asks OpenProcess instead of signalling.
+        monkeypatch.setattr(sys, "platform", "linux")
         monkeypatch.setattr(os, "kill", denied)
 
         assert _process_alive(4242) is True

@@ -565,7 +565,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         message: `Could not run the pynakes engine as "${error.command}".`,
         detail:
           "No usable engine was found. The extension ships one, which needs a " +
-          "Python 3.11+ interpreter on the system; if there is none, install the " +
+          "Python 3.12+ interpreter on the system; if there is none, install the " +
           "engine with `pip install pynakes`. The `pynakes.executable` setting " +
           "overrides discovery entirely, and `pynakes.engine` can force the " +
           "bundled or the installed engine.",

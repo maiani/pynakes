@@ -8,6 +8,7 @@ result. Do not import this module directly; use ``pynakes.engine``.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pynakes import _tex_rewrite
 from pynakes import keys as key_ops
@@ -17,12 +18,23 @@ from pynakes.usage import (
     tex_sources_from_metadata,
 )
 
+if TYPE_CHECKING:
+    from pynakes.model import BibFile
+
 
 class BibliographyKeys:
     """Mixin providing key operations for :class:`~pynakes.engine.Bibliography`.
 
     Consumers must not instantiate this class directly.
     """
+
+    if TYPE_CHECKING:
+        # Provided by the concrete ``Bibliography`` dataclass.
+        lib: BibFile
+        path: Path | None
+
+        def _stage_pinax_renames(self, renames: list[tuple[str, str]]) -> None: ...
+        def stage_tex_rewrites(self, rewrites: list[_tex_rewrite.TexRewrite]) -> None: ...
 
     def generate_keys(self) -> list[tuple[str, str]]:
         """Regenerate all citation keys from entry metadata."""

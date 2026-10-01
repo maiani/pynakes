@@ -27,7 +27,7 @@ WITH_ERRORS = FIXTURES / "duplicate_entries.bib"
 
 def _bib(tmp_path: Path, name: str, src: Path) -> Path:
     dst = tmp_path / name
-    dst.write_text(src.read_text())
+    dst.write_text(src.read_text(encoding="utf-8"))
     return dst
 
 

@@ -6,7 +6,7 @@ Frequently asked questions about pynakes.
 
 ### Q: Can I use pynakes with different Python versions?
 
-A: pynakes requires **Python 3.11 or later**. It uses modern Python features like type hints and pattern matching.
+A: pynakes requires **Python 3.12 or later**. It uses modern Python features like type hints and pattern matching.
 
 ### Q: How do I install pynakes for development?
 

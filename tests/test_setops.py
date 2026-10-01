@@ -166,7 +166,7 @@ def test_cli_combine_writes_combined_file(tmp_path: Path) -> None:
     assert data["action"] == "combine"
     assert data["entries"] == 2
     assert data["written"] is True
-    reparsed = parse_bib(Path(out).read_text())
+    reparsed = parse_bib(Path(out).read_text(encoding="utf-8"))
     assert set(reparsed.entries.keys()) == {"Smith2020", "Jones2021"}
 
 
@@ -184,7 +184,7 @@ def test_cli_combine_where_keeps_only_matching_entries(tmp_path: Path) -> None:
     data = json.loads(result.output)
     assert data["where"] == 'group "Bio"'
     assert data["entries"] == 1
-    assert set(parse_bib(Path(out).read_text()).entries.keys()) == {"Jones2021"}
+    assert set(parse_bib(Path(out).read_text(encoding="utf-8")).entries.keys()) == {"Jones2021"}
 
 
 def test_cli_combine_where_error_is_structured(tmp_path: Path) -> None:
@@ -261,7 +261,7 @@ def test_cli_combine_copies_pinax_materials_and_manifest(tmp_path: Path) -> None
     data = json.loads(result.output)
     assert data["pinax_materials"][0]["kind"] == "preprint_pdf"
     assert (tmp_path / "all.files" / "Smith2020.preprint.pdf").read_bytes() == b"pdf"
-    combined = parse_bib(Path(out).read_text())
+    combined = parse_bib(Path(out).read_text(encoding="utf-8"))
     assert combined.pynakes_metadata["pinax-files-dir"] == "all.files"
     manifest = json.loads((tmp_path / "all.files" / ".pinax" / "manifest.json").read_text())
     assert manifest["files"]["Smith2020"]["preprint_canonical"] is True
@@ -350,8 +350,8 @@ def test_cli_split_by_group(tmp_path: Path) -> None:
     data = json.loads(result.output)
     assert data["action"] == "split"
     assert {o["file"]: o["entries"] for o in data["outputs"]} == {ml: 1, rest: 1}
-    assert list(parse_bib(Path(ml).read_text()).entries.keys()) == ["Smith2020"]
-    assert list(parse_bib(Path(rest).read_text()).entries.keys()) == ["Jones2021"]
+    assert list(parse_bib(Path(ml).read_text(encoding="utf-8")).entries.keys()) == ["Smith2020"]
+    assert list(parse_bib(Path(rest).read_text(encoding="utf-8")).entries.keys()) == ["Jones2021"]
 
 
 def test_cli_split_copies_pinax_materials_to_matching_output(tmp_path: Path) -> None:
@@ -377,7 +377,10 @@ def test_cli_split_copies_pinax_materials_to_matching_output(tmp_path: Path) -> 
     assert outputs[ml]["pinax_materials"][0]["kind"] == "preprint_pdf"
     assert (tmp_path / "ml.files" / "Smith2020.preprint.pdf").read_bytes() == b"pdf"
     assert not (tmp_path / "rest.files" / "Smith2020.preprint.pdf").exists()
-    assert parse_bib(Path(ml).read_text()).pynakes_metadata["pinax-files-dir"] == "ml.files"
+    assert (
+        parse_bib(Path(ml).read_text(encoding="utf-8")).pynakes_metadata["pinax-files-dir"]
+        == "ml.files"
+    )
 
 
 def test_cli_split_catch_all_bucket_with_no_materials_does_not_crash(tmp_path: Path) -> None:
@@ -453,7 +456,7 @@ def test_cli_split_minimal_drops_metadata_and_skips_materials(tmp_path: Path) ->
     outputs = {item["file"]: item for item in data["outputs"]}
     assert outputs[ml]["pinax_materials"] == []
     assert not (tmp_path / "ml.files").exists()
-    content = Path(ml).read_text()
+    content = Path(ml).read_text(encoding="utf-8")
     assert "pynakes-meta" not in content
     assert "jabref-meta" not in content
     assert "Smith2020" in content
@@ -473,7 +476,7 @@ def test_cli_split_without_minimal_keeps_metadata(tmp_path: Path) -> None:
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["minimal"] is False
-    assert "jabref-meta" in Path(ml).read_text()
+    assert "jabref-meta" in Path(ml).read_text(encoding="utf-8")
 
 
 def test_cli_split_used_unused_with_tex(tmp_path: Path) -> None:
@@ -499,8 +502,8 @@ def test_cli_split_used_unused_with_tex(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
-    assert list(parse_bib(Path(used).read_text()).entries.keys()) == ["Smith2020"]
-    assert list(parse_bib(Path(unused).read_text()).entries.keys()) == ["Jones2021"]
+    assert list(parse_bib(Path(used).read_text(encoding="utf-8")).entries.keys()) == ["Smith2020"]
+    assert list(parse_bib(Path(unused).read_text(encoding="utf-8")).entries.keys()) == ["Jones2021"]
 
 
 def test_cli_split_bad_rule_errors(tmp_path: Path) -> None:

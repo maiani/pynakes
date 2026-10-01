@@ -81,7 +81,7 @@ class TestJabRefGroupsMetadata:
         fixture = fixtures_dir / "jabref_groups.bib"
         assert fixture.exists()
 
-        with open(fixture) as f:
+        with open(fixture, encoding="utf-8") as f:
             lib = parse_bib(f.read())
 
         # Should have parsed all entries
@@ -152,7 +152,7 @@ class TestJabRefFileAttachments:
         fixture = fixtures_dir / "linked_files.bib"
         assert fixture.exists()
 
-        with open(fixture) as f:
+        with open(fixture, encoding="utf-8") as f:
             lib = parse_bib(f.read())
 
         # All entries should have file field
@@ -475,7 +475,7 @@ class TestJabRefBiblatexConversion:
         fixture = fixtures_dir / "biblatex_sample.bib"
         assert fixture.exists()
 
-        with open(fixture) as f:
+        with open(fixture, encoding="utf-8") as f:
             lib = parse_bib(f.read())
 
         # Should parse all entries

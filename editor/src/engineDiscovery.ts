@@ -154,7 +154,7 @@ async function selectEngine(
     if (!bundled) {
       throw new PynakesUnavailableError(
         "the bundled pynakes engine",
-        "pynakes.engine is set to 'bundled', but no Python 3.11+ interpreter could run it.",
+        "pynakes.engine is set to 'bundled', but no Python 3.12+ interpreter could run it.",
       );
     }
     return { ...bundled, reason: `Using the bundled engine ${bundled.version} (forced).` };
@@ -208,13 +208,13 @@ async function selectEngine(
       installedVersion,
       reason:
         `Using the installed engine ${installedVersion}; the bundled engine could not run ` +
-        "because no Python 3.11+ interpreter was found.",
+        "because no Python 3.12+ interpreter was found.",
     };
   }
 
   throw new PynakesUnavailableError(
     "pynakes",
-    "No pynakes engine is available: the bundled engine needs a Python 3.11+ interpreter, " +
+    "No pynakes engine is available: the bundled engine needs a Python 3.12+ interpreter, " +
       "and no installed pynakes was found on PATH.",
   );
 }

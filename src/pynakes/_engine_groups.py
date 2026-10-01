@@ -7,8 +7,13 @@ module directly; use ``pynakes.engine``.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from pynakes import group_tree as group_tree_ops
 from pynakes import groups as group_ops
+
+if TYPE_CHECKING:
+    from pynakes.model import BibFile
 
 
 class BibliographyGroups:
@@ -16,6 +21,10 @@ class BibliographyGroups:
 
     Consumers must not instantiate this class directly.
     """
+
+    if TYPE_CHECKING:
+        # Provided by the concrete ``Bibliography`` dataclass.
+        lib: BibFile
 
     def list_groups(self) -> list[str]:
         """Return all group names in first-seen order."""

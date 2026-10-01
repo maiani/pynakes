@@ -112,7 +112,7 @@ class TestFormatCommand:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.chdir(tmp_path)
-        Path("local.bib").write_text("@article{Local, title={Local}}\n")
+        Path("local.bib").write_text("@article{Local, title={Local}}\n", encoding="utf-8")
         result = runner.invoke(
             app,
             ["format", "-", "--stdout"],
@@ -1932,7 +1932,9 @@ class TestReferenceCrud:
             "}\n\n"
             "@article{Noether1918,\n"
             "  title = {Invariante Variationsprobleme}\n"
-            "}\n"
+            "}\n",
+            encoding="utf-8",
+            newline="",
         )
 
         result = runner.invoke(
@@ -3066,13 +3068,13 @@ class TestNormalizeCommand:
 
     def test_normalize_rewrites_a_unicode_en_dash_page_range(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
-        bib.write_text("@article{A,\n  pages = {2446\u20132449}\n}\n")
+        bib.write_text("@article{A,\n  pages = {2446\u20132449}\n}\n", encoding="utf-8")
 
         result = runner.invoke(app, ["normalize", str(bib), "--json"])
 
         assert result.exit_code == 0, result.output
         assert json.loads(result.output)["operations"]["pages"] == 1
-        assert "pages = {2446--2449}" in bib.read_text()
+        assert "pages = {2446--2449}" in bib.read_text(encoding="utf-8")
 
     def test_normalize_dry_run_diff_json(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -3128,7 +3130,7 @@ class TestNormalizeCommand:
             "  doi = {10.5555/widget.2020}\n"
             "}\n"
         )
-        bib.write_text(original)
+        bib.write_text(original, encoding="utf-8", newline="")
 
         result = runner.invoke(
             app,

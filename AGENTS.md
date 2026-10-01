@@ -86,6 +86,7 @@ pre-commit install           # enable ruff hooks on commit
 pytest --cov --cov-fail-under=90
 ruff check src tests         # lint
 ruff format --check src tests
+mypy                         # type-check (baseline in pyproject.toml)
 mkdocs build --strict
 mkdocs serve                 # live-preview the docs at localhost:8000
 python -m build              # release artifact check
@@ -96,14 +97,16 @@ The API reference is generated from docstrings by `mkdocstrings`
 ([docs/api/reference.md](docs/api/reference.md)); keep public-module docstrings
 accurate rather than hand-maintaining a symbol list.
 
-For code changes, run the test suite and both Ruff checks before considering the
-change done. Changes under `editor/` run their own checks instead
+For code changes, run the test suite, both Ruff checks, and mypy before
+considering the change done. Changes under `editor/` run their own checks instead
 (`npm run compile && npm test` in that directory, or `pixi run test-extension`
-from the root). `pixi.toml` provides Node plus a pinned Python 3.11 for building
+from the root). `pixi.toml` provides Node plus a pinned Python 3.12 for building
 the extension — `pixi run build-extension` — and does not replace the pip
 workflow above for engine work. Run the strict docs build when documentation or public APIs change;
-run the artifact checks for packaging or release work. CI runs Python 3.11–3.13,
-the 90% coverage gate, strict docs, and wheel/sdist checks.
+run the artifact checks for packaging or release work. CI runs Python 3.12–3.14
+on Linux, Windows, and macOS (3.15 allowed to fail), a lowest-dependency job,
+the 90% coverage gate, Ruff and mypy, strict docs, and wheel/sdist checks.
+The release workflow reruns the suite against the built wheel before publishing.
 
 ## Invariants to preserve
 
@@ -132,7 +135,7 @@ tests pass:
 
 ## Conventions
 
-- Python ≥ 3.11, type hints throughout. Ruff line length 100 (E501 ignored).
+- Python ≥ 3.12, type hints throughout. Ruff line length 100 (E501 ignored).
 - CLI: top-level transforms/checks plus Typer resource families (`ref`,
   `groups`, `keys`, `fields`, `dedupe`, `metadata`, `tex`, `asset`, `corpus`).
   Command callbacks live in `cli_commands/`; operation modules stay independently

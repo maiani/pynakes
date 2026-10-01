@@ -170,8 +170,8 @@ def test_volume_open_exposes_read_only_views(tmp_path: Path) -> None:
 
 def test_volume_group_and_field_operations_mutate_in_memory_only(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
-    original = (FIXTURES / "simple.bib").read_text()
-    bib.write_text(original)
+    original = (FIXTURES / "simple.bib").read_text(encoding="utf-8")
+    bib.write_text(original, encoding="utf-8", newline="")
     coll = Bibliography.open(bib)
 
     assert coll.add_to_group("Smith2020", "Read") == 1
@@ -185,8 +185,8 @@ def test_volume_group_and_field_operations_mutate_in_memory_only(tmp_path: Path)
 
 def test_volume_preview_diff_commit_and_reset(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
-    original = (FIXTURES / "simple.bib").read_text()
-    bib.write_text(original)
+    original = (FIXTURES / "simple.bib").read_text(encoding="utf-8")
+    bib.write_text(original, encoding="utf-8", newline="")
     coll = Bibliography.open(bib)
 
     coll.add_to_group("Smith2020", "Read")
@@ -259,11 +259,11 @@ def test_setting_existing_metadata_value_does_not_make_buffer_dirty(tmp_path: Pa
 
 def test_reload_refreshes_source_snapshot(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
-    bib.write_text("@article{A,\n  title = {t}\n}\n")
+    bib.write_text("@article{A,\n  title = {t}\n}\n", encoding="utf-8", newline="")
     coll = Bibliography.open(bib)
     replacement = "@comment{pynakes-meta:\nnormalize-dois: on\n}\n\n@article{A,\n  title = {t}\n}\n"
 
-    bib.write_text(replacement)
+    bib.write_text(replacement, encoding="utf-8", newline="")
     coll.reload(force=True)
 
     assert coll.preview() == replacement

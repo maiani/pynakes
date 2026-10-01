@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Python 3.12 is now the minimum.** Python 3.11 is no longer supported;
+  3.12, 3.13 and 3.14 are, and each runs the full suite on Linux, Windows and
+  macOS. The bundled engine in the editor needs Python 3.12+ too.
+
+### Fixed
+
+- On Windows, `init --agent-guide` wrote `AGENTS.md` in the locale's code page
+  with CRLF line endings, mangling the template's non-ASCII text. It is now
+  UTF-8 with LF endings on every platform, like every other file pynakes writes.
+- On Windows, saving a library failed outright when JabRef, an editor, a backup
+  tool or antivirus held the file open at the moment of the final rename. The
+  rename is now retried for about a second and a half before the write is
+  reported as failed. Pinax material writes and the provider cache get the same
+  retry.
+
+### Build
+
+- CI tests every operating system and Python version the package metadata
+  claims, plus Python 3.15 as an allowed-to-fail pre-release, and adds a job
+  that installs each runtime dependency at its declared floor.
+- Releases are checked before anything is published: the tag must match the
+  package version and be on `main`, and `CHANGELOG.md` must have a section for
+  it. The suite then runs against the built wheel on all three operating
+  systems, and the package reaches PyPI before the GitHub release is created.
+  Running the workflow by hand performs a dry run.
+- mypy runs in CI. Modules with type errors when it was added are recorded as
+  a baseline in `pyproject.toml`; every other module must type-check clean.
+- Ruff now flags text I/O without an explicit encoding (`PLW1514`). Dependabot
+  watches GitHub Actions and pip. The `dev` extra declares `pyyaml` and `mypy`
+  and bounds `ruff`, and the `docs` extra bounds `mkdocs` below 2.
+
 ### Editor
 
 #### Added

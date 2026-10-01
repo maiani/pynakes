@@ -488,7 +488,7 @@ class TestWriteBibCanonical:
 
 @pytest.mark.parametrize("path", FIXTURE_BIBS, ids=lambda path: path.name)
 def test_every_fixture_is_semantics_preserving_and_idempotent(path: Path) -> None:
-    original = parse_bib(path.read_text())
+    original = parse_bib(path.read_text(encoding="utf-8"))
     formatted = write_bib_canonical(original)
     reparsed = parse_bib(formatted)
     # Entry types are compared case-insensitively: canonical layout lowercases
