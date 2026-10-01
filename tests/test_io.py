@@ -1,5 +1,6 @@
 """Tests for I/O operations."""
 
+import os
 from pathlib import Path
 
 import pytest
@@ -124,7 +125,7 @@ class TestSaveBib:
         assert result.backup_path is not None
         backup_file = Path(result.backup_path)
         assert backup_file.exists()
-        assert backup_file.read_text().startswith("@article{Old")
+        assert backup_file.read_text(encoding="utf-8").startswith("@article{Old")
 
     def test_save_no_backup_if_file_doesnt_exist(self, tmp_path: Path) -> None:
         """Test that no backup is created if file doesn't exist."""
@@ -163,17 +164,17 @@ class TestSaveBib:
     ) -> None:
         output_file = tmp_path / "output.bib"
         output_file.write_text("old")
-        original_replace = Path.replace
+        original_replace = os.replace
         observed_final_replace = False
 
-        def checked_replace(source: Path, target: Path | str) -> Path:
+        def checked_replace(source: Path | str, target: Path | str) -> None:
             nonlocal observed_final_replace
             if Path(target) == output_file:
                 observed_final_replace = True
                 assert output_file.read_text() == "old"
-            return original_replace(source, target)
+            original_replace(source, target)
 
-        monkeypatch.setattr(Path, "replace", checked_replace)
+        monkeypatch.setattr(os, "replace", checked_replace)
 
         result = save_text("new", str(output_file), backup=True, atomic=True)
 
@@ -187,14 +188,14 @@ class TestSaveBib:
     ) -> None:
         output_file = tmp_path / "output.bib"
         output_file.write_text("old")
-        original_replace = Path.replace
+        original_replace = os.replace
 
-        def fail_final_replace(source: Path, target: Path | str) -> Path:
+        def fail_final_replace(source: Path | str, target: Path | str) -> None:
             if Path(target) == output_file:
                 raise OSError("simulated replacement failure")
-            return original_replace(source, target)
+            original_replace(source, target)
 
-        monkeypatch.setattr(Path, "replace", fail_final_replace)
+        monkeypatch.setattr(os, "replace", fail_final_replace)
 
         result = save_text("new", str(output_file), backup=True, atomic=True)
 

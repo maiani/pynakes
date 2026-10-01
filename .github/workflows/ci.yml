@@ -6,14 +6,57 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
-    name: Python ${{ matrix.python-version }}
+  lint:
+    name: Lint and type-check
     runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install package
+        run: python -m pip install -e ".[dev]"
+
+      - name: Ruff lint
+        run: ruff check src tests
+
+      - name: Ruff format check
+        run: ruff format --check src tests
+
+      # Modules listed in pyproject's mypy baseline are skipped; every other
+      # module must type-check clean.
+      - name: Mypy
+        run: mypy
+
+  # Every operating system and Python version the package metadata claims.
+  test:
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.12", "3.13", "3.14"]
+        experimental: [false]
+        include:
+          # The next Python, as an early warning; allowed to fail.
+          - os: ubuntu-latest
+            python-version: "3.15"
+            experimental: true
 
     steps:
       - name: Check out repository
@@ -23,19 +66,61 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
           cache: pip
 
       - name: Install package
-        run: python -m pip install -e ".[dev,docs]"
-
-      - name: Ruff lint
-        run: ruff check src tests
-
-      - name: Ruff format check
-        run: ruff format --check src tests
+        run: python -m pip install -e ".[dev]"
 
       - name: Run tests
         run: pytest --cov --cov-fail-under=90
+
+  # The oldest direct dependencies the package declares, on the oldest Python:
+  # what a user with an older environment actually gets.
+  lowest:
+    name: Lowest dependencies / Python 3.12
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10
+
+      - name: Install package at its dependency floors
+        run: uv pip install --system --resolution lowest-direct -e .
+
+      # Test tools at their current versions: the floors under test are the
+      # runtime ones, not pytest's.
+      - name: Install test tools
+        run: uv pip install --system pytest hypothesis pyyaml
+
+      - name: Check the floors are what is installed
+        run: python .github/scripts/check_dependency_floors.py
+
+      - name: Run tests
+        run: pytest
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install package
+        run: python -m pip install -e ".[docs]"
 
       - name: Build docs
         run: mkdocs build --strict
@@ -60,7 +145,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: "3.12"
           cache: pip
 
       - name: Install Node dependencies
@@ -113,7 +198,7 @@ jobs:
         run: python -m build
 
       - name: Check distribution metadata
-        run: python -m twine check dist/*
+        run: python -m twine check --strict dist/*
 
       - name: Smoke-test built wheel
         run: |

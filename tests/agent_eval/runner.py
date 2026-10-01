@@ -103,7 +103,7 @@ def _repo_root() -> Path:
 
 
 def _write_json(path: Path, payload: Any) -> None:
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def _supervisor_prompt(config: EvalConfig, lab: LabWorkspace) -> str:
@@ -206,7 +206,7 @@ def _write_markdown_summary(
     else:
         for finding in findings:
             lines.append(f"- **{finding['category']}**: {finding['title']} - {finding['details']}")
-    path.write_text("\n".join(lines) + "\n")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def run_eval(

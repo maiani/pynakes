@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pynakes import convert as convert_ops
 from pynakes import dedupe as dedupe_ops
@@ -32,11 +33,11 @@ from pynakes._engine_helpers import (
 from pynakes.canonical import CanonicalLayout, format_selected_entries, validate_format_input
 from pynakes.editing import set_entry_type
 from pynakes.fetch_progress import FetchProgress
-from pynakes.filestore import FILES_DIR_KEY, resolve_files_dir
+from pynakes.filestore import FILES_DIR_KEY, FileStore, resolve_files_dir
 from pynakes.lint import LintIssue
 from pynakes.lint import lint as lint_lib
 from pynakes.metadata import FetchPolicy
-from pynakes.model import BibEntry, QueryFilter
+from pynakes.model import BibEntry, BibFile, QueryFilter
 from pynakes.progress import EntryProgress
 from pynakes.usage import tex_sources_from_metadata, validate_tex_sources
 
@@ -46,6 +47,24 @@ class BibliographyOperations:
 
     Consumers must not instantiate this class directly.
     """
+
+    if TYPE_CHECKING:
+        # Provided by the concrete ``Bibliography`` dataclass and the key mixin.
+        lib: BibFile
+        path: Path | None
+        _appended_entries: list[BibEntry]
+        _removed_entries: list[BibEntry]
+        _removed_comments: set[int]
+        _entry_snapshot: dict[int, str | None]
+        _format_layout: CanonicalLayout | None
+
+        @property
+        def files(self) -> FileStore | None: ...
+        def _stage_pinax_renames(self, renames: list[tuple[str, str]]) -> None: ...
+        def _stage_pinax_material_merges(self, merges: list[tuple[str, str]]) -> None: ...
+        def _rewrite_tex_for_renames(
+            self, renames: list[tuple[str, str]], *, allow_missing_sources: bool = False
+        ) -> int: ...
 
     # --- read-only views -------------------------------------------------
 

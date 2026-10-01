@@ -13,7 +13,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from pynakes._atomic import match_mode
+from pynakes._atomic import match_mode, replace_file
 
 _FILESYSTEM_ERRORS = (OSError, shutil.Error)
 
@@ -85,7 +85,7 @@ def _atomic_write_bytes(path: Path, data: bytes, root: Path) -> None:
         # Keep the material's permissions. A symlinked material is replaced,
         # never written through: its target may lie outside the store.
         match_mode(tmp_path, path)
-        tmp_path.replace(path)
+        replace_file(tmp_path, path)
     except _FILESYSTEM_ERRORS:
         tmp_path.unlink(missing_ok=True)
         raise
@@ -95,12 +95,12 @@ def _atomic_replace_dir(source: Path, target: Path, root: Path) -> None:
     backup = root / f".{target.name}.old-{uuid.uuid4().hex}"
     had_target = target.exists()
     if had_target:
-        target.replace(backup)
+        replace_file(target, backup)
     try:
-        source.replace(target)
+        replace_file(source, target)
     except _FILESYSTEM_ERRORS:
         if had_target and backup.exists() and not target.exists():
-            backup.replace(target)
+            replace_file(backup, target)
         raise
     else:
         if had_target:

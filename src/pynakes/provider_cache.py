@@ -33,7 +33,7 @@ import tempfile
 import threading
 from pathlib import Path
 
-from pynakes._atomic import match_mode
+from pynakes._atomic import match_mode, replace_file
 
 CACHE_FORMATS = ("json", "bib", "xml")
 
@@ -195,6 +195,7 @@ def _atomic_write_text(path: Path, text: str) -> None:
     tmp = tempfile.NamedTemporaryFile(
         "w",
         encoding="utf-8",
+        newline="",  # records end in "\n"; no CRLF translation on Windows
         prefix=f".{path.name}.",
         suffix=".tmp",
         dir=path.parent,
@@ -206,7 +207,7 @@ def _atomic_write_text(path: Path, text: str) -> None:
             tmp.write(text)
             tmp.flush()
         match_mode(tmp_path, path)
-        tmp_path.replace(path)
+        replace_file(tmp_path, path)
     except OSError:
         tmp_path.unlink(missing_ok=True)
         raise

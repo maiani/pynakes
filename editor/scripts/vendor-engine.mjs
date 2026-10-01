@@ -44,14 +44,14 @@ function buildPython() {
   const candidates = [process.env.PYNAKES_VENDOR_PYTHON, "python3", "python"].filter(Boolean);
   for (const candidate of candidates) {
     try {
-      run(candidate, ["-c", "import sys; assert sys.version_info >= (3, 11)"]);
+      run(candidate, ["-c", "import sys; assert sys.version_info >= (3, 12)"]);
       return candidate;
     } catch {
       continue;
     }
   }
   throw new Error(
-    "No Python 3.11+ found to build the bundle. Set PYNAKES_VENDOR_PYTHON to an interpreter.",
+    "No Python 3.12+ found to build the bundle. Set PYNAKES_VENDOR_PYTHON to an interpreter.",
   );
 }
 
@@ -195,7 +195,7 @@ try {
 
 prune(engineDir);
 const version = vendoredVersion(engineDir);
-const requiresPython = "3.11";
+const requiresPython = "3.12";
 writeLauncher(engineDir, requiresPython);
 const reported = smokeTest(python, engineDir, version);
 

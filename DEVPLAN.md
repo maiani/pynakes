@@ -50,39 +50,30 @@ What 0.7.0 commits to, and what every gate below tests for:
 
 #### Stage 1 — Stop-ship fixes → 0.6.5
 
-The fixes are recorded in CHANGELOG under 0.6.5, each with a regression test
-that fails without it, and the shipped pre-commit hooks are now run by the test
-suite. What remains is the release itself:
+Done: the fixes are recorded in CHANGELOG under 0.6.5, and 0.6.4 and 0.6.5 were
+published on 2026-10-01. The local-only `v0.6.2` tag was never released; retire
+it or leave it unpushed.
 
-- Push the `v0.6.4` tag, which never reached the remote (PyPI stops at 0.6.3),
-  or retire it in favor of 0.6.5; decide the same for `v0.6.2`.
-- Tag and publish 0.6.5.
-
-**Gate 1**: 0.6.5 is on PyPI.
+**Gate 1** (met): 0.6.5 is on PyPI.
 
 #### Stage 2 — CI, release pipeline, platforms
 
 Done second, so every later stage is tested everywhere the beta claims to run.
+The work is recorded in CHANGELOG under Unreleased: Python 3.12 as the floor, the
+three-OS matrix with 3.15 allowed to fail, a lowest-dependency job, release
+checks and wheel tests before publishing, PyPI before the GitHub release,
+dependabot, the two Windows fixes, and mypy at a recorded baseline (the
+`[[tool.mypy.overrides]]` list in `pyproject.toml`, to shrink and never grow).
+Actions are referenced by major version tag, by choice, rather than pinned by
+commit SHA. What remains is proving it:
 
-- **CI matrix**: Ubuntu, Windows, and macOS; Python 3.11–3.14, plus 3.15 as an
-  allowed-to-fail pre-release. Add a job that resolves the lowest declared
-  direct-dependency versions. Add the 3.14 classifier.
-- **Release workflow** (`release.yml`): run the tests against the built wheel
-  before publishing; verify the tag is on `main` and that CHANGELOG has a
-  section for the version; publish to PyPI before creating the GitHub release;
-  pin actions by commit SHA; add dependabot for actions and pip.
-- **Windows correctness**, found by reading and to be confirmed by the new
-  matrix: `init` writes without `encoding`/`newline`; `os.replace` fails while
-  JabRef, an editor, or antivirus holds the file open (retry briefly).
-- **Typing**: add mypy or pyright to CI at a recorded baseline, or drop the
-  `Typing :: Typed` classifier the package claims through `py.typed`.
-- **Dev dependencies**: declare `pyyaml` (imported by `test_gate_checks`),
-  bound `ruff` to a range, and bound `mkdocs<2`.
-- **Repository**: `SECURITY.md` with a reporting address, issue and PR
-  templates, CODEOWNERS.
+- Run the new matrix and fix what Windows and macOS turn up.
+- Dry-run the release workflow by hand (`workflow_dispatch`): every check and
+  the wheel tests, nothing published. TestPyPI needs a `testpypi` environment
+  and a trusted publisher on test.pypi.org before its option can be used.
 
 **Gate 2**: the full matrix is green, the lowest-dependency job included; a
-release dry run (TestPyPI or a pre-release tag) passes every new check.
+release dry run passes every new check.
 
 #### Stage 3 — Cleanup before the freeze
 

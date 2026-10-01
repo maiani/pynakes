@@ -164,7 +164,7 @@ repository. A second client is the trigger for splitting anything out, so
 
 ## Requirements
 
-A Python 3.11 or newer interpreter. The engine itself ships with the extension,
+A Python 3.12 or newer interpreter. The engine itself ships with the extension,
 so `pip install pynakes` is not required.
 
 The interpreter is taken from the Python extension's selected environment, then a
@@ -258,7 +258,7 @@ The packaged extension is written to **`editor/pynakes-vscode-<version>.vsix`**,
 beside this README; `vsce` prints its absolute path when it finishes. Install it
 by hand with `code --install-extension editor/pynakes-vscode-<version>.vsix`, or
 let `pixi run install-extension` resolve the filename for you. Pixi pins Python
-to 3.11 to match CI, so a bundle built locally is the bundle CI proves.
+to 3.12 to match CI, so a bundle built locally is the bundle CI proves.
 
 Tests cover the pure modules — `model.ts`, `insights.ts`, `staging.ts`,
 `version.ts` — and nothing else. That is deliberate: those hold the logic worth

@@ -38,12 +38,12 @@ class TestMultiOperationSequences:
         # convert to biblatex, then back to bibtex
         r = runner.invoke(app, ["convert", str(bib), "--to", "biblatex"])
         assert r.exit_code == 0, r.output
-        assert "journaltitle" in bib.read_text()
+        assert "journaltitle" in bib.read_text(encoding="utf-8")
 
         r = runner.invoke(app, ["convert", str(bib), "--to", "bibtex"])
         assert r.exit_code == 0, r.output
-        assert "journaltitle" not in bib.read_text()
-        assert "journal" in bib.read_text()
+        assert "journaltitle" not in bib.read_text(encoding="utf-8")
+        assert "journal" in bib.read_text(encoding="utf-8")
 
     def test_repair_then_check_keys(self, tmp_path: Path) -> None:
         path = tmp_path / "dups.bib"
@@ -57,21 +57,21 @@ class TestMultiOperationSequences:
 
 class TestDryRunParity:
     def test_dry_run_matches_actual_then_idempotent(self, bib: Path) -> None:
-        before = bib.read_text()
+        before = bib.read_text(encoding="utf-8")
 
         dry = runner.invoke(app, ["normalize", str(bib), "--dry-run", "--diff"])
         assert dry.exit_code == 0, dry.output
-        assert bib.read_text() == before  # dry-run never writes
+        assert bib.read_text(encoding="utf-8") == before  # dry-run never writes
 
         real = runner.invoke(app, ["normalize", str(bib)])
         assert real.exit_code == 0, real.output
-        after = bib.read_text()
+        after = bib.read_text(encoding="utf-8")
         assert after != before  # something normalized
 
         # Running again is a no-op: already normalized.
         again = runner.invoke(app, ["normalize", str(bib), "--json"])
         assert json.loads(again.output)["modified"] is False
-        assert bib.read_text() == after
+        assert bib.read_text(encoding="utf-8") == after
 
 
 class TestErrorContract:

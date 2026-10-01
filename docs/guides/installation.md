@@ -2,7 +2,7 @@
 
 ## System Requirements
 
-- Python 3.11 or later
+- Python 3.12 or later
 - pip or equivalent package manager
 - (Optional) git for development installation
 
@@ -52,7 +52,9 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-GitHub Actions runs these checks on Python 3.11, 3.12, and 3.13.
+GitHub Actions runs these checks on Linux, Windows, and macOS with Python 3.12,
+3.13, and 3.14, plus once against the lowest dependency versions
+`pyproject.toml` declares.
 
 ## Shell Completion
 

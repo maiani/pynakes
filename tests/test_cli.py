@@ -112,7 +112,7 @@ class TestFormatCommand:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.chdir(tmp_path)
-        Path("local.bib").write_text("@article{Local, title={Local}}\n")
+        Path("local.bib").write_text("@article{Local, title={Local}}\n", encoding="utf-8")
         result = runner.invoke(
             app,
             ["format", "-", "--stdout"],

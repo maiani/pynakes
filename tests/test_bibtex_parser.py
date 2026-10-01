@@ -413,7 +413,7 @@ class TestFixtures:
         fixture = fixtures_dir / "simple.bib"
         assert fixture.exists(), f"Fixture not found: {fixture}"
 
-        with open(fixture) as f:
+        with open(fixture, encoding="utf-8") as f:
             lib = parse_bib(f.read())
 
         assert len(lib.entries) == 5
@@ -425,7 +425,7 @@ class TestFixtures:
         fixture = fixtures_dir / "jabref_groups.bib"
         assert fixture.exists(), f"Fixture not found: {fixture}"
 
-        with open(fixture) as f:
+        with open(fixture, encoding="utf-8") as f:
             lib = parse_bib(f.read())
 
         assert len(lib.entries) == 4
@@ -436,7 +436,7 @@ class TestFixtures:
         fixture = fixtures_dir / "duplicate_entries.bib"
         assert fixture.exists(), f"Fixture not found: {fixture}"
 
-        with open(fixture) as f:
+        with open(fixture, encoding="utf-8") as f:
             lib = parse_bib(f.read())
 
         # The fixture intentionally contains repeated citation keys; all are kept.
@@ -449,7 +449,7 @@ class TestFixtures:
         fixture = fixtures_dir / "linked_files.bib"
         assert fixture.exists(), f"Fixture not found: {fixture}"
 
-        with open(fixture) as f:
+        with open(fixture, encoding="utf-8") as f:
             lib = parse_bib(f.read())
 
         assert len(lib.entries) == 4

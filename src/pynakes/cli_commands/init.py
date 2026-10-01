@@ -76,7 +76,8 @@ def _write_agents_guide(file: str, *, dry_run: bool) -> str | None:
     if dry_run:
         return None
     agents_path = Path(file).with_name("AGENTS.md")
-    agents_path.write_text(render_agents_md(Path(file).stem))
+    # Explicit, so the guide is the same UTF-8, LF-terminated file on Windows.
+    agents_path.write_text(render_agents_md(Path(file).stem), encoding="utf-8", newline="\n")
     return str(agents_path)
 
 

@@ -9,7 +9,7 @@ description = "Agent-friendly, round-trip-faithful BibTeX/BibLaTeX maintenance t
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 authors = [
     {name = "Andrea Maiani", email = "dev@andreamaiani.com"}
 ]
@@ -33,9 +33,9 @@ classifiers = [
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
     "Topic :: Text Processing :: Markup :: LaTeX",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -54,12 +54,14 @@ dev = [
     "pytest>=9.0.0",
     "pytest-cov>=4.1.0",
     "hypothesis>=6.100.0",
-    "ruff>=0.1.0",
+    "mypy>=1.19,<2",
+    "pyyaml>=6.0",
+    "ruff>=0.16,<0.17",
     "build>=1.2.0",
     "twine>=5.0.0",
 ]
 docs = [
-    "mkdocs>=1.6",
+    "mkdocs>=1.6,<2",
     "mkdocs-material>=9.5",
     "mkdocstrings[python]>=0.26",
 ]
@@ -93,12 +95,66 @@ markers = [
 ]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I"]
+select = ["E", "F", "W", "I", "PLW1514"]
 ignore = ["E501"]
+# PLW1514 (text I/O without an explicit encoding) is a preview rule. A bare
+# open()/read_text() uses the locale's code page on Windows, not UTF-8.
+preview = true
+explicit-preview-rules = true
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src/pynakes"]
+warn_unused_configs = true
+
+# The baseline: modules that had type errors when mypy entered CI (v0.7,
+# Stage 2). Shrink this list as modules are fixed; never add to it. Every
+# module not listed must type-check clean.
+[[tool.mypy.overrides]]
+module = [
+    "pynakes.batch",
+    "pynakes.bibtex_writer",
+    "pynakes.canonical",
+    "pynakes.cli_commands.convert",
+    "pynakes.cli_commands.dedupe",
+    "pynakes.cli_commands.fetch",
+    "pynakes.cli_commands.fields",
+    "pynakes.cli_commands.files",
+    "pynakes.cli_commands.format",
+    "pynakes.cli_commands.import_ref",
+    "pynakes.cli_commands.init",
+    "pynakes.cli_commands.inspect",
+    "pynakes.cli_commands.integrity",
+    "pynakes.cli_commands.keys",
+    "pynakes.cli_commands.metadata",
+    "pynakes.cli_commands.remove",
+    "pynakes.cli_commands._rich_progress",
+    "pynakes.cli_commands.search",
+    "pynakes.cli_commands.setops",
+    "pynakes.cli_commands.show",
+    "pynakes.cli_common",
+    "pynakes.cli_discovery",
+    "pynakes.cli",
+    "pynakes._engine_helpers",
+    "pynakes.filestore",
+    "pynakes.formatters._pages",
+    "pynakes.identity",
+    "pynakes.importer",
+    "pynakes._integrity_published",
+    "pynakes.interchange.ris",
+    "pynakes.interchange._shared",
+    "pynakes.model",
+    "pynakes.normalize",
+    "pynakes.provider_cache",
+    "pynakes.providers._http",
+    "pynakes.providers.repositories.europe_pmc",
+    "pynakes.query",
+]
+ignore_errors = true
 
 [tool.coverage.run]
 source = ["src/pynakes"]

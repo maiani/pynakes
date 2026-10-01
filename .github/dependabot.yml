@@ -1,0 +1,23 @@
+version: 2
+updates:
+  # Workflows reference actions by major tag, so these are major-version bumps.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Upper bounds in pyproject.toml (ruff, mypy, mkdocs): a PR when a release
+  # falls outside one. "increase-if-necessary" leaves a requirement alone while
+  # the latest release satisfies it, so the runtime floors CI's lowest job
+  # proves are never raised behind our backs.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+    versioning-strategy: increase-if-necessary
+    groups:
+      python:
+        patterns: ["*"]

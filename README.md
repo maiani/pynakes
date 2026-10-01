@@ -20,7 +20,7 @@ The Python CLI makes small, explicit, reviewable changes to `.bib` files —
 minimal diffs, dry-run previews, and atomic writes — and reports every change
 as structured JSON.
 
-Requires Python 3.11+ and is packaged as an OS-independent CLI and library.
+Requires Python 3.12+ and is packaged as an OS-independent CLI and library.
 
 Untouched entries write back byte-for-byte — no hidden reformatting, reordering, or re-quoting. The file stays diff-friendly in git and yours for decades.
 
@@ -207,7 +207,7 @@ v0.5.0 is the first public alpha. It includes the preservation-first
 parser/writer, the documented maintenance command surface, broad JabRef v5.15
 interoperability, machine-readable command discovery, and the optional Pinax
 corpus layer with arXiv and published-PDF material workflows. CI tests Python
-3.11–3.13 and enforces a 90% coverage floor.
+3.12–3.14 on Linux, Windows, and macOS, and enforces a 90% coverage floor.
 
 Until v1.0, pynakes does **not** guarantee backward compatibility for the Python
 API, CLI syntax, or JSON envelopes. The project aims to keep automation
