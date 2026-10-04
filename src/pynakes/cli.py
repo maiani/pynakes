@@ -11,6 +11,7 @@ from pynakes import __version__
 from pynakes.capabilities import COMMAND_GROUPS
 from pynakes.cli_commands import (
     add,
+    asset_check,
     batch,
     capabilities,
     compare,
@@ -19,7 +20,6 @@ from pynakes.cli_commands import (
     edit,
     fetch,
     fields,
-    files,
     find,
     format,
     groups,
@@ -37,7 +37,7 @@ from pynakes.cli_commands import (
     setops,
     show,
     tex,
-    used,
+    tex_scan,
 )
 from pynakes.cli_common import _bibfile_completer, _metadata_key_completer
 from pynakes.cli_common import _citekey_completer as _complete_fn
@@ -109,11 +109,11 @@ remove.register(ref_app)
 
 # tex: linked TeX sources (add/list/remove/clear) + scan (formerly `used`)
 tex.register(tex_app)
-used.register(tex_app)
+tex_scan.register(tex_app)
 
 # asset: Pinax materials (fetch download + linked-file check)
 fetch.register(asset_app)
-files.register(asset_app)
+asset_check.register(asset_app)
 
 # corpus: operations across multiple .bib files
 setops.register(corpus_app)

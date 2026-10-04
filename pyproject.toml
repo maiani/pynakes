@@ -123,7 +123,6 @@ module = [
     "pynakes.cli_commands.dedupe",
     "pynakes.cli_commands.fetch",
     "pynakes.cli_commands.fields",
-    "pynakes.cli_commands.files",
     "pynakes.cli_commands.format",
     "pynakes.cli_commands.import_ref",
     "pynakes.cli_commands.init",

@@ -482,7 +482,7 @@ def keys_usage(
 ) -> None:
     """Scan TeX sources directly for \\cite-family citations of one key.
 
-    Unlike `tex scan`/`used scan`, this takes no .bib file and never consults
+    Unlike `tex scan`, this takes no .bib file and never consults
     'tex-sources' metadata: it scans exactly the given --path directory or
     file(s), so a rename's blast radius can be checked over sources that were
     never registered with `tex add` — frozen snapshots, generated diffs, or

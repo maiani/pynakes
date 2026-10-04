@@ -16,8 +16,8 @@ import re
 from collections.abc import Callable
 from dataclasses import replace
 
+from pynakes import _identifiers
 from pynakes._identifiers import (
-    arxiv_doi,
     canonical_doi,
     looks_like_arxiv_id,
     looks_like_isbn,
@@ -355,6 +355,16 @@ def fetch_arxiv_atom(identifier: str, timeout: float = DEFAULT_TIMEOUT) -> str:
         return arxiv.fetch_atom(identifier, timeout=timeout)
     except ProviderFetchError as exc:
         raise ArxivImportError(str(exc)) from exc
+
+
+def arxiv_doi(identifier: str) -> str:
+    """Return the DataCite DOI arXiv registers for ``identifier``.
+
+    arXiv deposits every submission under ``10.48550/arXiv.<id>``, so this is a
+    derivation rather than a lookup: no network access, and the result is the
+    same string arXiv's own landing page advertises.
+    """
+    return _identifiers.arxiv_doi(identifier)
 
 
 # --- preparation -----------------------------------------------------------

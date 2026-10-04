@@ -1,5 +1,6 @@
 """BibLaTeX linked-file field parsing and validation."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -188,7 +189,7 @@ def resolve_linked_file(link: LinkedFile, bib_path: Path, roots: list[Path], lib
 
 
 def check_linked_files(
-    lib: BibFile, bib_file: str | Path, roots: list[str | Path] | None = None
+    lib: BibFile, bib_file: str | Path, roots: Sequence[str | Path] | None = None
 ) -> FileCheckReport:
     """Validate linked files in ``lib``.
 

@@ -1,8 +1,4 @@
-"""CLI command registration for pynakes.
-
-This module keeps command callbacks separate from application assembly while
-retaining the stable CLI contract.
-"""
+"""`asset check`: verify linked files and Pinax materials, optionally reconciling drift."""
 
 import typer
 

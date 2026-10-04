@@ -1,8 +1,4 @@
-"""CLI command registration for pynakes.
-
-This module keeps command callbacks separate from application assembly while
-retaining the stable CLI contract.
-"""
+"""`tex scan`: report which entries the TeX sources cite, and subset or tag them."""
 
 from pathlib import Path
 
