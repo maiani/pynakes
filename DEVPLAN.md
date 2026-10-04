@@ -74,43 +74,26 @@ job included; a release dry run passed every new check.
 
 #### Stage 3 — Cleanup before the freeze
 
-Shrink the surface before promising it: deleting a public name costs nothing
-now and a deprecation cycle later.
+Done: the deletions, consolidations, renames, and splits are recorded in
+CHANGELOG under Unreleased. Decisions taken along the way:
 
-- **Delete** (no callers): `group_tree.add_to_group_tree` and
-  `remove_from_group_tree` (byte-identical to `groups.add_to_group` and
-  `remove_from_group`); `cli_commands.groups._tree_mod`;
-  `canonical._align_width`; `filestore.write_erratum_pdf`;
-  `acl_anthology.DOI_PREFIX`; the unused `child_type` parameter of
-  `inheritance._crossref_fields`; the `interchange.FORMATS` and
-  `metadata.library_database_type` back-compat aliases; and
-  `importer.IDENTIFIER_KINDS`, `arxiv_entry`, and `fetch_arxiv_record` (a
-  public module, so each removal gets a CHANGELOG line).
-- **Remove or fold test-only helpers** into what they wrap:
-  `keys.has_duplicate_keys`, `keys.duplicate_key_counts`,
-  `importer.extract_doi_from_journal_url`, `importer.entry_from_bibtex`,
-  `group_tree.resolve_effective_groups`, `filestore.set_preprint_canonical`,
-  `provider_cache.stats`.
-- **Decide the `Bibliography` methods the CLI never calls**: `expand_journals`
-  (no caller, no test), `import_doi` (superseded by `import_reference`, though
-  the API docs say it remains), `journals_check`, `abbreviate_journals`,
-  `rename_citekey`. Keep `from_bibfile`, which is documented, and give it a
-  test.
-- **Consolidate duplicates** into one home each: the arXiv DOI prefix (four
-  copies), an entry's arXiv id (two), title similarity (two), case-insensitive
-  field lookup (four), the `journal`/`journaltitle` container getter (five),
-  the two TeX file walkers in `usage`, the duplicated group helpers and
-  delimiters, and the thirteen read-only commands that call `json.dumps`
-  instead of the shared emitter.
-- **Rename leftover modules**: `cli_commands/used.py` implements `tex scan`;
-  `cli_commands/files.py` implements `asset check`.
-- **Split before the 1000-line cap**: move the Pinax manifest code out of
-  `filestore` (953 lines) and the arXiv section out of `importer`; find seams
-  for `canonical` (985), `lint` (942), and `metadata/jabref` (888).
-- **Fix a stale docstring**: `keys usage` still refers to a removed `used scan`.
+- Of the `Bibliography` methods no command calls, only `import_doi` went; the
+  Python API is its own interface, and `journals_check`,
+  `abbreviate_journals`, `expand_journals`, and `rename_citekey` are
+  conveniences nothing else in it covers.
+- The Pinax `preprint_canonical` flag was removed rather than finished: nothing
+  could set it. A setter is an addition that can return after the freeze.
+- `importer` fell to 589 lines with its dead arXiv helpers gone, so its arXiv
+  section stayed put.
+- Splits keep public names defined in, or listed in `__all__` of, their public
+  module, so the generated API reference is unchanged: `canonical` lost its
+  field-order table and value wrapping, `lint` its issue type and profile
+  checks, `filestore` its manifest (a mixin), `metadata/jabref` its group
+  grammar.
 
-**Gate 3**: no module over 800 lines; vulture at 80% confidence reports only
-reviewed false positives; the suite and the coverage floor hold.
+**Gate 3** (met, 2026-10-04): no module over 800 lines (the largest is
+`fetch.py`, 789); vulture at 80% confidence reports nothing; the suite and the
+90% coverage floor hold.
 
 #### Stage 4 — Freeze the surface
 

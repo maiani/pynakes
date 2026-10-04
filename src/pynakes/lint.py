@@ -23,42 +23,63 @@ https://mirrors.ctan.org/macros/latex/contrib/biblatex/doc/biblatex.pdf
 """
 
 import csv
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
 
 from pynakes._identifiers import normalize_doi
+from pynakes._lint_issue import (
+    CATEGORY_FIXERS,
+    ISSUE_CATEGORIES,
+    SEVERITIES,
+    LintCategory,
+    LintIssue,
+    LintSeverity,
+    issue_category,
+)
+from pynakes._lint_profile import (
+    PROFILE_ISSUE_TYPES,
+    LintProfile,
+    _lint_profile_entry,
+    is_profile_issue,
+    profile_required_fields,
+    resolve_lint_profile,
+)
 from pynakes._lint_required import required_field_rules
 from pynakes.bibtex_parser import parse_raw_string_definition
 from pynakes.editing import raw_field_names, raw_field_value
-from pynakes.fields import TITLE_FIELDS, title_capitalization_is_protected
 from pynakes.formatters import normalize_page_numbers
 from pynakes.identity import identity_class
 from pynakes.journals import (
-    DEFAULT_JOURNAL_SOURCE,
-    JOURNAL_FIELDS,
-    JournalSources,
-    expected_journal_title,
     load_sources,
 )
 from pynakes.keys import (
     UnsupportedCitationKeyPatternError,
     entry_reference_keys,
-    generate_key_from_pattern,
     is_key_regeneration_exempt,
     planned_regenerated_keys,
 )
 from pynakes.metadata import (
     library_dialect,
-    library_key_pattern,
-    metadata_bool,
     metadata_category,
-    metadata_list,
-    metadata_value,
     validate_metadata_value,
 )
 from pynakes.model import BibEntry, BibFile, MetadataBlock, undefined_string_references
 from pynakes.usage import tex_sources_from_metadata, validate_tex_sources
+
+__all__ = [
+    "CATEGORY_FIXERS",
+    "ISSUE_CATEGORIES",
+    "PROFILE_ISSUE_TYPES",
+    "SEVERITIES",
+    "LintCategory",
+    "LintIssue",
+    "LintProfile",
+    "LintSeverity",
+    "is_profile_issue",
+    "issue_category",
+    "lint",
+    "profile_required_fields",
+    "resolve_lint_profile",
+]
 
 # Entry types for which a missing DOI is worth a (low-severity) warning. This is
 # lint's own policy, not a requirement either format states, so it stays here
@@ -134,139 +155,6 @@ _CONSISTENCY_ALTERNATIVES: dict[str, frozenset[str]] = {
 }
 
 
-# Profile findings remain warnings for interactive use, but ``lint --strict``
-# treats them as a failed conformance gate. Metadata drift belongs here too: an
-# unknown ``pynakes-meta`` key, a value the key's grammar rejects, or duplicate
-# blocks for one key all mean the library's persisted settings are not what
-# pynakes will apply.
-PROFILE_ISSUE_TYPES = frozenset(
-    {
-        "citation_key_pattern_mismatch",
-        "journal_style_mismatch",
-        "missing_profile_required_field",
-        "title_capitalization_unprotected",
-        "unsupported_citation_key_pattern",
-        "invalid_profile_setting",
-        "unknown_journal",
-        "unknown_metadata_key",
-        "invalid_metadata_value",
-        "duplicate_metadata_block",
-    }
-)
-
-
-@dataclass(frozen=True)
-class LintProfile:
-    """The metadata settings that define lintable library conformance."""
-
-    journal_style: str = "none"
-    journal_source: str = DEFAULT_JOURNAL_SOURCE
-    journal_table: str | None = None
-    ltwa_table: str | None = None
-    protect_titles: bool = False
-    title_fields: tuple[str, ...] = TITLE_FIELDS
-    protected_terms: tuple[str, ...] = ()
-
-
-def resolve_lint_profile(lib: BibFile) -> LintProfile:
-    """Resolve the same persisted normalization settings that lint can verify."""
-    journal_style = (metadata_value(lib, "normalize-journal-style") or "none").lower()
-    journal_source = (
-        metadata_value(lib, "normalize-journal-source") or DEFAULT_JOURNAL_SOURCE
-    ).lower()
-    title_fields = (
-        metadata_list(metadata_value(lib, "normalize-title-fields")) or LintProfile.title_fields
-    )
-    protected_terms = metadata_list(metadata_value(lib, "normalize-protected-terms"))
-    protect_titles = metadata_bool(
-        metadata_value(lib, "normalize-protect-titles"),
-        bool(protected_terms),
-    )
-    return LintProfile(
-        journal_style=journal_style,
-        journal_source=journal_source,
-        journal_table=metadata_value(lib, "normalize-journal-table"),
-        ltwa_table=metadata_value(lib, "normalize-ltwa-table"),
-        # Normalization protects titles by default, but lint enforces only a
-        # stored title preference. This keeps unprofiled libraries advisory.
-        protect_titles=protect_titles,
-        title_fields=tuple(field.lower() for field in title_fields),
-        protected_terms=protected_terms,
-    )
-
-
-def profile_required_fields(lib: BibFile, entry_type: str) -> tuple[str, ...]:
-    """Return additional required fields configured by the lint profile.
-
-    ``lint-required-fields`` applies to every entry and
-    ``lint-required-fields-<entrytype>`` adds type-specific requirements.
-    """
-    global_fields = metadata_list(metadata_value(lib, "lint-required-fields"))
-    type_fields = metadata_list(metadata_value(lib, f"lint-required-fields-{entry_type.lower()}"))
-    return global_fields + type_fields
-
-
-def is_profile_issue(issue: "LintIssue") -> bool:
-    """Return whether a finding is a stored-profile conformance deviation."""
-    return issue.type in PROFILE_ISSUE_TYPES
-
-
-LintSeverity = Literal["error", "warning", "info"]
-LintCategory = Literal["correctness", "content", "layout", "consistency", "profile"]
-
-SEVERITIES: tuple[LintSeverity, ...] = ("error", "warning", "info")
-
-# Which command resolves a category, or ``None`` when a human must decide.
-CATEGORY_FIXERS: dict[LintCategory, str | None] = {
-    "correctness": None,
-    "content": "normalize",
-    "layout": "format",
-    "consistency": None,
-    "profile": None,
-}
-
-# Every finding belongs to exactly one category. ``correctness`` findings are
-# structural problems no command can safely resolve; ``content`` and ``layout``
-# findings name the command that fixes them; ``consistency`` findings are
-# heuristic observations, not defects.
-ISSUE_CATEGORIES: dict[str, LintCategory] = {
-    "duplicate_field": "correctness",
-    "duplicate_key": "correctness",
-    "empty_key": "correctness",
-    "missing_required_field": "correctness",
-    "missing_reference_target": "correctness",
-    "undefined_string_reference": "correctness",
-    "no_entries": "correctness",
-    "citation_key_pattern_mismatch": "content",
-    "journal_style_mismatch": "content",
-    "malformed_doi": "content",
-    "malformed_groups": "content",
-    "nonstandard_page_range": "content",
-    "title_capitalization_unprotected": "content",
-    "unknown_journal": "content",
-    "unsupported_citation_key_pattern": "content",
-    "noncanonical_entry_type_case": "layout",
-    "noncanonical_field_name_case": "layout",
-    "inconsistent_field": "consistency",
-    "missing_doi": "consistency",
-    "invalid_profile_setting": "profile",
-    "missing_profile_required_field": "profile",
-    "unknown_metadata_key": "correctness",
-    "invalid_metadata_value": "correctness",
-    "duplicate_metadata_block": "correctness",
-    "missing_tex_source": "correctness",
-}
-
-
-def issue_category(issue_type: str) -> LintCategory:
-    """Return the category of ``issue_type``.
-
-    Unmapped types fall back to ``correctness`` so a new check is never silently
-    treated as advisory; ``tests/test_lint.py`` asserts the mapping is complete.
-    """
-    return ISSUE_CATEGORIES.get(issue_type, "correctness")
-
-
 # Findings whose ``key`` names a metadata setting or an on-disk file rather
 # than a citation key, so the entry-line lookup must never apply to them.
 _LINE_EXEMPT_TYPES = frozenset(
@@ -277,44 +165,6 @@ _LINE_EXEMPT_TYPES = frozenset(
         "missing_tex_source",
     }
 )
-
-
-@dataclass
-class LintIssue:
-    """A single validation finding."""
-
-    type: str
-    severity: LintSeverity
-    message: str
-    key: str | None = None
-    field: str | None = None
-    #: One-based source line of the finding's entry or metadata block, when the
-    #: library was parsed from text and the check could locate it; ``None``
-    #: otherwise (file-level findings, in-memory libraries).
-    line: int | None = None
-
-    @property
-    def category(self) -> LintCategory:
-        """Return which kind of problem this finding is."""
-        return issue_category(self.type)
-
-    @property
-    def fixer(self) -> str | None:
-        """Return the command that resolves this finding, if any."""
-        return CATEGORY_FIXERS[self.category]
-
-    def to_dict(self) -> dict[str, object]:
-        """Serialize the finding to a JSON-friendly dict for CLI output."""
-        return {
-            "type": self.type,
-            "severity": self.severity,
-            "category": self.category,
-            "fixer": self.fixer,
-            "message": self.message,
-            "key": self.key,
-            "field": self.field,
-            "line": self.line,
-        }
 
 
 def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
@@ -811,152 +661,3 @@ def _lint_entry(
     issues += _lint_pages(entry, fields)
     issues += _lint_groups(entry)
     return issues
-
-
-# ---------------------------------------------------------------------------
-# _lint_profile_entry helpers
-# ---------------------------------------------------------------------------
-
-
-def _lint_key_pattern(
-    entry: BibEntry,
-    lib: BibFile,
-    expected_key: str | None = None,
-    *,
-    exempt: bool = False,
-) -> list[LintIssue]:
-    """Check the entry's citation key against the configured key pattern.
-
-    Uses the native-first :func:`pynakes.metadata.library_key_pattern`, so a
-    pynakes ``key-pattern`` takes precedence over a JabRef ``keypattern_*``.
-    ``exempt`` entries (see :func:`pynakes.keys.is_key_regeneration_exempt`)
-    are never checked: ``keys generate`` would not touch their key either, so
-    flagging a "mismatch" here would just report the entry's real key as
-    wrong against a pattern it was never going to receive.
-    """
-    if exempt:
-        return []
-    pattern = library_key_pattern(lib, entry.type)
-    if not pattern:
-        return []
-    try:
-        expected_key = expected_key or generate_key_from_pattern(entry, pattern)
-    except UnsupportedCitationKeyPatternError as exc:
-        return [
-            LintIssue(
-                "unsupported_citation_key_pattern",
-                "warning",
-                f"Entry {entry.key!r} cannot be checked against key pattern {pattern!r}: {exc}",
-                key=entry.key,
-            )
-        ]
-    if entry.key != expected_key:
-        return [
-            LintIssue(
-                "citation_key_pattern_mismatch",
-                "warning",
-                f"Entry {entry.key!r} does not match configured citation-key pattern "
-                f"{pattern!r}; expected {expected_key!r}",
-                key=entry.key,
-            )
-        ]
-    return []
-
-
-def _lint_journal_style(
-    entry: BibEntry,
-    fields: dict[str, str],
-    profile: LintProfile,
-    journal_sources: JournalSources | None,
-) -> list[LintIssue]:
-    """Check entry journal fields against the configured journal style."""
-    if profile.journal_style not in {"abbreviated", "full"} or journal_sources is None:
-        return []
-    issues: list[LintIssue] = []
-    for field in JOURNAL_FIELDS:
-        title = fields.get(field)
-        if not title:
-            continue
-        expected_title = expected_journal_title(
-            title, entry, profile.journal_style, journal_sources
-        )
-        if expected_title is None:
-            issues.append(
-                LintIssue(
-                    "unknown_journal",
-                    "warning",
-                    f"Entry {entry.key!r} field {field!r} has no known "
-                    f"{profile.journal_style!r} journal mapping for {title!r}",
-                    key=entry.key,
-                    field=field,
-                )
-            )
-        elif expected_title != title:
-            issues.append(
-                LintIssue(
-                    "journal_style_mismatch",
-                    "warning",
-                    f"Entry {entry.key!r} field {field!r} is not in configured "
-                    f"{profile.journal_style!r} journal style; expected {expected_title!r}",
-                    key=entry.key,
-                    field=field,
-                )
-            )
-    return issues
-
-
-def _lint_consistency(
-    entry: BibEntry, lib: BibFile, profile: LintProfile, fields: dict[str, str]
-) -> list[LintIssue]:
-    """Check profile-required fields and title-capitalisation protection."""
-    issues: list[LintIssue] = []
-    for field in profile_required_fields(lib, entry.type):
-        normalized = field.lower()
-        if not fields.get(normalized, "").strip():
-            issues.append(
-                LintIssue(
-                    "missing_profile_required_field",
-                    "warning",
-                    f"{entry.type.lower()} entry {entry.key!r} is missing profile-required field "
-                    f"{normalized!r}",
-                    key=entry.key,
-                    field=normalized,
-                )
-            )
-    if profile.protect_titles:
-        for field in profile.title_fields:
-            title = fields.get(field)
-            if title and not title_capitalization_is_protected(
-                title, list(profile.protected_terms)
-            ):
-                issues.append(
-                    LintIssue(
-                        "title_capitalization_unprotected",
-                        "warning",
-                        f"Entry {entry.key!r} field {field!r} is not brace-protected as required "
-                        "by normalize-protect-titles",
-                        key=entry.key,
-                        field=field,
-                    )
-                )
-    return issues
-
-
-def _lint_profile_entry(
-    entry: BibEntry,
-    lib: BibFile,
-    profile: LintProfile,
-    journal_sources: JournalSources | None,
-    fields: dict[str, str] | None = None,
-    expected_key: str | None = None,
-    *,
-    key_pattern_exempt: bool = False,
-) -> list[LintIssue]:
-    """Check one entry against persisted preferences without changing it."""
-    if fields is None:
-        fields = entry.fields
-    return (
-        _lint_key_pattern(entry, lib, expected_key, exempt=key_pattern_exempt)
-        + _lint_consistency(entry, lib, profile, fields)
-        + _lint_journal_style(entry, fields, profile, journal_sources)
-    )

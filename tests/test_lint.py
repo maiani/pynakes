@@ -789,14 +789,24 @@ def test_custom_biblatex_entry_type_and_field_names_produce_no_errors() -> None:
 # --- severity and category axes --------------------------------------------
 
 
+def _lint_source_nodes() -> list[ast.AST]:
+    """Every AST node of lint.py and the _lint_* modules beside it."""
+    # The imported module's location, so a wheel install works too.
+    package = Path(lint_module.__file__).parent
+    sources = [package / "lint.py", *sorted(package.glob("_lint_*.py"))]
+    return [
+        node
+        for source in sources
+        for node in ast.walk(ast.parse(source.read_text(encoding="utf-8")))
+    ]
+
+
 def test_every_emitted_issue_type_has_a_category() -> None:
-    # Parses lint.py so a newly added check cannot silently inherit the
-    # correctness fallback: every LintIssue type must be mapped explicitly.
-    source = Path(lint_module.__file__)  # the imported module, so a wheel install works too
-    tree = ast.parse(source.read_text(encoding="utf-8"))
+    # Parses lint.py and its _lint_* modules so a newly added check cannot
+    # silently inherit the correctness fallback: every type must be mapped.
     emitted = {
         node.args[0].value
-        for node in ast.walk(tree)
+        for node in _lint_source_nodes()
         if isinstance(node, ast.Call)
         and getattr(node.func, "id", "") == "LintIssue"
         and node.args
@@ -812,11 +822,9 @@ def test_every_emitted_issue_type_has_a_category() -> None:
 
 
 def test_every_emitted_severity_is_declared() -> None:
-    source = Path(lint_module.__file__)  # the imported module, so a wheel install works too
-    tree = ast.parse(source.read_text(encoding="utf-8"))
     severities = {
         node.args[1].value
-        for node in ast.walk(tree)
+        for node in _lint_source_nodes()
         if isinstance(node, ast.Call)
         and getattr(node.func, "id", "") == "LintIssue"
         and len(node.args) > 1

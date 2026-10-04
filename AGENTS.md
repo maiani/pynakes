@@ -30,7 +30,10 @@ src/pynakes/
   engine.py           Bibliography lifecycle: open, stage, preview/diff, commit, reload
   _engine_*.py        focused Bibliography operation mixins/helpers
   canonical.py        explicit, whole-file canonical layout formatting
+  _canonical_*.py     its field-order table and opt-in value wrapping
   groups.py group_tree.py keys.py fields.py files.py lint.py
+  _lint_*.py          lint's issue type, categories, and profile checks
+  _entry_comments.py  comments attached above an entry, which move with it
   authors.py journals.py normalize.py
   importer.py         resolve + import references by DOI / arXiv id or supported URL
   lookup.py           resolve a written-out reference to records that exist
@@ -39,6 +42,7 @@ src/pynakes/
   entry_types.py      container/eprint field naming per entry type + dialect
   metadata/           jabref-meta + pynakes-meta parsing, schemas, safe updates
   filestore.py        Pinax paths, manifests, validation, and material transactions
+  _filestore_*.py     the provenance manifest mixin and atomic filesystem helpers
   fetch.py providers/ explicit network-backed material and metadata providers
   interchange/       CSL-JSON, RIS, MODS, EndNote, and CSV codecs
   cli_commands/       command callbacks grouped by concern
