@@ -111,7 +111,7 @@ def _resolve(entry: EntryLike, lookup: Lookup, seen: frozenset[int]) -> dict[str
     crossref = entry.fields.get("crossref", "").strip()
     parent = lookup(crossref) if crossref else None
     if parent is not None:
-        for name, value in _crossref_fields(parent, entry.type, lookup, seen).items():
+        for name, value in _crossref_fields(parent, lookup, seen).items():
             result.setdefault(name, value)
 
     return result
@@ -136,9 +136,7 @@ def _xdata_fields(entry: EntryLike, lookup: Lookup, seen: frozenset[int]) -> dic
     return result
 
 
-def _crossref_fields(
-    parent: EntryLike, child_type: str, lookup: Lookup, seen: frozenset[int]
-) -> dict[str, str]:
+def _crossref_fields(parent: EntryLike, lookup: Lookup, seen: frozenset[int]) -> dict[str, str]:
     """Fields a child inherits from its ``crossref`` parent, with title remap."""
     presolved = _resolve(parent, lookup, seen)
     title_map = _PARENT_TITLE_MAP.get(parent.type.lower(), {})

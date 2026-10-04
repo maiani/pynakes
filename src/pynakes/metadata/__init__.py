@@ -118,10 +118,6 @@ def parse_metadata_comment(
     )
 
 
-# Back-compat alias: `library_database_type` is now dialect-aware (checks
-# pynakes' native `dialect` key before falling back to JabRef's `databaseType`).
-library_database_type = library_dialect
-
 __all__ = [
     "CATEGORY_CITATION_KEY",
     "CATEGORY_FILES",
@@ -162,7 +158,6 @@ __all__ = [
     "format_save_order",
     "is_known_metadata_key",
     "jabref_projection",
-    "library_database_type",
     "library_dialect",
     "library_is_jabref_tracked",
     "library_key_pattern",

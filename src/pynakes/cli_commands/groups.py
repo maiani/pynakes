@@ -149,18 +149,6 @@ def groups_remove_entry(
     _group_mod_entry(file, key, group, params, add=False)
 
 
-def _tree_mod(
-    file: str,
-    params: RunParams,
-    action: str,
-    msg: str,
-    **details,
-) -> None:
-    """Run a tree modification and finish."""
-    coll = Bibliography.open(file)
-    _finish_mod(file, action, coll, params, [msg], **details)
-
-
 def groups_add_group(
     file: str | None = bib_file_argument(),
     name: str = typer.Argument(..., help="Group name to add"),

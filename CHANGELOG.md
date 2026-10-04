@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   3.12, 3.13 and 3.14 are, and each runs the full suite on Linux, Windows and
   macOS. The bundled engine in the editor needs Python 3.12+ too.
 
+### Removed
+
+- `pynakes.importer.arxiv_entry` and `fetch_arxiv_record`, which nothing
+  called: `import_reference` and `prepare_imported_reference` resolve arXiv
+  identifiers. The `pynakes.importer.ArxivRecord` re-export went with them.
+- `pynakes.importer.IDENTIFIER_KINDS`, an unused set of the identifier-kind
+  constants; the constants themselves remain.
+- `pynakes.metadata.library_database_type`, an alias of `library_dialect`.
+- `pynakes.interchange.FORMATS`, an alias of `IMPORT_FORMATS`.
+- `pynakes.group_tree.add_to_group_tree` and `remove_from_group_tree`,
+  identical to `pynakes.groups.add_to_group` and `remove_from_group`.
+
 ### Fixed
 
 - On Windows, `init --agent-guide` wrote `AGENTS.md` in the locale's code page

@@ -317,13 +317,6 @@ class FileStore:
         self._atomic_write(path, data)
         return path
 
-    def write_erratum_pdf(self, key: str, data: bytes) -> Path:
-        """Atomically write the erratum/corrected PDF for ``key``."""
-        path = self.paths_for(key).erratum_pdf
-        self.ensure_root()
-        self._atomic_write(path, data)
-        return path
-
     @property
     def manifest_path(self) -> Path:
         """Return the Pinax provenance manifest path."""

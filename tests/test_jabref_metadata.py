@@ -14,7 +14,7 @@ from pynakes.metadata import (
     consolidate_metadata,
     default_namespace,
     format_metadata_list,
-    library_database_type,
+    library_dialect,
     library_is_jabref_tracked,
     library_save_actions,
     library_save_order,
@@ -271,19 +271,19 @@ def test_library_save_order_reads_from_metadata() -> None:
     assert order.criteria == [("citationkey", False)]
 
 
-def test_library_database_type_reads_biblatex() -> None:
+def test_library_dialect_reads_biblatex() -> None:
     lib = parse_bib("@comment{jabref-meta: databaseType:biblatex;}\n")
-    assert library_database_type(lib) == "biblatex"
+    assert library_dialect(lib) == "biblatex"
 
 
-def test_library_database_type_reads_bibtex() -> None:
+def test_library_dialect_reads_bibtex() -> None:
     lib = parse_bib("@comment{jabref-meta: databaseType:bibtex;}\n")
-    assert library_database_type(lib) == "bibtex"
+    assert library_dialect(lib) == "bibtex"
 
 
-def test_library_database_type_defaults_to_bibtex_when_absent() -> None:
+def test_library_dialect_defaults_to_bibtex_when_absent() -> None:
     lib = parse_bib("@article{A, title = {T}}\n")
-    assert library_database_type(lib) == "bibtex"
+    assert library_dialect(lib) == "bibtex"
 
 
 def test_parse_both_namespaces_and_merge_precedence() -> None:

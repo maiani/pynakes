@@ -29,7 +29,6 @@ from dataclasses import dataclass
 from typing import Literal
 
 from pynakes._text_utils import _split_escaped
-from pynakes.editing import append_delimited_field, remove_entry_field, set_entry_field
 from pynakes.model import BibFile
 
 # ---------------------------------------------------------------------------
@@ -368,7 +367,6 @@ def _native_tree(lib: BibFile) -> list[GroupNode] | None:
 # ---------------------------------------------------------------------------
 
 _GROUPS_DELIM = ";"
-_GROUPS_JOIN = "; "
 
 
 def _write_tree(lib: BibFile, nodes: list[GroupNode]) -> None:
@@ -652,33 +650,3 @@ def list_direct_members(lib: BibFile, name: str) -> list[str]:
     if node is not None:
         return sorted(_group_entry_keys(lib, node))
     return sorted(entry.key for entry in lib.entries.values() if name in entry_group_names(entry))
-
-
-def add_to_group_tree(lib: BibFile, key: str, group: str) -> int:
-    """Add *key* to *group*, using the tree for validation.
-
-    If the group does not exist in the tree, a warning-level fallback is used
-    (the group is still added to the entry's ``groups`` field for
-    forward-compatibility).
-    """
-    count = 0
-    for entry in lib.entries.get_all(key):
-        if append_delimited_field(entry, "groups", group, _GROUPS_DELIM, _GROUPS_JOIN):
-            count += 1
-    return count
-
-
-def remove_from_group_tree(lib: BibFile, key: str, group: str) -> int:
-    """Remove *key* from *group*."""
-    count = 0
-    for entry in lib.entries.get_all(key):
-        groups = entry_group_names(entry)
-        if group not in groups:
-            continue
-        groups.remove(group)
-        if groups:
-            set_entry_field(entry, "groups", _GROUPS_JOIN.join(groups))
-        else:
-            remove_entry_field(entry, "groups")
-        count += 1
-    return count

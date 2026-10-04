@@ -404,13 +404,6 @@ def _sorted_fields(entry: BibEntry, layout: CanonicalLayout) -> list[tuple[str, 
     return structural + canonical + extras
 
 
-def _align_width(fields: list[tuple[str, str]]) -> int:
-    """Compute the column width for tabular ``=`` alignment."""
-    if not fields:
-        return 0
-    return max(len(name) for name, _ in fields)
-
-
 def format_entry(
     entry: BibEntry,
     layout: CanonicalLayout | None = None,

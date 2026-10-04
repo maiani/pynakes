@@ -66,9 +66,6 @@ from pynakes.providers.url_resolvers import (
     url_resolution_hint,
 )
 
-# Re-exported for callers that import the parsed-record type from this module.
-ArxivRecord = arxiv.ArxivRecord
-
 KEY_SOURCES = {"generated", "provider"}
 
 # Identifier types ``resolve_identifier`` can return.
@@ -97,34 +94,6 @@ OPENALEX = "openalex"
 SEMANTIC_SCHOLAR = "semantic_scholar"
 IACR = "iacr"
 ZBMATH = "zbmath"
-
-IDENTIFIER_KINDS = {
-    DOI,
-    ARXIV,
-    PMID,
-    PMCID,
-    EUROPE_PMC,
-    SSRN,
-    NBER,
-    BIORXIV,
-    MEDRXIV,
-    ZENODO,
-    OSF,
-    HAL,
-    CHEMRXIV,
-    RESEARCH_SQUARE,
-    PII,
-    ISBN,
-    INSPIRE,
-    DBLP,
-    ACL,
-    CROSSREF,
-    DATACITE,
-    OPENALEX,
-    SEMANTIC_SCHOLAR,
-    IACR,
-    ZBMATH,
-}
 
 
 # --- errors ----------------------------------------------------------------
@@ -412,37 +381,6 @@ def fetch_arxiv_atom(identifier: str, timeout: float = DEFAULT_TIMEOUT) -> str:
     """
     try:
         return arxiv.fetch_atom(identifier, timeout=timeout)
-    except ProviderFetchError as exc:
-        raise ArxivImportError(str(exc)) from exc
-
-
-def arxiv_entry(record: ArxivRecord, *, dialect: str = "bibtex") -> BibEntry:
-    """Build a fresh arXiv :class:`BibEntry` honoring the library ``dialect``.
-
-    BibLaTeX libraries get an ``@online`` entry (with a ``date`` field and
-    ``eprintclass``); BibTeX libraries get an ``@misc`` entry (with ``year``,
-    ``archivePrefix``, and ``primaryClass``). The arXiv id is always recorded in
-    ``eprint`` so :func:`pynakes.identity.entry_arxiv_id` and dedup recognize it
-    in either form.
-    """
-    metadata = arxiv.metadata_from_record(record, dialect=dialect)
-    return entry_from_metadata(metadata)
-
-
-def fetch_arxiv_record(identifier: str, fetcher: FetchArxivAtom | None = None) -> ArxivRecord:
-    """Fetch and parse arXiv metadata for ``identifier``.
-
-    Delegates fetch/parse to :mod:`pynakes.providers.repositories.arxiv`. The default Atom
-    fetcher is this module's :func:`fetch_arxiv_atom` wrapper so callers and
-    tests can substitute it; provider errors become :class:`ArxivImportError`.
-    """
-    normalized = normalize_arxiv(identifier)
-    if normalized is None:
-        raise ArxivImportError(f"Malformed arXiv identifier: {identifier!r}")
-    if fetcher is None:
-        fetcher = fetch_arxiv_atom
-    try:
-        return arxiv.fetch_record(normalized, fetcher=fetcher)
     except ProviderFetchError as exc:
         raise ArxivImportError(str(exc)) from exc
 

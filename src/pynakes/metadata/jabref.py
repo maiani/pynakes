@@ -257,8 +257,7 @@ def library_dialect(lib: BibFile) -> str:
     """Return the library dialect: native ``dialect`` first, else JabRef ``databaseType``.
 
     Defaults to ``"bibtex"`` when neither is set, the safer baseline for
-    constructed entries (``@misc`` is valid in both dialects). Replaces the
-    former ``library_database_type``.
+    constructed entries (``@misc`` is valid in both dialects).
     """
     native = pynakes_schema.native_dialect(lib)
     if native is not None:

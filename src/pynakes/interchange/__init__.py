@@ -21,9 +21,6 @@ from pynakes.model import BibFile
 EXPORT_FORMATS = ("csl-json", "ris", "mods", "endnote", "csv")
 IMPORT_FORMATS = ("csl-json", "ris", "mods", "endnote")
 
-# Back-compat alias for code that has not been updated yet.
-FORMATS = IMPORT_FORMATS
-
 
 def export_library(lib: BibFile, fmt: str) -> str:
     """Serialize *lib* to the named interchange format."""

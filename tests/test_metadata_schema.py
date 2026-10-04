@@ -119,7 +119,6 @@ def test_metadata_package_reexports_every_previously_public_name() -> None:
         "SaveOrder",
         "parse_save_order",
         "library_save_order",
-        "library_database_type",
         "library_is_jabref_tracked",
         "default_namespace",
         "parse_metadata_comment",
@@ -133,10 +132,6 @@ def test_metadata_package_reexports_every_previously_public_name() -> None:
     ]
     for name in previously_public_names:
         assert hasattr(metadata_pkg, name), f"pynakes.metadata.{name} no longer resolves"
-
-
-def test_library_database_type_alias_matches_library_dialect() -> None:
-    assert metadata_pkg.library_database_type is metadata_pkg.library_dialect
 
 
 # --- native key-pattern ----------------------------------------------------

@@ -17,7 +17,6 @@ from pynakes.providers.metadata._bibtex_service import bibtex_metadata
 from pynakes.providers.records import ReferenceMetadata
 
 BASE_URL = "https://aclanthology.org"
-DOI_PREFIX = "10.18653/v1"
 RawFetcher = Callable[[str], str]
 
 PROVIDER_NAME = "ACL Anthology"
