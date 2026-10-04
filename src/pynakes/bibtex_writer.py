@@ -1,5 +1,6 @@
 """BibTeX file writer with round-trip preservation."""
 
+from pynakes._entry_comments import entry_comments
 from pynakes.model import BibEntry, BibFile
 
 
@@ -70,17 +71,26 @@ def _canonical_layout(lib: BibFile) -> list:
 
     Blocks are emitted as comments, ``@string`` declarations, ``@preamble``,
     then entries — each separated from the previous by a blank line, matching
-    the conventional BibTeX arrangement.
+    the conventional BibTeX arrangement. A comment attached to an entry is
+    written directly above it instead (see :mod:`pynakes._entry_comments`), and
+    a blanked comment slot is skipped.
     """
     le = lib.line_ending
     segments: list[tuple[str, str, object]] = []
+    attached_texts, attached_indices = entry_comments(lib)
 
-    def add(kind: str, ref: object) -> None:
-        gap = "" if not segments else le * 2
+    def add(kind: str, ref: object, gap: str | None = None) -> None:
+        if gap is None:
+            gap = "" if not segments else le * 2
+            _gap, last_kind, last_ref = segments[-1] if segments else ("", "", None)
+            if last_kind == "comment" and lib.raw_comments[last_ref].endswith("\n"):
+                # A ``%`` comment carries its own newline; count it toward the gap.
+                gap = le
         segments.append((gap, kind, ref))
 
-    for index in range(len(lib.raw_comments)):
-        add("comment", index)
+    for index, comment in enumerate(lib.raw_comments):
+        if comment.strip() and index not in attached_indices:
+            add("comment", index)
 
     if lib.raw_strings:
         for index in range(len(lib.raw_strings)):
@@ -95,7 +105,10 @@ def _canonical_layout(lib: BibFile) -> list:
         add("preamble", index)
 
     for entry in lib.entries.values():
-        add("entry", entry)
+        run = attached_texts.get(id(entry), [])
+        for position, comment in enumerate(run):
+            add("raw", comment.rstrip("\r\n"), None if position == 0 else le)
+        add("entry", entry, le if run else None)
 
     return segments
 

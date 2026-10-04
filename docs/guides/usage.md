@@ -341,10 +341,14 @@ Pass a citation key to apply that preferred pattern to just one entry, or
 also rewrite matching TeX citations in linked `tex-sources` metadata when it is
 configured.
 
-`keys rename` updates the entry key in the `.bib` file and matching keys inside
-recognized TeX citation commands in the supplied `.tex` files/directories. It
-does not edit commented-out citations, and it exits with conflict if the target
-key already exists.
+`keys rename` updates the entry key in the `.bib` file, every `crossref`, `xref`,
+`xdata`, `related`, and `entryset` value in the library that names it, and
+matching keys inside recognized TeX citation commands in the supplied `.tex`
+files/directories. It does not edit commented-out citations, and it exits with
+conflict if the target key already exists. `keys generate` and `dedupe merge`
+update those reference fields the same way; `keys repair` leaves them alone,
+since a reference to a duplicated key is ambiguous. `lint` reports a reference
+field naming a key the library lacks as `missing_reference_target`.
 
 `keys usage` is a read-only lookup: given a key and one or more `--path`
 files/directories, it reports every `\cite`-family occurrence (file and line)
@@ -389,6 +393,16 @@ The `format` command deterministically places top-level comments before string
 declarations, preambles, and entries: `pynakes-meta` first, then `jabref-meta`,
 then other comments. It does not consolidate or change metadata values;
 metadata consolidation remains a `normalize` concern.
+
+A comment written **directly above an entry** — an `@comment{...}` block or a
+`%` line with no blank line between it and the entry — belongs to that entry:
+a note about it, or a directive another tool reads for the next entry, such as a
+linter suppression. Every command that moves or drops entries keeps such a
+comment with its entry: `format` and sorting write it directly above the entry
+wherever the entry lands, `ref remove` and `dedupe merge` remove it with the
+entry, and `corpus split`/`combine` send it to the output that receives the
+entry. Separate a comment from the entry below it with a blank line to make it a
+free, file-level comment instead.
 
 In JSON/API output, each metadata block exposes both forms of the value:
 `raw_value` is the parsed payload as stored in the comment, including JabRef's
@@ -762,7 +776,8 @@ readability convention chosen to make entries predictable and easy to scan:
 `--field-order` accepts `preferred`, `preserve`, or `alphabetical`.
 `--entry-order` accepts `preserve`, `key`, or `profile` (the library's `sort-order` /
 `saveOrderConfig`). `--block-order preserve` keeps comments, strings, preambles,
-and raw source in place as barriers while sorting entry runs; the default
+and raw source in place as barriers while sorting entry runs (a comment attached
+directly above an entry is not a barrier; it moves with its entry); the default
 `canonical` policy retains pynakes' metadata/JabRef placement convention.
 
 Safe value wrapping is opt-in. `--wrap-values stable` preserves authored legal

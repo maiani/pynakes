@@ -413,7 +413,9 @@ def keys_rename(
         )
         return
 
-    bib_changed = coll.rename_key(old, new)
+    coll.rename_key(old, new)
+    # Counts the renamed entry and every entry whose crossref/xdata followed it.
+    bib_changed = coll.changed_entries_count()
     source_changes, source_diff_parts, total_source_occurrences, source_warnings = (
         _rewrite_tex_sources(
             file,

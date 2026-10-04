@@ -379,8 +379,54 @@ class TestRename:
         with pytest.raises(ValueError, match="repair duplicates"):
             rename_key(lib, "Old", "New")
 
+    def test_rename_rewrites_crossref_and_xdata_references(self) -> None:
+        lib = parse_bib(
+            "@inproceedings{Gauss1801a, title={A Chapter}, crossref={Gauss1801}}\n"
+            "@inproceedings{Gauss1801b, title={B}, xdata={Common, Gauss1801}}\n"
+            "@proceedings{Gauss1801, title={Disquisitiones Arithmeticae}, year={1801}}\n"
+        )
+
+        assert rename_key(lib, "Gauss1801", "Gauss1801book") == 1
+
+        assert lib.entries["Gauss1801a"].fields["crossref"] == "Gauss1801book"
+        assert lib.entries["Gauss1801b"].fields["xdata"] == "Common, Gauss1801book"
+        assert "crossref={Gauss1801book}" in write_bib(lib)
+
+    def test_rename_leaves_unrelated_references_alone(self) -> None:
+        lib = parse_bib(
+            "@inproceedings{Gauss1801a, crossref={Gauss1801x}}\n@book{Gauss1801, year={1801}}\n"
+        )
+
+        rename_key(lib, "Gauss1801", "Gauss1801book")
+
+        assert lib.entries["Gauss1801a"].fields["crossref"] == "Gauss1801x"
+        assert lib.entries["Gauss1801a"].raw_content == (
+            "@inproceedings{Gauss1801a, crossref={Gauss1801x}}"
+        )
+
 
 class TestRegenerate:
+    def test_regenerate_all_rewrites_references_to_renamed_keys(self) -> None:
+        lib = parse_bib(
+            "@comment{jabref-meta: keypatterndefault:[auth][year];}\n"
+            "@inproceedings{child, author={Carl Gauss}, title={C}, crossref={parent}}\n"
+            "@proceedings{parent, editor={Carl Gauss}, title={P}, year={1801}}\n"
+        )
+
+        renames = dict(regenerate_keys(lib))
+
+        child = lib.entries[renames["child"]]
+        assert child.fields["crossref"] == renames["parent"]
+
+    def test_repair_leaves_references_to_a_duplicated_key_alone(self) -> None:
+        lib = parse_bib(
+            "@book{Dup, year={1}}\n@book{Dup, year={2}}\n@inbook{Child, crossref={Dup}}\n"
+        )
+
+        repair_duplicate_keys(lib)
+
+        assert lib.entries["Child"].fields["crossref"] == "Dup"
+
     def test_regenerate_one_uses_pattern_without_changing_other_keys(self) -> None:
         lib = parse_bib(
             "@comment{jabref-meta: keypatterndefault:[auth][shortyear];}\n"

@@ -123,6 +123,19 @@ def test_merge_duplicates_copies_missing_data_and_removes_duplicate() -> None:
     assert "url = {https://example.test/paper}" in preview
 
 
+def test_merge_points_references_at_the_surviving_entry() -> None:
+    lib = parse_bib(
+        "@proceedings{Euler1748, title={Introductio}, year={1748}, doi={10.5555/euler}}\n"
+        "@proceedings{Euler1748b, title={Introductio}, year={1748}, doi={10.5555/EULER}}\n"
+        "@inproceedings{Euler1748c, title={A Chapter}, crossref={Euler1748b}}\n"
+    )
+
+    report = merge_duplicates(lib)
+
+    assert report.removed_entry_count == 1
+    assert lib.entries["Euler1748c"].fields["crossref"] == "Euler1748"
+
+
 def test_merge_conflict_leaves_library_untouched() -> None:
     lib = parse_bib(
         "@article{A,\n"

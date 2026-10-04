@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `lint` reports a `crossref`, `xref`, `xdata`, `related`, or `entryset` value
+  that names a key the library lacks, as `missing_reference_target`.
+
 ### Changed
 
 - **Python 3.12 is now the minimum.** Python 3.11 is no longer supported;
@@ -41,6 +46,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A comment directly above an entry — an `@comment{...}` block or `%` line with
+  no blank line before the entry — now stays with that entry. Before, commands
+  that drop or move entries treated it as a free block, so a note or a linter
+  suppression silently attached itself to a different entry: `ref remove` and
+  `dedupe merge` left it above the next entry, `format --entry-order` and
+  `normalize --sort-by` left it behind while its entry moved, and `corpus split`
+  copied it into every output. It is now removed with its entry, written
+  directly above it wherever the entry lands, and sent only to the output that
+  receives it. A comment separated from the next entry by a blank line is a
+  free comment as before. With `--block-order preserve`, an attached comment
+  is no longer a barrier to sorting.
+- `keys rename` left `crossref = {Old}` pointing at a key that no longer
+  existed. Renaming a key now updates every `crossref`, `xref`, `xdata`,
+  `related`, and `entryset` value that names it, as do `keys generate` and
+  `dedupe merge` (which points them at the surviving entry).
+- `format` left two blank lines after a `%` comment where one was meant.
 - On Windows, `init --agent-guide` wrote `AGENTS.md` in the locale's code page
   with CRLF line endings, mangling the template's non-ASCII text. It is now
   UTF-8 with LF endings on every platform, like every other file pynakes writes.

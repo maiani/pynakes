@@ -16,6 +16,7 @@ from pynakes.identity import (
     compare_work_evidence,
     evidence_from_entry,
 )
+from pynakes.keys import rewrite_key_references
 from pynakes.model import BibEntry, BibFile
 
 
@@ -250,6 +251,9 @@ def merge_duplicates(
         for entry in plan.remove:
             lib.entries.remove(entry)
         removed.extend(plan.remove)
+        # A crossref/xdata naming a merged-away key now names the survivor.
+        retired = {entry.key for entry in plan.remove} - set(lib.entries.keys())
+        rewrite_key_references(lib, [(key, primary.key) for key in sorted(retired)])
         merged.append(
             ClusterMerge(
                 identity=plan.cluster.identity,

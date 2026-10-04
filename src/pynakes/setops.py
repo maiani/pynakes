@@ -16,6 +16,7 @@ predicate language is the shared selector grammar in :mod:`pynakes.query`, whose
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from pynakes._entry_comments import carry_from
 from pynakes.model import BibEntry, BibFile
 from pynakes.query import parse_query
 
@@ -80,8 +81,11 @@ def merge_libraries(named_libs: list[tuple[str, BibFile]], *, dedupe: bool = Fal
                 conflicts.append({"key": entry.key, "source": source})
 
     duplicate_keys = sorted(k for k, n in seen_count.items() if n > 1)
+    merged = context.derive(kept)
+    for _source, lib in named_libs[1:]:
+        carry_from(lib, merged)
     return MergeResult(
-        lib=context.derive(kept),
+        lib=merged,
         inputs=[name for name, _ in named_libs],
         duplicate_keys=duplicate_keys,
         conflicts=conflicts,

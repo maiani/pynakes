@@ -18,7 +18,7 @@ from pynakes._text_utils import entry_year
 from pynakes.authors import ascii_fold as _ascii_fold
 from pynakes.authors import last_name as _last_name
 from pynakes.authors import split_name_list as _split_name_list
-from pynakes.editing import rename_entry_key
+from pynakes.editing import rename_entry_key, set_entry_field
 from pynakes.formatters import (
     FIELD_FORMATTERS,
     first_page,
@@ -62,6 +62,50 @@ _STRUCTURAL_ENTRY_TYPES: frozenset[str] = frozenset({"xdata"})
 
 class UnsupportedCitationKeyPatternError(ValueError):
     """Raised when a JabRef citation-key pattern uses unsupported syntax."""
+
+
+# Fields whose value names other entries by citation key: ``crossref`` (BibTeX
+# and BibLaTeX) and BibLaTeX's ``xref``, ``xdata``, ``related`` and ``entryset``.
+# The last three hold comma-separated key lists.
+ENTRY_REFERENCE_FIELDS: tuple[str, ...] = ("crossref", "xref", "xdata", "related", "entryset")
+
+
+def entry_reference_keys(entry: BibEntry) -> list[tuple[str, str]]:
+    """Return ``(field, key)`` for every citation key *entry* references."""
+    return [
+        (name, part.strip())
+        for name in ENTRY_REFERENCE_FIELDS
+        for part in entry.fields.get(name, "").split(",")
+        if part.strip()
+    ]
+
+
+def rewrite_key_references(lib: BibFile, renames: list[tuple[str, str]]) -> int:
+    """Point reference fields at renamed keys; return how many entries changed.
+
+    Every :data:`ENTRY_REFERENCE_FIELDS` value naming an old key is rewritten to
+    the new one through the surgical editing helpers, so a rename never leaves
+    a ``crossref`` or ``xdata`` pointing at a key that no longer exists. The
+    renames apply simultaneously, so a swap or a chain maps each key once.
+    """
+    mapping = {old: new for old, new in renames if old != new}
+    if not mapping:
+        return 0
+    changed = 0
+    for entry in lib.entries.values():
+        touched = False
+        for name in ENTRY_REFERENCE_FIELDS:
+            value = entry.fields.get(name)
+            if not value:
+                continue
+            parts = value.split(",")
+            for index, part in enumerate(parts):
+                key = part.strip()
+                if key in mapping:
+                    parts[index] = part.replace(key, mapping[key], 1)
+            touched |= set_entry_field(entry, name, ",".join(parts))
+        changed += touched
+    return changed
 
 
 def _last_names_for(entry: BibEntry, field: str, fallback: str | None = None) -> list[str]:
@@ -514,18 +558,22 @@ def regenerate_keys(lib: BibFile) -> list[tuple[str, str]]:
 
     Collisions among generated keys are disambiguated with letter suffixes
     (``Smith2020``, ``Smith2020a``, ...). Returns the list of ``(old, new)``
-    renames actually applied. Modifies ``lib`` in place.
+    renames actually applied. Modifies ``lib`` in place; reference fields
+    naming a renamed key follow it.
 
     Structural entries whose type is in :data:`_STRUCTURAL_ENTRY_TYPES` (e.g.
     ``@xdata``) are skipped: they are referenced by key from other entries and
     renaming them would silently break those references. Entries with no
     author/editor or title are skipped too — see :func:`_lacks_key_material`.
     """
+    # A reference to a duplicated key is ambiguous, so it is left as written.
+    duplicated = set(lib.entries.duplicate_keys())
     renames: list[tuple[str, str]] = []
     for entry, new_key in planned_regenerated_keys(lib):
         old_key = entry.key
         if rename_entry_key(entry, new_key):
             renames.append((old_key, new_key))
+    rewrite_key_references(lib, [rename for rename in renames if rename[0] not in duplicated])
     return renames
 
 
@@ -552,6 +600,7 @@ def regenerate_key(lib: BibFile, key: str) -> tuple[str, str] | None:
     new_key = unique_key(generate_key(entry, lib), set(lib.entries.keys()) - {key})
     if not rename_entry_key(entry, new_key):
         return None
+    rewrite_key_references(lib, [(key, new_key)])
     return key, new_key
 
 
@@ -593,8 +642,10 @@ def validate_key(key: str) -> None:
 def rename_key(lib: BibFile, old: str, new: str) -> int:
     """Rename one unique citation key.
 
-    Returns 1 when the key changed, 0 for a no-op. Raises ``ValueError`` when
-    the old key is absent, duplicated, or the new key already exists.
+    Returns 1 when the key changed, 0 for a no-op. Reference fields naming the
+    old key follow it (see :func:`rewrite_key_references`). Raises
+    ``ValueError`` when the old key is absent, duplicated, or the new key
+    already exists.
     """
     validate_key(old)
     validate_key(new)
@@ -607,4 +658,7 @@ def rename_key(lib: BibFile, old: str, new: str) -> int:
         return 0
     if new in lib.entries:
         raise ValueError(f"Cannot rename {old!r} to {new!r}: target key already exists")
-    return 1 if rename_entry_key(matches[0], new) else 0
+    if not rename_entry_key(matches[0], new):
+        return 0
+    rewrite_key_references(lib, [(old, new)])
+    return 1

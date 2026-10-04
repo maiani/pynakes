@@ -30,6 +30,7 @@ from pynakes._engine_helpers import (
     metadata_fetch_policy,
     run_fetch_loop,
 )
+from pynakes._entry_comments import attached_comment_indices
 from pynakes.canonical import CanonicalLayout, format_selected_entries, validate_format_input
 from pynakes.editing import set_entry_type
 from pynakes.fetch_progress import FetchProgress
@@ -514,6 +515,7 @@ class BibliographyOperations:
             clusters = dedupe_ops.clusters_for_keys(clusters, keys)
         pinax_materials, pinax_merges = self._plan_pinax_dedupe_materials(clusters)
         report = dedupe_ops.merge_duplicates(self.lib, clusters)
+        self._remove_attached_comments(report.removed_entries)
         self._removed_entries.extend(report.removed_entries)
         report.pinax_materials = pinax_materials
         self._stage_pinax_material_merges(pinax_merges)
@@ -556,10 +558,23 @@ class BibliographyOperations:
         Returns the number of entries removed.
         """
         entries = self.lib.entries.get_all(key)
+        self._remove_attached_comments(entries)
         for entry in entries:
             self.lib.entries.remove(entry)
             self._removed_entries.append(entry)
         return len(entries)
+
+    def _remove_attached_comments(self, entries: list[BibEntry]) -> None:
+        """Stage removal of the comments attached directly above *entries*.
+
+        Such a comment describes its entry (see :mod:`pynakes._entry_comments`);
+        left behind, it would silently attach to whichever entry follows.
+        """
+        attached = attached_comment_indices(self.lib)
+        for entry in entries:
+            for index in attached.get(id(entry), []):
+                self.lib.raw_comments[index] = ""
+                self._removed_comments.add(index)
 
     def enrich(
         self,

@@ -18,6 +18,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 
+from pynakes._entry_comments import (
+    attachment_signature,
+    comment_texts,
+    entry_comments,
+    with_comments,
+)
 from pynakes.bibtex_parser import parse_bib, parse_raw_string_definition
 from pynakes.bibtex_writer import _quote_field_value, render_entry
 from pynakes.editing import raw_field_names
@@ -674,7 +680,7 @@ def _validate_formatted_semantics(lib: BibFile, text: str, layout: CanonicalLayo
         raise ValueError("format safety check failed: canonical output changed entry semantics")
 
     def raw_blocks(values: list[str]) -> Counter:
-        return Counter(value.strip("\r\n") for value in values)
+        return Counter(value.strip("\r\n") for value in values if value.strip())
 
     if raw_blocks(lib.raw_strings) != raw_blocks(reparsed.raw_strings):
         raise ValueError(
@@ -682,8 +688,12 @@ def _validate_formatted_semantics(lib: BibFile, text: str, layout: CanonicalLayo
         )
     if raw_blocks(lib.preamble) != raw_blocks(reparsed.preamble):
         raise ValueError("format safety check failed: canonical output changed @preamble blocks")
-    if raw_blocks(lib.raw_comments) != raw_blocks(reparsed.raw_comments):
+    if raw_blocks(comment_texts(lib)) != raw_blocks(reparsed.raw_comments):
         raise ValueError("format safety check failed: canonical output changed @comment blocks")
+    if attachment_signature(lib) != attachment_signature(reparsed):
+        raise ValueError(
+            "format safety check failed: canonical output moved a comment off its entry"
+        )
 
 
 def format_selected_entries(
@@ -771,12 +781,17 @@ def _write_preserved_blocks(lib: BibFile, layout: CanonicalLayout) -> str:
     blocks: list[tuple[str, str]] = []
     entry_run: list[BibEntry] = []
     emitted_entries: set[int] = set()
+    # A comment attached to an entry moves with it rather than acting as a barrier.
+    attached_texts, attached_indices = entry_comments(lib)
+
+    def render(entry: BibEntry) -> str:
+        return with_comments(entry, format_entry(entry, layout, le), attached_texts, le)
 
     def flush_entries() -> None:
         if not entry_run:
             return
         for entry in _ordered_entries(lib, layout, entry_run):
-            blocks.append(("entry", format_entry(entry, layout, le)))
+            blocks.append(("entry", render(entry)))
             emitted_entries.add(id(entry))
         entry_run.clear()
 
@@ -786,6 +801,8 @@ def _write_preserved_blocks(lib: BibFile, layout: CanonicalLayout) -> str:
             blocks.append(("raw", gap.strip("\r\n")))
         if kind == "entry" and isinstance(ref, BibEntry):
             entry_run.append(ref)
+            continue
+        if kind == "comment" and ref in attached_indices:
             continue
         flush_entries()
         if kind == "comment" and isinstance(ref, int) and ref < len(lib.raw_comments):
@@ -800,7 +817,7 @@ def _write_preserved_blocks(lib: BibFile, layout: CanonicalLayout) -> str:
 
     missing = [entry for entry in lib.entries.values() if id(entry) not in emitted_entries]
     for entry in _ordered_entries(lib, layout, missing):
-        blocks.append(("entry", format_entry(entry, layout, le)))
+        blocks.append(("entry", render(entry)))
 
     trailing = lib.source_trailing.strip("\r\n")
     if trailing:
@@ -903,8 +920,11 @@ def write_bib_canonical(
     jabref_comments: list[str] = []
     plain_comments: list[str] = []
 
-    for comment in lib.raw_comments:
+    attached_texts, attached_indices = entry_comments(lib)
+    for index, comment in enumerate(lib.raw_comments):
         stripped = comment.strip()
+        if not stripped or index in attached_indices:
+            continue
         if stripped.lower().startswith("@comment{pynakes-meta:"):
             pynakes_comments.append(comment)
         elif stripped.lower().startswith("@comment{jabref-meta:"):
@@ -915,11 +935,13 @@ def write_bib_canonical(
     # Emit pynakes-native metadata first, followed by ordinary comments.
     # JabRef metadata is emitted after the bibliography body below, matching
     # JabRef's trailing metadata convention.
+    # A ``%`` comment's text ends with its own newline; strip it so the
+    # separator alone sets the spacing.
     for comment in pynakes_comments:
-        parts.append(comment)
+        parts.append(comment.rstrip("\r\n"))
         parts.append(le * 2)
     for comment in plain_comments:
-        parts.append(comment)
+        parts.append(comment.rstrip("\r\n"))
         parts.append(le * 2)
 
     # @string declarations, alphabetical by key. Keep every source declaration,
@@ -950,7 +972,7 @@ def write_bib_canonical(
     # Entries.
     entries = _ordered_entries(lib, layout)
     for idx, entry in enumerate(entries):
-        entry_text = format_entry(entry, layout, le)
+        entry_text = with_comments(entry, format_entry(entry, layout, le), attached_texts, le)
         parts.append(entry_text)
         if idx < len(entries) - 1 and layout.blank_line_entries:
             parts.append(le * 2)

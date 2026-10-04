@@ -535,6 +535,9 @@ class BibFile:
         self.line_ending = line_ending
         self.source_layout = list(source_layout or [])
         self.source_trailing = source_trailing
+        # Comments attached to entries, carried as text by a derived library that
+        # has no source layout to read them from; see pynakes._entry_comments.
+        self._entry_comments: dict[int, tuple[str, ...]] = {}
 
     @property
     def jabref_metadata(self) -> dict[str, str]:
@@ -590,9 +593,13 @@ class BibFile:
 
         Subsets and partitions keep string definitions, preamble, comments,
         metadata, encoding, and line-ending preferences, but intentionally drop
-        the original source layout because the entry set has changed.
+        the original source layout because the entry set has changed. A comment
+        attached directly above an entry stays with that entry: it is kept only
+        if the entry is, and is written directly above it.
         """
-        return BibFile(
+        from pynakes._entry_comments import detach_into
+
+        derived = BibFile(
             entries=EntryStore(list(entries)),
             strings=dict(self.strings),
             raw_strings=list(self.raw_strings),
@@ -603,6 +610,8 @@ class BibFile:
             encoding=self.encoding,
             line_ending=self.line_ending,
         )
+        detach_into(self, derived)
+        return derived
 
     def to_dict(self) -> dict[str, object]:
         """Serialize the bib file to a JSON-friendly dict."""

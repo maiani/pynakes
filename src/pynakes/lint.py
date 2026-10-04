@@ -43,6 +43,7 @@ from pynakes.journals import (
 )
 from pynakes.keys import (
     UnsupportedCitationKeyPatternError,
+    entry_reference_keys,
     generate_key_from_pattern,
     is_key_regeneration_exempt,
     planned_regenerated_keys,
@@ -233,6 +234,7 @@ ISSUE_CATEGORIES: dict[str, LintCategory] = {
     "duplicate_key": "correctness",
     "empty_key": "correctness",
     "missing_required_field": "correctness",
+    "missing_reference_target": "correctness",
     "undefined_string_reference": "correctness",
     "no_entries": "correctness",
     "citation_key_pattern_mismatch": "content",
@@ -397,6 +399,7 @@ def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
             )
         )
 
+    issues.extend(_lint_reference_targets(lib))
     issues.extend(_lint_metadata(lib))
     issues.extend(_lint_field_consistency(lib, dialect=dialect))
     if base_dir is not None:
@@ -714,6 +717,23 @@ def _lint_pages(entry: BibEntry, fields: dict[str, str]) -> list[LintIssue]:
             key=entry.key,
             field="pages",
         )
+    ]
+
+
+def _lint_reference_targets(lib: BibFile) -> list[LintIssue]:
+    """Report a ``crossref``/``xdata``/... naming a key the library lacks."""
+    present = set(lib.entries.keys())
+    return [
+        LintIssue(
+            "missing_reference_target",
+            "warning",
+            f"Entry {entry.key!r} has {field} = {{{target}}}, but no entry has that key",
+            key=entry.key,
+            field=field,
+        )
+        for entry in lib.entries.values()
+        for field, target in entry_reference_keys(entry)
+        if target not in present
     ]
 
 

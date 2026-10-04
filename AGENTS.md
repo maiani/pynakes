@@ -1,7 +1,6 @@
 # Working on pynakes
 
 Guidance for coding agents (and humans) **developing** this repository.
-`CLAUDE.md` is a symlink to this file.
 
 > Looking for how to *use* the `pynakes` CLI from an LLM or automation
 > workflow? That's a different audience — see

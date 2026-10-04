@@ -382,6 +382,33 @@ def test_malformed_groups() -> None:
     assert "malformed_groups" in _types(lint(lib))
 
 
+def test_reference_to_a_missing_key_is_reported() -> None:
+    lib = parse_bib(
+        "@inproceedings{Gauss1801a, title={A Chapter}, crossref={Gauss1801x},"
+        " xdata={Gauss1801, Absent}}\n"
+        "@proceedings{Gauss1801, title={Disquisitiones Arithmeticae}, year={1801}}\n"
+    )
+
+    found = [
+        (issue.key, issue.field, issue.severity, issue.line)
+        for issue in lint(lib)
+        if issue.type == "missing_reference_target"
+    ]
+
+    assert found == [
+        ("Gauss1801a", "crossref", "warning", 1),
+        ("Gauss1801a", "xdata", "warning", 1),
+    ]
+
+
+def test_resolved_references_are_not_reported() -> None:
+    lib = parse_bib(
+        "@inproceedings{Gauss1801a, title={A Chapter}, crossref={Gauss1801}}\n"
+        "@proceedings{Gauss1801, title={Disquisitiones Arithmeticae}, year={1801}}\n"
+    )
+    assert "missing_reference_target" not in _types(lint(lib))
+
+
 def test_no_false_positives_on_clean_entry() -> None:
     lib = parse_bib(
         "@article{A,\n  author = {Jane Doe},\n  title = {A Study},\n"

@@ -368,6 +368,7 @@ class TestWriteBibCanonical:
             "@misc{B, title={B}}\n"
             "@misc{A, title={A}}\n"
             "@comment{second section}\n"
+            "\n"
             "@misc{D, title={D}}\n"
             "@misc{C, title={C}}\n"
         )
