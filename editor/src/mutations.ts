@@ -16,6 +16,8 @@
 import * as vscode from "vscode";
 import { resolveEngine } from "./engineDiscovery";
 import {
+  FILE_MOVED_MESSAGE,
+  NO_FINGERPRINT_MESSAGE,
   applyMutation,
   describeMutation,
   findDuplicates,
@@ -246,7 +248,9 @@ export async function promptGroup(
  * instead is the property that matters — the diff shown is the diff that
  * lands. The engine's own `--dry-run --diff` output goes to the Diff pane,
  * the approval dialog is raised over it, and approval re-runs the identical
- * invocation without `--dry-run`.
+ * invocation without `--dry-run`, conditional on the file still having the
+ * digest the preview reported — so nothing written while the dialog was open
+ * is overwritten.
  *
  * The file is reconciled first for the same reason a commit reconciles it: a
  * write against a stale buffer would discard whatever the text editor holds.
@@ -316,6 +320,15 @@ export async function runMutation(
       return;
     }
 
+    // The write is conditional on the file the preview read. An engine that
+    // cannot report that file's digest cannot honor the condition either, so
+    // nothing is attempted rather than writing unguarded.
+    const sourceSha256 = preview.sourceSha256;
+    if (!sourceSha256) {
+      fail(NO_FINGERPRINT_MESSAGE);
+      return;
+    }
+
     host.post({
       type: "diff",
       entries: [{ key: label, diff: preview.diff, warnings: preview.warnings }],
@@ -331,9 +344,16 @@ export async function runMutation(
       return;
     }
 
-    const applied = await applyMutation(command, filePath, mutation, cwd);
+    const applied = await applyMutation(command, filePath, mutation, sourceSha256, cwd);
     if (!applied.ok) {
-      fail(applied.message);
+      // Not applied, whichever way it was refused. A file that moved while the
+      // dialog was open is re-read, so what the view shows is what is there.
+      if (applied.conflict === true && applied.error === "ExternalModification") {
+        fail(FILE_MOVED_MESSAGE);
+        await host.reload();
+        return;
+      }
+      fail(applied.conflict === true ? `Nothing was written: ${applied.message}` : applied.message);
       return;
     }
     host.post({

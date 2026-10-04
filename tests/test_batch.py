@@ -253,3 +253,96 @@ def test_cli_batch_rejects_two_sources_and_bad_json(tmp_path: Path) -> None:
     malformed = runner.invoke(app, ["corpus", "batch", str(bib), "--ops", "not-json", "--json"])
     assert malformed.exit_code == 1, malformed.output
     assert "not valid JSON" in json.loads(malformed.output)["message"]
+
+
+# --- ref.edit means what ``ref edit`` means ---------------------------------
+
+EDIT_SRC = (
+    "@book{Newton1687,\n  title = {Principia},\n  year = {1687}\n}\n\n"
+    "@book{Euler1748,\n  title = {Introductio},\n  year = {1748}\n}\n"
+)
+
+
+def test_ref_edit_trims_values_like_the_command() -> None:
+    coll = Bibliography.from_text(EDIT_SRC)
+    apply_operations(
+        coll, [{"op": "ref.edit", "key": "Newton1687", "fields": {"note": "  first edition  "}}]
+    )
+    assert coll.lib.entries["Newton1687"].fields["note"] == "first edition"
+
+
+@pytest.mark.parametrize(
+    ("operation", "message"),
+    [
+        ({"fields": {"bad name": "x"}}, "Invalid field name"),
+        ({"fields": {"type": "article"}}, "is not a field"),
+        ({"fields": {"KEY": "Other"}}, "is not a field"),
+        ({"fields": {"note": 3}}, "needs a string value"),
+        ({"fields": ["note"]}, "'fields' must be an object"),
+        ({"clear_fields": "title"}, "'clear_fields' must be an array"),
+        ({"fields": {"Title": "x"}, "clear_fields": ["title"]}, "Cannot set and clear"),
+    ],
+)
+def test_ref_edit_rejects_what_the_command_rejects(operation: dict, message: str) -> None:
+    coll = Bibliography.from_text(EDIT_SRC)
+    with pytest.raises(ValueError, match=message):
+        apply_operations(coll, [{"op": "ref.edit", "key": "Newton1687", **operation}])
+    assert not coll.is_modified
+
+
+def test_cli_batch_ref_edit_of_an_unknown_key_is_invalid_input(tmp_path: Path) -> None:
+    bib = tmp_path / "r.bib"
+    bib.write_text(EDIT_SRC)
+    ops = json.dumps([{"op": "ref.edit", "key": "Missing1900", "fields": {"note": "x"}}])
+
+    result = runner.invoke(app, ["corpus", "batch", str(bib), "--ops", ops, "--json"])
+
+    assert result.exit_code == 1, result.output
+    payload = json.loads(result.output)
+    assert payload["error"] == "InvalidInput"
+    assert "Missing1900" in payload["message"]
+    assert bib.read_text() == EDIT_SRC
+
+
+def test_cli_batch_edits_several_entries_in_one_write(tmp_path: Path) -> None:
+    bib = tmp_path / "r.bib"
+    bib.write_text(EDIT_SRC)
+    ops = json.dumps(
+        [
+            {"op": "ref.edit", "key": "Euler1748", "entry_type": "article"},
+            {
+                "op": "ref.edit",
+                "key": "Newton1687",
+                "fields": {"year": "1713"},
+                "clear_fields": ["title"],
+            },
+        ]
+    )
+
+    result = runner.invoke(app, ["corpus", "batch", str(bib), "--ops", ops, "--json"])
+
+    assert result.exit_code == 0, result.output
+    plan = {entry["key"]: entry for entry in json.loads(result.output)["plan"]["entries"]}
+    assert plan["Newton1687"]["fields"]["year"] == {"old": "1687", "new": "1713"}
+    assert plan["Newton1687"]["fields"]["title"] == {"old": "Principia", "new": None}
+    assert plan["Euler1748"]["type"] == {"old": "book", "new": "article"}
+    text = bib.read_text()
+    assert "@article{Euler1748," in text
+    assert "year = {1713}" in text
+    assert "Principia" not in text
+
+
+def test_cli_batch_writes_nothing_when_a_later_edit_fails(tmp_path: Path) -> None:
+    bib = tmp_path / "r.bib"
+    bib.write_text(EDIT_SRC)
+    ops = json.dumps(
+        [
+            {"op": "ref.edit", "key": "Newton1687", "fields": {"year": "1713"}},
+            {"op": "ref.edit", "key": "Euler1748", "fields": {"bad name": "x"}},
+        ]
+    )
+
+    result = runner.invoke(app, ["corpus", "batch", str(bib), "--ops", ops, "--json"])
+
+    assert result.exit_code == 1, result.output
+    assert bib.read_text() == EDIT_SRC

@@ -10,11 +10,11 @@ A graphical client for `.bib` files, built on the pynakes engine.
 ## The one rule this client keeps
 
 **It has no bibliography implementation of its own.** Every fact it displays
-arrives from the engine's JSON envelope, and every change leaves through
-`ref edit`. There is no BibTeX parser here, no metadata schema, no selector-
-grammar evaluator, no cache, and no second source of truth — so the view and the
-CLI cannot disagree about what an entry is, and a file the engine reads correctly
-cannot be displayed wrongly by the client.
+arrives from the engine's JSON envelope, and every change leaves through one of
+the engine's own modifying commands. There is no BibTeX parser here, no metadata
+schema, no selector-grammar evaluator, no cache, and no second source of truth —
+so the view and the CLI cannot disagree about what an entry is, and a file the
+engine reads correctly cannot be displayed wrongly by the client.
 
 The consequence worth knowing: when this client needs something the engine cannot
 express, the fix goes into the engine, not into TypeScript here. That rule is
@@ -28,7 +28,12 @@ itself. Two envelope bugs surfaced the same way and were fixed in the engine:
 `ref remove --diff` emitted its warnings in the `diff` field and dropped them
 from `warnings`, and `ref add` reported a taken citation key as an exit-1
 error while `ref import` reported the identical situation as an exit-2
-conflict with options.
+conflict with options. Guarding a commit against a change made during its
+approval added `--expect-sha256` and the `source_sha256` it takes back, rather
+than the client hashing the file itself; and committing staged entries as one
+`corpus batch` exposed that its `ref.edit` neither trimmed values nor checked
+field names the way `ref edit` does, so the batch operation was fixed rather
+than the values trimmed here.
 
 `src/model.ts` is the only place that transforms engine output, and it only does
 display tidying: collapsing wrapped whitespace, rendering the `and` name
@@ -70,16 +75,21 @@ Findings, the staged diff, Compare, and Duplicates each live in either the right
 dock or the bottom dock, moved by the arrow beside their tab, and stack as tabs
 when one dock holds more than one. Nothing is written when you type. Edits
 accumulate as pending changes, **Preview** shows the engine's exact unified diff,
-and committing asks for explicit confirmation with that diff on screen. Two
+and committing asks for explicit confirmation with that diff on screen. Three
 properties matter:
 
-- *The diff you approve is the diff that lands.* It is the engine's own diff from
-  `ref edit --dry-run --diff`, never reconstructed here, and the commit reuses
-  the same requests in the same order.
+- *The diff you approve is the diff that lands.* Every pending entry goes into
+  one `corpus batch`; its diff is the engine's own, from `--dry-run --diff`,
+  never reconstructed here, and the commit reruns the same operations in the
+  same order.
+- *A commit lands whole or not at all.* The batch is one write, so a commit that
+  cannot apply one entry applies none, and every pending edit stays pending.
 - *A commit cannot silently clobber a change made elsewhere.* Every pending edit
   remembers the value it was made against; the dry run reports what the file
   currently holds; if those disagree the commit is refused with nothing written,
-  rather than reverting someone else's work.
+  rather than reverting someone else's work. And the commit carries the file
+  digest the dry run reported (`--expect-sha256`), so a change made while the
+  approval dialog is open is refused by the engine too, rather than overwritten.
 
 Pending changes survive switching away from the tab, because they live in the
 extension rather than in the webview.
@@ -111,13 +121,17 @@ An entry's detail pane removes it, and its **Groups** chips add and remove
 membership. Every one of these goes through the same path: the engine's own
 `--dry-run --diff` lands in the Staged diff pane, the approval dialog names what
 the diff cannot show — materials that would be deleted, a network request that
-was made — and approving re-runs the identical invocation without `--dry-run`.
-Nothing here is staged, because none of it is a field edit; what it shares with
-the field editor is that the diff you approve is the diff that lands.
+was made — and approving re-runs the identical invocation without `--dry-run`,
+conditional on the file still being the one the preview read. Nothing here is
+staged, because none of it is a field edit; what it shares with the field editor
+is that the diff you approve is the diff that lands.
 
-A conflict is the engine declining to guess rather than a failure. Importing a
-reference the library already holds asks whether to add it anyway and replays
-the answer; a citation key already taken says so and writes nothing.
+A conflict is the engine declining to guess rather than a failure — and never a
+success: whatever answered with one wrote nothing, and is reported as such.
+Importing a reference the library already holds asks whether to add it anyway
+and replays the answer; a citation key already taken says so and writes
+nothing; a file that changed while the approval dialog was open says so, writes
+nothing, and re-reads the file.
 
 **Materials.** Entries whose linked files exist carry a `🗎` marker, and the
 detail pane lists them by kind — published PDF, preprint, source, supplement,
@@ -292,8 +306,9 @@ beyond pending edits.
 
 Reads run concurrently (`inspect`, `groups tree`, `groups list`, `lint` are
 independent reads of an unchanging file) while writes run strictly sequentially,
-because each `ref edit` rewrites the whole file atomically and concurrent writes
-would race.
+because each write rewrites the whole file atomically and concurrent writes
+would race. A staged commit is a single write — one `corpus batch` — however many
+entries it covers.
 
 ## Packaging
 

@@ -9,6 +9,7 @@ import typer
 from pynakes import group_tree as group_tree_ops
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    _EXPECT_SHA256_OPTION,
     RunParams,
     _emit_error,
     _emit_json,
@@ -115,13 +116,20 @@ def groups_add_entry(
     key: str = typer.Argument(..., help="Citation key to add"),
     group: str = typer.Argument(..., help="Group name"),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Add an entry to a group."""
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     _group_mod_entry(file, key, group, params, add=True)
 
 
@@ -130,13 +138,20 @@ def groups_remove_entry(
     key: str = typer.Argument(..., help="Citation key to remove"),
     group: str = typer.Argument(..., help="Group name"),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Remove an entry from a group."""
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     _group_mod_entry(file, key, group, params, add=False)
 
 

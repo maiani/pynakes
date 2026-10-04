@@ -10,6 +10,7 @@ from pynakes.cli_commands._reference import (
 )
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    _EXPECT_SHA256_OPTION,
     RunParams,
     _emit_error,
     _finish_mod,
@@ -30,6 +31,7 @@ def edit(
     clear_field: list[str] = typer.Option([], "--clear-field", help="Remove a field; repeatable"),
     entry_type: str | None = typer.Option(None, "--type", help="Set the entry type"),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
@@ -66,7 +68,13 @@ def edit(
             f"Cannot set and clear the same field(s): {', '.join(sorted(overlap))}",
         )
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     coll = Bibliography.open(file)
     entry = unique_entry(coll, key, json_output, action="ref_edit")
     if interactive:

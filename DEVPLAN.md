@@ -139,9 +139,12 @@ replacement.
     `capabilities` gains `status` and `action`; `tex scan --group/--keyword`
     returns a `plan`.
   - Every envelope reports the fingerprint of the file it read, and modifying
-    commands accept it back as a precondition (working name `--expect-sha256`),
-    so a caller's preview → approve → commit cannot overwrite an edit made in
-    between.
+    commands accept it back as a precondition, so a caller's preview → approve
+    → commit cannot overwrite an edit made in between. Modifying envelopes
+    already report `source_sha256`, and the commands the editor writes through
+    accept `--expect-sha256`; what remains is the read-only envelopes and every
+    other modifying command (`capabilities.write_precondition.commands` lists
+    the current set).
 - **Exit codes and errors.**
   - Usage errors exit 1 in both output modes; outside `--json` they currently
     exit 2, Click's default and pynakes's conflict code. Human-mode errors go to
@@ -293,12 +296,6 @@ The track runs in parallel with the stages above.
 - **Move to the beta envelope in the same change as Stage 4**, so the client
   never depends on a form the engine is deprecating — including the `tex scan`
   `action` value it reads today.
-- **Use the precondition.** Pass the fingerprint from the preview back on
-  commit, so an edit made while the approval dialog is open is not overwritten.
-  Treat a `conflict` envelope as not applied: today only `status == "error"`
-  counts as a failure, so a conflicted staged edit is silently dropped. Commit
-  several staged entries as one `corpus batch` instead of one `ref edit` per
-  entry.
 - **Thin-client discipline** — no BibTeX parser, metadata schema, or source of
   truth in the client. When the view needs something the engine does not
   expose, the engine grows it; a workaround in TypeScript is a regression even

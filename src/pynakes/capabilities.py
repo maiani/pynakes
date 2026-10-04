@@ -50,7 +50,7 @@ _ERROR_CODES = {
     "conflict": {
         "exit_code": 2,
         "codes": {
-            "ExternalModification": "The file changed on disk since it was read.",
+            "ExternalModification": "The file changed on disk since it was read, or no longer matches --expect-sha256 (includes 'expected_sha256' and 'source_sha256').",
             "DuplicateMetadata": "metadata set: multiple blocks match the key (ambiguous).",
             "DuplicateMergeKey": "combine/split --dedupe: a shared key has differing content.",
             "DedupeConflict": "dedupe merge: a cluster has irreconcilable field values.",
@@ -238,8 +238,28 @@ def command_schemas() -> dict:
     return schemas
 
 
+def _write_precondition(schemas: dict) -> dict:
+    """Describe ``--expect-sha256``, listing the commands that accept it today."""
+    return {
+        "option": "--expect-sha256",
+        "envelope_key": "source_sha256",
+        "conflict": "ExternalModification",
+        "description": (
+            "A modifying command reports source_sha256, the digest of the file it read. "
+            "Pass it back as --expect-sha256 on the real run: if the file changed in "
+            "between, the command exits 2 and writes nothing."
+        ),
+        "commands": sorted(
+            name
+            for name, schema in schemas.items()
+            if any("--expect-sha256" in option.get("flags", []) for option in schema["options"])
+        ),
+    }
+
+
 def get_capabilities() -> dict:
     """Return a structured description of supported operations and commands."""
+    schemas = command_schemas()
     return {
         "tool": "pynakes",
         "version": VERSION,
@@ -253,6 +273,7 @@ def get_capabilities() -> dict:
         "supports_backup": True,
         "supports_atomic_write": True,
         "supports_multiple_files": True,
+        "write_precondition": _write_precondition(schemas),
         "python_api": {
             "facade": "pynakes.Bibliography",
             "public_exports": list(PUBLIC_API_EXPORTS),
@@ -389,7 +410,7 @@ def get_capabilities() -> dict:
         # Self-description for agents: the full per-command schema (args/options/
         # types) derived from the live CLI, the enumerated error/conflict codes,
         # and the one selector grammar shared by every entry-addressable command.
-        "command_schemas": command_schemas(),
+        "command_schemas": schemas,
         "error_codes": _ERROR_CODES,
         "predicate_grammar": _PREDICATE_GRAMMAR,
         "search_query_grammar": _SEARCH_QUERY_GRAMMAR,

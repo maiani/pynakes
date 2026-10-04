@@ -29,6 +29,7 @@ same atomic commit. The ``ref remove`` command deletes them by default; the
 batch operation never does.
 """
 
+import re
 from dataclasses import dataclass
 
 from pynakes.engine import Bibliography
@@ -118,6 +119,42 @@ def _validate(spec: OperationSpec, params: dict, index: int, op: str) -> None:
         raise BatchError(index, op, f"missing parameter(s): {', '.join(missing)}")
 
 
+#: The field-name rule ``ref edit --field`` enforces, so a field edit means the
+#: same thing whether it arrives as a command or as a batch operation.
+_FIELD_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_:-]*")
+
+
+def _ref_edit_arguments(coll: Bibliography, params: dict) -> tuple[dict[str, str], list[str]]:
+    """Validate a ``ref.edit`` operation exactly as ``ref edit`` validates its options.
+
+    Field names must be names, ``key``/``type`` are not fields, values are
+    trimmed, a field cannot be both set and cleared, and an unknown citation
+    key is an input error rather than an internal one.
+    """
+    raw_fields = params.get("fields") or {}
+    raw_clear = params.get("clear_fields") or []
+    if not isinstance(raw_fields, dict):
+        raise ValueError("'fields' must be an object of field names to values")
+    if not isinstance(raw_clear, list) or not all(isinstance(name, str) for name in raw_clear):
+        raise ValueError("'clear_fields' must be an array of field names")
+    fields: dict[str, str] = {}
+    for raw_name, value in raw_fields.items():
+        name = str(raw_name).strip()
+        if not _FIELD_NAME_RE.fullmatch(name):
+            raise ValueError(f"Invalid field name: {name!r}")
+        if name.lower() in {"key", "type"}:
+            raise ValueError(f"{name!r} is not a field; use the citation key or entry_type")
+        if not isinstance(value, str):
+            raise ValueError(f"Field {name!r} needs a string value")
+        fields[name] = value.strip()
+    overlap = {name.lower() for name in fields} & {name.lower() for name in raw_clear}
+    if overlap:
+        raise ValueError(f"Cannot set and clear the same field(s): {', '.join(sorted(overlap))}")
+    if not coll.entries.get_all(params["key"]):
+        raise ValueError(f"No entry with citation key {params['key']!r}")
+    return fields, list(raw_clear)
+
+
 def _apply_one(coll: Bibliography, op: str, params: dict) -> dict:
     """Dispatch one validated operation to the bibliography; return a result dict."""
     if op == "fields.set":
@@ -168,10 +205,11 @@ def _apply_one(coll: Bibliography, op: str, params: dict) -> dict:
         )
         return {"key": entry.key, "entry_type": entry.type}
     if op == "ref.edit":
+        fields, clear_fields = _ref_edit_arguments(coll, params)
         return coll.edit_entry(
             params["key"],
-            fields=params.get("fields"),
-            clear_fields=params.get("clear_fields"),
+            fields=fields,
+            clear_fields=clear_fields,
             entry_type=params.get("entry_type"),
         )
     if op == "ref.remove":

@@ -9,6 +9,7 @@ import typer
 from pynakes import dedupe as dedupe_ops
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    _EXPECT_SHA256_OPTION,
     CheckOutcome,
     RunParams,
     _emit_dedupe_conflict,
@@ -72,6 +73,7 @@ def dedupe_merge(
         "comma-separated, repeatable. Omit to merge every cluster in the file"
     ),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
@@ -82,7 +84,13 @@ def dedupe_merge(
     only the clusters containing a named key are, so one pair can be resolved
     after looking at it without accepting every other merge the file invites.
     """
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     file = _resolve_input_bib(file, json_output)
     selected = parse_key_selector(key)
     coll = Bibliography.open(file)

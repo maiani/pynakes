@@ -314,28 +314,13 @@ export interface SearchSuccess {
 
 export type SearchEnvelope = SearchSuccess | InspectError;
 
-/** What `ref edit` reports about one entry's change. */
+/** What a modifying command's `plan` reports about one entry's change. */
 export interface RefEditPlanEntry {
   change: string;
   key: string;
   fields?: Record<string, { old: string | null; new: string | null }>;
   /** Present when the entry type changed. */
   type?: { old: string; new: string };
-}
-
-export interface RefEditSuccess {
-  status: "success";
-  action: "ref_edit";
-  file: string;
-  dry_run: boolean;
-  modified: boolean;
-  modified_entries: number;
-  warnings: string[];
-  plan: {
-    summary: Record<string, number>;
-    entries: RefEditPlanEntry[];
-  };
-  diff?: string;
 }
 
 /** One field where the other side of a `ref compare` disagrees with the local entry. */
@@ -368,8 +353,6 @@ export interface RefCompareSuccess {
 }
 
 export type RefCompareEnvelope = RefCompareSuccess | InspectError;
-
-export type RefEditEnvelope = RefEditSuccess | InspectError;
 
 /** What `keys rename` reports. */
 export interface KeysRenameSuccess {
@@ -507,7 +490,7 @@ export type AssetCheckEnvelope = AssetCheckSuccess | InspectError;
 // Entry-level and group-level mutations.
 //
 // Unlike a field edit, these change *which* entries exist or which groups they
-// belong to, so they cannot be expressed as a staged `ref edit`. Every one of
+// belong to, so they cannot be expressed as a staged `ref.edit`. Every one of
 // them emits the engine's shared modifying-command envelope, which is what lets
 // the view run them all through one preview-and-approve path.
 // ---------------------------------------------------------------------------
@@ -527,6 +510,12 @@ export interface MutationSuccess {
   };
   diff?: string;
   /**
+   * The sha256 of the file as this invocation read it. A preview's value goes
+   * back as `--expect-sha256` on the write it was approved for, so that write
+   * is refused if the file changed while the approval was pending.
+   */
+  source_sha256?: string;
+  /**
    * The entry the command acted on, for the ones that act on exactly one:
    * `ref add`, `ref import`, and the two `groups` entry commands. Absent from
    * `ref remove` and `dedupe merge`, which can touch several.
@@ -545,6 +534,10 @@ export interface MutationConflict {
   message: string;
   key?: string;
   options: { id: string; description: string }[];
+  /** An `ExternalModification` refused by `--expect-sha256`: the digest passed... */
+  expected_sha256?: string;
+  /** ...and the digest the file has now. */
+  source_sha256?: string;
 }
 
 export type MutationEnvelope = MutationSuccess | MutationConflict | InspectError;
@@ -624,4 +617,25 @@ export interface DedupeMergeSuccess extends MutationSuccess {
   field_changes: number;
 }
 
-export type DedupeMergeEnvelope = DedupeMergeSuccess | InspectError;
+// A cluster whose copies disagree irreconcilably is an exit-2 `DedupeConflict`.
+export type DedupeMergeEnvelope = DedupeMergeSuccess | MutationConflict | InspectError;
+
+/** One `corpus batch` operation, spelled in the engine's batch vocabulary. */
+export interface RefEditOperation {
+  op: "ref.edit";
+  key: string;
+  fields?: Record<string, string>;
+  clear_fields?: string[];
+  entry_type?: string;
+}
+
+/**
+ * `corpus batch`: several operations previewed as one diff and written in one
+ * commit — every one of them, or none.
+ */
+export interface CorpusBatchSuccess extends MutationSuccess {
+  action: "batch";
+  operations: { op: string; result: Record<string, unknown> }[];
+}
+
+export type CorpusBatchEnvelope = CorpusBatchSuccess | MutationConflict | InspectError;

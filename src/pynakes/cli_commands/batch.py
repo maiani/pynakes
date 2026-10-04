@@ -11,7 +11,9 @@ import typer
 from pynakes.batch import BatchError, apply_operations
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    _EXPECT_SHA256_OPTION,
     RunParams,
+    _check_expected_sha256,
     _emit_conflict,
     _emit_error,
     _finish_mod,
@@ -33,6 +35,7 @@ def batch(
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Apply a sequence of operations atomically (one preview, one commit)."""
@@ -55,8 +58,17 @@ def batch(
         return
 
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     coll = Bibliography.open(file)
+    # Before the operations run: against a file that moved, one of them could
+    # fail with an error that hides the real reason, which is the precondition.
+    _check_expected_sha256(file, coll, params)
     try:
         op_results = apply_operations(coll, operations)
     except BatchError as exc:

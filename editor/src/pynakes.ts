@@ -11,10 +11,14 @@
  */
 
 import { execFile } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import type { PynakesCommand } from "./engineDiscovery";
 import { extractVersion } from "./version";
 import type {
   AssetCheckEnvelope,
+  CorpusBatchEnvelope,
   DedupeCheckEnvelope,
   DedupeMergeEnvelope,
   GroupsListEnvelope,
@@ -24,7 +28,7 @@ import type {
   KeysRenameEnvelope,
   LintEnvelope,
   RefCompareEnvelope,
-  RefEditEnvelope,
+  RefEditOperation,
   SearchEnvelope,
   TexScanEnvelope,
 } from "./model";
@@ -235,7 +239,24 @@ export function searchBib(
   return runJson<SearchEnvelope>(command, args, cwd);
 }
 
-/** A field-level change to one entry, as `ref edit` expresses it. */
+/**
+ * The tail every modifying invocation shares: `--dry-run` for a preview, the
+ * diff always, and — on the write a preview was approved for — the digest that
+ * preview reported, so the engine refuses rather than writes if the file moved
+ * while the approval was pending.
+ */
+function modifyingFlags(args: string[], dryRun: boolean, expectSha256?: string): string[] {
+  if (dryRun) {
+    args.push("--dry-run");
+  }
+  args.push("--diff");
+  if (expectSha256) {
+    args.push("--expect-sha256", expectSha256);
+  }
+  return args;
+}
+
+/** A field-level change to one entry, as a `ref.edit` batch operation expresses it. */
 export interface RefEditRequest {
   key: string;
   /** Fields to set or replace. */
@@ -246,40 +267,63 @@ export interface RefEditRequest {
   entryType?: string;
 }
 
-/** Build the argument list for one `ref edit` invocation. */
-export function refEditArgs(filePath: string, request: RefEditRequest, dryRun: boolean): string[] {
-  const args = ["ref", "edit", request.key, filePath];
-  for (const [field, value] of Object.entries(request.set)) {
-    args.push("--field", `${field}=${value}`);
+/** Spell one entry's change in the engine's batch vocabulary. */
+export function refEditOperation(request: RefEditRequest): RefEditOperation {
+  const operation: RefEditOperation = { op: "ref.edit", key: request.key };
+  if (Object.keys(request.set).length > 0) {
+    operation.fields = request.set;
   }
-  for (const field of request.clear) {
-    args.push("--clear-field", field);
+  if (request.clear.length > 0) {
+    operation.clear_fields = request.clear;
   }
   if (request.entryType) {
-    args.push("--type", request.entryType);
+    operation.entry_type = request.entryType;
   }
-  if (dryRun) {
-    args.push("--dry-run");
-  }
-  args.push("--diff");
-  return args;
+  return operation;
+}
+
+/** Build the argument list for one `corpus batch` invocation over an operations file. */
+export function corpusBatchArgs(
+  filePath: string,
+  opsFile: string,
+  dryRun: boolean,
+  expectSha256?: string,
+): string[] {
+  return modifyingFlags(["corpus", "batch", filePath, "--ops-file", opsFile], dryRun, expectSha256);
 }
 
 /**
- * Apply (or preview) one entry's staged changes.
+ * Apply (or preview) every staged entry's changes as one `corpus batch`.
  *
- * With `dryRun` the engine reports the plan and diff without writing, which is
- * both the preview and the pre-commit safety check: the plan's `old` values
- * reveal whether the file still holds what the view was editing against.
+ * One invocation, so one write: the engine applies all of them or none, and
+ * the preview is the single diff of exactly that write. With `dryRun` it also
+ * reports each field's current value in the plan, which is the pre-commit
+ * safety check, and the file's digest, which the write passes back.
+ *
+ * The operations travel in a temporary file rather than on the command line: a
+ * commit of several long fields (abstracts, say) would otherwise approach the
+ * platform's argument-length limit.
  */
-export function refEdit(
+export async function corpusBatch(
   command: PynakesCommand,
   filePath: string,
-  request: RefEditRequest,
+  requests: RefEditRequest[],
   dryRun: boolean,
+  expectSha256?: string,
   cwd?: string,
-): Promise<RefEditEnvelope> {
-  return runJson<RefEditEnvelope>(command, refEditArgs(filePath, request, dryRun), cwd);
+): Promise<CorpusBatchEnvelope> {
+  const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "pynakes-batch-"));
+  try {
+    const opsFile = path.join(dir, "ops.json");
+    await fs.promises.writeFile(opsFile, JSON.stringify(requests.map(refEditOperation)), "utf-8");
+    return await runJson<CorpusBatchEnvelope>(
+      command,
+      corpusBatchArgs(filePath, opsFile, dryRun, expectSha256),
+      cwd,
+    );
+  } finally {
+    await fs.promises.rm(dir, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -331,7 +375,9 @@ export function keysRename(
  * engine's modifying-command contract: `--dry-run --diff` previews without
  * writing and the same invocation without it applies. The view runs every one
  * through the same preview-then-approve path, so the diff shown is the diff
- * that lands — the property the staged field editor already keeps.
+ * that lands — the property the staged field editor already keeps. The write
+ * carries the preview's `source_sha256` as `expectSha256`, so it lands only on
+ * the file the preview read.
  *
  * Each builder is exported separately from its runner so the argument list can
  * be asserted in a unit test without spawning anything.
@@ -348,6 +394,7 @@ export function refAddArgs(
   filePath: string,
   request: RefAddRequest,
   dryRun: boolean,
+  expectSha256?: string,
 ): string[] {
   const args = ["ref", "add", request.key, filePath, "--type", request.entryType];
   for (const [field, value] of Object.entries(request.fields)) {
@@ -355,11 +402,7 @@ export function refAddArgs(
       args.push("--field", `${field}=${value}`);
     }
   }
-  if (dryRun) {
-    args.push("--dry-run");
-  }
-  args.push("--diff");
-  return args;
+  return modifyingFlags(args, dryRun, expectSha256);
 }
 
 export function refAdd(
@@ -368,8 +411,13 @@ export function refAdd(
   request: RefAddRequest,
   dryRun: boolean,
   cwd?: string,
+  expectSha256?: string,
 ): Promise<MutationEnvelope> {
-  return runJson<MutationEnvelope>(command, refAddArgs(filePath, request, dryRun), cwd);
+  return runJson<MutationEnvelope>(
+    command,
+    refAddArgs(filePath, request, dryRun, expectSha256),
+    cwd,
+  );
 }
 
 /**
@@ -391,6 +439,7 @@ export function refImportArgs(
   filePath: string,
   request: RefImportRequest,
   dryRun: boolean,
+  expectSha256?: string,
 ): string[] {
   const args = ["ref", "import", request.identifier, filePath];
   if (request.key?.trim()) {
@@ -399,11 +448,7 @@ export function refImportArgs(
   if (request.allowDuplicate) {
     args.push("--allow-duplicate");
   }
-  if (dryRun) {
-    args.push("--dry-run");
-  }
-  args.push("--diff");
-  return args;
+  return modifyingFlags(args, dryRun, expectSha256);
 }
 
 export function refImport(
@@ -412,8 +457,13 @@ export function refImport(
   request: RefImportRequest,
   dryRun: boolean,
   cwd?: string,
+  expectSha256?: string,
 ): Promise<MutationEnvelope> {
-  return runJson<MutationEnvelope>(command, refImportArgs(filePath, request, dryRun), cwd);
+  return runJson<MutationEnvelope>(
+    command,
+    refImportArgs(filePath, request, dryRun, expectSha256),
+    cwd,
+  );
 }
 
 /**
@@ -428,16 +478,13 @@ export function refRemoveArgs(
   keys: string[],
   keepFiles: boolean,
   dryRun: boolean,
+  expectSha256?: string,
 ): string[] {
   const args = ["ref", "remove", filePath, ...keys];
   if (keepFiles) {
     args.push("--keep-files");
   }
-  if (dryRun) {
-    args.push("--dry-run");
-  }
-  args.push("--diff");
-  return args;
+  return modifyingFlags(args, dryRun, expectSha256);
 }
 
 export function refRemove(
@@ -447,10 +494,11 @@ export function refRemove(
   keepFiles: boolean,
   dryRun: boolean,
   cwd?: string,
+  expectSha256?: string,
 ): Promise<MutationEnvelope> {
   return runJson<MutationEnvelope>(
     command,
-    refRemoveArgs(filePath, keys, keepFiles, dryRun),
+    refRemoveArgs(filePath, keys, keepFiles, dryRun, expectSha256),
     cwd,
   );
 }
@@ -462,6 +510,7 @@ export function groupsEntryArgs(
   group: string,
   member: boolean,
   dryRun: boolean,
+  expectSha256?: string,
 ): string[] {
   const args = [
     "groups",
@@ -470,11 +519,7 @@ export function groupsEntryArgs(
     key,
     group,
   ];
-  if (dryRun) {
-    args.push("--dry-run");
-  }
-  args.push("--diff");
-  return args;
+  return modifyingFlags(args, dryRun, expectSha256);
 }
 
 export function groupsEntry(
@@ -485,10 +530,11 @@ export function groupsEntry(
   member: boolean,
   dryRun: boolean,
   cwd?: string,
+  expectSha256?: string,
 ): Promise<MutationEnvelope> {
   return runJson<MutationEnvelope>(
     command,
-    groupsEntryArgs(filePath, key, group, member, dryRun),
+    groupsEntryArgs(filePath, key, group, member, dryRun, expectSha256),
     cwd,
   );
 }
@@ -517,16 +563,13 @@ export function dedupeMergeArgs(
   filePath: string,
   keys: string[] | undefined,
   dryRun: boolean,
+  expectSha256?: string,
 ): string[] {
   const args = ["dedupe", "merge", filePath];
   for (const key of keys ?? []) {
     args.push("--key", key);
   }
-  if (dryRun) {
-    args.push("--dry-run");
-  }
-  args.push("--diff");
-  return args;
+  return modifyingFlags(args, dryRun, expectSha256);
 }
 
 export function dedupeMerge(
@@ -535,8 +578,13 @@ export function dedupeMerge(
   keys: string[] | undefined,
   dryRun: boolean,
   cwd?: string,
+  expectSha256?: string,
 ): Promise<DedupeMergeEnvelope> {
-  return runJson<DedupeMergeEnvelope>(command, dedupeMergeArgs(filePath, keys, dryRun), cwd);
+  return runJson<DedupeMergeEnvelope>(
+    command,
+    dedupeMergeArgs(filePath, keys, dryRun, expectSha256),
+    cwd,
+  );
 }
 
 /** Engine version string, or `undefined` when it cannot be determined. */

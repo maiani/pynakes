@@ -34,6 +34,7 @@ import {
   type RefImportRequest,
   type SearchOptions,
   assetCheck,
+  corpusBatch,
   dedupeCheck,
   dedupeMerge,
   groupsEntry,
@@ -44,7 +45,6 @@ import {
   lintBib,
   refAdd,
   refCompare,
-  refEdit,
   refImport,
   refRemove,
   searchBib,
@@ -170,23 +170,65 @@ export async function runSearch(
   };
 }
 
-/** One entry's dry-run result. */
+/** Said when a write was refused because the file moved under its approved preview. */
+export const FILE_MOVED_MESSAGE =
+  "The file changed while this change was awaiting approval, so nothing was written. " +
+  "Review the current state and apply again.";
+
+/** Said when the engine's preview carried no digest to make the write conditional on. */
+export const NO_FINGERPRINT_MESSAGE =
+  "Nothing was written: the engine did not report the file's fingerprint, so the write " +
+  "could not be guarded against a concurrent change. Update pynakes, or let the " +
+  "extension use its bundled engine.";
+
+/** What the engine reports it would change in one staged entry. */
 export interface PreviewEntry {
   key: string;
-  diff: string;
   plan?: RefEditPlanEntry;
-  warnings: string[];
+}
+
+/**
+ * A modifying call that did not apply.
+ *
+ * `conflict` is the engine's exit 2 — it declined rather than failed — and
+ * `error` names which conflict, so a caller can tell a file that moved
+ * (`ExternalModification`) from a question it was asked. Either way nothing
+ * was written, which is the one thing every caller must act on.
+ */
+export interface NotApplied {
+  ok: false;
+  conflict: boolean;
+  error?: string;
+  message: string;
 }
 
 export type PreviewResult =
-  | { ok: true; entries: PreviewEntry[] }
-  | { ok: false; key: string; message: string };
+  | {
+      ok: true;
+      entries: PreviewEntry[];
+      /** The single diff of the one write the commit would make. */
+      diff: string;
+      warnings: string[];
+      /** The file's digest as the preview read it; the commit passes it back. */
+      sourceSha256?: string;
+    }
+  | NotApplied;
+
+function notApplied(envelope: { status: "error" | "conflict"; error: string; message: string }): NotApplied {
+  return {
+    ok: false,
+    conflict: envelope.status === "conflict",
+    error: envelope.error,
+    message: envelope.message,
+  };
+}
 
 /**
- * Dry-run every staged change.
+ * Dry-run every staged change as the one `corpus batch` the commit will run.
  *
- * These run concurrently: a dry run writes nothing, so there is no ordering
- * requirement, and the caller sorted the requests for a stable presentation.
+ * The caller sorted the requests, so a preview and the commit that follows it
+ * apply the same operations in the same order, and the diff approved is the
+ * diff that lands.
  */
 export async function previewEdits(
   command: PynakesCommand,
@@ -194,23 +236,20 @@ export async function previewEdits(
   requests: RefEditRequest[],
   cwd?: string,
 ): Promise<PreviewResult> {
-  const envelopes = await Promise.all(
-    requests.map((request) => refEdit(command, filePath, request, true, cwd)),
-  );
-  const entries: PreviewEntry[] = [];
-  for (const [index, envelope] of envelopes.entries()) {
-    const request = requests[index];
-    if (envelope.status === "error") {
-      return { ok: false, key: request.key, message: envelope.message };
-    }
-    entries.push({
-      key: request.key,
-      diff: envelope.diff ?? "",
-      plan: envelope.plan?.entries?.find((candidate) => candidate.key === request.key),
-      warnings: envelope.warnings ?? [],
-    });
+  const envelope = await corpusBatch(command, filePath, requests, true, undefined, cwd);
+  if (envelope.status !== "success") {
+    return notApplied(envelope);
   }
-  return { ok: true, entries };
+  return {
+    ok: true,
+    entries: requests.map((request) => ({
+      key: request.key,
+      plan: envelope.plan?.entries?.find((candidate) => candidate.key === request.key),
+    })),
+    diff: envelope.diff ?? "",
+    warnings: envelope.warnings ?? [],
+    sourceSha256: envelope.source_sha256,
+  };
 }
 
 /** Outcome of comparing one entry against another reference. */
@@ -251,39 +290,39 @@ export async function compareEntry(
   };
 }
 
-export interface CommitResult {
-  /** Entries written, in the order they were applied. */
-  applied: string[];
-  warnings: string[];
-  /** Set when a write failed; entries before it were already applied. */
-  failure?: { key: string; message: string };
-}
+export type CommitResult =
+  | {
+      ok: true;
+      /** Entries written — every staged one, since the batch is all or nothing. */
+      applied: string[];
+      warnings: string[];
+    }
+  | NotApplied;
 
 /**
- * Apply staged changes.
+ * Apply staged changes as one `corpus batch`: one write, all of them or none.
  *
- * Strictly sequential, unlike the preview: each invocation rewrites the whole
- * file atomically, so concurrent writes would race and the last one would win
- * with the others lost. On the first failure it stops and reports what was
- * already applied, rather than continuing over a file in an unexpected state.
+ * `expectSha256` is the digest the approved preview reported. The engine
+ * refuses with an `ExternalModification` conflict, writing nothing, when the
+ * file no longer has it — an edit made while the approval dialog was open is
+ * never overwritten.
  */
 export async function commitEdits(
   command: PynakesCommand,
   filePath: string,
   requests: RefEditRequest[],
+  expectSha256: string,
   cwd?: string,
 ): Promise<CommitResult> {
-  const applied: string[] = [];
-  const warnings: string[] = [];
-  for (const request of requests) {
-    const envelope = await refEdit(command, filePath, request, false, cwd);
-    if (envelope.status === "error") {
-      return { applied, warnings, failure: { key: request.key, message: envelope.message } };
-    }
-    applied.push(request.key);
-    warnings.push(...(envelope.warnings ?? []));
+  const envelope = await corpusBatch(command, filePath, requests, false, expectSha256, cwd);
+  if (envelope.status !== "success") {
+    return notApplied(envelope);
   }
-  return { applied, warnings };
+  return {
+    ok: true,
+    applied: requests.map((request) => request.key),
+    warnings: envelope.warnings ?? [],
+  };
 }
 
 /** Outcome of renaming one citation key. */
@@ -365,14 +404,23 @@ function runMutation(
   mutation: Mutation,
   dryRun: boolean,
   cwd?: string,
+  expectSha256?: string,
 ): Promise<MutationEnvelope> {
   switch (mutation.kind) {
     case "add":
-      return refAdd(command, filePath, mutation.request, dryRun, cwd);
+      return refAdd(command, filePath, mutation.request, dryRun, cwd, expectSha256);
     case "import":
-      return refImport(command, filePath, mutation.request, dryRun, cwd);
+      return refImport(command, filePath, mutation.request, dryRun, cwd, expectSha256);
     case "remove":
-      return refRemove(command, filePath, mutation.keys, mutation.keepFiles, dryRun, cwd);
+      return refRemove(
+        command,
+        filePath,
+        mutation.keys,
+        mutation.keepFiles,
+        dryRun,
+        cwd,
+        expectSha256,
+      );
     case "group":
       return groupsEntry(
         command,
@@ -382,16 +430,35 @@ function runMutation(
         mutation.member,
         dryRun,
         cwd,
+        expectSha256,
       );
     case "dedupeMerge":
-      return dedupeMerge(command, filePath, mutation.keys, dryRun, cwd);
+      return dedupeMerge(command, filePath, mutation.keys, dryRun, cwd, expectSha256);
   }
 }
 
 export type MutationOutcome =
-  | { ok: true; diff: string; warnings: string[]; modified: boolean; key?: string }
-  /** The engine refused and named the choices — exit 2, never guessed past. */
-  | { ok: false; conflict: true; message: string; options: { id: string; description: string }[] }
+  | {
+      ok: true;
+      diff: string;
+      warnings: string[];
+      modified: boolean;
+      key?: string;
+      /** The file's digest as this call read it; a preview's goes back on the write. */
+      sourceSha256?: string;
+    }
+  /**
+   * The engine refused and named the choices — exit 2, never guessed past.
+   * `error` says which refusal: `ExternalModification` is a file that moved
+   * under an approved preview.
+   */
+  | {
+      ok: false;
+      conflict: true;
+      error: string;
+      message: string;
+      options: { id: string; description: string }[];
+    }
   | { ok: false; conflict?: false; message: string };
 
 function reduce(envelope: MutationEnvelope): MutationOutcome {
@@ -402,6 +469,7 @@ function reduce(envelope: MutationEnvelope): MutationOutcome {
     return {
       ok: false,
       conflict: true,
+      error: envelope.error,
       message: envelope.message,
       options: envelope.options ?? [],
     };
@@ -412,6 +480,7 @@ function reduce(envelope: MutationEnvelope): MutationOutcome {
     warnings: envelope.warnings ?? [],
     modified: envelope.modified,
     key: envelope.key,
+    sourceSha256: envelope.source_sha256,
   };
 }
 
@@ -425,14 +494,21 @@ export async function previewMutation(
   return reduce(await runMutation(command, filePath, mutation, true, cwd));
 }
 
-/** Apply a mutation that has already been previewed and approved. */
+/**
+ * Apply a mutation that has already been previewed and approved.
+ *
+ * `expectSha256` is the digest that preview reported: the engine writes only
+ * if the file still has it, and otherwise answers with an
+ * `ExternalModification` conflict and writes nothing.
+ */
 export async function applyMutation(
   command: PynakesCommand,
   filePath: string,
   mutation: Mutation,
+  expectSha256: string,
   cwd?: string,
 ): Promise<MutationOutcome> {
-  return reduce(await runMutation(command, filePath, mutation, false, cwd));
+  return reduce(await runMutation(command, filePath, mutation, false, cwd, expectSha256));
 }
 
 export type DuplicatesOutcome =

@@ -6,9 +6,10 @@
  * is hidden, and pending changes to a file must not evaporate with it.
  *
  * Every staged field remembers the value it was edited *against*. That base is
- * what makes a safe commit possible: `ref edit --dry-run` reports the value the
- * file currently holds, and comparing the two detects that the file moved under
- * the editor before anything is written.
+ * what makes a safe commit possible: the `corpus batch --dry-run` preview
+ * reports the value the file currently holds, and comparing the two detects
+ * that the file moved under the editor before the edit was approved. (A move
+ * *after* that preview is the engine's to catch, through `--expect-sha256`.)
  */
 
 import type { RefEditPlanEntry } from "./model";
@@ -129,7 +130,8 @@ export function stagedCount(state: StagingState): { fields: number; entries: num
 }
 
 /**
- * Translate pending changes into one `ref edit` request per entry.
+ * Translate pending changes into one `ref.edit` request per entry, all of
+ * which are committed together as one `corpus batch`.
  *
  * Sorted by citation key so a preview and the commit that follows it apply in
  * the same order, and so the diff a user approved is the diff that lands.
@@ -154,6 +156,19 @@ export function toRequests(state: StagingState): RefEditRequest[] {
       }
       return request;
     });
+}
+
+/**
+ * The heading over a staged commit's diff.
+ *
+ * The commit is one write, so its diff is one diff; the heading names the
+ * entries it covers rather than pretending each has a diff of its own.
+ */
+export function diffHeading(keys: string[]): string {
+  if (keys.length === 1) {
+    return keys[0];
+  }
+  return `${keys.length} entries: ${keys.join(", ")}`;
 }
 
 /** A staged change whose base no longer matches what the file holds. */

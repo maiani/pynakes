@@ -19,7 +19,9 @@ from pynakes.cli_commands._fetch_report import fetch_report_lines
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     _CACHE_FILE_OPTION,
+    _EXPECT_SHA256_OPTION,
     RunParams,
+    _check_expected_sha256,
     _emit_conflict,
     _emit_error,
     _emit_json,
@@ -82,6 +84,7 @@ def import_reference(
         help="After importing, fetch configured Pinax materials for the new entry",
     ),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     cache_file: str | None = _CACHE_FILE_OPTION,
@@ -96,7 +99,13 @@ def import_reference(
     abandon the rest. A single identifier keeps its existing behavior: a failure
     is the command's failure.
     """
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     positional, trailing = split_library_argument(list(identifiers))
     if trailing is not None:
         if file is not None:
@@ -134,6 +143,8 @@ def import_reference(
         return
 
     coll = Bibliography.open(file)
+    # Before any provider is asked: a stale precondition should cost no lookup.
+    _check_expected_sha256(file, coll, params)
     if len(positional) > 1:
         _import_several(coll, file, positional, params, key_source, allow_duplicate, cache_file)
         return

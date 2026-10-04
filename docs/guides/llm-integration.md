@@ -77,6 +77,23 @@ commands and their semantics.
    pynakes normalize refs.bib --json
    ```
 
+   When time passes between the preview and the write — a person reviewing the
+   diff, an agent waiting on approval — pass the preview's `source_sha256` back
+   as `--expect-sha256`. If the file changed in between, the command writes
+   nothing and exits `2` with an `ExternalModification` conflict instead of
+   applying the approved change on top of an edit nobody reviewed:
+
+   ```bash
+   pynakes corpus batch refs.bib --dry-run --diff --json --ops-file ops.json
+   # ... review; then, with the source_sha256 from that preview:
+   pynakes corpus batch refs.bib --json --ops-file ops.json \
+     --expect-sha256 9a6660d44e528fcd22a29a915bddea03a86d6587f6c708a39b19a5f734afb786
+   ```
+
+   `capabilities.write_precondition.commands` lists the commands that accept
+   it: today `ref edit`, `ref add`, `ref import`, `ref remove`, `groups
+   add-entry`, `groups remove-entry`, `dedupe merge`, and `corpus batch`.
+
 4. Run the checks affected by the edit. A complete local validation pass is:
 
    ```bash
@@ -234,6 +251,7 @@ Ordinary modifying commands return this common envelope:
     "entries": [],
     "metadata": []
   },
+  "source_sha256": "9a6660d44e528fcd22a29a915bddea03a86d6587f6c708a39b19a5f734afb786",
   "diff": "--- refs.bib\n+++ refs.bib\n..."
 }
 ```
@@ -248,6 +266,9 @@ Common fields:
 - `modified_entries`: the number of changed entries.
 - `warnings`: always an array, including when empty.
 - `plan`: a structured description of staged changes.
+- `source_sha256`: the sha256 of the file as this invocation read it — before
+  the write, also on a real run. Pass it back as `--expect-sha256` to make a
+  later write conditional on the file being unchanged.
 - `diff`: included when requested and a textual change exists.
 
 Commands add operation-specific fields alongside this envelope. Read-only
@@ -283,6 +304,11 @@ Conflicts exit `2` and include resolutions:
 ```json
 {"status":"conflict","error":"DuplicateCitationKey","options":["..."]}
 ```
+
+A conflict means nothing was written. A refused `--expect-sha256` is an
+`ExternalModification` conflict that also carries `expected_sha256` (what you
+passed) and `source_sha256` (what the file holds now); re-read the file and
+preview again rather than retrying with the new digest unreviewed.
 
 Branch on `error`, not on message text. Discover the current code inventory
 from `capabilities.error_codes`.

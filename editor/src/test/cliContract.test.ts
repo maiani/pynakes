@@ -24,6 +24,7 @@ import * as path from "node:path";
 import { test } from "node:test";
 import {
   type PynakesCommand,
+  type RefEditRequest,
   dedupeCheck,
   dedupeMerge,
   groupsEntry,
@@ -34,10 +35,10 @@ import {
   lintBib,
   refAdd,
   refCompare,
-  refEdit,
   refRemove,
   searchBib,
 } from "../pynakes.js";
+import { applyMutation, commitEdits, previewEdits, previewMutation } from "../library.js";
 
 // out/test/cliContract.test.js -> out/test -> out -> editor -> repo root -> src
 const repoSrc = path.resolve(__dirname, "..", "..", "..", "src");
@@ -94,19 +95,115 @@ test("inspect/groups/lint/search return their documented envelope shape", { skip
   assert.ok(search.matches.some((match) => match.key === "Smith2020"));
 });
 
-test("ref edit stages a field through the documented argv shape", { skip }, async () => {
-  const file = tempBib("@article{Smith2020,\n  title = {A Paper}\n}\n");
+// --- staged commits: one batch, guarded by the preview's digest ------------
 
-  const envelope = await refEdit(
-    command,
-    file,
-    { key: "Smith2020", set: { number: "10" }, clear: [] },
-    false,
-  );
-  if (envelope.status !== "success") {
-    assert.fail(`ref edit failed: ${JSON.stringify(envelope)}`);
+const TWO_ENTRIES =
+  "@book{Newton1687,\n  title = {Principia},\n  year = {1687}\n}\n\n" +
+  "@book{Euler1748,\n  title = {Introductio},\n  year = {1748}\n}\n";
+
+const STAGED: RefEditRequest[] = [
+  { key: "Euler1748", set: { note: "  two volumes  " }, clear: [], entryType: "article" },
+  { key: "Newton1687", set: { year: "1713" }, clear: ["title"] },
+];
+
+test("several staged entries preview as one diff and commit as one write", { skip }, async () => {
+  const file = tempBib(TWO_ENTRIES);
+
+  const preview = await previewEdits(command, file, STAGED);
+  if (!preview.ok) {
+    assert.fail(`preview failed: ${JSON.stringify(preview)}`);
   }
-  assert.match(fs.readFileSync(file, "utf-8"), /number\s*=\s*\{?10\}?/);
+  assert.equal(fs.readFileSync(file, "utf-8"), TWO_ENTRIES, "a preview must write nothing");
+  assert.match(preview.diff, /-@book\{Euler1748,/);
+  assert.match(preview.diff, /\+  year = \{1713\}/);
+  assert.deepEqual(preview.entries[1].plan?.fields?.year, { old: "1687", new: "1713" });
+  assert.match(preview.sourceSha256 ?? "", /^[0-9a-f]{64}$/);
+
+  const result = await commitEdits(command, file, STAGED, preview.sourceSha256 ?? "");
+  if (!result.ok) {
+    assert.fail(`commit failed: ${JSON.stringify(result)}`);
+  }
+  assert.deepEqual(result.applied, ["Euler1748", "Newton1687"]);
+  const written = fs.readFileSync(file, "utf-8");
+  assert.match(written, /@article\{Euler1748,/);
+  // Values are trimmed exactly as `ref edit --field` trims them.
+  assert.match(written, /note = \{two volumes\}/);
+  assert.match(written, /year = \{1713\}/);
+  assert.doesNotMatch(written, /Principia/);
+});
+
+test("a commit over a file that moved after its preview writes nothing", { skip }, async () => {
+  const file = tempBib(TWO_ENTRIES);
+  const preview = await previewEdits(command, file, STAGED);
+  if (!preview.ok) {
+    assert.fail(`preview failed: ${JSON.stringify(preview)}`);
+  }
+  // An edit made while the approval dialog is open.
+  const moved = TWO_ENTRIES + "\n@misc{Leibniz1684,\n  year = {1684}\n}\n";
+  fs.writeFileSync(file, moved, "utf-8");
+
+  const result = await commitEdits(command, file, STAGED, preview.sourceSha256 ?? "");
+
+  assert.equal(result.ok, false);
+  assert.equal(!result.ok && result.conflict, true);
+  assert.equal(!result.ok && result.error, "ExternalModification");
+  assert.equal(fs.readFileSync(file, "utf-8"), moved);
+});
+
+test("a batch that cannot apply one entry applies none and says so", { skip }, async () => {
+  const file = tempBib(TWO_ENTRIES);
+  const requests = [
+    { key: "Euler1748", set: { note: "kept" }, clear: [] },
+    { key: "Missing1900", set: { note: "x" }, clear: [] },
+  ];
+
+  const preview = await previewEdits(command, file, requests);
+  assert.equal(preview.ok, false);
+
+  // Even with a valid precondition, the write is one transaction.
+  const sha = await previewEdits(command, file, requests.slice(0, 1));
+  const result = await commitEdits(command, file, requests, sha.ok ? sha.sourceSha256 ?? "" : "");
+  assert.equal(result.ok, false);
+  assert.equal(fs.readFileSync(file, "utf-8"), TWO_ENTRIES, "all or nothing");
+});
+
+test("a duplicated key is refused, never reported as applied", { skip }, async () => {
+  // `ref edit` answered this with an exit-2 conflict the view read as success,
+  // so the staged edit was cleared without being written.
+  const duplicated = TWO_ENTRIES + "\n@book{Euler1748,\n  title = {Copy}\n}\n";
+  const file = tempBib(duplicated);
+
+  const preview = await previewEdits(command, file, [
+    { key: "Euler1748", set: { note: "x" }, clear: [] },
+  ]);
+
+  assert.equal(preview.ok, false);
+  assert.equal(fs.readFileSync(file, "utf-8"), duplicated);
+});
+
+test("an entry-level change is applied only to the file its preview read", { skip }, async () => {
+  const file = tempBib(TWO_ENTRIES);
+  const mutation = { kind: "remove" as const, keys: ["Euler1748"], keepFiles: true };
+
+  const preview = await previewMutation(command, file, mutation);
+  if (!preview.ok) {
+    assert.fail(`preview failed: ${JSON.stringify(preview)}`);
+  }
+  const moved = TWO_ENTRIES + "\n@misc{Leibniz1684,\n  year = {1684}\n}\n";
+  fs.writeFileSync(file, moved, "utf-8");
+
+  const stale = await applyMutation(command, file, mutation, preview.sourceSha256 ?? "");
+  assert.equal(stale.ok, false);
+  assert.equal(!stale.ok && stale.conflict === true && stale.error, "ExternalModification");
+  assert.equal(fs.readFileSync(file, "utf-8"), moved);
+
+  const fresh = await previewMutation(command, file, mutation);
+  if (!fresh.ok) {
+    assert.fail(`preview failed: ${JSON.stringify(fresh)}`);
+  }
+  const applied = await applyMutation(command, file, mutation, fresh.sourceSha256 ?? "");
+  assert.equal(applied.ok, true);
+  assert.doesNotMatch(fs.readFileSync(file, "utf-8"), /@book\{Euler1748,/);
 });
 
 test(

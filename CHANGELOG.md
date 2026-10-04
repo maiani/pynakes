@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `lint` reports a `crossref`, `xref`, `xdata`, `related`, or `entryset` value
   that names a key the library lacks, as `missing_reference_target`.
+- **A write precondition.** Every modifying command's JSON envelope now reports
+  `source_sha256`, the digest of the file as that invocation read it. `ref
+  edit`, `ref add`, `ref import`, `ref remove`, `groups add-entry`, `groups
+  remove-entry`, `dedupe merge`, and `corpus batch` accept it back as
+  `--expect-sha256`: when the file no longer has that digest, the command exits
+  2 with an `ExternalModification` conflict carrying `expected_sha256` and
+  `source_sha256`, and writes nothing. Passing the digest from a `--dry-run`
+  back on the real run means an edit made between preview and approval is never
+  overwritten. The remaining modifying commands gain the option with the Stage 4
+  envelope work.
+- **Pynakes for VS Code** applies the precondition: a commit or an entry-level
+  change carries the digest its preview reported, so a change made while the
+  approval dialog is open is refused rather than overwritten. Several staged
+  entries are committed as one `corpus batch` — one write, all or nothing —
+  instead of one `ref edit` per entry, and a conflict envelope is treated as
+  not applied, keeping the staged edits, where it used to count as success and
+  drop them.
 
 ### Changed
 
@@ -50,6 +67,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The `corpus batch` `ref.edit` operation now validates its input as `ref
+  edit` does: field values are trimmed, an invalid field name or a `key`/`type`
+  pseudo-field is refused, a field cannot be both set and cleared, and an
+  unknown citation key is an `InvalidInput` error. Before, an unknown key
+  surfaced as an `InternalError`, and an invalid field name was written into
+  the file.
 - A comment directly above an entry — an `@comment{...}` block or `%` line with
   no blank line before the entry — now stays with that entry. Before, commands
   that drop or move entries treated it as a free block, so a note or a linter

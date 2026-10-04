@@ -23,6 +23,8 @@ import {
 } from "./insights";
 import type { LintSeverity, Summary } from "./model";
 import {
+  FILE_MOVED_MESSAGE,
+  NO_FINGERPRINT_MESSAGE,
   commitEdits,
   compareEntry,
   previewEdits,
@@ -47,6 +49,7 @@ import {
   describeCommand,
 } from "./pynakes";
 import {
+  diffHeading,
   discardEntry,
   emptyStaging,
   findConflicts,
@@ -969,21 +972,24 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       return;
     }
     await this.withMirror(document, panel, async ({ command, cwd, source }) => {
-      const result = await previewEdits(command, source, toRequests(state), cwd);
+      const requests = toRequests(state);
+      const result = await previewEdits(command, source, requests, cwd);
       if (!result.ok) {
         void panel.webview.postMessage({
           type: "commitError",
-          message: `Previewing ${result.key} failed: ${result.message}`,
+          message: `Preview failed: ${result.message}`,
         });
         return;
       }
       void panel.webview.postMessage({
         type: "diff",
-        entries: result.entries.map((entry) => ({
-          key: entry.key,
-          diff: entry.diff,
-          warnings: entry.warnings,
-        })),
+        entries: [
+          {
+            key: diffHeading(requests.map((request) => request.key)),
+            diff: result.diff,
+            warnings: result.warnings,
+          },
+        ],
       });
     });
   }
@@ -997,6 +1003,11 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
    * current values, which are checked against what each edit was staged
    * against — that is what stops a commit from silently reverting a change
    * someone else made in between. Only then is approval requested.
+   *
+   * The write is one `corpus batch`, so it lands whole or not at all, and it
+   * carries the digest the dry run reported, so a change made while the
+   * approval dialog was open is refused rather than overwritten. Anything short
+   * of success leaves every staged edit in place: nothing was written.
    */
   private async commit(document: vscode.TextDocument, panel: vscode.WebviewPanel): Promise<void> {
     const state = this.stagingFor(document);
@@ -1028,8 +1039,13 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       if (!preview.ok) {
         void panel.webview.postMessage({
           type: "commitError",
-          message: `Cannot apply: ${preview.key} — ${preview.message}`,
+          message: `Cannot apply: ${preview.message}`,
         });
+        return;
+      }
+      const sourceSha256 = preview.sourceSha256;
+      if (!sourceSha256) {
+        void panel.webview.postMessage({ type: "commitError", message: NO_FINGERPRINT_MESSAGE });
         return;
       }
 
@@ -1055,11 +1071,13 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       // Put the diff on screen before asking, so approval is informed.
       void panel.webview.postMessage({
         type: "diff",
-        entries: preview.entries.map((entry) => ({
-          key: entry.key,
-          diff: entry.diff,
-          warnings: entry.warnings,
-        })),
+        entries: [
+          {
+            key: diffHeading(requests.map((request) => request.key)),
+            diff: preview.diff,
+            warnings: preview.warnings,
+          },
+        ],
       });
 
       const counts = stagedCount(state);
@@ -1075,17 +1093,22 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         return;
       }
 
-      const result = await commitEdits(command, filePath, requests, cwd);
-      if (result.failure) {
-        void panel.webview.postMessage({
-          type: "commitError",
-          message:
-            `Wrote ${result.applied.length} of ${requests.length} entries, then ` +
-            `${result.failure.key} failed: ${result.failure.message}`,
-        });
-        // Keep only what was not applied, so a retry does not redo written work.
-        for (const key of result.applied) {
-          discardEntry(state, key);
+      const result = await commitEdits(command, filePath, requests, sourceSha256, cwd);
+      if (!result.ok) {
+        // Nothing was written, so every staged edit stays staged. A file that
+        // moved is reported as the conflict it is; the reload below shows what
+        // it holds now, and the next apply re-checks each edit against it.
+        if (result.conflict && result.error === "ExternalModification") {
+          void panel.webview.postMessage({
+            type: "conflict",
+            conflicts: [],
+            message: FILE_MOVED_MESSAGE,
+          });
+        } else {
+          void panel.webview.postMessage({
+            type: "commitError",
+            message: `Nothing was written: ${result.message}`,
+          });
         }
       } else {
         this.staging.set(document.uri.toString(), emptyStaging());

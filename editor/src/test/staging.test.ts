@@ -2,7 +2,9 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { corpusBatchArgs, refAddArgs, refEditOperation } from "../pynakes.js";
 import {
+  diffHeading,
   discardEntry,
   emptyStaging,
   findConflicts,
@@ -90,6 +92,55 @@ test("requests split set from clear and sort deterministically", () => {
   assert.deepEqual(requests[0].clear, ["month"]);
   assert.equal(requests[0].entryType, "book");
   assert.equal(requests[1].entryType, undefined);
+});
+
+test("staged requests become ref.edit batch operations, omitting what is not changing", () => {
+  let state = stageField(emptyStaging(), "Zeno", "year", "1", "2");
+  state = stageField(state, "Anaximander", "note", "kept", null);
+  state = stageField(state, "Anaximander", "month", null, "mar");
+  state = stageType(state, "Anaximander", "book", "article");
+
+  assert.deepEqual(toRequests(state).map(refEditOperation), [
+    {
+      op: "ref.edit",
+      key: "Anaximander",
+      fields: { note: "kept" },
+      clear_fields: ["month"],
+      entry_type: "book",
+    },
+    { op: "ref.edit", key: "Zeno", fields: { year: "1" } },
+  ]);
+});
+
+test("a batch preview and its commit differ only by --dry-run and the precondition", () => {
+  const preview = corpusBatchArgs("refs.bib", "ops.json", true);
+  const commit = corpusBatchArgs("refs.bib", "ops.json", false, "ab".repeat(32));
+
+  assert.deepEqual(preview, ["corpus", "batch", "refs.bib", "--ops-file", "ops.json", "--dry-run", "--diff"]);
+  assert.deepEqual(commit, [
+    "corpus",
+    "batch",
+    "refs.bib",
+    "--ops-file",
+    "ops.json",
+    "--diff",
+    "--expect-sha256",
+    "ab".repeat(32),
+  ]);
+});
+
+test("a mutation passes the precondition only when given one", () => {
+  const request = { key: "Newton1687", entryType: "book", fields: {} };
+  assert.ok(!refAddArgs("refs.bib", request, true).includes("--expect-sha256"));
+  assert.deepEqual(refAddArgs("refs.bib", request, false, "cd".repeat(32)).slice(-2), [
+    "--expect-sha256",
+    "cd".repeat(32),
+  ]);
+});
+
+test("the diff heading names the entries one commit covers", () => {
+  assert.equal(diffHeading(["Newton1687"]), "Newton1687");
+  assert.equal(diffHeading(["Euler1748", "Newton1687"]), "2 entries: Euler1748, Newton1687");
 });
 
 test("findConflicts reports a field the file changed underneath the edit", () => {

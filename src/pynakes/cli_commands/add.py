@@ -11,6 +11,7 @@ from pynakes.cli_commands._reference import (
 )
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    _EXPECT_SHA256_OPTION,
     RunParams,
     _emit_conflict,
     _emit_error,
@@ -60,6 +61,7 @@ def add(
         False, "--allow-duplicate", help="Append even if the citation key already exists"
     ),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
@@ -93,7 +95,13 @@ def add(
             "InvalidInput",
             "Specify the library once, not both positionally and with --file",
         )
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     file = _resolve_input_bib(file_option or file, json_output)
     try:
         fields = parse_field_assignments(field)

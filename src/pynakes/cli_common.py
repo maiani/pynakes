@@ -198,6 +198,9 @@ class RunParams:
     diff: bool = False
     json_output: bool = False
     backup: bool = False
+    #: The ``sha256`` the caller previewed against (``--expect-sha256``); the
+    #: command refuses with an exit-2 conflict when the file no longer matches.
+    expect_sha256: str | None = None
 
 
 def _verb(action: str, params: RunParams, past: str | None = None) -> str:
@@ -326,6 +329,12 @@ def _emit_dedupe_conflict(json_output: bool, exc: DedupeConflictError) -> None:
     )
 
 
+_EXTERNAL_MODIFICATION_OPTIONS = [
+    {"id": "reload", "description": "Reload the file and retry the operation"},
+    {"id": "manual_review", "description": "Review the on-disk changes before retrying"},
+]
+
+
 def _safe(fn: _F) -> _F:
     """Turn every failure into a structured error instead of a traceback.
 
@@ -353,16 +362,7 @@ def _safe(fn: _F) -> _F:
                 "ExternalModification",
                 str(exc),
                 file=str(exc.path),
-                options=[
-                    {
-                        "id": "reload",
-                        "description": "Reload the file and retry the operation",
-                    },
-                    {
-                        "id": "manual_review",
-                        "description": "Review the on-disk changes before retrying",
-                    },
-                ],
+                options=_EXTERNAL_MODIFICATION_OPTIONS,
             )
         except InvalidInputError as exc:
             _emit_error(json_output, "InvalidInput", str(exc))
@@ -413,6 +413,53 @@ _BACKUP_OPTION = typer.Option(
     help="Also write a <file>.bak copy before overwriting (off by default; "
     "writes are already atomic and re-parse-validated)",
 )
+
+
+_SHA256_RE = re.compile(r"[0-9a-fA-F]{64}")
+
+_EXPECT_SHA256_OPTION = typer.Option(
+    None,
+    "--expect-sha256",
+    metavar="SHA256",
+    help="Refuse with an exit-2 ExternalModification conflict, writing nothing, unless "
+    "the file's sha256 still equals this value: pass back the source_sha256 a "
+    "--dry-run reported, so an edit made in between is never overwritten",
+)
+
+
+def _source_sha256(coll: Bibliography) -> str | None:
+    """Return the sha256 of the file state *coll* was read from, if it read one."""
+    source = coll.source_fingerprint
+    return source.sha256 if source is not None else None
+
+
+def _check_expected_sha256(file, coll: Bibliography, params: RunParams) -> None:
+    """Enforce ``--expect-sha256``: the file must still be the one the caller saw.
+
+    The digest is of the bytes this invocation parsed, and ``commit`` separately
+    refuses a file that changes after that read, so together they guarantee the
+    write lands on exactly the state the caller previewed. Idempotent, so a
+    command may call it early (before operations that would otherwise fail on
+    a changed file with a less useful error) and :func:`_finish_mod` again.
+    """
+    expected = params.expect_sha256
+    if expected is None:
+        return
+    expected = expected.strip().lower()
+    if not _SHA256_RE.fullmatch(expected):
+        raise InvalidInputError("--expect-sha256 needs a 64-character hexadecimal sha256 digest")
+    actual = _source_sha256(coll)
+    if actual == expected:
+        return
+    _emit_conflict(
+        params.json_output,
+        "ExternalModification",
+        f"File changed since it was previewed: {file}",
+        file=str(file),
+        expected_sha256=expected,
+        source_sha256=actual,
+        options=_EXTERNAL_MODIFICATION_OPTIONS,
+    )
 
 
 def _citekey_completer(ctx, incomplete):
@@ -489,8 +536,11 @@ def _finish_mod(
 
     Every modifying command shares this envelope:
     ``status, action, file, dry_run, modified, modified_entries, warnings``, a
-    structured ``plan`` (machine-readable per-entry/field changes), plus
-    command-specific keys, and an optional ``diff`` when ``--diff`` is set.
+    structured ``plan`` (machine-readable per-entry/field changes),
+    ``source_sha256`` (the digest of the file as this invocation read it, which
+    ``--expect-sha256`` accepts back), plus command-specific keys, and an
+    optional ``diff`` when ``--diff`` is set. A ``params.expect_sha256`` that no
+    longer matches the file is refused here, before anything is written.
 
     When ``diff_text`` is provided it is used as-is (useful for commands that
     combine multiple diffs, e.g. ``keys rename``). Otherwise the diff is
@@ -502,7 +552,9 @@ def _finish_mod(
     silent corruption of the envelope that ``ref remove`` shipped with. The
     signature now refuses it.
     """
-    # The plan must be read before commit, which refreshes the pristine baseline.
+    _check_expected_sha256(file, coll, params)
+    # Read before commit, which refreshes both the fingerprint and the baseline.
+    source_sha256 = _source_sha256(coll)
     plan = coll.change_plan()
     if diff_text is None:
         diff_text, modified, changed = _preview_or_commit(coll, params)
@@ -519,6 +571,7 @@ def _finish_mod(
         "modified_entries": changed,
         "warnings": warnings or [],
         "plan": plan,
+        "source_sha256": source_sha256,
         **details,
     }
     _emit(params.json_output, result, human, diff_text, params.diff)
