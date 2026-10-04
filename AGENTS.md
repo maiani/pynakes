@@ -143,7 +143,7 @@ tests pass:
   `groups`, `keys`, `fields`, `dedupe`, `metadata`, `tex`, `asset`, `corpus`).
   Command callbacks live in `cli_commands/`; operation modules stay independently
   unit-testable. Keep `capabilities` synchronized with the live command surface.
-- Try to limit file length preferably to ~500 lines, with a maximum limit of 1000.
+- Try to limit file length preferably to ~500 lines, with a maximum limit of 800.
 - Add tests and a `CHANGELOG.md` entry with each behavioral change.
 - Use generic invented references or old, famous historical works in code,
   tests, comments, docstrings, and `CHANGELOG.md`. Never commit examples derived
