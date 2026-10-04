@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from pynakes._text_utils import _split_escaped
+from pynakes.groups import entry_groups
 from pynakes.model import BibFile
 
 # ---------------------------------------------------------------------------
@@ -356,8 +357,6 @@ def _native_tree(lib: BibFile) -> list[GroupNode] | None:
 # CRUD — all operations write through the native key
 # ---------------------------------------------------------------------------
 
-_GROUPS_DELIM = ";"
-
 
 def _write_tree(lib: BibFile, nodes: list[GroupNode]) -> None:
     """Serialize *nodes* to the native ``group-tree`` key and write to *lib*.
@@ -516,7 +515,7 @@ def _matches_search_group(entry, node) -> bool:
 def _group_entry_keys(lib, node) -> set[str]:
     keys: set[str] = set()
     for entry in lib.entries.values():
-        if node.name in entry_group_names(entry):
+        if node.name in entry_groups(entry):
             keys.add(entry.key)
     if node.group_type == "KeywordGroup":
         for entry in lib.entries.values():
@@ -536,12 +535,6 @@ def _group_entry_keys(lib, node) -> set[str]:
 # ---------------------------------------------------------------------------
 
 
-def entry_group_names(entry) -> list[str]:
-    """Return the raw group names assigned to *entry* (from its ``groups`` field)."""
-    raw = entry.fields.get("groups") or ""
-    return [g.strip() for g in raw.split(_GROUPS_DELIM) if g.strip()]
-
-
 def list_entries_in_group_tree(lib: BibFile, group: str, *, exact: bool = False) -> list[str]:
     """Return entry keys that belong to *group*, including dynamic matches.
 
@@ -552,9 +545,7 @@ def list_entries_in_group_tree(lib: BibFile, group: str, *, exact: bool = False)
     """
     tree = library_group_tree(lib)
     if tree is None:
-        return sorted(
-            [entry.key for entry in lib.entries.values() if group in entry_group_names(entry)]
-        )
+        return sorted([entry.key for entry in lib.entries.values() if group in entry_groups(entry)])
     node = _node_by_name(tree, group)
     if node is None:
         return []
@@ -603,4 +594,4 @@ def list_direct_members(lib: BibFile, name: str) -> list[str]:
     node = _node_by_name(tree, name) if tree else None
     if node is not None:
         return sorted(_group_entry_keys(lib, node))
-    return sorted(entry.key for entry in lib.entries.values() if name in entry_group_names(entry))
+    return sorted(entry.key for entry in lib.entries.values() if name in entry_groups(entry))

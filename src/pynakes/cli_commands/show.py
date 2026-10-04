@@ -1,12 +1,11 @@
 """CLI command registration for ``pynakes ref show``."""
 
-import json
-
 import typer
 
 from pynakes.cli_commands._reference import parse_key_list, unique_entries, unique_entry
 from pynakes.cli_common import (
     InvalidInputError,
+    _emit_json,
     _entries,
     _resolve_input_bib,
     _safe,
@@ -75,19 +74,16 @@ def show(
     entry = unique_entry(coll, key, json_output, action="ref_show")
     fields = coll.lib.resolved_fields(entry) if resolved else entry.fields
     if json_output:
-        typer.echo(
-            json.dumps(
-                {
-                    "status": "success",
-                    "action": "ref_show",
-                    "file": file,
-                    "key": entry.key,
-                    "entry_type": entry.type,
-                    "fields": dict(fields),
-                    "resolved": resolved,
-                },
-                indent=2,
-            )
+        _emit_json(
+            {
+                "status": "success",
+                "action": "ref_show",
+                "file": file,
+                "key": entry.key,
+                "entry_type": entry.type,
+                "fields": dict(fields),
+                "resolved": resolved,
+            }
         )
         return
     typer.echo(f"@{entry.type}{{{entry.key}}}")
@@ -117,20 +113,17 @@ def _show_summaries(
         )
 
     if json_output:
-        typer.echo(
-            json.dumps(
-                {
-                    "status": "success",
-                    "action": "ref_show",
-                    "file": file,
-                    "keys": keys,
-                    "count": len(summaries),
-                    "entries": summaries,
-                    "resolved": resolved,
-                    "abstract": include_abstract,
-                },
-                indent=2,
-            )
+        _emit_json(
+            {
+                "status": "success",
+                "action": "ref_show",
+                "file": file,
+                "keys": keys,
+                "count": len(summaries),
+                "entries": summaries,
+                "resolved": resolved,
+                "abstract": include_abstract,
+            }
         )
         return
 

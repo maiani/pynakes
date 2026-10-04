@@ -2,6 +2,7 @@
 
 import json
 
+from pynakes.entry_types import CONTAINER_FIELDS, container_title
 from pynakes.interchange._shared import (
     assign_container,
     assign_key,
@@ -96,10 +97,8 @@ def _entry_to_csl(entry: BibEntry) -> dict:
         csl_name = _BIB_TO_CSL_FIELD.get(name)
         if csl_name:
             item[csl_name] = value
-    if fields.get("journal") or fields.get("journaltitle") or fields.get("booktitle"):
-        item["container-title"] = (
-            fields.get("journal") or fields.get("journaltitle") or fields.get("booktitle")
-        )
+    if container := container_title(fields, CONTAINER_FIELDS):
+        item["container-title"] = container
     if fields.get("pages"):
         start, end = split_pages(fields["pages"])
         item["page"] = f"{start}-{end}" if end else start

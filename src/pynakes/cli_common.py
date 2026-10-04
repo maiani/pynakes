@@ -85,6 +85,11 @@ def _resolve_input_bib(file: str | None, json_output: bool) -> str:
     return str(candidates[0])
 
 
+def _emit_json(payload: dict) -> None:
+    """Write one JSON envelope to stdout, in the format every command shares."""
+    typer.echo(json.dumps(payload, indent=2))
+
+
 def _emit(
     json_output: bool,
     result: dict,
@@ -95,7 +100,7 @@ def _emit(
     if json_output:
         if show_diff and diff_text:
             result["diff"] = diff_text
-        typer.echo(json.dumps(result, indent=2))
+        _emit_json(result)
         return
     for line in human:
         typer.echo(line)
@@ -227,9 +232,7 @@ def stdin_is_interactive() -> bool:
 
 def _emit_error(json_output: bool, error: str, message: str, code: int = 1, **extra) -> None:
     if json_output:
-        typer.echo(
-            json.dumps({"status": "error", "error": error, "message": message, **extra}, indent=2)
-        )
+        _emit_json({"status": "error", "error": error, "message": message, **extra})
     else:
         typer.echo(f"{error}: {message}")
     raise typer.Exit(code=code)
@@ -237,11 +240,7 @@ def _emit_error(json_output: bool, error: str, message: str, code: int = 1, **ex
 
 def _emit_conflict(json_output: bool, error: str, message: str, **extra) -> None:
     if json_output:
-        typer.echo(
-            json.dumps(
-                {"status": "conflict", "error": error, "message": message, **extra}, indent=2
-            )
-        )
+        _emit_json({"status": "conflict", "error": error, "message": message, **extra})
     else:
         typer.echo(f"{error}: {message}")
     raise typer.Exit(code=2)
@@ -642,7 +641,7 @@ def _run_single_check(
     """Run a read-only check over a single file."""
     outcome = check_one(file)
     if json_output:
-        typer.echo(json.dumps(outcome.result, indent=2))
+        _emit_json(outcome.result)
     else:
         for line in outcome.human:
             typer.echo(line)
@@ -699,7 +698,7 @@ def _run_multi_checks(
         "summary": {"files": len(files), "failed_files": failed_files, **totals},
     }
     if json_output:
-        typer.echo(json.dumps(aggregate, indent=2))
+        _emit_json(aggregate)
     else:
         typer.echo(
             f"{len(files)} file(s) checked; {failed_files} with findings, {error_files} unreadable."

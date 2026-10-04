@@ -25,7 +25,10 @@ entry-type aliases (section 2.1.1), so ``suppperiodical`` resolves like
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import NamedTuple
+
+from pynakes._text_utils import fold_field_names
 
 # Types whose container is a periodical: the container title goes in
 # ``journal`` (BibTeX) or ``journaltitle`` (BibLaTeX).
@@ -59,6 +62,18 @@ BOOK_PART_LIKE = frozenset(
 CONTAINER_FIELDS = ("journal", "journaltitle", "booktitle")
 
 
+def container_title(
+    fields: Mapping[str, str], names: tuple[str, ...] = ("journal", "journaltitle")
+) -> str:
+    """Return the first non-blank of ``names`` in ``fields``, stripped, or ``""``.
+
+    The default reads a periodical under either dialect's spelling (BibTeX
+    ``journal``, BibLaTeX ``journaltitle``); pass :data:`CONTAINER_FIELDS` to
+    accept a ``booktitle`` as well.
+    """
+    return next((value for name in names if (value := fields.get(name, "").strip())), "")
+
+
 def is_biblatex(dialect: str) -> bool:
     """Whether ``dialect`` names BibLaTeX rather than BibTeX."""
     return dialect.strip().lower() == "biblatex"
@@ -86,7 +101,7 @@ def has_container(fields: dict[str, str]) -> bool:
     :func:`container_field` would write, so an entry carrying ``booktitle`` is
     not given a redundant ``journal`` naming the same volume.
     """
-    lowered = {name.lower(): value for name, value in fields.items()}
+    lowered = fold_field_names(fields)
     return any((lowered.get(name) or "").strip() for name in CONTAINER_FIELDS)
 
 

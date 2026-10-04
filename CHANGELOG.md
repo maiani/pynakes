@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   through `import_reference` or `prepare_imported_entry`.
 - `pynakes.group_tree.resolve_effective_groups` and `entry_computed_groups`,
   which nothing outside the tests called.
+- `pynakes.group_tree.entry_group_names`, identical to
+  `pynakes.groups.entry_groups`.
 - **Pinax: the `preprint_canonical` flag.** Nothing could set it except by
   editing `.pinax/manifest.json` by hand, and `asset fetch` never initialized it
   as the guide claimed. The canonical copy is now always the published PDF,
@@ -64,6 +66,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `related`, and `entryset` value that names it, as do `keys generate` and
   `dedupe merge` (which points them at the surviving entry).
 - `format` left two blank lines after a `%` comment where one was meant.
+- `convert` to CSL-JSON, MODS, RIS, or EndNote exported a `journal` holding
+  only whitespace as the container title instead of the `journaltitle` or
+  `booktitle` behind it.
 - On Windows, `init --agent-guide` wrote `AGENTS.md` in the locale's code page
   with CRLF line endings, mangling the template's non-ASCII text. It is now
   UTF-8 with LF endings on every platform, like every other file pynakes writes.

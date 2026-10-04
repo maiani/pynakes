@@ -17,6 +17,7 @@ from collections.abc import Callable
 from dataclasses import replace
 
 from pynakes._identifiers import (
+    arxiv_doi,
     canonical_doi,
     looks_like_arxiv_id,
     looks_like_isbn,
@@ -426,16 +427,6 @@ def prepare_imported_entry(
 
     _assign_key(entry, lib, key=key, key_source=key_source, provider_key=provider_key)
     return entry
-
-
-def arxiv_doi(identifier: str) -> str:
-    """Return the DataCite DOI arXiv registers for ``identifier``.
-
-    arXiv deposits every submission under ``10.48550/arXiv.<id>``, so this is a
-    derivation rather than a lookup: no network access, and the result is the
-    same string arXiv's own landing page advertises.
-    """
-    return f"10.48550/arXiv.{identifier}"
 
 
 def _arxiv_metadata_via_doi(identifier: str, fetcher: FetchBibTeX | None, dialect: str):

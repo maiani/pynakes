@@ -4,12 +4,11 @@ This module keeps command callbacks separate from application assembly while
 retaining the stable CLI contract.
 """
 
-import json
-
 import typer
 
 from pynakes.authors import split_name_list
 from pynakes.cli_common import (
+    _emit_json,
     _entries,
     _resolve_input_bib,
     _safe,
@@ -119,7 +118,7 @@ def inspect(
                 "files_dir": str(store.root),
                 "manifest": str(store.manifest_path),
             }
-        typer.echo(json.dumps(result, indent=2))
+        _emit_json(result)
         return
 
     le = "CRLF" if lib.line_ending == "\r\n" else "LF"

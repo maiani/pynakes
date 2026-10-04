@@ -73,6 +73,35 @@ def arxiv_id_from_text(value: str) -> str | None:
     return normalize_arxiv(match.group(1))
 
 
+#: arXiv registers every submission with DataCite under this DOI prefix.
+ARXIV_DOI_PREFIX = "10.48550/arXiv."
+
+
+def arxiv_doi(identifier: str) -> str:
+    """Return the DataCite DOI arXiv registers for ``identifier``.
+
+    A derivation rather than a lookup: no network access, and the result is the
+    same string arXiv's own landing page advertises.
+    """
+    return f"{ARXIV_DOI_PREFIX}{identifier}"
+
+
+def arxiv_id_from_doi(value: str) -> str | None:
+    """Return the arXiv id an arXiv DataCite DOI encodes, or ``None``."""
+    doi = value.strip()
+    if not doi.lower().startswith(ARXIV_DOI_PREFIX.lower()):
+        return None
+    return normalize_arxiv(doi[len(ARXIV_DOI_PREFIX) :])
+
+
+def is_arxiv_doi(value: str) -> bool:
+    """Return whether ``value`` (a DOI or DOI URL) is one arXiv registered."""
+    try:
+        return normalize_doi(value).lower().startswith(ARXIV_DOI_PREFIX.lower())
+    except ValueError:
+        return False
+
+
 def looks_like_arxiv_id(value: str) -> bool:
     """Return whether ``value`` has a recognized bare arXiv-id shape."""
     return bool(_ARXIV_NEW_RE.match(value) or _ARXIV_OLD_RE.match(value))

@@ -4,8 +4,6 @@ This module keeps command callbacks separate from application assembly while
 retaining the stable CLI contract.
 """
 
-import json
-
 import typer
 
 from pynakes import group_tree as group_tree_ops
@@ -13,6 +11,7 @@ from pynakes.cli_common import (
     _BACKUP_OPTION,
     RunParams,
     _emit_error,
+    _emit_json,
     _entries,
     _finish_mod,
     _resolve_input_bib,
@@ -37,12 +36,7 @@ def groups_list(
     members = {g: group_tree_ops.list_direct_members(lib, g) for g in names}
 
     if json_output:
-        typer.echo(
-            json.dumps(
-                {"status": "success", "action": "groups_list", "file": file, "groups": members},
-                indent=2,
-            )
-        )
+        _emit_json({"status": "success", "action": "groups_list", "file": file, "groups": members})
         return
 
     if not names:
@@ -62,16 +56,13 @@ def groups_tree(
     tree = group_tree_ops.list_tree(lib)
 
     if json_output:
-        typer.echo(
-            json.dumps(
-                {
-                    "status": "success",
-                    "action": "groups_tree",
-                    "file": file,
-                    "tree": [n.to_dict() for n in tree] if tree else [],
-                },
-                indent=2,
-            )
+        _emit_json(
+            {
+                "status": "success",
+                "action": "groups_tree",
+                "file": file,
+                "tree": [n.to_dict() for n in tree] if tree else [],
+            }
         )
         return
 
@@ -329,18 +320,15 @@ def groups_list_entries(
     entries = group_tree_ops.list_entries_in_group_tree(lib, name, exact=exact)
 
     if json_output:
-        typer.echo(
-            json.dumps(
-                {
-                    "status": "success",
-                    "action": "groups_list_entries",
-                    "file": file,
-                    "group": name,
-                    "exact": exact,
-                    "entries": entries,
-                },
-                indent=2,
-            )
+        _emit_json(
+            {
+                "status": "success",
+                "action": "groups_list_entries",
+                "file": file,
+                "group": name,
+                "exact": exact,
+                "entries": entries,
+            }
         )
         return
 

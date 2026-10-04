@@ -1,11 +1,10 @@
 """CLI command registration for bibliography search."""
 
-import json
-
 import typer
 
 from pynakes import search as search_ops
 from pynakes.cli_common import (
+    _emit_json,
     _entries,
     _resolve_input_bib,
     _safe,
@@ -98,27 +97,24 @@ def search(
     )
 
     if json_output:
-        typer.echo(
-            json.dumps(
-                {
-                    "status": "success",
-                    "action": "search",
-                    "file": file,
-                    "query": query,
-                    "where": where,
-                    "keys": parse_key_selector(key),
-                    "where_parsed": where_filter.to_dict() if where_filter is not None else None,
-                    "fields": field or [],
-                    "case_sensitive": case_sensitive,
-                    "fuzzy": fuzzy,
-                    "show_abstract": show_abstract,
-                    "limit": limit,
-                    "ranked": ranked,
-                    "count": len(results),
-                    "matches": [result.to_dict() for result in results],
-                },
-                indent=2,
-            )
+        _emit_json(
+            {
+                "status": "success",
+                "action": "search",
+                "file": file,
+                "query": query,
+                "where": where,
+                "keys": parse_key_selector(key),
+                "where_parsed": where_filter.to_dict() if where_filter is not None else None,
+                "fields": field or [],
+                "case_sensitive": case_sensitive,
+                "fuzzy": fuzzy,
+                "show_abstract": show_abstract,
+                "limit": limit,
+                "ranked": ranked,
+                "count": len(results),
+                "matches": [result.to_dict() for result in results],
+            }
         )
         return
 

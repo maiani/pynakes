@@ -10,7 +10,6 @@ resolved, in one write, while a single-identifier import keeps its existing
 error and conflict envelopes byte for byte.
 """
 
-import json
 import sys
 
 import typer
@@ -23,6 +22,7 @@ from pynakes.cli_common import (
     RunParams,
     _emit_conflict,
     _emit_error,
+    _emit_json,
     _finish_mod,
     _resolve_input_bib,
     _safe,
@@ -155,27 +155,24 @@ def import_reference(
         return
     except importer_ops.DuplicateReferenceError as exc:
         if json_output:
-            typer.echo(
-                json.dumps(
-                    {
-                        "status": "conflict",
-                        "error": "DuplicateReference",
-                        "message": str(exc),
-                        "identifier": exc.identifier,
-                        "existing_keys": exc.keys,
-                        "options": [
-                            {
-                                "id": "keep_existing",
-                                "description": "Do not import a duplicate reference",
-                            },
-                            {
-                                "id": "allow_duplicate",
-                                "description": "Retry with --allow-duplicate",
-                            },
-                        ],
-                    },
-                    indent=2,
-                )
+            _emit_json(
+                {
+                    "status": "conflict",
+                    "error": "DuplicateReference",
+                    "message": str(exc),
+                    "identifier": exc.identifier,
+                    "existing_keys": exc.keys,
+                    "options": [
+                        {
+                            "id": "keep_existing",
+                            "description": "Do not import a duplicate reference",
+                        },
+                        {
+                            "id": "allow_duplicate",
+                            "description": "Retry with --allow-duplicate",
+                        },
+                    ],
+                }
             )
         else:
             typer.echo(f"DuplicateReference: {exc}")

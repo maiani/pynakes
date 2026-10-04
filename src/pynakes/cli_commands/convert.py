@@ -7,7 +7,6 @@ usual diff/commit workflow. With an interchange format it reads the library and
 file and *imports* it to BibTeX (``--from csl-json``/``ris``/``mods``/``endnote``).
 """
 
-import json
 from pathlib import Path
 
 import typer
@@ -17,6 +16,7 @@ from pynakes.cli_common import (
     _BACKUP_OPTION,
     RunParams,
     _emit_error,
+    _emit_json,
     _entries,
     _finish_mod,
     _refuse_input_as_output,
@@ -173,7 +173,7 @@ def _emit_conversion(
             "written": written,
             "content": None if out else content,
         }
-        typer.echo(json.dumps(result, indent=2))
+        _emit_json(result)
         return
 
     if out:

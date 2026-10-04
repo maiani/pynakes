@@ -4,11 +4,10 @@ This module keeps command callbacks separate from application assembly while
 retaining the stable CLI contract.
 """
 
-import json
-
 import typer
 
 from pynakes.capabilities import get_capabilities
+from pynakes.cli_common import _emit_json
 
 # --- capabilities ------------------------------------------------
 
@@ -19,7 +18,7 @@ def capabilities(
     """Show tool capabilities."""
     caps = get_capabilities()
     if json_output:
-        typer.echo(json.dumps(caps, indent=2))
+        _emit_json(caps)
         return
     typer.echo(f"{caps['tool']} v{caps['version']}")
     descriptions = caps["commands"]

@@ -11,7 +11,6 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from difflib import SequenceMatcher
 from typing import Literal
 
 from pynakes._identifiers import (
@@ -19,7 +18,7 @@ from pynakes._identifiers import (
     canonical_doi,
     normalize_arxiv,
 )
-from pynakes._text_utils import _normalize_text, entry_year
+from pynakes._text_utils import _normalize_text, entry_year, title_similarity
 from pynakes.authors import last_name, split_name_list
 from pynakes.model import BibEntry, BibFile
 
@@ -335,7 +334,7 @@ def compare_work_evidence(left: WorkEvidence, right: WorkEvidence) -> WorkMatch:
         return WorkMatch("unknown", ("no matching stable identifier",))
     if len(left.title_fingerprint) < 12 or len(right.title_fingerprint) < 12:
         return WorkMatch("unknown", ("insufficient title evidence",))
-    score = SequenceMatcher(None, left.title_fingerprint, right.title_fingerprint).ratio()
+    score = title_similarity(left.title_fingerprint, right.title_fingerprint)
     if score < 0.92:
         return WorkMatch("unknown", ("title similarity below threshold",), score)
     shared_authors = sorted(set(left.authors).intersection(right.authors))

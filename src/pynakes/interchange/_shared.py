@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from pynakes._calendar import MONTH_ABBR_TO_NUM as MONTH_NUMBERS
 from pynakes.authors import split_name_list
+from pynakes.entry_types import container_title
 from pynakes.keys import generate_key, unique_key
 from pynakes.model import BibEntry, BibFile, EntryStore
 
@@ -152,7 +153,7 @@ def _common_entry_to_format(entry: BibEntry, spec: _EntryFormatSpec) -> list[str
         tag = spec.field_map.get(name)
         if tag:
             lines.append(spec.field_line_fmt % (tag, value))
-    container = fields.get("journal") or fields.get("journaltitle")
+    container = container_title(fields)
     if container:
         lines.append(spec.journal_fmt % container)
     if fields.get("booktitle"):

@@ -14,12 +14,15 @@ from __future__ import annotations
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from difflib import SequenceMatcher
 from typing import TypeVar
 
 from pynakes._identifiers import doi_from_text, normalize_doi
-from pynakes._text_utils import _normalize_text
-from pynakes.entry_types import CONTAINER_FIELDS, container_field, has_container
+from pynakes.entry_types import (
+    CONTAINER_FIELDS,
+    container_field,
+    container_title,
+    has_container,
+)
 from pynakes.keys import _first_author_last_name
 from pynakes.model import BibEntry
 from pynakes.progress import EntryProgress, EntryProgressEvent
@@ -370,16 +373,12 @@ def _doi_from_entry_urls(entry: BibEntry) -> str | None:
     return None
 
 
-def _similarity(left: str, right: str) -> float:
-    return SequenceMatcher(None, _normalize_text(left), _normalize_text(right)).ratio()
-
-
 def _first_author(entry: BibEntry) -> str:
     return _first_author_last_name(entry).lower()
 
 
 def _journal(entry: BibEntry) -> str:
-    return entry.fields.get("journal", "").strip() or entry.fields.get("journaltitle", "").strip()
+    return container_title(entry.fields)
 
 
 def _has_retraction_flag(entry: BibEntry) -> bool:

@@ -1,13 +1,12 @@
 """CLI command registration for ``pynakes ref find``."""
 
-import json
-
 import typer
 
 from pynakes import lookup as lookup_ops
 from pynakes.cli_common import (
     _CACHE_FILE_OPTION,
     _emit_error,
+    _emit_json,
     _safe,
 )
 from pynakes.providers._http import ProviderFetchError
@@ -57,9 +56,7 @@ def find(
         return
 
     if json_output:
-        typer.echo(
-            json.dumps({"status": "success", "action": "ref_find", **report.to_dict()}, indent=2)
-        )
+        _emit_json({"status": "success", "action": "ref_find", **report.to_dict()})
         return
 
     if not report.candidates:

@@ -4,8 +4,6 @@ This module keeps command callbacks separate from application assembly while
 retaining the stable CLI contract.
 """
 
-import json
-
 import typer
 
 from pynakes import metadata as metadata_ops
@@ -14,6 +12,7 @@ from pynakes.cli_common import (
     RunParams,
     _emit_conflict,
     _emit_error,
+    _emit_json,
     _finish_mod,
     _resolve_input_bib,
     _safe,
@@ -36,25 +35,22 @@ def metadata_list(
     warnings = metadata_ops.aliased_drift_warnings(lib)
 
     if json_output:
-        typer.echo(
-            json.dumps(
-                {
-                    "status": "success",
-                    "action": "metadata_list",
-                    "file": file,
-                    "metadata": {
-                        "values": dict(lib.jabref_metadata),
-                        "blocks": [b.to_dict() for b in lib.jabref_metadata_blocks],
-                    },
-                    "pynakes_metadata": {
-                        "values": dict(lib.pynakes_metadata),
-                        "blocks": [b.to_dict() for b in lib.pynakes_metadata_blocks],
-                    },
-                    "effective": dict(lib.metadata),
-                    "warnings": warnings,
+        _emit_json(
+            {
+                "status": "success",
+                "action": "metadata_list",
+                "file": file,
+                "metadata": {
+                    "values": dict(lib.jabref_metadata),
+                    "blocks": [b.to_dict() for b in lib.jabref_metadata_blocks],
                 },
-                indent=2,
-            )
+                "pynakes_metadata": {
+                    "values": dict(lib.pynakes_metadata),
+                    "blocks": [b.to_dict() for b in lib.pynakes_metadata_blocks],
+                },
+                "effective": dict(lib.metadata),
+                "warnings": warnings,
+            }
         )
         return
 

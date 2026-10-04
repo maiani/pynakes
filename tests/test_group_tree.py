@@ -19,7 +19,6 @@ from pynakes.group_tree import (
     _split_escaped,
     _unescape,
     add_node,
-    entry_group_names,
     format_jabref_grouping,
     known_group_names,
     library_group_tree,
@@ -35,6 +34,7 @@ from pynakes.group_tree import (
     serialize_native,
     update_node,
 )
+from pynakes.groups import entry_groups
 from pynakes.model import BibEntry, BibFile
 
 # ---------------------------------------------------------------------------
@@ -602,14 +602,14 @@ def test_update_node_not_found() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_entry_group_names() -> None:
+def test_entry_groups() -> None:
     entry = BibEntry(key="A", type="article", fields={"groups": "ML; Deep Learning"})
-    assert entry_group_names(entry) == ["ML", "Deep Learning"]
+    assert entry_groups(entry) == ["ML", "Deep Learning"]
 
 
-def test_entry_group_names_empty() -> None:
+def test_entry_groups_empty() -> None:
     entry = BibEntry(key="A", type="article", fields={})
-    assert entry_group_names(entry) == []
+    assert entry_groups(entry) == []
 
 
 def test_list_entries_in_group_tree_with_tree() -> None:

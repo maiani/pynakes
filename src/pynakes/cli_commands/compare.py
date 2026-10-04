@@ -1,13 +1,12 @@
 """CLI command registration for ``pynakes ref compare``."""
 
-import json
-
 import typer
 
 from pynakes.cli_commands._reference import unique_entries, unique_entry
 from pynakes.cli_common import (
     _CACHE_FILE_OPTION,
     InvalidInputError,
+    _emit_json,
     _resolve_input_bib,
     _safe,
     bib_file_argument,
@@ -57,17 +56,14 @@ def compare(
         report = coll.compare_entry_with_remote(entry.key, online=online, cache_file=cache_file)
 
     if json_output:
-        typer.echo(
-            json.dumps(
-                {
-                    "status": "success",
-                    "action": "ref_compare",
-                    "file": file,
-                    "online": online,
-                    **report.to_dict(),
-                },
-                indent=2,
-            )
+        _emit_json(
+            {
+                "status": "success",
+                "action": "ref_compare",
+                "file": file,
+                "online": online,
+                **report.to_dict(),
+            }
         )
         return
 

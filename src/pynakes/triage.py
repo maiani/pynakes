@@ -14,6 +14,7 @@ and no value rewriting.
 
 from collections.abc import Mapping
 
+from pynakes._text_utils import fold_field_names
 from pynakes.model import BibEntry
 
 #: Venue-like fields, in preference order. The first one an entry carries is
@@ -77,7 +78,7 @@ def entry_summary(
     requested", which a caller triaging candidates needs to tell apart.
     """
     source = entry.fields if fields is None else fields
-    lookup = {name.lower(): value for name, value in source.items()}
+    lookup = fold_field_names(source)
 
     summary: dict[str, str | None] = {}
     for alternatives in (("title",), _CREATOR_FIELDS, _DATE_FIELDS, VENUE_FIELDS):

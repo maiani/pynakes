@@ -14,6 +14,7 @@ import shlex
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
+from pynakes._text_utils import find_field_name
 from pynakes.model import BibEntry, BibFile
 from pynakes.query import FUZZY_THRESHOLD, fuzzy_score
 
@@ -320,8 +321,8 @@ def _candidate_values(
         normalized = field.lower()
         if field_filter is not None and normalized not in field_filter:
             return []
-        value = next((v for k, v in entry.fields.items() if k.lower() == normalized), None)
-        return [(normalized, value)] if value is not None else []
+        stored = find_field_name(entry.fields, normalized)
+        return [(normalized, entry.fields[stored])] if stored is not None else []
 
     values = [("key", entry.key), ("type", entry.type)]
     values.extend(

@@ -3,6 +3,7 @@
 from xml.etree import ElementTree as ET
 
 from pynakes.authors import split_name_list
+from pynakes.entry_types import CONTAINER_FIELDS, container_title
 from pynakes.interchange._shared import (
     assign_container,
     assign_key,
@@ -141,7 +142,7 @@ def _add_origin_info(mods: ET.Element, fields: dict[str, str]) -> None:
 
 
 def _add_related_item(mods: ET.Element, fields: dict[str, str]) -> None:
-    container = fields.get("journal") or fields.get("journaltitle") or fields.get("booktitle")
+    container = container_title(fields, CONTAINER_FIELDS)
     if not container and not fields.get("series"):
         return
     related = _sub(mods, "relatedItem", type="host")

@@ -207,11 +207,14 @@ def _strip_tex_comments(text: str) -> str:
     return "\n".join(cleaned_lines)
 
 
-def _iter_source_files(paths: Iterable[str]) -> Iterator[Path]:
-    """Yield .tex/.aux files from the given files and/or directories.
+def _walk_sources(
+    paths: Iterable[str], suffixes: tuple[str, ...], *, any_named_file: bool
+) -> Iterator[Path]:
+    """Yield files with ``suffixes`` from the given files and/or directories.
 
-    Directories are scanned recursively. Explicitly named files are used as-is
-    regardless of extension.
+    Directories are scanned recursively, one suffix at a time, each in sorted
+    order. A file named explicitly is yielded when ``any_named_file`` is set or
+    its suffix is one of ``suffixes``.
 
     Raises:
         FileNotFoundError: if a named path does not exist.
@@ -219,12 +222,18 @@ def _iter_source_files(paths: Iterable[str]) -> Iterator[Path]:
     for path_str in paths:
         path = Path(path_str)
         if path.is_dir():
-            yield from sorted(path.rglob("*.tex"))
-            yield from sorted(path.rglob("*.aux"))
+            for suffix in suffixes:
+                yield from sorted(path.rglob(f"*{suffix}"))
         elif path.exists():
-            yield path
+            if any_named_file or path.suffix.lower() in suffixes:
+                yield path
         else:
             raise FileNotFoundError(f"Source not found: {path_str}")
+
+
+def _iter_source_files(paths: Iterable[str]) -> Iterator[Path]:
+    """Yield .tex/.aux files; an explicitly named file is used whatever its extension."""
+    return _walk_sources(paths, (".tex", ".aux"), any_named_file=True)
 
 
 @dataclass
@@ -354,17 +363,7 @@ def find_key_usages(key: str, paths: Iterable[str]) -> tuple[list[KeyUsageMatch]
 
 def iter_tex_files(paths: Iterable[str]) -> list[Path]:
     """Return `.tex` files from the given files and/or directories."""
-    files: list[Path] = []
-    for path_str in paths:
-        path = Path(path_str)
-        if path.is_dir():
-            files.extend(sorted(path.rglob("*.tex")))
-        elif path.exists():
-            if path.suffix.lower() == ".tex":
-                files.append(path)
-        else:
-            raise FileNotFoundError(f"Source not found: {path_str}")
-    return files
+    return list(_walk_sources(paths, (".tex",), any_named_file=False))
 
 
 def rename_citation_key_in_tex(text: str, old: str, new: str) -> tuple[str, int]:

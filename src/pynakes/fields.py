@@ -10,6 +10,7 @@ import re
 from collections.abc import Iterable, Iterator
 
 from pynakes import query
+from pynakes._text_utils import find_field_name
 from pynakes.editing import (
     append_delimited_field,
     remove_entry_field,
@@ -36,13 +37,7 @@ def _resolve_field_name(entry: BibEntry, name: str) -> str:
     keep other casing). Falls back to ``name`` unchanged when no field of that
     name — in any case — exists on ``entry``.
     """
-    if name in entry.fields:
-        return name
-    lowered = name.lower()
-    for key in entry.fields:
-        if key.lower() == lowered:
-            return key
-    return name
+    return find_field_name(entry.fields, name) or name
 
 
 def rename_field(lib: BibFile, old: str, new: str, where: QueryFilter = None) -> int:

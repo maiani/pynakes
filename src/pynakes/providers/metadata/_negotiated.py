@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import re
 
-from pynakes._identifiers import normalize_arxiv
+from pynakes._identifiers import arxiv_doi, arxiv_id_from_doi, is_arxiv_doi, normalize_arxiv
 from pynakes.entry_types import (
     CONTAINER_FIELDS,
     eprint_fields,
@@ -39,8 +39,6 @@ from pynakes.entry_types import (
     preprint_entry_type,
 )
 from pynakes.providers.records import ReferenceMetadata
-
-ARXIV_DOI_PREFIX = "10.48550/arxiv."
 
 # ``Quantum Physics (quant-ph)`` -> ``quant-ph``. arXiv's DataCite keywords
 # carry the primary category in parentheses; nothing else in the list does.
@@ -84,7 +82,7 @@ def _dedupe_keywords(fields: dict[str, str]) -> None:
 
 def _is_arxiv(metadata: ReferenceMetadata) -> bool:
     doi = metadata.fields.get("doi", "") or metadata.identifiers.get("doi", "")
-    if doi.strip().lower().startswith(ARXIV_DOI_PREFIX):
+    if is_arxiv_doi(doi):
         return True
     return metadata.fields.get("publisher", "").strip().lower() == "arxiv"
 
@@ -108,7 +106,7 @@ def _refine_arxiv(metadata: ReferenceMetadata, *, dialect: str) -> None:
         _set(fields, expressions, names.archive, names.archive_value)
         if category := _primary_class(fields.get("keywords", "")):
             _set(fields, expressions, names.eprint_class, category)
-        canonical = f"10.48550/arXiv.{arxiv_id}"
+        canonical = arxiv_doi(arxiv_id)
         if fields.get("doi", "") != canonical:
             _set(fields, expressions, "doi", canonical)
             metadata.identifiers["doi"] = canonical
@@ -132,10 +130,7 @@ def _arxiv_id(metadata: ReferenceMetadata) -> str | None:
         candidate = normalize_arxiv(url.split("arxiv.org/abs/", 1)[1].strip().rstrip("/"))
         if candidate:
             return candidate
-    doi = (metadata.fields.get("doi", "") or metadata.identifiers.get("doi", "")).strip()
-    if doi.lower().startswith(ARXIV_DOI_PREFIX):
-        return normalize_arxiv(doi[len(ARXIV_DOI_PREFIX) :])
-    return None
+    return arxiv_id_from_doi(metadata.fields.get("doi", "") or metadata.identifiers.get("doi", ""))
 
 
 def _primary_class(keywords: str) -> str | None:

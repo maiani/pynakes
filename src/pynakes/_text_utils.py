@@ -7,12 +7,30 @@ group).
 """
 
 import re
+from collections.abc import Mapping
+from difflib import SequenceMatcher
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pynakes.model import BibEntry
 
 _YEAR_RE = re.compile(r"\d{4}")
+
+
+def fold_field_names(fields: Mapping[str, str]) -> dict[str, str]:
+    """Return ``fields`` keyed by lowercase name, since BibTeX names ignore case.
+
+    A parsed entry's names are already lowercase; a hand-built mapping may not be.
+    """
+    return {name.lower(): value for name, value in fields.items()}
+
+
+def find_field_name(fields: Mapping[str, str], name: str) -> str | None:
+    """Return the key under which ``fields`` stores ``name``, ignoring case."""
+    if name in fields:
+        return name
+    lowered = name.lower()
+    return next((key for key in fields if key.lower() == lowered), None)
 
 
 def entry_year(entry: "BibEntry") -> str:
@@ -111,6 +129,16 @@ def _normalize_text(value: str) -> str:
     """
     lowered = value.replace("{", "").replace("}", "").replace("&", "and").lower()
     return " ".join("".join(ch for ch in lowered if ch.isalnum() or ch.isspace()).split())
+
+
+def title_similarity(left: str, right: str) -> float:
+    """Return how alike two titles are, from 0 to 1, after :func:`_normalize_text`.
+
+    The one similarity measure for deciding whether two titles name the same
+    work, shared by dedupe evidence and integrity checks. Normalizing is
+    idempotent, so already-normalized fingerprints score the same.
+    """
+    return SequenceMatcher(None, _normalize_text(left), _normalize_text(right)).ratio()
 
 
 def _split_escaped(value: str, delimiter: str) -> list[str]:

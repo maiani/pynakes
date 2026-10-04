@@ -19,7 +19,7 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
-from pynakes._identifiers import normalize_arxiv, normalize_doi
+from pynakes._identifiers import is_arxiv_doi, normalize_arxiv, normalize_doi
 from pynakes._integrity_common import (
     _PREPRINT_DOI_PREFIXES,
     FieldUpdate,
@@ -349,7 +349,7 @@ def _apply_published_candidate(
 ) -> None:
     before = len(report.updates)
     existing_doi = _field_value(entry, "doi").strip()
-    if candidate.doi and (not existing_doi or _doi_is_arxiv(existing_doi)):
+    if candidate.doi and (not existing_doi or is_arxiv_doi(existing_doi)):
         try:
             value = normalize_doi(candidate.doi)
         except ValueError:
@@ -380,13 +380,6 @@ def _apply_published_candidate(
             report.updates.append(FieldUpdate(entry.key, "year", published_year))
     if len(report.updates) > before and entry.key not in report.promoted_keys:
         report.promoted_keys.append(entry.key)
-
-
-def _doi_is_arxiv(value: str) -> bool:
-    try:
-        return normalize_doi(value).lower().startswith("10.48550/arxiv.")
-    except ValueError:
-        return False
 
 
 def _apply_arxiv_backfill_candidate(
@@ -429,11 +422,4 @@ def _preprint_identity(entry: BibEntry) -> tuple[str, str] | None:
     url = " ".join(entry.fields.get(field, "") for field in ("url", "howpublished", "note")).lower()
     if "ssrn.com" in url:
         return "ssrn", url
-    return None
-
-
-def _entry_arxiv_id(entry: BibEntry) -> str | None:
-    identifiers = evidence_from_entry(entry).identifiers.by_kind()
-    if arxiv := identifiers.get("arxiv"):
-        return sorted(arxiv)[0]
     return None

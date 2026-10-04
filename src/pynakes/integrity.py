@@ -43,17 +43,17 @@ from pynakes._integrity_common import (
     _has_retraction_flag,
     _map_concurrently,
     _remote_container,
-    _similarity,
 )
 from pynakes._integrity_published import (
-    _entry_arxiv_id,
     _fetch_arxiv_fields,
     check_published,
     fetch_arxiv_metadata,
 )
-from pynakes._text_utils import entry_year
+from pynakes._text_utils import entry_year, title_similarity
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.editing import set_entry_field
+from pynakes.entry_types import container_title
+from pynakes.identity import entry_arxiv_id
 from pynakes.journals import _journal_titles_equivalent
 from pynakes.metadata import library_dialect
 from pynakes.model import BibEntry, BibFile
@@ -279,7 +279,7 @@ def enrich_library(
             continue
 
         plan.append(("fetch", None))
-        journal = entry.fields.get("journal") or entry.fields.get("journaltitle")
+        journal = container_title(entry.fields) or None
         fetch_positions.append(pos)
         fetch_jobs.append((normalized, journal, entry.key, cache_file))
 
@@ -354,7 +354,7 @@ def compare_entry_with_remote(
                 report.fields = _diff_fields(entry, remote.fields)
                 return report
 
-    arxiv_id = _entry_arxiv_id(entry)
+    arxiv_id = entry_arxiv_id(entry)
     if arxiv_id:
         try:
             remote_fields = _fetch_arxiv_fields(arxiv_id, cache_file=cache_file)
@@ -422,7 +422,7 @@ def _compare_entry(local: BibEntry, remote: BibEntry) -> list[IntegrityIssue]:
     issues: list[IntegrityIssue] = []
     local_title = local.fields.get("title", "")
     remote_title = remote.fields.get("title", "")
-    if local_title and remote_title and _similarity(local_title, remote_title) < 0.86:
+    if local_title and remote_title and title_similarity(local_title, remote_title) < 0.86:
         issues.append(
             IntegrityIssue(
                 "title_mismatch",
