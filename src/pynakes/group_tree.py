@@ -110,16 +110,6 @@ def _descendant_names(nodes: list[GroupNode], name: str) -> list[str]:
     return result
 
 
-def _ancestor_names(nodes: list[GroupNode], name: str) -> list[str]:
-    """Return *name* and all ancestor group names (start to root)."""
-    result: list[str] = [name]
-    parent = _parent_of(nodes, name)
-    while parent:
-        result.append(parent.name)
-        parent = _parent_of(nodes, parent.name)
-    return result
-
-
 def _parent_of(nodes: list[GroupNode], name: str) -> GroupNode | None:
     """Return the parent node of *name*, or ``None`` if root-level."""
     for n in nodes:
@@ -541,22 +531,6 @@ def _group_entry_keys(lib, node) -> set[str]:
     return keys
 
 
-def entry_computed_groups(lib, entry_key) -> list[str]:
-    entry = lib.entries.get(entry_key)
-    if entry is None:
-        return []
-    tree = library_group_tree(lib)
-    if tree is None:
-        return []
-    result: list[str] = []
-    for node in tree:
-        if node.group_type == "KeywordGroup" and _matches_keyword_group(entry, node):
-            result.append(node.name)
-        elif node.group_type == "SearchGroup" and _matches_search_group(entry, node):
-            result.append(node.name)
-    return result
-
-
 # ---------------------------------------------------------------------------
 # Tree-aware group queries (extend groups.py semantics)
 # ---------------------------------------------------------------------------
@@ -566,26 +540,6 @@ def entry_group_names(entry) -> list[str]:
     """Return the raw group names assigned to *entry* (from its ``groups`` field)."""
     raw = entry.fields.get("groups") or ""
     return [g.strip() for g in raw.split(_GROUPS_DELIM) if g.strip()]
-
-
-def resolve_effective_groups(lib: BibFile, entry) -> list[str]:
-    """Return all effective groups for *entry*, including inherited ancestors
-    and computed dynamic groups.
-
-    If a group tree is defined, this walks upward from each assigned group and
-    each computed dynamic group, including all ancestors.  Without a tree,
-    returns the raw group names only.
-    """
-    raw = entry_group_names(entry)
-    tree = library_group_tree(lib)
-    if tree is None:
-        return raw
-    effective: set[str] = set()
-    for g in raw:
-        effective.update(_ancestor_names(tree, g))
-    for g in entry_computed_groups(lib, entry.key):
-        effective.update(_ancestor_names(tree, g))
-    return [g for g in raw if g in effective] + [g for g in effective if g not in raw]
 
 
 def list_entries_in_group_tree(lib: BibFile, group: str, *, exact: bool = False) -> list[str]:

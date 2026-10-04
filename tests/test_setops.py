@@ -240,7 +240,6 @@ def test_cli_combine_copies_pinax_materials_and_manifest(tmp_path: Path) -> None
                 "version": 1,
                 "files": {
                     "Smith2020": {
-                        "preprint_canonical": True,
                         "preprint_pdf": {
                             "source": "https://arxiv.org/pdf/2101.00001",
                             "fetched_date": "2026-06-27",
@@ -264,7 +263,7 @@ def test_cli_combine_copies_pinax_materials_and_manifest(tmp_path: Path) -> None
     combined = parse_bib(Path(out).read_text(encoding="utf-8"))
     assert combined.pynakes_metadata["pinax-files-dir"] == "all.files"
     manifest = json.loads((tmp_path / "all.files" / ".pinax" / "manifest.json").read_text())
-    assert manifest["files"]["Smith2020"]["preprint_canonical"] is True
+    assert manifest["files"]["Smith2020"]["preprint_pdf"]["refetchable"] is True
 
 
 def test_cli_combine_dry_run_writes_nothing(tmp_path: Path) -> None:

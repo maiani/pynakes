@@ -10,7 +10,6 @@ from pynakes.bibtex_writer import write_bib
 from pynakes.cli import app
 from pynakes.group_tree import (
     GroupNode,
-    _ancestor_names,
     _descendant_names,
     _escape,
     _group_entry_keys,
@@ -20,7 +19,6 @@ from pynakes.group_tree import (
     _split_escaped,
     _unescape,
     add_node,
-    entry_computed_groups,
     entry_group_names,
     format_jabref_grouping,
     known_group_names,
@@ -34,7 +32,6 @@ from pynakes.group_tree import (
     parse_native,
     remove_node,
     rename_node,
-    resolve_effective_groups,
     serialize_native,
     update_node,
 )
@@ -55,17 +52,6 @@ def test_descendant_names() -> None:
     assert _descendant_names(nodes, "A") == ["A", "B", "C", "D"]
     assert _descendant_names(nodes, "B") == ["B", "C"]
     assert _descendant_names(nodes, "C") == ["C"]
-
-
-def test_ancestor_names() -> None:
-    nodes = [
-        GroupNode(name="A"),
-        GroupNode(name="B", parent="A"),
-        GroupNode(name="C", parent="B"),
-    ]
-    assert _ancestor_names(nodes, "C") == ["C", "B", "A"]
-    assert _ancestor_names(nodes, "B") == ["B", "A"]
-    assert _ancestor_names(nodes, "A") == ["A"]
 
 
 def test_node_by_name() -> None:
@@ -661,22 +647,6 @@ def test_list_entries_in_group_tree_no_tree() -> None:
     assert result == ["A"]
 
 
-def test_resolve_effective_groups() -> None:
-    lib = _fresh_lib()
-    add_node(lib, "ML")
-    add_node(lib, "Deep Learning", parent="ML")
-    entry = BibEntry(key="A", type="article", fields={"groups": "Deep Learning"})
-    effective = resolve_effective_groups(lib, entry)
-    assert "Deep Learning" in effective
-    assert "ML" in effective
-
-
-def test_resolve_effective_groups_no_tree() -> None:
-    lib = _fresh_lib()
-    entry = BibEntry(key="A", type="article", fields={"groups": "Deep Learning"})
-    assert resolve_effective_groups(lib, entry) == ["Deep Learning"]
-
-
 # ---------------------------------------------------------------------------
 # Dynamic group evaluation — KeywordGroup
 # ---------------------------------------------------------------------------
@@ -815,44 +785,6 @@ def test_group_entry_keys_combined_explicit_and_dynamic() -> None:
 
 
 # ---------------------------------------------------------------------------
-# entry_computed_groups
-# ---------------------------------------------------------------------------
-
-
-def test_entry_computed_groups() -> None:
-    lib = _fresh_lib()
-    add_node(lib, "ML")
-    update_node(
-        lib,
-        "ML",
-        group_type="KeywordGroup",
-        field="keywords",
-        expression="machine learning",
-        separator=";",
-    )
-    lib.entries.add(BibEntry(key="A", type="article", fields={"keywords": "machine learning"}))
-    lib.entries.add(BibEntry(key="B", type="article", fields={"keywords": "deep learning"}))
-    assert entry_computed_groups(lib, "A") == ["ML"]
-    assert entry_computed_groups(lib, "B") == []
-
-
-def test_entry_computed_groups_search() -> None:
-    lib = _fresh_lib()
-    add_node(lib, "Deep Learning")
-    update_node(lib, "Deep Learning", group_type="SearchGroup", expression="deep learning")
-    lib.entries.add(BibEntry(key="A", type="article", fields={"title": "On Deep Learning Methods"}))
-    lib.entries.add(BibEntry(key="B", type="article", fields={"title": "Shallow Networks"}))
-    assert "Deep Learning" in entry_computed_groups(lib, "A")
-    assert entry_computed_groups(lib, "B") == []
-
-
-def test_entry_computed_groups_no_tree() -> None:
-    lib = _fresh_lib()
-    lib.entries.add(BibEntry(key="A", type="article", fields={"keywords": "machine learning"}))
-    assert entry_computed_groups(lib, "A") == []
-
-
-# ---------------------------------------------------------------------------
 # Integration tests — list_entries_in_group_tree with dynamic groups
 # ---------------------------------------------------------------------------
 
@@ -913,25 +845,6 @@ def test_list_entries_in_group_tree_exact_dynamic() -> None:
     lib.entries.add(BibEntry(key="A", type="article", fields={"keywords": "machine learning"}))
     result = list_entries_in_group_tree(lib, "ML", exact=True)
     assert "A" in result
-
-
-# ---------------------------------------------------------------------------
-# Integration tests — resolve_effective_groups with dynamic groups
-# ---------------------------------------------------------------------------
-
-
-def test_resolve_effective_groups_with_dynamic() -> None:
-    lib = _fresh_lib()
-    add_node(lib, "ML")
-    add_node(lib, "Deep Learning", parent="ML")
-    update_node(
-        lib, "Deep Learning", group_type="KeywordGroup", field="title", expression="deep learning"
-    )
-    entry = BibEntry(key="A", type="article", fields={"title": "Deep Learning Advances"})
-    lib.entries.add(entry)
-    effective = resolve_effective_groups(lib, entry)
-    assert "Deep Learning" in effective
-    assert "ML" in effective
 
 
 # ---------------------------------------------------------------------------

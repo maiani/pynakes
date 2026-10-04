@@ -309,7 +309,6 @@ def test_dedupe_merge_moves_pinax_materials_to_surviving_key(tmp_path: Path) -> 
                 "version": 1,
                 "files": {
                     "Duplicate": {
-                        "preprint_canonical": False,
                         "preprint_pdf": {
                             "source": "https://arxiv.org/pdf/2101.00001",
                             "fetched_date": "2026-06-27",

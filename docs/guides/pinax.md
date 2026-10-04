@@ -224,8 +224,8 @@ These extend the core invariants in
    hardlinks or clever sharing), so inputs remain intact and a wrong result is
    undone by deleting the outputs. To reclaim disk after a `corpus split`, delete the
    source pinax — an explicit, reversible step rather than baked-in destruction.
-   Per-entry state (`preprint_canonical`, provenance) is copied alongside, so it
-   survives the move between files without having to live on the entry.
+   Each entry's provenance row is copied alongside, so it survives the move
+   between files without having to live on the entry.
 
 ## No new command namespace
 
@@ -382,23 +382,13 @@ does not collect credentials, import browser cookies, automate SSO, or bypass
 publisher controls. A login page is reported as authentication required rather
 than stored as a PDF. The same access mode can be combined with `--supplement`.
 
-**Two roles come apart, and a boolean picks the canonical.** `<citekey>.published.pdf`
-is the *version of record* (what you cite). The **canonical**
-artifact (what you read and work from) is chosen by a simple per-entry boolean,
-`preprint_canonical` (default `false`):
-
-- `false` → canonical is `<citekey>.published.pdf` (falling back to the
-  preprint if there is no published PDF).
-- `true` → canonical is `<citekey>.preprint.pdf` together with its
-  `<citekey>.source/` archive.
-
-Set `preprint_canonical: true` when the arXiv version is the one to trust — most
-often because the authors revised it *after* publication, and because it carries
-**source** (LaTeX) the published PDF does not. It is a deliberate, explicit flag,
-not an inferred rule: `asset fetch` may initialize it (e.g. when the arXiv `updated`
-date postdates publication), but the stored truth is just the boolean and you can
-flip it. Filenames stay fixed to the version *class* — they never flip — so only
-the `canonical` pointer changes.
+**The version of record is the canonical copy.** `<citekey>.published.pdf` is
+the *version of record* (what you cite), and it is also the **canonical**
+artifact (what you read and work from) whenever it is present. When an entry has
+no published PDF, the canonical artifact is `<citekey>.preprint.pdf` together
+with its `<citekey>.source/` archive. Filenames stay fixed to the version
+*class*, so having both versions on disk never renames anything; the preprint
+and its source remain readable at their own paths.
 
 If a work is split across two *entries* (a separate `@misc` arXiv and an
 `@article` published), that is a duplicate for `dedupe` — and merging it in a
@@ -454,8 +444,8 @@ a preprint exists, backfills the arXiv id.
   entry, which *is* its provenance.
 
 Once `eprint` is present, the existing `fetch-source` machinery downloads the
-`<citekey>.source/` tree unchanged; `preprint_canonical: true` then lets you
-read the arXiv source while still citing the version of record. This is distinct
+`<citekey>.source/` tree unchanged, so you can read the arXiv source at
+`preprint_source` while still citing the version of record. This is distinct
 from [step 9](#implementation-steps) (open-access *published PDF* bytes): this
 step recovers the *identifier linkage*, and is useful to any library, pinax or
 not.
@@ -490,7 +480,6 @@ records **provenance only**:
   "version": 1,
   "files": {
     "alvarez2019": {
-      "preprint_canonical": true,
       "published_pdf":   { "source": "https://doi.org/10.1103/xxxx",         "fetched_date": "2026-06-27", "sha256": "…", "refetchable": true },
       "preprint_pdf":    { "source": "https://arxiv.org/pdf/1903.01234",     "fetched_date": "2026-06-27", "sha256": "…", "refetchable": true },
       "preprint_source": { "source": "https://arxiv.org/e-print/1903.01234", "fetched_date": "2026-06-27", "sha256": "…", "refetchable": true }
@@ -510,14 +499,10 @@ records **provenance only**:
   surfaced by `asset check`, not a second source of truth.
 - `refetchable: false` marks a precious file — the one thing in `.pinax/` worth
   keeping for its own sake.
-- `preprint_canonical` (per entry, default `false`) marks the preprint as the
-  canonical content to read; `canonical_*` resolves from it. `false` → the
-  published `<citekey>.pdf` (or the preprint if there is no published PDF);
-   `true` → the `.preprint` / `.source` artifacts. See [Preprint and published
-  versions](#preprint-and-published-versions).
 - Each artifact records when it was obtained — `fetched_date` (downloaded by
   `asset fetch`) or `added_date` (manually placed) — as provenance. It is not a
-  canonical-selection input; `preprint_canonical` decides that.
+  canonical-selection input: `canonical_*` is derived from which files are
+  present. See [Preprint and published versions](#preprint-and-published-versions).
 
 ## Agent surface
 
@@ -530,16 +515,16 @@ pinax annotates every entry with what is available locally:
   "published_pdf": "refs.files/alvarez2019.published.pdf",
   "preprint_pdf": "refs.files/alvarez2019.preprint.pdf",
   "preprint_source": "refs.files/alvarez2019.source/",
-  "canonical_pdf": "refs.files/alvarez2019.preprint.pdf",
-  "canonical_source": "refs.files/alvarez2019.source/",
+  "canonical_pdf": "refs.files/alvarez2019.published.pdf",
+  "canonical_source": null,
   "refetchable": true
 }
 ```
 
 This is the contract that lets an agent working in the repository **resolve a
 local path and read the paper without re-downloading it** — it reads
-`canonical_pdf` (here the arXiv version, because `preprint_canonical` is set,
-which also brings `canonical_source`) — and knows, for what is missing, whether a
+`canonical_pdf` (here the published version; with no published PDF it would be
+the arXiv version, and `canonical_source` its source tree) — and knows, for what is missing, whether a
 `asset fetch` could retrieve it. It is a derived view over the
 filesystem scan, emitted through the same documented JSON envelope as every other
 command.
@@ -608,10 +593,9 @@ checklist.
    `preprint_pdf` / `preprint_source` / `canonical_pdf`; `asset check` reports
    presence, orphans, and drift, and enforces the unique-key precondition for
    file-addressing operations. *(Implemented.)*
-5. **`preprint_canonical` + provenance manifest (Tier 1).** `.pinax/manifest.json`
-   with `source` / `fetched_date` / `sha256` / `refetchable` per artifact and the
-   per-entry `preprint_canonical` boolean (default `false`); `asset fetch` writes it and
-   may initialize the boolean; `canonical_*` resolves from it. *(Implemented.)*
+5. **Provenance manifest (Tier 1).** `.pinax/manifest.json` with `source` /
+   `fetched_date` / `sha256` / `refetchable` per artifact; `asset fetch` writes
+   it. *(Implemented.)*
 6. **Pinax-aware `corpus combine` / `corpus split`.** Each output is a pinax; an output entry's
    materials and per-entry state are copied into its `pinax-files-dir`. Non-destructive —
    inputs untouched. (Lower-risk than rename: outputs are fresh, so a failure just
@@ -647,12 +631,12 @@ Settled in discussion:
    per-invocation flag.
 - **`add --fetch` is a convenience trigger** — it imports the reference, then
   runs the same metadata-driven fetch policy for the new key.
-- **Canonical is a per-entry `preprint_canonical` boolean**, default `false`.
+- **Canonical is the published PDF**, falling back to the preprint and its source.
 - **PDF-only e-prints** are handled gracefully (the source step is skipped).
 - **Operations preserve the pinax** — `corpus combine` / `corpus split` produce pinakes,
   **plainly copying** materials into the outputs (no hardlinks); both stay
   non-destructive, and you delete the source pinax to reclaim disk after a split.
-  `preprint_canonical` and provenance travel as copied per-entry state.
+  Provenance travels as copied per-entry state.
 - **`pinax-files-dir` is constrained** — relative, never escaping the `.bib`'s directory.
 - **Metadata format stays `pynakes-meta`** for now; a TOML sidecar in the
   `pinax-files-dir` is the planned home for corpus config when it outgrows flat scalars

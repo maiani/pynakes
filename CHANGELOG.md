@@ -24,6 +24,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `pynakes.interchange.FORMATS`, an alias of `IMPORT_FORMATS`.
 - `pynakes.group_tree.add_to_group_tree` and `remove_from_group_tree`,
   identical to `pynakes.groups.add_to_group` and `remove_from_group`.
+- `pynakes.keys.has_duplicate_keys` and `duplicate_key_counts`: call
+  `lib.entries.duplicate_keys()`, which they wrapped.
+- `pynakes.importer.extract_doi_from_journal_url`, a wrapper of
+  `pynakes.providers.url_resolvers.extract_publisher_doi`, and
+  `pynakes.importer.entry_from_bibtex`; a DOI import parses provider BibTeX
+  through `import_reference` or `prepare_imported_entry`.
+- `pynakes.group_tree.resolve_effective_groups` and `entry_computed_groups`,
+  which nothing outside the tests called.
+- **Pinax: the `preprint_canonical` flag.** Nothing could set it except by
+  editing `.pinax/manifest.json` by hand, and `asset fetch` never initialized it
+  as the guide claimed. The canonical copy is now always the published PDF,
+  falling back to the preprint and its source when there is none; `inspect
+  --json` no longer reports `preprint_canonical`, and new manifest rows no
+  longer carry it. A flag left in an existing manifest is ignored.
 
 ### Fixed
 

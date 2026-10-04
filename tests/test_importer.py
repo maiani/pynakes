@@ -16,10 +16,9 @@ from pynakes.importer import (
     UnsupportedIdentifierError,
     arxiv_doi,
     canonical_doi,
-    entry_from_bibtex,
+    entry_from_metadata,
     existing_keys_for_arxiv,
     existing_keys_for_doi,
-    extract_doi_from_journal_url,
     fetch_bibtex_for_doi,
     normalize_arxiv,
     normalize_doi,
@@ -30,6 +29,8 @@ from pynakes.importer import (
 )
 from pynakes.model import BibFile
 from pynakes.providers._http import ProviderFetchError
+from pynakes.providers.metadata.doi import parse_bibtex
+from pynakes.providers.url_resolvers import extract_publisher_doi
 
 ARXIV_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
@@ -80,8 +81,8 @@ def test_normalize_doi_rejects_invalid_values() -> None:
         normalize_doi("not-a-doi")
 
 
-def test_entry_from_bibtex_returns_first_entry() -> None:
-    entry = entry_from_bibtex(PROVIDER_BIBTEX)
+def test_entry_from_metadata_returns_first_entry() -> None:
+    entry = entry_from_metadata(parse_bibtex(PROVIDER_BIBTEX))
     assert entry.type == "article"
     assert entry.fields["title"] == "A Practical Test of DOI Import"
     assert entry.modified is True
@@ -274,11 +275,15 @@ def test_doi_import_asks_crossref_only_when_it_owns_the_fetch_and_lacks_pages(
     assert "pages" not in entry.fields
 
 
-def test_entry_from_bibtex_rejects_empty_and_invalid() -> None:
+def test_doi_import_rejects_empty_and_invalid_provider_bibtex() -> None:
     with pytest.raises(DOIImportError, match="no BibTeX entries"):
-        entry_from_bibtex("% just a comment\n")
+        prepare_imported_entry(parse_bib(""), "10.5555/x", fetcher=lambda doi: "% just a comment\n")
     with pytest.raises(DOIImportError, match="invalid BibTeX"):
-        entry_from_bibtex("@article{broken, title = {unbalanced }\n")
+        prepare_imported_entry(
+            parse_bib(""),
+            "10.5555/x",
+            fetcher=lambda doi: "@article{broken, title = {unbalanced }\n",
+        )
 
 
 def test_existing_keys_for_doi_skips_malformed_existing_doi() -> None:
@@ -291,7 +296,7 @@ def test_canonical_doi_is_lowercased() -> None:
 
 
 def test_render_entry_roundtrips() -> None:
-    entry = entry_from_bibtex(PROVIDER_BIBTEX)
+    entry = entry_from_metadata(parse_bibtex(PROVIDER_BIBTEX))
     rendered = write_bib(BibFile(entries=[entry])).rstrip("\r\n")
     assert rendered.startswith("@article{provider-key")
     assert not rendered.endswith("\n")
@@ -375,8 +380,8 @@ def test_resolve_identifier_rejects_unknown(value: str) -> None:
         ),
     ],
 )
-def test_extract_doi_from_journal_url(url: str, expected_doi: str) -> None:
-    assert extract_doi_from_journal_url(url) == expected_doi
+def test_extract_publisher_doi(url: str, expected_doi: str) -> None:
+    assert extract_publisher_doi(url) == expected_doi
 
 
 @pytest.mark.parametrize(
@@ -388,8 +393,8 @@ def test_extract_doi_from_journal_url(url: str, expected_doi: str) -> None:
         "not a url at all",
     ],
 )
-def test_extract_doi_from_journal_url_returns_none_for_unknown(url: str) -> None:
-    assert extract_doi_from_journal_url(url) is None
+def test_extract_publisher_doi_returns_none_for_unknown(url: str) -> None:
+    assert extract_publisher_doi(url) is None
 
 
 @pytest.mark.parametrize(

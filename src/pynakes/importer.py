@@ -61,7 +61,6 @@ from pynakes.providers.repositories import (
     zenodo,
 )
 from pynakes.providers.url_resolvers import (
-    extract_publisher_doi,
     resolve_reference_url,
     url_resolution_hint,
 )
@@ -172,25 +171,6 @@ def _normalize_rfc_number(value: str) -> str:
 
 
 # --- identifier resolution -------------------------------------------------
-
-
-def extract_doi_from_journal_url(url: str) -> str | None:
-    """Extract a DOI from a recognized journal article URL, or return ``None``.
-
-    Consults the DOI-bearing rules of the declarative publisher URL resolver
-    table. Currently supports:
-
-    * ``nature.com/articles/{slug}`` → DOI ``10.1038/{slug}``
-    * ``journals.aps.org/{journal}/abstract/{doi}`` → DOI embedded in path
-    * ``link.springer.com/{article,chapter,book,…}/{doi}`` → DOI in path
-    * ``onlinelibrary.wiley.com/doi/{doi}`` → DOI in path
-    * ``journals.plos.org/{journal}/article?id={doi}`` → DOI in query
-
-    Publisher URLs addressed by another identifier — such as a ScienceDirect
-    PII — resolve through :func:`resolve_identifier` and their own provider
-    instead, so they are not returned here.
-    """
-    return extract_publisher_doi(url)
 
 
 def resolve_identifier(value: str) -> tuple[str, str]:
@@ -318,15 +298,6 @@ def _with_crossref_locator(metadata: ReferenceMetadata, doi: str) -> ReferenceMe
     if not locator:
         return metadata
     return replace(metadata, fields={**metadata.fields, "pages": locator})
-
-
-def entry_from_bibtex(text: str) -> BibEntry:
-    """Parse provider BibTeX and return the first entry."""
-    try:
-        metadata = doi_provider.parse_bibtex(text)
-    except ProviderFetchError as exc:
-        raise DOIImportError(str(exc)) from exc
-    return entry_from_metadata(metadata)
 
 
 def entry_from_metadata(metadata: ReferenceMetadata) -> BibEntry:

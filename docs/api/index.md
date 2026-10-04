@@ -235,7 +235,6 @@ changed = remove_from_group(lib, "Smith2020", "AI")
 
 ```python
 from pynakes.keys import (
-    duplicate_key_counts,
     generate_key,
     regenerate_keys,
     rename_key,
@@ -245,7 +244,7 @@ from pynakes.usage import rename_citation_key_in_tex
 
 entry = lib.entries["Smith2020"]
 key = generate_key(entry, lib)
-duplicates = duplicate_key_counts(lib)
+duplicates = lib.entries.duplicate_keys()  # {key: count}
 renames = regenerate_keys(lib)
 changed = rename_key(lib, "Smith2020", "Smith2020ML")
 repairs = repair_duplicate_keys(lib)

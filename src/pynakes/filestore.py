@@ -347,18 +347,6 @@ class FileStore:
         text = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
         self._atomic_write(target, text.encode("utf-8"))
 
-    def preprint_canonical(self, key: str) -> bool:
-        """Return whether ``key`` selects preprint material as canonical."""
-        row = _manifest_row(self.read_manifest(), key, create=False)
-        return bool(row.get("preprint_canonical", False)) if row is not None else False
-
-    def set_preprint_canonical(self, key: str, value: bool) -> None:
-        """Set the per-entry canonical preprint flag in the manifest."""
-        manifest = self.read_manifest()
-        row = _manifest_row(manifest, key, create=True)
-        row["preprint_canonical"] = bool(value)
-        self.write_manifest(manifest)
-
     def record_artifact(
         self,
         key: str,
@@ -389,14 +377,12 @@ class FileStore:
             record["access"] = access
         manifest = self.read_manifest()
         row = _manifest_row(manifest, key, create=True)
-        row.setdefault("preprint_canonical", False)
         row[kind] = record
         self.write_manifest(manifest)
 
     def annotation_for(self, key: str, *, refetchable: bool = False) -> dict[str, object]:
         """Return agent-facing material paths and canonical selection for ``key``."""
         presence = self.presence_for(key)
-        preprint_canonical = self.preprint_canonical(key)
 
         published_pdf = presence.paths.published_pdf if presence.published_pdf else None
         preprint_pdf = presence.paths.preprint_pdf if presence.preprint_pdf else None
@@ -404,15 +390,12 @@ class FileStore:
         supplement_pdf = presence.paths.supplement_pdf if presence.supplement_pdf else None
         erratum_pdf = presence.paths.erratum_pdf if presence.erratum_pdf else None
 
-        canonical_pdf: Path | None
-        canonical_source: Path | None = None
-        if preprint_canonical:
-            canonical_pdf = preprint_pdf or published_pdf
-            canonical_source = preprint_source if preprint_pdf is not None else None
-        else:
-            canonical_pdf = published_pdf or preprint_pdf
-            if published_pdf is None and preprint_pdf is not None:
-                canonical_source = preprint_source
+        # The version of record is what to read when there is one; a preprint
+        # stands in for it, bringing its source tree, only when there is not.
+        canonical_pdf = published_pdf or preprint_pdf
+        canonical_source = (
+            preprint_source if published_pdf is None and preprint_pdf is not None else None
+        )
 
         return {
             "published_pdf": _path_or_none(published_pdf),
@@ -422,7 +405,6 @@ class FileStore:
             "erratum_pdf": _path_or_none(erratum_pdf),
             "canonical_pdf": _path_or_none(canonical_pdf),
             "canonical_source": _path_or_none(canonical_source),
-            "preprint_canonical": preprint_canonical,
             "refetchable": bool(refetchable or _manifest_refetchable(self.read_manifest(), key)),
         }
 
@@ -490,7 +472,7 @@ class FileStore:
             )
 
         if self.manifest_path.exists():
-            self._validate_manifest_row_merge(old, new, {item["kind"] for item in planned})
+            self._validate_manifest_row_merge(old, new)
         return planned
 
     def merge_materials(self, old: str, new: str) -> PinaxRenameTransaction:
@@ -551,9 +533,7 @@ class FileStore:
                 if not exists:
                     del row[kind]
                     fixed.append({"key": key, "kind": kind, "action": "removed_missing_file"})
-            if not any(kind in row for kind in ARTIFACT_KINDS) and not row.get(
-                "preprint_canonical", False
-            ):
+            if not _manifest_row_has_state(row):
                 del files[key]
 
         for key in key_list:
@@ -574,11 +554,7 @@ class FileStore:
                         "refetchable": False,
                     }
                     fixed.append({"key": key, "kind": kind, "action": "added_manual_record"})
-            if (
-                not row_existed
-                and not any(kind in row for kind in ARTIFACT_KINDS)
-                and not row.get("preprint_canonical", False)
-            ):
+            if not row_existed and not _manifest_row_has_state(row):
                 del files[key]
 
         self.write_manifest(manifest, backup=backup)
@@ -754,7 +730,7 @@ class FileStore:
         files[new] = files.pop(old)
         self.write_manifest(manifest)
 
-    def _validate_manifest_row_merge(self, old: str, new: str, moved_kinds: set[str]) -> None:
+    def _validate_manifest_row_merge(self, old: str, new: str) -> None:
         manifest = self.read_manifest()
         files = manifest["files"]
         if not isinstance(files, dict):
@@ -770,12 +746,6 @@ class FileStore:
                 raise ValueError(
                     f"Cannot merge Pinax manifest row {old!r}: target key {new!r} "
                     f"already has {kind}"
-                )
-        if moved_kinds and "preprint_canonical" in old_row and "preprint_canonical" in new_row:
-            if bool(old_row["preprint_canonical"]) != bool(new_row["preprint_canonical"]):
-                raise ValueError(
-                    f"Cannot merge Pinax manifest row {old!r}: target key {new!r} "
-                    "has conflicting preprint_canonical state"
                 )
 
     def _merge_manifest_row(self, old: str, new: str, moved_kinds: set[str]) -> None:
@@ -796,8 +766,6 @@ class FileStore:
         for kind in moved_kinds:
             if kind in old_row:
                 new_row[kind] = old_row[kind]
-        if moved_kinds and "preprint_canonical" in old_row:
-            new_row.setdefault("preprint_canonical", bool(old_row["preprint_canonical"]))
         files.pop(old, None)
         if not _manifest_row_has_state(new_row):
             files.pop(new, None)
@@ -879,7 +847,7 @@ def _material_exists(path: Path, kind: str) -> bool:
 
 
 def _manifest_row_has_state(row: dict[str, object]) -> bool:
-    return any(kind in row for kind in ARTIFACT_KINDS) or bool(row.get("preprint_canonical", False))
+    return any(kind in row for kind in ARTIFACT_KINDS)
 
 
 def _copy_manifest_row(source: FileStore, target: FileStore, key: str) -> None:

@@ -99,26 +99,23 @@ class TestStore:
         assert not path.exists()
         assert cache.get("doi", "10.5555/example", "bib") is None
 
-    def test_stats_report_what_is_held(self, tmp_path: Path) -> None:
-        cache = ProviderCache(tmp_path / ".pynakes-cache")
+    def test_records_in_several_namespaces_are_held_apart(self, tmp_path: Path) -> None:
+        path = tmp_path / ".pynakes-cache"
+        cache = ProviderCache(path)
         cache.put("doi", "10.5555/example", "bib", "@article{a}")
         cache.put("arxiv", "1234.5678", "xml", "<feed/>")
 
-        stats = cache.stats()
-        assert stats["records"] == 2
-        assert stats["exists"] is True
-        assert stats["namespaces"] == {"arxiv": 1, "doi": 1}
+        assert path.is_file()
+        reopened = ProviderCache(path)
+        assert reopened.get("doi", "10.5555/example", "bib") == "@article{a}"
+        assert reopened.get("arxiv", "1234.5678", "xml") == "<feed/>"
+        assert reopened.get("doi", "1234.5678", "xml") is None
 
-    def test_stats_on_a_cache_that_was_never_written(self, tmp_path: Path) -> None:
-        stats = ProviderCache(tmp_path / ".pynakes-cache").stats()
+    def test_a_cache_that_was_never_written_creates_no_file(self, tmp_path: Path) -> None:
+        cache = ProviderCache(tmp_path / ".pynakes-cache")
 
-        assert stats == {
-            "path": str(tmp_path / ".pynakes-cache"),
-            "exists": False,
-            "records": 0,
-            "bytes": 0,
-            "namespaces": {},
-        }
+        assert cache.get("doi", "10.5555/example", "bib") is None
+        assert not (tmp_path / ".pynakes-cache").exists()
 
     def test_dropping_the_last_record_removes_the_file(self, tmp_path: Path) -> None:
         path = tmp_path / ".pynakes-cache"
@@ -148,16 +145,6 @@ class TestLocationResolution:
         assert open_cache(None) is cache
         assert list(tmp_path.iterdir()) == []
 
-    def test_the_in_process_memo_reports_itself_as_holding_no_file(self) -> None:
-        cache = open_cache(None)
-        cache.put("doi", "10.5555/example", "bib", "@article{a}")
-
-        stats = cache.stats()
-        assert stats["path"] is None
-        assert stats["exists"] is False
-        assert stats["bytes"] == 0
-        assert stats["records"] == 1
-
     def test_the_in_process_memo_survives_compaction_pressure(self) -> None:
         # Compaction is a file operation; with no file it must be a no-op that
         # still keeps every live record reachable.
@@ -165,8 +152,8 @@ class TestLocationResolution:
         for index in range(60):
             cache.put("doi", f"10.5555/example-{index}", "bib", f"@a{{{index}}}")
 
-        assert cache.get("doi", "10.5555/example-59", "bib") == "@a{59}"
-        assert cache.stats()["records"] == 60
+        for index in range(60):
+            assert cache.get("doi", f"10.5555/example-{index}", "bib") == f"@a{{{index}}}"
 
     def test_one_instance_is_shared_per_path(self, tmp_path: Path) -> None:
         # A single online run reads the cache file once, not once per lookup.

@@ -6,10 +6,8 @@ from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.keys import (
     UnsupportedCitationKeyPatternError,
-    duplicate_key_counts,
     generate_key,
     generate_key_from_pattern,
-    has_duplicate_keys,
     regenerate_key,
     regenerate_keys,
     rename_key,
@@ -324,13 +322,11 @@ class TestGenerateKey:
 class TestDuplicateDetection:
     def test_detects_duplicates(self) -> None:
         lib = parse_bib("@article{A,year={1}}\n@article{A,year={2}}\n@book{B,year={3}}\n")
-        assert has_duplicate_keys(lib) is True
-        assert duplicate_key_counts(lib) == {"A": 2}
+        assert lib.entries.duplicate_keys() == {"A": 2}
 
     def test_no_duplicates(self) -> None:
         lib = parse_bib("@article{A,year={1}}\n@book{B,year={2}}\n")
-        assert has_duplicate_keys(lib) is False
-        assert duplicate_key_counts(lib) == {}
+        assert lib.entries.duplicate_keys() == {}
 
 
 class TestRepair:
@@ -342,14 +338,14 @@ class TestRepair:
         renames = repair_duplicate_keys(lib)
         assert renames == [("A", "A_2"), ("A", "A_3")]
         assert sorted(lib.entries.keys()) == ["A", "A_2", "A_3"]
-        assert not has_duplicate_keys(lib)
+        assert not lib.entries.duplicate_keys()
 
     def test_repair_avoids_existing_keys(self) -> None:
         lib = parse_bib("@article{A,year={1}}\n@article{A,year={2}}\n@article{A_2,year={3}}\n")
         renames = repair_duplicate_keys(lib)
         # A_2 is taken, so the duplicate becomes A_3.
         assert renames == [("A", "A_3")]
-        assert not has_duplicate_keys(lib)
+        assert not lib.entries.duplicate_keys()
 
     def test_repair_round_trips(self) -> None:
         lib = parse_bib(

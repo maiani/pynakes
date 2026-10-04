@@ -133,11 +133,9 @@ def test_manifest_records_canonical_annotation_and_drift(tmp_path: Path) -> None
         fetched_date="2026-06-27",
         refetchable=True,
     )
-    store.set_preprint_canonical("A", True)
 
     annotation = store.annotation_for("A")
     assert annotation["canonical_pdf"] == str(root / "A.preprint.pdf")
-    assert annotation["preprint_canonical"] is True
     assert annotation["refetchable"] is True
 
     (root / "A.preprint.pdf").unlink()
@@ -159,7 +157,6 @@ def test_copy_materials_copies_files_and_manifest_row(tmp_path: Path) -> None:
         fetched_date="2026-06-27",
         refetchable=True,
     )
-    source.set_preprint_canonical("A", True)
     target = FileStore(root=tmp_path / "target.files", bib_path=tmp_path / "target.bib")
 
     copied = target.copy_materials_from(source, "A")
@@ -168,7 +165,25 @@ def test_copy_materials_copies_files_and_manifest_row(tmp_path: Path) -> None:
     assert (tmp_path / "target.files" / "A.preprint.pdf").read_bytes() == b"preprint"
     assert (tmp_path / "target.files" / "A.source" / "paper.tex").read_text() == "\\title{A}\n"
     manifest = json.loads((tmp_path / "target.files" / ".pinax" / "manifest.json").read_text())
-    assert manifest["files"]["A"]["preprint_canonical"] is True
+    assert manifest["files"]["A"]["preprint_pdf"]["refetchable"] is True
+
+
+def test_canonical_is_the_published_pdf_when_there_is_one(tmp_path: Path) -> None:
+    root = tmp_path / "refs.files"
+    root.mkdir()
+    (root / "A.preprint.pdf").write_bytes(b"preprint")
+    (root / "A.source").mkdir()
+    store = FileStore(root=root, bib_path=tmp_path / "refs.bib")
+
+    preprint_only = store.annotation_for("A")
+    assert preprint_only["canonical_pdf"] == str(root / "A.preprint.pdf")
+    assert preprint_only["canonical_source"] == str(root / "A.source")
+
+    (root / "A.published.pdf").write_bytes(b"published")
+    both = store.annotation_for("A")
+    assert both["canonical_pdf"] == str(root / "A.published.pdf")
+    assert both["canonical_source"] is None
+    assert "preprint_canonical" not in both
 
 
 def test_copy_materials_skips_root_creation_when_entry_has_no_files(tmp_path: Path) -> None:

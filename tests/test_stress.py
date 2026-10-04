@@ -48,10 +48,10 @@ def test_repair_keys_on_many_duplicates() -> None:
         f"@article{{Dup{i % 5},\n  title = {{T{i}}},\n  year = {{2020}}\n}}" for i in range(200)
     ]
     lib = parse_bib("\n\n".join(blocks) + "\n")
-    assert keys_ops.has_duplicate_keys(lib)
+    assert lib.entries.duplicate_keys()
 
     renames = keys_ops.repair_duplicate_keys(lib)
     assert renames  # something was renamed
     # After repair, no duplicate keys remain.
-    assert not keys_ops.has_duplicate_keys(lib)
+    assert not lib.entries.duplicate_keys()
     assert len(set(e.key for e in lib.entries.values())) == len(lib.entries)

@@ -124,21 +124,6 @@ class ProviderCache:
 
     # --- maintenance ------------------------------------------------------
 
-    def stats(self) -> dict[str, object]:
-        """Describe what this cache currently holds."""
-        with self._lock:
-            by_namespace: dict[str, int] = {}
-            for namespace, _, _ in self._records:
-                by_namespace[namespace] = by_namespace.get(namespace, 0) + 1
-            on_disk = self.path is not None and self.path.is_file()
-            return {
-                "path": None if self.path is None else str(self.path),
-                "exists": on_disk,
-                "records": len(self._records),
-                "bytes": self.path.stat().st_size if on_disk else 0,
-                "namespaces": dict(sorted(by_namespace.items())),
-            }
-
     def clear(self) -> int:
         """Remove the cache file, returning how many records it held."""
         with self._lock:

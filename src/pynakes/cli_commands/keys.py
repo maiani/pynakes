@@ -40,7 +40,7 @@ from pynakes.usage import (
 
 def _keys_check_one(file: str) -> CheckOutcome:
     coll = Bibliography.open(file)
-    duplicates = keys_ops.duplicate_key_counts(coll.lib)
+    duplicates = coll.lib.entries.duplicate_keys()
     instances = coll.lib.entries.duplicate_key_instances()
     issues = [
         {

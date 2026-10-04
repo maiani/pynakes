@@ -171,7 +171,7 @@ def test_download_arxiv_materials_writes_pdf_and_source(tmp_path: Path) -> None:
     )
     manifest = json.loads((tmp_path / "refs.files" / ".pinax" / "manifest.json").read_text())
     row = manifest["files"]["Noether1918"]
-    assert row["preprint_canonical"] is False
+    assert "preprint_canonical" not in row
     assert row["preprint_pdf"]["source"] == "https://arxiv.org/pdf/2101.00001"
     assert row["preprint_pdf"]["fetched_date"] == "2026-06-27"
     assert row["preprint_pdf"]["refetchable"] is True
@@ -533,7 +533,7 @@ def test_download_published_material_writes_pdf_and_manifest(tmp_path: Path) -> 
 
     manifest = json.loads((tmp_path / "refs.files" / ".pinax" / "manifest.json").read_text())
     row = manifest["files"]["Noether1918"]
-    assert row["preprint_canonical"] is False
+    assert "preprint_canonical" not in row
     assert row["published_pdf"]["source"] == "https://example.com/paper.pdf"
     assert row["published_pdf"]["fetched_date"] == "2026-06-27"
     assert row["published_pdf"]["refetchable"] is True

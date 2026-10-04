@@ -64,16 +64,6 @@ class UnsupportedCitationKeyPatternError(ValueError):
     """Raised when a JabRef citation-key pattern uses unsupported syntax."""
 
 
-def has_duplicate_keys(lib: BibFile) -> bool:
-    """Return ``True`` if any citation key appears more than once."""
-    return bool(lib.entries.duplicate_keys())
-
-
-def duplicate_key_counts(lib: BibFile) -> dict[str, int]:
-    """Return ``{key: count}`` for keys that appear more than once."""
-    return lib.entries.duplicate_keys()
-
-
 def _last_names_for(entry: BibEntry, field: str, fallback: str | None = None) -> list[str]:
     raw = entry.fields.get(field) or (entry.fields.get(fallback, "") if fallback else "") or ""
     return [name for name in (_last_name(p) for p in _split_name_list(raw)) if name]
