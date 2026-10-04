@@ -368,26 +368,6 @@ class BibliographyOperations:
         report = journal_ops.normalize_journals(self.lib, "full", sources)
         return report
 
-    def import_doi(
-        self,
-        doi: str,
-        *,
-        key: str | None = None,
-        key_source: str = "generated",
-        allow_duplicate_doi: bool = False,
-    ) -> BibEntry:
-        """Import one DOI entry into memory."""
-        entry = importer_ops.prepare_imported_entry(
-            self.lib,
-            doi,
-            key=key,
-            key_source=key_source,
-            allow_duplicate_doi=allow_duplicate_doi,
-        )
-        self.lib.entries.add(entry)
-        self._appended_entries.append(entry)
-        return entry
-
     def import_reference(
         self,
         identifier: str,

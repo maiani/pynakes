@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   constants; the constants themselves remain.
 - `pynakes.metadata.library_database_type`, an alias of `library_dialect`.
 - `pynakes.interchange.FORMATS`, an alias of `IMPORT_FORMATS`.
+- `Bibliography.import_doi`: `Bibliography.import_reference` accepts a DOI
+  and does everything it did.
 - `pynakes.group_tree.add_to_group_tree` and `remove_from_group_tree`,
   identical to `pynakes.groups.add_to_group` and `remove_from_group`.
 - `pynakes.keys.has_duplicate_keys` and `duplicate_key_counts`: call

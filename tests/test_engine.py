@@ -354,23 +354,31 @@ def test_volume_journal_operations() -> None:
     assert coll.entries["A"].fields["journal"] == "Phys. Rev. Lett."
 
 
-def test_volume_import_doi_adds_entry_in_memory(monkeypatch) -> None:
-    coll = Bibliography.from_text("")
-    provider_bibtex = """@article{provider,
-  author = {Jane Smith},
-  title = {A DOI Paper},
-  journal = {Journal},
-  year = {2024},
-  doi = {10.5555/example}
-}
-"""
-    monkeypatch.setattr("pynakes.importer.fetch_bibtex_for_doi", lambda doi: provider_bibtex)
+def test_volume_expand_journals_restores_full_titles() -> None:
+    coll = Bibliography.from_text(
+        "@article{A,\n  title = {T},\n  journal = {Phys. Rev. Lett.},\n  year = {2020}\n}\n"
+    )
 
-    entry = coll.import_doi("10.5555/example")
+    report = coll.expand_journals()
 
-    assert entry.key == "Smith2024DOI"
-    assert coll.entries["Smith2024DOI"] is entry
-    assert coll.is_dirty is True
+    assert report.changed == 1
+    assert coll.entries["A"].fields["journal"] == "Physical Review Letters"
+
+
+def test_from_bibfile_wraps_the_library_without_copying_it(tmp_path: Path) -> None:
+    lib = parse_bib("@book{Newton1687,\n  title = {Principia}\n}\n")
+    bib = tmp_path / "refs.bib"
+
+    coll = Bibliography.from_bibfile(lib, bib)
+
+    assert coll.lib is lib
+    assert coll.path == bib
+    assert coll.is_dirty is False
+    assert coll.diff() == ""
+
+    coll.rename_field("title", "maintitle")
+    coll.commit()
+    assert bib.read_text(encoding="utf-8") == "@book{Newton1687,\n  maintitle = {Principia}\n}\n"
 
 
 def test_entry_edits_survives_unsnapshotted_entry_with_raw_content() -> None:

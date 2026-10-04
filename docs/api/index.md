@@ -355,8 +355,7 @@ print(coll.diff())
 
 `import_reference()` auto-detects the identifier type, fetches metadata only (no
 PDFs), and — for arXiv — emits `@online` for BibLaTeX libraries and `@misc` for
-BibTeX ones per `databaseType`. `Bibliography.import_doi()` remains as the
-DOI-specific entry point.
+BibTeX ones per `databaseType`.
 
 For lower-level workflows, `pynakes.importer.prepare_imported_reference`,
 `pynakes.importer.prepare_imported_entry`, and `pynakes.importer.render_entry`
