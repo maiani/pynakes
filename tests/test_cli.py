@@ -638,7 +638,7 @@ class TestInspectAndLint:
         result = runner.invoke(app, ["lint", str(bib), "--json"])
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
-        assert data["errors"] >= 1
+        assert data["summary"]["errors"] >= 1
         assert any(i["type"] == "duplicate_key" for i in data["issues"])
 
     def test_lint_json_reports_undefined_string_references(self, tmp_path: Path) -> None:
@@ -658,7 +658,7 @@ class TestInspectAndLint:
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
-        assert data["errors"] == 1
+        assert data["summary"]["errors"] == 1
         assert data["issues"][-1] == {
             "type": "undefined_string_reference",
             "severity": "error",
@@ -862,15 +862,16 @@ class TestSearchCommand:
             "}\n"
         )
 
-        options = [str(bib), "--field", "title", "--show-abstract", "--json"]
-        reported = runner.invoke(app, ["search", "widgets", *options])
+        options = ["--in-field", "title", "--abstract", "--json"]
+        reported = runner.invoke(app, ["search", str(bib), "widgets", *options])
         # A term that only occurs in the abstract still does not match, so
         # reporting the field has not widened the search.
-        searched = runner.invoke(app, ["search", "restricted", *options])
+        searched = runner.invoke(app, ["search", str(bib), "restricted", *options])
 
         assert reported.exit_code == 0, reported.output
         data = json.loads(reported.output)
-        assert data["show_abstract"] is True
+        assert data["abstract"] is True
+        assert data["in_fields"] == ["title"]
         assert data["matches"][0]["fields"]["abstract"] == "Restricted output still carries this."
         assert data["matches"][0]["matched_fields"] == ["title"]
         assert searched.exit_code == 0, searched.output
@@ -1605,12 +1606,12 @@ class TestImportCommand:
 
         result = runner.invoke(
             app,
-            ["ref", "import", "10.5555/provider", str(bib), "--key-source", "garbage", "--json"],
+            ["ref", "import", str(bib), "10.5555/provider", "--key-source", "garbage", "--json"],
         )
 
         assert result.exit_code == 1, result.output
         data = json.loads(result.output)
-        assert data["error"] == "InvalidKeySource"
+        assert data["error"] == "UsageError"
 
     def test_add_duplicate_doi_conflicts(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
@@ -1728,7 +1729,7 @@ class TestAddCommand:
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
-        assert data["action"] == "add"
+        assert data["action"] == "ref_add"
         assert data["key"] == "Manual2026"
         assert data["entry_type"] == "book"
         assert data["fields"]["year"] == "1843"
@@ -1822,14 +1823,15 @@ class TestAddCommand:
         bib = tmp_path / "refs.bib"
         bib.write_text("")
 
-        result = runner.invoke(app, ["ref", "add", "Stub2026", str(bib), "--json"])
+        result = runner.invoke(app, ["ref", "add", str(bib), "Stub2026", "--json"])
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         assert data["warnings"], "expected a missing-required-field warning"
         warning = data["warnings"][0]
-        assert "Stub2026" in warning
-        assert "author" in warning and "title" in warning
+        assert warning["type"] == "missing_required_fields"
+        assert "Stub2026" in warning["message"]
+        assert "author" in warning["fields"] and "title" in warning["fields"]
         # The entry is still created.
         assert "@article{Stub2026," in bib.read_text()
 
@@ -1842,8 +1844,8 @@ class TestAddCommand:
             [
                 "ref",
                 "add",
-                "Curie1911",
                 str(bib),
+                "Curie1911",
                 "--field",
                 "author=Marie Curie",
                 "--field",
@@ -2170,14 +2172,16 @@ class TestGroupsCommand:
         bib = _copy(tmp_path, "simple.bib")
         original = bib.read_text()
         result = runner.invoke(
-            app, ["groups", "add-entry", str(bib), "Smith2020", "Fav", "--dry-run"]
+            app, ["groups", "add-entry", str(bib), "Smith2020", "Fav", "--create", "--dry-run"]
         )
         assert result.exit_code == 0, result.output
         assert bib.read_text() == original
 
     def test_add_entry_writes(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        result = runner.invoke(app, ["groups", "add-entry", str(bib), "Smith2020", "Fav"])
+        result = runner.invoke(
+            app, ["groups", "add-entry", str(bib), "Smith2020", "Fav", "--create"]
+        )
         assert result.exit_code == 0, result.output
         assert "groups = {Fav}" in bib.read_text()
 
@@ -2591,7 +2595,7 @@ class TestKeysCommand:
         )
 
         assert result.exit_code == 1, result.output
-        assert json.loads(result.output)["error"] == "NoTeXSources"
+        assert json.loads(result.output)["error"] == "NoSources"
 
     def test_repair_warns_about_ambiguous_tex_citations(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -3064,7 +3068,7 @@ class TestNormalizeCommand:
         assert result.exit_code == 0, result.output
         skipped = json.loads(result.output)["operations"]["skipped"]
         assert "--journal-style" in skipped["journals"]
-        assert "--keys" in skipped["keys"]
+        assert "--key-generation" in skipped["keys"]
 
     def test_normalize_rewrites_a_unicode_en_dash_page_range(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -3275,7 +3279,7 @@ class TestNormalizeCommand:
 
         assert result.exit_code == 1, result.output
         data = json.loads(result.output)
-        assert data["error"] == "InvalidNormalizeOption"
+        assert data["error"] == "UsageError"
 
     def test_normalize_uses_journal_table(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -3700,7 +3704,7 @@ class TestConvertCommand:
 
         assert result.exit_code == 1, result.output
         data = json.loads(result.output)
-        assert data["error"] == "UnknownConvertTarget"
+        assert data["error"] == "UsageError"
 
     def test_convert_export_to_csl_json_stdout(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -3808,7 +3812,7 @@ class TestConvertCommand:
         result = runner.invoke(app, ["convert", str(src), "--from", "csv", "--json"])
 
         assert result.exit_code == 1, result.output
-        assert json.loads(result.output)["error"] == "UnknownConvertSource"
+        assert json.loads(result.output)["error"] == "UsageError"
 
     def test_convert_import_foreign_to_foreign_rejected(self, tmp_path: Path) -> None:
         src = tmp_path / "in.ris"
@@ -3899,10 +3903,12 @@ class TestErrorHandling:
         assert data["error"] == "UsageError"
 
     def test_usage_error_human_mode_keeps_click_text(self, tmp_path: Path, monkeypatch) -> None:
-        # Without --json, humans keep Click's usage text and its exit code 2.
+        # Without --json, humans keep Click's usage text, on stderr, with exit
+        # code 1: exit 2 is pynakes's conflict code, never a usage error.
         bib = _copy(tmp_path, "simple.bib")
         result = runner.invoke(app, ["ref", "remove", str(bib)])
-        assert result.exit_code == 2
+        assert result.exit_code == 1
+        assert result.stdout == ""
         assert not result.output.strip().startswith("{")
         assert "Usage:" in result.output
 
@@ -3970,7 +3976,8 @@ class TestEnvelopeConsistency:
     def test_groups_add_entry_envelope(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
         r = runner.invoke(
-            app, ["groups", "add-entry", str(bib), "Smith2020", "X", "--dry-run", "--json"]
+            app,
+            ["groups", "add-entry", str(bib), "Smith2020", "X", "--create", "--dry-run", "--json"],
         )
         assert self.ENVELOPE <= set(json.loads(r.output))
 
@@ -4241,7 +4248,7 @@ class TestSourcesCommand:
 
 
 _MODIFYING_CASES = [
-    (["groups", "add-entry"], ["Smith2020", "Fav"], "simple.bib"),
+    (["groups", "add-entry"], ["Smith2020", "Fav", "--create"], "simple.bib"),
     (["keys", "repair"], [], "duplicate_entries.bib"),
     (["keys", "generate"], ["--all"], "simple.bib"),
     (["fields", "rename"], ["journal", "journaltitle"], "simple.bib"),
@@ -4485,8 +4492,7 @@ class TestAssetFetchLibraryTargeting:
     def test_file_option_targets_a_library_among_siblings(
         self, tmp_path: Path, monkeypatch
     ) -> None:
-        # The citation key comes first positionally, so the whole-library form
-        # needs --file; with siblings present, auto-detection cannot decide.
+        # With siblings present, auto-detection cannot decide; --file names one.
         self._library_pair(tmp_path, monkeypatch)
 
         result = runner.invoke(app, ["asset", "fetch", "--file", "main.bib", "--dry-run", "--json"])
@@ -4496,28 +4502,29 @@ class TestAssetFetchLibraryTargeting:
         assert data["file"] == "main.bib"
         assert data["dry_run"] is True
 
-    def test_library_path_as_the_key_argument_is_a_pointed_error(
+    def test_a_lone_library_argument_fetches_the_whole_library(
         self, tmp_path: Path, monkeypatch
     ) -> None:
+        # The library comes first, so naming only it is the whole-library form.
         self._library_pair(tmp_path, monkeypatch)
 
         result = runner.invoke(app, ["asset", "fetch", "main.bib", "--dry-run", "--json"])
 
-        assert result.exit_code == 1
-        message = json.loads(result.output)["message"]
-        assert "citation key, not a library path" in message
-        assert "--file main.bib" in message
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["file"] == "main.bib"
 
     def test_library_given_twice_is_refused(self, tmp_path: Path, monkeypatch) -> None:
         self._library_pair(tmp_path, monkeypatch)
 
         result = runner.invoke(
             app,
-            ["asset", "fetch", "Newton1687", "main.bib", "--file", "other.bib", "--json"],
+            ["asset", "fetch", "main.bib", "Newton1687", "--file", "other.bib", "--json"],
         )
 
         assert result.exit_code == 1
-        assert "not both positionally and with --file" in json.loads(result.output)["message"]
+        payload = json.loads(result.output)
+        assert payload["error"] == "UsageError"
+        assert "main.bib looks like a library" in payload["message"]
 
     def test_blank_key_means_every_entry(self, tmp_path: Path, monkeypatch) -> None:
         # An unset variable in a script ("$KEY") must not become a lookup for
@@ -4571,9 +4578,9 @@ class TestLintCategories:
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
-        assert data["info"] > 0
-        assert data["by_category"]["layout"] == 3
-        assert set(data["by_category"]) >= {"consistency", "layout"}
+        assert data["summary"]["info"] > 0
+        assert data["summary"]["by_category"]["layout"] == 3
+        assert set(data["summary"]["by_category"]) >= {"consistency", "layout"}
         layout = [i for i in data["issues"] if i["category"] == "layout"]
         assert all(i["severity"] == "info" and i["fixer"] == "format" for i in layout)
 
@@ -4594,7 +4601,7 @@ class TestLintCategories:
 
         result = runner.invoke(app, ["lint", str(bib)])
 
-        assert "Run `pynakes normalize --keys on` to resolve 1 of them." in result.output
+        assert "Run `pynakes normalize --key-generation on` to resolve 1 of them." in result.output
 
     def test_key_normalization_stops_with_actionable_error(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -4607,13 +4614,13 @@ class TestLintCategories:
         )
         bib.write_text(original)
 
-        result = runner.invoke(app, ["normalize", str(bib), "--keys", "on", "--json"])
+        result = runner.invoke(app, ["normalize", str(bib), "--key-generation", "on", "--json"])
 
         assert result.exit_code == 1, result.output
         data = json.loads(result.output)
         assert data["error"] == "MissingTexSource"
         assert data["sources"] == [str(tmp_path / "missing.tex")]
-        assert "--force" in data["message"]
+        assert "--ignore-missing-tex" in data["message"] + data["hint"]
         assert bib.read_text() == original
 
     def test_force_key_normalization_skips_missing_tex_sources(self, tmp_path: Path) -> None:
@@ -4626,7 +4633,10 @@ class TestLintCategories:
             "@article{Old, author = {Jane Doe}, year = {2024}, title = {Study}}\n"
         )
 
-        result = runner.invoke(app, ["normalize", str(bib), "--keys", "on", "--force", "--json"])
+        result = runner.invoke(
+            app,
+            ["normalize", str(bib), "--key-generation", "on", "--ignore-missing-tex", "--json"],
+        )
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -4646,8 +4656,8 @@ class TestLintCategories:
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
-        assert set(data["by_category"]) == {"layout"}
-        assert data["issue_count"] == 3
+        assert set(data["summary"]["by_category"]) == {"layout"}
+        assert data["summary"]["issues"] == 3
 
     def test_category_filter_accepts_several_categories(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -4659,7 +4669,7 @@ class TestLintCategories:
         )
 
         data = json.loads(result.output)
-        assert set(data["by_category"]) == {"layout", "consistency"}
+        assert set(data["summary"]["by_category"]) == {"layout", "consistency"}
 
     def test_unknown_category_is_an_error(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -4670,7 +4680,7 @@ class TestLintCategories:
         assert result.exit_code == 1
         data = json.loads(result.output)
         assert data["status"] == "error"
-        assert data["error"] == "InvalidCategory"
+        assert data["error"] == "UsageError"
 
     def test_format_clears_every_layout_finding(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -4680,7 +4690,7 @@ class TestLintCategories:
         result = runner.invoke(app, ["lint", str(bib), "--category", "layout", "--json"])
 
         data = json.loads(result.output)
-        assert data["issue_count"] == 0
+        assert data["summary"]["issues"] == 0
 
     def test_advisory_findings_alone_do_not_fail_strict(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -4688,6 +4698,6 @@ class TestLintCategories:
 
         result = runner.invoke(app, ["lint", str(bib), "--strict", "--json"])
 
-        # Only errors and profile deviations gate a strict run.
+        # Only errors and profile deviations fail --strict.
         assert result.exit_code == 0, result.output
-        assert json.loads(result.output)["errors"] == 0
+        assert json.loads(result.output)["summary"]["errors"] == 0

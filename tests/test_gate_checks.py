@@ -49,22 +49,23 @@ class TestLintStrict:
         result = runner.invoke(app, ["lint", str(bib)])
         assert result.exit_code == 0, result.output
 
-    def test_single_file_envelope_unchanged_by_strict(self, tmp_path: Path) -> None:
-        # --strict must not alter the documented per-file envelope keys.
+    def test_single_file_envelope_is_the_per_file_shape(self, tmp_path: Path) -> None:
+        # --strict records itself but does not alter the per-file envelope keys.
         bib = _bib(tmp_path, "a.bib", CLEAN)
         result = runner.invoke(app, ["lint", str(bib), "--strict", "--json"])
         data = json.loads(result.output)
         assert set(data) == {
             "status",
             "action",
+            "strict",
             "file",
-            "issue_count",
-            "errors",
+            "source_sha256",
             "warnings",
-            "info",
-            "by_category",
+            "summary",
             "issues",
         }
+        assert data["strict"] is True
+        assert set(data["summary"]) == {"issues", "errors", "warnings", "info", "by_category"}
         assert "files" not in data  # not the aggregate shape
 
 
@@ -107,7 +108,7 @@ class TestLintMultiFile:
         assert data["status"] == "error"
         err = next(f for f in data["files"] if f["file"] == str(missing))
         assert err["status"] == "error"
-        assert err["error"] == "FileNotFoundError"
+        assert err["error"] == "FileNotFound"
         assert data["summary"]["failed_files"] == 1
 
     def test_human_output_labels_each_file(self, tmp_path: Path) -> None:

@@ -12,6 +12,7 @@ from pynakes.cli_common import (
     _entries,
     _resolve_input_bib,
     _safe,
+    _source_sha256,
     bib_file_argument,
 )
 from pynakes.engine import Bibliography
@@ -72,7 +73,8 @@ def inspect(
     entry's own fields.
     """
     file = _resolve_input_bib(file, json_output)
-    lib = Bibliography.open(file).lib
+    coll = Bibliography.open(file)
+    lib = coll.lib
     duplicates = lib.entries.duplicate_keys()
     store = FileStore.from_metadata(lib, file)
 
@@ -96,6 +98,8 @@ def inspect(
             "status": "success",
             "action": "inspect",
             "file": file,
+            "source_sha256": _source_sha256(coll),
+            "warnings": [],
             "encoding": lib.encoding,
             "line_ending": "crlf" if lib.line_ending == "\r\n" else "lf",
             "entry_count": len(lib.entries),

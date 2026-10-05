@@ -50,6 +50,9 @@ src/pynakes/
   scrub.py            private-content removal for a public release copy
   capabilities.py     machine-readable capability description
   batch.py setops.py diff.py cli.py cli_common.py cli_discovery.py
+  cli_surface.py      library-first positionals, --file, and every deprecated form
+  cli_errors.py       the error-code catalogue (status + exit code per code)
+  cli_choices.py cli_checks.py cli_completion.py   option choices, gates, completion
 tests/                pytest suite, conformance fixtures, and opt-in agent eval
 editor/               VS Code extension companion (TypeScript, own toolchain)
 ```

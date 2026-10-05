@@ -7,8 +7,10 @@ retaining the stable CLI contract.
 import typer
 
 from pynakes import normalize as normalize_ops
+from pynakes.cli_choices import AuthorStyle, JournalSource, JournalStyle, Switch
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    _EXPECT_SHA256_OPTION,
     RunParams,
     _emit_error,
     _finish_mod,
@@ -25,22 +27,20 @@ from pynakes.usage import MissingTexSourcesError
 
 
 def _optional_bool(value: str) -> bool | None:
+    """Map a ``metadata``/``on``/``off`` switch to defer, true, or false."""
     normalized = value.lower()
     if normalized == "metadata":
         return None
-    if normalized in {"on", "true", "yes", "1"}:
-        return True
-    if normalized in {"off", "false", "no", "0"}:
-        return False
-    raise ValueError("expected metadata, on, or off")
+    return normalized == "on"
 
 
 def normalize(
     file: str | None = bib_file_argument(),
-    title_protection: str = typer.Option(
-        "metadata",
+    title_protection: Switch = typer.Option(
+        Switch.METADATA,
         "--title-protection",
-        help="metadata, on, or off",
+        case_sensitive=False,
+        help="Brace-protect capitalization-sensitive title words",
     ),
     title_field: list[str] | None = typer.Option(
         None,
@@ -58,21 +58,23 @@ def normalize(
         help="Field to remove from every entry (e.g. abstract); can be repeated. "
         "Off by default; combines with any normalize-drop-fields metadata key",
     ),
-    author_style: str = typer.Option(
-        "metadata",
+    author_style: AuthorStyle = typer.Option(
+        AuthorStyle.METADATA,
         "--author-style",
-        help="metadata, jabref, conservative, bibtex, biblatex, or none",
+        case_sensitive=False,
+        help="Author-list style",
     ),
-    journal_style: str = typer.Option(
-        "metadata",
+    journal_style: JournalStyle = typer.Option(
+        JournalStyle.METADATA,
         "--journal-style",
-        help="metadata, abbreviated, full, or none (default: no change unless metadata sets it)",
+        case_sensitive=False,
+        help="Journal-name style (default: no change unless metadata sets it)",
     ),
-    journal_source: str = typer.Option(
-        "metadata",
+    journal_source: JournalSource = typer.Option(
+        JournalSource.METADATA,
         "--journal-source",
-        help="metadata, jabref, or none (base exact-mapping table before "
-        "--journal-table; default: jabref)",
+        case_sensitive=False,
+        help="Base exact-mapping journal table, applied before --journal-table (default: jabref)",
     ),
     journal_table: str | None = typer.Option(
         None,
@@ -84,30 +86,35 @@ def normalize(
         "--ltwa-table",
         help="CSV/TSV LTWA word abbreviation table",
     ),
-    doi_normalization: str = typer.Option(
-        "metadata",
+    doi_normalization: Switch = typer.Option(
+        Switch.METADATA,
         "--doi-normalization",
-        help="metadata, on, or off",
+        case_sensitive=False,
+        help="Strip DOI URL prefixes and labels down to the bare DOI",
     ),
-    page_normalization: str = typer.Option(
-        "metadata",
+    page_normalization: Switch = typer.Option(
+        Switch.METADATA,
         "--pages",
-        help="Rewrite page ranges to start--end (metadata, on, or off)",
+        case_sensitive=False,
+        help="Rewrite page ranges to start--end",
     ),
-    key_normalization: str = typer.Option(
-        "metadata",
-        "--keys",
-        help="Regenerate citation keys from pattern (metadata, on, or off)",
+    key_normalization: Switch = typer.Option(
+        Switch.METADATA,
+        "--key-generation",
+        case_sensitive=False,
+        help="Regenerate citation keys from the library's key pattern",
     ),
-    identifier_case: str = typer.Option(
-        "metadata",
+    identifier_case: Switch = typer.Option(
+        Switch.METADATA,
         "--identifier-case",
-        help="Lowercase entry types and field names (metadata, on, or off)",
+        case_sensitive=False,
+        help="Lowercase entry types and field names",
     ),
-    metadata_formatting: str = typer.Option(
-        "metadata",
+    metadata_formatting: Switch = typer.Option(
+        Switch.METADATA,
         "--metadata-formatting",
-        help="Consolidate metadata layout: pynakes-meta top, jabref-meta bottom (metadata, on, or off)",
+        case_sensitive=False,
+        help="Consolidate metadata layout: pynakes-meta top, jabref-meta bottom",
     ),
     sort_by: list[str] | None = typer.Option(
         None,
@@ -121,9 +128,10 @@ def normalize(
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
     backup: bool = _BACKUP_OPTION,
-    force: bool = typer.Option(
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
+    ignore_missing_tex: bool = typer.Option(
         False,
-        "--force",
+        "--ignore-missing-tex",
         help="Regenerate keys despite missing linked TeX sources; those sources are not rewritten",
     ),
 ) -> None:
@@ -132,13 +140,19 @@ def normalize(
     Each step follows the library's configured settings (its normalization
     metadata) unless overridden by a flag.
     """
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
 
     if file == "-":
         _emit_error(
             json_output,
             "InvalidInput",
-            "normalize requires a file; stdin is supported by format --stdout",
+            "normalize requires a file; stdin is supported by format - --out -",
         )
 
     file = _resolve_input_bib(file, json_output)
@@ -162,14 +176,14 @@ def normalize(
             sort_by,
         )
         coll = Bibliography.open(file)
-        report = coll.normalize(options, force_key_renames=force)
+        report = coll.normalize(options, force_key_renames=ignore_missing_tex)
     except MissingTexSourcesError as exc:
         _emit_error(
             json_output,
             "MissingTexSource",
             str(exc),
             sources=exc.sources,
-            hint="Restore/remove the declared sources, or rerun with --force.",
+            hint="Restore/remove the declared sources, or rerun with --ignore-missing-tex.",
         )
     except ValueError as exc:
         _emit_error(json_output, "InvalidNormalizeOption", str(exc))

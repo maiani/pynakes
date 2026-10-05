@@ -7,7 +7,7 @@ the native ``dialect`` and ``key-pattern`` keys in ``pynakes-meta`` and no
 top). This module renders that seed file in the canonical layout (any
 one consolidated ``pynakes-meta`` block first, then sorted ``jabref-meta``
 comments) and extracts the copyable profile from an existing
-library for ``init --from``.  The native ``group-tree`` metadata key is
+library for ``init --profile-from``.  The native ``group-tree`` metadata key is
 copied as a reusable convention (unlike the legacy JabRef group metadata
 keys, which are library-specific content).
 
@@ -29,7 +29,7 @@ from pynakes.metadata import (
 from pynakes.model import BibFile
 
 # Metadata that is library-specific *content*, not a reusable maintenance
-# convention, so ``--from`` never copies it: the source library's own linked
+# convention, so ``--profile-from`` never copies it: the source library's own linked
 # TeX sources, per-file management bookkeeping, and legacy JabRef group
 # metadata.  The native ``group-tree`` key *is* copied (it represents a
 # convention, not content), so a new library inherits the template's group
@@ -51,8 +51,8 @@ _PROFILE_SKIP_CATEGORIES = {"selectors"}
 # working library rather than an empty file: the modern BibLaTeX dialect and a
 # citation-key pattern equivalent to pynakes' own ``AuthorYearTitle`` fallback,
 # so `keys generate` behaves consistently and the convention is visible in the
-# file. Both are overridable via `--type` / `--key-pattern`, or replaced wholesale
-# by `--from`.
+# file. Both are overridable via `--dialect` / `--key-pattern`, or replaced wholesale
+# by `--profile-from`.
 DEFAULT_TYPE = "biblatex"
 DEFAULT_KEY_PATTERN = "[auth][year][veryshorttitle]"
 
@@ -116,7 +116,7 @@ def _native_key_form(key: str) -> str:
 def missing_profile_entries(lib: BibFile, entries: list[ProfileEntry]) -> list[ProfileEntry]:
     """Return the subset of ``entries`` whose concept ``lib`` doesn't already set.
 
-    Used by ``init --from`` on an already-initialized library (``--pinax`` onto
+    Used by ``init --profile-from`` on an already-initialized library (``--pinax`` onto
     an existing file) to merge in only the maintenance-profile settings the
     library is missing, rather than clobbering its existing conventions.
     Aliasing-aware: a native ``dialect`` key counts as already set even when
@@ -200,8 +200,8 @@ file (key: `pinax-files-dir`). Fetch behaviour is configured by:
    and `pynakes asset check {bibname}.bib --root .` before and after changes.
 
 4. **Add new references through pynakes** — use
-   `pynakes ref import <identifier> {bibname}.bib` for DOI/repository metadata lookup,
-   or `pynakes ref add <key> {bibname}.bib --field name=value` for a manual entry,
+   `pynakes ref import {bibname}.bib <identifier>` for DOI/repository metadata lookup,
+   or `pynakes ref add {bibname}.bib <key> --field name=value` for a manual entry,
    rather than writing entries by hand. `ref import` auto-detects DOI
    (`10.1103/PhysRevLett.116.061102`), arXiv ID (`2301.00001`),
    provider-prefixed identifiers (`PMID:12345678`), and supported reference

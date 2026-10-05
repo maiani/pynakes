@@ -95,7 +95,7 @@ def test_normalize_library_runs_standard_pass() -> None:
         },
     }
     assert "--journal-style" in report.skipped["journals"]
-    assert "--keys" in report.skipped["keys"]
+    assert "--key-generation" in report.skipped["keys"]
 
 
 def test_every_skippable_step_can_be_named_and_turned_back_on() -> None:

@@ -11,14 +11,16 @@ from pathlib import Path
 import typer
 
 from pynakes.cli_common import (
+    _BACKUP_OPTION,
+    _EXPECT_SHA256_OPTION,
     RunParams,
-    _emit,
-    _emit_error,
+    _emit_json,
     _finish_mod,
     _resolve_input_bib,
     _safe,
+    _source_sha256,
     _verb,
-    bib_file_option,
+    bib_file_argument,
 )
 from pynakes.engine import Bibliography
 from pynakes.metadata import format_metadata_list, metadata_list_values
@@ -42,66 +44,25 @@ def _clear_stored_sources(coll: Bibliography) -> None:
     coll.remove_metadata(TEX_SOURCES_KEY, namespace="jabref")
 
 
-_FILE_OPTION = bib_file_option()
-
-
-def _is_bib_path_arg(value: str) -> bool:
-    """Return whether a variadic tex argument explicitly names a bibliography."""
-    return Path(value).suffix.lower() == ".bib"
-
-
-def _resolve_tex_args(
-    paths: list[str],
-    file: str | None,
-    json_output: bool,
-) -> tuple[str, list[str]]:
-    """Resolve a bibliography supplied via ``--file`` or one positional ``.bib``."""
-    positional_bibs = [path for path in paths if _is_bib_path_arg(path)]
-
-    if file is not None:
-        if positional_bibs:
-            _emit_error(
-                json_output,
-                "InvalidInput",
-                "Pass the .bib file either with --file or as one positional argument, not both",
-            )
-        return _resolve_input_bib(file, json_output), paths
-
-    if len(positional_bibs) > 1:
-        _emit_error(
-            json_output,
-            "InvalidInput",
-            "Pass exactly one positional .bib file to select the library",
-        )
-
-    if positional_bibs:
-        source_paths = [path for path in paths if not _is_bib_path_arg(path)]
-        if not source_paths:
-            _emit_error(json_output, "InvalidInput", "Provide at least one TeX source path")
-        return _resolve_input_bib(positional_bibs[0], json_output), source_paths
-
-    return _resolve_input_bib(None, json_output), paths
-
-
 def tex_list(
-    file: str | None = _FILE_OPTION,
+    file: str | None = bib_file_argument(),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """List the TeX source files linked to this library."""
     file = _resolve_input_bib(file, json_output)
-    lib = Bibliography.open(file).lib
-    sources = tex_sources_from_metadata(lib, Path(file).parent)
+    coll = Bibliography.open(file)
+    sources = tex_sources_from_metadata(coll.lib, Path(file).parent)
 
     if json_output:
-        _emit(
-            json_output,
+        _emit_json(
             {
                 "status": "success",
                 "action": "tex_list",
                 "file": file,
+                "source_sha256": _source_sha256(coll),
+                "warnings": [],
                 "sources": sources,
-            },
-            [],
+            }
         )
         return
 
@@ -114,18 +75,23 @@ def tex_list(
 
 
 def tex_add(
+    file: str | None = bib_file_argument(),
     paths: list[str] = typer.Argument(..., help="One or more .tex files or directories to link"),
-    file: str | None = _FILE_OPTION,
-    backup: bool = typer.Option(
-        False, "--backup", help="Also write a <file>.bak copy before overwriting"
-    ),
+    backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Link one or more TeX source files or directories to this library."""
-    file, paths = _resolve_tex_args(paths, file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    file = _resolve_input_bib(file, json_output)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     coll = Bibliography.open(file)
     current = _parse_stored_sources(coll.lib)
 
@@ -136,19 +102,8 @@ def tex_add(
             added.append(p)
 
     if not added:
-        _emit(
-            params.json_output,
-            {
-                "status": "success",
-                "action": "tex_add",
-                "file": file,
-                "dry_run": params.dry_run,
-                "modified": False,
-                "modified_entries": 0,
-                "warnings": [],
-                "added": [],
-            },
-            ["No new sources to add."],
+        _finish_mod(
+            file, "tex_add", coll, params, ["No new sources to add."], modified_entries=0, added=[]
         )
         return
 
@@ -168,20 +123,25 @@ def tex_add(
 
 
 def tex_remove(
+    file: str | None = bib_file_argument(),
     paths: list[str] = typer.Argument(
         ..., help="One or more TeX source files or directories to unlink"
     ),
-    file: str | None = _FILE_OPTION,
-    backup: bool = typer.Option(
-        False, "--backup", help="Also write a <file>.bak copy before overwriting"
-    ),
+    backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Unlink one or more TeX source files or directories from this library."""
-    file, paths = _resolve_tex_args(paths, file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    file = _resolve_input_bib(file, json_output)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     coll = Bibliography.open(file)
     current = _parse_stored_sources(coll.lib)
 
@@ -190,19 +150,14 @@ def tex_remove(
 
     removed = [s for s in current if s in remove_set]
     if not removed:
-        _emit(
-            params.json_output,
-            {
-                "status": "success",
-                "action": "tex_remove",
-                "file": file,
-                "dry_run": params.dry_run,
-                "modified": False,
-                "modified_entries": 0,
-                "warnings": [],
-                "removed": [],
-            },
+        _finish_mod(
+            file,
+            "tex_remove",
+            coll,
+            params,
             ["No matching sources to remove."],
+            modified_entries=0,
+            removed=[],
         )
         return
 
@@ -225,34 +180,34 @@ def tex_remove(
 
 
 def tex_clear(
-    file: str | None = _FILE_OPTION,
-    backup: bool = typer.Option(
-        False, "--backup", help="Also write a <file>.bak copy before overwriting"
-    ),
+    file: str | None = bib_file_argument(),
+    backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Unlink all TeX source files from this library."""
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     coll = Bibliography.open(file)
     current = tex_sources_from_metadata(coll.lib, Path(file).parent)
 
     if not current:
-        _emit(
-            params.json_output,
-            {
-                "status": "success",
-                "action": "tex_clear",
-                "file": file,
-                "dry_run": params.dry_run,
-                "modified": False,
-                "modified_entries": 0,
-                "warnings": [],
-                "cleared": False,
-            },
+        _finish_mod(
+            file,
+            "tex_clear",
+            coll,
+            params,
             ["No sources to clear."],
+            modified_entries=0,
+            cleared=False,
         )
         return
 

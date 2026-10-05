@@ -3,7 +3,8 @@
 import typer
 
 from pynakes import files as files_ops
-from pynakes.cli_common import CheckOutcome, _run_checks, _safe
+from pynakes.cli_checks import CheckOutcome, _run_checks, strict_option
+from pynakes.cli_common import _safe, _source_sha256
 from pynakes.engine import Bibliography
 from pynakes.filestore import FileStore
 
@@ -13,7 +14,8 @@ from pynakes.filestore import FileStore
 def _files_check_one(
     file: str, root: list[str] | None, fix: bool = False, backup: bool = False
 ) -> CheckOutcome:
-    lib = Bibliography.open(file).lib
+    coll = Bibliography.open(file)
+    lib = coll.lib
     report = files_ops.check_linked_files(lib, file, root)
     store = FileStore.from_metadata(lib, file)
     fixed: list[dict[str, str]] = []
@@ -25,8 +27,10 @@ def _files_check_one(
     pinax = store.scan_entries(lib.entries.values()) if store is not None else None
     result = {
         "status": "success",
-        "action": "files_check",
+        "action": "asset_check",
         "file": file,
+        "source_sha256": _source_sha256(coll),
+        "warnings": [],
         **report.to_dict(),
     }
     if pinax is not None:
@@ -80,9 +84,7 @@ def files_check(
         "--root",
         help="Additional directory to resolve relative linked-file paths; can be repeated",
     ),
-    strict: bool = typer.Option(
-        False, "--strict", help="Exit 1 if any linked file is missing or wrong-type"
-    ),
+    strict: bool = strict_option("a linked file is missing, unresolved, or the wrong type"),
     fix: bool = typer.Option(False, "--fix", help="Reconcile Pinax manifest drift"),
     backup: bool = typer.Option(
         False,
@@ -94,7 +96,7 @@ def files_check(
     """Validate linked-file references (accepts multiple files for CI gating)."""
     _run_checks(
         files,
-        "files_check",
+        "asset_check",
         lambda f: _files_check_one(f, root, fix, backup),
         json_output,
         strict,

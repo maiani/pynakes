@@ -17,14 +17,17 @@ from pynakes._text_utils import strip_meta_terminator
 from pynakes.bibtex_writer import write_bib
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    _FORCE_OPTION,
     RunParams,
     _emit,
     _emit_conflict,
     _entries,
     _finish_create,
+    _refuse_existing_output,
     _refuse_input_as_output,
     _require_written,
     _safe,
+    _source_sha256,
     _verb,
     build_where_filter,
     key_option,
@@ -32,16 +35,24 @@ from pynakes.cli_common import (
     where_option,
 )
 from pynakes.diff import generate_diff
+from pynakes.engine import Bibliography
 from pynakes.filestore import FILES_DIR_KEY, FileStore
-from pynakes.io import load_bib, save_text
+from pynakes.io import save_text
 from pynakes.metadata import metadata_value, set_metadata
 from pynakes.model import BibFile
 from pynakes.setops import PartitionRule, merge_libraries, partition_library, strip_metadata_blocks
 from pynakes.usage import collect_cited_keys
 
 
-def _load_inputs(paths: list[str]) -> list[tuple[str, BibFile]]:
-    return [(path, load_bib(path)) for path in paths]
+def _load_inputs(paths: list[str]) -> tuple[list[tuple[str, BibFile]], dict[str, str | None]]:
+    """Parse every input, returning the libraries and each input's sha256."""
+    named: list[tuple[str, BibFile]] = []
+    digests: dict[str, str | None] = {}
+    for path in paths:
+        coll = Bibliography.open(path)
+        named.append((path, coll.lib))
+        digests[path] = _source_sha256(coll)
+    return named, digests
 
 
 def _entry_sources(named_libs: list[tuple[str, BibFile]]) -> dict[int, FileStore]:
@@ -98,6 +109,7 @@ def _copy_pinax_materials(
 def combine(
     inputs: list[str] = typer.Argument(..., help="Two or more .bib files to combine"),
     out: str = typer.Option(..., "--out", help="Path to write the combined .bib"),
+    force: bool = _FORCE_OPTION,
     dedupe: bool = typer.Option(
         False,
         "--dedupe",
@@ -124,7 +136,8 @@ def combine(
     """
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
     selector = build_where_filter(where, keys=key)
-    named_inputs = _load_inputs(inputs)
+    _refuse_existing_output(json_output, out, force)
+    named_inputs, digests = _load_inputs(inputs)
     pinax_sources = _entry_sources(named_inputs)
     merged = merge_libraries(named_inputs, dedupe=dedupe)
     if merged.conflicts:
@@ -168,7 +181,7 @@ def combine(
 
     warnings: list[dict[str, object]] = []
     if merged.duplicate_keys:
-        warnings.append({"type": "duplicate_keys", "keys": merged.duplicate_keys})
+        warnings.append(_duplicate_keys_warning(merged.duplicate_keys))
     output_files_dir = metadata_value(merged.lib, FILES_DIR_KEY)
     if (
         pinax_sources
@@ -198,21 +211,30 @@ def combine(
     human.append(f"{_verb('write', params, 'Wrote')} {out}.")
 
     _finish_create(
-        params=params,
-        path=out,
-        action="combine",
-        content=content,
-        human=human,
+        params,
+        out,
+        "corpus_combine",
+        content,
+        human,
         previous_content=previous_content,
         backup=backup,
         warnings=warnings,
         inputs=merged.inputs,
+        sources_sha256=digests,
         dedupe=dedupe,
         where=where,
         keys=parse_key_selector(key),
         entries=entries,
         pinax_materials=pinax_materials,
     )
+
+
+def _duplicate_keys_warning(keys: list[str]) -> dict[str, object]:
+    return {
+        "type": "duplicate_keys",
+        "message": f"The output holds duplicate citation keys: {', '.join(keys)}",
+        "keys": keys,
+    }
 
 
 # --- split -----------------------------------------------------------------
@@ -226,9 +248,9 @@ def _parse_rules(specs: list[str]) -> list[PartitionRule]:
         label = label.strip()
         predicate = predicate.strip()
         if not sep or not label or not predicate:
-            raise ValueError(f"Invalid --to {spec!r}; expected FILE='predicate'")
+            raise ValueError(f"Invalid --route {spec!r}; expected FILE='predicate'")
         if label in seen:
-            raise ValueError(f"Duplicate output file in --to: {label!r}")
+            raise ValueError(f"Duplicate output file in --route: {label!r}")
         seen.add(label)
         rules.append(PartitionRule(label=label, predicate=predicate))
     return rules
@@ -236,13 +258,14 @@ def _parse_rules(specs: list[str]) -> list[PartitionRule]:
 
 def split(
     inputs: list[str] = typer.Argument(..., help="One or more .bib files (merged in memory)"),
-    to: list[str] = typer.Option(
+    route: list[str] = typer.Option(
         ...,
-        "--to",
+        "--route",
         help="Output rule FILE='predicate' (repeatable). Predicate: any --where "
         "expression (including and/or/not), or one of * / used / unused / "
         'group "Name".',
     ),
+    force: bool = _FORCE_OPTION,
     copy: bool = typer.Option(
         False,
         "--copy",
@@ -278,9 +301,9 @@ def split(
     metadata blocks entirely and skips materials copying.
     """
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    rules = _parse_rules(to)
+    rules = _parse_rules(route)
 
-    named_inputs = _load_inputs(inputs)
+    named_inputs, digests = _load_inputs(inputs)
     pinax_sources = _entry_sources(named_inputs)
     merged = merge_libraries(named_inputs, dedupe=dedupe)
     if merged.conflicts:
@@ -310,6 +333,7 @@ def split(
 
     for rule in rules:
         _refuse_input_as_output(params.json_output, rule.label, [*inputs, *sources])
+        _refuse_existing_output(params.json_output, rule.label, force)
 
     result = partition_library(merged.lib, rules, copy=copy, cited_keys=cited_keys)
 
@@ -346,7 +370,7 @@ def split(
 
         outputs.append(
             {
-                "file": rule.label,
+                "path": rule.label,
                 "predicate": rule.predicate,
                 "entries": count,
                 "written": written,
@@ -356,16 +380,23 @@ def split(
 
     warnings: list[dict[str, object]] = []
     if merged.duplicate_keys:
-        warnings.append({"type": "duplicate_keys", "keys": merged.duplicate_keys})
+        warnings.append(_duplicate_keys_warning(merged.duplicate_keys))
     if result.unrouted:
-        warnings.append({"type": "unrouted_entries", "count": result.unrouted})
+        warnings.append(
+            {
+                "type": "unrouted_entries",
+                "message": f"{result.unrouted} {_entries(result.unrouted)} matched no output",
+                "count": result.unrouted,
+            }
+        )
 
     diff_text = "\n".join(chunk for chunk in diff_chunks if chunk)
 
     payload = {
         "status": "success",
-        "action": "split",
+        "action": "corpus_split",
         "inputs": merged.inputs,
+        "sources_sha256": digests,
         "dry_run": params.dry_run,
         "copy": copy,
         "minimal": minimal,
@@ -377,7 +408,7 @@ def split(
     for entry in outputs:
         count = entry["entries"]
         human.append(
-            f"  {_verb('write', params, 'Wrote')} {count} {_entries(count)} → {entry['file']}  [{entry['predicate']}]"
+            f"  {_verb('write', params, 'Wrote')} {count} {_entries(count)} → {entry['path']}  [{entry['predicate']}]"
         )
     if result.unrouted:
         human.append(f"  {result.unrouted} {_entries(result.unrouted)} matched no output.")

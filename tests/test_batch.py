@@ -22,7 +22,7 @@ def test_apply_operations_runs_in_order() -> None:
     results = apply_operations(
         coll,
         [
-            {"op": "groups.add_entry", "key": "A", "group": "ML"},
+            {"op": "groups.add_entry", "key": "A", "group": "ML", "create": True},
             {"op": "fields.append", "field": "keywords", "value": "ml"},
         ],
     )
@@ -66,7 +66,7 @@ def test_every_declared_operation_has_a_dispatch_branch() -> None:
         "fields.append": {"field": "keywords", "value": "ml"},
         "fields.clear": {"field": "journal"},
         "fields.protect_title": {},
-        "groups.add_entry": {"key": "A", "group": "ML"},
+        "groups.add_entry": {"key": "A", "group": "ML", "create": True},
         "groups.remove_entry": {"key": "A", "group": "ML"},
         "keys.generate": {},
         "keys.repair": {},
@@ -83,7 +83,7 @@ def test_every_declared_operation_has_a_dispatch_branch() -> None:
 
     assert set(operations) == set(batch_ops.OPERATION_SPECS)
     for op, params in operations.items():
-        coll = Bibliography.from_text(SRC)
+        coll = Bibliography.from_text(SRC.replace("title = {t}", "title = {t},\n  groups = {ML}"))
         apply_operations(coll, [{"op": op, **params}])
 
 
@@ -185,14 +185,14 @@ def test_cli_batch_atomic_commit(tmp_path: Path) -> None:
     bib.write_text(SRC)
     ops = json.dumps(
         [
-            {"op": "groups.add_entry", "key": "A", "group": "ML"},
+            {"op": "groups.add_entry", "key": "A", "group": "ML", "create": True},
             {"op": "normalize", "journal_style": "abbreviated"},
         ]
     )
     result = runner.invoke(app, ["corpus", "batch", str(bib), "--ops", ops, "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
-    assert data["action"] == "batch"
+    assert data["action"] == "corpus_batch"
     assert len(data["operations"]) == 2
     assert data["plan"]["summary"]["modified"] == 1
     reparsed = parse_bib(bib.read_text())
@@ -290,7 +290,8 @@ def test_ref_edit_rejects_what_the_command_rejects(operation: dict, message: str
     assert not coll.is_modified
 
 
-def test_cli_batch_ref_edit_of_an_unknown_key_is_invalid_input(tmp_path: Path) -> None:
+def test_cli_batch_ref_edit_of_an_unknown_key_is_key_not_found(tmp_path: Path) -> None:
+    """A batch operation reports the code the standalone command reports."""
     bib = tmp_path / "r.bib"
     bib.write_text(EDIT_SRC)
     ops = json.dumps([{"op": "ref.edit", "key": "Missing1900", "fields": {"note": "x"}}])
@@ -299,9 +300,32 @@ def test_cli_batch_ref_edit_of_an_unknown_key_is_invalid_input(tmp_path: Path) -
 
     assert result.exit_code == 1, result.output
     payload = json.loads(result.output)
-    assert payload["error"] == "InvalidInput"
+    assert payload["error"] == "KeyNotFound"
+    assert payload["index"] == 0
     assert "Missing1900" in payload["message"]
     assert bib.read_text() == EDIT_SRC
+
+
+def test_cli_batch_ref_edit_of_a_duplicated_key_is_a_conflict(tmp_path: Path) -> None:
+    bib = tmp_path / "r.bib"
+    bib.write_text(EDIT_SRC + EDIT_SRC)
+    ops = json.dumps([{"op": "ref.edit", "key": "Newton1687", "fields": {"note": "x"}}])
+
+    result = runner.invoke(app, ["corpus", "batch", str(bib), "--ops", ops, "--json"])
+
+    assert result.exit_code == 2, result.output
+    payload = json.loads(result.output)
+    assert payload["status"] == "conflict"
+    assert payload["error"] == "DuplicateCitationKey"
+    assert payload["options"]
+
+
+def test_batch_group_membership_needs_an_existing_group_or_create() -> None:
+    coll = Bibliography.from_text(SRC)
+    with pytest.raises(batch_ops.BatchError) as raised:
+        apply_operations(coll, [{"op": "groups.add_entry", "key": "A", "group": "ML"}])
+    assert raised.value.code == "KeyNotFound"
+    assert not coll.is_modified
 
 
 def test_cli_batch_edits_several_entries_in_one_write(tmp_path: Path) -> None:

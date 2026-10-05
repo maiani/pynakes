@@ -146,7 +146,7 @@ SKIPPABLE_STEPS: dict[str, tuple[str, str]] = {
     "dois": ("--doi-normalization on", "normalize-dois"),
     "pages": ("--pages on", "normalize-pages"),
     "identifier_case": ("--identifier-case on", "normalize-identifier-case"),
-    "keys": ("--keys on", "normalize-keys"),
+    "keys": ("--key-generation on", "normalize-keys"),
 }
 
 

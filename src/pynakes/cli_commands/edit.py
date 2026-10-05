@@ -23,10 +23,10 @@ from pynakes.engine import Bibliography
 
 
 def edit(
-    key: str = typer.Argument(..., help="Citation key to edit"),
     file: str | None = bib_file_argument(),
+    key: str = typer.Argument(..., help="Citation key to edit"),
     field: list[str] = typer.Option(
-        [], "--field", "-f", help="Set or replace a field; repeatable: name=value"
+        [], "--field", help="Set or replace a field; repeatable: name=value"
     ),
     clear_field: list[str] = typer.Option([], "--clear-field", help="Remove a field; repeatable"),
     entry_type: str | None = typer.Option(None, "--type", help="Set the entry type"),

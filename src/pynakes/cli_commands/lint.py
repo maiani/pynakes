@@ -8,21 +8,19 @@ from pathlib import Path
 
 import typer
 
-from pynakes.cli_common import (
-    CheckOutcome,
-    _emit_error,
-    _run_checks,
-    _safe,
-)
+from pynakes.cli_checks import CheckOutcome, _run_checks, strict_option
+from pynakes.cli_choices import LintCategory
+from pynakes.cli_common import _safe, _source_sha256
 from pynakes.engine import Bibliography
-from pynakes.lint import CATEGORY_FIXERS, LintIssue, is_profile_issue
+from pynakes.lint import LintIssue, is_profile_issue
 from pynakes.lint import lint as lint_lib
 
 # --- lint ------------------------------------------------------------------
 
 
 def _lint_one(file: str, categories: set[str] | None = None) -> CheckOutcome:
-    lib = Bibliography.open(file).lib
+    coll = Bibliography.open(file)
+    lib = coll.lib
     issues = lint_lib(lib, base_dir=Path(file).parent)
     if categories:
         issues = [issue for issue in issues if issue.category in categories]
@@ -37,11 +35,15 @@ def _lint_one(file: str, categories: set[str] | None = None) -> CheckOutcome:
         "status": "success",
         "action": "lint",
         "file": file,
-        "issue_count": len(issues),
-        "errors": errors,
-        "warnings": warnings,
-        "info": infos,
-        "by_category": by_category,
+        "source_sha256": _source_sha256(coll),
+        "warnings": [],
+        "summary": {
+            "issues": len(issues),
+            "errors": errors,
+            "warnings": warnings,
+            "info": infos,
+            "by_category": by_category,
+        },
         "issues": [i.to_dict() for i in issues],
     }
     if not issues:
@@ -52,7 +54,7 @@ def _lint_one(file: str, categories: set[str] | None = None) -> CheckOutcome:
             f"{len(issues)} issue(s): {errors} error(s), {warnings} warning(s), {infos} info."
         )
         human.extend(_fixer_hints(issues))
-    # Structural errors and declared-profile deviations gate a strict build.
+    # Structural errors and declared-profile deviations fail --strict.
     # Other findings (a missing DOI, layout drift) remain advisory.
     return CheckOutcome(
         result=result,
@@ -77,7 +79,7 @@ def _fixer_hints(issues: list) -> list[str]:
     for issue in issues:
         if issue.fixer is not None:
             command = (
-                "normalize --keys on"
+                "normalize --key-generation on"
                 if issue.type == "citation_key_pattern_mismatch"
                 else issue.fixer
             )
@@ -90,29 +92,16 @@ def _fixer_hints(issues: list) -> list[str]:
 
 def lint(
     files: list[str] = typer.Argument(..., help="One or more .bib files"),
-    strict: bool = typer.Option(
-        False,
-        "--strict",
-        help="Exit 1 on errors or metadata-profile deviations",
-    ),
-    category: list[str] = typer.Option(
+    strict: bool = strict_option("there are errors or metadata-profile deviations"),
+    category: list[LintCategory] = typer.Option(
         [],
         "--category",
-        help=(f"Report only these categories (repeatable): {', '.join(sorted(CATEGORY_FIXERS))}"),
+        help="Report only these categories (repeatable)",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Validate entries and report issues (accepts multiple files for CI gating)."""
-    unknown = sorted(set(category) - set(CATEGORY_FIXERS))
-    if unknown:
-        _emit_error(
-            json_output,
-            "InvalidCategory",
-            f"Unknown lint category: {', '.join(unknown)}; "
-            f"expected one of: {', '.join(sorted(CATEGORY_FIXERS))}",
-        )
-        return
-    categories = set(category)
+    categories = {item.value for item in category}
     _run_checks(
         files,
         "lint",

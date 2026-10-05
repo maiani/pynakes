@@ -103,73 +103,67 @@ working through 0.7.x with a `deprecated` warning and is removed in 0.8.0; where
 a flag's meaning changes, the old use fails with an error naming the
 replacement.
 
-- **One positional convention.** There are six today: library first (about 30
-  commands); operand first (`ref show/edit/compare/add`, `asset fetch`,
-  `search`); either order (`keys generate`); library only through `--file`
-  (`ref import`, `tex list/add/remove/clear`); sources as a required `--path`
-  option (`keys usage`); and several files (`lint`, `verify`, `dedupe check`,
-  `keys check`, `asset check`, `corpus combine/split`). Adopt library first,
-  plus a `--file` option on every single-library command. Stop choosing the
-  library slot by `Path.is_file()` — `tex scan paper.tex` parses the `.tex` as
-  the library — and reject a `.bib`-looking token in the wrong slot with an
-  error that says so.
-- **One meaning per flag.** `-f` is `--field` in `ref add/edit` but `--file` in
-  `ref import` and `tex`. Rename the outliers of `--to` (`convert` format vs
-  `corpus split` routing rule), `--from` (`convert` format vs `init` profile),
-  `--type` (`init` dialect vs entry type), `--keys` (`normalize` mode vs
-  `ref show` selection), `--field` (four meanings), `--force` (overwrite vs
-  ignore missing TeX), and `--published` (three meanings).
-- **One flag per concept**: `--abstract` and `--show-abstract`; `--title-field`
-  and `--field`; TeX sources given as positionals, `PATHS`, `--path`, or
-  `--tex/--aux`; `--out`, `--stdout`, and `--to` for output; `--strict` and
-  `--check` for gating; `--bestpdf`; `--keep-field` beside `--keep-fields`.
-- **Enumerated options become `click.Choice`**, so help and `capabilities` list
-  their values: `normalize` (ten options), `init --type`, `--key-source`,
-  `--namespace`, `lint --category`, `--context`.
-- **Envelope.**
-  - `action` is the command path joined by `_` (`ref_edit`, `tex_scan`,
-    `asset_check`), replacing four naming schemes that include the legacy
-    `used` and `files_check`; check modes report `check: true` rather than a
-    separate `format-check` action.
-  - `warnings` is always a list of objects: the `lint`/`verify` counts move to
-    `summary`, and `info`/`infos` settle on one spelling.
-  - `file` is always the input and written paths go in `out`/`outputs`;
-    `scrub` and `corpus combine` currently put the output in `file`.
-  - `convert` gains the modifying-command keys and honors `--diff`;
-    `capabilities` gains `status` and `action`; `tex scan --group/--keyword`
-    returns a `plan`.
-  - Every envelope reports the fingerprint of the file it read, and modifying
-    commands accept it back as a precondition, so a caller's preview → approve
-    → commit cannot overwrite an edit made in between. Modifying envelopes
-    already report `source_sha256`, and the commands the editor writes through
-    accept `--expect-sha256`; what remains is the read-only envelopes and every
-    other modifying command (`capabilities.write_precondition.commands` lists
-    the current set).
-- **Exit codes and errors.**
-  - Usage errors exit 1 in both output modes; outside `--json` they currently
-    exit 2, Click's default and pynakes's conflict code. Human-mode errors go to
-    stderr.
-  - Conflicts are classified consistently: an existing group and an existing
-    key are both conflicts (exit 2), and a missing group is `KeyNotFound`
-    everywhere.
-  - One central error-code enum. Catalogue the nine codes emitted but not
-    listed, reclassify `OnlineLookupRequired` and `ProviderUnavailable`
-    (catalogued as conflicts, emitted with exit 1), merge `NoTeXSources` into
-    `NoSources`, and stop emitting Python class names such as
-    `FileNotFoundError`.
-- **Overwrite policy**: an existing output file requires `--force` everywhere,
-  as `init` already does — `convert --out`, `tex scan --out`,
-  `corpus split --to`, `corpus combine --out`. An output naming one of the
-  command's inputs is refused outright since 0.6.5; requiring `--force` for
-  every other existing file waited for the freeze because it breaks scripts
-  that regenerate their outputs.
-- **Validation**: `groups move-group --parent` and `groups add-entry` refuse a
-  group that does not exist; `ref compare` without `--online` stops telling CLI
-  users to "pass online=True".
-- **Decisions to record before the gate**: whether `asset check --fix` gains
+**In progress** (first pass on branch `stage-4-freeze`, 2026-10-05; recorded in
+CHANGELOG under Unreleased). Done: library-first positionals with `--file`/`-f`
+on every single-library command and syntactic library detection
+(`pynakes.cli_surface`, which also holds every deprecated form); one meaning per
+flag and one flag per concept; enumerated options as Typer choices
+(`pynakes.cli_choices`); the beta envelope (`action` naming, warning objects,
+`file`/`out`, `summary`, `source_sha256` everywhere, `--expect-sha256` on every
+modifying command); usage errors exit 1 and human errors on stderr; one error
+catalogue (`pynakes.cli_errors`) that fixes each code's exit code and generates
+`capabilities`; the overwrite policy; the group validations; batch error codes.
+
+Decisions taken:
+
+- `--strict` and `--check` stay two flags with one meaning each: `--strict`
+  gates a command that is read-only anyway (`lint`, `verify`, `dedupe check`,
+  `keys check`, `asset check`); `--check` is the check mode of a transform
+  (`format`, `scrub`), which then writes nothing. Envelopes report `strict` or
+  `check` accordingly.
+- `-f` is `--file` everywhere; `--field` means a `name=value` assignment
+  (`ref add`/`ref edit`), and the field-*name* options got distinct names.
+- `--published` keeps one meaning, "consider preprints' published versions":
+  `verify` reports them, `enrich` applies them; `asset fetch` moved to
+  `--material`.
+- `--out PATH|-` is the one output flag; `format --stdout` became `--out -`.
+- `ref remove KEY` refuses a key shared by several entries
+  (`DuplicateCitationKey`), as `ref show`/`ref edit` do; `keys repair` first.
+- `groups add-entry` refuses an unknown group unless `--create`, which the
+  editor's "New group…" flow needs; batch `groups.add_entry` takes `create`.
+- `scrub --out` naming its own input (in-place scrub) needs no `--force`.
+- `corpus batch` operations report the standalone command's error codes
+  (`KeyNotFound`, `DuplicateCitationKey`, `CitationKeyConflict`) with `index`.
+
+**Remaining before the gate:**
+
+- **Editor migration** (same change as the envelope, per the editor track):
+  `editor/src/pynakes.ts` still passes the operand-first order (`search`, `ref
+  compare`, `ref add`, `ref import` — accepted, but with a `deprecated`
+  warning); `model.ts` still names `used`, `files_check`, and `batch`, reads the
+  `lint` counts at top level and `search`'s `fields`/`show_abstract`; the "New
+  group…" flow must pass `groups add-entry --create`. Then
+  `npm run compile && npm test`.
+- **Gate 4 contract tests**: the positional-signature table, the
+  flag-spelling sweep, the envelope-schema sweep over every command's `--json`
+  output, the AST test that every emitted code is catalogued, and the
+  `capabilities` option-type/choice/code test. Today
+  `tests/test_write_precondition.py` covers `--expect-sha256` on every
+  modifying command, and the rest is sampled.
+- **Tests for the new behavior** not yet written: each deprecated spelling and
+  value (warning shape in JSON, stderr line in human mode), the legacy
+  operand-first order per command, the misplaced-`.bib` usage error, `--file`
+  given twice, `-f name=value` on `ref add`/`edit`, the `--force` overwrite
+  policy per command, `format --out`, `convert --diff`/`--force`/`--expect-sha256`
+  on import, `ref remove` of a duplicated key, multi-file checks' catalogued
+  error codes.
+- **Docs**: README, quickstart, usage, pinax, and llm-integration examples
+  still show the old forms (they run, with a deprecation warning); the contract
+  doc does not describe the beta envelope yet. Stage 6 regenerates the reference;
+  the contract doc should move with this stage.
+- **Decisions still to record**: whether `asset check --fix` gains
   `--dry-run`/`--diff`; whether `keys check` stays beside `lint`'s
-  `duplicate_key` finding; whether `ref remove KEY` removes every duplicate
-  sharing that key; where `verify` and `enrich` live. `keys usage` and
+  `duplicate_key` finding; where `verify` and `enrich` live. `keys usage` and
   `tex scan` both stay — neither is a subset of the other.
 
 **Gate 4**: contract tests enforce the surface instead of sampling it — a table

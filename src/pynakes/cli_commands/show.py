@@ -9,51 +9,46 @@ from pynakes.cli_common import (
     _entries,
     _resolve_input_bib,
     _safe,
+    _source_sha256,
     bib_file_argument,
+    key_option,
 )
 from pynakes.engine import Bibliography
 from pynakes.triage import entry_summary
 
 
 def show(
-    key: str | None = typer.Argument(None, help="Citation key to display"),
     file: str | None = bib_file_argument(),
-    keys: list[str] | None = typer.Option(
-        None,
-        "--keys",
-        help="Summarize several references at once: comma-separated keys, repeatable",
+    key: str | None = typer.Argument(None, help="Citation key to display"),
+    keys: list[str] | None = key_option(
+        "Summarize several references at once: comma-separated keys, repeatable"
     ),
     resolved: bool = typer.Option(
         False, "--resolved", help="Include fields inherited through crossref/xdata"
     ),
     abstract: bool = typer.Option(
-        False, "--abstract", help="Include each abstract in the --keys summary"
+        False, "--abstract", help="Include each abstract in the --key summary"
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Show one uniquely identified reference, or triage several at once.
 
     With a citation key this prints every stored field of that one reference.
-    With ``--keys k1,k2,...`` it prints a compact summary of each requested
+    With ``--key k1,k2,...`` it prints a compact summary of each requested
     reference instead — title, creator, date, venue, and identifiers, plus the
     abstract under ``--abstract`` — so a set of candidates can be scanned in
     one call rather than one invocation per key. Both forms refuse to guess
-    when a key is duplicated, and the ``--keys`` form reports every unknown key
+    when a key is duplicated, and the ``--key`` form reports every unknown key
     together.
     """
     if keys:
-        # ``--keys`` supplies the keys, so the leading positional can only be
-        # the library: ``ref show --keys a,b refs.bib`` parses like every other
-        # command even though the file is normally the *second* argument.
         if key is not None:
-            if file is not None:
-                raise InvalidInputError("Pass a citation key or --keys, not both")
-            key, file = None, key
+            raise InvalidInputError("Pass a citation key or --key, not both")
     elif key is None:
-        raise InvalidInputError("Provide a citation key or --keys")
+        raise InvalidInputError("Provide a citation key or --key")
     if abstract and not keys:
         raise InvalidInputError(
-            "--abstract applies to the --keys summary; showing a single key already "
+            "--abstract applies to the --key summary; showing a single key already "
             "prints every field, abstract included"
         )
 
@@ -79,6 +74,8 @@ def show(
                 "status": "success",
                 "action": "ref_show",
                 "file": file,
+                "source_sha256": _source_sha256(coll),
+                "warnings": [],
                 "key": entry.key,
                 "entry_type": entry.type,
                 "fields": dict(fields),
@@ -118,6 +115,8 @@ def _show_summaries(
                 "status": "success",
                 "action": "ref_show",
                 "file": file,
+                "source_sha256": _source_sha256(coll),
+                "warnings": [],
                 "keys": keys,
                 "count": len(summaries),
                 "entries": summaries,

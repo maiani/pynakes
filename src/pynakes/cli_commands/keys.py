@@ -10,18 +10,20 @@ import typer
 
 from pynakes import _tex_rewrite
 from pynakes import keys as keys_ops
+from pynakes.cli_checks import CheckOutcome, _run_checks, strict_option
 from pynakes.cli_common import (
     _BACKUP_OPTION,
-    CheckOutcome,
+    _EXPECT_SHA256_OPTION,
     RunParams,
+    _check_expected_sha256,
     _emit,
     _emit_conflict,
     _emit_error,
     _entries,
     _finish_mod,
     _resolve_input_bib,
-    _run_checks,
     _safe,
+    _source_sha256,
     _verb,
     bib_file_argument,
 )
@@ -36,6 +38,18 @@ from pynakes.usage import (
 )
 
 # --- keys ------------------------------------------------------------------
+
+
+def _params(
+    dry_run: bool, diff: bool, json_output: bool, backup: bool, expect_sha256: str | None
+) -> RunParams:
+    return RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
 
 
 def _keys_check_one(file: str) -> CheckOutcome:
@@ -56,6 +70,8 @@ def _keys_check_one(file: str) -> CheckOutcome:
         "status": "success",
         "action": "keys_check",
         "file": file,
+        "source_sha256": _source_sha256(coll),
+        "warnings": [],
         "has_duplicates": bool(duplicates),
         "duplicate_keys": duplicates,
         "duplicate_key_instances": instances,
@@ -79,7 +95,7 @@ def _keys_check_one(file: str) -> CheckOutcome:
 
 def keys_check(
     files: list[str] = typer.Argument(..., help="One or more .bib files"),
-    strict: bool = typer.Option(False, "--strict", help="Exit 1 if duplicate keys are found"),
+    strict: bool = strict_option("duplicate citation keys are found"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Report duplicate citation keys in one or more .bib files."""
@@ -90,68 +106,10 @@ def _rename_payload(renames: list[tuple[str, str]]) -> dict:
     return {"renames": [{"old": o, "new": n} for o, n in renames]}
 
 
-def _looks_like_bib_path(value: str) -> bool:
-    path = Path(value)
-    return path.suffix.lower() == ".bib" or path.is_file()
-
-
-def _resolve_generate_args(
-    first: str | None,
-    second: str | None,
-    all_entries: bool,
-    json_output: bool,
-) -> tuple[str, str | None]:
-    """Resolve ``keys generate``'s compatible file/key calling forms."""
-    if all_entries:
-        if second is not None:
-            _emit_error(
-                json_output,
-                "InvalidInput",
-                "Use either --all or one citation key, not both",
-            )
-        if first is not None and not _looks_like_bib_path(first):
-            _emit_error(
-                json_output,
-                "InvalidInput",
-                "Use either --all or one citation key, not both",
-            )
-        return _resolve_input_bib(first, json_output), None
-
-    if first is None:
-        _emit_error(
-            json_output,
-            "InvalidInput",
-            "Provide a citation key, or pass --all to regenerate every key",
-        )
-
-    if second is None and not _looks_like_bib_path(first):
-        return _resolve_input_bib(None, json_output), first
-
-    if second is None:
-        _emit_error(
-            json_output,
-            "InvalidInput",
-            "Provide a citation key with the file, or pass --all to regenerate every key",
-        )
-
-    first_is_file = _looks_like_bib_path(first or "")
-    second_is_file = _looks_like_bib_path(second)
-    if first_is_file and not second_is_file:
-        return _resolve_input_bib(first, json_output), second
-    if second_is_file and not first_is_file:
-        return _resolve_input_bib(second, json_output), first
-
-    _emit_error(
-        json_output,
-        "InvalidInput",
-        "When passing both a file and a citation key, exactly one positional argument must be a .bib file",
-    )
-
-
 def _no_tex_sources(json_output: bool) -> None:
     _emit_error(
         json_output,
-        "NoTeXSources",
+        "NoSources",
         "No .tex files found in the provided sources or the library's 'tex-sources' metadata",
     )
 
@@ -219,30 +177,30 @@ def _rewrite_tex_sources(
 
 
 def keys_generate(
-    file_or_key: str | None = typer.Argument(
-        None,
-        help=(
-            "Path to the .bib file, or a citation key when the file is auto-detected "
-            "(also accepts KEY FILE)"
-        ),
-    ),
-    key_or_file: str | None = typer.Argument(
-        None,
-        help="Optional citation key or .bib file, allowing either FILE KEY or KEY FILE",
-    ),
+    file: str | None = bib_file_argument(),
+    key: str | None = typer.Argument(None, help="Citation key to regenerate"),
     all_entries: bool = typer.Option(
         False,
         "--all",
         help="Regenerate every citation key instead of one selected key",
     ),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Derive citation keys from entry metadata and update linked TeX citations."""
-    file, key = _resolve_generate_args(file_or_key, key_or_file, all_entries, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    if all_entries and key is not None:
+        _emit_error(json_output, "InvalidInput", "Use either --all or one citation key, not both")
+    if not all_entries and key is None:
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            "Provide a citation key, or pass --all to regenerate every key",
+        )
+    file = _resolve_input_bib(file, json_output)
+    params = _params(dry_run, diff, json_output, backup, expect_sha256)
     coll = Bibliography.open(file)
     if key is None:
         renames = coll.generate_keys()
@@ -294,12 +252,13 @@ def keys_generate(
 def keys_repair(
     file: str | None = bib_file_argument(),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Rename duplicate citation keys so every key is unique."""
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = _params(dry_run, diff, json_output, backup, expect_sha256)
     file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
     renames = coll.repair_keys()
@@ -367,14 +326,16 @@ def keys_rename(
         "(defaults to the library's 'tex-sources' metadata)",
     ),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Rename one citation key to an explicit value and update TeX citations."""
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = _params(dry_run, diff, json_output, backup, expect_sha256)
     coll = Bibliography.open(file)
+    _check_expected_sha256(file, coll, params)
     keys_ops.validate_key(old)
     keys_ops.validate_key(new)
 
@@ -473,23 +434,19 @@ def keys_rename(
 
 def keys_usage(
     key: str = typer.Argument(..., help="Citation key to search for"),
-    path: list[str] = typer.Option(
-        ...,
-        "--path",
-        help="One or more .tex files or directories to scan (repeatable)",
-    ),
+    sources: list[str] = typer.Argument(..., help="One or more .tex files or directories to scan"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Scan TeX sources directly for \\cite-family citations of one key.
 
     Unlike `tex scan`, this takes no .bib file and never consults
-    'tex-sources' metadata: it scans exactly the given --path directory or
-    file(s), so a rename's blast radius can be checked over sources that were
-    never registered with `tex add` — frozen snapshots, generated diffs, or
-    any other .tex the library does not track.
+    'tex-sources' metadata: it scans exactly the given directories or files,
+    so a rename's blast radius can be checked over sources that were never
+    registered with `tex add` — frozen snapshots, generated diffs, or any
+    other .tex the library does not track.
     """
     keys_ops.validate_key(key)
-    matches, scanned = find_key_usages(key, path)
+    matches, scanned = find_key_usages(key, sources)
 
     human = [f"Scanned {len(scanned)} .tex file(s) for citations of {key!r}."]
     if matches:
@@ -501,8 +458,9 @@ def keys_usage(
     result = {
         "status": "success",
         "action": "keys_usage",
+        "warnings": [],
         "key": key,
-        "paths": list(path),
+        "sources": list(sources),
         "scanned": scanned,
         "count": len(matches),
         "matches": [m.to_dict() for m in matches],

@@ -1,17 +1,17 @@
 """CLI command for creating a new library: ``init``.
 
 ``init`` scaffolds a new ``.bib`` file, optionally seeded with a metadata profile
-(``--type``, ``--key-pattern``, or a profile copied from an existing library via
-``--from``). It refuses to overwrite an existing file unless ``--force``, and —
+(``--dialect``, ``--key-pattern``, or a profile copied from an existing library
+via ``--profile-from``). It refuses to overwrite an existing file unless ``--force``, and —
 like ``combine``/``split`` — reports the file it creates rather than using the
 single-file modify envelope.
 
 When ``--pinax`` is passed with an existing ``.bib`` file, the file is converted
 to a Pinax by adding ``pinax-files-dir`` and ``pinax-fetch-policy`` metadata (no ``--force``
-needed — the conversion is additive). Combined with ``--from``, it also merges
+needed — the conversion is additive). Combined with ``--profile-from``, it also merges
 in any maintenance-profile keys (``dialect``, ``key-pattern``, ``normalize-keys``,
 ``sort-order``, ...) the template has and this library lacks, rather than
-leaving ``--from`` a no-op. ``--agent-guide`` writes an ``AGENTS.md`` template
+leaving ``--profile-from`` a no-op. ``--agent-guide`` writes an ``AGENTS.md`` template
 for LLM agents.
 """
 
@@ -20,9 +20,12 @@ from pathlib import Path
 import typer
 
 from pynakes._text_utils import strip_meta_terminator
+from pynakes.cli_choices import Dialect
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    _EXPECT_SHA256_OPTION,
     RunParams,
+    _check_expected_sha256,
     _emit_error,
     _finish_create,
     _finish_mod,
@@ -93,16 +96,21 @@ def _convert_to_pinax(
 
     With ``from_``, also merges in the maintenance-profile keys the template
     library has and this one lacks (e.g. ``dialect``, ``key-pattern``,
-    ``normalize-keys``, ``sort-order``) rather than leaving ``--from`` a no-op.
+    ``normalize-keys``, ``sort-order``) rather than leaving ``--profile-from`` a no-op.
     """
     stem = Path(file).stem
-    warnings: list[str] = []
+    warnings: list[dict] = []
 
     if not _has_pinax_metadata(coll):
         coll.set_metadata("pinax-files-dir", f"{stem}.files")
         coll.set_metadata("pinax-fetch-policy", "bestpdf")
     else:
-        warnings.append("pinax-files-dir already set; pinax metadata unchanged")
+        warnings.append(
+            {
+                "type": "pinax_already_set",
+                "message": "pinax-files-dir already set; pinax metadata unchanged",
+            }
+        )
 
     if from_ is not None:
         template_entries = collect_profile(Bibliography.open(from_).lib)
@@ -111,16 +119,31 @@ def _convert_to_pinax(
             coll.set_metadata(entry.key, entry.value, namespace=entry.namespace)
         if missing:
             keys = ", ".join(sorted(entry.key for entry in missing))
-            warnings.append(f"Merged {len(missing)} profile key(s) from {from_}: {keys}")
+            warnings.append(
+                {
+                    "type": "profile_merged",
+                    "message": f"Merged {len(missing)} profile key(s) from {from_}: {keys}",
+                }
+            )
         else:
-            warnings.append(f"No missing profile keys to merge from {from_}")
+            warnings.append(
+                {
+                    "type": "profile_merged",
+                    "message": f"No missing profile keys to merge from {from_}",
+                }
+            )
 
     store = coll.files
     if store is not None and not params.dry_run:
         store.ensure_root()
 
     if coll.externally_changed():
-        warnings.append("file was modified externally; changes were merged on commit")
+        warnings.append(
+            {
+                "type": "external_modification",
+                "message": "file was modified externally; changes were merged on commit",
+            }
+        )
 
     agents_path = _write_agents_guide(file, dry_run=params.dry_run) if agent_guide else None
 
@@ -128,18 +151,20 @@ def _convert_to_pinax(
         "pinax": True,
         "files_dir": f"{stem}.files",
         "agent_guide": agents_path,
-        "from": from_,
+        "profile_from": from_,
         "merged_keys": [entry.key for entry in missing] if from_ is not None else [],
     }
     if agents_path:
-        warnings.append(f"Wrote agent guide to {agents_path}.")
+        warnings.append(
+            {"type": "agent_guide_written", "message": f"Wrote agent guide to {agents_path}."}
+        )
 
     _finish_mod(
         file,
         "init",
         coll,
         params,
-        [f"Initialized pinax for {file}."] + [f"  {w}" for w in warnings],
+        [f"Initialized pinax for {file}."] + [f"  {w['message']}" for w in warnings],
         warnings=warnings,
         **extra,
     )
@@ -149,8 +174,10 @@ def init(
     file: str | None = typer.Argument(
         None, help="Path to the .bib library (default: auto-detect single .bib in cwd with --pinax)"
     ),
-    type_: str | None = typer.Option(
-        None, "--type", help="Library dialect: biblatex or bibtex (sets the native 'dialect' key)"
+    dialect: Dialect | None = typer.Option(
+        None,
+        "--dialect",
+        help="Library dialect (sets the native 'dialect' key)",
     ),
     key_pattern: str | None = typer.Option(
         None,
@@ -164,7 +191,7 @@ def init(
         "library opens JabRef-tracked; by default a fresh library is pynakes-native only",
     ),
     from_: str | None = typer.Option(
-        None, "--from", help="Copy the metadata profile from an existing .bib library"
+        None, "--profile-from", help="Copy the metadata profile from an existing .bib library"
     ),
     pinax: bool = typer.Option(
         False, "--pinax", help="Seed pinax mode (pinax-files-dir, pinax-fetch-policy)"
@@ -178,6 +205,7 @@ def init(
         False, "--force", help="Overwrite the target file if it already exists"
     ),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show what would be written without creating the file"
     ),
@@ -191,17 +219,23 @@ def init(
     With no options it writes a sensible, pynakes-native default profile (the
     BibLaTeX dialect and pynakes' default citation-key pattern, as the native
     ``dialect``/``key-pattern`` keys in ``pynakes-meta`` — no ``jabref-meta``
-    unless requested). ``--type`` / ``--key-pattern`` override individual
+    unless requested). ``--dialect`` / ``--key-pattern`` override individual
     settings; ``--jabref`` also emits the JabRef projection so the library opens
-    JabRef-tracked; ``--from`` replaces the defaults with another library's
+    JabRef-tracked; ``--profile-from`` replaces the defaults with another library's
     maintenance profile (its conventions, not its group tree or TeX-source
     list). ``--pinax`` seeds pinax mode and, when the file already exists,
-    converts it in place; combined with ``--from`` on an existing file, it
+    converts it in place; combined with ``--profile-from`` on an existing file, it
     merges in the template's missing profile keys instead of replacing
     anything already set. ``--agent-guide`` writes AGENTS.md (only meaningful
     alongside ``--pinax``).
     """
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
 
     if file is None:
         if pinax:
@@ -214,18 +248,12 @@ def init(
                 "only --pinax supports auto-detection",
             )
 
-    if type_ is not None and type_ not in {"biblatex", "bibtex"}:
-        _emit_error(
-            params.json_output,
-            "InvalidInput",
-            f"Invalid --type {type_!r}; expected biblatex or bibtex",
-        )
-
     exists = Path(file).exists()
 
     # Pinax conversion: additive metadata update on an existing file.
     if pinax and exists:
         coll = Bibliography.open(file)
+        _check_expected_sha256(file, coll, params)
         _convert_to_pinax(coll, file, params=params, agent_guide=agent_guide, from_=from_)
         return
 
@@ -245,8 +273,8 @@ def init(
         collect_profile(Bibliography.open(from_).lib) if from_ is not None else default_profile()
     )
     overrides: list[tuple[str, str, str]] = []
-    if type_ is not None:
-        overrides.append(("dialect", type_, "pynakes"))
+    if dialect is not None:
+        overrides.append(("dialect", dialect.value, "pynakes"))
     if key_pattern is not None:
         overrides.append(("key-pattern", key_pattern, "pynakes"))
     if pinax:
@@ -284,19 +312,20 @@ def init(
     created = not params.dry_run
 
     _finish_create(
-        params=params,
-        path=file,
-        action="init",
-        content=content,
-        human=human,
+        params,
+        file,
+        "init",
+        content,
+        human,
+        file=file,
         previous_content=previous_content,
         backup=backup,
         pinax=pinax,
-        type=effective_type,
+        dialect=effective_type,
         keys=keys,
         agent_guide=agents_path,
         created=created,
-        **{"from": from_},
+        profile_from=from_,
     )
 
 

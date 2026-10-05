@@ -2,7 +2,7 @@
 
 Removes entries by citation key through the standard lifecycle. In a pinax,
 removes the entry's materials from ``pinax-files-dir`` by default (``--keep-files``
-opts out).
+opts out). A key shared by several entries is refused as ambiguous.
 """
 
 import typer
@@ -11,6 +11,7 @@ from pynakes.cli_common import (
     _BACKUP_OPTION,
     _EXPECT_SHA256_OPTION,
     RunParams,
+    _emit_conflict,
     _emit_error,
     _entries,
     _finish_mod,
@@ -46,16 +47,43 @@ def remove(
 
     coll = Bibliography.open(file)
 
+    # A duplicated key names several entries, and removing every one of them is
+    # a guess about which the caller meant; ``ref show`` and ``ref edit`` refuse
+    # the same ambiguity. ``keys repair`` makes the keys unique first.
+    duplicated = [key for key in dict.fromkeys(citekeys) if len(coll.entries.get_all(key)) > 1]
+    if duplicated:
+        listed = ", ".join(repr(key) for key in duplicated)
+        _emit_conflict(
+            json_output,
+            "DuplicateCitationKey",
+            f"Citation key {listed} identifies more than one reference; "
+            "repair the duplicates, then remove the one you mean",
+            keys=duplicated,
+            options=[
+                {
+                    "id": "repair_duplicates",
+                    "description": "Run keys repair to make the keys unique, then retry "
+                    "with the key of the entry to remove",
+                }
+            ],
+        )
+
     total = 0
     removed_keys: list[str] = []
-    warnings: list[str] = []
+    warnings: list[dict] = []
     for key in citekeys:
         count = coll.remove_entry(key)
         if count:
             total += count
             removed_keys.append(key)
         else:
-            warnings.append(f"Citation key {key!r} not found; skipped.")
+            warnings.append(
+                {
+                    "type": "key_not_found",
+                    "key": key,
+                    "message": f"Citation key {key!r} not found; skipped.",
+                }
+            )
 
     if not total:
         _emit_error(json_output, "KeyNotFound", "No matching citation keys found to remove.")
@@ -87,7 +115,7 @@ def remove(
     if material_removals:
         details["material_removals"] = material_removals
 
-    _finish_mod(file, "remove", coll, params, human, warnings=warnings, **details)
+    _finish_mod(file, "ref_remove", coll, params, human, warnings=warnings, **details)
 
 
 def register(app: typer.Typer) -> None:

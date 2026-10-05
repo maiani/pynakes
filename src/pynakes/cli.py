@@ -6,6 +6,7 @@ in pynakes.cli_commands, grouped by command family.
 
 import typer
 import typer.main
+from typer.core import TyperOption
 
 from pynakes import __version__
 from pynakes.capabilities import COMMAND_GROUPS
@@ -39,9 +40,10 @@ from pynakes.cli_commands import (
     tex,
     tex_scan,
 )
-from pynakes.cli_common import _bibfile_completer, _metadata_key_completer
-from pynakes.cli_common import _citekey_completer as _complete_fn
+from pynakes.cli_completion import _bibfile_completer, _metadata_key_completer
+from pynakes.cli_completion import _citekey_completer as _complete_fn
 from pynakes.cli_discovery import AutoBibGroup
+from pynakes.cli_surface import FILE_OPTION, FILE_OPTION_HELP, LIBRARY_ARGUMENT
 
 app = typer.Typer(
     help="Agent-friendly BibTeX library management tool",
@@ -164,14 +166,19 @@ for _info in app.registered_groups:
 app.registered_commands.sort(key=lambda info: _panel_sort_key(_command_name(info)))
 app.registered_groups.sort(key=lambda info: _panel_sort_key(info.name))
 
-# --- Shell completion wiring ------------------------------------------------
-# Typer does not forward ``shell_complete`` from arguments. Since
+# --- Command wiring ---------------------------------------------------------
+# Typer does not forward ``shell_complete`` from arguments, and the shared
+# ``--file`` option is added here rather than to every callback. Since
 # ``typer.main.get_command()`` builds a fresh Click tree on every call, we
-# monkey-patch it so our completion wiring is always applied.
+# monkey-patch it so this wiring is always applied.
 
 # Maps (command_path, parameter_name) → shell_complete callback.
 _CITEKEY_ARGS: dict[tuple[str, ...], str] = {
+    ("ref", "show"): "key",
+    ("ref", "edit"): "key",
+    ("ref", "compare"): "key",
     ("ref", "remove"): "citekeys",
+    ("keys", "generate"): "key",
     ("asset", "fetch"): "target",
     ("keys", "rename"): "old",
     ("keys", "usage"): "key",
@@ -184,28 +191,44 @@ _METADATA_KEY_ARGS: dict[tuple[str, ...], str] = {
 }
 
 
-def _wire_completion(command, path=()) -> None:
+def _file_option() -> TyperOption:
+    """Return the ``--file``/``-f`` option every single-library command carries.
+
+    Its value never reaches the callback: :mod:`pynakes.cli_surface` moves it
+    into the leading FILE argument before Click parses the line. It exists as a
+    real option so help, completion, and ``capabilities`` all show it.
+    """
+    option = TyperOption(
+        param_decls=["file_option", *FILE_OPTION],
+        default=None,
+        metavar="FILE",
+        expose_value=False,
+        help=FILE_OPTION_HELP,
+    )
+    option.shell_complete = _bibfile_completer  # type: ignore[method-assign]
+    return option
+
+
+def _wire_command(command, path=()) -> None:
     for name, sub in command.commands.items():
         full = (*path, name)
-        if not hasattr(sub, "commands"):
-            target = _CITEKEY_ARGS.get(full)
-            meta_target = _METADATA_KEY_ARGS.get(full)
-            for param in sub.params:
-                if param.name == target:
-                    param.shell_complete = _complete_fn
-                if param.name == meta_target:
-                    param.shell_complete = _metadata_key_completer
-                if param.name in ("file", "bib_file"):
-                    if target is not None:
-                        param.shell_complete = _complete_fn
-                    elif meta_target is not None:
-                        param.shell_complete = _metadata_key_completer
-                    else:
-                        param.shell_complete = _bibfile_completer
-                if param.name in ("file_or_key", "key_or_file"):
-                    param.shell_complete = _bibfile_completer
-        else:
-            _wire_completion(sub, full)
+        if hasattr(sub, "commands"):
+            _wire_command(sub, full)
+            continue
+        target = _CITEKEY_ARGS.get(full)
+        meta_target = _METADATA_KEY_ARGS.get(full)
+        arguments = [param for param in sub.params if param.param_type_name == "argument"]
+        if arguments and arguments[0].name == LIBRARY_ARGUMENT:
+            sub.params.append(_file_option())
+        for param in sub.params:
+            if param.name == target:
+                param.shell_complete = _complete_fn
+            if param.name == meta_target:
+                param.shell_complete = _metadata_key_completer
+            if param.name == LIBRARY_ARGUMENT:
+                # The leading slot holds the library, or the first operand when
+                # the library is auto-detected: this offers both.
+                param.shell_complete = _bibfile_completer
 
 
 _get_command_orig = typer.main.get_command
@@ -213,7 +236,7 @@ _get_command_orig = typer.main.get_command
 
 def _get_command_patched(typer_instance):
     cmd = _get_command_orig(typer_instance)
-    _wire_completion(cmd)
+    _wire_command(cmd)
     return cmd
 
 

@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `format --out PATH` writes the formatted library elsewhere, leaving the input
+  untouched (`--out -` writes it to stdout).
+- `capabilities` describes the positional convention and every deprecated form.
 - `lint` reports a `crossref`, `xref`, `xdata`, `related`, or `entryset` value
   that names a key the library lacks, as `missing_reference_target`.
 - **A write precondition.** Every modifying command's JSON envelope now reports
@@ -19,8 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2 with an `ExternalModification` conflict carrying `expected_sha256` and
   `source_sha256`, and writes nothing. Passing the digest from a `--dry-run`
   back on the real run means an edit made between preview and approval is never
-  overwritten. The remaining modifying commands gain the option with the Stage 4
-  envelope work.
+  overwritten. Every other modifying command gained the option in Stage 4
+  (see Changed).
 - **Pynakes for VS Code** applies the precondition: a commit or an entry-level
   change carries the digest its preview reported, so a change made while the
   approval dialog is open is refused rather than overwritten. Several staged
@@ -31,6 +34,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking — one positional convention (Stage 4).** Every command that reads
+  one library takes it first: `ref show FILE KEY`, `ref edit FILE KEY`, `ref
+  compare FILE KEY`, `ref add FILE [KEY]`, `ref import FILE IDENTIFIER...`,
+  `search FILE QUERY`, `asset fetch FILE [KEY]`, `keys generate FILE [KEY]`,
+  `tex list/add/remove/clear FILE ...`. Every such command also accepts
+  `--file`/`-f`, and the library may still be omitted when the working
+  directory holds one `.bib`. The library slot is chosen by spelling alone (a
+  `.bib` suffix, or a full set of positionals), never by `Path.is_file()`, so
+  `tex scan paper.tex` no longer parses the `.tex` as the library; a
+  `.bib`-looking token in any other argument is a `UsageError`. The old
+  operand-first order still works through 0.7.x with a `deprecated` warning.
+  `keys usage KEY SOURCES...` takes its TeX sources as positionals.
+- **Breaking — one meaning per flag (Stage 4).** Renamed, with the old spelling
+  kept through 0.7.x behind a `deprecated` warning (`{"type": "deprecated",
+  "old", "new", "message"}` in `warnings`, or a line on stderr): `ref show
+  --keys` → `--key`; `search --field` → `--in-field`, `--show-abstract` →
+  `--abstract`; `scrub --field` → `--drop-field`, `--keep-fields` →
+  `--keep-field '*'`; `fields protect-title --field` → `--title-field`;
+  `normalize --keys` → `--key-generation`, `--force` → `--ignore-missing-tex`;
+  `init --type` → `--dialect`, `--from` → `--profile-from`; `corpus split --to`
+  → `--route`; `format --stdout` → `--out -`; `keys usage --path` → positional
+  sources; `asset fetch --preprint/--published/--source/--supplement/--bestpdf`
+  → `--material preprint|published|source|supplement|best-pdf`. `-f` now means
+  `--file` everywhere; on `ref add`/`ref edit` a `-f name=value` fails naming
+  `--field`. Renamed values: `groups --context 0/1/2` →
+  `independent/refining/including`; `normalize` switches take
+  `metadata/on/off` (`true/yes/1/false/no/0` deprecated).
+- **Enumerated options are validated choices** listed in help and
+  `capabilities`: the `normalize` switches and styles, `init --dialect`,
+  `convert --to/--from`, `ref import --key-source`, `metadata --namespace`,
+  `lint --category`, `groups --context`, `asset fetch --material`. An invalid
+  value is a `UsageError` (replacing `InvalidKeySource`, `InvalidCategory`,
+  `InvalidNamespace`, `UnknownConvertTarget`, and `UnknownConvertSource`).
+- **Breaking — the beta envelope (Stage 4).** `action` is the command path
+  joined by `_` (`ref_add`, `ref_import`, `ref_remove`, `tex_scan`,
+  `asset_fetch`, `asset_check`, `corpus_combine`, `corpus_split`,
+  `corpus_batch`), replacing `add`, `import`, `remove`, `used`, `fetch`,
+  `files_check`, `combine`, `split`, and `batch`; `format --check` and `scrub
+  --check` report their own action with `check: true` instead of
+  `format-check`/`scrub-check`. `warnings` is always a list of objects with
+  `type` and `message`; `lint` and `verify` counts move to `summary` (`info`,
+  not `infos`). `file` is always the input: `scrub` and `corpus combine` report
+  the written path as `out`, `corpus split` outputs carry `path`. `convert`
+  reports the modifying-command keys and honors `--diff` for `--out`;
+  `capabilities` reports `status` and `action`; `tex scan` reports a `plan`.
+  Every envelope that reads one library reports `source_sha256`, and
+  `--expect-sha256` is accepted by every modifying command; `corpus
+  combine/split` report `sources_sha256`.
+- **Exit codes and errors (Stage 4).** Usage errors exit 1 in both output
+  modes (they exited 2, the conflict code, outside `--json`); human-mode errors
+  and conflicts go to stderr, conflicts listing their options. One error
+  catalogue (`pynakes.cli_errors`) fixes each code's status and exit code, and
+  `capabilities` is generated from it: the nine uncatalogued codes are
+  catalogued or retired, `OnlineLookupRequired` and `ProviderUnavailable` are
+  errors (exit 1), `NoTeXSources` is merged into `NoSources`, and multi-file
+  checks report catalogued codes instead of Python class names. An existing
+  group is a `GroupConflict` (exit 2) as an existing key is a
+  `CitationKeyConflict`; a missing group is `KeyNotFound` everywhere. `corpus
+  batch` errors carry the code the standalone command would report (and the
+  failing `index` and `op`).
+- **Overwrite policy.** An existing output file needs `--force`: `convert
+  --out`, `tex scan --out`, `corpus combine --out`, `corpus split` outputs,
+  `format --out`, and `scrub --out` (except in place).
+- **Validation.** `groups add-entry` refuses a group the library lacks unless
+  `--create` is given; `groups remove-entry`, `add-group --parent`,
+  `move-group --parent`, and `update-group --parent` refuse a missing group.
+  `ref remove KEY` and batch `ref.remove` refuse a key shared by several
+  entries (`DuplicateCitationKey`) instead of removing all of them. `ref
+  compare` without `--online` no longer tells CLI users to pass `online=True`.
 - **Python 3.12 is now the minimum.** Python 3.11 is no longer supported;
   3.12, 3.13 and 3.14 are, and each runs the full suite on Linux, Windows and
   macOS. The bundled engine in the editor needs Python 3.12+ too.

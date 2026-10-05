@@ -400,7 +400,8 @@ def test_verify_cli_strict_exits_one_with_json(monkeypatch, tmp_path: Path) -> N
     assert result.exit_code == 1
     assert data["status"] == "success"
     assert data["action"] == "verify"
-    assert data["errors"] == 1
+    assert data["strict"] is True
+    assert data["summary"]["errors"] == 1
 
 
 def test_enrich_cli_dry_run_diff_json(monkeypatch, tmp_path: Path) -> None:
@@ -911,7 +912,7 @@ def test_verify_cli_accepts_concurrency_option(monkeypatch, tmp_path: Path) -> N
     result = runner.invoke(app, ["verify", str(bib), "--online", "-j", "4", "--json"])
 
     assert result.exit_code == 0, result.output
-    assert json.loads(result.output)["checked"] == 2
+    assert json.loads(result.output)["summary"]["checked"] == 2
 
 
 def test_verify_cli_rejects_zero_concurrency(tmp_path: Path) -> None:

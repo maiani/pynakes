@@ -6,6 +6,7 @@ the tool rather than guessing. Update this when commands are added or removed.
 
 from pynakes import __all__ as PUBLIC_API_EXPORTS
 from pynakes import __version__ as VERSION
+from pynakes.cli_errors import catalogue_description
 from pynakes.query import FUZZY_THRESHOLD, WHERE_GRAMMAR
 
 # Stable type vocabulary for command-schema introspection. The on-disk click
@@ -21,48 +22,6 @@ _TYPE_VOCABULARY = {
     "choice": "choice",
 }
 
-# Error/conflict codes a caller may see in the JSON envelope's ``error`` field,
-# enumerated so callers can route on them explicitly. Grouped by the exit
-# code / status they accompany. Kept in sync with the codes the CLI emits.
-_ERROR_CODES = {
-    "error": {
-        "exit_code": 1,
-        "codes": {
-            "FileNotFound": "A given file does not exist.",
-            "MissingTexSource": "normalize key regeneration found a missing linked TeX source; pass --force to proceed without rewriting it.",
-            "FileExists": "init: the target .bib already exists (pass --force to overwrite).",
-            "ParseError": "A .bib or source file could not be parsed (includes 'line').",
-            "InvalidInput": "An argument, option, or predicate was invalid.",
-            "IOError": "A read or write failed.",
-            "OutputIsInput": "convert/tex scan/corpus split: the output path is also an input.",
-            "InternalError": "An unexpected failure inside pynakes (a bug; please report it).",
-            "NoSources": "tex scan: no sources given and no 'tex-sources' metadata to use.",
-            "InvalidNamespace": "metadata set: namespace was not 'jabref' or 'pynakes'.",
-            "InvalidNormalizeOption": "normalize: an option value was not allowed.",
-            "RecursiveFormatError": "format --recursive: one or more files failed.",
-            "FormatLintError": "format: lint errors make a lossless rewrite unsafe.",
-            "KeyNotFound": "A referenced citation key is not in the library (remove, keys rename, etc.).",
-            "InvalidIdentifier": "import: an identifier value was malformed.",
-            "UnsupportedIdentifier": "import: no provider recognized the identifier or URL.",
-            "ReferenceImportError": "import: provider metadata could not be resolved or imported.",
-        },
-    },
-    "conflict": {
-        "exit_code": 2,
-        "codes": {
-            "ExternalModification": "The file changed on disk since it was read, or no longer matches --expect-sha256 (includes 'expected_sha256' and 'source_sha256').",
-            "DuplicateMetadata": "metadata set: multiple blocks match the key (ambiguous).",
-            "DuplicateMergeKey": "combine/split --dedupe: a shared key has differing content.",
-            "DedupeConflict": "dedupe merge: a cluster has irreconcilable field values.",
-            "DuplicateReference": "import: the provider identity is already present.",
-            "OnlineLookupRequired": "ref find: pass --online to allow the index query.",
-            "ProviderUnavailable": "ref find: the bibliographic index could not be reached.",
-            "CitationKeyConflict": "ref add/import: the chosen citation key already exists.",
-            "DuplicateCitationKey": "ref show/edit: the citation key identifies multiple entries.",
-        },
-    },
-}
-
 # One transversal selector surface: the same grammar for every command that
 # addresses a set of entries. Described by `pynakes.query`, so the capability
 # description cannot drift from the parser.
@@ -72,7 +31,7 @@ _PREDICATE_GRAMMAR = {
         "search (--where, --key)",
         "format (--where, --key)",
         "corpus combine (--where, --key)",
-        "corpus split (--to)",
+        "corpus split (--route)",
         "batch (fields.* where)",
     ],
     "key_selector": (
@@ -82,7 +41,7 @@ _PREDICATE_GRAMMAR = {
         "are ANDed). On ref add and ref import, which create an entry rather "
         "than select one, --key names the key to assign."
     ),
-    "bucket_predicates_used_by": ["corpus split (--to)"],
+    "bucket_predicates_used_by": ["corpus split (--route)"],
     **WHERE_GRAMMAR,
 }
 
@@ -239,15 +198,15 @@ def command_schemas() -> dict:
 
 
 def _write_precondition(schemas: dict) -> dict:
-    """Describe ``--expect-sha256``, listing the commands that accept it today."""
+    """Describe ``--expect-sha256``, listing the commands that accept it."""
     return {
         "option": "--expect-sha256",
         "envelope_key": "source_sha256",
         "conflict": "ExternalModification",
         "description": (
-            "A modifying command reports source_sha256, the digest of the file it read. "
-            "Pass it back as --expect-sha256 on the real run: if the file changed in "
-            "between, the command exits 2 and writes nothing."
+            "Every envelope reports source_sha256, the digest of the library it read. "
+            "Every modifying command accepts it back as --expect-sha256: if the file "
+            "changed in between, the command exits 2 and writes nothing."
         ),
         "commands": sorted(
             name
@@ -255,6 +214,13 @@ def _write_precondition(schemas: dict) -> dict:
             if any("--expect-sha256" in option.get("flags", []) for option in schema["options"])
         ),
     }
+
+
+def deprecations() -> list[dict]:
+    """Describe every deprecated form (imported lazily: it reads the CLI tables)."""
+    from pynakes.cli_surface import deprecations as described
+
+    return described()
 
 
 def get_capabilities() -> dict:
@@ -295,8 +261,26 @@ def get_capabilities() -> dict:
         "metadata_namespaces": ["jabref-meta", "pynakes-meta"],
         "exit_codes": {
             "0": "success",
-            "1": "error (parse, validation, I/O)",
+            "1": "error (usage, parse, validation, I/O)",
             "2": "conflict (operation blocked; options returned)",
+        },
+        "positional_convention": {
+            "library_first": (
+                "Every command that reads one library takes it as the leading FILE "
+                "argument, or as --file/-f, or not at all when the working directory "
+                "holds exactly one .bib file."
+            ),
+            "library_detection": (
+                "The leading positional is the library when it ends in .bib, or when "
+                "the positionals fill every argument the command has; otherwise the "
+                "lone local .bib is used. A .bib-looking token in any other argument "
+                "is refused as a usage error."
+            ),
+        },
+        "deprecations": {
+            "removed_in": "0.8.0",
+            "warning": {"type": "deprecated", "old": "...", "new": "..."},
+            "forms": deprecations(),
         },
         # Read-only checks that accept one or more .bib files and support
         # --strict (exit 1 on findings) — the primitives for CI / pre-commit
@@ -411,7 +395,7 @@ def get_capabilities() -> dict:
         # types) derived from the live CLI, the enumerated error/conflict codes,
         # and the one selector grammar shared by every entry-addressable command.
         "command_schemas": schemas,
-        "error_codes": _ERROR_CODES,
+        "error_codes": catalogue_description(),
         "predicate_grammar": _PREDICATE_GRAMMAR,
         "search_query_grammar": _SEARCH_QUERY_GRAMMAR,
         "formatting": {

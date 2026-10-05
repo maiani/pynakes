@@ -8,6 +8,7 @@ from pynakes.cli_common import (
     _entries,
     _resolve_input_bib,
     _safe,
+    _source_sha256,
     bib_file_argument,
     build_where_filter,
     key_option,
@@ -19,6 +20,7 @@ from pynakes.triage import abstract_excerpt
 
 
 def search(
+    file: str | None = bib_file_argument(),
     query: str = typer.Argument(
         ...,
         help=(
@@ -26,10 +28,9 @@ def search(
             'field:"phrase". Pass "" to select by --where alone'
         ),
     ),
-    file: str | None = bib_file_argument(),
-    field: list[str] | None = typer.Option(
+    in_field: list[str] | None = typer.Option(
         None,
-        "--field",
+        "--in-field",
         help="Restrict stored fields searched and returned; repeat for multiple fields",
     ),
     where: str | None = where_option(),
@@ -40,9 +41,9 @@ def search(
         "--fuzzy",
         help="Also match near-misses (misspellings, inflections) by similarity",
     ),
-    show_abstract: bool = typer.Option(
+    abstract: bool = typer.Option(
         False,
-        "--show-abstract",
+        "--abstract",
         help="Print an excerpt of each result's abstract beneath the hit",
     ),
     limit: int | None = typer.Option(None, "--limit", help="Maximum number of matches"),
@@ -75,20 +76,21 @@ def search(
     Predicate-only results report no matched fields and are always in file
     order, since relevance ranking needs terms to rank.
 
-    ``--show-abstract`` adds a one-line abstract excerpt under each hit, so a
+    ``--abstract`` adds a one-line abstract excerpt under each hit, so a
     candidate set can be triaged from the search itself; ``--json`` always
     carries the full abstract. To read whole entries instead, pass the keys to
-    ``ref show --keys``.
+    ``ref show --key``.
     """
     file = _resolve_input_bib(file, json_output)
-    lib = Bibliography.open(file).lib
+    coll = Bibliography.open(file)
+    lib = coll.lib
     where_filter = build_where_filter(where, keys=key)
     ranked = not no_rank and bool(query.strip())
     results = search_ops.search_entries(
         lib,
         query,
-        fields=field,
-        extra_fields=("abstract",) if show_abstract else None,
+        fields=in_field,
+        extra_fields=("abstract",) if abstract else None,
         where=where_filter,
         case_sensitive=case_sensitive,
         fuzzy=fuzzy,
@@ -102,14 +104,16 @@ def search(
                 "status": "success",
                 "action": "search",
                 "file": file,
+                "source_sha256": _source_sha256(coll),
+                "warnings": [],
                 "query": query,
                 "where": where,
                 "keys": parse_key_selector(key),
                 "where_parsed": where_filter.to_dict() if where_filter is not None else None,
-                "fields": field or [],
+                "in_fields": in_field or [],
                 "case_sensitive": case_sensitive,
                 "fuzzy": fuzzy,
-                "show_abstract": show_abstract,
+                "abstract": abstract,
                 "limit": limit,
                 "ranked": ranked,
                 "count": len(results),
@@ -127,7 +131,7 @@ def search(
             tag += f", ~{result.score:.2f}"
         label = f" [{tag}]" if tag else ""
         typer.echo(f"  @{result.type}{{{result.key}}}{suffix}{label}")
-        if show_abstract:
+        if abstract:
             excerpt = abstract_excerpt(result.fields.get("abstract"))
             typer.echo(f"      {excerpt or '(no abstract)'}")
 

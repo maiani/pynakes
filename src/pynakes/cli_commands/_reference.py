@@ -135,9 +135,9 @@ def unique_entry(coll: Bibliography, key: str, json_output: bool, *, action: str
 
 
 def parse_key_list(values: list[str]) -> list[str]:
-    """Parse repeated and comma-separated ``--keys`` values into unique keys.
+    """Parse repeated and comma-separated ``--key`` values into unique keys.
 
-    ``--keys a,b --keys c`` and ``--keys a,b,c`` are the same request. Order is
+    ``--key a,b --key c`` and ``--key a,b,c`` are the same request. Order is
     the order given, and a key repeated across the values appears once, so a
     caller pasting a candidate list from two searches gets one summary per
     reference rather than one per mention.
@@ -149,7 +149,7 @@ def parse_key_list(values: list[str]) -> list[str]:
             if key and key not in keys:
                 keys.append(key)
     if not keys:
-        raise InvalidInputError("--keys requires at least one citation key")
+        raise InvalidInputError("--key requires at least one citation key")
     return keys
 
 

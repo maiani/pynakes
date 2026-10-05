@@ -6,15 +6,15 @@ import os
 import re
 import sys
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TypeVar
+from typing import NoReturn, TypeVar
 
 import click
 import typer
-from click.shell_completion import CompletionItem
 
-from pynakes.bibtex_parser import ParseError, parse_bib
+from pynakes.bibtex_parser import ParseError
+from pynakes.cli_errors import spec_for
 from pynakes.dedupe import DedupeConflictError
 from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography, ExternalModificationError
@@ -37,11 +37,6 @@ def is_auxiliary_bib_file(path: Path) -> bool:
 def bib_file_argument(help: str = BIB_FILE_HELP) -> typer.Argument:
     """Return the standard optional ``.bib`` positional argument."""
     return typer.Argument(None, help=help)
-
-
-def bib_file_option(help: str = BIB_FILE_HELP) -> typer.Option:
-    """Return the standard optional ``--file`` option for commands with other positionals."""
-    return typer.Option(None, "--file", "-f", help=help)
 
 
 def bib_candidates(directory: Path) -> list[Path]:
@@ -85,8 +80,54 @@ def _resolve_input_bib(file: str | None, json_output: bool) -> str:
     return str(candidates[0])
 
 
+# --- deprecations ----------------------------------------------------------
+
+#: Deprecated forms this invocation used, reported in the envelope it emits.
+#: A process runs one command, and :class:`pynakes.cli_discovery.AutoBibGroup`
+#: clears the list when an invocation starts, so in-process callers (tests)
+#: never see an earlier command's notices.
+_DEPRECATIONS: list[dict] = []
+
+
+def reset_deprecations() -> None:
+    """Forget the deprecation notices of a previous invocation."""
+    _DEPRECATIONS.clear()
+
+
+def note_deprecation(json_output: bool, old: str, new: str) -> None:
+    """Record that the caller used a deprecated form that still works.
+
+    With ``--json`` the notice becomes a ``deprecated`` warning in the envelope
+    the command emits; otherwise it is printed to stderr at once, so stdout
+    stays exactly what the command writes there.
+    """
+    message = f"{old} is deprecated and will be removed in 0.8.0; use {new}"
+    if json_output:
+        _DEPRECATIONS.append({"type": "deprecated", "old": old, "new": new, "message": message})
+    else:
+        typer.echo(f"Deprecated: {message}.", err=True)
+
+
+def _warning_object(warning: object) -> dict:
+    """Return *warning* as the ``{"type", "message", ...}`` object the envelope promises."""
+    if isinstance(warning, dict):
+        if "message" not in warning:
+            warning = {**warning, "message": str(warning.get("type", "warning"))}
+        return warning if "type" in warning else {"type": "warning", **warning}
+    return {"type": "warning", "message": str(warning)}
+
+
 def _emit_json(payload: dict) -> None:
-    """Write one JSON envelope to stdout, in the format every command shares."""
+    """Write one JSON envelope to stdout, in the format every command shares.
+
+    ``warnings`` is always a list of objects carrying ``type`` and ``message``;
+    any deprecated form the invocation used is appended to it.
+    """
+    if "warnings" in payload or _DEPRECATIONS:
+        warnings = [_warning_object(w) for w in payload.get("warnings") or []]
+        warnings.extend(_DEPRECATIONS)
+        _DEPRECATIONS.clear()
+        payload["warnings"] = warnings
     typer.echo(json.dumps(payload, indent=2))
 
 
@@ -233,20 +274,29 @@ def stdin_is_interactive() -> bool:
         return False
 
 
-def _emit_error(json_output: bool, error: str, message: str, code: int = 1, **extra) -> None:
+def _emit_error(json_output: bool, error: str, message: str, **extra) -> NoReturn:
+    """Report a failure under a catalogued code and exit with that code's exit status.
+
+    The status (``error`` or ``conflict``) and the exit code come from
+    :data:`pynakes.cli_errors.CATALOGUE`, never from the caller, so one code
+    cannot be an error in one command and a conflict in another. Outside
+    ``--json`` the line goes to stderr.
+    """
+    spec = spec_for(error)
     if json_output:
-        _emit_json({"status": "error", "error": error, "message": message, **extra})
+        _emit_json({"status": spec.status, "error": error, "message": message, **extra})
     else:
-        typer.echo(f"{error}: {message}")
-    raise typer.Exit(code=code)
+        typer.echo(f"{error}: {message}", err=True)
+        for option in extra.get("options") or []:
+            typer.echo(f"  - {option['description']}", err=True)
+    raise typer.Exit(code=spec.exit_code)
 
 
-def _emit_conflict(json_output: bool, error: str, message: str, **extra) -> None:
-    if json_output:
-        _emit_json({"status": "conflict", "error": error, "message": message, **extra})
-    else:
-        typer.echo(f"{error}: {message}")
-    raise typer.Exit(code=2)
+def _emit_conflict(json_output: bool, error: str, message: str, **extra) -> NoReturn:
+    """Report a conflict: a catalogued exit-2 code, with the caller's ``options``."""
+    if spec_for(error).exit_code != 2:
+        raise AssertionError(f"{error} is not catalogued as a conflict")
+    _emit_error(json_output, error, message, **extra)
 
 
 class InvalidInputError(ValueError):
@@ -442,13 +492,17 @@ def _check_expected_sha256(file, coll: Bibliography, params: RunParams) -> None:
     command may call it early (before operations that would otherwise fail on
     a changed file with a less useful error) and :func:`_finish_mod` again.
     """
+    _check_expected_digest(file, _source_sha256(coll), params)
+
+
+def _check_expected_digest(file, actual: str | None, params: RunParams) -> None:
+    """Refuse with an exit-2 conflict unless *actual* is the ``--expect-sha256`` digest."""
     expected = params.expect_sha256
     if expected is None:
         return
     expected = expected.strip().lower()
     if not _SHA256_RE.fullmatch(expected):
         raise InvalidInputError("--expect-sha256 needs a 64-character hexadecimal sha256 digest")
-    actual = _source_sha256(coll)
     if actual == expected:
         return
     _emit_conflict(
@@ -460,64 +514,6 @@ def _check_expected_sha256(file, coll: Bibliography, params: RunParams) -> None:
         source_sha256=actual,
         options=_EXTERNAL_MODIFICATION_OPTIONS,
     )
-
-
-def _citekey_completer(ctx, incomplete):
-    """Shell-completion callback yielding matching citation keys.
-
-    Intended for use as ``param.shell_complete`` on citekey arguments.
-    Auto-detects the ``.bib`` file from ``ctx.params`` or the current directory.
-
-    Click/ShellComplete calls this with ``(ctx, incomplete)`` — see
-    ``ShellComplete.get_completions``.
-    """
-    file = ctx.params.get("file") or ctx.params.get("bib_file")
-    if file is None:
-        candidate = single_bib_file(Path.cwd())
-        if candidate is None:
-            return []
-        file = str(candidate)
-    try:
-        lib = parse_bib(Path(file).read_text(encoding="utf-8"))
-        return [
-            CompletionItem(key)
-            for key in sorted(set(lib.entries.keys()))
-            if incomplete.lower() in key.lower()
-        ]
-    except Exception:
-        return []
-
-
-def _bibfile_completer(ctx, incomplete):
-    """Shell-completion callback for the ``.bib`` file positional argument.
-
-    When a single ``.bib`` file can be auto-detected, this returns citekeys
-    from that library (so the user can Tab complete citekeys without first
-    filling in the file argument).  Otherwise it falls back to suggesting
-    ``.bib`` filenames.
-    """
-    candidate = single_bib_file(Path.cwd())
-    if candidate is not None:
-        name = candidate.name
-        items: list[CompletionItem] = []
-        if incomplete.lower() in name.lower():
-            items.append(CompletionItem(name))
-        try:
-            lib = parse_bib(candidate.read_text(encoding="utf-8"))
-        except Exception:
-            return items
-        for key in sorted(set(lib.entries.keys())):
-            if incomplete.lower() in key.lower():
-                items.append(CompletionItem(key))
-        return items
-    try:
-        return [
-            CompletionItem(p.name)
-            for p in bib_candidates(Path("."))
-            if incomplete.lower() in p.name.lower()
-        ]
-    except Exception:
-        return []
 
 
 def _finish_mod(
@@ -579,10 +575,12 @@ def _finish_mod(
 
 def _finish_create(
     params: RunParams,
-    path: str,
+    out: str,
     action: str,
     content: str,
     human: list[str],
+    *,
+    file: str | None = None,
     previous_content: str = "",
     backup: bool = False,
     warnings: list | None = None,
@@ -592,59 +590,57 @@ def _finish_create(
 ) -> None:
     """Write a new file and emit the standard creation-command result.
 
-    File-creation commands (``combine``, ``split``, ``used``, ``init``) share
-    this envelope: ``status, action, file, dry_run, written, warnings``, plus
+    File-creation commands (``init``, ``scrub``, ``corpus combine``) share this
+    envelope: ``status, action, file, out, dry_run, written, warnings``, plus
     command-specific keys, and an optional ``diff`` when ``--diff`` is set.
+    ``file`` is the library the command read (omitted when it read several),
+    and ``out`` the path it writes.
 
     ``diff_label`` names the file the diff describes, for a command whose
     ``previous_content`` came from somewhere other than the output path
     (``scrub`` diffs its source against the copy it writes). ``encoding``
     carries a source library's own encoding into the file it derives.
     """
-    diff_text = generate_diff(previous_content, content, diff_label or path) if params.diff else ""
+    diff_text = generate_diff(previous_content, content, diff_label or out) if params.diff else ""
     written = False
     if not params.dry_run:
-        result = save_text(content, path, encoding=encoding, backup=backup)
-        if not result.success:
-            _emit_error(params.json_output, "IOError", result.error or f"Failed to write {path}")
+        result = save_text(content, out, encoding=encoding, backup=backup)
+        _require_written(params.json_output, result, out)
         written = True
 
-    payload = {
-        "status": "success",
-        "action": action,
-        "file": path,
-        "dry_run": params.dry_run,
-        "written": written,
-        "warnings": warnings or [],
-        **details,
-    }
+    payload: dict = {"status": "success", "action": action}
+    if file is not None:
+        payload["file"] = file
+    payload.update(
+        {
+            "out": out,
+            "dry_run": params.dry_run,
+            "written": written,
+            "warnings": warnings or [],
+            **details,
+        }
+    )
     _emit(params.json_output, payload, human, diff_text, params.diff)
 
 
-def _metadata_key_completer(ctx, incomplete):
-    """Shell-completion callback yielding known metadata keys.
+_FORCE_OPTION = typer.Option(
+    False, "--force", help="Overwrite the output file if it already exists"
+)
 
-    Intended for use as ``param.shell_complete`` on the ``key`` argument of
-    ``metadata set``. Suggests all keys known to either JabRef or pynakes.
+
+def _refuse_existing_output(json_output: bool, out: str, force: bool) -> None:
+    """Exit with ``FileExists`` when ``out`` exists and ``--force`` was not given.
+
+    Checked before anything is computed or written, in a dry run too: a preview
+    that the real run would refuse is not a preview of anything.
     """
-    from pynakes.metadata.jabref import JABREF_EXACT_KEYS, JABREF_PREFIX_KEYS
-    from pynakes.metadata.schema import PYNAKES_EXACT_KEYS, PYNAKES_PREFIX_KEYS
-
-    incomplete_lower = incomplete.lower()
-    items: list[CompletionItem] = []
-    for key in JABREF_EXACT_KEYS:
-        if incomplete_lower in key.lower():
-            items.append(CompletionItem(key))
-    for key in PYNAKES_EXACT_KEYS:
-        if incomplete_lower in key.lower():
-            items.append(CompletionItem(key))
-    for prefix in JABREF_PREFIX_KEYS:
-        if incomplete_lower in prefix.lower():
-            items.append(CompletionItem(prefix))
-    for prefix in PYNAKES_PREFIX_KEYS:
-        if incomplete_lower in prefix.lower():
-            items.append(CompletionItem(prefix))
-    return items
+    if out != "-" and not force and Path(out).exists():
+        _emit_error(
+            json_output,
+            "FileExists",
+            f"{out} already exists; pass --force to overwrite it",
+            file=str(out),
+        )
 
 
 _CACHE_FILE_OPTION = typer.Option(
@@ -663,121 +659,3 @@ _CONCURRENCY_OPTION = typer.Option(
     help="Number of provider lookups to run at once during an --online pass "
     "(result ordering and applied updates are unaffected)",
 )
-
-
-# --- read-only checks (single- or multi-file) ------------------------------
-
-
-@dataclass
-class CheckOutcome:
-    """The result of running one read-only check over a single file.
-
-    ``result`` is the historical per-file JSON envelope (emitted unchanged when
-    a single file is given). ``human`` are the human-readable lines for that
-    file. ``failed`` is whether the file trips a ``--strict`` gate. ``summary``
-    contributes integer counters to the multi-file aggregate.
-    """
-
-    result: dict
-    human: list[str]
-    failed: bool = False
-    summary: dict = field(default_factory=dict)
-
-
-def _run_single_check(
-    file: str,
-    action: str,
-    check_one: Callable[[str], CheckOutcome],
-    json_output: bool,
-    strict: bool,
-) -> None:
-    """Run a read-only check over a single file."""
-    outcome = check_one(file)
-    if json_output:
-        _emit_json(outcome.result)
-    else:
-        for line in outcome.human:
-            typer.echo(line)
-    if strict and outcome.failed:
-        raise typer.Exit(code=1)
-
-
-def _run_multi_checks(
-    files: list[str],
-    action: str,
-    check_one: Callable[[str], CheckOutcome],
-    json_output: bool,
-    strict: bool,
-) -> None:
-    """Run a read-only check over multiple files and emit an aggregate result."""
-    results: list[dict] = []
-    totals: dict = {}
-    error_files = 0
-    findings_failed = 0
-    for path in files:
-        try:
-            outcome = check_one(path)
-        except (FileNotFoundError, ParseError, OSError, ValueError) as exc:
-            error_files += 1
-            err = {
-                "status": "error",
-                "file": path,
-                "error": type(exc).__name__,
-                "message": getattr(exc, "message", str(exc)),
-            }
-            if isinstance(exc, ParseError):
-                err["line"] = exc.line
-            results.append(err)
-            if not json_output:
-                typer.echo(f"# {path}")
-                typer.echo(f"  [error] {err['message']}")
-        else:
-            results.append(outcome.result)
-            if outcome.failed:
-                findings_failed += 1
-            for key, value in outcome.summary.items():
-                totals[key] = totals.get(key, 0) + value
-            if not json_output:
-                typer.echo(f"# {path}")
-                for line in outcome.human:
-                    typer.echo(line)
-
-    failed_files = error_files + findings_failed
-    aggregate = {
-        "status": "error" if error_files else "success",
-        "action": action,
-        "strict": strict,
-        "files": results,
-        "summary": {"files": len(files), "failed_files": failed_files, **totals},
-    }
-    if json_output:
-        _emit_json(aggregate)
-    else:
-        typer.echo(
-            f"{len(files)} file(s) checked; {failed_files} with findings, {error_files} unreadable."
-        )
-    if error_files or (strict and findings_failed):
-        raise typer.Exit(code=1)
-
-
-def _run_checks(
-    files: list[str],
-    action: str,
-    check_one: Callable[[str], CheckOutcome],
-    json_output: bool,
-    strict: bool,
-) -> None:
-    """Run a read-only check over one or more files and emit the result.
-
-    A single file preserves the exact historical per-file envelope and human
-    output (the documented, byte-stable contract). Multiple files emit an
-    aggregate ``{status, action, strict, files: [...], summary}`` envelope, with
-    each element the same per-file envelope (or a per-file error object).
-
-    Exit code: ``1`` if any file could not be read/parsed, or — when
-    ``--strict`` — if any file tripped its gate; otherwise ``0``.
-    """
-    if len(files) == 1:
-        _run_single_check(files[0], action, check_one, json_output, strict)
-    else:
-        _run_multi_checks(files, action, check_one, json_output, strict)

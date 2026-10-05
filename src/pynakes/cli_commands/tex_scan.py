@@ -7,15 +7,20 @@ import typer
 from pynakes.bibtex_writer import write_bib
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    _EXPECT_SHA256_OPTION,
+    _FORCE_OPTION,
     RunParams,
+    _check_expected_sha256,
     _emit,
     _emit_error,
     _entries,
     _preview_or_commit,
+    _refuse_existing_output,
     _refuse_input_as_output,
     _require_written,
     _resolve_input_bib,
     _safe,
+    _source_sha256,
     _verb,
     bib_file_argument,
 )
@@ -31,11 +36,11 @@ from pynakes.usage import (
     tex_sources_from_metadata,
 )
 
-# --- used ------------------------------------------------------------------
+# --- tex scan --------------------------------------------------------------
 
 
-def used(
-    bib_file: str | None = bib_file_argument(),
+def scan(
+    file: str | None = bib_file_argument(),
     sources: list[str] | None = typer.Argument(
         None,
         help="One or more .tex/.aux files or directories to scan "
@@ -44,21 +49,33 @@ def used(
     out: str | None = typer.Option(
         None, "--out", help="Write a subset .bib containing only the used entries"
     ),
+    force: bool = _FORCE_OPTION,
     group: str | None = typer.Option(None, "--group", help="Tag used entries into this group"),
     keyword: str | None = typer.Option(
         None, "--keyword", help="Tag used entries with this keyword"
     ),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would change without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff of changes"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Report which entries are used in LaTeX sources; optionally tag or export them."""
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    bib_file = _resolve_input_bib(bib_file, json_output)
-    coll = Bibliography.open(bib_file)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
+    if group and keyword:
+        _emit_error(json_output, "InvalidInput", "Tag with --group or --keyword, not both")
+    file = _resolve_input_bib(file, json_output)
+    coll = Bibliography.open(file)
+    _check_expected_sha256(file, coll, params)
+    source_sha256 = _source_sha256(coll)
     resolved_sources = (
-        list(sources) if sources else tex_sources_from_metadata(coll.lib, Path(bib_file).parent)
+        list(sources) if sources else tex_sources_from_metadata(coll.lib, Path(file).parent)
     )
     warnings: list[dict] = []
     if not sources:
@@ -72,7 +89,8 @@ def used(
         return
     occurrences, include_all, scanned = collect_citation_occurrences(resolved_sources)
     if out:
-        _refuse_input_as_output(json_output, out, [bib_file, *scanned])
+        _refuse_input_as_output(json_output, out, [file, *scanned])
+        _refuse_existing_output(json_output, out, force)
     report = analyze_usage(
         coll.lib,
         set(occurrences),
@@ -93,6 +111,7 @@ def used(
     bib_diff = ""
     file_modified = False
     tagged_entries = 0
+    plan = coll.change_plan()
     if tag_field:
         if not params.dry_run:
             coll.mark_dirty(tagged)
@@ -133,23 +152,25 @@ def used(
 
     result = {
         "status": "success",
-        "action": "used",
-        "file": bib_file,
+        "action": "tex_scan",
+        "file": file,
         "dry_run": params.dry_run,
         "modified": file_modified,
         "modified_entries": tagged_entries,
         "warnings": warnings,
+        "plan": plan,
+        "source_sha256": source_sha256,
+        "out": out,
+        "written": out_written,
         "report": report.to_dict(),
         "tagged": {"field": tag_field, "value": group or keyword, "count": tagged}
         if tag_field
         else None,
-        "exported": {"path": out, "written": out_written, "count": len(report.used)}
-        if out
-        else None,
+        "exported": len(report.used) if out else None,
     }
     _emit(params.json_output, result, human, bib_diff, params.diff)
 
 
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
-    app.command("scan")(_safe(used))
+    app.command("scan")(_safe(scan))

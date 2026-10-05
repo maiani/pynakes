@@ -9,14 +9,15 @@ from pynakes.cli_common import (
     _emit_json,
     _resolve_input_bib,
     _safe,
+    _source_sha256,
     bib_file_argument,
 )
 from pynakes.engine import Bibliography
 
 
 def compare(
-    key: str = typer.Argument(..., help="Citation key to compare"),
     file: str | None = bib_file_argument(),
+    key: str = typer.Argument(..., help="Citation key to compare"),
     with_: str | None = typer.Option(
         None,
         "--with",
@@ -40,7 +41,7 @@ def compare(
 
     Either way, reports only the fields where a non-empty value on the other
     side differs from the local one, for manual review — nothing is written.
-    Apply chosen fields afterward with ``ref edit KEY --field name=value``.
+    Apply chosen fields afterward with ``ref edit FILE KEY --field name=value``.
     """
     if with_ is not None and online:
         raise InvalidInputError(
@@ -54,6 +55,13 @@ def compare(
     else:
         entry = unique_entry(coll, key, json_output, action="ref_compare")
         report = coll.compare_entry_with_remote(entry.key, online=online, cache_file=cache_file)
+        for warning in report.warnings:
+            if warning.get("type") == "offline":
+                # The engine's message names its Python keyword argument.
+                warning["message"] = (
+                    "Nothing was compared: pass --online to fetch the remote record, "
+                    "or --with KEY to compare against another local entry"
+                )
 
     if json_output:
         _emit_json(
@@ -61,6 +69,7 @@ def compare(
                 "status": "success",
                 "action": "ref_compare",
                 "file": file,
+                "source_sha256": _source_sha256(coll),
                 "online": online,
                 **report.to_dict(),
             }

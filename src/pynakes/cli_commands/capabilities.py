@@ -7,7 +7,7 @@ retaining the stable CLI contract.
 import typer
 
 from pynakes.capabilities import get_capabilities
-from pynakes.cli_common import _emit_json
+from pynakes.cli_common import _emit_json, _safe
 
 # --- capabilities ------------------------------------------------
 
@@ -18,7 +18,7 @@ def capabilities(
     """Show tool capabilities."""
     caps = get_capabilities()
     if json_output:
-        _emit_json(caps)
+        _emit_json({"status": "success", "action": "capabilities", "warnings": [], **caps})
         return
     typer.echo(f"{caps['tool']} v{caps['version']}")
     descriptions = caps["commands"]
@@ -30,4 +30,4 @@ def capabilities(
 
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
-    app.command()(capabilities)
+    app.command()(_safe(capabilities))

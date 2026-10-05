@@ -37,12 +37,52 @@ from pynakes.normalize import NormalizeOptions
 
 
 class BatchError(ValueError):
-    """A batch operation could not be applied. Carries the offending op index."""
+    """A batch operation could not be applied. Carries the offending op index.
 
-    def __init__(self, index: int, op: str, message: str):
+    ``code`` is the error code the standalone command reports for the same
+    failure — ``KeyNotFound`` for an unknown citation key or group,
+    ``DuplicateCitationKey`` for an ambiguous one, ``CitationKeyConflict`` for
+    a key that is already taken — so a caller routes on one vocabulary whether
+    an edit arrives as a command or as an operation. Anything else is
+    ``InvalidInput``.
+    """
+
+    def __init__(self, index: int, op: str, message: str, code: str = "InvalidInput"):
         self.index = index
         self.op = op
+        self.code = code
         super().__init__(f"operation {index} ({op!r}): {message}")
+
+
+class _Refused(ValueError):
+    """An operation refused for a reason with its own error code."""
+
+    def __init__(self, code: str, message: str):
+        self.code = code
+        super().__init__(message)
+
+
+def _unique_key(coll: Bibliography, key: str) -> None:
+    """Refuse an unknown or duplicated citation key, as the commands do."""
+    matches = coll.entries.get_all(key)
+    if not matches:
+        raise _Refused("KeyNotFound", f"No entry with citation key {key!r}")
+    if len(matches) > 1:
+        raise _Refused(
+            "DuplicateCitationKey", f"Citation key {key!r} identifies {len(matches)} entries"
+        )
+
+
+def _existing_key(coll: Bibliography, key: str) -> None:
+    if not coll.entries.get_all(key):
+        raise _Refused("KeyNotFound", f"No entry with citation key {key!r}")
+
+
+def _existing_group(coll: Bibliography, group: str) -> None:
+    from pynakes.group_tree import known_group_names
+
+    if group not in known_group_names(coll.lib):
+        raise _Refused("KeyNotFound", f"Group {group!r} not found")
 
 
 @dataclass(frozen=True)
@@ -67,7 +107,9 @@ OPERATION_SPECS: dict[str, OperationSpec] = {
     "fields.protect_title": OperationSpec(
         (), ("field", "where", "terms"), "Brace-protect title case"
     ),
-    "groups.add_entry": OperationSpec(("key", "group"), (), "Add an entry to a group"),
+    "groups.add_entry": OperationSpec(
+        ("key", "group"), ("create",), "Add an entry to a group (create: make a new group)"
+    ),
     "groups.remove_entry": OperationSpec(("key", "group"), (), "Remove an entry from a group"),
     "keys.generate": OperationSpec((), (), "Regenerate every citation key"),
     "keys.repair": OperationSpec((), (), "Make duplicate citation keys unique"),
@@ -128,30 +170,31 @@ def _ref_edit_arguments(coll: Bibliography, params: dict) -> tuple[dict[str, str
     """Validate a ``ref.edit`` operation exactly as ``ref edit`` validates its options.
 
     Field names must be names, ``key``/``type`` are not fields, values are
-    trimmed, a field cannot be both set and cleared, and an unknown citation
-    key is an input error rather than an internal one.
+    trimmed, and a field cannot be both set and cleared.
     """
     raw_fields = params.get("fields") or {}
     raw_clear = params.get("clear_fields") or []
     if not isinstance(raw_fields, dict):
-        raise ValueError("'fields' must be an object of field names to values")
+        raise _Refused("InvalidInput", "'fields' must be an object of field names to values")
     if not isinstance(raw_clear, list) or not all(isinstance(name, str) for name in raw_clear):
-        raise ValueError("'clear_fields' must be an array of field names")
+        raise _Refused("InvalidInput", "'clear_fields' must be an array of field names")
     fields: dict[str, str] = {}
     for raw_name, value in raw_fields.items():
         name = str(raw_name).strip()
         if not _FIELD_NAME_RE.fullmatch(name):
-            raise ValueError(f"Invalid field name: {name!r}")
+            raise _Refused("InvalidInput", f"Invalid field name: {name!r}")
         if name.lower() in {"key", "type"}:
-            raise ValueError(f"{name!r} is not a field; use the citation key or entry_type")
+            raise _Refused(
+                "InvalidInput", f"{name!r} is not a field; use the citation key or entry_type"
+            )
         if not isinstance(value, str):
-            raise ValueError(f"Field {name!r} needs a string value")
+            raise _Refused("InvalidInput", f"Field {name!r} needs a string value")
         fields[name] = value.strip()
     overlap = {name.lower() for name in fields} & {name.lower() for name in raw_clear}
     if overlap:
-        raise ValueError(f"Cannot set and clear the same field(s): {', '.join(sorted(overlap))}")
-    if not coll.entries.get_all(params["key"]):
-        raise ValueError(f"No entry with citation key {params['key']!r}")
+        raise _Refused(
+            "InvalidInput", f"Cannot set and clear the same field(s): {', '.join(sorted(overlap))}"
+        )
     return fields, list(raw_clear)
 
 
@@ -177,14 +220,22 @@ def _apply_one(coll: Bibliography, op: str, params: dict) -> dict:
             result["warnings"] = [f"No matching entries had field {field!r}"]
         return result
     if op == "groups.add_entry":
+        _existing_key(coll, params["key"])
+        if not params.get("create"):
+            _existing_group(coll, params["group"])
         return {"changed": coll.add_to_group(params["key"], params["group"])}
     if op == "groups.remove_entry":
+        _existing_key(coll, params["key"])
+        _existing_group(coll, params["group"])
         return {"changed": coll.remove_from_group(params["key"], params["group"])}
     if op == "keys.generate":
         return {"renames": [{"old": o, "new": n} for o, n in coll.generate_keys()]}
     if op == "keys.repair":
         return {"renames": [{"old": o, "new": n} for o, n in coll.repair_keys()]}
     if op == "keys.rename":
+        _unique_key(coll, params["old"])
+        if params["new"] != params["old"] and coll.entries.get_all(params["new"]):
+            raise _Refused("CitationKeyConflict", f"Citation key {params['new']!r} already exists")
         return {"changed": coll.rename_key(params["old"], params["new"])}
     if op == "normalize":
         return {"operations": coll.normalize(NormalizeOptions(**params)).operations}
@@ -197,6 +248,8 @@ def _apply_one(coll: Bibliography, op: str, params: dict) -> dict:
         )
         return {"key": update.key, "namespace": update.namespace, "created": update.created}
     if op == "ref.add":
+        if coll.entries.get_all(params["key"]) and not params.get("allow_duplicate"):
+            raise _Refused("CitationKeyConflict", f"Citation key {params['key']!r} already exists")
         entry = coll.add_entry(
             params["entry_type"],
             params["key"],
@@ -205,6 +258,7 @@ def _apply_one(coll: Bibliography, op: str, params: dict) -> dict:
         )
         return {"key": entry.key, "entry_type": entry.type}
     if op == "ref.edit":
+        _unique_key(coll, params["key"])
         fields, clear_fields = _ref_edit_arguments(coll, params)
         return coll.edit_entry(
             params["key"],
@@ -213,10 +267,8 @@ def _apply_one(coll: Bibliography, op: str, params: dict) -> dict:
             entry_type=params.get("entry_type"),
         )
     if op == "ref.remove":
-        removed = coll.remove_entry(params["key"])
-        if not removed:
-            raise ValueError(f"No entry with citation key {params['key']!r}")
-        return {"removed": removed}
+        _unique_key(coll, params["key"])
+        return {"removed": coll.remove_entry(params["key"])}
     if op == "dedupe.merge":
         keys = params.get("keys")
         report = coll.dedupe_merge(list(keys) if keys else None)
@@ -250,7 +302,11 @@ def apply_operations(coll: Bibliography, operations: list[dict]) -> list[dict]:
             raise BatchError(index, op, "unknown operation")
         params = {k: v for k, v in raw.items() if k != "op"}
         _validate(spec, params, index, op)
-        results.append({"op": op, "result": _apply_one(coll, op, params)})
+        try:
+            result = _apply_one(coll, op, params)
+        except _Refused as exc:
+            raise BatchError(index, op, str(exc), code=exc.code) from exc
+        results.append({"op": op, "result": result})
     return results
 
 
