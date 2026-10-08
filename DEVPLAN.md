@@ -232,6 +232,22 @@ editor passes against the new envelope (see the editor track).
   idempotent; combine then split round-trips.
 - **Test hygiene**: three tests sleep 5 s in real retry backoff; the shared
   HTTP layer (`providers/_http`) sits at 79% coverage.
+- **Type checking with ty** (does not gate Gate 5): replace mypy with Astral's
+  ty, which is far faster and sits beside Ruff in the same toolchain. It is a
+  different checker, not a faster mypy — it infers differently, reports
+  different errors, and does not read `[tool.mypy]` — so the switch runs in
+  order:
+  1. Confirm ty's release status is fit for a CI gate.
+  2. Run ty over `src/pynakes` and triage its findings against mypy's: real
+     defects get fixed; false positives get recorded.
+  3. Rebuild the baseline in ty's own configuration from the modules that still
+     fail, under the same rule as today's `[[tool.mypy.overrides]]` list —
+     shrink it, never grow it. Take the chance to shrink it: the mypy baseline
+     still exempts 36 modules.
+  4. Run both checkers in CI for a while; mypy stays the gate until ty has
+     caught what mypy catches.
+  5. Then swap: ty in the `dev` extra, the CI type-check step, the pre-commit
+     config, and the AGENTS.md check list; drop mypy and `[tool.mypy]`.
 
 **Gate 5**: the hostile-input matrix runs in CI with zero tracebacks and zero
 invalid JSON; profiling shows no quadratic path in parsing, `lint`, or
