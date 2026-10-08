@@ -160,6 +160,7 @@ pynakes lint refs.bib
 pynakes lint refs.bib --json
 pynakes lint refs.bib chapters/*.bib --strict   # multi-file CI gate
 pynakes lint refs.bib --category correctness    # only structural problems
+pynakes lint refs.bib --ignore missing_doi --ignore layout   # leave findings out
 ```
 
 Checks include duplicate citation keys, dialect-aware missing required fields by
@@ -208,6 +209,24 @@ and profile deviations gate `--strict` — including metadata drift (unknown
 pynakes keys, invalid metadata values, duplicate blocks). Human output ends
 with the commands that would clear the fixable findings, for example
 `Run `pynakes format` to resolve 3 of them.`
+
+Some findings can never be fixed — a venue that assigns no DOIs, a journal with
+no volumes — and would keep a commit hook failing or noisy. `--ignore NAME`
+(repeatable) leaves a finding type (`missing_doi`) or a whole category
+(`consistency`) out of the report and out of the `--strict` gate. To make that a
+property of the library rather than of one invocation, store it:
+
+```bibtex
+@comment{pynakes-meta:
+lint-ignore: missing_doi, layout
+}
+```
+
+`--ignore` adds to the stored list; it cannot re-enable what the library
+ignores. Suppression is never silent: the summary's `suppressed` count, and a
+closing line in human output, report how many findings were left out. An
+unknown name is refused on the command line and reported as
+`invalid_metadata_value` in the stored setting.
 
 `pynakes normalize refs.bib` also repairs bare full month names such as
 `month = june`, which BibTeX interprets as an undefined string reference. It

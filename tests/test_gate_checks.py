@@ -65,7 +65,14 @@ class TestLintStrict:
             "issues",
         }
         assert data["strict"] is True
-        assert set(data["summary"]) == {"issues", "errors", "warnings", "info", "by_category"}
+        assert set(data["summary"]) == {
+            "issues",
+            "errors",
+            "warnings",
+            "info",
+            "suppressed",
+            "by_category",
+        }
         assert "files" not in data  # not the aggregate shape
 
 

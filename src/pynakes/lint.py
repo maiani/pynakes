@@ -28,18 +28,21 @@ from pathlib import Path
 from pynakes._identifiers import normalize_doi
 from pynakes._lint_issue import (
     CATEGORY_FIXERS,
+    IGNORABLE_NAMES,
     ISSUE_CATEGORIES,
     SEVERITIES,
     LintCategory,
     LintIssue,
     LintSeverity,
     issue_category,
+    unknown_ignore_names,
 )
 from pynakes._lint_profile import (
     PROFILE_ISSUE_TYPES,
     LintProfile,
     _lint_profile_entry,
     is_profile_issue,
+    library_lint_ignores,
     profile_required_fields,
     resolve_lint_profile,
 )
@@ -68,6 +71,7 @@ from pynakes.usage import tex_sources_from_metadata, validate_tex_sources
 
 __all__ = [
     "CATEGORY_FIXERS",
+    "IGNORABLE_NAMES",
     "ISSUE_CATEGORIES",
     "PROFILE_ISSUE_TYPES",
     "SEVERITIES",
@@ -77,9 +81,11 @@ __all__ = [
     "LintSeverity",
     "is_profile_issue",
     "issue_category",
+    "library_lint_ignores",
     "lint",
     "profile_required_fields",
     "resolve_lint_profile",
+    "unknown_ignore_names",
 ]
 
 # Entry types for which a missing DOI is worth a (low-severity) warning. This is

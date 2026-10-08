@@ -58,6 +58,16 @@ ISSUE_CATEGORIES: dict[str, LintCategory] = {
 }
 
 
+# Names ``lint --ignore`` and the ``lint-ignore`` setting accept: a finding type
+# or a whole category. The two sets never share a name.
+IGNORABLE_NAMES: frozenset[str] = frozenset(ISSUE_CATEGORIES) | frozenset(CATEGORY_FIXERS)
+
+
+def unknown_ignore_names(names: tuple[str, ...] | list[str]) -> list[str]:
+    """Return the entries of ``names`` that are neither a finding type nor a category."""
+    return [name for name in names if name not in IGNORABLE_NAMES]
+
+
 def issue_category(issue_type: str) -> LintCategory:
     """Return the category of ``issue_type``.
 
@@ -85,6 +95,10 @@ class LintIssue:
     def category(self) -> LintCategory:
         """Return which kind of problem this finding is."""
         return issue_category(self.type)
+
+    def is_ignored(self, ignores: frozenset[str] | set[str]) -> bool:
+        """Return whether ``ignores`` names this finding's type or category."""
+        return self.type in ignores or self.category in ignores
 
     @property
     def fixer(self) -> str | None:

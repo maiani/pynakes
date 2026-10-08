@@ -318,6 +318,9 @@ def test_format_profile_keys_are_owned_and_validated() -> None:
     metadata_pkg.validate_metadata_value("format-wrap-values", "stable")
     metadata_pkg.validate_metadata_value("format-trailing-comma", "false")
     metadata_pkg.validate_metadata_value("format-entry-type-case", "preserve")
+    metadata_pkg.validate_metadata_value("lint-ignore", "missing_doi, consistency")
+    with pytest.raises(ValueError, match="lint-ignore"):
+        metadata_pkg.validate_metadata_value("lint-ignore", "missing_dio")
     assert metadata_pkg.metadata_category("format-entry-type-case") == "formatting"
 
     with pytest.raises(ValueError, match="format-field-order"):

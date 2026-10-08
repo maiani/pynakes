@@ -77,6 +77,7 @@ to find the operation module that owns a key.
 | `format-entry-type-case` | formatting | `lower` (default) or `preserve` — keep each entry's type spelling, e.g. JabRef's `@Article` | `format`, `normalize`, `lint` | — |
 | `lint-required-fields` | lint | Fields required on every entry | `lint` | — |
 | `lint-required-fields-<entrytype>` | lint | Extra fields required on one entry type | `lint` | — |
+| `lint-ignore` | lint | List of finding types and/or categories the `lint` command leaves out (counted as `suppressed`) | `lint` | — |
 | `tex-sources` | usage | List of TeX files or directories, relative to the `.bib` file | `keys`, `tex scan` | — |
 | `group-tree` | groups | Pipe-delimited group hierarchy; aliases JabRef's `grouping` (read native-first) — see [Grouping](#grouping) | `groups tree`/`add-group`/`remove-group`/`rename-group`/`move-group`/`update-group` | `grouping` / `groupsTree` / `groups:N...` |
 | `scrub-fields` | scrub | List of extra field names/globs `scrub` removes, on top of its default private set | `scrub` | — |

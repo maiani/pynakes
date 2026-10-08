@@ -94,6 +94,16 @@ pre-commit run pynakes-dedupe-check --hook-stage manual --all-files
 Move them into the default stages (drop the `stages: [manual]`) if you want
 them on every commit.
 
+A finding your library can never clear fails the lint hook on every commit. Leave
+it out either for the hook alone, with `args`, or for the library itself, with a
+`lint-ignore` setting that every `pynakes lint` run then honors (see
+[lint](usage.md#lint)):
+
+```yaml
+      - id: pynakes-lint
+        args: [--ignore, missing_profile_required_field]
+```
+
 ## GitHub Actions
 
 A minimal job that gates a paper repository on citation integrity:

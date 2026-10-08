@@ -713,6 +713,71 @@ class TestInspectAndLint:
         strict = runner.invoke(app, ["lint", str(bib), "--strict", "--json"])
         assert strict.exit_code == 1, strict.output
 
+    _NEWTON = (
+        "@article{Newton1687,\n"
+        "  author = {Newton, Isaac},\n"
+        "  title = {Philosophiae Naturalis Principia Mathematica},\n"
+        "  journal = {Royal Society},\n"
+        "  year = {1687}\n"
+        "}\n"
+    )
+
+    def test_lint_ignore_leaves_out_a_type_or_category_and_counts_it(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(self._NEWTON)
+
+        for name in ("missing_doi", "consistency"):
+            result = runner.invoke(app, ["lint", str(bib), "--ignore", name, "--json"])
+            assert result.exit_code == 0, result.output
+            payload = json.loads(result.output)
+            assert all(issue["type"] != "missing_doi" for issue in payload["issues"])
+            assert payload["summary"]["suppressed"] >= 1
+
+        plain = json.loads(runner.invoke(app, ["lint", str(bib), "--json"]).output)
+        assert plain["summary"]["suppressed"] == 0
+        human = runner.invoke(app, ["lint", str(bib), "--ignore", "missing_doi"])
+        assert "suppressed" in human.output
+
+    def test_lint_ignore_setting_lets_a_strict_gate_pass(self, tmp_path: Path) -> None:
+        # A profile-required field the venue never assigns fails --strict; the
+        # library can accept that once, and a commit hook then passes.
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@comment{pynakes-meta: lint-required-fields: volume;}\n\n" + self._NEWTON)
+        assert runner.invoke(app, ["lint", str(bib), "--strict"]).exit_code == 1
+
+        bib.write_text(
+            "@comment{pynakes-meta:\n"
+            "lint-required-fields: volume\n"
+            "lint-ignore: missing_profile_required_field\n"
+            "}\n\n" + self._NEWTON
+        )
+        result = runner.invoke(app, ["lint", str(bib), "--strict", "--json"])
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["summary"]["suppressed"] == 1
+
+    def test_lint_ignore_refuses_an_unknown_name(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(self._NEWTON)
+
+        result = runner.invoke(app, ["lint", str(bib), "--ignore", "missing_dio", "--json"])
+
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert payload["error"] == "InvalidInput"
+        assert "missing_dio" in payload["message"]
+
+    def test_lint_ignore_totals_suppressed_across_files(self, tmp_path: Path) -> None:
+        first, second = tmp_path / "a.bib", tmp_path / "b.bib"
+        first.write_text(self._NEWTON)
+        second.write_text(self._NEWTON)
+
+        result = runner.invoke(
+            app, ["lint", str(first), str(second), "--ignore", "missing_doi", "--json"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["summary"]["suppressed"] == 2
+
     def test_lint_strict_fails_on_metadata_drift(self, tmp_path: Path) -> None:
         # A typo'd stored metadata value is stored-profile drift: advisory in
         # interactive lint, but a failed conformance gate under --strict.

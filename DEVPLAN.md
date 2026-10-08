@@ -134,6 +134,14 @@ Decisions taken:
 - `scrub --out` naming its own input (in-place scrub) needs no `--force`.
 - `corpus batch` operations report the standalone command's error codes
   (`KeyNotFound`, `DuplicateCitationKey`, `CitationKeyConflict`) with `index`.
+- For lint gating in a commit hook ([#2](https://github.com/maiani/pynakes/issues/2)):
+  entry-type case is `format-entry-type-case`, not a `lint-` key — settings are
+  named for the command that applies them and `lint` verifies them, as it
+  verifies the `normalize-*` keys, so a layout finding fires exactly when
+  `format` would change the source (field-name case follows the same rule if it
+  ever gets a setting). Rule selection is one `--ignore NAME` taking a finding
+  type or a category, mirrored by one `lint-ignore` key; the command applies it,
+  and the `lint()` function keeps returning every finding.
 
 **Remaining before the gate:**
 
@@ -161,23 +169,6 @@ Decisions taken:
   still show the old forms (they run, with a deprecation warning); the contract
   doc does not describe the beta envelope yet. Stage 6 regenerates the reference;
   the contract doc should move with this stage.
-- **Lint gating in pre-commit** ([#2](https://github.com/maiani/pynakes/issues/2)).
-  `format-entry-type-case` is done (see CHANGELOG). It took the `format-`
-  prefix, not `lint-`: settings are named for the command that applies them and
-  `lint` verifies them, as it already verifies the `normalize-*` keys, so a
-  layout finding fires exactly when `format` would change the source. Field-name
-  case follows the same rule if it ever gets its own setting. Remaining:
-  - **Rule selection**: `lint --ignore TYPE` and `--ignore-category CATEGORY`
-    (repeatable) for one-off hook `args:`, and a persistent `lint-ignore` key in
-    `pynakes-meta` beside `lint-required-fields`. Suppression is never silent:
-    the summary reports a `suppressed` count. `--strict` itself keeps its gate
-    (errors and profile deviations); the `info` findings the issue names
-    (`missing_doi`, type case) already pass it.
-  - Not before the freeze, and only if asked for: under `preserve`, entries
-    added by `ref add`/`ref import` are written lowercase, so a JabRef library
-    mixes `@article` with `@Article` until JabRef next saves it. A JabRef
-    spelling value for `format-entry-type-case`, or a `consistency` finding for
-    mixed spellings of one type, would close that.
 - **Decisions still to record**: whether `asset check --fix` gains
   `--dry-run`/`--diff`; whether `keys check` stays beside `lint`'s
   `duplicate_key` finding; where `verify` and `enrich` live. `keys usage` and
@@ -401,6 +392,11 @@ rather than worked around in the client.
   Either way the waived findings count toward `summary.suppressed`, and a waiver
   that no longer matches any finding is reported, so stale waivers do not
   accumulate.
+- **Type spelling of new entries** (only if asked for): under
+  `format-entry-type-case: preserve`, `ref add` and `ref import` still write
+  `@book`, so a JabRef library mixes spellings until JabRef next saves it. A
+  JabRef spelling value for the setting, or a `consistency` finding for mixed
+  spellings of one type, would close that.
 - **Further import paths**: candidates not yet in the inventory, ordered by the
   size of the community whose canonical identifier is not a DOI: NASA ADS
   (bibcodes; needs a user-supplied API token), RePEc/IDEAS handles, MathSciNet

@@ -5,7 +5,7 @@ Public through :mod:`pynakes.lint`, which re-exports the non-underscore names.
 
 from dataclasses import dataclass
 
-from pynakes._lint_issue import LintIssue
+from pynakes._lint_issue import IGNORABLE_NAMES, LintIssue
 from pynakes.fields import TITLE_FIELDS, title_capitalization_is_protected
 from pynakes.journals import (
     DEFAULT_JOURNAL_SOURCE,
@@ -95,6 +95,18 @@ def profile_required_fields(lib: BibFile, entry_type: str) -> tuple[str, ...]:
     global_fields = metadata_list(metadata_value(lib, "lint-required-fields"))
     type_fields = metadata_list(metadata_value(lib, f"lint-required-fields-{entry_type.lower()}"))
     return global_fields + type_fields
+
+
+def library_lint_ignores(lib: BibFile) -> frozenset[str]:
+    """Return the finding types and categories the library's ``lint-ignore`` names.
+
+    Unknown names are dropped here; ``lint`` reports them as
+    ``invalid_metadata_value``. ``lint`` itself returns every finding: the
+    command applies the ignores, so callers that gate on a finding (``format``
+    refusing a repeated field) never see it suppressed.
+    """
+    names = metadata_list(metadata_value(lib, "lint-ignore"))
+    return frozenset(name for name in names if name in IGNORABLE_NAMES)
 
 
 def is_profile_issue(issue: "LintIssue") -> bool:

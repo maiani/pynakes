@@ -17,6 +17,7 @@ from pynakes.lint import (
     _lint_entry,
     _lint_profile_entry,
     issue_category,
+    library_lint_ignores,
     lint,
 )
 from pynakes.model import BibEntry
@@ -515,6 +516,26 @@ def test_accepts_defined_and_standard_bibtex_string_references() -> None:
     )
 
     assert "undefined_string_reference" not in _types(lint(lib))
+
+
+def test_lint_reports_every_finding_and_validates_lint_ignore() -> None:
+    # `lint()` never applies the ignores itself (format's lossless-rewrite gate
+    # reads it); an unknown name is reported and dropped.
+    lib = parse_bib(
+        "@comment{pynakes-meta: lint-ignore: missing_doi, layout, missing_dio;}\n"
+        "@Article{Newton1687,\n  author = {Newton, Isaac},\n  title = {Principia},\n"
+        "  journal = {Royal Society},\n  year = {1687}\n}\n"
+    )
+
+    issues = lint(lib)
+
+    assert {"missing_doi", "noncanonical_entry_type_case"} <= _types(issues)
+    assert "invalid_metadata_value" in _types(issues)
+    assert library_lint_ignores(lib) == frozenset({"missing_doi", "layout"})
+    assert [issue.type for issue in issues if issue.is_ignored(library_lint_ignores(lib))] == [
+        "noncanonical_entry_type_case",
+        "missing_doi",
+    ]
 
 
 def test_entry_type_case_follows_the_format_setting() -> None:

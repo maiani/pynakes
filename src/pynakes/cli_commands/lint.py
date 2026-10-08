@@ -10,18 +10,30 @@ import typer
 
 from pynakes.cli_checks import CheckOutcome, _run_checks, strict_option
 from pynakes.cli_choices import LintCategory
-from pynakes.cli_common import _safe, _source_sha256
+from pynakes.cli_common import _emit_error, _safe, _source_sha256
 from pynakes.engine import Bibliography
-from pynakes.lint import LintIssue, is_profile_issue
+from pynakes.lint import (
+    LintIssue,
+    is_profile_issue,
+    library_lint_ignores,
+    unknown_ignore_names,
+)
 from pynakes.lint import lint as lint_lib
 
 # --- lint ------------------------------------------------------------------
 
 
-def _lint_one(file: str, categories: set[str] | None = None) -> CheckOutcome:
+def _lint_one(
+    file: str, categories: set[str] | None = None, ignores: frozenset[str] = frozenset()
+) -> CheckOutcome:
     coll = Bibliography.open(file)
     lib = coll.lib
     issues = lint_lib(lib, base_dir=Path(file).parent)
+    # The command line adds to the library's own `lint-ignore`; it never
+    # re-enables what the library ignores.
+    ignored = ignores | library_lint_ignores(lib)
+    suppressed = sum(1 for issue in issues if issue.is_ignored(ignored))
+    issues = [issue for issue in issues if not issue.is_ignored(ignored)]
     if categories:
         issues = [issue for issue in issues if issue.category in categories]
     errors = sum(1 for i in issues if i.severity == "error")
@@ -42,6 +54,7 @@ def _lint_one(file: str, categories: set[str] | None = None) -> CheckOutcome:
             "errors": errors,
             "warnings": warnings,
             "info": infos,
+            "suppressed": suppressed,
             "by_category": by_category,
         },
         "issues": [i.to_dict() for i in issues],
@@ -54,13 +67,21 @@ def _lint_one(file: str, categories: set[str] | None = None) -> CheckOutcome:
             f"{len(issues)} issue(s): {errors} error(s), {warnings} warning(s), {infos} info."
         )
         human.extend(_fixer_hints(issues))
+    if suppressed:
+        human.append(f"{suppressed} finding(s) suppressed by lint-ignore or --ignore.")
     # Structural errors and declared-profile deviations fail --strict.
     # Other findings (a missing DOI, layout drift) remain advisory.
     return CheckOutcome(
         result=result,
         human=human,
         failed=errors > 0 or any(is_profile_issue(issue) for issue in issues),
-        summary={"issues": len(issues), "errors": errors, "warnings": warnings, "info": infos},
+        summary={
+            "issues": len(issues),
+            "errors": errors,
+            "warnings": warnings,
+            "info": infos,
+            "suppressed": suppressed,
+        },
     )
 
 
@@ -98,14 +119,29 @@ def lint(
         "--category",
         help="Report only these categories (repeatable)",
     ),
+    ignore: list[str] = typer.Option(
+        [],
+        "--ignore",
+        metavar="NAME",
+        help="Leave out a finding type (missing_doi) or a whole category (consistency); "
+        "repeatable, and added to the library's lint-ignore setting",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Validate entries and report issues (accepts multiple files for CI gating)."""
     categories = {item.value for item in category}
+    unknown = unknown_ignore_names(ignore)
+    if unknown:
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            f"--ignore names no finding type or category: {', '.join(unknown)}",
+        )
+    ignores = frozenset(ignore)
     _run_checks(
         files,
         "lint",
-        lambda file: _lint_one(file, categories),
+        lambda file: _lint_one(file, categories, ignores),
         json_output,
         strict,
     )
