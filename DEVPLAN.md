@@ -161,10 +161,32 @@ Decisions taken:
   still show the old forms (they run, with a deprecation warning); the contract
   doc does not describe the beta envelope yet. Stage 6 regenerates the reference;
   the contract doc should move with this stage.
+- **Lint gating in pre-commit** ([#2](https://github.com/maiani/pynakes/issues/2)).
+  `format-entry-type-case` is done (see CHANGELOG). It took the `format-`
+  prefix, not `lint-`: settings are named for the command that applies them and
+  `lint` verifies them, as it already verifies the `normalize-*` keys, so a
+  layout finding fires exactly when `format` would change the source. Field-name
+  case follows the same rule if it ever gets its own setting. Remaining:
+  - **Rule selection**: `lint --ignore TYPE` and `--ignore-category CATEGORY`
+    (repeatable) for one-off hook `args:`, and a persistent `lint-ignore` key in
+    `pynakes-meta` beside `lint-required-fields`. Suppression is never silent:
+    the summary reports a `suppressed` count. `--strict` itself keeps its gate
+    (errors and profile deviations); the `info` findings the issue names
+    (`missing_doi`, type case) already pass it.
+  - Not before the freeze, and only if asked for: under `preserve`, entries
+    added by `ref add`/`ref import` are written lowercase, so a JabRef library
+    mixes `@article` with `@Article` until JabRef next saves it. A JabRef
+    spelling value for `format-entry-type-case`, or a `consistency` finding for
+    mixed spellings of one type, would close that.
 - **Decisions still to record**: whether `asset check --fix` gains
   `--dry-run`/`--diff`; whether `keys check` stays beside `lint`'s
   `duplicate_key` finding; where `verify` and `enrich` live. `keys usage` and
-  `tex scan` both stay — neither is a subset of the other.
+  `tex scan` both stay — neither is a subset of the other. Whether a
+  project-level config (`pynakes.toml` or `[tool.pynakes]`), as #2 proposes,
+  joins the settings the `.bib` carries: leaning no for 0.7 — the library is the
+  one place its lint and format settings live, every client reads them there,
+  and a second, discovered source would make a file lint differently by
+  directory.
 
 **Gate 4**: contract tests enforce the surface instead of sampling it — a table
 test of every command's positional signature; a sweep asserting that each flag
@@ -360,6 +382,25 @@ rather than worked around in the client.
   `Library`, retaining per-file provenance while adding corpus-wide rollups and
   cross-library coverage/duplication views. Reuse the same typed results rather
   than creating an unrelated statistics implementation.
+- **Per-entry lint waivers** ([#2](https://github.com/maiani/pynakes/issues/2)):
+  accept a known exception on one entry ("this venue assigns no DOIs", "this
+  journal has no volumes") without turning the rule off library-wide. A waiver
+  names a rule *and*, where the finding has one, a field
+  (`missing_profile_required_field` on `volume`), so it cannot hide an unrelated
+  finding, and it carries a reason. Two placements to choose between:
+  - a directive comment directly above the entry (`% pynakes: ignore
+    missing_doi -- …`), which `_entry_comments` already carries with the entry
+    through `format`, sorting, `ref remove`, `dedupe merge`, and
+    `corpus split`/`combine`, and which survives `keys rename` untouched —
+    *first verify that JabRef keeps a comment attached above an entry when it
+    saves*;
+  - a waiver table in `pynakes-meta` keyed by citation key, which gathers every
+    waiver in one place but must be rewritten by `keys rename` and `dedupe
+    merge`, and needs a finding of its own for a waiver naming no entry.
+
+  Either way the waived findings count toward `summary.suppressed`, and a waiver
+  that no longer matches any finding is reported, so stale waivers do not
+  accumulate.
 - **Further import paths**: candidates not yet in the inventory, ordered by the
   size of the community whose canonical identifier is not a DOI: NASA ADS
   (bibcodes; needs a user-supplied API token), RePEc/IDEAS handles, MathSciNet
@@ -392,7 +433,7 @@ rather than worked around in the client.
   are removed in 0.8.0, as the beta promise schedules.
 
 **Done when**: `Library`, `Catalogue`, single-bibliography and library-wide
-analysis, and the
+analysis, per-entry lint waivers, and the
 cross-library entry operations (`corpus pick`/`search`/`dedupe`) shipped with
 tests and docs; MCP server published as a companion package; agent-plan and
 change-summary features shipped; `pytest && ruff` green; CHANGELOG updated;

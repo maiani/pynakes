@@ -229,6 +229,29 @@ def test_normalize_identifier_case_honors_metadata_setting() -> None:
     assert lib.entries["A"].raw_content.startswith("@Article")
 
 
+def test_normalize_keeps_entry_types_under_preserve_type_case() -> None:
+    # `format-entry-type-case: preserve` owns type spelling for every command,
+    # so normalize recases field names but leaves `@Article` alone.
+    lib = parse_bib(
+        "@comment{pynakes-meta: format-entry-type-case: preserve;}\n"
+        "@Article{A,\n  TITLE = {Paper}\n}\n"
+    )
+
+    report = normalize_library(
+        lib,
+        NormalizeOptions(
+            protect_titles=False,
+            author_style="none",
+            journal_style="none",
+            normalize_dois=False,
+        ),
+    )
+
+    assert report.entry_types == 0
+    assert report.field_names == 1
+    assert lib.entries["A"].raw_content == "@Article{A,\n  title = {Paper}\n}"
+
+
 def test_normalize_abbreviates_journals_only_when_style_configured() -> None:
     src = "@article{A,\n  title = {Paper},\n  journal = {Nature Machine Intelligence}\n}\n"
 

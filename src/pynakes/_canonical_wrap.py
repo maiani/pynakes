@@ -32,9 +32,7 @@ def _render_wrapped_entry(
 ) -> str:
     """Render an entry with opt-in, expression-preserving value wrapping."""
     width = max((len(name) for name, _ in fields), default=0) if layout.alignment == "equals" else 0
-    # Entry types are case-insensitive in BibTeX, so canonical layout lowercases
-    # them exactly as the parser already lowercases field names.
-    lines = [f"@{entry.type.lower()}{{{entry.key},"]
+    lines = [f"@{layout.entry_type(entry.type)}{{{entry.key},"]
     for index, (name, expression) in enumerate(fields):
         pad = " " * (width - len(name)) if width else ""
         prefix = f"{layout.indent}{name}{pad} = "

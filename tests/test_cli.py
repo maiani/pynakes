@@ -145,6 +145,26 @@ class TestFormatCommand:
         assert clean.exit_code == 0, clean.output
         assert json.loads(clean.output)["modified"] is False
 
+    def test_check_passes_on_jabref_spelled_types_under_preserve(self, tmp_path: Path) -> None:
+        path = tmp_path / "refs.bib"
+        path.write_text("@Article{A,\n  title = {T},\n}\n")
+
+        assert runner.invoke(app, ["format", str(path), "--check"]).exit_code == 1
+        flag = runner.invoke(app, ["format", str(path), "--check", "--entry-type-case", "preserve"])
+        assert flag.exit_code == 0, flag.output
+
+        path.write_text(
+            "@comment{pynakes-meta: format-entry-type-case: preserve;}\n\n"
+            "@Article{A,\n  title = {T},\n}\n"
+        )
+        runner.invoke(app, ["format", str(path)])
+        assert "@Article{A," in path.read_text()
+        clean = runner.invoke(app, ["format", str(path), "--check"])
+        assert clean.exit_code == 0, clean.output
+        lowered = runner.invoke(app, ["format", str(path), "--entry-type-case", "lower"])
+        assert lowered.exit_code == 0, lowered.output
+        assert "@article{A," in path.read_text()
+
     def test_check_ignores_content_normalization_deviations(self, tmp_path: Path) -> None:
         path = tmp_path / "refs.bib"
         path.write_text(

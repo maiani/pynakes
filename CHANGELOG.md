@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `format --out PATH` writes the formatted library elsewhere, leaving the input
   untouched (`--out -` writes it to stdout).
 - `capabilities` describes the positional convention and every deprecated form.
+- **`format-entry-type-case`** (`lower`, the default, or `preserve`) and
+  `format --entry-type-case`: under `preserve`, entry types keep their own
+  spelling, so a library JabRef saves as `@Article`/`@InProceedings` no longer
+  churns between the two tools and `format --check` can pass on it. The setting
+  governs type case for every command — `normalize` leaves types alone (field
+  names are still lowercased) and `lint` reports `noncanonical_entry_type_case`
+  only when `format` would recase the type. `init --jabref` sets it
+  ([#2](https://github.com/maiani/pynakes/issues/2)).
 - `lint` reports a `crossref`, `xref`, `xdata`, `related`, or `entryset` value
   that names a key the library lacks, as `missing_reference_target`.
 - **A write precondition.** Every modifying command's JSON envelope now reports

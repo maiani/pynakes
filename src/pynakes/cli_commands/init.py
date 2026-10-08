@@ -188,7 +188,8 @@ def init(
         False,
         "--jabref",
         help="Also emit a JabRef metadata projection (databaseType, keypatterndefault) so the "
-        "library opens JabRef-tracked; by default a fresh library is pynakes-native only",
+        "library opens JabRef-tracked, and keep JabRef's entry-type spelling "
+        "(format-entry-type-case: preserve); by default a fresh library is pynakes-native only",
     ),
     from_: str | None = typer.Option(
         None, "--profile-from", help="Copy the metadata profile from an existing .bib library"
@@ -221,7 +222,8 @@ def init(
     ``dialect``/``key-pattern`` keys in ``pynakes-meta`` — no ``jabref-meta``
     unless requested). ``--dialect`` / ``--key-pattern`` override individual
     settings; ``--jabref`` also emits the JabRef projection so the library opens
-    JabRef-tracked; ``--profile-from`` replaces the defaults with another library's
+    JabRef-tracked, and sets ``format-entry-type-case: preserve`` so ``format``
+    and ``normalize`` leave JabRef's ``@Article`` spelling alone; ``--profile-from`` replaces the defaults with another library's
     maintenance profile (its conventions, not its group tree or TeX-source
     list). ``--pinax`` seeds pinax mode and, when the file already exists,
     converts it in place; combined with ``--profile-from`` on an existing file, it
@@ -281,6 +283,9 @@ def init(
         stem = Path(file).stem
         overrides.append(("pinax-files-dir", f"{stem}.files", "pynakes"))
         overrides.append(("pinax-fetch-policy", "bestpdf", "pynakes"))
+    if jabref:
+        # JabRef saves types in its own spelling; recasing them would churn.
+        overrides.append(("format-entry-type-case", "preserve", "pynakes"))
     entries = apply_overrides(entries, overrides)
 
     # With --jabref, project the native dialect/key-pattern into their JabRef

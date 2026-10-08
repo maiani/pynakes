@@ -170,8 +170,8 @@ def render_entry(
     """Render one entry from already-delimited field expressions.
 
     ``entry_type`` overrides the rendered type, which the canonical formatter
-    uses to emit the case-insensitive entry type in its canonical lowercase
-    form. Ordinary edits keep the entry's own spelling.
+    uses to emit the case-insensitive entry type in its configured case.
+    Ordinary edits keep the entry's own spelling.
     """
     lines = [f"@{entry_type or entry.type}{{{entry.key},"]
     width = max((len(name) for name, _ in fields), default=0) if tabular else 0

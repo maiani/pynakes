@@ -127,6 +127,8 @@ def test_init_jabref_projects_native_keys(tmp_path: Path) -> None:
     assert lib.jabref_metadata_blocks != []
     assert lib.metadata["databaseType"].rstrip(";") == "biblatex"
     assert lib.metadata["keypatterndefault"].rstrip(";") == "[auth][year][veryshorttitle]"
+    # JabRef saves `@Article`; format and normalize must not fight it.
+    assert lib.metadata["format-entry-type-case"] == "preserve"
 
 
 def test_init_refuses_existing_without_force(tmp_path: Path) -> None:

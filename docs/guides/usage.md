@@ -189,7 +189,7 @@ and a **severity** ranking urgency:
 | --- | --- | --- | --- |
 | `correctness` | you decide | `error` | duplicate keys, missing required fields, undefined string references |
 | `content` | `normalize` | `warning` | journal style, malformed DOI, non-BibTeX page range, unprotected title case, key-pattern mismatch |
-| `layout` | `format` | `info` | mixed-case entry types and field names |
+| `layout` | `format` | `info` | mixed-case field names, and entry types unless `format-entry-type-case` is `preserve` |
 | `consistency` | nothing — an observation | `info` | missing article DOI, a field most comparable peers define |
 | `profile` | you decide | `warning` | deviations from the library's stored lint profile |
 
@@ -757,8 +757,22 @@ block layout formatting of an incomplete draft.
 
 `format` clears every `layout`-category lint finding: it lowercases entry types
 and field names, both of which BibTeX treats case-insensitively, so recasing them
-changes no bibliographic value. Only `format` does this — an ordinary surgical
-edit leaves the spelling of entries it was not asked to change untouched.
+changes no bibliographic value. An ordinary surgical edit leaves the spelling of
+entries it was not asked to change untouched.
+
+A library that another tool saves in its own type spelling — JabRef writes
+`@Article` and `@InProceedings` — would churn: `format` lowercases the types and
+the next JabRef save restores them. Set `format-entry-type-case: preserve` (or
+pass `--entry-type-case preserve`) to keep each entry's own spelling. The
+setting governs type case for every command: `format` keeps the spelling,
+`normalize` leaves types alone while still lowercasing field names, and `lint`
+reports a type only when `format` would recase it. `init --jabref` sets it.
+
+```bibtex
+@comment{pynakes-meta:
+format-entry-type-case: preserve
+}
+```
 
 By default, fields use **pynakes' preferred order**. This is not prescribed by
 BibTeX, BibLaTeX, or JabRef; field order has no bibliographic meaning. It is a
@@ -817,7 +831,8 @@ Default behavior:
 - normalize author/editor lists in JabRef style
 - normalize DOI values
 - rewrite page ranges to `start--end`
-- lowercase entry types and field names
+- lowercase entry types and field names (entry types stay as they are under
+  `format-entry-type-case: preserve`; see [format](#format))
 - leave journal titles unchanged unless a journal style is configured
 
 A step the library has turned off reports `off` rather than `0`, because the

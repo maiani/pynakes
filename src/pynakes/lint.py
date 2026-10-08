@@ -45,6 +45,7 @@ from pynakes._lint_profile import (
 )
 from pynakes._lint_required import required_field_rules
 from pynakes.bibtex_parser import parse_raw_string_definition
+from pynakes.canonical import EntryTypeCase, resolve_entry_type_case
 from pynakes.editing import raw_field_names, raw_field_value
 from pynakes.formatters import normalize_page_numbers
 from pynakes.identity import identity_class
@@ -179,6 +180,11 @@ def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
     profile = resolve_lint_profile(lib)
     journal_sources = None
     dialect = library_dialect(lib)
+    try:
+        type_case = resolve_entry_type_case(lib)
+    except ValueError:
+        # ``_lint_metadata`` reports the invalid value; check against the default.
+        type_case = "lower"
 
     # A value outside the journal-style enum is reported by ``_lint_metadata``
     # as ``invalid_metadata_value`` (the schema is the single validator); here
@@ -236,7 +242,7 @@ def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
         fields = lib.resolved_fields(entry)
         issues.extend(_lint_duplicate_fields(entry))
         issues.extend(_lint_undefined_string_references(entry, lib))
-        issues.extend(_lint_entry(entry, fields, dialect=dialect))
+        issues.extend(_lint_entry(entry, fields, dialect=dialect, type_case=type_case))
         issues.extend(
             _lint_profile_entry(
                 entry,
@@ -624,14 +630,20 @@ def _lint_entry(
     fields: dict[str, str] | None = None,
     *,
     dialect: str = "bibtex",
+    type_case: EntryTypeCase = "lower",
 ) -> list[LintIssue]:
-    """Run structural checks on a single entry; return all findings."""
+    """Run structural checks on a single entry; return all findings.
+
+    ``type_case`` is the library's ``format-entry-type-case``: a type is
+    reported exactly when ``format`` would recase it, so never under
+    ``preserve``.
+    """
     if fields is None:
         fields = entry.fields
     etype = entry.type.lower()
 
     issues: list[LintIssue] = []
-    if entry.type != etype:
+    if type_case == "lower" and entry.type != etype:
         issues.append(
             LintIssue(
                 "noncanonical_entry_type_case",

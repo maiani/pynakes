@@ -517,6 +517,34 @@ def test_accepts_defined_and_standard_bibtex_string_references() -> None:
     assert "undefined_string_reference" not in _types(lint(lib))
 
 
+def test_entry_type_case_follows_the_format_setting() -> None:
+    # lint reports a type exactly when `format` would recase it: never under
+    # `preserve`. Field-name case is a separate finding and still applies.
+    lib = parse_bib(
+        "@comment{pynakes-meta: format-entry-type-case: preserve;}\n"
+        "@Book{Newton1687,\n  author = {Newton, Isaac},\n  Title = {Principia},\n"
+        "  publisher = {Royal Society},\n  year = {1687}\n}\n"
+    )
+
+    types = _types(lint(lib))
+
+    assert "noncanonical_entry_type_case" not in types
+    assert "noncanonical_field_name_case" in types
+
+
+def test_invalid_entry_type_case_is_reported_and_checked_as_lower() -> None:
+    lib = parse_bib(
+        "@comment{pynakes-meta: format-entry-type-case: title;}\n"
+        "@Book{Newton1687,\n  author = {Newton, Isaac},\n  title = {Principia},\n"
+        "  publisher = {Royal Society},\n  year = {1687}\n}\n"
+    )
+
+    types = _types(lint(lib))
+
+    assert "invalid_metadata_value" in types
+    assert "noncanonical_entry_type_case" in types
+
+
 def test_reports_noncanonical_identifier_case_without_inspecting_values() -> None:
     lib = parse_bib(
         "@Article{A,\n  TITLE = {A field-like phrase: FIELD = value},\n  DOI = {10.1234/abc}\n}\n"

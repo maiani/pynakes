@@ -68,6 +68,7 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     "format-block-order": CATEGORY_FORMATTING,
     "format-wrap-values": CATEGORY_FORMATTING,
     "format-line-width": CATEGORY_FORMATTING,
+    "format-entry-type-case": CATEGORY_FORMATTING,
     "pinax-files-dir": CATEGORY_PINAX,
     "pinax-fetch-policy": CATEGORY_PINAX,
     # Linked LaTeX sources that cite this library; consulted by the citation-key
@@ -107,6 +108,7 @@ _FORMAT_CHOICES = {
     "format-entry-order": {"preserve", "key", "profile"},
     "format-block-order": {"preserve", "canonical"},
     "format-wrap-values": {"off", "stable", "canonical"},
+    "format-entry-type-case": {"lower", "preserve"},
 }
 
 

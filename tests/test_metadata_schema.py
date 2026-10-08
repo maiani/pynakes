@@ -317,9 +317,13 @@ def test_format_profile_keys_are_owned_and_validated() -> None:
     metadata_pkg.validate_metadata_value("format-block-order", "preserve")
     metadata_pkg.validate_metadata_value("format-wrap-values", "stable")
     metadata_pkg.validate_metadata_value("format-trailing-comma", "false")
+    metadata_pkg.validate_metadata_value("format-entry-type-case", "preserve")
+    assert metadata_pkg.metadata_category("format-entry-type-case") == "formatting"
 
     with pytest.raises(ValueError, match="format-field-order"):
         metadata_pkg.validate_metadata_value("format-field-order", "random")
+    with pytest.raises(ValueError, match="format-entry-type-case"):
+        metadata_pkg.validate_metadata_value("format-entry-type-case", "title")
     with pytest.raises(ValueError, match="at least 20"):
         metadata_pkg.validate_metadata_value("format-line-width", "10")
     with pytest.raises(ValueError, match="positive integer"):

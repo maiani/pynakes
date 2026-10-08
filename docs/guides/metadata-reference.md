@@ -74,6 +74,7 @@ to find the operation module that owns a key.
 | `format-block-order` | formatting | `canonical` or `preserve` (default: `canonical`) | `format` | — |
 | `format-wrap-values` | formatting | `off`, `stable`, or `canonical` (default: `off`) | `format` | — |
 | `format-line-width` | formatting | Integer at least 20 (default: `100`) | `format` wrapping | — |
+| `format-entry-type-case` | formatting | `lower` (default) or `preserve` — keep each entry's type spelling, e.g. JabRef's `@Article` | `format`, `normalize`, `lint` | — |
 | `lint-required-fields` | lint | Fields required on every entry | `lint` | — |
 | `lint-required-fields-<entrytype>` | lint | Extra fields required on one entry type | `lint` | — |
 | `tex-sources` | usage | List of TeX files or directories, relative to the `.bib` file | `keys`, `tex scan` | — |

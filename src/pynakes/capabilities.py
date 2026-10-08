@@ -414,6 +414,7 @@ def get_capabilities() -> dict:
                 "block_order": "canonical",
                 "wrap_values": "off",
                 "line_width": 100,
+                "entry_type_case": "lower",
             },
             "choices": {
                 "alignment": ["compact", "equals"],
@@ -421,6 +422,7 @@ def get_capabilities() -> dict:
                 "entry_order": ["preserve", "key", "profile"],
                 "block_order": ["preserve", "canonical"],
                 "wrap_values": ["off", "stable", "canonical"],
+                "entry_type_case": ["lower", "preserve"],
             },
             "wrapping": {
                 "never": [

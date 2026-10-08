@@ -36,6 +36,8 @@ class TestGetCapabilities:
         assert formatting["defaults"]["field_order"] == "preferred"
         assert formatting["defaults"]["block_order"] == "canonical"
         assert formatting["choices"]["wrap_values"] == ["off", "stable", "canonical"]
+        assert formatting["defaults"]["entry_type_case"] == "lower"
+        assert formatting["choices"]["entry_type_case"] == ["lower", "preserve"]
         assert "repeated fields" in formatting["lint_gate"]
         assert "format_bibliography" in get_capabilities()["capabilities"]
 

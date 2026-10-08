@@ -68,6 +68,11 @@ class WrapValuesChoice(str, Enum):
     canonical = "canonical"
 
 
+class EntryTypeCaseChoice(str, Enum):
+    lower = "lower"
+    preserve = "preserve"
+
+
 @dataclass(frozen=True)
 class FormatOverrides:
     indent: str | None
@@ -79,6 +84,7 @@ class FormatOverrides:
     block_order: BlockOrderChoice | None
     wrap_values: WrapValuesChoice | None
     line_width: int | None
+    entry_type_case: EntryTypeCaseChoice | None = None
 
 
 def _layout(
@@ -99,6 +105,9 @@ def _layout(
         block_order=overrides.block_order.value if overrides.block_order is not None else None,
         wrap_values=overrides.wrap_values.value if overrides.wrap_values is not None else None,
         line_width=overrides.line_width,
+        entry_type_case=(
+            overrides.entry_type_case.value if overrides.entry_type_case is not None else None
+        ),
     )
 
 
@@ -271,6 +280,11 @@ def format_bibliography(
     line_width: int | None = typer.Option(
         None, "--line-width", min=20, help="Maximum line width for wrapped values"
     ),
+    entry_type_case: EntryTypeCaseChoice | None = typer.Option(
+        None,
+        "--entry-type-case",
+        help="Entry-type spelling: lowercase, or keep each entry's own (e.g. @Article)",
+    ),
     where: str | None = where_option(
         "Reformat only the entries matching this selector; the rest of the file "
         "stays byte-for-byte identical"
@@ -340,6 +354,7 @@ def format_bibliography(
         block_order=block_order,
         wrap_values=wrap_values,
         line_width=line_width,
+        entry_type_case=entry_type_case,
     )
     params = RunParams(
         dry_run=dry_run,

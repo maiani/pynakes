@@ -8,6 +8,7 @@ from pynakes import journals as journal_ops
 from pynakes._calendar import MONTH_ABBR_TO_NAME, MONTH_NUM_TO_ABBR, month_name_to_int
 from pynakes._identifiers import normalize_doi
 from pynakes.authors import NAME_FIELDS
+from pynakes.canonical import resolve_entry_type_case
 from pynakes.editing import (
     normalize_entry_field_names,
     raw_field_value,
@@ -440,7 +441,9 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
     result.months = normalize_month_macros(lib)
 
     if _resolve_bool(lib, opts.identifier_case, "identifier-case", True):
-        result.entry_types, result.field_names = normalize_identifier_case(lib)
+        result.entry_types, result.field_names = normalize_identifier_case(
+            lib, entry_types=resolve_entry_type_case(lib) == "lower"
+        )
     else:
         _record_skip(result, "identifier_case", "identifier-case normalization is off")
 
@@ -623,15 +626,20 @@ def _entry_sort_key(entry: BibEntry, field_name: str) -> tuple:
     return (0, raw.lower(), "")
 
 
-def normalize_identifier_case(lib: BibFile) -> tuple[int, int]:
-    """Lowercase entry types and field names while preserving entry layout."""
-    entry_types = 0
+def normalize_identifier_case(lib: BibFile, *, entry_types: bool = True) -> tuple[int, int]:
+    """Lowercase entry types and field names while preserving entry layout.
+
+    ``entry_types=False`` leaves each type's spelling alone, as a library whose
+    ``format-entry-type-case`` is ``preserve`` asks; field names are still
+    lowercased. Returns the counts of recased types and field names.
+    """
+    recased_types = 0
     field_names = 0
     for entry in lib.entries.values():
-        if set_entry_type(entry, entry.type.lower()):
-            entry_types += 1
+        if entry_types and set_entry_type(entry, entry.type.lower()):
+            recased_types += 1
         field_names += normalize_entry_field_names(entry)
-    return entry_types, field_names
+    return recased_types, field_names
 
 
 def _apply_save_action_formatters(lib: BibFile, save_actions) -> tuple[int, list[dict[str, str]]]:
