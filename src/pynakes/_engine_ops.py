@@ -216,6 +216,9 @@ class BibliographyOperations:
         if len(matches) != 1:
             raise ValueError(f"Citation key {key!r} is duplicated; repair duplicates first")
         entry = matches[0]
+        # Check every value before staging any, so a bad one changes nothing.
+        for name, value in (fields or {}).items():
+            field_ops.check_field_value(name, value)
 
         def selected(candidate: BibEntry) -> bool:
             return candidate is entry
@@ -419,6 +422,8 @@ class BibliographyOperations:
             raise ValueError("Entry type must not be empty")
         if self.lib.entries.get_all(key) and not allow_duplicate:
             raise ValueError(f"Citation key already exists: {key}")
+        for name, value in fields.items():
+            field_ops.check_field_value(name, value)
         entry = BibEntry(key=key, type=entry_type, fields=dict(fields), modified=True)
         self.lib.entries.add(entry)
         self._appended_entries.append(entry)

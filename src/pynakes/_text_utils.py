@@ -53,6 +53,42 @@ def _is_escaped(text: str, index: int) -> bool:
     return bool(backslashes % 2)
 
 
+def unbalanced_brace(value: str) -> str | None:
+    """Return the brace that keeps *value* from being one braced BibTeX value.
+
+    Returns ``"}"`` for a closing brace with no opener before it, ``"{"`` for an
+    opening brace never closed, and ``None`` when ``{value}`` is balanced. The
+    counting is the parser's own: its block scanner in
+    :mod:`pynakes.bibtex_parser` counts every brace, backslash-escaped ones
+    included, as BibTeX does (``\\{`` is a TeX escape, not a BibTeX one). So
+    ``a \\{ b`` is as unbalanced as ``a { b``, and ``a \\{ b \\}`` is fine.
+    """
+    depth = 0
+    for char in value:
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            if not depth:
+                return "}"
+            depth -= 1
+    return "{" if depth else None
+
+
+def check_balanced_braces(what: str, value: str) -> None:
+    """Raise ``ValueError`` naming *what* when *value* has an unmatched brace.
+
+    For user-supplied text written between braces (a field value, a metadata
+    value, a group name), where a stray brace would end the field or block
+    early and leave a file that no longer parses, or parses differently.
+    """
+    brace = unbalanced_brace(value)
+    if brace is not None:
+        raise ValueError(
+            f"{what} has an unmatched {brace!r}; braces must balance (escaped \\{{ and "
+            "\\} count too), or the written file would not parse"
+        )
+
+
 def iter_toplevel_splits(
     text: str,
     *,

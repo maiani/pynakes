@@ -17,7 +17,7 @@ reusable independent of pynakes' specific vocabulary.
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
-from pynakes._text_utils import strip_meta_terminator
+from pynakes._text_utils import check_balanced_braces, strip_meta_terminator
 from pynakes.model import BibFile, MetadataBlock
 
 Classifier = Callable[[str], str]
@@ -403,8 +403,12 @@ def set_in_namespace(
 
     ``namespace`` must be ``"jabref"`` or ``"pynakes"``. Pure mechanics: this
     does not check whether ``key`` belongs to ``namespace`` — callers (see
-    :func:`pynakes.metadata.schema.set_metadata`) own that policy.
+    :func:`pynakes.metadata.schema.set_metadata`) own that policy. Raises
+    ``ValueError`` when ``key`` or ``value`` has an unmatched brace: the block
+    is written inside ``@comment{...}``, which a stray brace would end early.
     """
+    check_balanced_braces(f"Metadata key {key!r}", key)
+    check_balanced_braces(f"Metadata value for {key!r}", value)
     if namespace == "jabref":
         return _set_jabref_metadata(lib, key, value, classify or _unclassified)
     if namespace == "pynakes":

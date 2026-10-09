@@ -10,7 +10,7 @@ import re
 from collections.abc import Iterable, Iterator
 
 from pynakes import query
-from pynakes._text_utils import find_field_name
+from pynakes._text_utils import check_balanced_braces, find_field_name
 from pynakes.editing import (
     append_delimited_field,
     remove_entry_field,
@@ -20,6 +20,17 @@ from pynakes.editing import (
 from pynakes.model import BibEntry, BibFile, QueryFilter
 
 TITLE_FIELDS = ("title", "booktitle", "maintitle", "subtitle")
+
+
+def check_field_value(name: str, value: str) -> None:
+    """Raise ``ValueError`` when *value* cannot be written as field *name*.
+
+    A value is written between braces, so an unmatched ``{`` or ``}`` would end
+    the field — or the entry — early and leave a file that no longer parses,
+    or parses into different fields. Escaped braces count too, as they do for
+    BibTeX (see :func:`~pynakes._text_utils.unbalanced_brace`).
+    """
+    check_balanced_braces(f"Value for field {name!r}", value)
 
 
 def _selected(lib: BibFile, where: QueryFilter) -> Iterator[BibEntry]:
@@ -59,8 +70,10 @@ def set_field(lib: BibFile, field: str, value: str, where: QueryFilter = None) -
 
     ``field`` is matched case-insensitively against stored field names, avoiding
     a duplicate field with different casing. Returns the number of entries
-    changed and modifies ``lib`` in place.
+    changed and modifies ``lib`` in place. Raises ``ValueError`` for a value
+    with unbalanced braces (see :func:`check_field_value`).
     """
+    check_field_value(field, value)
     count = 0
     for entry in _selected(lib, where):
         actual_field = _resolve_field_name(entry, field)
@@ -103,6 +116,7 @@ def append_field(
     duplicate values are not re-added. Returns the number of entries changed.
     Modifies ``lib`` in place.
     """
+    check_field_value(field, value)
     count = 0
     for entry in _selected(lib, where):
         actual_field = _resolve_field_name(entry, field)

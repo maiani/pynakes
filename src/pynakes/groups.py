@@ -6,6 +6,7 @@ These helpers read and edit that field while preserving all other formatting
 via the surgical raw-text editing in :mod:`pynakes.editing`.
 """
 
+from pynakes._text_utils import check_balanced_braces
 from pynakes.editing import append_delimited_field, remove_entry_field, set_entry_field
 from pynakes.model import BibEntry, BibFile
 
@@ -46,6 +47,7 @@ def add_to_group(lib: BibFile, key: str, group: str) -> int:
     Returns the number of entries newly added (already-member entries are
     skipped). Modifies ``lib`` in place.
     """
+    check_balanced_braces(f"Group name {group!r}", group)
     count = 0
     for entry in lib.entries.get_all(key):
         if append_delimited_field(entry, "groups", group, GROUPS_DELIM, GROUPS_JOIN):

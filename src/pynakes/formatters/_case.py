@@ -2,6 +2,8 @@
 
 import re
 
+from pynakes._text_utils import unbalanced_brace
+
 _SENTENCE_ABBREVIATIONS = {"dr", "mr", "mrs", "ms", "prof", "sr", "jr", "vs", "etc"}
 _TITLE_SMALL_WORDS = {
     "a",
@@ -61,15 +63,7 @@ _TITLE_DASHES = set("-~⸗〰᐀֊־‐‑‒–—―⁓⁻₋−⸺⸻〜゠�
 
 def _has_balanced_braces(value: str) -> bool:
     """Return whether LaTeX brace protection is structurally balanced."""
-    depth = 0
-    for char in value:
-        if char == "{":
-            depth += 1
-        elif char == "}":
-            depth -= 1
-            if depth < 0:
-                return False
-    return depth == 0
+    return unbalanced_brace(value) is None
 
 
 def _sentence_parts(value: str) -> list[str]:
