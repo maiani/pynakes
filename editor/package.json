@@ -2,7 +2,7 @@
   "name": "pynakes-vscode",
   "displayName": "Pynakes",
   "description": "Browse BibTeX/BibLaTeX bibliographies in VS Code, powered by the pynakes engine.",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "pynakes",
   "license": "MIT",
   "private": true,

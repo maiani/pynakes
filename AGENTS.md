@@ -147,7 +147,8 @@ tests pass:
   Command callbacks live in `cli_commands/`; operation modules stay independently
   unit-testable. Keep `capabilities` synchronized with the live command surface.
 - Try to limit file length preferably to ~500 lines, with a maximum limit of 800.
-- Add tests and a `CHANGELOG.md` entry with each behavioral change.
+- Add tests and a `CHANGELOG.md` entry with each behavioral change. Changes to
+  the extension go in `editor/CHANGELOG.md` instead: it is versioned on its own.
 - Use generic invented references or old, famous historical works in code,
   tests, comments, docstrings, and `CHANGELOG.md`. Never commit examples derived
   from private data, recent bug reports, or user-provided `.bib` entries;
