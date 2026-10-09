@@ -100,7 +100,10 @@ def directive(
     else:
         changed = [name for name in selected if coll.add_entry_directive(name, verb, args, reason)]
     text = format_directive(verb, args, reason)
-    verb_done = "Removed" if remove else "Added"
+    if dry_run:
+        verb_done = "Would remove" if remove else "Would add"
+    else:
+        verb_done = "Removed" if remove else "Added"
     human = [f"{verb_done} {text!r} on {len(changed)} of {len(selected)} selected entries."]
     warnings: list[dict[str, str]] = []
     if not selected:

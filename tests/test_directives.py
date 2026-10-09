@@ -395,3 +395,16 @@ def test_directives_survive_a_jabref_rewrite() -> None:
     assert set(rules) == {"Newton1687", "Darwin1859"}
     assert "missing_doi" not in unwaived
     assert unwaived == ["noncanonical_entry_type_case"]  # Newton's @Article stays
+
+
+def test_ref_directive_dry_run_says_what_it_would_do(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text(NEWTON)
+
+    result = runner.invoke(
+        app,
+        ["ref", "directive", str(bib), "ignore", "missing_doi", "--key", "Newton1687", "--dry-run"],
+    )
+
+    assert result.output.startswith("Would add")
+    assert bib.read_text() == NEWTON
