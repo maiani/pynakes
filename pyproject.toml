@@ -91,9 +91,6 @@ pynakes = [
 testpaths = ["tests"]
 addopts = ["-v", "--tb=short"]
 pythonpath = ["src"]
-markers = [
-    "agent_eval: opt-in real-agent beta-test harness",
-]
 
 [tool.ruff]
 target-version = "py312"

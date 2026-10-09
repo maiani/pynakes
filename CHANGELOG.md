@@ -188,6 +188,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   falling back to the preprint and its source when there is none; `inspect
   --json` no longer reports `preprint_canonical`, and new manifest rows no
   longer carry it. A flag left in an existing manifest is ignored.
+- **The agent beta-evaluation harness** (`tests/agent_eval/`, its test, the
+  `agent_eval` pytest marker, and the Agent Beta Eval guide). It ran only by
+  hand against one agent CLI, and its regular test checked the harness rather
+  than pynakes; the JSON envelope contract stays guarded by `tests/test_cli.py`.
 
 ### Fixed
 

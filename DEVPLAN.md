@@ -303,8 +303,7 @@ not asserted in the correctness suite); the property tests above pass.
   mkdocs `site_url` is a placeholder and no docs deployment exists; README
   relative links break on PyPI; the README claims conformance "verified against
   TeX Live" while those oracle tests skip in CI; fifteen help texts show literal
-  RST double backticks; the agent-evaluation guide moves out of the user
-  navigation.
+  RST double backticks.
 
 **Gate 6**: `mkdocs build --strict` green; every offline shell example in the
 README, quickstart, and usage guide runs in a CI doc test; the command reference
