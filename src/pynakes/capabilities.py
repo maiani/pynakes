@@ -14,8 +14,14 @@ from pynakes.query import FUZZY_THRESHOLD, WHERE_GRAMMAR
 # `capabilities` schema does not change shape when Typer/click internals do.
 _TYPE_VOCABULARY = {
     "text": "string",
+    "str": "string",
     "boolean": "boolean",
     "integer": "integer",
+    # Click's current names; ``int range`` is an option with min/max bounds.
+    "int": "integer",
+    "int range": "integer",
+    "float": "number",
+    "float range": "number",
     "path": "path",
     "filename": "path",
     "file": "path",
@@ -149,7 +155,9 @@ def _param_schema(param) -> dict:
         if getattr(param, "nargs", 1) == -1:
             entry["variadic"] = True
     else:
-        entry["flags"] = list(param.opts)
+        # Every spelling, including the negative half of a flag pair
+        # (``--no-blank-lines``) and short forms (``-f``).
+        entry["flags"] = [*param.opts, *getattr(param, "secondary_opts", [])]
         default = param.default
         if isinstance(default, (str, int, float, bool)) or default is None:
             entry["default"] = default
@@ -188,12 +196,14 @@ def command_schemas() -> dict:
     ``"groups add-entry"``) lists the command's help, positional ``arguments``,
     and ``options`` with stable type names, flags, defaults, and choices.
     """
-    from typer.main import get_command
+    import typer.main
 
+    # Imported first: pynakes.cli wires the shared --file option into
+    # typer.main.get_command, which must be looked up after that patch.
     from pynakes.cli import app
 
     schemas: dict = {}
-    _walk_commands(get_command(app), "", schemas)
+    _walk_commands(typer.main.get_command(app), "", schemas)
     return schemas
 
 
