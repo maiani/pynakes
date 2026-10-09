@@ -14,25 +14,36 @@ def write_bib(lib: BibFile) -> str:
     and an in-place edit changes only the edited entry. For an in-memory or
     structurally changed library the layout is derived in canonical order.
     """
-    layout, trailing = _effective_layout(lib)
-    text = _render_layout(lib, layout, trailing)
-    le = lib.line_ending
-    if text and not text.endswith(le):
-        text += le
+    if _source_layout_matches(lib) or _is_blank_source(lib):
+        # The source's own text after its last block is authoritative: a file
+        # without a final newline, or ending in LF inside a CRLF file, or
+        # holding only whitespace, writes back exactly so.
+        return _render_layout(lib, lib.source_layout, lib.source_trailing)
+    # The recorded positions are stale once entries or declarations were added
+    # or removed, so a canonical layout is derived instead. It ends with a line
+    # break unless it already ends with one of any style, or the parsed source
+    # had none after its last block.
+    text = _render_layout(lib, _canonical_layout(lib), "")
+    keeps_no_final_newline = bool(lib.source_layout) and not lib.source_trailing
+    if text and not text.endswith(("\n", "\r")) and not keeps_no_final_newline:
+        text += lib.line_ending
     return text
 
 
-def _effective_layout(lib: BibFile) -> tuple[list, str]:
-    """Return the layout to render and the trailing text after the last block.
+def _is_blank_source(lib: BibFile) -> bool:
+    """Whether ``lib`` was parsed from text holding no block at all.
 
-    The preserved source layout is reused only while it still describes exactly
-    the library's current blocks; once entries or declarations are added or
-    removed those recorded positions are stale, so a canonical layout is
-    derived instead.
+    Such text (empty, or whitespace and stray characters only) is recorded
+    entirely as ``source_trailing``, and nothing in the library replaces it.
     """
-    if _source_layout_matches(lib):
-        return lib.source_layout, lib.source_trailing
-    return _canonical_layout(lib), ""
+    return (
+        not lib.source_layout
+        and not lib.entries
+        and not lib.raw_comments
+        and not lib.raw_strings
+        and not lib.strings
+        and not lib.preamble
+    )
 
 
 def _source_layout_matches(lib: BibFile) -> bool:

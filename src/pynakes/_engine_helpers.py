@@ -195,11 +195,27 @@ def append_entry_text(
         return entry_text + line_ending * 2 + metadata
     if not original_text:
         return entry_text + line_ending
-    if original_text.endswith(line_ending * 2):
-        return original_text + entry_text + line_ending
-    if original_text.endswith(line_ending):
-        return original_text + line_ending + entry_text + line_ending
-    return original_text + line_ending + line_ending + entry_text + line_ending
+    # Count the file's own line breaks at its end, whatever their style, so an
+    # LF ending a CRLF file is not taken for a missing one. A file that had no
+    # final newline gets none after the appended entry either.
+    breaks = _trailing_line_breaks(original_text)
+    final = line_ending if breaks else ""
+    return original_text + line_ending * max(0, 2 - breaks) + entry_text + final
+
+
+def _trailing_line_breaks(text: str) -> int:
+    """Count the line breaks (``\\r\\n``, ``\\n``, or ``\\r``) ending ``text``."""
+    count = 0
+    end = len(text)
+    while end:
+        if text.endswith("\r\n", 0, end):
+            end -= 2
+        elif text[end - 1] in "\r\n":
+            end -= 1
+        else:
+            break
+        count += 1
+    return count
 
 
 def block_removal_span(pristine_text: str, span: SourceSpan) -> SourceSpan:
