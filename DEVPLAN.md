@@ -98,15 +98,14 @@ CHANGELOG under Unreleased. Decisions taken along the way:
 #### Stage 4 — Freeze the surface
 
 The one deliberate batch of breaking CLI changes, so the promise starts from a
-consistent surface. Where an old form can be recognized unambiguously, it keeps
-working through 0.7.x with a `deprecated` warning and is removed in 0.8.0; where
-a flag's meaning changes, the old use fails with an error naming the
-replacement.
+consistent surface. The renamed and reordered forms are removed outright in
+0.7.0, with no aliases: nobody depends on them yet, and the beta promise —
+deprecation before removal — applies from 0.7.0 onward.
 
 **In progress** (first pass on branch `stage-4-freeze`, 2026-10-05; recorded in
 CHANGELOG under Unreleased). Done: library-first positionals with `--file`/`-f`
 on every single-library command and syntactic library detection
-(`pynakes.cli_surface`, which also holds every deprecated form); one meaning per
+(`pynakes.cli_surface`); one meaning per
 flag and one flag per concept; enumerated options as Typer choices
 (`pynakes.cli_choices`); the beta envelope (`action` naming, warning objects,
 `file`/`out`, `summary`, `source_sha256` everywhere, `--expect-sha256` on every
@@ -143,8 +142,8 @@ Decisions taken:
   type or a category, mirrored by one `lint-ignore` key; the command applies it,
   and the `lint()` function keeps returning every finding.
 - `asset check` is a pure read-only gate; reconciling the Pinax manifest moved
-  to `asset repair`, with `--dry-run`/`--diff` (`asset check --fix` is a
-  deprecated alias until 0.8), mirroring `keys check`/`keys repair`.
+  to `asset repair`, with `--dry-run`/`--diff`, mirroring
+  `keys check`/`keys repair`.
 - `keys check` stays beside lint's `duplicate_key`: it gates on key uniqueness
   alone, which `lint --strict` no longer can, and is the read side of
   `keys repair`.
@@ -171,27 +170,17 @@ Decisions taken:
   (checked with JabKit 6.0-beta.1), so JabRef did not decide it. One generic
   `ref directive` writes every verb, so a new directive adds a word to the
   grammar, not a command to the frozen surface.
+- The pre-0.7 forms are removed, not deprecated (2026-10-09): an old order or
+  spelling is a `UsageError`, and `capabilities` lists no deprecations.
+  `tests/test_cli_surface.py` checks that each one fails.
+- The editor moved to the library-first order and the beta envelope in the same
+  branch, with real-engine contract tests for the calls it makes.
 
-**Remaining before the gate:**
+**Remaining before the gate:** tests for the `--force` overwrite policy per
+command, `format --out`, `convert --diff`/`--force`/`--expect-sha256` on import,
+`ref remove` of a duplicated key, and the multi-file checks' catalogued error
+codes.
 
-- **Editor migration** (same change as the envelope, per the editor track):
-  `editor/src/pynakes.ts` still passes the operand-first order (`search`, `ref
-  compare`, `ref add`, `ref import` — accepted, but with a `deprecated`
-  warning); `model.ts` still names `used`, `files_check`, and `batch`, reads the
-  `lint` counts at top level and `search`'s `fields`/`show_abstract`; the "New
-  group…" flow must pass `groups add-entry --create`. Then
-  `npm run compile && npm test`.
-- **Tests for the new behavior** not yet written: each deprecated spelling and
-  value (warning shape in JSON, stderr line in human mode), the legacy
-  operand-first order per command, the misplaced-`.bib` usage error, `--file`
-  given twice, `-f name=value` on `ref add`/`edit`, the `--force` overwrite
-  policy per command, `format --out`, `convert --diff`/`--force`/`--expect-sha256`
-  on import, `ref remove` of a duplicated key, multi-file checks' catalogued
-  error codes.
-- **Docs**: README, quickstart, usage, pinax, and llm-integration examples
-  still show the old forms (they run, with a deprecation warning); the contract
-  doc does not describe the beta envelope yet. Stage 6 regenerates the reference;
-  the contract doc should move with this stage.
 **Gate 4**: contract tests enforce the surface instead of sampling it — a table
 test of every command's positional signature; a sweep asserting that each flag
 spelling has one meaning; an envelope-schema test over every command's `--json`
@@ -332,9 +321,9 @@ not library-scoped exploration. See
 [Graphical clients and their scope](docs/vision.md#graphical-clients-and-their-scope).
 The track runs in parallel with the stages above.
 
-- **Move to the beta envelope in the same change as Stage 4**, so the client
-  never depends on a form the engine is deprecating — including the `tex scan`
-  `action` value it reads today.
+- **Move to the beta envelope in the same change as Stage 4.** *(Done on
+  `stage-4-freeze`: library-first arguments, the renamed actions, `lint` counts
+  under `summary`, and `groups add-entry --create`.)*
 - **Thin-client discipline** — no BibTeX parser, metadata schema, or source of
   truth in the client. When the view needs something the engine does not
   expose, the engine grows it; a workaround in TypeScript is a regression even
@@ -447,8 +436,6 @@ rather than worked around in the client.
 - **Editor toward beta**: whatever of the v0.7 alpha feature work remains, plus
   the library-scoped reads the `Library` makes possible. The extension may
   *read* library-scoped things; it never owns or curates them.
-- **Deprecation removals**: the forms deprecated in 0.7.x by the surface freeze
-  are removed in 0.8.0, as the beta promise schedules.
 
 **Done when**: `Library`, `Catalogue`, single-bibliography and library-wide
 analysis, and the
