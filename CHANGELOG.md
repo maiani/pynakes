@@ -177,6 +177,9 @@ form is a `UsageError`, never silently reinterpreted.
 
 ### Changed
 
+- `inspect` reports the encoding of a file with a byte-order mark by its codec
+  name: `utf-8-sig`, `utf-16-le`, `utf-16-be`, `utf-32-le`, or `utf-32-be`.
+  A UTF-8 file with a mark used to report `utf-8`.
 - **`ref import` follows the library's declared style.** An imported entry is
   given the library's `normalize-*` settings and JabRef saveActions (journal
   and author style, title protection, and the rest) and its `format-*` layout,
@@ -231,6 +234,25 @@ form is a `UsageError`, never silently reinterpreted.
 
 ### Fixed
 
+- A UTF-16 or UTF-32 library parsed as zero entries. A byte-order mark (UTF-8,
+  UTF-16, or UTF-32, either byte order) now sets the encoding, and writes keep
+  the mark and encoding, so an unmodified file still round-trips byte for byte.
+- A UTF-8 file with one stray byte was silently read as Latin-1, so every
+  accented character became mojibake that the next write saved. Such a file,
+  and one with a NUL byte but no byte-order mark, now fails with `ParseError`
+  naming the line. A genuine Latin-1 file, with no UTF-8 multi-byte characters,
+  still loads as Latin-1.
+- `--backup` overwrote the previous backup. The first is still `<file>.bak`;
+  later ones go to `<file>.bak.1`, `<file>.bak.2`, and so on. `asset repair
+  --backup` follows the same rule for `manifest.json.bak`.
+- A save that reported success could, after a crash or power loss, leave the
+  library empty, truncated, or still the old version. Atomic writes now sync
+  the temporary file before renaming it into place, and on POSIX sync the
+  directory afterwards.
+- Writing a file changed its ending: a library without a final newline gained
+  one, a CRLF file whose last line ends in LF gained an extra CRLF, and a
+  whitespace-only file was written back empty. The file's own ending is kept,
+  also when an entry is appended.
 - Large libraries took quadratic time: finding an entry's line number counted
   every line before it, and looking an entry up by key scanned the whole
   library, so a 20,000-entry file never finished parsing. Both are now linear

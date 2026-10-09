@@ -33,7 +33,7 @@ import tempfile
 import threading
 from pathlib import Path
 
-from pynakes._atomic import match_mode, replace_file
+from pynakes._atomic import match_mode, replace_file, sync_file
 
 CACHE_FORMATS = ("json", "bib", "xml")
 
@@ -190,7 +190,7 @@ def _atomic_write_text(path: Path, text: str) -> None:
     try:
         with tmp:
             tmp.write(text)
-            tmp.flush()
+            sync_file(tmp)
         match_mode(tmp_path, path)
         replace_file(tmp_path, path)
     except OSError:

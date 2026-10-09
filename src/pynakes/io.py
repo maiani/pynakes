@@ -1,12 +1,20 @@
 """I/O operations for BibTeX files with atomic writes and backups."""
 
+import codecs
 import os
+import re
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from shutil import copyfile, copymode
+from shutil import copyfileobj, copymode
 
-from pynakes._atomic import match_mode, replace_file, replacement_target
+from pynakes._atomic import (
+    match_mode,
+    next_backup_path,
+    replace_file,
+    replacement_target,
+    sync_file,
+)
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.model import BibFile
@@ -29,12 +37,18 @@ class SaveResult:
 
 
 def _write_backup(path: Path) -> str:
-    """Copy ``path`` to ``<path>.bak`` without moving the original away."""
-    backup_path = Path(f"{path}.bak")
+    """Copy ``path`` to a new backup without moving the original away.
+
+    The backup is ``<path>.bak``, or the next free ``<path>.bak.N`` when that
+    exists: an earlier backup is never overwritten.
+    """
+    backup_path = next_backup_path(path)
     with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as tmp:
         staged_backup = Path(tmp.name)
     try:
-        copyfile(path, staged_backup)
+        with path.open("rb") as source, staged_backup.open("wb") as staged:
+            copyfileobj(source, staged)
+            sync_file(staged)
         copymode(path, staged_backup)
         replace_file(staged_backup, backup_path)
     finally:
@@ -42,20 +56,83 @@ def _write_backup(path: Path) -> str:
     return str(backup_path)
 
 
-def _decode_bytes(data: bytes) -> tuple[str, str]:
+# Byte-order marks, longest first: a UTF-32-LE mark begins with the UTF-16-LE one.
+_BOMS: tuple[tuple[bytes, str], ...] = (
+    (codecs.BOM_UTF32_LE, "utf-32-le"),
+    (codecs.BOM_UTF32_BE, "utf-32-be"),
+    (codecs.BOM_UTF8, "utf-8-sig"),
+    (codecs.BOM_UTF16_LE, "utf-16-le"),
+    (codecs.BOM_UTF16_BE, "utf-16-be"),
+)
+# The encodings whose codec neither reads nor writes the mark itself. They are
+# only ever detected from a mark, so a file read in one is written with it.
+_MARKED = {encoding: bom for bom, encoding in _BOMS if encoding != "utf-8-sig"}
+
+# One well-formed UTF-8 multi-byte character (RFC 3629: no overlongs, no
+# surrogates, nothing above U+10FFFF).
+_UTF8_MULTIBYTE = re.compile(
+    rb"[\xc2-\xdf][\x80-\xbf]"
+    rb"|\xe0[\xa0-\xbf][\x80-\xbf]|[\xe1-\xec\xee\xef][\x80-\xbf]{2}|\xed[\x80-\x9f][\x80-\xbf]"
+    rb"|\xf0[\x90-\xbf][\x80-\xbf]{2}|[\xf1-\xf3][\x80-\xbf]{3}|\xf4[\x80-\x8f][\x80-\xbf]{2}"
+)
+
+
+def _line_of(data: bytes, offset: int) -> int:
+    return data.count(b"\n", 0, offset) + 1
+
+
+def _decode_bytes(data: bytes, source: str | Path | None = None) -> tuple[str, str]:
     """Decode file bytes, returning ``(text, encoding)``.
 
-    Tries UTF-8 first, then falls back to latin-1 (which never fails). Decoding
-    from bytes deliberately avoids text-mode universal-newline translation, so
-    ``\\r\\n`` line endings survive intact for the parser to detect.
+    A byte-order mark decides: UTF-8, UTF-16, or UTF-32, the mark itself left
+    out of the text and restored by :func:`encode_text`. Without one the file is
+    UTF-8, or Latin-1 when it is not valid UTF-8 and holds no UTF-8 multi-byte
+    character at all, so that every byte is a character of its own. Decoding
+    from bytes avoids text-mode newline translation, so ``\\r\\n`` survives for
+    the parser to detect.
+
+    Raises:
+        ParseError: The bytes are neither: valid UTF-8 apart from stray bytes,
+            which as Latin-1 would turn every accented character into mojibake;
+            a NUL byte without a mark, as in binary data or UTF-16 without a
+            mark; or malformed under the encoding their mark names.
     """
-    for encoding in ("utf-8", "latin-1"):
-        try:
-            return data.decode(encoding), encoding
-        except UnicodeDecodeError:
-            continue
-    # latin-1 cannot raise, but keep a defensive default.
-    return data.decode("utf-8", errors="replace"), "utf-8"
+    name = f"{source}: " if source is not None else ""
+    for bom, encoding in _BOMS:
+        if data.startswith(bom):
+            body = data if encoding == "utf-8-sig" else data[len(bom) :]
+            try:
+                return body.decode(encoding), encoding
+            except UnicodeDecodeError as exc:
+                offset = exc.start + (0 if encoding == "utf-8-sig" else len(bom))
+                raise ParseError(
+                    f"{name}the byte-order mark says {encoding}, but the bytes after it "
+                    f"are not valid {encoding} ({exc.reason})",
+                    line=_line_of(data, offset),
+                ) from None
+    nul = data.find(b"\0")
+    if nul != -1:
+        raise ParseError(
+            f"{name}the file contains a NUL byte, so it is binary, or UTF-16 or "
+            "UTF-32 without a byte-order mark; save it as UTF-8",
+            line=_line_of(data, nul),
+        )
+    try:
+        return data.decode("utf-8"), "utf-8"
+    except UnicodeDecodeError as exc:
+        if _UTF8_MULTIBYTE.search(data) is None:
+            return data.decode("latin-1"), "latin-1"
+        raise ParseError(
+            f"{name}the file is UTF-8 except for byte 0x{data[exc.start]:02X}, which is "
+            "not valid UTF-8; reading it as Latin-1 instead would garble every other "
+            "non-ASCII character, so fix that byte or save the file as UTF-8",
+            line=_line_of(data, exc.start),
+        ) from None
+
+
+def encode_text(text: str, encoding: str) -> bytes:
+    """Encode ``text`` in ``encoding``, with the byte-order mark the file was read with."""
+    return _MARKED.get(encoding, b"") + text.encode(encoding)
 
 
 def load_bib(file_path: str) -> BibFile:
@@ -86,7 +163,7 @@ def _load_source(file_path: str | Path) -> tuple[BibFile, str, bytes]:
         raise FileNotFoundError(f"File not found: {file_path}")
 
     data = path.read_bytes()
-    text, encoding = _decode_bytes(data)
+    text, encoding = _decode_bytes(data, path)
 
     lib = parse_bib(text)
     lib.encoding = encoding
@@ -136,7 +213,9 @@ def save_text(
     When backup and atomic writing are both enabled, the backup is staged as a
     copy and published before the destination is atomically replaced. The
     original therefore remains at the destination path until the final replace.
-    Temporary files are removed on handled failures. These mechanics reduce
+    The temporary file is synced to disk before the replace and, on POSIX, the
+    directory after it, so a crash right after a successful save does not lose
+    it. Temporary files are removed on handled failures. These mechanics reduce
     common interruption hazards; they are not a formal durability guarantee
     against every process, operating-system, or storage failure.
     """
@@ -156,23 +235,19 @@ def save_text(
         )
 
     try:
+        data = encode_text(content, encoding)
         if atomic:
             # Write content to a temporary file in the same directory so the
             # final rename is guaranteed to be on the same filesystem.
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                dir=target.parent,
-                delete=False,
-                encoding=encoding,
-                newline="",
-            ) as tmp:
+            with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as tmp:
                 tmp_path = Path(tmp.name)
-                tmp.write(content)
+                tmp.write(data)
+                sync_file(tmp)
 
             if validate:
+                # Read back exactly as a later load would, mark and all.
                 try:
-                    with tmp_path.open("r", encoding=encoding) as f:
-                        parse_bib(f.read())
+                    parse_bib(_decode_bytes(tmp_path.read_bytes())[0])
                 except ParseError as e:
                     return SaveResult(
                         success=False,
@@ -194,8 +269,9 @@ def save_text(
             # Non-atomic write — preserve a copied backup first if requested.
             if backup and original_exists:
                 backup_path = _write_backup(path)
-            with open(path, "w", encoding=encoding, newline="") as f:
-                f.write(content)
+            with path.open("wb") as f:
+                f.write(data)
+                sync_file(f)
 
         return SaveResult(success=True, file_path=file_path, backup_path=backup_path, error=None)
 

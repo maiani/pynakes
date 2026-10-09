@@ -35,7 +35,8 @@ A: `--dry-run` shows what *would* happen without modifying the file. Always use 
 A: Not by default. Writes are atomic (write-to-temp-then-rename) and
 re-parse-validated, so the original is never left half-written. If you also want
 a `<file>.bak` copy of the previous contents, pass `--backup` to the modifying
-command.
+command. An existing backup is never overwritten: while `<file>.bak` exists, the
+next backup is `<file>.bak.1`, then `<file>.bak.2`, and so on.
 
 ### Q: Can I use pynakes with BibLaTeX?
 
@@ -94,7 +95,8 @@ A: If you see entries in the diff that didn't change, it might be due to whitesp
 ### Q: Can I undo a change?
 
 A: Preview first with `--dry-run`, and use version control. If you ran the
-command with `--backup`, restore the `.bak` copy:
+command with `--backup`, restore the `.bak` copy (the highest-numbered
+`.bak.N`, if there is one, is the most recent):
 ```bash
 cp refs.bib.bak refs.bib
 ```

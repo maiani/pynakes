@@ -238,14 +238,23 @@ round-trip guarantee. Direct whole-library serialization can reassemble top-leve
 constructs, so callers wanting the smallest possible file diff should use
 Bibliography.
 
-`io.load_bib()` detects UTF-8 or Latin-1 from bytes before parsing. `save_bib()`
+`io.load_bib()` detects the encoding from bytes before parsing. A byte-order
+mark names it (`utf-8-sig`, `utf-16-le`/`-be`, `utf-32-le`/`-be`), and a write
+puts the same mark back, so such a file still round-trips byte for byte.
+Without a mark the file is UTF-8, or Latin-1 when it holds no UTF-8 multi-byte
+character at all. A file that is UTF-8 apart from a few stray bytes, or that
+contains a NUL byte without a mark (binary data, or UTF-16 without a mark), is
+refused with a `ParseError` naming the line rather than silently read as
+Latin-1 or as an empty library. `save_bib()`
 and `save_text()` support backup creation, temporary-file writes, re-parse
 validation for BibTeX text, and replacement of the destination. They return
 `SaveResult` rather than exposing ordinary write failures as raw tracebacks to
 the CLI. With atomic writes and backups enabled, a copied backup is staged
 without moving the original, then the prepared destination replaces the
-original in one filesystem operation. Handled failures clean up temporary
-files. These are safety mechanisms and design goals, not formal guarantees
+original in one filesystem operation. The temporary file is synced to disk
+before that replace and, on POSIX, the directory after it, so a save that
+reported success survives a crash or power loss right after it. Handled
+failures clean up temporary files. These are safety mechanisms and design goals, not formal guarantees
 against every process crash, operating-system failure, or storage failure.
 
 ## Domain modules

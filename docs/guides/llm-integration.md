@@ -24,9 +24,10 @@ contract. For command-by-command tutorials, see the [usage guide](usage.md).
   options instead of choosing one.
 - **Validated replacement.** Commits prepare a temporary file, re-parse it, and
   replace the destination. Surgical edits leave untouched entries byte-for-byte
-  identical. `--backup` retains a `<file>.bak` copy where supported. These
-  mechanisms reduce common failure risks but are not formal durability
-  guarantees.
+  identical. `--backup` retains a `<file>.bak` copy where supported, or
+  `<file>.bak.1`, `.bak.2`, ... once one exists, so an earlier backup is never
+  overwritten. These mechanisms reduce common failure risks but are not formal
+  durability guarantees.
 
 ## Discover the command surface
 

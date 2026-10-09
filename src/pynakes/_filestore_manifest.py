@@ -17,6 +17,8 @@ from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, overload
 
+from pynakes._atomic import next_backup_path
+
 if TYPE_CHECKING:
     from pynakes.filestore import FileStore, MaterialPaths, MaterialPresence
 
@@ -72,7 +74,7 @@ class PinaxManifest:
         target = self.manifest_path
         target.parent.mkdir(parents=True, exist_ok=True)
         if backup and target.exists():
-            shutil.copy2(target, Path(str(target) + ".bak"))
+            shutil.copy2(target, next_backup_path(target))
         self._atomic_write(target, self.manifest_text(manifest).encode("utf-8"))
 
     def manifest_text(self, manifest: dict[str, object]) -> str:
