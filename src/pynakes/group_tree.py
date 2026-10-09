@@ -28,7 +28,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from pynakes._text_utils import _split_escaped
+from pynakes._text_utils import _split_escaped, check_balanced_braces
 from pynakes.groups import entry_groups
 from pynakes.model import BibFile
 
@@ -397,6 +397,7 @@ def add_node(
     Returns ``True`` if a new node was added, ``False`` if a node with the same
     name already exists.
     """
+    check_balanced_braces(f"Group name {name!r}", name)
     tree = library_group_tree(lib) or []
     if _node_by_name(tree, name):
         return False
@@ -428,6 +429,7 @@ def rename_node(lib: BibFile, old_name: str, new_name: str) -> bool:
     Returns ``True`` if a node was renamed, ``False`` if *old_name* was not
     found or *new_name* already exists.
     """
+    check_balanced_braces(f"Group name {new_name!r}", new_name)
     tree = library_group_tree(lib) or []
     node = _node_by_name(tree, old_name)
     if node is None or _node_by_name(tree, new_name):
@@ -465,8 +467,12 @@ def update_node(lib: BibFile, name: str, **kwargs) -> bool:
     Acceptable keyword arguments: ``parent``, ``context``, ``color``,
     ``expanded``, ``description``, ``group_type``, ``field``, ``expression``,
     ``case_sensitive``, ``separator``, ``search_flags``, ``entries``.
-    Returns ``False`` when *name* is not found.
+    Returns ``False`` when *name* is not found. Raises ``ValueError`` for a
+    text property with an unmatched brace, before anything changes.
     """
+    for key, value in kwargs.items():
+        if isinstance(value, str):
+            check_balanced_braces(f"Group {key} {value!r}", value)
     tree = library_group_tree(lib) or []
     node = _node_by_name(tree, name)
     if node is None:

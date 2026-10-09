@@ -244,8 +244,11 @@ casing (`month = Jan` → `month = jan`), while preserving literals such as
 
 `lint` (along with `keys check`, `asset check`, `dedupe check`, and `verify`)
 accepts multiple files, or auto-detects a single `.bib` in the current directory
-when no file is given. Auto-detection ignores RevTeX-generated `*Notes.bib`
-auxiliary files; pass one explicitly if you really want to inspect it. These
+when no file is given. Auto-detection ignores the `<jobname>Notes.bib` file
+REVTeX generates, recognized by that name and the `@CONTROL{REVTEX4...}` entry it
+opens with, and names it in the error when it was the only `.bib` found; pass one
+explicitly if you really want to inspect it. A library you named `notes.bib` is
+not skipped. These
 checks support `--strict`, which exits `1` when any finding remains so it can
 gate a build; for `lint`, suppressed findings do not count. See
 [Metadata Reference](metadata-reference.md) for the complete schema and

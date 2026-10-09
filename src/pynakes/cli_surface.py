@@ -16,7 +16,12 @@ from pathlib import Path, PurePath
 import click
 import typer
 
-from pynakes.cli_common import _emit_error, bib_candidates, missing_bib_message
+from pynakes.cli_common import (
+    _emit_error,
+    auxiliary_bib_files,
+    bib_candidates,
+    missing_bib_message,
+)
 
 #: The name of the library argument on every single-library command.
 LIBRARY_ARGUMENT = "file"
@@ -189,7 +194,8 @@ def _autodetected(json_output: bool) -> str:
     """Return the lone ``.bib`` in the working directory, or report why there is none."""
     candidates = bib_candidates(Path.cwd())
     if len(candidates) != 1:
-        _emit_error(json_output, "InvalidInput", missing_bib_message(candidates))
+        message = missing_bib_message(candidates, auxiliary_bib_files(Path.cwd()))
+        _emit_error(json_output, "InvalidInput", message)
     return candidates[0].name
 
 

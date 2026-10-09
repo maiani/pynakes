@@ -234,6 +234,19 @@ form is a `UsageError`, never silently reinterpreted.
 
 ### Fixed
 
+- A value with an unmatched `{` or `}` was accepted and could leave a file that
+  no longer parsed. `fields set`/`append`, `ref add`/`ref edit --field`,
+  `corpus batch`, the `groups` commands, and `metadata set` now refuse it with
+  `InvalidInput` before anything is staged. Braces count as the parser counts
+  them, escaped ones included.
+- `asset check` reported a Pinax store as clean when `.pinax/manifest.json` was
+  missing, while `asset repair` recorded the material files it found. It now
+  reports that drift, and `asset check --strict` fails on it.
+- Auto-detection and `format --recursive` skipped any file whose name ended in
+  `notes.bib`, so a library named `notes.bib` or `LectureNotes.bib` was ignored.
+  Only the `<jobname>Notes.bib` that REVTeX generates is skipped now, recognized
+  by its name and its `@CONTROL{REVTEX4…}` entry, and when it is the only `.bib`
+  present the error names it.
 - A UTF-16 or UTF-32 library parsed as zero entries. A byte-order mark (UTF-8,
   UTF-16, or UTF-32, either byte order) now sets the encoding, and writes keep
   the mark and encoding, so an unmodified file still round-trips byte for byte.

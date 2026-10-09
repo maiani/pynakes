@@ -1,9 +1,13 @@
 """Tests for citation-key generation, duplicate detection, and repair."""
 
+import json
+
 import pytest
+from typer.testing import CliRunner
 
 from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
+from pynakes.cli import app
 from pynakes.keys import (
     UnsupportedCitationKeyPatternError,
     generate_key,
@@ -565,3 +569,59 @@ def test_ordinary_key_pattern_regex_still_applies() -> None:
     from pynakes.keys import _regex_modifier
 
     assert _regex_modifier("On the Sphere", 'regex("^(On|The) ","")') == "the Sphere"
+
+
+class TestRenameFollowsReferencesThroughTheCli:
+    """Every CLI path that renames a key keeps reference fields consistent."""
+
+    SOURCE = (
+        "@book{Newton1687,\n  title = {Principia},\n}\n\n"
+        "@inbook{Euler1748,\n"
+        "  crossref = {Newton1687},\n"
+        "  xref = {Newton1687},\n"
+        "  xdata = {Newton1687, Common},\n"
+        "  related = {Common,Newton1687},\n"
+        "  entryset = {Newton1687},\n"
+        "}\n\n"
+        "@misc{Common,\n  title = {Shared},\n}\n"
+    )
+
+    def _assert_followed(self, text: str) -> None:
+        lib = parse_bib(text)
+        fields = lib.entries["Euler1748"].fields
+        assert fields["crossref"] == "Newton1688"
+        assert fields["xref"] == "Newton1688"
+        assert fields["xdata"] == "Newton1688, Common"
+        assert fields["related"] == "Common,Newton1688"
+        assert fields["entryset"] == "Newton1688"
+        assert "Newton1687" not in text
+
+    def test_keys_rename(self, tmp_path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(self.SOURCE, encoding="utf-8")
+
+        result = CliRunner().invoke(app, ["keys", "rename", str(bib), "Newton1687", "Newton1688"])
+
+        assert result.exit_code == 0, result.output
+        self._assert_followed(bib.read_text(encoding="utf-8"))
+
+    def test_corpus_batch_keys_rename(self, tmp_path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(self.SOURCE, encoding="utf-8")
+        ops = json.dumps([{"op": "keys.rename", "old": "Newton1687", "new": "Newton1688"}])
+
+        result = CliRunner().invoke(app, ["corpus", "batch", str(bib), "--ops", ops, "--json"])
+
+        assert result.exit_code == 0, result.output
+        self._assert_followed(bib.read_text(encoding="utf-8"))
+
+    def test_keys_repair_leaves_references_to_the_duplicated_key(self, tmp_path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text(self.SOURCE + "\n@book{Newton1687,\n  title = {Opticks},\n}\n")
+
+        result = CliRunner().invoke(app, ["keys", "repair", str(bib)])
+
+        assert result.exit_code == 0, result.output
+        fields = parse_bib(bib.read_text(encoding="utf-8")).entries["Euler1748"].fields
+        assert fields["crossref"] == "Newton1687"
+        assert fields["related"] == "Common,Newton1687"

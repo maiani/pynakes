@@ -224,18 +224,21 @@ tests the gate did not require moved to Stage 5.
   into place by `_atomic_replace_dir` (Pinax preprint sources) are not synced,
   nor is the manifest's `shutil.copy2` backup.
 - **Correctness gaps**:
-  - `keys rename` leaves `crossref`, `xdata`, and `related` pointing at the old
-    key.
-  - User-supplied values with unbalanced braces are accepted.
+  - *(Done: rename paths follow references, now tested through the CLI;
+    unbalanced user values refused; `asset check` without a manifest; REVTeX
+    `Notes.bib` discovery.)* Follow-ups: `_canonical_wrap._balanced_braces`
+    skips escaped braces while the parser counts them, a possible `format` bug;
+    a fully braced reference such as `related = {{Newton1687}}` is not rewritten
+    on rename; values pynakes takes from elsewhere (provider metadata, `file`
+    paths) are not brace-checked.
   - *(Done: encoding detection by byte-order mark and refusal of mixed bytes,
     the file's own ending kept on write, numbered backups.)* Left: a few
     readers still assume UTF-8 and can misread a UTF-16 or Latin-1 library —
     the previous-content diffs of `convert` and `corpus`, `cli_completion`, and
     `asset_check`.
-  - `asset check` reports no drift when the Pinax manifest file is absent,
-    while `asset repair` records the material files it finds: the drift scan
-    returns early without a manifest.
-  - `*notes.bib` is skipped by auto-discovery with a misleading error.
+- **Module size.** `fetch.py` (789), `_engine_helpers.py` (773), `normalize.py`
+  (739), and `_engine_ops.py` (713) are near the 800-line limit: split them
+  before adding to them.
 - **Stage 4 behavior tests** not yet written: the `--force` overwrite policy
   per command, `format --out`, `convert --diff`/`--force`/`--expect-sha256` on
   import, `ref remove` of a duplicated key, and the multi-file checks'

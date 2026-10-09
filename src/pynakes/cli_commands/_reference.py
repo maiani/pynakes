@@ -6,6 +6,7 @@ import typer
 
 from pynakes.cli_common import InvalidInputError, _emit_conflict, _emit_error
 from pynakes.engine import Bibliography
+from pynakes.fields import check_field_value
 from pynakes.lint import required_field_rules
 from pynakes.metadata import library_dialect
 from pynakes.model import BibEntry
@@ -45,6 +46,7 @@ def parse_field_assignments(assignments: list[str]) -> dict[str, str]:
         if name.lower() in {"key", "type"}:
             raise ValueError(f"{name!r} is not a field; use the citation key or --type")
         fields[name] = value.strip()
+        check_field_value(name, fields[name])
     return fields
 
 

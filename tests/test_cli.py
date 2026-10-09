@@ -496,9 +496,11 @@ class TestInspectAndLint:
     def test_auto_discovery_ignores_revtex_notes_bib(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text("@article{A,\n  title = {T}\n}\n")
-        (tmp_path / "refsNotes.bib").write_text("@article{N,\n  title = {Generated Notes}\n}\n")
+        (tmp_path / "refsNotes.bib").write_text(
+            "@CONTROL{REVTEX42Control}\n@article{N,\n  title = {Generated Notes}\n}\n"
+        )
         (tmp_path / "refs_diffNotes.bib").write_text(
-            "@article{D,\n  title = {Generated Diff Notes}\n}\n"
+            "@CONTROL{REVTEX41Control}\n@article{D,\n  title = {Generated Diff Notes}\n}\n"
         )
         monkeypatch.chdir(tmp_path)
 
