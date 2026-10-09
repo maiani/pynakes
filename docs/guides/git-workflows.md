@@ -75,6 +75,17 @@ pre-commit install
 pre-commit run --all-files
 ```
 
+The hook runs the release named by `rev`, not the pynakes you may have installed
+yourself, so a fix you have tested locally reaches the hook only once a release
+includes it and `rev` points at that release. `pre-commit autoupdate` moves
+`rev` to the latest release.
+
+pynakes takes its version from git tags, and pre-commit clones only the pinned
+commit, without tags. Inside the hook's environment `pynakes --version`
+therefore reports a placeholder such as `0.1.0.dev1`. The code is the release
+`rev` names; only the label is missing. To check which release a hook runs, read
+`rev`, not the version string.
+
 `pynakes-lint` and `pynakes-keys-check` run on every commit. Two more hooks are
 defined but gated behind pre-commit's `manual` stage, because they have
 preconditions you may not always meet (linked PDFs checked into the repo;
