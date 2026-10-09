@@ -55,7 +55,21 @@ ISSUE_CATEGORIES: dict[str, LintCategory] = {
     "invalid_metadata_value": "correctness",
     "duplicate_metadata_block": "correctness",
     "missing_tex_source": "correctness",
+    "invalid_entry_directive": "correctness",
+    "unused_entry_directive": "correctness",
 }
+
+
+# Findings whose ``key`` names a metadata setting or an on-disk file rather
+# than a citation key: no entry-line lookup or per-entry directive applies.
+NON_ENTRY_ISSUE_TYPES = frozenset(
+    {
+        "unknown_metadata_key",
+        "invalid_metadata_value",
+        "duplicate_metadata_block",
+        "missing_tex_source",
+    }
+)
 
 
 # Names ``lint --ignore`` and the ``lint-ignore`` setting accept: a finding type

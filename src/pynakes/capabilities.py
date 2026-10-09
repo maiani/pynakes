@@ -298,6 +298,7 @@ def get_capabilities() -> dict:
             "create_library",
             "inspect_library",
             "lint",
+            "entry_directives",
             "manage_groups",
             "manage_group_tree",
             "manage_fields",
@@ -358,7 +359,8 @@ def get_capabilities() -> dict:
             "inspect": "Inspect a .bib file structure",
             "lint": "Validate entries and report issues",
             "ref": "Create, show, edit, compare, find, import, and remove individual "
-            "references (add, show, edit, compare, find, import, remove)",
+            "references, and set per-entry directives "
+            "(add, show, edit, directive, compare, find, import, remove)",
             "groups": "Manage entry groups and group hierarchy "
             "(list, list-entries, add-entry, remove-entry, tree, add-group, "
             "remove-group, rename-group, move-group, update-group)",

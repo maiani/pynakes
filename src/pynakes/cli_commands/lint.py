@@ -14,7 +14,9 @@ from pynakes.cli_common import _emit_error, _safe, _source_sha256
 from pynakes.engine import Bibliography
 from pynakes.lint import (
     LintIssue,
+    entry_ignore_rules,
     is_profile_issue,
+    is_waived,
     library_lint_ignores,
     unknown_ignore_names,
 )
@@ -30,10 +32,13 @@ def _lint_one(
     lib = coll.lib
     issues = lint_lib(lib, base_dir=Path(file).parent)
     # The command line adds to the library's own `lint-ignore`; it never
-    # re-enables what the library ignores.
+    # re-enables what the library ignores. `ignore` directives above an entry
+    # waive that entry's findings.
     ignored = ignores | library_lint_ignores(lib)
-    suppressed = sum(1 for issue in issues if issue.is_ignored(ignored))
-    issues = [issue for issue in issues if not issue.is_ignored(ignored)]
+    rules = entry_ignore_rules(lib)
+    kept = [i for i in issues if not (i.is_ignored(ignored) or is_waived(i, rules))]
+    suppressed = len(issues) - len(kept)
+    issues = kept
     if categories:
         issues = [issue for issue in issues if issue.category in categories]
     errors = sum(1 for i in issues if i.severity == "error")
@@ -68,7 +73,9 @@ def _lint_one(
         )
         human.extend(_fixer_hints(issues))
     if suppressed:
-        human.append(f"{suppressed} finding(s) suppressed by lint-ignore or --ignore.")
+        human.append(
+            f"{suppressed} finding(s) suppressed by lint-ignore, --ignore, or an ignore directive."
+        )
     # Structural errors and declared-profile deviations fail --strict.
     # Other findings (a missing DOI, layout drift) remain advisory.
     return CheckOutcome(

@@ -101,6 +101,15 @@ JabRef and future JabRef-native keys route to `jabref-meta` from then on.
 Running it again once tracked is a no-op. See the
 [metadata usage guide](usage.md#metadata) for the CLI workflow.
 
+## Per-entry directives
+
+pynakes' per-entry [directives](usage.md#per-entry-directives) — a
+`% pynakes: ...` line or `@comment{pynakes: ...}` block directly above an
+entry — survive JabRef. Checked against JabKit 6.0-beta.1 (`convert` from
+BibTeX to BibTeX, which uses JabRef's writer): JabRef keeps the comment directly
+above its entry both when it writes the entry back unchanged and when it
+rewrites it, and `tests/test_directives.py` pins that rewritten output.
+
 ## Round-trip fidelity and the JabRef grammars understood
 
 An unmodified entry or metadata comment always writes back byte-for-byte —

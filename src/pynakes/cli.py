@@ -18,6 +18,7 @@ from pynakes.cli_commands import (
     compare,
     convert,
     dedupe,
+    directive,
     edit,
     fetch,
     fields,
@@ -105,6 +106,7 @@ add.register(ref_app)
 import_ref.register(ref_app)
 show.register(ref_app)
 edit.register(ref_app)
+directive.register(ref_app)
 compare.register(ref_app)
 find.register(ref_app)
 remove.register(ref_app)
@@ -176,6 +178,7 @@ app.registered_groups.sort(key=lambda info: _panel_sort_key(info.name))
 _CITEKEY_ARGS: dict[tuple[str, ...], str] = {
     ("ref", "show"): "key",
     ("ref", "edit"): "key",
+    ("ref", "directive"): "key",
     ("ref", "compare"): "key",
     ("ref", "remove"): "citekeys",
     ("keys", "generate"): "key",

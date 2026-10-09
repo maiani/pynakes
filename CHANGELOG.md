@@ -28,6 +28,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   count, and an unknown name is refused (`InvalidInput`) or, when stored,
   reported as `invalid_metadata_value`. The `lint()` Python function still
   returns every finding ([#2](https://github.com/maiani/pynakes/issues/2)).
+- **Per-entry directives** and **`ref directive`**. A comment directly above an
+  entry, `% pynakes: <verb> <args> [-- reason]` (or `@comment{pynakes: ...}`),
+  is a setting for that entry alone. The first verb is `ignore`: `% pynakes:
+  ignore missing_doi -- the venue assigns no DOIs` makes `lint` leave that
+  entry's matching findings out, by finding type or category and optionally one
+  field (`missing_profile_required_field:volume`); they count toward
+  `suppressed`. `lint` reports a directive it cannot act on as
+  `invalid_entry_directive` and an `ignore` that matches no finding as
+  `unused_entry_directive`. `ref directive FILE KEY VERB [ARGS...] [--reason]
+  [--remove]` writes or removes a directive, changing only that line. Directives
+  move with their entry and survive a JabRef save (checked with JabKit
+  6.0-beta.1) ([#2](https://github.com/maiani/pynakes/issues/2)).
 - `lint` reports a `crossref`, `xref`, `xdata`, `related`, or `entryset` value
   that names a key the library lacks, as `missing_reference_target`.
 - **A write precondition.** Every modifying command's JSON envelope now reports

@@ -223,7 +223,8 @@ lint-ignore: missing_doi, layout
 ```
 
 `--ignore` adds to the stored list; it cannot re-enable what the library
-ignores. Suppression is never silent: the summary's `suppressed` count, and a
+ignores. To accept a finding on one entry only — this venue assigns no DOIs —
+write an `ignore` [directive](#per-entry-directives) above it instead. Suppression is never silent: the summary's `suppressed` count, and a
 closing line in human output, report how many findings were left out. An
 unknown name is refused on the command line and reported as
 `invalid_metadata_value` in the stored setting.
@@ -556,6 +557,46 @@ interactive mode automatically and presents the current type and required
 fields as defaults; pressing Enter preserves each value. Interactive mode
 requires a terminal: supplying no change options under `--json` or headless
 stdin is an error rather than a prompt.
+
+## Per-entry directives
+
+A library's settings live in its `pynakes-meta` comment. A setting for **one
+entry** lives in a comment directly above that entry — a *directive*:
+
+```bibtex
+% pynakes: ignore missing_doi -- the venue assigns no DOIs
+@article{Newton1687,
+```
+
+A directive is `pynakes:`, a verb, its comma-separated arguments, and an
+optional reason after ` -- `, written as a `%` line or as
+`@comment{pynakes: ...}`. It must sit directly above the entry: a blank line
+in between makes it a free comment that applies to nothing. Every command that
+moves or drops entries carries it along (see
+[metadata](#metadata)), and BibTeX, Biber, and JabRef leave it alone.
+
+| Verb | Arguments | Effect |
+| --- | --- | --- |
+| `ignore` | finding types or categories, each optionally `NAME:FIELD` | `lint` leaves this entry's matching findings out of its report and its `--strict` gate |
+
+`ref directive` writes and removes directives, changing only the directive
+line:
+
+```bash
+pynakes ref directive refs.bib Newton1687 ignore missing_doi --reason "no DOI assigned"
+pynakes ref directive refs.bib Newton1687 ignore missing_profile_required_field:volume
+pynakes ref directive refs.bib Newton1687 ignore missing_doi --remove
+pynakes ref directive refs.bib Newton1687 ignore --remove   # every ignore on the entry
+```
+
+Arguments the entry's directives already carry are not repeated; giving a new
+`--reason` for them rewrites the reason. `--remove` takes arguments out of the
+entry's directives of that verb and deletes a directive left with none. A
+directive pynakes cannot act on is refused by `ref directive` and reported by
+`lint` as `invalid_entry_directive`; an `ignore` that no longer matches any
+finding is reported as `unused_entry_directive`, so a waiver does not outlive
+its reason unnoticed. Waived findings count toward the lint summary's
+`suppressed`.
 
 ## find
 

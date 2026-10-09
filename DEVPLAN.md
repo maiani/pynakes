@@ -142,6 +142,13 @@ Decisions taken:
   ever gets a setting). Rule selection is one `--ignore NAME` taking a finding
   type or a category, mirrored by one `lint-ignore` key; the command applies it,
   and the `lint()` function keeps returning every finding.
+- A setting for one entry is a directive comment directly above it
+  (`% pynakes: verb args -- reason`), not a `pynakes-*` field: library settings
+  already live in a comment, and a field would carry tool instructions into
+  exports, interchange formats, and public copies. Both forms survive JabRef
+  (checked with JabKit 6.0-beta.1), so JabRef did not decide it. One generic
+  `ref directive` writes every verb, so a new directive adds a word to the
+  grammar, not a command to the frozen surface.
 
 **Remaining before the gate:**
 
@@ -389,25 +396,15 @@ rather than worked around in the client.
   `Library`, retaining per-file provenance while adding corpus-wide rollups and
   cross-library coverage/duplication views. Reuse the same typed results rather
   than creating an unrelated statistics implementation.
-- **Per-entry lint waivers** ([#2](https://github.com/maiani/pynakes/issues/2)):
-  accept a known exception on one entry ("this venue assigns no DOIs", "this
-  journal has no volumes") without turning the rule off library-wide. A waiver
-  names a rule *and*, where the finding has one, a field
-  (`missing_profile_required_field` on `volume`), so it cannot hide an unrelated
-  finding, and it carries a reason. Two placements to choose between:
-  - a directive comment directly above the entry (`% pynakes: ignore
-    missing_doi -- …`), which `_entry_comments` already carries with the entry
-    through `format`, sorting, `ref remove`, `dedupe merge`, and
-    `corpus split`/`combine`, and which survives `keys rename` untouched —
-    *first verify that JabRef keeps a comment attached above an entry when it
-    saves*;
-  - a waiver table in `pynakes-meta` keyed by citation key, which gathers every
-    waiver in one place but must be rewritten by `keys rename` and `dedupe
-    merge`, and needs a finding of its own for a waiver naming no entry.
-
-  Either way the waived findings count toward `summary.suppressed`, and a waiver
-  that no longer matches any finding is reported, so stale waivers do not
-  accumulate.
+- **More per-entry directives.** `% pynakes: ignore` shipped with the
+  `ref directive` writer (see CHANGELOG); each further verb is a word in the
+  same grammar, not a new command. Candidates, each the per-entry form of a
+  library setting or a recurring false positive: `distinct-from KEY` for a pair
+  `dedupe check` flags but that are different works (the same commit-hook
+  problem #2 raised for lint); `no-fetch` or a per-entry fetch policy for
+  `asset fetch`; `keep-key` against key regeneration; and an opt-out from
+  `enrich` when a provider's record for the work is wrong. `ref show` could list
+  an entry's directives.
 - **Type spelling of new entries** (only if asked for): under
   `format-entry-type-case: preserve`, `ref add` and `ref import` still write
   `@book`, so a JabRef library mixes spellings until JabRef next saves it. A
@@ -445,7 +442,7 @@ rather than worked around in the client.
   are removed in 0.8.0, as the beta promise schedules.
 
 **Done when**: `Library`, `Catalogue`, single-bibliography and library-wide
-analysis, per-entry lint waivers, and the
+analysis, and the
 cross-library entry operations (`corpus pick`/`search`/`dedupe`) shipped with
 tests and docs; MCP server published as a companion package; agent-plan and
 change-summary features shipped; `pytest && ruff` green; CHANGELOG updated;

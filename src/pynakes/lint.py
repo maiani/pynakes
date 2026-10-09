@@ -26,10 +26,18 @@ import csv
 from pathlib import Path
 
 from pynakes._identifiers import normalize_doi
+from pynakes._lint_directives import (
+    DIRECTIVE_ISSUE_TYPES,
+    IgnoreRule,
+    directive_findings,
+    entry_ignore_rules,
+    is_waived,
+)
 from pynakes._lint_issue import (
     CATEGORY_FIXERS,
     IGNORABLE_NAMES,
     ISSUE_CATEGORIES,
+    NON_ENTRY_ISSUE_TYPES,
     SEVERITIES,
     LintCategory,
     LintIssue,
@@ -71,15 +79,19 @@ from pynakes.usage import tex_sources_from_metadata, validate_tex_sources
 
 __all__ = [
     "CATEGORY_FIXERS",
+    "DIRECTIVE_ISSUE_TYPES",
     "IGNORABLE_NAMES",
     "ISSUE_CATEGORIES",
     "PROFILE_ISSUE_TYPES",
     "SEVERITIES",
+    "IgnoreRule",
     "LintCategory",
     "LintIssue",
     "LintProfile",
     "LintSeverity",
+    "entry_ignore_rules",
     "is_profile_issue",
+    "is_waived",
     "issue_category",
     "library_lint_ignores",
     "lint",
@@ -160,18 +172,6 @@ _CONSISTENCY_DECORATION_FIELDS = frozenset(
 _CONSISTENCY_ALTERNATIVES: dict[str, frozenset[str]] = {
     "pages": frozenset({"articleno", "artnum", "eid", "numpages", "doi"}),
 }
-
-
-# Findings whose ``key`` names a metadata setting or an on-disk file rather
-# than a citation key, so the entry-line lookup must never apply to them.
-_LINE_EXEMPT_TYPES = frozenset(
-    {
-        "unknown_metadata_key",
-        "invalid_metadata_value",
-        "duplicate_metadata_block",
-        "missing_tex_source",
-    }
-)
 
 
 def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
@@ -266,6 +266,7 @@ def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
     issues.extend(_lint_field_consistency(lib, dialect=dialect))
     if base_dir is not None:
         issues.extend(_lint_tex_sources(lib, base_dir))
+    issues.extend(directive_findings(lib, issues))
 
     # Locate entry-level findings that could not stamp themselves. The first
     # occurrence of a key wins: with duplicates the finding already names the
@@ -278,7 +279,7 @@ def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
         if entry.start_line is not None and entry.key not in first_line_by_key:
             first_line_by_key[entry.key] = entry.start_line
     for issue in issues:
-        if issue.line is None and issue.key and issue.type not in _LINE_EXEMPT_TYPES:
+        if issue.line is None and issue.key and issue.type not in NON_ENTRY_ISSUE_TYPES:
             issue.line = first_line_by_key.get(issue.key)
     return issues
 

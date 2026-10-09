@@ -144,6 +144,10 @@ the all-or-nothing guarantee rather than an exception to it.
   `ref show --keys k1,k2,… [--abstract]` to triage a candidate set in one call
   instead of one invocation per key.
 - Use `ref edit <key>` for a multi-field patch to one reference.
+- Use `ref directive <key> ignore <finding> --reason "..."` to accept a lint
+  finding a human has judged unfixable for one entry (a venue with no DOIs),
+  rather than inventing a value to silence it. Record the reason; `lint`
+  reports the waiver as `unused_entry_directive` once it no longer applies.
 - Use `ref compare <key> --online` to check one reference's DOI (or, absent a
   DOI, its arXiv id) against provider metadata, or `ref compare <key> --with
   <other-key>` to compare it against another entry already in the library

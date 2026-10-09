@@ -18,12 +18,14 @@ from pathlib import Path
 
 from pynakes import _tex_rewrite
 from pynakes import metadata as metadata_ops
+from pynakes._engine_directives import BibliographyDirectives
 from pynakes._engine_groups import BibliographyGroups
 from pynakes._engine_helpers import (
     CommitResult,
     ExternalModificationError,
     FileFingerprint,
     SourceSnapshot,
+    SourceSpan,
     SpanEdit,
     append_entry_text,
     apply_span_edits,
@@ -56,7 +58,9 @@ __all__ = [
 
 
 @dataclass
-class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations):
+class Bibliography(
+    BibliographyKeys, BibliographyGroups, BibliographyDirectives, BibliographyOperations
+):
     """One in-memory bibliography.
 
     A bibliography is a *derived editing buffer*, not a second source of truth. It
@@ -84,6 +88,8 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
     #: Comment slots a scrub blanked, removed from the source with their
     #: trailing gap so no empty block is left where they were.
     _removed_comments: set[int] = field(default_factory=set)
+    #: Directive lines to write directly above an entry (see ``add_entry_directive``).
+    _directive_insertions: list[tuple[BibEntry, str]] = field(default_factory=list)
     _pinax_renames: list[tuple[str, str]] = field(default_factory=list)
     _pinax_material_merges: list[tuple[str, str]] = field(default_factory=list)
     _format_layout: CanonicalLayout | None = None
@@ -291,6 +297,7 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
         self._pinax_material_merges.clear()
         self._consolidate_metadata = False
         self._removed_comments.clear()
+        self._directive_insertions.clear()
         self._format_layout = None
         self._tex_rewrites.clear()
         self._after_commit.clear()
@@ -394,6 +401,17 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
             edits.append(SpanEdit(span, new))
         return edits, insertions
 
+    def _directive_edits(self) -> list[SpanEdit]:
+        """Insert each staged directive line at the start of its entry's span."""
+        le = self.lib.line_ending
+        edits: list[SpanEdit] = []
+        for entry, line in self._directive_insertions:
+            start = self._source_snapshot.entries[id(entry)].start
+            own_line = start == 0 or self._pristine_text[start - 1] == "\n"
+            text = f"{line}{le}" if own_line else f"{le}{line}{le}"
+            edits.append(SpanEdit(SourceSpan(start, start, ""), text))
+        return edits
+
     def _removed_entry_edits(self) -> list[SpanEdit] | None:
         edits: list[SpanEdit] = []
         for entry in self._removed_entries:
@@ -430,7 +448,7 @@ class Bibliography(BibliographyKeys, BibliographyGroups, BibliographyOperations)
         try:
             text = apply_span_edits(
                 self._pristine_text,
-                [*entry_edits, *removed_entry_edits, *comment_edits],
+                [*entry_edits, *removed_entry_edits, *comment_edits, *self._directive_edits()],
             )
         except ValueError as exc:
             raise RuntimeError(f"could not apply surgical source edits: {exc}") from exc
