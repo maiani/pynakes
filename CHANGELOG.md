@@ -210,7 +210,9 @@ form is a `UsageError`, never silently reinterpreted.
 
 - `capabilities` now lists `--file`/`-f` on the 47 commands that take it (the
   schema was read before the option was wired in), the `--no-…` half of every
-  flag pair, and integer options as `integer` instead of `string`.
+  flag pair, and integer options as `integer` instead of `string`. A bounded
+  integer option (`ref find --limit`) is `integer` on click 8.1 too, which names
+  that type differently.
 - A comment directly above an entry, an `@comment{...}` block or a `%` line with
   no blank line before the entry, now stays with that entry. Before, commands
   that drop or move entries treated it as a free block, so a note or a linter

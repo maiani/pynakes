@@ -184,3 +184,25 @@ class TestCapabilitiesCommand:
         assert "pynakes v" in result.output
         for name in get_capabilities()["commands"]:
             assert name in result.output
+
+
+class TestStableTypeNames:
+    """Click renamed its types after 8.1; both spellings map to one schema type."""
+
+    def test_old_and_new_click_type_names_agree(self) -> None:
+        from types import SimpleNamespace
+
+        from pynakes.capabilities import _stable_type
+
+        def param(name: str) -> SimpleNamespace:
+            return SimpleNamespace(type=SimpleNamespace(name=name), multiple=False, nargs=1)
+
+        # (click 8.1 name, current click name, schema type)
+        for click81, current, expected in [
+            ("text", "str", "string"),
+            ("integer", "int", "integer"),
+            ("integer range", "int range", "integer"),
+            ("float range", "float range", "number"),
+        ]:
+            assert _stable_type(param(click81)) == expected, click81
+            assert _stable_type(param(current)) == expected, current
