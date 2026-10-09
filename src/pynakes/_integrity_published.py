@@ -16,7 +16,7 @@ happened.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from pathlib import Path
 
 from pynakes._identifiers import is_arxiv_doi, normalize_arxiv, normalize_doi
@@ -159,16 +159,18 @@ def check_published(
     semantic_scholar_fetcher: Callable[[str], dict | None] | None = None,
     progress: EntryProgress | None = None,
     concurrency: int = 1,
+    keys: Collection[str] | None = None,
 ) -> PublishedReport:
     """Detect preprints and optionally apply published DOI/journal metadata.
 
     ``concurrency`` bounds how many arXiv/backfill lookups run at once;
     candidates, warnings, and applied updates are still produced in the
     library's own entry order regardless of fetch completion order.
+    ``keys`` limits the run to those citation keys; ``None`` means every entry.
     """
     report = PublishedReport()
     dialect = library_dialect(lib)
-    entries = list(lib.entries.values())
+    entries = [entry for entry in lib.entries.values() if keys is None or entry.key in keys]
     entry_total = len(entries)
 
     # kind in {"noop", "done", "backfill", "arxiv"}. "done" entries were

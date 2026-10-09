@@ -18,7 +18,7 @@ The report types and shared field helpers live in
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -240,16 +240,18 @@ def enrich_library(
     cache_file: str | Path | None = None,
     progress: EntryProgress | None = None,
     concurrency: int = 1,
+    keys: Collection[str] | None = None,
 ) -> EnrichReport:
     """Fill missing fields from local DOI URLs and DOI provider metadata.
 
     ``concurrency`` bounds how many remote lookups run at once; field updates
     are still applied in the library's own entry order regardless of fetch
     completion order, so the result is identical to a serial run either way.
+    ``keys`` limits the run to those citation keys; ``None`` means every entry.
     """
     report = EnrichReport()
     dialect = library_dialect(lib)
-    entries = list(lib.entries.values())
+    entries = [entry for entry in lib.entries.values() if keys is None or entry.key in keys]
     entry_total = len(entries)
 
     # kind in {"no_doi", "malformed", "offline", "fetch"}; data carries the

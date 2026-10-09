@@ -12,9 +12,8 @@ from pynakes.cli_common import (
     _resolve_input_bib,
     _safe,
     bib_file_argument,
-    build_where_filter,
     key_option,
-    parse_key_selector,
+    select_keys,
     where_option,
 )
 from pynakes.directives import EntryDirective, directive_problem, format_directive
@@ -68,7 +67,6 @@ def directive(
         problem = directive_problem(EntryDirective(verb, args))
         if problem is not None:
             _emit_error(json_output, "InvalidInput", f"Invalid directive: {problem}")
-    selector = build_where_filter(where, keys=key)
     file = _resolve_input_bib(file, json_output)
     params = RunParams(
         dry_run=dry_run,
@@ -78,21 +76,7 @@ def directive(
         expect_sha256=expect_sha256,
     )
     coll = Bibliography.open(file)
-    missing = [name for name in parse_key_selector(key) if name not in coll.lib.entries]
-    if missing:
-        _emit_error(
-            json_output,
-            "KeyNotFound",
-            f"No reference with key {', '.join(map(repr, missing))}",
-            action="ref_directive",
-        )
-    selected = list(
-        dict.fromkeys(
-            entry.key
-            for entry in coll.lib.entries.values()
-            if selector is not None and selector(entry)
-        )
-    )
+    selected = select_keys(coll, where, key, json_output, "ref_directive") or []
     for name in selected:
         unique_entry(coll, name, json_output, action="ref_directive")
     if remove:

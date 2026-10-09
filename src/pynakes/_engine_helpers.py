@@ -6,7 +6,7 @@ public API; importers should use the re-exports in ``engine.py``.
 """
 
 import hashlib
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Collection, Generator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -434,13 +434,26 @@ def _add_entry_index(
 # ---------------------------------------------------------------------------
 
 
-def build_fetch_queue(lib: BibFile, target: str | None) -> list[BibEntry]:
+def build_fetch_queue(
+    lib: BibFile, target: str | None, keys: Collection[str] | None = None
+) -> list[BibEntry]:
     """Resolve the list of entries to fetch, raising on ambiguous keys.
 
-    When *target* is given only that one entry is returned; otherwise all
-    entries in *lib* are returned after verifying that no duplicate citation
-    keys exist (Pinax material addressing requires unique keys).
+    When *target* is given only that one entry is returned; with *keys*, the
+    entries they name; otherwise all entries in *lib*. Either way no citation
+    key in the queue may be duplicated (Pinax material addressing requires
+    unique keys).
     """
+    if keys is not None:
+        queue = [entry for entry in lib.entries.values() if entry.key in keys]
+        duplicated = sorted(
+            {entry.key for entry in queue if len(lib.entries.get_all(entry.key)) > 1}
+        )
+        if duplicated:
+            raise ValueError(
+                f"Cannot fetch for duplicate key(s) {', '.join(map(repr, duplicated))}"
+            )
+        return queue
     if target is not None:
         entries = list(lib.entries.get_all(target))
         if not entries:

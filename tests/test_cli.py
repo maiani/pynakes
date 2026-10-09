@@ -2330,13 +2330,14 @@ class TestMetadataCommand:
 
 
 class TestKeysCommand:
-    def test_generate_help_uses_all_not_key_option(self) -> None:
+    def test_generate_help_offers_all_and_the_shared_selector(self) -> None:
         result = runner.invoke(app, ["keys", "generate", "--help"])
 
         assert result.exit_code == 0, result.output
         out = _plain_cli_output(result.output)
         assert "--all" in out
-        assert "--key" not in out
+        assert "--key" in out
+        assert "--where" in out
 
     def test_generate_single_key_uses_preferred_pattern(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"

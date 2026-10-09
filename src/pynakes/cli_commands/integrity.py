@@ -29,6 +29,10 @@ from pynakes.cli_common import (
     _source_sha256,
     _verb,
     bib_file_argument,
+    key_option,
+    parse_key_selector,
+    select_keys,
+    where_option,
 )
 from pynakes.engine import Bibliography
 from pynakes.progress import EntryProgressEvent
@@ -182,6 +186,8 @@ def enrich(
         help="Also promote preprints to their published version, writing the "
         "published DOI/journal when one is available (use with --online)",
     ),
+    where: str | None = where_option(),
+    key: list[str] | None = key_option(),
     cache_file: str | None = _CACHE_FILE_OPTION,
     concurrency: int = _CONCURRENCY_OPTION,
     backup: bool = _BACKUP_OPTION,
@@ -195,6 +201,8 @@ def enrich(
     Fills missing DOI/date/identifier fields; with ``--published`` it also
     promotes preprints to their published version (writing the published
     DOI/journal), folding in the former ``published --apply`` operation.
+    ``--key`` and ``--where`` limit it to the selected entries, so a lookup
+    for a handful of references never reaches the rest of the library.
     """
     file = _resolve_input_bib(file, json_output)
     params = RunParams(
@@ -207,15 +215,26 @@ def enrich(
     coll = Bibliography.open(file)
     # Before any provider is asked: a stale precondition should cost no lookup.
     _check_expected_sha256(file, coll, params)
+    selected = select_keys(coll, where, key, json_output, "enrich")
     if online and not json_output:
         with _RichIntegrityProgress("Enriching") as progress:
             report = coll.enrich(
-                online=online, cache_file=cache_file, progress=progress, concurrency=concurrency
+                online=online,
+                cache_file=cache_file,
+                progress=progress,
+                concurrency=concurrency,
+                keys=selected,
             )
     else:
-        report = coll.enrich(online=online, cache_file=cache_file, concurrency=concurrency)
+        report = coll.enrich(
+            online=online, cache_file=cache_file, concurrency=concurrency, keys=selected
+        )
     updates = list(report.updates)
     warnings = list(report.warnings)
+    if selected == []:
+        warnings.append(
+            {"type": "no_entries_selected", "message": "No entry matched the selection"}
+        )
     extra: dict[str, object] = {}
     detail: list[str] = []
     if published:
@@ -226,10 +245,11 @@ def enrich(
                     cache_file=cache_file,
                     progress=progress,
                     concurrency=concurrency,
+                    keys=selected,
                 )
         else:
             preprints = coll.apply_published(
-                online=online, cache_file=cache_file, concurrency=concurrency
+                online=online, cache_file=cache_file, concurrency=concurrency, keys=selected
             )
         updates += preprints.updates
         warnings += preprints.warnings
@@ -270,6 +290,9 @@ def enrich(
         changed_entries=len({update.key for update in updates}),
         changed_fields=len(updates),
         updates=[update.to_dict() for update in updates],
+        where=where,
+        keys=parse_key_selector(key),
+        selected=None if selected is None else len(selected),
         **extra,
     )
 

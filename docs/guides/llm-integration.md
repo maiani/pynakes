@@ -43,8 +43,9 @@ It includes:
   options, types, defaults, and help text.
 - `error_codes`: the error and conflict codes on which a caller can branch.
 - `predicate_grammar`: the one selector grammar every entry-addressable
-  command accepts (`fields`, `search`, `format`, `corpus combine --where`, and
-  `corpus split --route`), including boolean composition and its operator table.
+  command accepts, including boolean composition and its operator table. Its
+  `used_by` list is read from the live commands (`normalize`, `enrich`,
+  `fields`, `format`, `search`, and the rest), plus `corpus split --route`.
   Its `key_selector` entry documents `--key`, the no-grammar shorthand for
   selecting by citation key that every `--where` command also accepts.
 - `search_query_grammar`: term, phrase, field, fuzzy, ranking, and

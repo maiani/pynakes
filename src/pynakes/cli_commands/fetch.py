@@ -29,6 +29,9 @@ from pynakes.cli_common import (
     _resolve_input_bib,
     _safe,
     bib_file_argument,
+    key_option,
+    select_keys,
+    where_option,
 )
 from pynakes.engine import Bibliography
 from pynakes.fetch_progress import FetchArtifact, FetchProgressEvent
@@ -133,12 +136,14 @@ def fetch(
         "--access",
         help="Publisher access context: open or institutional (uses existing network access)",
     ),
+    where: str | None = where_option(),
+    key: list[str] | None = key_option(),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Download Pinax materials, optionally using existing institutional network access.
 
     With no citation key every entry with configured missing materials is
-    fetched.
+    fetched; ``--key`` / ``--where`` fetch for the selected entries only.
     """
     params = RunParams(
         dry_run=dry_run,
@@ -151,6 +156,10 @@ def fetch(
         # A blank key (an unset variable in a script) means "no key", not a
         # lookup for the empty key.
         target = None
+    if target is not None and (where is not None or key):
+        _emit_error(
+            json_output, "InvalidInput", "Name one citation key or select with --key/--where"
+        )
     file = _resolve_input_bib(file, json_output)
 
     try:
@@ -163,10 +172,12 @@ def fetch(
         FetchPolicy(**{flag: flag in chosen for flag in MATERIALS.values()}) if chosen else None
     )
     _check_expected_sha256(file, coll, params)
+    selected = select_keys(coll, where, key, json_output, "asset_fetch")
 
     if params.json_output:
         report = coll.fetch_materials(
             target=target,
+            keys=selected,
             policy=policy,
             dry_run=params.dry_run,
             cache_file=cache_file,
@@ -176,6 +187,7 @@ def fetch(
         with _RichFetchProgress() as progress:
             report = coll.fetch_materials(
                 target=target,
+                keys=selected,
                 policy=policy,
                 dry_run=params.dry_run,
                 cache_file=cache_file,

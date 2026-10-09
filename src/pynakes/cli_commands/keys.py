@@ -26,6 +26,9 @@ from pynakes.cli_common import (
     _source_sha256,
     _verb,
     bib_file_argument,
+    key_option,
+    select_keys,
+    where_option,
 )
 from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography, ExternalModificationError
@@ -184,25 +187,34 @@ def keys_generate(
         "--all",
         help="Regenerate every citation key instead of one selected key",
     ),
+    where: str | None = where_option(),
+    key_selector: list[str] | None = key_option(),
     backup: bool = _BACKUP_OPTION,
     expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Derive citation keys from entry metadata and update linked TeX citations."""
-    if all_entries and key is not None:
-        _emit_error(json_output, "InvalidInput", "Use either --all or one citation key, not both")
-    if not all_entries and key is None:
+    """Derive citation keys from entry metadata and update linked TeX citations.
+
+    Name one key, select several with ``--key`` / ``--where``, or pass ``--all``.
+    """
+    selecting = where is not None or bool(key_selector)
+    if sum((all_entries, key is not None, selecting)) != 1:
         _emit_error(
             json_output,
             "InvalidInput",
-            "Provide a citation key, or pass --all to regenerate every key",
+            "Provide one citation key, select entries with --key/--where, "
+            "or pass --all to regenerate every key",
         )
     file = _resolve_input_bib(file, json_output)
     params = _params(dry_run, diff, json_output, backup, expect_sha256)
     coll = Bibliography.open(file)
-    if key is None:
+    duplicated: list[str] = []
+    selected = select_keys(coll, where, key_selector, json_output, "keys_generate")
+    if selected is not None:
+        renames, duplicated = coll.generate_selected_keys(selected)
+    elif key is None:
         renames = coll.generate_keys()
     else:
         rename = coll.generate_key(key)
@@ -225,6 +237,18 @@ def keys_generate(
             json_output,
         )
     )
+    source_warnings = [
+        *(
+            {"type": "duplicate_key", "key": name, "message": f"Left duplicated key {name!r}"}
+            for name in duplicated
+        ),
+        *(
+            [{"type": "no_entries_selected", "message": "No entry matched the selection"}]
+            if selected == []
+            else []
+        ),
+        *source_warnings,
+    ]
     for w in source_warnings:
         human.append(f"  {w['message']}")
     if source_changes:

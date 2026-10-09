@@ -23,8 +23,13 @@ Every command that addresses a *set* of entries takes the same selector: the
 so there are no command-specific filter flags to learn.
 
 Accepted by [`fields`](#fields), [`search`](#search), [`format`](#format),
-[`corpus combine`](#combine), [`corpus split`](#split) (`--route` rules), and the
-`fields.*` operations of `corpus batch`.
+[`normalize`](#normalize), [`enrich`](#verify-enrich), `keys generate`,
+`asset fetch`, `ref directive`, [`corpus combine`](#combine),
+[`corpus split`](#split) (`--route` rules), and the `fields.*` operations of
+`corpus batch`. A `--key` that names no entry is a `KeyNotFound` error, and a
+selection that matches nothing writes nothing and warns `no_entries_selected`.
+`pynakes capabilities` lists every command that takes the selector under
+`predicate_grammar.used_by`.
 
 Predicates combine with `and`, `or`, and `not`; `and` binds tighter than `or`,
 and parentheses group explicitly:
@@ -913,6 +918,22 @@ changed none", while `journals=off` means the step never ran. The human summary
 names the flag that turns each one on, and `--json` carries the full reason
 under `operations.skipped`.
 
+To run some steps on some entries, name the steps with `--only` and the
+entries with `--key` or `--where`:
+
+```bash
+# abbreviate two journal names, and change nothing else
+pynakes normalize refs.bib --key Newton1687,Euler1748 --only journals --dry-run --diff
+```
+
+The steps are `metadata`, `drop-fields`, `titles`, `authors`, `dois`, `pages`,
+`journals`, `save-actions`, `months`, `identifier-case`, `sort`, and `keys`. A
+step left out reports why under `operations.skipped`. A selection never re-sorts
+the file or rearranges its metadata, since those act on the file as a whole, and
+`--sort-by` or `--metadata-formatting` given with a selection is refused. So is a
+flag that configures a step `--only` leaves out, such as
+`--only journals --author-style biblatex`.
+
 Useful overrides:
 
 ```bash
@@ -1282,7 +1303,12 @@ pynakes verify refs.bib --online --strict --json
 pynakes verify refs.bib --online --published --json
 pynakes enrich refs.bib --online --dry-run --diff
 pynakes enrich refs.bib --online --published --dry-run --diff
+pynakes enrich refs.bib --online --key Newton1687 --dry-run --diff
+pynakes enrich refs.bib --online --where 'doi missing and year >= 2020'
 ```
+
+`--key` and `--where` limit `enrich` to the selected entries, so a lookup for a
+few references never queries a provider for the rest of the library.
 
 `verify --strict` exits with code `1` when warnings or errors are reported.
 

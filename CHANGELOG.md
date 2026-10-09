@@ -109,6 +109,22 @@ form is a `UsageError`, never silently reinterpreted.
 
 ### Added
 
+- **One entry selector on every command that edits entries.** `enrich`,
+  `normalize`, `keys generate`, and `asset fetch` now take `--key` and `--where`,
+  like `fields`, `format`, and `ref directive`. A lookup for a few references no
+  longer has to run over the whole library or be done by hand. A `--key` naming
+  no entry is a `KeyNotFound` error; a selection that matches nothing writes
+  nothing and warns `no_entries_selected`. A contract test now fails any
+  entry-editing command that lacks the selector without a recorded reason.
+  `keys generate` had its `--key` removed in 0.6 when its positional key became
+  the way to name one entry; it returns as the shared selector.
+- **`normalize --only STEP`** runs just the named steps (comma-separated,
+  repeatable), and `--key`/`--where` just the selected entries:
+  `normalize --key Newton1687,Euler1748 --only journals` abbreviates two journal
+  names and changes nothing else. A selection never re-sorts the file or
+  rearranges its metadata. A flag for a step that cannot run is refused rather
+  than ignored: `--sort-by` with a selection, or `--author-style` with
+  `--only journals`. Each step left out is reported under `operations.skipped`.
 - **Suppressing accepted lint findings**
   ([#2](https://github.com/maiani/pynakes/issues/2)):
   - **`lint --ignore NAME`** (repeatable) and the **`lint-ignore`** library
@@ -213,6 +229,8 @@ form is a `UsageError`, never silently reinterpreted.
   replacing the first. The field scanner took the `"` for the start of a quoted
   value and stopped seeing field names for the rest of the entry. `normalize`,
   `enrich`, `fields`, and every other command that edits fields were affected.
+- `capabilities` listed only some of the commands that accept `--where`; its
+  `predicate_grammar.used_by` is now read from the live commands.
 - `capabilities` now lists `--file`/`-f` on the 47 commands that take it (the
   schema was read before the option was wired in), the `--no-…` half of every
   flag pair, and integer options as `integer` instead of `string`. A bounded
