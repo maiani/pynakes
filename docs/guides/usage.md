@@ -204,9 +204,11 @@ reference.
 
 Layout and consistency findings are `info` so that they cannot bury a structural
 `error`; `--category` filters the report, and `--json` adds `info` and
-`by_category` counts plus per-finding `category` and `fixer` keys. Only errors
-and profile deviations gate `--strict` — including metadata drift (unknown
-pynakes keys, invalid metadata values, duplicate blocks). Human output ends
+`by_category` counts plus per-finding `category` and `fixer` keys.
+`--strict` means *clean*: any finding left in the report fails it, whatever its
+severity, as every other check fails on any finding. A finding the library
+accepts is suppressed explicitly — `lint-ignore`, `--ignore`, or an `ignore`
+directive on the entry — rather than tolerated by a severity rule. Human output ends
 with the commands that would clear the fixable findings, for example
 `Run `pynakes format` to resolve 3 of them.`
 
@@ -239,8 +241,8 @@ casing (`month = Jan` → `month = jan`), while preserving literals such as
 accepts multiple files, or auto-detects a single `.bib` in the current directory
 when no file is given. Auto-detection ignores RevTeX-generated `*Notes.bib`
 auxiliary files; pass one explicitly if you really want to inspect it. These
-checks support `--strict`, which exits `1` for errors or profile deviations so
-it can gate a build. See
+checks support `--strict`, which exits `1` when any finding remains so it can
+gate a build; for `lint`, suppressed findings do not count. See
 [Metadata Reference](metadata-reference.md) for the complete schema and
 [Git Workflows](git-workflows.md) for pre-commit and CI recipes.
 
@@ -579,15 +581,20 @@ moves or drops entries carries it along (see
 | --- | --- | --- |
 | `ignore` | finding types or categories, each optionally `NAME:FIELD` | `lint` leaves this entry's matching findings out of its report and its `--strict` gate |
 
-`ref directive` writes and removes directives, changing only the directive
-line:
+`ref directive` writes and removes directives on the entries named by `--key`
+or selected by `--where`, changing only the directive lines:
 
 ```bash
-pynakes ref directive refs.bib Newton1687 ignore missing_doi --reason "no DOI assigned"
-pynakes ref directive refs.bib Newton1687 ignore missing_profile_required_field:volume
-pynakes ref directive refs.bib Newton1687 ignore missing_doi --remove
-pynakes ref directive refs.bib Newton1687 ignore --remove   # every ignore on the entry
+pynakes ref directive refs.bib ignore missing_doi --key Newton1687 --reason "no DOI assigned"
+pynakes ref directive refs.bib ignore missing_profile_required_field:volume --key Newton1687
+pynakes ref directive refs.bib ignore missing_doi --where 'doi missing and year < 1950' \
+  --reason "pre-DOI era"
+pynakes ref directive refs.bib ignore missing_doi --key Newton1687 --remove
+pynakes ref directive refs.bib ignore --key Newton1687 --remove   # every ignore on it
 ```
+
+`--where` is how a library adopts `lint --strict`: waive the findings it has
+accepted, by selection, and every new finding still fails the gate.
 
 Arguments the entry's directives already carry are not repeated; giving a new
 `--reason` for them rewrites the reason. `--remove` takes arguments out of the

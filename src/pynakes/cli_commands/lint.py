@@ -15,7 +15,6 @@ from pynakes.engine import Bibliography
 from pynakes.lint import (
     LintIssue,
     entry_ignore_rules,
-    is_profile_issue,
     is_waived,
     library_lint_ignores,
     unknown_ignore_names,
@@ -76,12 +75,13 @@ def _lint_one(
         human.append(
             f"{suppressed} finding(s) suppressed by lint-ignore, --ignore, or an ignore directive."
         )
-    # Structural errors and declared-profile deviations fail --strict.
-    # Other findings (a missing DOI, layout drift) remain advisory.
+    # --strict means clean: any finding left after suppression fails it, as
+    # every other gate fails on any finding. A finding the library accepts is
+    # suppressed explicitly (lint-ignore, --ignore, an ignore directive).
     return CheckOutcome(
         result=result,
         human=human,
-        failed=errors > 0 or any(is_profile_issue(issue) for issue in issues),
+        failed=bool(issues),
         summary={
             "issues": len(issues),
             "errors": errors,
@@ -120,7 +120,9 @@ def _fixer_hints(issues: list) -> list[str]:
 
 def lint(
     files: list[str] = typer.Argument(..., help="One or more .bib files"),
-    strict: bool = strict_option("there are errors or metadata-profile deviations"),
+    strict: bool = strict_option(
+        "any finding is left after lint-ignore, --ignore, and ignore directives"
+    ),
     category: list[LintCategory] = typer.Option(
         [],
         "--category",

@@ -19,15 +19,20 @@ runner = CliRunner()
 FIXTURES = Path(__file__).parent / "fixtures"
 REPO_ROOT = Path(__file__).parent.parent
 
-# simple.bib is clean (only advisory warnings); duplicate_entries.bib has
-# duplicate-key *errors*.
+# simple.bib is clean once its one advisory finding (Brown2022 has no DOI) is
+# waived, which _bib does; duplicate_entries.bib has duplicate-key *errors*.
 CLEAN = FIXTURES / "simple.bib"
 WITH_ERRORS = FIXTURES / "duplicate_entries.bib"
 
 
 def _bib(tmp_path: Path, name: str, src: Path) -> Path:
     dst = tmp_path / name
-    dst.write_text(src.read_text(encoding="utf-8"))
+    text = src.read_text(encoding="utf-8")
+    if src == CLEAN:
+        text = text.replace(
+            "@inproceedings{Brown2022,", "% pynakes: ignore missing_doi\n@inproceedings{Brown2022,"
+        )
+    dst.write_text(text)
     return dst
 
 
@@ -193,7 +198,8 @@ class TestPreCommitHooks:
         bib = tmp_path / "refs.bib"
         bib.write_text(
             "@article{Euler1748,\n  author = {Euler, Leonhard},\n"
-            "  title = {Introductio},\n  journal = {Opera},\n  year = {1748}\n}\n"
+            "  title = {Introductio},\n  journal = {Opera},\n  year = {1748},\n"
+            "  doi = {10.1234/euler.1748}\n}\n"
         )
         hooks = yaml.safe_load((REPO_ROOT / ".pre-commit-hooks.yaml").read_text())
         for hook in hooks:

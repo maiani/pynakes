@@ -142,6 +142,10 @@ Decisions taken:
   ever gets a setting). Rule selection is one `--ignore NAME` taking a finding
   type or a category, mirrored by one `lint-ignore` key; the command applies it,
   and the `lint()` function keeps returning every finding.
+- `lint --strict` fails on any finding left after suppression, not only on
+  errors and profile deviations: every other gate already failed on any
+  finding, and once findings can be suppressed explicitly, "strict" can mean
+  clean. `--where` on `ref directive` is how an existing library adopts it.
 - A setting for one entry is a directive comment directly above it
   (`% pynakes: verb args -- reason`), not a `pynakes-*` field: library settings
   already live in a comment, and a field would carry tool instructions into

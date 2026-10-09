@@ -748,12 +748,12 @@ class TestInspectAndLint:
         bib.write_text(
             "@comment{pynakes-meta:\n"
             "lint-required-fields: volume\n"
-            "lint-ignore: missing_profile_required_field\n"
+            "lint-ignore: missing_profile_required_field, missing_doi\n"
             "}\n\n" + self._NEWTON
         )
         result = runner.invoke(app, ["lint", str(bib), "--strict", "--json"])
         assert result.exit_code == 0, result.output
-        assert json.loads(result.output)["summary"]["suppressed"] == 1
+        assert json.loads(result.output)["summary"]["suppressed"] == 2
 
     def test_lint_ignore_refuses_an_unknown_name(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -4777,12 +4777,19 @@ class TestLintCategories:
         data = json.loads(result.output)
         assert data["summary"]["issues"] == 0
 
-    def test_advisory_findings_alone_do_not_fail_strict(self, tmp_path: Path) -> None:
+    def test_advisory_findings_fail_strict_until_suppressed(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text(self.MIXED)
 
-        result = runner.invoke(app, ["lint", str(bib), "--strict", "--json"])
-
-        # Only errors and profile deviations fail --strict.
-        assert result.exit_code == 0, result.output
-        assert json.loads(result.output)["summary"]["errors"] == 0
+        # --strict means clean: an info finding fails it as an error would...
+        strict = runner.invoke(app, ["lint", str(bib), "--strict", "--json"])
+        assert strict.exit_code == 1, strict.output
+        assert json.loads(strict.output)["summary"]["errors"] == 0
+        # ...until the library or the run says it is accepted.
+        accepted = runner.invoke(
+            app,
+            ["lint", str(bib), "--strict", "--ignore", "layout", "--ignore", "consistency"],
+        )
+        assert accepted.exit_code == 0, accepted.output
+        # Without --strict, lint only reports.
+        assert runner.invoke(app, ["lint", str(bib)]).exit_code == 0

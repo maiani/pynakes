@@ -247,7 +247,17 @@ def test_ref_directive_adds_and_lint_honors_it(tmp_path: Path) -> None:
 
     result = runner.invoke(
         app,
-        ["ref", "directive", str(bib), "Newton1687", "ignore", "missing_doi", "--reason", "none"],
+        [
+            "ref",
+            "directive",
+            str(bib),
+            "ignore",
+            "missing_doi",
+            "--key",
+            "Newton1687",
+            "--reason",
+            "none",
+        ],
     )
     assert result.exit_code == 0, result.output
     assert bib.read_text() == "% pynakes: ignore missing_doi -- none\n" + NEWTON
@@ -263,7 +273,17 @@ def test_ref_directive_envelope_and_remove(tmp_path: Path) -> None:
 
     result = runner.invoke(
         app,
-        ["ref", "directive", str(bib), "Newton1687", "ignore", "layout", "--remove", "--json"],
+        [
+            "ref",
+            "directive",
+            str(bib),
+            "ignore",
+            "layout",
+            "--key",
+            "Newton1687",
+            "--remove",
+            "--json",
+        ],
     )
 
     assert result.exit_code == 0, result.output
@@ -272,12 +292,23 @@ def test_ref_directive_envelope_and_remove(tmp_path: Path) -> None:
     assert payload["modified"] is True
     assert payload["modified_entries"] == 1
     assert payload["directive"] == {"verb": "ignore", "args": ["layout"], "reason": None}
+    assert payload["keys"] == ["Newton1687"]
     assert payload["removed"] is True
     assert bib.read_text() == "% pynakes: ignore missing_doi\n" + NEWTON
 
     again = runner.invoke(
         app,
-        ["ref", "directive", str(bib), "Newton1687", "ignore", "layout", "--remove", "--json"],
+        [
+            "ref",
+            "directive",
+            str(bib),
+            "ignore",
+            "layout",
+            "--key",
+            "Newton1687",
+            "--remove",
+            "--json",
+        ],
     )
     payload = json.loads(again.output)
     assert payload["modified"] is False
@@ -287,10 +318,11 @@ def test_ref_directive_envelope_and_remove(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("argv", "error"),
     [
-        (["Newton1687", "ignore", "missing_dio"], "InvalidInput"),
-        (["Newton1687", "keep-key"], "InvalidInput"),
-        (["Newton1687", "ignore", "layout", "--remove", "--reason", "x"], "InvalidInput"),
-        (["Euclid300", "ignore", "missing_doi"], "KeyNotFound"),
+        (["ignore", "missing_dio", "--key", "Newton1687"], "InvalidInput"),
+        (["keep-key", "--key", "Newton1687"], "InvalidInput"),
+        (["ignore", "layout", "--key", "Newton1687", "--remove", "--reason", "x"], "InvalidInput"),
+        (["ignore", "missing_doi"], "InvalidInput"),  # no --key or --where
+        (["ignore", "missing_doi", "--key", "Euclid300"], "KeyNotFound"),
     ],
 )
 def test_ref_directive_refusals(tmp_path: Path, argv: list[str], error: str) -> None:
@@ -302,6 +334,32 @@ def test_ref_directive_refusals(tmp_path: Path, argv: list[str], error: str) -> 
     assert result.exit_code == 1
     assert json.loads(result.output)["error"] == error
     assert bib.read_text() == NEWTON
+
+
+def test_ref_directive_where_waives_a_selection(tmp_path: Path) -> None:
+    # Silencing a whole class of known findings at once, while a new entry with
+    # the same finding still shows up.
+    bib = tmp_path / "refs.bib"
+    late = NEWTON.replace("Newton1687", "Euler1748").replace("1687", "2026")
+    bib.write_text(NEWTON + "\n" + DARWIN + "\n" + late)
+
+    result = runner.invoke(
+        app,
+        ["ref", "directive", str(bib), "ignore", "missing_doi", "--where", "year < 1950", "--json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["keys"] == ["Newton1687", "Darwin1858"]
+    assert payload["selected"] == 2
+    linted = json.loads(runner.invoke(app, ["lint", str(bib), "--json"]).output)
+    assert [i["key"] for i in linted["issues"] if i["type"] == "missing_doi"] == ["Euler1748"]
+
+    nothing = runner.invoke(
+        app,
+        ["ref", "directive", str(bib), "ignore", "missing_doi", "--where", "year < 1000", "--json"],
+    )
+    assert json.loads(nothing.output)["warnings"][0]["type"] == "no_entries_selected"
 
 
 def test_directives_survive_a_jabref_rewrite() -> None:

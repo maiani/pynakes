@@ -259,9 +259,8 @@ matters, or check whether `normalize-journal-source` is set to `none` and the
 journal simply isn't in a table you've configured.
 
 The warnings are advisory in a normal run. `pynakes lint --strict` exits `1`
-for structural errors and these metadata-conformance warnings, allowing a
-repository to enforce its own stored settings in CI. Other advisory warnings,
-such as a missing DOI, remain non-blocking.
+for these metadata-conformance warnings as for any other finding not
+suppressed, allowing a repository to enforce its own stored settings in CI.
 
 ```bibtex
 @comment{pynakes-meta:

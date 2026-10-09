@@ -68,7 +68,7 @@ STALE = "0" * 64
 # ``{bib}`` is the library.
 WRITES = {
     "ref edit": ["ref", "edit", "{bib}", "Newton1687", "--field", "note=first edition"],
-    "ref directive": ["ref", "directive", "{bib}", "Newton1687", "ignore", "missing_doi"],
+    "ref directive": ["ref", "directive", "{bib}", "ignore", "missing_doi", "--key", "Newton1687"],
     "ref add": ["ref", "add", "{bib}", "Galileo1638", "--type", "book", "--field", "year=1638"],
     "ref remove": ["ref", "remove", "{bib}", "Euler1748b", "--keep-files"],
     "groups add-entry": ["groups", "add-entry", "{bib}", "Euler1748", "Optics"],

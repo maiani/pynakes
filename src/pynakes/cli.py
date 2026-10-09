@@ -178,7 +178,6 @@ app.registered_groups.sort(key=lambda info: _panel_sort_key(info.name))
 _CITEKEY_ARGS: dict[tuple[str, ...], str] = {
     ("ref", "show"): "key",
     ("ref", "edit"): "key",
-    ("ref", "directive"): "key",
     ("ref", "compare"): "key",
     ("ref", "remove"): "citekeys",
     ("keys", "generate"): "key",

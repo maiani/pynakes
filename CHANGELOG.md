@@ -36,8 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   field (`missing_profile_required_field:volume`); they count toward
   `suppressed`. `lint` reports a directive it cannot act on as
   `invalid_entry_directive` and an `ignore` that matches no finding as
-  `unused_entry_directive`. `ref directive FILE KEY VERB [ARGS...] [--reason]
-  [--remove]` writes or removes a directive, changing only that line. Directives
+  `unused_entry_directive`. `ref directive FILE VERB [ARGS...] (--key KEYS |
+  --where EXPR) [--reason] [--remove]` writes or removes a directive on one
+  entry or a whole selection, changing only the directive lines. Directives
   move with their entry and survive a JabRef save (checked with JabKit
   6.0-beta.1) ([#2](https://github.com/maiani/pynakes/issues/2)).
 - `lint` reports a `crossref`, `xref`, `xdata`, `related`, or `entryset` value
@@ -62,6 +63,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking — `lint --strict` fails on any finding left after suppression.**
+  It used to fail only on errors and stored-profile deviations, so a library
+  could pass with hundreds of info findings, and `lint` was the one check whose
+  `--strict` did not fail on every finding. `--strict` now means clean: a
+  finding the library accepts is suppressed explicitly with `lint-ignore`,
+  `--ignore`, or an `ignore` directive, and anything else — new findings
+  included — fails the `pynakes-lint` hook. Without `--strict`, `lint` still
+  only reports. To adopt it, waive the accepted findings first, e.g.
+  `ref directive refs.bib ignore missing_doi --where 'doi missing and year < 1950'`
+  ([#2](https://github.com/maiani/pynakes/issues/2)).
 - **Breaking — one positional convention (Stage 4).** Every command that reads
   one library takes it first: `ref show FILE KEY`, `ref edit FILE KEY`, `ref
   compare FILE KEY`, `ref add FILE [KEY]`, `ref import FILE IDENTIFIER...`,
