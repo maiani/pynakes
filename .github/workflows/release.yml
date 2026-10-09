@@ -28,7 +28,8 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
         with:
-          # Full history and main, to tell whether the tag is on main.
+          # Full history, main, and tags: to tell whether the tag is on main,
+          # and for a dry run to derive the next version from the latest tag.
           fetch-depth: 0
 
       - name: Set up Python
@@ -36,8 +37,12 @@ jobs:
         with:
           python-version: "3.13"
 
-      # Tag matches pyproject's version, tag is on main, CHANGELOG has a
-      # section for the version. A dry run checks only the CHANGELOG.
+      - name: Install setuptools-scm
+        run: python -m pip install setuptools-scm
+
+      # The tag is a canonical vX.Y.Z on main, and CHANGELOG has a section for
+      # its version. A dry run checks CHANGELOG has a section for the version
+      # the next release would have.
       - name: Check the release is ready
         id: check
         run: |
@@ -54,6 +59,10 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+        with:
+          # The package version comes from git tags (setuptools-scm); a
+          # shallow checkout would build 0.1.devN.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -69,6 +78,12 @@ jobs:
 
       - name: Check distribution metadata
         run: python -m twine check --strict dist/*
+
+      # What setuptools-scm built is what the tag names: a tag is never
+      # published under a different version.
+      - name: Check the distributions carry the tag's version
+        if: github.ref_type == 'tag'
+        run: python .github/scripts/check_release.py --tag "$GITHUB_REF_NAME" --dist dist
 
       - name: Upload distributions
         uses: actions/upload-artifact@v6
