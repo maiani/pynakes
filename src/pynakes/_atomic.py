@@ -27,6 +27,20 @@ def replacement_target(path: Path) -> Path:
     return Path(os.path.realpath(path)) if path.is_symlink() else path
 
 
+def next_backup_path(path: Path) -> Path:
+    """Return where a backup of ``path`` goes without replacing an earlier one.
+
+    The first backup is ``<path>.bak``; while that exists, the lowest free
+    ``<path>.bak.N`` (N = 1, 2, ...). The name depends only on what is on disk.
+    """
+    candidate = Path(f"{path}.bak")
+    number = 0
+    while os.path.lexists(candidate):
+        number += 1
+        candidate = Path(f"{path}.bak.{number}")
+    return candidate
+
+
 def _new_file_mode() -> int:
     """Return the mode an ordinary ``open(..., "w")`` would create a file with."""
     umask = os.umask(0)

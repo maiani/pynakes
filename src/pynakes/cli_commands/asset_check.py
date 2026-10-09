@@ -97,7 +97,9 @@ def files_check(
 def asset_repair(
     file: str | None = bib_file_argument(),
     backup: bool = typer.Option(
-        False, "--backup", help="Also write manifest.json.bak before reconciling"
+        False,
+        "--backup",
+        help="Also write manifest.json.bak (or the next free .bak.N) before reconciling",
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Report the repairs without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff of the manifest"),

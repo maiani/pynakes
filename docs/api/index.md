@@ -165,7 +165,8 @@ if not result.success:
     raise OSError(result.error)
 ```
 
-`SaveResult` records the destination, optional `.bak` path, and controlled
+`SaveResult` records the destination, optional backup path (`.bak`, or the next
+free `.bak.N`, so an earlier backup is never overwritten), and controlled
 error information. `load_bib` records the detected file encoding on the
 returned library.
 

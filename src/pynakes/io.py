@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from shutil import copyfile, copymode
 
-from pynakes._atomic import match_mode, replace_file, replacement_target
+from pynakes._atomic import match_mode, next_backup_path, replace_file, replacement_target
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.model import BibFile
@@ -31,8 +31,12 @@ class SaveResult:
 
 
 def _write_backup(path: Path) -> str:
-    """Copy ``path`` to ``<path>.bak`` without moving the original away."""
-    backup_path = Path(f"{path}.bak")
+    """Copy ``path`` to a new backup without moving the original away.
+
+    The backup is ``<path>.bak``, or the next free ``<path>.bak.N`` when that
+    exists: an earlier backup is never overwritten.
+    """
+    backup_path = next_backup_path(path)
     with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as tmp:
         staged_backup = Path(tmp.name)
     try:

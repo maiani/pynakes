@@ -444,7 +444,7 @@ def _preview_or_commit(coll: Bibliography, params: RunParams) -> tuple[str, bool
 
     In ``--dry-run`` mode this previews without writing; otherwise it commits
     (atomic write + re-parse validation) and reports the committed outcome.
-    Use ``params.backup`` to also leave a ``<file>.bak`` copy behind.
+    Use ``params.backup`` to also leave a ``<file>.bak`` (or ``.bak.N``) copy behind.
     """
     if params.dry_run:
         return coll.diff(), coll.is_modified, coll.changed_entries_count()
@@ -455,7 +455,8 @@ def _preview_or_commit(coll: Bibliography, params: RunParams) -> tuple[str, bool
 _BACKUP_OPTION = typer.Option(
     False,
     "--backup",
-    help="Also write a <file>.bak copy before overwriting (off by default; "
+    help="Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... "
+    "when earlier backups exist, which are never overwritten (off by default; "
     "writes are already atomic and re-parse-validated)",
 )
 

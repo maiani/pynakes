@@ -229,7 +229,8 @@ class Bibliography(
         """Write staged edits to the bound file and refresh the collection snapshot.
 
         Writes are atomic and re-parse-validated, so a ``.bak`` is opt-in:
-        pass ``backup=True`` to also leave a ``<file>.bak`` copy behind.
+        pass ``backup=True`` to also leave a ``<file>.bak`` copy behind (the
+        next free ``<file>.bak.N`` when earlier backups exist).
         """
         if self.path is None:
             raise ValueError("commit requires a bound path")
