@@ -17,9 +17,8 @@ contract. For command-by-command tutorials, see the [usage guide](usage.md).
 - **Explicit network access.** Network use is limited to `ref import`, `asset
   fetch`, `ref import --fetch`, `verify --online`, `enrich --online`,
   `ref compare --online`, and `ref find --online`.
-- **Reviewable edits.** Ordinary modifying commands support `--dry-run` and
-  `--diff`. The maintenance operation `asset check --fix` is the exception: it
-  writes directly and can retain the prior manifest with `--backup`.
+- **Reviewable edits.** Modifying commands support `--dry-run` and `--diff`,
+  including `asset repair`, whose diff is of the Pinax manifest it reconciles.
 - **Structured output.** Use `--json`; do not parse human-readable output.
 - **Explicit conflicts.** A blocked operation exits `2` and returns resolution
   options instead of choosing one.

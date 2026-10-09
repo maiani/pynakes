@@ -78,7 +78,7 @@ Opt in by setting `pinax-files-dir` in the library metadata. Now every citation 
 - **arXiv download** — PDFs and source bundles, automatically fetched, verified, and extracted with provenance tracking (source hash, download timestamp)
 - **Open-access published PDFs** — resolved from DOI via OpenAlex, CrossRef, and publisher-specific URL overrides; `.published.pdf` lands only for genuinely OA papers, never misidentified repository mirrors
 - **`asset fetch`** — download configured materials for all entries or one key
-- **`asset check`** — validate presence, detect orphans, verify checksums, optionally fix (`--fix`)
+- **`asset check`** / **`asset repair`** — validate presence and detect orphans and manifest drift; reconcile the manifest, with a preview
 - **`ref remove`** — removes both the entry and its materials by default
 - **Coordinated key edits** — renaming a key moves its materials
 - **`corpus combine`/`corpus split`** — materials follow their entries

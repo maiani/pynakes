@@ -142,6 +142,18 @@ Decisions taken:
   ever gets a setting). Rule selection is one `--ignore NAME` taking a finding
   type or a category, mirrored by one `lint-ignore` key; the command applies it,
   and the `lint()` function keeps returning every finding.
+- `asset check` is a pure read-only gate; reconciling the Pinax manifest moved
+  to `asset repair`, with `--dry-run`/`--diff` (`asset check --fix` is a
+  deprecated alias until 0.8), mirroring `keys check`/`keys repair`.
+- `keys check` stays beside lint's `duplicate_key`: it gates on key uniqueness
+  alone, which `lint --strict` no longer can, and is the read side of
+  `keys repair`.
+- `verify` and `enrich` stay top-level: they are the online counterparts of
+  `lint` (diagnose) and `normalize` (change content). `keys usage` and
+  `tex scan` both stay — neither is a subset of the other.
+- No project-level config (`pynakes.toml`, `[tool.pynakes]`) in 0.7: the `.bib`
+  carries its own settings and every client reads them there. Revisit with the
+  v0.8 `Library`, whose directory is the natural home for shared defaults.
 - `lint --strict` fails on any finding left after suppression, not only on
   errors and profile deviations: every other gate already failed on any
   finding, and once findings can be suppressed explicitly, "strict" can mean
@@ -180,16 +192,6 @@ Decisions taken:
   still show the old forms (they run, with a deprecation warning); the contract
   doc does not describe the beta envelope yet. Stage 6 regenerates the reference;
   the contract doc should move with this stage.
-- **Decisions still to record**: whether `asset check --fix` gains
-  `--dry-run`/`--diff`; whether `keys check` stays beside `lint`'s
-  `duplicate_key` finding; where `verify` and `enrich` live. `keys usage` and
-  `tex scan` both stay — neither is a subset of the other. Whether a
-  project-level config (`pynakes.toml` or `[tool.pynakes]`), as #2 proposes,
-  joins the settings the `.bib` carries: leaning no for 0.7 — the library is the
-  one place its lint and format settings live, every client reads them there,
-  and a second, discovered source would make a file lint differently by
-  directory.
-
 **Gate 4**: contract tests enforce the surface instead of sampling it — a table
 test of every command's positional signature; a sweep asserting that each flag
 spelling has one meaning; an envelope-schema test over every command's `--json`
@@ -236,6 +238,9 @@ editor passes against the new envelope (see the editor track).
   - A mixed-ending file gains a CRLF at EOF, a CRLF file without a final newline
     gains one, and a whitespace-only file becomes empty.
   - `--backup` overwrites the previous backup.
+  - `asset check` reports no drift when the Pinax manifest file is absent,
+    while `asset repair` records the material files it finds: the drift scan
+    returns early without a manifest.
   - `*notes.bib` is skipped by auto-discovery with a misleading error.
 - **Property tests** for invariants the suite currently samples: whole-file
   byte equality including CRLF, BOM, and inter-entry text; a one-field edit

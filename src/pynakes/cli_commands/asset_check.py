@@ -1,10 +1,20 @@
-"""`asset check`: verify linked files and Pinax materials, optionally reconciling drift."""
+"""`asset check` verifies linked files and Pinax materials; `asset repair` reconciles drift."""
 
 import typer
 
 from pynakes import files as files_ops
 from pynakes.cli_checks import CheckOutcome, _run_checks, strict_option
-from pynakes.cli_common import _safe, _source_sha256
+from pynakes.cli_common import (
+    _emit,
+    _emit_error,
+    _resolve_input_bib,
+    _safe,
+    _source_sha256,
+    bib_file_argument,
+    note_deprecation,
+)
+from pynakes.cli_surface import MOVED_OPTIONS
+from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography
 from pynakes.filestore import FileStore
 
@@ -85,15 +95,18 @@ def files_check(
         help="Additional directory to resolve relative linked-file paths; can be repeated",
     ),
     strict: bool = strict_option("a linked file is missing, unresolved, or the wrong type"),
-    fix: bool = typer.Option(False, "--fix", help="Reconcile Pinax manifest drift"),
+    fix: bool = typer.Option(False, "--fix", hidden=True, help="Deprecated: use asset repair"),
     backup: bool = typer.Option(
-        False,
-        "--backup",
-        help="Also write manifest.json.bak before reconciling Pinax manifest drift",
+        False, "--backup", hidden=True, help="Deprecated: use asset repair"
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Validate linked-file references (accepts multiple files for CI gating)."""
+    if fix:
+        # A gate command no longer writes; `asset repair` previews and reconciles.
+        note_deprecation(
+            json_output, "asset check --fix", MOVED_OPTIONS[("asset", "check")]["--fix"]
+        )
     _run_checks(
         files,
         "asset_check",
@@ -103,6 +116,58 @@ def files_check(
     )
 
 
+def asset_repair(
+    file: str | None = bib_file_argument(),
+    backup: bool = typer.Option(
+        False, "--backup", help="Also write manifest.json.bak before reconciling"
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Report the repairs without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff of the manifest"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Reconcile the Pinax manifest with the material files that exist.
+
+    Drops manifest rows for keys the library no longer has and records for
+    files that are gone, and records material files the manifest does not
+    know (as manual additions). Only the manifest changes: no material file
+    and no byte of the library. ``asset check`` reports the same drift.
+    """
+    file = _resolve_input_bib(file, json_output)
+    coll = Bibliography.open(file)
+    store = FileStore.from_metadata(coll.lib, file)
+    if store is None:
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            f"{file} has no Pinax (no pinax-files-dir); run `pynakes init --pinax` first",
+            action="asset_repair",
+        )
+    manifest, fixed = store.reconcile_manifest(
+        entry.key for entry in coll.lib.entries.values() if entry.key.strip()
+    )
+    path = store.manifest_path
+    before = path.read_text(encoding="utf-8") if path.is_file() else ""
+    after = store.manifest_text(manifest) if fixed else before
+    if fixed and not dry_run:
+        store.write_manifest(manifest, backup=backup)
+    verb = "would repair" if dry_run else "repaired"
+    human = [f"{file}: {verb} {len(fixed)} Pinax manifest item(s)."]
+    human += [f"  [{item['action']}] {item['key']}:{item['kind']}" for item in fixed]
+    result = {
+        "status": "success",
+        "action": "asset_repair",
+        "file": file,
+        "dry_run": dry_run,
+        "modified": bool(fixed) and not dry_run,
+        "modified_entries": 0,
+        "warnings": [],
+        "source_sha256": _source_sha256(coll),
+        "fixed": fixed,
+    }
+    _emit(json_output, result, human, generate_diff(before, after, str(path)), diff)
+
+
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
     app.command("check")(_safe(files_check))
+    app.command("repair")(_safe(asset_repair))

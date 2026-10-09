@@ -136,6 +136,13 @@ DEPRECATED_VALUES: dict[tuple[str, ...], dict[str, dict[str, str]]] = {
     ("lint",): {"--category": {"layout": "formatting"}},
 }
 
+#: Options that 0.7 moved to a command of their own. The old use still works,
+#: with a warning the command itself emits, until 0.8.
+MOVED_OPTIONS: dict[tuple[str, ...], dict[str, str]] = {
+    # A gate command no longer writes; the repair previews and diffs.
+    ("asset", "check"): {"--fix": "asset repair"},
+}
+
 #: Short flags whose meaning changed in 0.7: the old use fails, naming the new one.
 #: ``-f`` set a field on ``ref add``/``ref edit``; it now names the library
 #: everywhere, as it already did on ``ref import`` and ``tex``.
@@ -436,6 +443,9 @@ def deprecations() -> list[dict]:
                         "new": f"{option} {new}",
                     }
                 )
+    for path, moved in MOVED_OPTIONS.items():
+        for old, new in moved.items():
+            described.append({"command": command_line(path), "old": old, "new": new})
     for path, operand in LEGACY_OPERAND_FIRST.items():
         line = command_line(path)
         described.append(

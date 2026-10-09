@@ -389,7 +389,7 @@ def get_capabilities() -> dict:
             "of writing)",
             "asset": "Fetch and validate Pinax materials — arXiv PDF/source, "
             "open or institutionally entitled published/supplement PDF download, "
-            "and linked-file checks (fetch, check)",
+            "linked-file checks, and manifest repair (fetch, check, repair)",
             "corpus": "Operate across multiple .bib files (combine, split, batch)",
             "capabilities": "Show this capability description",
         },

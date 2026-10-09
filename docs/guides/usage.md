@@ -775,8 +775,16 @@ Validate JabRef linked files stored in `file` fields.
 pynakes asset check refs.bib
 pynakes asset check refs.bib --json
 pynakes asset check refs.bib --root ~/papers --json
-pynakes asset check refs.bib --fix --backup
+pynakes asset repair refs.bib --dry-run --diff   # preview the manifest repair
+pynakes asset repair refs.bib --backup
 ```
+
+`asset check` only reports, so it can gate a commit. `asset repair` reconciles
+the Pinax manifest with the material files that exist: it drops records for
+keys the library no longer has and for files that are gone, and records files
+the manifest does not know. It changes only the manifest — no material file and
+no byte of the library. (`asset check --fix` did this before 0.7; it still
+works, with a deprecation warning, until 0.8.0.)
 
 `asset check` takes one or more libraries as positional arguments (handy for CI
 gating). `asset fetch` downloads materials for one entry or for a whole library;

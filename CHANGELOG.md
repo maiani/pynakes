@@ -73,6 +73,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only reports. To adopt it, waive the accepted findings first, e.g.
   `ref directive refs.bib ignore missing_doi --where 'doi missing and year < 1950'`
   ([#2](https://github.com/maiani/pynakes/issues/2)).
+- **`asset repair`** reconciles the Pinax manifest with the material files that
+  exist, with `--dry-run` and a `--diff` of the manifest. `asset check` is now a
+  pure read-only gate, like every other check: `asset check --fix` still works
+  through 0.7.x with a `deprecated` warning and is removed in 0.8.0.
 - **The `layout` lint category is renamed `formatting`.** It holds the findings
   `format` fixes — spelling BibTeX ignores, such as `@Article` vs `@article` —
   and "layout" read as whitespace and indentation, which `lint` never reports.

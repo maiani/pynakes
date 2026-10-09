@@ -45,7 +45,7 @@ class TestTopLevelHelp:
         # The group name sits in its own table column; the description column
         # ends with "→ <subcommands>".
         assert "→ add, import, show, edit, directive, compare, find, remove" in out
-        assert "→ fetch, check" in out
+        assert "→ fetch, check, repair" in out
         assert "→ combine, split, batch" in out
         assert "→ list, add, remove, clear, scan" in out
 
@@ -1148,7 +1148,7 @@ class TestFilesCommand:
             "reason": "manifest without file",
         }
 
-    def test_check_fix_reconciles_pinax_manifest_drift(self, tmp_path: Path) -> None:
+    def test_repair_reconciles_pinax_manifest_drift(self, tmp_path: Path) -> None:
         files = tmp_path / "refs.files"
         files.mkdir()
         (files / "A.preprint.pdf").write_bytes(b"pdf")
@@ -1176,21 +1176,36 @@ class TestFilesCommand:
             "@article{A,\n  title = {T}\n}\n@comment{pynakes-meta:\npinax-files-dir:\n}\n"
         )
 
-        result = runner.invoke(app, ["asset", "check", str(bib), "--fix", "--json"])
+        manifest_path = files / ".pinax" / "manifest.json"
+        pristine = manifest_path.read_text()
+
+        preview = runner.invoke(app, ["asset", "repair", str(bib), "--dry-run", "--diff", "--json"])
+
+        assert preview.exit_code == 0, preview.output
+        planned = json.loads(preview.output)
+        assert planned["action"] == "asset_repair"
+        assert planned["dry_run"] is True and planned["modified"] is False
+        assert "Ghost" in planned["diff"]
+        assert manifest_path.read_text() == pristine
+
+        result = runner.invoke(app, ["asset", "repair", str(bib), "--json"])
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
+        assert data["fixed"] == planned["fixed"]
         assert {item["action"] for item in data["fixed"]} == {
             "removed_missing_file",
             "removed_orphan_row",
             "added_manual_record",
         }
-        assert data["pinax"]["drift"] == []
-        manifest = json.loads((files / ".pinax" / "manifest.json").read_text())
+        assert data["modified"] is True
+        manifest = json.loads(manifest_path.read_text())
         assert "Ghost" not in manifest["files"]
         assert manifest["files"]["A"]["preprint_pdf"]["source"] == "manual"
+        checked = json.loads(runner.invoke(app, ["asset", "check", str(bib), "--json"]).output)
+        assert checked["pinax"]["drift"] == []
 
-    def test_check_fix_backup_writes_manifest_bak(self, tmp_path: Path) -> None:
+    def test_repair_backup_writes_manifest_bak(self, tmp_path: Path) -> None:
         files = tmp_path / "refs.files"
         files.mkdir()
         (files / "A.preprint.pdf").write_bytes(b"pdf")
@@ -1218,13 +1233,39 @@ class TestFilesCommand:
             "@article{A,\n  title = {T}\n}\n@comment{pynakes-meta:\npinax-files-dir:\n}\n"
         )
 
-        result = runner.invoke(app, ["asset", "check", str(bib), "--fix", "--backup", "--json"])
+        result = runner.invoke(app, ["asset", "repair", str(bib), "--backup", "--json"])
 
         assert result.exit_code == 0, result.output
         backup = files / ".pinax" / "manifest.json.bak"
         assert backup.exists()
         assert "published_pdf" in backup.read_text()
         assert "published_pdf" not in manifest.read_text()
+
+    def test_check_fix_is_a_deprecated_alias_for_repair(self, tmp_path: Path) -> None:
+        files = tmp_path / "refs.files"
+        files.mkdir()
+        (files / "A.preprint.pdf").write_bytes(b"pdf")
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{A,\n  title = {T}\n}\n@comment{pynakes-meta:\npinax-files-dir:\n}\n"
+        )
+
+        result = runner.invoke(app, ["asset", "check", str(bib), "--fix", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["warnings"][0]["type"] == "deprecated"
+        assert data["warnings"][0]["new"] == "asset repair"
+        assert [item["action"] for item in data["fixed"]] == ["added_manual_record"]
+
+    def test_repair_needs_a_pinax(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n")
+
+        result = runner.invoke(app, ["asset", "repair", str(bib), "--json"])
+
+        assert result.exit_code == 1
+        assert json.loads(result.output)["error"] == "InvalidInput"
 
 
 ARXIV_ATOM = """<?xml version="1.0" encoding="UTF-8"?>

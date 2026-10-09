@@ -237,7 +237,8 @@ only when — a `pinax-files-dir` is set:
 | --- | --- | --- |
 | Declare the materials directory | `init --pinax`, or `metadata set pinax-files-dir` | The only step that "creates" a pinax. |
 | See what materials exist | `inspect [--json]` | The report gains per-entry presence and local paths — the [agent surface](#agent-surface). |
-| Validate materials | `asset check [--fix]` | Reports missing/orphan/drift between references and `pinax-files-dir`; reconciles with `--fix`. |
+| Validate materials | `asset check` | Reports missing/orphan/drift between references and `pinax-files-dir`. |
+| Reconcile the manifest | `asset repair [--dry-run --diff]` | Brings the provenance manifest in line with the material files that exist. |
 | Rename / regenerate keys | `keys rename`, `keys generate`, `keys repair` | Every material sharing the key — `<citekey>.published.pdf`, `<citekey>.preprint.pdf`, `<citekey>.source/` — moves with it (see [Coordinated edits](#coordinated-edits-and-atomicity)). |
 | Download missing materials | `asset fetch` (the one new download verb) | See [Fetch](#fetch-the-first-slice). |
 | Combine / split | `corpus combine`, `corpus split` | Produce pinakes; each output entry's materials are copied into the output's `pinax-files-dir`. Non-destructive — inputs untouched. |
@@ -457,9 +458,10 @@ mechanic, because a `.bib` text commit and a binary file move cannot be one
 atomic transaction.
 
 The rule: **filesystem first (it is reversible), then the `.bib` commit; roll
-back the moves if the commit fails.** `asset check --fix` is the backstop: if a
-process dies mid-operation or a user renames a file by hand, the references and
-materials drift, and `asset check` reports the drift and reconciles it — never by
+back the moves if the commit fails.** `asset check` and `asset repair` are the
+backstop: if a process dies mid-operation or a user renames a file by hand, the
+references and materials drift; `asset check` reports the drift and
+`asset repair` reconciles it — never by
 guessing, always by reporting first. Accepting this reconcile step is the honest
 cost of addressing materials by citation key, and it is acceptable because the
 drift is always detectable and the fix always reviewable.
@@ -602,7 +604,7 @@ checklist.
    discards a half-written output.) *(Implemented.)*
 7. **Coordinated key edits (own design pass).** `keys rename` / `generate` /
    `repair` move every `<citekey>*` material *in place* (filesystem first, then
-   commit, rollback on failure); `asset check --fix` reconciles drift. The only
+   commit, rollback on failure); `asset repair` reconciles drift. The only
    in-place material operation, so the riskiest. *(Implemented.)*
 8. **`add --fetch` for arXiv Pinax materials.** One-step import-and-download for
    arXiv references, using the existing Pinax fetch policy for preprint
