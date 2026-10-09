@@ -304,6 +304,15 @@ form is a `UsageError`, never silently reinterpreted.
   CLI contract tests had skipped on every run for want of the engine's
   dependencies; `PYNAKES_REQUIRE_ENGINE` now makes that a failure in CI.
   `pixi run test-extension` installs the engine too.
+- The package version comes from git through setuptools-scm instead of a
+  number written in `pyproject.toml`. A checkout at tag `vX.Y.Z` is exactly
+  `X.Y.Z`; between tags it is the next minor release with the distance and
+  commit, such as `0.7.0.dev12+g1a2b3c4`. A development install used to report
+  the last release while running unreleased code, which hid why it behaved
+  differently from that release. Building from a checkout now needs its git
+  history and tags; CI fetches them. A release checks that the built wheel and
+  sdist carry the tag's version, and a dry run checks `CHANGELOG.md` for the
+  version the next release would have. The sdist ships the same files as before.
 
 ### Editor
 

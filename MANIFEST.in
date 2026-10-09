@@ -1,4 +1,16 @@
+# setuptools-scm adds every file git tracks to the sdist. The sdist carries the
+# package, its tests, and the files packaging needs, nothing else: the editor
+# extension, the docs, CI, and repository tooling stay out. Top-level files are
+# excluded as a whole and the needed ones named, so a new one is not shipped by
+# accident.
+exclude *
+include pyproject.toml README.md LICENSE MANIFEST.in .pre-commit-hooks.yaml
+prune .github
+prune .vscode
+prune docs
+prune editor
+prune scripts
+
 # Ship the complete test environment with the source distribution so downstream
 # packagers can validate the archive without checking out the repository.
-include .pre-commit-hooks.yaml
 recursive-include tests *.py *.bib *.json *.tex *.aux
