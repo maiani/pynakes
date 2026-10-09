@@ -711,6 +711,16 @@ Some platforms publish article URLs with no identifier in them at all — AIP's
 fail with advice to import the DOI printed on the article page rather than
 guessing at a match.
 
+### Imports follow the library's style
+
+An imported entry is written the way the library says its entries look, so a
+clean file stays clean. The `normalize-*` settings the library declares (journal
+style, author style, title protection, and the rest) and its JabRef saveActions
+are applied to the new entry, and so is its `format-*` layout, such as
+`format-alignment: equals`. Nothing else in the file changes. A library that
+declares none of these settings gets the entry as the provider described it;
+run `normalize` or `format` with `--key` to bring it in line by hand.
+
 ### Importing several at once
 
 Give several identifiers, or pipe a list, and they resolve in one call and

@@ -177,6 +177,13 @@ form is a `UsageError`, never silently reinterpreted.
 
 ### Changed
 
+- **`ref import` follows the library's declared style.** An imported entry is
+  given the library's `normalize-*` settings and JabRef saveActions (journal
+  and author style, title protection, and the rest) and its `format-*` layout,
+  such as aligned `=`. It used to arrive with full journal names and compact
+  layout in a library that abbreviates and aligns, so `lint` flagged it at once.
+  Only the new entry changes, and a library that declares none of these
+  settings gets the entry as before.
 - `normalize` no longer loads the bundled journal tables when no journal style
   is configured (the default), which saved about 0.4 s per run. With a style,
   the 66,000 bundled rows are parsed once per process instead of on every call.

@@ -31,6 +31,7 @@ from pynakes._engine_helpers import (
     run_fetch_loop,
 )
 from pynakes._entry_comments import attached_comment_indices
+from pynakes._library_style import apply_library_style
 from pynakes.canonical import CanonicalLayout, format_selected_entries, validate_format_input
 from pynakes.editing import set_entry_type
 from pynakes.fetch_progress import FetchProgress
@@ -384,7 +385,9 @@ class BibliographyOperations:
         """Import one reference from a supported identifier or URL into memory.
 
         The identifier type is auto-detected and provider metadata is normalized
-        for the library's BibTeX/BibLaTeX dialect. Returns ``(kind, entry)``.
+        for the library's BibTeX/BibLaTeX dialect. The entry then follows the
+        library's declared ``normalize-*`` and ``format-*`` settings, so it
+        needs no clean-up pass of its own. Returns ``(kind, entry)``.
         """
         kind, entry = importer_ops.prepare_imported_reference(
             self.lib,
@@ -394,6 +397,7 @@ class BibliographyOperations:
             key_source=key_source,
             allow_duplicate=allow_duplicate,
         )
+        apply_library_style(self.lib, entry)
         self.lib.entries.add(entry)
         self._appended_entries.append(entry)
         return kind, entry
