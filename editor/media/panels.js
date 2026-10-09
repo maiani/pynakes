@@ -133,9 +133,10 @@ window.PV = window.PV || {};
     for (const pane of panes) {
       const holder = document.createElement("span");
       holder.className = "pane-tab-holder" + (pane === active ? " active" : "");
+      // Query before appending: appending a fragment empties it.
       const tab = paneTab(pane);
+      tab.querySelector(".tab").classList.toggle("active", pane === active);
       holder.appendChild(tab);
-      tab.querySelector(".tab").classList.add("active");
       tabs.appendChild(holder);
     }
 

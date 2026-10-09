@@ -17,7 +17,10 @@ _TYPE_VOCABULARY = {
     "str": "string",
     "boolean": "boolean",
     "integer": "integer",
-    # Click's current names; ``int range`` is an option with min/max bounds.
+    # An option with min/max bounds: ``integer range`` up to click 8.1,
+    # ``int range`` after it.
+    "integer range": "integer",
+    # Click's current names.
     "int": "integer",
     "int range": "integer",
     "float": "number",

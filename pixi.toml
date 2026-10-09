@@ -9,7 +9,6 @@
 
 [workspace]
 name = "pynakes"
-version = "0.6.0"
 channels = ["conda-forge"]
 platforms = ["linux-64", "osx-arm64", "osx-64", "win-64"]
 
@@ -23,6 +22,12 @@ nodejs = ">=20"
 # versions, and a bundle should not depend on which Python happened to build it.
 python = "3.12.*"
 pip = "*"
+
+# The engine itself, editable, so the extension's contract and webview tests
+# run against this repository's `src/` instead of skipping for want of its
+# dependencies.
+[pypi-dependencies]
+pynakes = { path = ".", editable = true }
 
 [tasks.build-extension]
 description = "Build the VS Code extension into an installable .vsix"

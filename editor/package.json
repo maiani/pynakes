@@ -2,7 +2,7 @@
   "name": "pynakes-vscode",
   "displayName": "Pynakes",
   "description": "Browse BibTeX/BibLaTeX bibliographies in VS Code, powered by the pynakes engine.",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "pynakes",
   "license": "MIT",
   "private": true,
@@ -137,8 +137,10 @@
     "clean": "node -e \"const fs=require('fs');for (const t of ['engine','out']) fs.rmSync(t,{recursive:true,force:true});for (const f of fs.readdirSync('.')) if (f.endsWith('.vsix')) fs.rmSync(f)\""
   },
   "devDependencies": {
+    "@types/jsdom": "^30.0.0",
     "@types/node": "^22.10.0",
     "@types/vscode": "^1.90.0",
+    "jsdom": "^30.1.2",
     "typescript": "^5.7.0"
   }
 }

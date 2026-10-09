@@ -171,6 +171,9 @@ const python = buildPython();
 console.log(`Building the engine bundle with ${python}`);
 
 removeRecursive(engineDir);
+// setuptools builds in the repository's git-ignored `build/` and never prunes
+// it, so a module deleted from `src/` would otherwise ride along in the wheel.
+removeRecursive(path.join(repoRoot, "build"));
 const wheelDir = fs.mkdtempSync(path.join(os.tmpdir(), "pynakes-wheel-"));
 try {
   run(python, ["-m", "pip", "wheel", repoRoot, "--no-deps", "-w", wheelDir, "-q"]);
