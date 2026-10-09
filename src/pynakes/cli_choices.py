@@ -75,7 +75,7 @@ class KeySource(StrEnum):
 class LintCategory(StrEnum):
     CORRECTNESS = "correctness"
     CONTENT = "content"
-    LAYOUT = "layout"
+    FORMATTING = "formatting"
     CONSISTENCY = "consistency"
     PROFILE = "profile"
 

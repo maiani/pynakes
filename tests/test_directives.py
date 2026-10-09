@@ -51,14 +51,14 @@ def _types(issues) -> list[str]:
     [
         ("% pynakes: ignore missing_doi\n", EntryDirective("ignore", ("missing_doi",))),
         (
-            "% pynakes: ignore missing_doi, layout -- no DOI -- ever",
-            EntryDirective("ignore", ("missing_doi", "layout"), "no DOI -- ever"),
+            "% pynakes: ignore missing_doi, formatting -- no DOI -- ever",
+            EntryDirective("ignore", ("missing_doi", "formatting"), "no DOI -- ever"),
         ),
         ("%%  Pynakes:  IGNORE a b,c --", EntryDirective("ignore", ("a", "b", "c"))),
-        ("@comment{pynakes: ignore layout}", EntryDirective("ignore", ("layout",))),
+        ("@comment{pynakes: ignore formatting}", EntryDirective("ignore", ("formatting",))),
         ("@Comment(pynakes: keep-key)", EntryDirective("keep-key")),
         ("% a note about the work", None),
-        ("@comment{pynakes-meta: lint-ignore: layout}", None),
+        ("@comment{pynakes-meta: lint-ignore: formatting}", None),
     ],
 )
 def test_parse_directive(comment: str, expected: EntryDirective | None) -> None:
@@ -66,11 +66,11 @@ def test_parse_directive(comment: str, expected: EntryDirective | None) -> None:
 
 
 def test_format_directive_round_trips_through_the_parser() -> None:
-    line = format_directive("ignore", ("missing_doi", "layout"), "no DOI assigned")
+    line = format_directive("ignore", ("missing_doi", "formatting"), "no DOI assigned")
 
-    assert line == "% pynakes: ignore missing_doi, layout -- no DOI assigned"
+    assert line == "% pynakes: ignore missing_doi, formatting -- no DOI assigned"
     assert parse_directive(line) == EntryDirective(
-        "ignore", ("missing_doi", "layout"), "no DOI assigned"
+        "ignore", ("missing_doi", "formatting"), "no DOI assigned"
     )
 
 
@@ -93,7 +93,7 @@ def test_directive_problem(directive: EntryDirective, problem: str | None) -> No
 def test_only_a_comment_attached_to_the_entry_is_its_directive() -> None:
     # A blank line makes the comment a free, file-level comment.
     lib = parse_bib(
-        "% pynakes: ignore layout\n\n"
+        "% pynakes: ignore formatting\n\n"
         + NEWTON
         + "\n% pynakes: ignore missing_doi\n@comment{pynakes: ignore consistency}\n"
         + DARWIN
@@ -143,7 +143,8 @@ def test_ignore_with_a_field_waives_only_that_field() -> None:
 
 def test_invalid_and_unused_directives_are_findings() -> None:
     lib = parse_bib(
-        "% pynakes: ignore missing_dio\n% pynakes: keep-key\n% pynakes: ignore layout\n" + NEWTON
+        "% pynakes: ignore missing_dio\n% pynakes: keep-key\n% pynakes: ignore formatting\n"
+        + NEWTON
     )
 
     issues = [issue for issue in lint(lib) if issue.key == "Newton1687"]
@@ -152,9 +153,9 @@ def test_invalid_and_unused_directives_are_findings() -> None:
         messages[issue.type].append(issue.message)
 
     assert len(messages["invalid_entry_directive"]) == 2
-    # `layout` matches nothing: the entry is already lowercase.
+    # `formatting` matches nothing: the entry is already lowercase.
     assert messages["unused_entry_directive"] == [
-        "Entry 'Newton1687' ignores 'layout', but lint reports no such finding for it; "
+        "Entry 'Newton1687' ignores 'formatting', but lint reports no such finding for it; "
         "remove the directive"
     ]
     rules = entry_ignore_rules(lib)
@@ -204,7 +205,7 @@ def test_adding_keeps_crlf_and_works_on_the_first_entry(tmp_path: Path) -> None:
 
 
 def test_adding_present_arguments_changes_only_a_new_reason(tmp_path: Path) -> None:
-    source = "% pynakes: ignore missing_doi, layout -- old\n" + NEWTON
+    source = "% pynakes: ignore missing_doi, formatting -- old\n" + NEWTON
     coll = _open(tmp_path, source)
 
     assert not coll.add_entry_directive("Newton1687", "ignore", ("missing_doi",))
@@ -215,12 +216,12 @@ def test_adding_present_arguments_changes_only_a_new_reason(tmp_path: Path) -> N
 
 def test_removing_arguments_rewrites_or_drops_the_line(tmp_path: Path) -> None:
     source = (
-        NEWTON + "\n% pynakes: ignore missing_doi, layout -- why\n"
+        NEWTON + "\n% pynakes: ignore missing_doi, formatting -- why\n"
         "@comment{pynakes: ignore consistency}\n" + DARWIN
     )
     coll = _open(tmp_path, source)
 
-    assert coll.remove_entry_directive("Darwin1858", "ignore", ("layout", "consistency")) == 2
+    assert coll.remove_entry_directive("Darwin1858", "ignore", ("formatting", "consistency")) == 2
 
     assert coll.preview() == NEWTON + "\n% pynakes: ignore missing_doi -- why\n" + DARWIN
     assert coll.remove_entry_directive("Darwin1858", "ignore") == 1
@@ -269,7 +270,7 @@ def test_ref_directive_adds_and_lint_honors_it(tmp_path: Path) -> None:
 
 def test_ref_directive_envelope_and_remove(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
-    bib.write_text("% pynakes: ignore missing_doi, layout\n" + NEWTON)
+    bib.write_text("% pynakes: ignore missing_doi, formatting\n" + NEWTON)
 
     result = runner.invoke(
         app,
@@ -278,7 +279,7 @@ def test_ref_directive_envelope_and_remove(tmp_path: Path) -> None:
             "directive",
             str(bib),
             "ignore",
-            "layout",
+            "formatting",
             "--key",
             "Newton1687",
             "--remove",
@@ -291,7 +292,7 @@ def test_ref_directive_envelope_and_remove(tmp_path: Path) -> None:
     assert payload["action"] == "ref_directive"
     assert payload["modified"] is True
     assert payload["modified_entries"] == 1
-    assert payload["directive"] == {"verb": "ignore", "args": ["layout"], "reason": None}
+    assert payload["directive"] == {"verb": "ignore", "args": ["formatting"], "reason": None}
     assert payload["keys"] == ["Newton1687"]
     assert payload["removed"] is True
     assert bib.read_text() == "% pynakes: ignore missing_doi\n" + NEWTON
@@ -303,7 +304,7 @@ def test_ref_directive_envelope_and_remove(tmp_path: Path) -> None:
             "directive",
             str(bib),
             "ignore",
-            "layout",
+            "formatting",
             "--key",
             "Newton1687",
             "--remove",
@@ -320,7 +321,10 @@ def test_ref_directive_envelope_and_remove(tmp_path: Path) -> None:
     [
         (["ignore", "missing_dio", "--key", "Newton1687"], "InvalidInput"),
         (["keep-key", "--key", "Newton1687"], "InvalidInput"),
-        (["ignore", "layout", "--key", "Newton1687", "--remove", "--reason", "x"], "InvalidInput"),
+        (
+            ["ignore", "formatting", "--key", "Newton1687", "--remove", "--reason", "x"],
+            "InvalidInput",
+        ),
         (["ignore", "missing_doi"], "InvalidInput"),  # no --key or --where
         (["ignore", "missing_doi", "--key", "Euclid300"], "KeyNotFound"),
     ],
@@ -375,7 +379,7 @@ def test_directives_survive_a_jabref_rewrite() -> None:
         "  year                = {1687},\n"
         "}\n"
         "\n"
-        "@comment{pynakes: ignore layout}\n"
+        "@comment{pynakes: ignore formatting}\n"
         "@Book{Darwin1859,\n"
         "  author              = {Darwin, Charles},\n"
         "  title               = {ON THE ORIGIN OF SPECIES},\n"

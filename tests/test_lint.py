@@ -522,7 +522,7 @@ def test_lint_reports_every_finding_and_validates_lint_ignore() -> None:
     # `lint()` never applies the ignores itself (format's lossless-rewrite gate
     # reads it); an unknown name is reported and dropped.
     lib = parse_bib(
-        "@comment{pynakes-meta: lint-ignore: missing_doi, layout, missing_dio;}\n"
+        "@comment{pynakes-meta: lint-ignore: missing_doi, formatting, missing_dio;}\n"
         "@Article{Newton1687,\n  author = {Newton, Isaac},\n  title = {Principia},\n"
         "  journal = {Royal Society},\n  year = {1687}\n}\n"
     )
@@ -531,7 +531,7 @@ def test_lint_reports_every_finding_and_validates_lint_ignore() -> None:
 
     assert {"missing_doi", "noncanonical_entry_type_case"} <= _types(issues)
     assert "invalid_metadata_value" in _types(issues)
-    assert library_lint_ignores(lib) == frozenset({"missing_doi", "layout"})
+    assert library_lint_ignores(lib) == frozenset({"missing_doi", "formatting"})
     assert [issue.type for issue in issues if issue.is_ignored(library_lint_ignores(lib))] == [
         "noncanonical_entry_type_case",
         "missing_doi",
@@ -896,8 +896,8 @@ def test_every_category_declares_whether_a_command_fixes_it() -> None:
         ("journal_style_mismatch", "content", "normalize"),
         ("malformed_doi", "content", "normalize"),
         ("nonstandard_page_range", "content", "normalize"),
-        ("noncanonical_entry_type_case", "layout", "format"),
-        ("noncanonical_field_name_case", "layout", "format"),
+        ("noncanonical_entry_type_case", "formatting", "format"),
+        ("noncanonical_field_name_case", "formatting", "format"),
         ("inconsistent_field", "consistency", None),
         ("missing_doi", "consistency", None),
         ("invalid_profile_setting", "profile", None),
@@ -922,7 +922,7 @@ def test_layout_findings_are_advisory_and_point_at_format() -> None:
         "  journal = {Nature},\n  YEAR = {2020},\n  doi = {10.1234/abc}\n}\n"
     )
 
-    layout = [i for i in lint(lib) if i.category == "layout"]
+    layout = [i for i in lint(lib) if i.category == "formatting"]
 
     assert {i.type for i in layout} == {
         "noncanonical_entry_type_case",
@@ -940,7 +940,7 @@ def test_advisory_findings_never_outrank_a_structural_error() -> None:
     issues = lint(lib)
 
     assert any(i.severity == "error" and i.category == "correctness" for i in issues)
-    assert {i.severity for i in issues if i.category in {"layout", "consistency"}} == {"info"}
+    assert {i.severity for i in issues if i.category in {"formatting", "consistency"}} == {"info"}
 
 
 # --- consistency scoping ---------------------------------------------------

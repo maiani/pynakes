@@ -131,6 +131,9 @@ DEPRECATED_VALUES: dict[tuple[str, ...], dict[str, dict[str, str]]] = {
     ("normalize",): {flag: _ON_OFF for flag in _NORMALIZE_SWITCHES},
     ("groups", "add-group"): {"--context": _CONTEXT},
     ("groups", "update-group"): {"--context": _CONTEXT},
+    # The lint category `format` fixes was named `layout`, which read as
+    # whitespace and indentation; it holds spelling BibTeX ignores.
+    ("lint",): {"--category": {"layout": "formatting"}},
 }
 
 #: Short flags whose meaning changed in 0.7: the old use fails, naming the new one.

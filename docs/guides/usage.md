@@ -160,7 +160,7 @@ pynakes lint refs.bib
 pynakes lint refs.bib --json
 pynakes lint refs.bib chapters/*.bib --strict   # multi-file CI gate
 pynakes lint refs.bib --category correctness    # only structural problems
-pynakes lint refs.bib --ignore missing_doi --ignore layout   # leave findings out
+pynakes lint refs.bib --ignore missing_doi --ignore formatting   # leave findings out
 ```
 
 Checks include duplicate citation keys, dialect-aware missing required fields by
@@ -190,7 +190,7 @@ and a **severity** ranking urgency:
 | --- | --- | --- | --- |
 | `correctness` | you decide | `error` | duplicate keys, missing required fields, undefined string references |
 | `content` | `normalize` | `warning` | journal style, malformed DOI, non-BibTeX page range, unprotected title case, key-pattern mismatch |
-| `layout` | `format` | `info` | mixed-case field names, and entry types unless `format-entry-type-case` is `preserve` |
+| `formatting` | `format` | `info` | mixed-case field names, and entry types unless `format-entry-type-case` is `preserve` |
 | `consistency` | nothing — an observation | `info` | missing article DOI, a field most comparable peers define |
 | `profile` | you decide | `warning` | deviations from the library's stored lint profile |
 
@@ -220,7 +220,7 @@ property of the library rather than of one invocation, store it:
 
 ```bibtex
 @comment{pynakes-meta:
-lint-ignore: missing_doi, layout
+lint-ignore: missing_doi, formatting
 }
 ```
 
@@ -822,7 +822,7 @@ model cannot rewrite losslessly, currently repeated assignments of one field in
 an entry. Other lint findings remain available through `pynakes lint` but do not
 block layout formatting of an incomplete draft.
 
-`format` clears every `layout`-category lint finding: it lowercases entry types
+`format` clears every `formatting`-category lint finding: it lowercases entry types
 and field names, both of which BibTeX treats case-insensitively, so recasing them
 changes no bibliographic value. An ordinary surgical edit leaves the spelling of
 entries it was not asked to change untouched.

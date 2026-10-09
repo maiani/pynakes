@@ -9,7 +9,7 @@ from typing import Literal
 LintSeverity = Literal["error", "warning", "info"]
 
 
-LintCategory = Literal["correctness", "content", "layout", "consistency", "profile"]
+LintCategory = Literal["correctness", "content", "formatting", "consistency", "profile"]
 
 
 SEVERITIES: tuple[LintSeverity, ...] = ("error", "warning", "info")
@@ -19,14 +19,14 @@ SEVERITIES: tuple[LintSeverity, ...] = ("error", "warning", "info")
 CATEGORY_FIXERS: dict[LintCategory, str | None] = {
     "correctness": None,
     "content": "normalize",
-    "layout": "format",
+    "formatting": "format",
     "consistency": None,
     "profile": None,
 }
 
 
 # Every finding belongs to exactly one category. ``correctness`` findings are
-# structural problems no command can safely resolve; ``content`` and ``layout``
+# structural problems no command can safely resolve; ``content`` and ``formatting``
 # findings name the command that fixes them; ``consistency`` findings are
 # heuristic observations, not defects.
 ISSUE_CATEGORIES: dict[str, LintCategory] = {
@@ -45,8 +45,8 @@ ISSUE_CATEGORIES: dict[str, LintCategory] = {
     "title_capitalization_unprotected": "content",
     "unknown_journal": "content",
     "unsupported_citation_key_pattern": "content",
-    "noncanonical_entry_type_case": "layout",
-    "noncanonical_field_name_case": "layout",
+    "noncanonical_entry_type_case": "formatting",
+    "noncanonical_field_name_case": "formatting",
     "inconsistent_field": "consistency",
     "missing_doi": "consistency",
     "invalid_profile_setting": "profile",

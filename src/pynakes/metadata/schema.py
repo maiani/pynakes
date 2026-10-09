@@ -186,7 +186,7 @@ def validate_metadata_value(key: str, value: str) -> None:
         if unknown:
             raise ValueError(
                 f"Unknown lint-ignore name(s) {unknown!r}; expected a finding type "
-                "or a category (correctness, content, layout, consistency, profile)"
+                "or a category (correctness, content, formatting, consistency, profile)"
             )
         if not metadata_list(stripped):
             raise ValueError("lint-ignore must name at least one finding type or category")

@@ -4664,9 +4664,9 @@ class TestLintCategories:
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         assert data["summary"]["info"] > 0
-        assert data["summary"]["by_category"]["layout"] == 3
-        assert set(data["summary"]["by_category"]) >= {"consistency", "layout"}
-        layout = [i for i in data["issues"] if i["category"] == "layout"]
+        assert data["summary"]["by_category"]["formatting"] == 3
+        assert set(data["summary"]["by_category"]) >= {"consistency", "formatting"}
+        layout = [i for i in data["issues"] if i["category"] == "formatting"]
         assert all(i["severity"] == "info" and i["fixer"] == "format" for i in layout)
 
     def test_human_output_names_the_fixing_command(self, tmp_path: Path) -> None:
@@ -4737,12 +4737,26 @@ class TestLintCategories:
         bib = tmp_path / "refs.bib"
         bib.write_text(self.MIXED)
 
+        result = runner.invoke(app, ["lint", str(bib), "--category", "formatting", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert set(data["summary"]["by_category"]) == {"formatting"}
+        assert data["summary"]["issues"] == 3
+
+    def test_layout_category_is_a_deprecated_alias(self, tmp_path: Path) -> None:
+        # `layout` was renamed `formatting` in 0.7; the old value still works
+        # through 0.7.x with a structured deprecation warning.
+        bib = tmp_path / "refs.bib"
+        bib.write_text(self.MIXED)
+
         result = runner.invoke(app, ["lint", str(bib), "--category", "layout", "--json"])
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
-        assert set(data["summary"]["by_category"]) == {"layout"}
-        assert data["summary"]["issues"] == 3
+        assert set(data["summary"]["by_category"]) == {"formatting"}
+        assert data["warnings"][0]["type"] == "deprecated"
+        assert data["warnings"][0]["new"] == "--category formatting"
 
     def test_category_filter_accepts_several_categories(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -4750,11 +4764,11 @@ class TestLintCategories:
 
         result = runner.invoke(
             app,
-            ["lint", str(bib), "--category", "layout", "--category", "consistency", "--json"],
+            ["lint", str(bib), "--category", "formatting", "--category", "consistency", "--json"],
         )
 
         data = json.loads(result.output)
-        assert set(data["summary"]["by_category"]) == {"layout", "consistency"}
+        assert set(data["summary"]["by_category"]) == {"formatting", "consistency"}
 
     def test_unknown_category_is_an_error(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -4772,7 +4786,7 @@ class TestLintCategories:
         bib.write_text(self.MIXED)
 
         assert runner.invoke(app, ["format", str(bib)]).exit_code == 0
-        result = runner.invoke(app, ["lint", str(bib), "--category", "layout", "--json"])
+        result = runner.invoke(app, ["lint", str(bib), "--category", "formatting", "--json"])
 
         data = json.loads(result.output)
         assert data["summary"]["issues"] == 0
@@ -4788,7 +4802,7 @@ class TestLintCategories:
         # ...until the library or the run says it is accepted.
         accepted = runner.invoke(
             app,
-            ["lint", str(bib), "--strict", "--ignore", "layout", "--ignore", "consistency"],
+            ["lint", str(bib), "--strict", "--ignore", "formatting", "--ignore", "consistency"],
         )
         assert accepted.exit_code == 0, accepted.output
         # Without --strict, lint only reports.
