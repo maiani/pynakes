@@ -102,8 +102,8 @@ consistent surface. The renamed and reordered forms are removed outright in
 0.7.0, with no aliases: nobody depends on them yet, and the beta promise —
 deprecation before removal — applies from 0.7.0 onward.
 
-**In progress** (first pass on branch `stage-4-freeze`, 2026-10-05; recorded in
-CHANGELOG under Unreleased). Done: library-first positionals with `--file`/`-f`
+**Done** (on branch `stage-4-freeze`, 2026-10-05 to 2026-10-09; recorded in
+CHANGELOG under Unreleased): library-first positionals with `--file`/`-f`
 on every single-library command and syntactic library detection
 (`pynakes.cli_surface`); one meaning per
 flag and one flag per concept; enumerated options as Typer choices
@@ -176,17 +176,16 @@ Decisions taken:
 - The editor moved to the library-first order and the beta envelope in the same
   branch, with real-engine contract tests for the calls it makes.
 
-**Remaining before the gate:** tests for the `--force` overwrite policy per
-command, `format --out`, `convert --diff`/`--force`/`--expect-sha256` on import,
-`ref remove` of a duplicated key, and the multi-file checks' catalogued error
-codes.
-
 **Gate 4**: contract tests enforce the surface instead of sampling it — a table
 test of every command's positional signature; a sweep asserting that each flag
 spelling has one meaning; an envelope-schema test over every command's `--json`
 output; a test that every emitted error code is catalogued with its exit code;
 and a `capabilities` test covering option types, choices, and error codes. The
 editor passes against the new envelope (see the editor track).
+
+**Gate 4** (met, 2026-10-09): `tests/test_contract.py` enforces all five; the
+editor's real-engine contract tests pass against the 0.7 surface. Behavior
+tests the gate did not require moved to Stage 5.
 
 #### Stage 5 — Hardening and scale
 
@@ -230,6 +229,10 @@ editor passes against the new envelope (see the editor track).
     while `asset repair` records the material files it finds: the drift scan
     returns early without a manifest.
   - `*notes.bib` is skipped by auto-discovery with a misleading error.
+- **Stage 4 behavior tests** not yet written: the `--force` overwrite policy
+  per command, `format --out`, `convert --diff`/`--force`/`--expect-sha256` on
+  import, `ref remove` of a duplicated key, and the multi-file checks'
+  catalogued error codes.
 - **Property tests** for invariants the suite currently samples: whole-file
   byte equality including CRLF, BOM, and inter-entry text; a one-field edit
   changes one entry; commit output always parses; `format` and `normalize` are
