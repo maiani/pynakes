@@ -83,7 +83,11 @@ CATALOGUE: dict[ErrorCode, ErrorSpec] = {
     _E.OUTPUT_IS_INPUT: ErrorSpec(
         1, "The output path is also one of the command's inputs (includes 'file')."
     ),
-    _E.PARSE_ERROR: ErrorSpec(1, "A .bib or source file could not be parsed (includes 'line')."),
+    _E.PARSE_ERROR: ErrorSpec(
+        1,
+        "A .bib or source file could not be decoded or parsed: malformed BibTeX, or bytes "
+        "in no single encoding pynakes reads losslessly (includes 'line').",
+    ),
     _E.IO_ERROR: ErrorSpec(1, "A read or write failed."),
     _E.INTERNAL_ERROR: ErrorSpec(
         1, "An unexpected failure inside pynakes (a bug; please report it)."

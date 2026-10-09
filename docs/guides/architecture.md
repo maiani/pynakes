@@ -238,7 +238,14 @@ round-trip guarantee. Direct whole-library serialization can reassemble top-leve
 constructs, so callers wanting the smallest possible file diff should use
 Bibliography.
 
-`io.load_bib()` detects UTF-8 or Latin-1 from bytes before parsing. `save_bib()`
+`io.load_bib()` detects the encoding from bytes before parsing. A byte-order
+mark names it (`utf-8-sig`, `utf-16-le`/`-be`, `utf-32-le`/`-be`), and a write
+puts the same mark back, so such a file still round-trips byte for byte.
+Without a mark the file is UTF-8, or Latin-1 when it holds no UTF-8 multi-byte
+character at all. A file that is UTF-8 apart from a few stray bytes, or that
+contains a NUL byte without a mark (binary data, or UTF-16 without a mark), is
+refused with a `ParseError` naming the line rather than silently read as
+Latin-1 or as an empty library. `save_bib()`
 and `save_text()` support backup creation, temporary-file writes, re-parse
 validation for BibTeX text, and replacement of the destination. They return
 `SaveResult` rather than exposing ordinary write failures as raw tracebacks to
