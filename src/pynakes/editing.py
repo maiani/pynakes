@@ -134,13 +134,18 @@ def _raw_field_name_spans(raw: str) -> list[tuple[int, int]]:
     i = header.end()
     while i < len(raw):
         char = raw[i]
-        if in_quotes:
-            if char == '"' and (i == 0 or raw[i - 1] != "\\"):
-                in_quotes = False
+        # A quote delimits a value only outside braces: inside them it is a
+        # literal character, as in the umlaut ``{\"o}``, and taking it for an
+        # opening quote would hide every field name after it.
+        if char == '"' and depth == 0 and not _is_escaped(raw, i):
+            in_quotes = not in_quotes
             i += 1
             continue
-        if char == '"':
-            in_quotes = True
+        if in_quotes:
+            if char == "{":
+                depth += 1
+            elif char == "}" and depth:
+                depth -= 1
             i += 1
             continue
         if char == "%" and depth == 0 and not _is_escaped(raw, i):

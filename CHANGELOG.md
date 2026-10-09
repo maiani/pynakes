@@ -208,6 +208,11 @@ form is a `UsageError`, never silently reinterpreted.
 
 ### Fixed
 
+- Editing a field that followed a value containing a braced quote, such as the
+  umlaut in `K{\"o}rper`, appended a second copy of the field instead of
+  replacing the first. The field scanner took the `"` for the start of a quoted
+  value and stopped seeing field names for the rest of the entry. `normalize`,
+  `enrich`, `fields`, and every other command that edits fields were affected.
 - `capabilities` now lists `--file`/`-f` on the 47 commands that take it (the
   schema was read before the option was wired in), the `--no-…` half of every
   flag pair, and integer options as `integer` instead of `string`. A bounded
