@@ -226,7 +226,7 @@ export function searchBib(
   options: SearchOptions,
   cwd?: string,
 ): Promise<SearchEnvelope> {
-  const args = ["search", options.query, filePath];
+  const args = ["search", filePath, options.query];
   if (options.where?.trim()) {
     args.push("--where", options.where.trim());
   }
@@ -344,7 +344,7 @@ export function refCompare(
   cwd?: string,
   withKey?: string,
 ): Promise<RefCompareEnvelope> {
-  const args = ["ref", "compare", key, filePath];
+  const args = ["ref", "compare", filePath, key];
   if (withKey) {
     args.push("--with", withKey);
   } else if (online) {
@@ -396,7 +396,7 @@ export function refAddArgs(
   dryRun: boolean,
   expectSha256?: string,
 ): string[] {
-  const args = ["ref", "add", request.key, filePath, "--type", request.entryType];
+  const args = ["ref", "add", filePath, request.key, "--type", request.entryType];
   for (const [field, value] of Object.entries(request.fields)) {
     if (value.trim()) {
       args.push("--field", `${field}=${value}`);
@@ -441,7 +441,7 @@ export function refImportArgs(
   dryRun: boolean,
   expectSha256?: string,
 ): string[] {
-  const args = ["ref", "import", request.identifier, filePath];
+  const args = ["ref", "import", filePath, request.identifier];
   if (request.key?.trim()) {
     args.push("--key", request.key.trim());
   }
@@ -511,6 +511,7 @@ export function groupsEntryArgs(
   member: boolean,
   dryRun: boolean,
   expectSha256?: string,
+  create = false,
 ): string[] {
   const args = [
     "groups",
@@ -519,6 +520,11 @@ export function groupsEntryArgs(
     key,
     group,
   ];
+  // The engine refuses a group it does not know unless asked to create it, so
+  // a typo in a group the library already has is never silently a new one.
+  if (member && create) {
+    args.push("--create");
+  }
   return modifyingFlags(args, dryRun, expectSha256);
 }
 
@@ -531,10 +537,11 @@ export function groupsEntry(
   dryRun: boolean,
   cwd?: string,
   expectSha256?: string,
+  create = false,
 ): Promise<MutationEnvelope> {
   return runJson<MutationEnvelope>(
     command,
-    groupsEntryArgs(filePath, key, group, member, dryRun, expectSha256),
+    groupsEntryArgs(filePath, key, group, member, dryRun, expectSha256, create),
     cwd,
   );
 }

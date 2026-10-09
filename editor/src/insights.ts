@@ -179,10 +179,10 @@ export function indexLint(envelope: LintSuccess): LintIndex {
     byCategory,
     issues: envelope.issues,
     counts: {
-      errors: envelope.errors,
-      warnings: envelope.warnings,
-      info: envelope.info,
-      total: envelope.issue_count,
+      errors: envelope.summary.errors,
+      warnings: envelope.summary.warnings,
+      info: envelope.summary.info,
+      total: envelope.summary.issues,
     },
   };
 }
