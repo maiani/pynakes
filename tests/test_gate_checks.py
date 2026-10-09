@@ -154,6 +154,27 @@ class TestOtherStrictChecks:
         bib.write_text("@article{A,\n  title = {T},\n  file = {A:A.pdf:PDF}\n}\n")
         assert runner.invoke(app, ["asset", "check", str(bib), "--strict"]).exit_code == 0
 
+    def test_asset_check_reports_pinax_drift_without_a_manifest(self, tmp_path: Path) -> None:
+        files = tmp_path / "refs.files"
+        files.mkdir()
+        (files / "Newton1687.preprint.pdf").write_bytes(b"pdf")
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@book{Newton1687,\n  title = {Principia}\n}\n"
+            "@comment{pynakes-meta:\npinax-files-dir:\n}\n"
+        )
+
+        checked = json.loads(runner.invoke(app, ["asset", "check", str(bib), "--json"]).output)
+
+        assert checked["pinax"]["drift"] == [
+            {"key": "Newton1687", "kind": "preprint_pdf", "reason": "file without manifest"}
+        ]
+        assert runner.invoke(app, ["asset", "check", str(bib), "--strict"]).exit_code == 1
+        repaired = json.loads(runner.invoke(app, ["asset", "repair", str(bib), "--json"]).output)
+        assert [item["action"] for item in repaired["fixed"]] == ["added_manual_record"]
+        rechecked = json.loads(runner.invoke(app, ["asset", "check", str(bib), "--json"]).output)
+        assert rechecked["pinax"]["drift"] == []
+
     def test_dedupe_check_strict(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text(

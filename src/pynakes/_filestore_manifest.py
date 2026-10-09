@@ -183,9 +183,8 @@ class PinaxManifest:
         return manifest, fixed
 
     def _manifest_drift(self, known: set[str]) -> list[dict[str, str]]:
-        path = self.manifest_path
-        if not path.exists():
-            return []
+        # An absent manifest reads as an empty one, so every material file found
+        # is drift: exactly what reconcile_manifest (asset repair) would record.
         manifest = self.read_manifest()
         files = manifest["files"]
         if not isinstance(files, dict):
