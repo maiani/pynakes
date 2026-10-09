@@ -23,6 +23,12 @@ nodejs = ">=20"
 python = "3.12.*"
 pip = "*"
 
+# The engine itself, editable, so the extension's contract and webview tests
+# run against this repository's `src/` instead of skipping for want of its
+# dependencies.
+[pypi-dependencies]
+pynakes = { path = ".", editable = true }
+
 [tasks.build-extension]
 description = "Build the VS Code extension into an installable .vsix"
 cmd = "npm install --no-audit --no-fund && npm run package"

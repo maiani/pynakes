@@ -12,18 +12,15 @@
  * contract that have already drifted once.
  *
  * Requires a `python3` that can `import pynakes` from this repo's `src/`
- * (see `pixi.toml`); skips itself with a clear reason otherwise, rather than
- * failing `npm test` for a contributor working on the extension alone.
+ * (see `pixi.toml`); see `engine.ts` for when it skips instead.
  */
 
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
 import {
-  type PynakesCommand,
   type RefEditRequest,
   dedupeCheck,
   dedupeMerge,
@@ -39,24 +36,7 @@ import {
   searchBib,
 } from "../pynakes.js";
 import { applyMutation, commitEdits, previewEdits, previewMutation } from "../library.js";
-
-// out/test/cliContract.test.js -> out/test -> out -> editor -> repo root -> src
-const repoSrc = path.resolve(__dirname, "..", "..", "..", "src");
-
-const command: PynakesCommand = { executable: "python3", leadingArgs: ["-m", "pynakes"] };
-process.env.PYTHONPATH = repoSrc;
-
-function engineSkipReason(): string | false {
-  try {
-    execFileSync(command.executable, [...command.leadingArgs, "--version"], {
-      stdio: "ignore",
-    });
-    return false;
-  } catch (error) {
-    return `pynakes is not runnable as "${command.executable} -m pynakes" with ` +
-      `PYTHONPATH=${repoSrc}: ${(error as Error).message}`;
-  }
-}
+import { command, engineSkipReason } from "./engine.js";
 
 const skip = engineSkipReason();
 

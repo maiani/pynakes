@@ -270,6 +270,10 @@ form is a `UsageError`, never silently reinterpreted.
 - Ruff now flags text I/O without an explicit encoding (`PLW1514`). Dependabot
   watches GitHub Actions and pip. The `dev` extra declares `pyyaml` and `mypy`
   and bounds `ruff`, and the `docs` extra bounds `mkdocs` below 2.
+- The editor job installs the engine before running the extension's tests. Its
+  CLI contract tests had skipped on every run for want of the engine's
+  dependencies; `PYNAKES_REQUIRE_ENGINE` now makes that a failure in CI.
+  `pixi run test-extension` installs the engine too.
 
 ### Editor
 

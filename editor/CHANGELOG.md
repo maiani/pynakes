@@ -145,6 +145,17 @@ release. Its version says nothing about which engine it runs.
 
 ### Fixed
 
+- The view left an empty band below its panes. A hidden banner or notice takes
+  no grid slot, so the panes slid up into a row sized to their content; each
+  part of the view now keeps its own row and the panes fill the window.
+- The view threw on its first render whenever a dock held any pane, so the
+  right and bottom docks never appeared and editing was unreachable. Each pane
+  tab was marked active after its fragment had been appended, when the fragment
+  was already empty; only the active pane's tab is now marked, before appending.
+  Webview smoke tests now load the real view in jsdom, drive it through the
+  real engine, and fail on any error it raises.
+- A locally built `.vsix` bundled engine modules since deleted from `src/`:
+  setuptools reused a stale `build/` directory. Vendoring now clears it first.
 - Engine warnings are shown by their message. The engine reports warnings as
   objects, and the view joined them as strings, which would have shown
   `[object Object]`.

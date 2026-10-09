@@ -24,6 +24,25 @@ body {
   font-size: var(--vscode-font-size);
 }
 
+/* Each child keeps its own row. A hidden banner or notice takes no grid slot,
+   so auto-placement would slide the layout up into an `auto` row and leave the
+   `1fr` row as an empty band below it. */
+.toolbar {
+  grid-row: 1;
+}
+.banner {
+  grid-row: 2;
+}
+.notice {
+  grid-row: 3;
+}
+.layout {
+  grid-row: 4;
+}
+.commit-bar {
+  grid-row: 5;
+}
+
 /* Toolbar ---------------------------------------------------------------- */
 
 .toolbar {
