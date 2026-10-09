@@ -210,9 +210,8 @@ editor passes against the new envelope (see the editor track).
 - **Scale.** The parser is quadratic — 8,000 entries take 25 s and 20,000 time
   out — through whole-prefix line counting (`_text_utils._line_number`) and a
   linear `EntryStore.__contains__`. This is v0.9's linear parser path, pulled
-  forward because real libraries are this size. Also: `normalize` loads 66,000
-  journal rows even with journal styling off (about 2.5 s per run), and
-  `format` takes 36 s on a single 2 MB field.
+  forward because real libraries are this size. Also: `format` takes 36 s on a
+  single 2 MB field.
 - **`scrub` completeness.** `scrub --check` passes a file containing comments
   between entries, `%` lines inside entries, JabRef `comment-<user>` fields
   (which name the user), BibDesk and Mendeley fields (`date-added`,
@@ -246,8 +245,10 @@ editor passes against the new envelope (see the editor track).
   byte equality including CRLF, BOM, and inter-entry text; a one-field edit
   changes one entry; commit output always parses; `format` and `normalize` are
   idempotent; combine then split round-trips.
-- **Test hygiene**: three tests sleep 5 s in real retry backoff; the shared
-  HTTP layer (`providers/_http`) sits at 79% coverage.
+- **Test hygiene**: the shared HTTP layer (`providers/_http`) sits at 79%
+  coverage. (The suite runs in about 25 s with coverage, after the retry
+  backoff stopped sleeping in tests and the journal tables stopped loading on
+  every `normalize`.)
 - **Type checking with ty** (does not gate Gate 5): replace mypy with Astral's
   ty, which is far faster and sits beside Ruff in the same toolchain. It is a
   different checker, not a faster mypy — it infers differently, reports

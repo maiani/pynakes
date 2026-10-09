@@ -73,6 +73,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only reports. To adopt it, waive the accepted findings first, e.g.
   `ref directive refs.bib ignore missing_doi --where 'doi missing and year < 1950'`
   ([#2](https://github.com/maiani/pynakes/issues/2)).
+- **`normalize` no longer loads the bundled journal tables when no journal
+  style is configured** (the default), which saved about 0.4 s per run; with a
+  style, the 66,000 bundled rows are parsed once per process instead of on every
+  call.
 - **`asset repair`** reconciles the Pinax manifest with the material files that
   exist, with `--dry-run` and a `--diff` of the manifest. `asset check` is now a
   pure read-only gate, like every other check: `asset check --fix` still works

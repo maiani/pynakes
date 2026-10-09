@@ -278,8 +278,18 @@ def builtin_sources(journal_source: str = DEFAULT_JOURNAL_SOURCE) -> JournalSour
         )
     sources = JournalSources()
     if journal_source == "jabref":
-        _load_bundled_jabref(sources)
+        bundled = _bundled_jabref()
+        # Copies of the index dicts: callers layer their own tables on top.
+        sources.title_mappings.update(bundled.title_mappings)
+        sources.abbreviated_mappings.update(bundled.abbreviated_mappings)
+        sources.issn_mappings.update(bundled.issn_mappings)
     return sources
+
+
+@lru_cache(maxsize=1)
+def _bundled_jabref() -> JournalSources:
+    """Parse the vendored JabRef tables once per process (66,000 rows)."""
+    return _load_bundled_jabref(JournalSources())
 
 
 def _load_bundled_jabref(sources: JournalSources) -> JournalSources:
