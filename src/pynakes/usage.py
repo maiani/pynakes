@@ -12,7 +12,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from pynakes._text_utils import _line_number
+from pynakes._text_utils import LineCounter
 from pynakes.editing import append_delimited_field, splice_into_text
 from pynakes.groups import GROUPS_DELIM as _GROUPS_DELIM
 from pynakes.groups import GROUPS_JOIN as _GROUPS_JOIN
@@ -273,6 +273,7 @@ def _iter_text_occurrences(text: str, path: Path) -> Iterator[tuple[str, KeyUsag
     is_aux = path.suffix.lower() == ".aux"
     scanned = text if is_aux else _strip_tex_comments(text)
     pattern = _AUX_CITATION_RE if is_aux else _TEX_CITE_RE
+    lines = LineCounter(scanned)
     for match in pattern.finditer(scanned):
         raw = match.group(0)
         name = _MACRO_NAME_RE.match(raw)
@@ -282,7 +283,7 @@ def _iter_text_occurrences(text: str, path: Path) -> Iterator[tuple[str, KeyUsag
                 key,
                 KeyUsageMatch(
                     path=str(path),
-                    line=_line_number(scanned, match.start()),
+                    line=lines.at(match.start()),
                     text=raw.strip(),
                     column=match.start() - line_start + 1,
                     macro=name.group(1) if name else "",

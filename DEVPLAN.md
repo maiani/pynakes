@@ -195,11 +195,16 @@ tests the gate did not require moved to Stage 5.
   MODS, EndNote, CSV); symlink-following in `corpus combine`'s material copy;
   and the JSON output of `ref import` and `asset fetch`. Any data-loss or
   security finding ships as a 0.6.x patch without waiting for this stage.
-- **Scale.** The parser is quadratic — 8,000 entries take 25 s and 20,000 time
-  out — through whole-prefix line counting (`_text_utils._line_number`) and a
-  linear `EntryStore.__contains__`. This is v0.9's linear parser path, pulled
-  forward because real libraries are this size. Also: `format` takes 36 s on a
-  single 2 MB field.
+- **Scale.** *(Done, 2026-10-09.)* Line numbering and key lookup were linear
+  per call, which made parsing and everything built on it quadratic; both are
+  now linear in total (`LineCounter`, `EntryStore`'s key index). Measured with
+  `scripts/bench_scale.py` on a synthetic library (one machine; recorded, not
+  asserted) — at 20,000 entries (5.3 MB): parse 2.6 s, `lint` 8.7 s,
+  `format --check` 14.6 s, `normalize --dry-run` 6.7 s, each 5× its 4,000-entry
+  time. A single 4 MB field formats in 8.5 s, linear in its size; the 36 s
+  reported for a 2 MB field no longer reproduces. What remains is constant
+  factors — each entry is parsed about three times in a `format --check` run —
+  which belongs to v0.9's performance work.
 - **`scrub` completeness.** `scrub --check` passes a file containing comments
   between entries, `%` lines inside entries, JabRef `comment-<user>` fields
   (which name the user), BibDesk and Mendeley fields (`date-added`,

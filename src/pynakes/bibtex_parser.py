@@ -3,7 +3,7 @@
 import logging
 import re
 
-from pynakes._text_utils import _is_escaped, _line_end, _line_number
+from pynakes._text_utils import LineCounter, _is_escaped, _line_end
 from pynakes.metadata import parse_metadata_comment
 from pynakes.model import (
     BibEntry,
@@ -75,6 +75,7 @@ def parse_bib(text: str) -> BibFile:
     layout: list[tuple[str, str, object]] = []
     prev_end = 0
     position = 0
+    lines = LineCounter(text)
     while position < len(text):
         char = text[position]
         if char == "%" and not _is_escaped(text, position):
@@ -98,13 +99,13 @@ def parse_bib(text: str) -> BibFile:
         opener = header.group("opener")
         block_end = _find_block_end(text, header.start("opener"))
         if block_end is None:
-            line = _line_number(text, position)
+            line = lines.at(position)
             message = "Unmatched braces" if opener == "{" else "Unmatched parentheses"
             raise ParseError(f"{message} in {normalized_type} block", line)
 
         raw_block = text[position:block_end]
         body = text[header.end() : block_end - 1]
-        line_num = _line_number(text, position)
+        line_num = lines.at(position)
         gap = text[prev_end:position]
 
         if normalized_type == "string":
