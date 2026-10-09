@@ -426,7 +426,7 @@ def test_cli_keep_fields_scrubs_blocks_only(tmp_path: Path) -> None:
     source = _bib(tmp_path, "library.bib", PRIVATE)
     out = tmp_path / "public.bib"
     result = runner.invoke(
-        app, ["scrub", str(source), "--out", str(out), "--keep-fields", "--json"]
+        app, ["scrub", str(source), "--out", str(out), "--keep-field", "*", "--json"]
     )
 
     data = json.loads(result.output)

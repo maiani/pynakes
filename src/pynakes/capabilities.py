@@ -226,13 +226,6 @@ def _write_precondition(schemas: dict) -> dict:
     }
 
 
-def deprecations() -> list[dict]:
-    """Describe every deprecated form (imported lazily: it reads the CLI tables)."""
-    from pynakes.cli_surface import deprecations as described
-
-    return described()
-
-
 def get_capabilities() -> dict:
     """Return a structured description of supported operations and commands."""
     schemas = command_schemas()
@@ -286,11 +279,6 @@ def get_capabilities() -> dict:
                 "lone local .bib is used. A .bib-looking token in any other argument "
                 "is refused as a usage error."
             ),
-        },
-        "deprecations": {
-            "removed_in": "0.8.0",
-            "warning": {"type": "deprecated", "old": "...", "new": "..."},
-            "forms": deprecations(),
         },
         # Read-only checks that accept one or more .bib files and support
         # --strict (exit 1 on findings) — the primitives for CI / pre-commit

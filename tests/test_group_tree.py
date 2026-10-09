@@ -1046,7 +1046,7 @@ def test_groups_cli_human_views_and_tree_lifecycle(tmp_path: Path) -> None:
             "--color",
             "ff0000ff",
             "--context",
-            "1",
+            "refining",
             "--collapsed",
         ],
     )

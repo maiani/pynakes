@@ -80,34 +80,6 @@ def _resolve_input_bib(file: str | None, json_output: bool) -> str:
     return str(candidates[0])
 
 
-# --- deprecations ----------------------------------------------------------
-
-#: Deprecated forms this invocation used, reported in the envelope it emits.
-#: A process runs one command, and :class:`pynakes.cli_discovery.AutoBibGroup`
-#: clears the list when an invocation starts, so in-process callers (tests)
-#: never see an earlier command's notices.
-_DEPRECATIONS: list[dict] = []
-
-
-def reset_deprecations() -> None:
-    """Forget the deprecation notices of a previous invocation."""
-    _DEPRECATIONS.clear()
-
-
-def note_deprecation(json_output: bool, old: str, new: str) -> None:
-    """Record that the caller used a deprecated form that still works.
-
-    With ``--json`` the notice becomes a ``deprecated`` warning in the envelope
-    the command emits; otherwise it is printed to stderr at once, so stdout
-    stays exactly what the command writes there.
-    """
-    message = f"{old} is deprecated and will be removed in 0.8.0; use {new}"
-    if json_output:
-        _DEPRECATIONS.append({"type": "deprecated", "old": old, "new": new, "message": message})
-    else:
-        typer.echo(f"Deprecated: {message}.", err=True)
-
-
 def _warning_object(warning: object) -> dict:
     """Return *warning* as the ``{"type", "message", ...}`` object the envelope promises."""
     if isinstance(warning, dict):
@@ -120,14 +92,10 @@ def _warning_object(warning: object) -> dict:
 def _emit_json(payload: dict) -> None:
     """Write one JSON envelope to stdout, in the format every command shares.
 
-    ``warnings`` is always a list of objects carrying ``type`` and ``message``;
-    any deprecated form the invocation used is appended to it.
+    ``warnings`` is always a list of objects carrying ``type`` and ``message``.
     """
-    if "warnings" in payload or _DEPRECATIONS:
-        warnings = [_warning_object(w) for w in payload.get("warnings") or []]
-        warnings.extend(_DEPRECATIONS)
-        _DEPRECATIONS.clear()
-        payload["warnings"] = warnings
+    if "warnings" in payload:
+        payload["warnings"] = [_warning_object(w) for w in payload["warnings"] or []]
     typer.echo(json.dumps(payload, indent=2))
 
 

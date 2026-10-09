@@ -277,7 +277,7 @@ Given an arXiv entry, it downloads the PDF and the source bundle into the right
 place:
 
 ```text
-pynakes asset fetch alvarez2019 refs.bib  →  refs.files/alvarez2019.preprint.pdf
+pynakes asset fetch refs.bib alvarez2019  →  refs.files/alvarez2019.preprint.pdf
                                              refs.files/alvarez2019.source/
 ```
 
@@ -287,7 +287,7 @@ the library with `--file`:
 
 ```bash
 pynakes asset fetch --file refs.bib          # every entry in this library
-pynakes asset fetch alvarez2019 refs.bib     # one entry
+pynakes asset fetch refs.bib alvarez2019     # one entry
 pynakes asset fetch                          # every entry, lone .bib auto-detected
 ```
 
@@ -339,8 +339,8 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
 What `asset fetch` downloads is **governed by metadata** — a single
 `pinax-fetch-policy`
 key, a comma-separated list of artifact names, selects what to download (it never
-triggers network access on its own during offline operations). Per-invocation
-flags `--preprint`, `--published`, `--source`, `--supplement`, and `--bestpdf` override the
+triggers network access on its own during offline operations). A repeatable
+`--material preprint|published|source|supplement|best-pdf` overrides the
 metadata policy for one call:
 
 ```bibtex
@@ -363,8 +363,7 @@ and the two version classes hang off it by name:
 The `pinax-fetch-policy` key selects what `asset fetch` downloads: `preprint` the arXiv
 PDF, `source` the arXiv source tree, `published` the `.published.pdf`
 PDF, and `supplement` the `.supplement.pdf` PDF — set in metadata (or overridden
-per invocation with `--preprint`, `--published`, `--source`, `--supplement`, or
-`--bestpdf`). Supplement fetching writes one unambiguous publisher-advertised
+per invocation with `--material`). Supplement fetching writes one unambiguous publisher-advertised
 PDF; when several files are advertised it reports the candidates without
 choosing one. The `bestpdf` policy (the default)
 tries the published PDF first and falls back to the preprint when no open-access
@@ -376,12 +375,12 @@ to publisher-hosted URLs only, and when no direct `pdf_url` is available,
 [publisher-specific overrides](#published-pdf-resolution-chain) or CrossRef
 are tried as fallbacks.
 
-For subscription content, `asset fetch --published --access institutional`
+For subscription content, `asset fetch --material published --access institutional`
 adds an explicit publisher-landing-page fallback. It uses only access already
 available to the process through an institutional network, VPN, or proxy. It
 does not collect credentials, import browser cookies, automate SSO, or bypass
 publisher controls. A login page is reported as authentication required rather
-than stored as a PDF. The same access mode can be combined with `--supplement`.
+than stored as a PDF. The same access mode can be combined with `--material supplement`.
 
 **The version of record is the canonical copy.** `<citekey>.published.pdf` is
 the *version of record* (what you cite), and it is also the **canonical**
@@ -584,7 +583,7 @@ checklist.
    `fetch_arxiv_source`, the URL builders, and safe tar extraction; add the
    `FileStore` atomic writers for the preprint PDF and the extracted source.
    Unit-tested with fixtures, no real network. *(Implemented.)*
-3. **The `asset fetch` command.** `pynakes asset fetch [target] [file]
+3. **The `asset fetch` command.** `pynakes asset fetch [file] [target]
     [--dry-run] [--cache-file PATH] [--json]`, with what-to-download governed by
     the `pinax-fetch-policy` metadata key;
     `Bibliography.ensure_files_dir` + `fetch_materials`; the zero-config default

@@ -44,7 +44,7 @@ It includes:
 - `error_codes`: the error and conflict codes on which a caller can branch.
 - `predicate_grammar`: the one selector grammar every entry-addressable
   command accepts (`fields`, `search`, `format`, `corpus combine --where`, and
-  `corpus split --to`), including boolean composition and its operator table.
+  `corpus split --route`), including boolean composition and its operator table.
   Its `key_selector` entry documents `--key`, the no-grammar shorthand for
   selecting by citation key that every `--where` command also accepts.
 - `search_query_grammar`: term, phrase, field, fuzzy, ranking, and
@@ -140,7 +140,7 @@ the all-or-nothing guarantee rather than an exception to it.
 ## Choosing the right operation
 
 - Use `ref show <key>` to read one uniquely keyed reference, and
-  `ref show --keys k1,k2,… [--abstract]` to triage a candidate set in one call
+  `ref show --key k1,k2,… [--abstract]` to triage a candidate set in one call
   instead of one invocation per key.
 - Use `ref edit <key>` for a multi-field patch to one reference.
 - Use `ref directive ignore <finding> --key <key> --reason "..."` to accept a lint
@@ -183,7 +183,7 @@ the all-or-nothing guarantee rather than an exception to it.
 - Use `keys rename` when a key change must also update TeX citations; use
   `keys generate` to apply the configured key pattern.
 - Before renaming a key, check its blast radius with
-  `keys usage <key> --path <dir>`: a read-only `.tex` scan for `\cite`-family
+  `keys usage <key> <dir>...`: a read-only `.tex` scan for `\cite`-family
   macros citing that key. It takes no `.bib` file and ignores `tex-sources`
   metadata, so it also covers sources `tex add` was never pointed at — a
   frozen snapshot, a generated diff, a collaborator's copy.
@@ -195,9 +195,9 @@ is duplicated, repair the duplicate keys or select entries with a bulk
 To find candidates from a half-remembered title, `search --fuzzy` matches near
 misses and reports, per hit, which field matched, whether the match was exact or
 fuzzy, its score, and the matching excerpt — enough to decide without reading
-each entry. Add `--show-abstract` when the excerpt is not enough to separate
+each entry. Add `--abstract` when the excerpt is not enough to separate
 the candidates, then summarize the survivors with one
-`ref show --keys k1,k2,… --abstract --json` call: each entry reports its
+`ref show --key k1,k2,… --abstract --json` call: each entry reports its
 `entry_type` and a `summary` of title, creator, date, venue, and identifiers,
 with `abstract: null` where none is stored. Read a chosen entry in full with a
 single-key `ref show <key> --json`.
@@ -232,7 +232,34 @@ Always evaluate both the process exit code and the JSON `status`.
 
 ## JSON contract
 
-Ordinary modifying commands return this common envelope:
+Every `--json` envelope belongs to one of five families. The family fixes the
+keys a caller can rely on; each command adds its own fields alongside them.
+`tests/test_contract.py` checks every command against its family, and from
+0.7.0 removing or renaming one of these keys is a breaking change.
+
+| Family | Commands | Keys always present on success |
+|---|---|---|
+| modify | edits one library in place (`normalize`, `ref edit`, `fields set`, `tex add`, …) | `status`, `action`, `file`, `dry_run`, `modified`, `modified_entries`, `warnings`, `source_sha256` |
+| create | writes new files (`init`, `scrub`, `corpus combine`, `corpus split`) | `status`, `action`, `dry_run`, `warnings`, plus `out`/`written` or `outputs` |
+| read | reports without writing (`ref show`, `search`, `inspect`, `tex list`, …) | `status`, `action`, `warnings`, `source_sha256` |
+| check | gates a library (`lint`, `verify`, `keys check`, `dedupe check`, `asset check`) | `status`, `action`, `file`, `warnings`, `source_sha256`, `strict` |
+| error | any failure or conflict | `status`, `error`, `message` |
+
+Shared rules:
+
+- `status` is `success`, `error`, or `conflict`.
+- `action` is the command path with spaces and hyphens as underscores:
+  `ref show` reports `ref_show`, `groups add-entry` reports `groups_add_entry`.
+- `warnings` is always an array of objects, each with at least `type` and
+  `message`. Branch on `type`.
+- `source_sha256` is the sha256 of the library as this invocation read it —
+  before the write, also on a real run. Pass it back as `--expect-sha256` to
+  make a later write conditional on the file being unchanged. A create command
+  reports it for the library it read, or `sources_sha256` when it read several;
+  `init`, `capabilities`, and `keys usage` read no library and omit it.
+- `diff` is included when `--diff` was passed and a textual change exists.
+
+A modify envelope looks like this:
 
 ```json
 {
@@ -259,24 +286,14 @@ Ordinary modifying commands return this common envelope:
 }
 ```
 
-Common fields:
+`modified` says whether content would change or did change, `modified_entries`
+counts the changed entries, and `plan` describes the staged changes (below).
 
-- `status`: `success`, `error`, or `conflict`.
-- `action`: the operation name.
-- `file`: the target `.bib` path.
-- `dry_run`: whether the operation was a preview.
-- `modified`: whether content would change or did change.
-- `modified_entries`: the number of changed entries.
-- `warnings`: always an array, including when empty.
-- `plan`: a structured description of staged changes.
-- `source_sha256`: the sha256 of the file as this invocation read it — before
-  the write, also on a real run. Pass it back as `--expect-sha256` to make a
-  later write conditional on the file being unchanged.
-- `diff`: included when requested and a textual change exists.
-
-Commands add operation-specific fields alongside this envelope. Read-only
-commands retain `status` and `action`, then return their command-specific data.
-Multi-file gate commands return a `files` collection and aggregate `summary`.
+A check envelope puts its counts under `summary` and its findings beside it
+(`issues` for `lint`). Given several libraries, a check reports them under
+`files`, one object per library, with an aggregate `summary` that also counts
+`files` and `failed_files`; the top level then has no `file` or
+`source_sha256`, and each item carries its own.
 
 ### The `plan` object
 
@@ -299,14 +316,18 @@ compared best-effort.
 Errors exit `1`:
 
 ```json
-{"status":"error","error":"InvalidInput","message":"..."}
+{"status":"error","error":"KeyNotFound","message":"No reference with key 'Nope'","action":"ref_show"}
 ```
 
 Conflicts exit `2` and include resolutions:
 
 ```json
-{"status":"conflict","error":"DuplicateCitationKey","options":["..."]}
+{"status":"conflict","error":"DuplicateCitationKey","message":"...",
+ "options":[{"id":"...","description":"..."}]}
 ```
+
+Each `error` code has one status and one exit code wherever it is raised; both
+come from a single catalogue, which `capabilities.error_codes` publishes.
 
 A conflict means nothing was written. A refused `--expect-sha256` is an
 `ExternalModification` conflict that also carries `expected_sha256` (what you
@@ -318,11 +339,11 @@ from `capabilities.error_codes`.
 
 ### Commands that create files
 
-`init`, `scrub`, `corpus combine`, and `corpus split` create or project files
-rather than editing one existing library. Their envelopes therefore report
-fields such as `inputs`, `out`, `outputs`, `written`, `entries`, `source`,
-`removed`, and `unrouted` instead of the ordinary single-file mutation fields. They retain the same
-`status`/exit-code rules and support `--dry-run`, `--diff`, and `--json`.
+The create family writes files rather than editing one existing library, so it
+reports `out`, `outputs`, `written`, and command-specific fields such as
+`inputs`, `entries`, `removed`, and `unrouted` instead of `modified` and
+`plan`. The `status` and exit-code rules are the same, and every create command
+supports `--dry-run`, `--diff`, and `--json`.
 
 For `corpus split`, inspect every output bucket and `unrouted`; warnings report
 duplicate or unrouted entries. With `--dedupe`, incompatible same-key entries

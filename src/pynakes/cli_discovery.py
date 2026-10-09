@@ -10,8 +10,8 @@ import typer
 from click.shell_completion import CompletionItem
 from typer.core import TyperGroup
 
-from pynakes.cli_common import _emit_error, reset_deprecations
-from pynakes.cli_surface import prepare_arguments
+from pynakes.cli_common import _emit_error
+from pynakes.cli_surface import place_library
 
 # Context-meta key recording whether the caller asked for JSON output, so the
 # group can honor the JSON contract when reframing a usage error.
@@ -288,7 +288,7 @@ class AutoBibGroup(TyperGroup):
                 command = self.get_command(ctx, args[0])
                 if command is not None and not hasattr(command, "commands"):
                     path = _command_path(ctx, args[0])
-                    args[1:] = prepare_arguments(path, command, args[1:], json_output)
+                    args[1:] = place_library(path, command, args[1:], json_output)
             return super().parse_args(ctx, args)
         except _USAGE_ERRORS as exc:
             _annotate_usage_error(exc)
@@ -307,7 +307,6 @@ class AutoBibGroup(TyperGroup):
         bypassing the ``invoke`` override, so it is intercepted here too. A usage
         error exits 1 in both output modes: exit 2 is pynakes's conflict code.
         """
-        reset_deprecations()
         json_output = "--json" in (args if args is not None else sys.argv[1:])
         try:
             return super().main(args=args, prog_name=prog_name, **extra)

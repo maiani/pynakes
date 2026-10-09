@@ -85,18 +85,18 @@ columns. LTWA tables should contain `Word` and `Abbreviation` columns.
 ## 7. Import or add a reference
 
 ```bash
-pynakes ref import 10.5555/example refs.bib --dry-run --diff
-pynakes ref import 10.5555/example refs.bib
-pynakes ref import arXiv:2301.00001 refs.bib
-pynakes ref import arXiv:2301.00001 refs.bib --fetch
-pynakes ref add Manual2026 refs.bib --field title="Manual Reference" --field year=2026
+pynakes ref import refs.bib 10.5555/example --dry-run --diff
+pynakes ref import refs.bib 10.5555/example
+pynakes ref import refs.bib arXiv:2301.00001
+pynakes ref import refs.bib arXiv:2301.00001 --fetch
+pynakes ref add refs.bib Manual2026 --field title="Manual Reference" --field year=2026
 ```
 
 Citation-key choices:
 
 ```bash
-pynakes ref import 10.5555/example refs.bib --key-source provider
-pynakes ref import 10.5555/example refs.bib --key ManualKey2026
+pynakes ref import refs.bib 10.5555/example --key-source provider
+pynakes ref import refs.bib 10.5555/example --key ManualKey2026
 ```
 
 By default, imported entries use generated keys. If the library stores a

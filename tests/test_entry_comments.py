@@ -140,7 +140,7 @@ class TestDerivedLibraries:
 
         result = runner.invoke(
             app,
-            ["corpus", "split", str(bib), "--to", f"{old}=year<1800", "--to", f"{new}=*"],
+            ["corpus", "split", str(bib), "--route", f"{old}=year<1800", "--route", f"{new}=*"],
         )
 
         assert result.exit_code == 0, result.output

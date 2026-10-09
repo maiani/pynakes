@@ -11,9 +11,7 @@ from pynakes.cli_common import (
     _safe,
     _source_sha256,
     bib_file_argument,
-    note_deprecation,
 )
-from pynakes.cli_surface import MOVED_OPTIONS
 from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography
 from pynakes.filestore import FileStore
@@ -21,19 +19,11 @@ from pynakes.filestore import FileStore
 # --- files -----------------------------------------------------------------
 
 
-def _files_check_one(
-    file: str, root: list[str] | None, fix: bool = False, backup: bool = False
-) -> CheckOutcome:
+def _files_check_one(file: str, root: list[str] | None) -> CheckOutcome:
     coll = Bibliography.open(file)
     lib = coll.lib
     report = files_ops.check_linked_files(lib, file, root)
     store = FileStore.from_metadata(lib, file)
-    fixed: list[dict[str, str]] = []
-    if store is not None and fix:
-        fixed = store.fix_drift(
-            (entry.key for entry in lib.entries.values() if entry.key.strip()),
-            backup=backup,
-        )
     pinax = store.scan_entries(lib.entries.values()) if store is not None else None
     result = {
         "status": "success",
@@ -45,7 +35,6 @@ def _files_check_one(
     }
     if pinax is not None:
         result["pinax"] = pinax.to_dict()
-        result["fixed"] = fixed
     human = [
         f"{file}: checked {report.checked} linked file(s); "
         f"ok={report.ok}, missing={report.missing}, "
@@ -62,8 +51,6 @@ def _files_check_one(
             f"  pinax: entries={len(pinax.entries)}, "
             f"orphans={len(pinax.orphans)}, drift={len(pinax.drift)}."
         )
-        if fixed:
-            human.append(f"    fixed {len(fixed)} pinax manifest item(s).")
         human += [
             f"    [orphan] {orphan.key}:{orphan.kind}: {orphan.path}" for orphan in pinax.orphans
         ]
@@ -95,22 +82,13 @@ def files_check(
         help="Additional directory to resolve relative linked-file paths; can be repeated",
     ),
     strict: bool = strict_option("a linked file is missing, unresolved, or the wrong type"),
-    fix: bool = typer.Option(False, "--fix", hidden=True, help="Deprecated: use asset repair"),
-    backup: bool = typer.Option(
-        False, "--backup", hidden=True, help="Deprecated: use asset repair"
-    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Validate linked-file references (accepts multiple files for CI gating)."""
-    if fix:
-        # A gate command no longer writes; `asset repair` previews and reconciles.
-        note_deprecation(
-            json_output, "asset check --fix", MOVED_OPTIONS[("asset", "check")]["--fix"]
-        )
     _run_checks(
         files,
         "asset_check",
-        lambda f: _files_check_one(f, root, fix, backup),
+        lambda f: _files_check_one(f, root),
         json_output,
         strict,
     )

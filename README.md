@@ -133,17 +133,17 @@ pynakes inspect mylib.bib
 pynakes lint mylib.bib --json
 
 # Import by DOI, repository id, ISBN, or supported URL, or add one manually
-pynakes ref import 10.5555/example mylib.bib
-pynakes ref import arXiv:2301.00001 mylib.bib
-pynakes ref import PMID:12345678 mylib.bib
-pynakes ref import 978-0-00-000000-2 mylib.bib
-pynakes ref import INSPIRE:Author:2024abc mylib.bib
-pynakes ref import https://link.springer.com/article/10.5555/example mylib.bib
-pynakes ref add Manual2026 mylib.bib --field title="Manual Reference" --field year=2026
+pynakes ref import mylib.bib 10.5555/example
+pynakes ref import mylib.bib arXiv:2301.00001
+pynakes ref import mylib.bib PMID:12345678
+pynakes ref import mylib.bib 978-0-00-000000-2
+pynakes ref import mylib.bib INSPIRE:Author:2024abc
+pynakes ref import mylib.bib https://link.springer.com/article/10.5555/example
+pynakes ref add mylib.bib Manual2026 --field title="Manual Reference" --field year=2026
 pynakes ref add  # interactive
-pynakes ref show Manual2026 mylib.bib
-pynakes ref edit Manual2026 mylib.bib --field year=2027 --clear-field note
-pynakes ref edit Manual2026 mylib.bib  # interactive
+pynakes ref show mylib.bib Manual2026
+pynakes ref edit mylib.bib Manual2026 --field year=2027 --clear-field note
+pynakes ref edit mylib.bib Manual2026  # interactive
 
 # Preview the normalization pass before committing
 pynakes normalize mylib.bib --dry-run --diff
@@ -155,7 +155,7 @@ pynakes ref remove mylib.bib DeprecatedKey2020
 pynakes keys rename mylib.bib OldKey2020 NewKey2020 paper.tex chapters/
 
 # Fetch configured materials for one entry (Pinax mode)
-pynakes asset fetch arXivKey2024 mylib.bib
+pynakes asset fetch mylib.bib arXivKey2024
 
 # Search entries
 pynakes search mylib.bib "neural network" --json

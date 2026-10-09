@@ -59,18 +59,18 @@ pynakes normalize refs.bib --ltwa-table ltwa.csv --dry-run --diff
 ## Example 3: Import or Add a Reference
 
 ```bash
-pynakes ref import 10.5555/example refs.bib --dry-run --diff
-pynakes ref import 10.5555/example refs.bib
-pynakes ref import arXiv:2301.00001 refs.bib
-pynakes ref import arXiv:2301.00001 refs.bib --fetch
-pynakes ref add Manual2026 refs.bib --field title="Manual Reference" --field year=2026
+pynakes ref import refs.bib 10.5555/example --dry-run --diff
+pynakes ref import refs.bib 10.5555/example
+pynakes ref import refs.bib arXiv:2301.00001
+pynakes ref import refs.bib arXiv:2301.00001 --fetch
+pynakes ref add refs.bib Manual2026 --field title="Manual Reference" --field year=2026
 ```
 
 Use the provider key or an explicit key:
 
 ```bash
-pynakes ref import 10.5555/example refs.bib --key-source provider
-pynakes ref import 10.5555/example refs.bib --key Smith2026Example
+pynakes ref import refs.bib 10.5555/example --key-source provider
+pynakes ref import refs.bib 10.5555/example --key Smith2026Example
 ```
 
 If the DOI already exists, the command exits with a conflict unless you pass
@@ -129,7 +129,7 @@ pynakes keys repair refs.bib
 Regenerate a key from entry metadata, or regenerate the whole library explicitly:
 
 ```bash
-pynakes keys generate OldKey2020 refs.bib --dry-run --diff
+pynakes keys generate refs.bib OldKey2020 --dry-run --diff
 pynakes keys generate refs.bib --all --dry-run --diff
 ```
 

@@ -184,26 +184,6 @@ def test_init_rejects_bad_dialect(tmp_path: Path) -> None:
     assert not out.exists()
 
 
-def test_init_deprecated_type_and_from_still_work_with_a_warning(tmp_path: Path) -> None:
-    template = tmp_path / "template.bib"
-    assert runner.invoke(app, ["init", str(template), "--dialect", "bibtex"]).exit_code == 0
-    out = tmp_path / "refs.bib"
-
-    result = runner.invoke(
-        app, ["init", str(out), "--type", "bibtex", "--from", str(template), "--json"]
-    )
-
-    assert result.exit_code == 0, result.output
-    data = json.loads(result.output)
-    assert data["dialect"] == "bibtex"
-    assert data["profile_from"] == str(template)
-    deprecated = [w for w in data["warnings"] if w["type"] == "deprecated"]
-    assert {(w["old"], w["new"]) for w in deprecated} == {
-        ("--type", "--dialect"),
-        ("--from", "--profile-from"),
-    }
-
-
 def test_init_pinax_creates_files_dir_beside_target(tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()
