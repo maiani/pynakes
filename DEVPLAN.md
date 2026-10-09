@@ -219,17 +219,19 @@ tests the gate did not require moved to Stage 5.
   http(s)-only redirects, refusal of private and loopback addresses, a warning
   on an https → http downgrade, and an arXiv-id shape check before a URL is
   built from one.
-- **Durability**: consider `fsync` before the replace; no write path syncs
-  today.
+- **Durability.** *(Done: atomic writes sync the file before the replace and
+  the directory after it on POSIX.)* Left: the contents of a directory moved
+  into place by `_atomic_replace_dir` (Pinax preprint sources) are not synced,
+  nor is the manifest's `shutil.copy2` backup.
 - **Correctness gaps**:
   - `keys rename` leaves `crossref`, `xdata`, and `related` pointing at the old
     key.
   - User-supplied values with unbalanced braces are accepted.
-  - A mostly-UTF-8 file with one bad byte silently decodes as latin-1; a UTF-16
-    file parses as zero entries.
-  - A mixed-ending file gains a CRLF at EOF, a CRLF file without a final newline
-    gains one, and a whitespace-only file becomes empty.
-  - `--backup` overwrites the previous backup.
+  - *(Done: encoding detection by byte-order mark and refusal of mixed bytes,
+    the file's own ending kept on write, numbered backups.)* Left: a few
+    readers still assume UTF-8 and can misread a UTF-16 or Latin-1 library —
+    the previous-content diffs of `convert` and `corpus`, `cli_completion`, and
+    `asset_check`.
   - `asset check` reports no drift when the Pinax manifest file is absent,
     while `asset repair` records the material files it finds: the drift scan
     returns early without a manifest.
