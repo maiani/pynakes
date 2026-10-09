@@ -74,8 +74,10 @@ to find the operation module that owns a key.
 | `format-block-order` | formatting | `canonical` or `preserve` (default: `canonical`) | `format` | — |
 | `format-wrap-values` | formatting | `off`, `stable`, or `canonical` (default: `off`) | `format` | — |
 | `format-line-width` | formatting | Integer at least 20 (default: `100`) | `format` wrapping | — |
+| `format-entry-type-case` | formatting | `lower` (default) or `preserve` — keep each entry's type spelling, e.g. JabRef's `@Article` | `format`, `normalize`, `lint` | — |
 | `lint-required-fields` | lint | Fields required on every entry | `lint` | — |
 | `lint-required-fields-<entrytype>` | lint | Extra fields required on one entry type | `lint` | — |
+| `lint-ignore` | lint | List of finding types and/or categories the `lint` command leaves out (counted as `suppressed`) | `lint` | — |
 | `tex-sources` | usage | List of TeX files or directories, relative to the `.bib` file | `keys`, `tex scan` | — |
 | `group-tree` | groups | Pipe-delimited group hierarchy; aliases JabRef's `grouping` (read native-first) — see [Grouping](#grouping) | `groups tree`/`add-group`/`remove-group`/`rename-group`/`move-group`/`update-group` | `grouping` / `groupsTree` / `groups:N...` |
 | `scrub-fields` | scrub | List of extra field names/globs `scrub` removes, on top of its default private set | `scrub` | — |
@@ -257,9 +259,8 @@ matters, or check whether `normalize-journal-source` is set to `none` and the
 journal simply isn't in a table you've configured.
 
 The warnings are advisory in a normal run. `pynakes lint --strict` exits `1`
-for structural errors and these metadata-conformance warnings, allowing a
-repository to enforce its own stored settings in CI. Other advisory warnings,
-such as a missing DOI, remain non-blocking.
+for these metadata-conformance warnings as for any other finding not
+suppressed, allowing a repository to enforce its own stored settings in CI.
 
 ```bibtex
 @comment{pynakes-meta:

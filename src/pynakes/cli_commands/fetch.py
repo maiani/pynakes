@@ -4,7 +4,6 @@ Downloads arXiv materials (PDF and source) into the configured Pinax directory.
 """
 
 from enum import Enum
-from pathlib import Path
 
 import typer
 from rich.progress import (
@@ -16,12 +15,15 @@ from rich.progress import (
     TransferSpeedColumn,
 )
 
+from pynakes.cli_choices import Material
 from pynakes.cli_commands._fetch_report import fetch_report_lines
 from pynakes.cli_commands._rich_progress import RichProgressBase
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     _CACHE_FILE_OPTION,
+    _EXPECT_SHA256_OPTION,
     RunParams,
+    _check_expected_sha256,
     _emit_error,
     _finish_mod,
     _resolve_input_bib,
@@ -97,45 +99,30 @@ class _RichFetchProgress(RichProgressBase):
                 self._progress.remove_task(task_id)
 
 
-def _looks_like_bib_path(target: str | None) -> bool:
-    """Return whether ``target`` is a path to an existing ``.bib`` file.
-
-    A citation key is never also a ``.bib`` file on disk, so this distinguishes
-    ``asset fetch refs.bib`` (a mis-typed whole-library run) from
-    ``asset fetch Newton1687`` without guessing.
-    """
-    return target is not None and target.lower().endswith(".bib") and Path(target).is_file()
+#: The fetch-policy flag each ``--material`` sets.
+MATERIALS = {
+    Material.PREPRINT: "preprint",
+    Material.PUBLISHED: "published",
+    Material.SOURCE: "source",
+    Material.SUPPLEMENT: "supplement",
+    Material.BEST_PDF: "bestpdf",
+}
 
 
 def fetch(
+    file: str | None = bib_file_argument(),
     target: str | None = typer.Argument(
         None, help="Citation key to fetch (default: all entries with configured missing materials)"
     ),
-    file: str | None = bib_file_argument(),
-    file_option: str | None = typer.Option(
-        None, "--file", help="Library path when the citation-key argument is omitted"
-    ),
-    preprint: bool | None = typer.Option(
-        None, "--preprint", help="Fetch preprint PDF (overrides metadata pinax-fetch-policy)"
-    ),
-    published: bool | None = typer.Option(
-        None, "--published", help="Fetch published PDF (overrides metadata pinax-fetch-policy)"
-    ),
-    source: bool | None = typer.Option(
-        None, "--source", help="Fetch arXiv source (overrides metadata pinax-fetch-policy)"
-    ),
-    supplement: bool | None = typer.Option(
-        None, "--supplement", help="Fetch one unambiguous supplementary PDF"
-    ),
-    bestpdf: bool | None = typer.Option(
+    material: list[Material] | None = typer.Option(
         None,
-        "--bestpdf",
-        help=(
-            "Best available PDF: published if OA, otherwise preprint "
-            "(overrides metadata pinax-fetch-policy)"
-        ),
+        "--material",
+        help="Material to fetch, repeatable; overrides the library's pinax-fetch-policy. "
+        "best-pdf is the published PDF when open access, otherwise the preprint; "
+        "supplement fetches one unambiguous supplementary PDF",
     ),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show what would be fetched without downloading"
     ),
@@ -151,48 +138,31 @@ def fetch(
     """Download Pinax materials, optionally using existing institutional network access.
 
     With no citation key every entry with configured missing materials is
-    fetched. Since the key comes first positionally, name the library with
-    ``--file`` for that whole-library form (``asset fetch --file refs.bib``);
-    the positional library path is for the single-key form
-    (``asset fetch KEY refs.bib``).
+    fetched.
     """
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    if file is not None and file_option is not None:
-        _emit_error(
-            json_output,
-            "InvalidInput",
-            "Specify the library once, not both positionally and with --file",
-        )
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     if target is not None and not target.strip():
         # A blank key (an unset variable in a script) means "no key", not a
         # lookup for the empty key.
         target = None
-    if file is None and file_option is None and _looks_like_bib_path(target):
-        _emit_error(
-            json_output,
-            "InvalidInput",
-            f"The first argument is a citation key, not a library path; "
-            f"use --file {target} to fetch every entry in that library",
-        )
-    file = _resolve_input_bib(file_option or file, json_output)
+    file = _resolve_input_bib(file, json_output)
 
     try:
         coll = Bibliography.open(file)
     except ValueError as exc:
         _emit_error(json_output, "InvalidInput", str(exc))
 
-    flags = [preprint, published, source, supplement, bestpdf]
+    chosen = {MATERIALS[name] for name in material or []}
     policy = (
-        FetchPolicy(
-            preprint=bool(preprint),
-            published=bool(published),
-            source=bool(source),
-            supplement=bool(supplement),
-            bestpdf=bool(bestpdf),
-        )
-        if any(f is not None for f in flags)
-        else None
+        FetchPolicy(**{flag: flag in chosen for flag in MATERIALS.values()}) if chosen else None
     )
+    _check_expected_sha256(file, coll, params)
 
     if params.json_output:
         report = coll.fetch_materials(
@@ -213,20 +183,20 @@ def fetch(
                 access=access.value,
             )
 
-    warnings = fetch_report_lines(report)
+    human = fetch_report_lines(report)
 
     if coll.files is not None:
         files_dir = str(coll.files.root)
-        warnings.append(f"Files stored in {files_dir}")
+        human.append(f"Files stored in {files_dir}")
     else:
         files_dir = None
 
     _finish_mod(
         file,
-        "fetch",
+        "asset_fetch",
         coll,
         params,
-        warnings,
+        human,
         files_dir=files_dir,
         access=report["access"],
         fetch_policy=report["fetch_policy"],

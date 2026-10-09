@@ -14,13 +14,20 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from pynakes.capabilities import _ERROR_CODES, get_capabilities
+from pynakes.capabilities import get_capabilities
 from pynakes.cli import app
+from pynakes.cli_errors import catalogue_description
 from pynakes.engine import Bibliography
 
 runner = CliRunner()
 
 LIBRARY = (
+    "@comment{pynakes-meta:\n"
+    "group-tree: Mechanics||2||1||StaticGroup|||0|||\n"
+    "  Optics||2||1||StaticGroup|||0|||\n"
+    "tex-sources: paper.tex\n"
+    "}\n"
+    "\n"
     "@book{Newton1687,\n"
     "  author = {Isaac Newton},\n"
     "  title = {Philosophiae Naturalis Principia Mathematica},\n"
@@ -39,17 +46,58 @@ LIBRARY = (
     "  title = {Introductio in analysin infinitorum},\n"
     "  year = {1748}\n"
     "}\n"
+    "\n"
+    "@book{Hooke1665,\n"
+    "  author = {Robert Hooke},\n"
+    "  title = {Micrographia},\n"
+    "  year = {1665}\n"
+    "}\n"
+    "\n"
+    "@book{Hooke1665,\n"
+    "  author = {Robert Hooke},\n"
+    "  title = {Micrographia, second issue},\n"
+    "  year = {1667}\n"
+    "}\n"
 )
+
+PAPER = "\\documentclass{article}\\begin{document}\\cite{Newton1687}\\end{document}\n"
 
 STALE = "0" * 64
 
-# One invocation per command that accepts the precondition; ``{bib}`` is the library.
+# One invocation per modifying command, each of which changes the library;
+# ``{bib}`` is the library.
 WRITES = {
-    "ref edit": ["ref", "edit", "Newton1687", "{bib}", "--field", "note=first edition"],
-    "ref add": ["ref", "add", "Galileo1638", "{bib}", "--type", "book", "--field", "year=1638"],
+    "ref edit": ["ref", "edit", "{bib}", "Newton1687", "--field", "note=first edition"],
+    "ref directive": ["ref", "directive", "{bib}", "ignore", "missing_doi", "--key", "Newton1687"],
+    "ref add": ["ref", "add", "{bib}", "Galileo1638", "--type", "book", "--field", "year=1638"],
     "ref remove": ["ref", "remove", "{bib}", "Euler1748b", "--keep-files"],
-    "groups add-entry": ["groups", "add-entry", "{bib}", "Euler1748", "Analysis"],
+    "groups add-entry": ["groups", "add-entry", "{bib}", "Euler1748", "Optics"],
     "groups remove-entry": ["groups", "remove-entry", "{bib}", "Newton1687", "Mechanics"],
+    "groups add-group": ["groups", "add-group", "{bib}", "Acoustics"],
+    "groups remove-group": ["groups", "remove-group", "{bib}", "Optics"],
+    "groups rename-group": ["groups", "rename-group", "{bib}", "Optics", "Light"],
+    "groups move-group": ["groups", "move-group", "{bib}", "Optics", "--parent", "Mechanics"],
+    "groups update-group": ["groups", "update-group", "{bib}", "Optics", "--color", "8a8a8aff"],
+    "fields set": ["fields", "set", "{bib}", "note", "checked", "--key", "Newton1687"],
+    "fields rename": ["fields", "rename", "{bib}", "year", "date"],
+    "fields move": ["fields", "move", "{bib}", "year", "date"],
+    "fields append": ["fields", "append", "{bib}", "keywords", "classic"],
+    "fields clear": ["fields", "clear", "{bib}", "year"],
+    "fields protect-title": ["fields", "protect-title", "{bib}", "--term", "Principia"],
+    "keys generate": ["keys", "generate", "{bib}", "--all"],
+    "keys repair": ["keys", "repair", "{bib}"],
+    "keys rename": ["keys", "rename", "{bib}", "Euler1748", "Euler1748a"],
+    "metadata set": ["metadata", "set", "{bib}", "key-pattern", "[auth][year]"],
+    "metadata remove": ["metadata", "remove", "{bib}", "tex-sources"],
+    "metadata adopt-jabref": ["metadata", "adopt-jabref", "{bib}"],
+    "tex add": ["tex", "add", "{bib}", "appendix.tex"],
+    "tex remove": ["tex", "remove", "{bib}", "paper.tex"],
+    "tex clear": ["tex", "clear", "{bib}"],
+    "tex scan": ["tex", "scan", "{bib}", "--keyword", "cited"],
+    "normalize": ["normalize", "{bib}", "--drop-field", "year"],
+    "format": ["format", "{bib}", "--indent", "    "],
+    "convert": ["convert", "{bib}", "--to", "biblatex"],
+    "init": ["init", "{bib}", "--pinax"],
     "dedupe merge": ["dedupe", "merge", "{bib}", "--key", "Euler1748"],
     "corpus batch": [
         "corpus",
@@ -60,10 +108,15 @@ WRITES = {
     ],
 }
 
+#: Modifying commands that accept the precondition but reach the network (or,
+#: offline, have nothing to write), so the table above cannot exercise them.
+NETWORK_WRITES = {"ref import", "asset fetch", "enrich"}
+
 
 def _library(tmp_path: Path) -> Path:
     bib = tmp_path / "lib.bib"
     bib.write_bytes(LIBRARY.encode("utf-8"))
+    (tmp_path / "paper.tex").write_text(PAPER, encoding="utf-8")
     return bib
 
 
@@ -212,5 +265,5 @@ def test_capabilities_list_exactly_the_commands_that_accept_the_precondition() -
     described = get_capabilities()["write_precondition"]
     assert described["option"] == "--expect-sha256"
     assert described["envelope_key"] == "source_sha256"
-    assert described["conflict"] in _ERROR_CODES["conflict"]["codes"]
-    assert set(described["commands"]) == set(WRITES) | {"ref import"}
+    assert described["conflict"] in catalogue_description()["conflict"]["codes"]
+    assert set(described["commands"]) == set(WRITES) | NETWORK_WRITES

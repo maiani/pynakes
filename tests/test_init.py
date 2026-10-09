@@ -74,12 +74,12 @@ def test_collect_profile_keeps_conventions_drops_content(tmp_path: Path) -> None
 
 def test_init_creates_typed_library(tmp_path: Path) -> None:
     out = tmp_path / "refs.bib"
-    result = runner.invoke(app, ["init", str(out), "--type", "biblatex", "--json"])
+    result = runner.invoke(app, ["init", str(out), "--dialect", "biblatex", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["action"] == "init"
     assert data["created"] is True
-    assert data["type"] == "biblatex"
+    assert data["dialect"] == "biblatex"
     assert out.exists()
     lib = load_bib(str(out))
     # A fresh library is pynakes-native: the dialect lands in the native key,
@@ -92,9 +92,9 @@ def test_init_creates_typed_library(tmp_path: Path) -> None:
 
 def test_init_type_overrides_default(tmp_path: Path) -> None:
     out = tmp_path / "refs.bib"
-    result = runner.invoke(app, ["init", str(out), "--type", "bibtex", "--json"])
+    result = runner.invoke(app, ["init", str(out), "--dialect", "bibtex", "--json"])
     assert result.exit_code == 0, result.output
-    assert json.loads(result.output)["type"] == "bibtex"
+    assert json.loads(result.output)["dialect"] == "bibtex"
     assert load_bib(str(out)).metadata["dialect"] == "bibtex"
 
 
@@ -103,7 +103,7 @@ def test_init_bare_seeds_default_profile(tmp_path: Path) -> None:
     result = runner.invoke(app, ["init", str(out), "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
-    assert data["type"] == "biblatex"
+    assert data["dialect"] == "biblatex"
     # A bare init is useful, not empty: it carries the pynakes-native profile
     # and no jabref-meta.
     keys = {key.lower() for key in data["keys"]}
@@ -127,6 +127,8 @@ def test_init_jabref_projects_native_keys(tmp_path: Path) -> None:
     assert lib.jabref_metadata_blocks != []
     assert lib.metadata["databaseType"].rstrip(";") == "biblatex"
     assert lib.metadata["keypatterndefault"].rstrip(";") == "[auth][year][veryshorttitle]"
+    # JabRef saves `@Article`; format and normalize must not fight it.
+    assert lib.metadata["format-entry-type-case"] == "preserve"
 
 
 def test_init_refuses_existing_without_force(tmp_path: Path) -> None:
@@ -142,7 +144,7 @@ def test_init_refuses_existing_without_force(tmp_path: Path) -> None:
 def test_init_force_overwrites_and_backs_up_when_requested(tmp_path: Path) -> None:
     out = tmp_path / "refs.bib"
     out.write_text("@article{Old2020,\n  title = {Old}\n}\n")
-    result = runner.invoke(app, ["init", str(out), "--type", "bibtex", "--force", "--backup"])
+    result = runner.invoke(app, ["init", str(out), "--dialect", "bibtex", "--force", "--backup"])
     assert result.exit_code == 0, result.output
     assert "Old2020" not in out.read_text()
     assert (tmp_path / "refs.bib.bak").read_text().strip().startswith("@article{Old2020")
@@ -152,7 +154,7 @@ def test_init_from_copies_profile_not_content(tmp_path: Path) -> None:
     template = tmp_path / "template.bib"
     template.write_text(TEMPLATE)
     out = tmp_path / "new.bib"
-    result = runner.invoke(app, ["init", str(out), "--from", str(template), "--json"])
+    result = runner.invoke(app, ["init", str(out), "--profile-from", str(template), "--json"])
     assert result.exit_code == 0, result.output
     keys = {key.lower() for key in json.loads(result.output)["keys"]}
     assert {"databasetype", "keypatterndefault", "normalize-author-style"} <= keys
@@ -165,7 +167,7 @@ def test_init_from_copies_profile_not_content(tmp_path: Path) -> None:
 def test_init_dry_run_diff_writes_nothing(tmp_path: Path) -> None:
     out = tmp_path / "refs.bib"
     result = runner.invoke(
-        app, ["init", str(out), "--type", "biblatex", "--dry-run", "--diff", "--json"]
+        app, ["init", str(out), "--dialect", "biblatex", "--dry-run", "--diff", "--json"]
     )
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -174,11 +176,11 @@ def test_init_dry_run_diff_writes_nothing(tmp_path: Path) -> None:
     assert not out.exists()
 
 
-def test_init_rejects_bad_type(tmp_path: Path) -> None:
+def test_init_rejects_bad_dialect(tmp_path: Path) -> None:
     out = tmp_path / "refs.bib"
-    result = runner.invoke(app, ["init", str(out), "--type", "endnote", "--json"])
+    result = runner.invoke(app, ["init", str(out), "--dialect", "endnote", "--json"])
     assert result.exit_code == 1, result.output
-    assert json.loads(result.output)["error"] == "InvalidInput"
+    assert json.loads(result.output)["error"] == "UsageError"
     assert not out.exists()
 
 
@@ -229,7 +231,9 @@ def test_init_converts_existing_library_to_pinax_idempotently(tmp_path: Path) ->
     assert second.exit_code == 0, second.output
     second_data = json.loads(second.output)
     assert second_data["modified"] is False
-    assert any("pinax-files-dir already set" in warning for warning in second_data["warnings"])
+    assert any(
+        "pinax-files-dir already set" in warning["message"] for warning in second_data["warnings"]
+    )
 
 
 def test_init_pinax_from_merges_missing_profile_keys(tmp_path: Path) -> None:
@@ -243,13 +247,15 @@ def test_init_pinax_from_merges_missing_profile_keys(tmp_path: Path) -> None:
         "@article{Noether1918,\n  title = {Invariant Variational Problems}\n}\n"
     )
 
-    result = runner.invoke(app, ["init", str(out), "--pinax", "--from", str(template), "--json"])
+    result = runner.invoke(
+        app, ["init", str(out), "--pinax", "--profile-from", str(template), "--json"]
+    )
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
-    assert data["from"] == str(template)
+    assert data["profile_from"] == str(template)
     assert set(data["merged_keys"]) == {"keypatterndefault", "normalize-author-style"}
-    assert any("Merged 2 profile key(s)" in warning for warning in data["warnings"])
+    assert any("Merged 2 profile key(s)" in warning["message"] for warning in data["warnings"])
 
     meta = load_bib(str(out)).metadata
     # Pre-existing dialect is untouched, not clobbered by the template's databaseType.
@@ -263,14 +269,20 @@ def test_init_pinax_from_no_missing_keys_is_reported(tmp_path: Path) -> None:
     template = tmp_path / "template.bib"
     template.write_text(TEMPLATE)
     out = tmp_path / "library.bib"
-    result = runner.invoke(app, ["init", str(out), "--pinax", "--from", str(template), "--json"])
+    result = runner.invoke(
+        app, ["init", str(out), "--pinax", "--profile-from", str(template), "--json"]
+    )
     assert result.exit_code == 0, result.output
 
-    second = runner.invoke(app, ["init", str(out), "--pinax", "--from", str(template), "--json"])
+    second = runner.invoke(
+        app, ["init", str(out), "--pinax", "--profile-from", str(template), "--json"]
+    )
     assert second.exit_code == 0, second.output
     data = json.loads(second.output)
     assert data["merged_keys"] == []
-    assert any("No missing profile keys to merge" in warning for warning in data["warnings"])
+    assert any(
+        "No missing profile keys to merge" in warning["message"] for warning in data["warnings"]
+    )
 
 
 def test_init_without_target_is_structured_error() -> None:

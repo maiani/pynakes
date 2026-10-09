@@ -1046,7 +1046,7 @@ def test_groups_cli_human_views_and_tree_lifecycle(tmp_path: Path) -> None:
             "--color",
             "ff0000ff",
             "--context",
-            "1",
+            "refining",
             "--collapsed",
         ],
     )
@@ -1075,21 +1075,39 @@ def test_groups_cli_structured_errors(tmp_path: Path) -> None:
     bib.write_text("@article{Noether1918,\n  title = {Invariant Variational Problems}\n}\n")
     runner = CliRunner()
 
-    for args, error in (
-        (["add-entry", str(bib), "Missing", "Physics"], "KeyNotFound"),
-        (["add-group", str(bib), "Physics"], None),
-        (["add-group", str(bib), "Physics"], "InvalidInput"),
-        (["remove-group", str(bib), "Missing"], "KeyNotFound"),
-        (["rename-group", str(bib), "Missing", "Other"], "InvalidInput"),
-        (["move-group", str(bib), "Missing"], "InvalidInput"),
-        (["update-group", str(bib), "Missing"], "KeyNotFound"),
+    # A missing group is KeyNotFound everywhere; an existing one is a conflict.
+    for args, error, exit_code in (
+        (["add-entry", str(bib), "Missing", "Physics"], "KeyNotFound", 1),
+        (["add-entry", str(bib), "Noether1918", "Physics"], "KeyNotFound", 1),
+        (["add-group", str(bib), "Physics"], None, 0),
+        (["add-group", str(bib), "Physics"], "GroupConflict", 2),
+        (["add-group", str(bib), "Waves", "--parent", "Missing"], "KeyNotFound", 1),
+        (["remove-entry", str(bib), "Noether1918", "Missing"], "KeyNotFound", 1),
+        (["remove-group", str(bib), "Missing"], "KeyNotFound", 1),
+        (["rename-group", str(bib), "Missing", "Other"], "KeyNotFound", 1),
+        (["add-group", str(bib), "Optics"], None, 0),
+        (["rename-group", str(bib), "Optics", "Physics"], "GroupConflict", 2),
+        (["move-group", str(bib), "Missing"], "KeyNotFound", 1),
+        (["move-group", str(bib), "Optics", "--parent", "Missing"], "KeyNotFound", 1),
+        (["update-group", str(bib), "Missing"], "KeyNotFound", 1),
+        (["update-group", str(bib), "Optics", "--parent", "Missing"], "KeyNotFound", 1),
     ):
         result = runner.invoke(app, ["groups", *args, "--json"])
-        if error is None:
-            assert result.exit_code == 0, result.output
-        else:
-            assert result.exit_code == 1, result.output
+        assert result.exit_code == exit_code, (args, result.output)
+        if error is not None:
             assert json.loads(result.output)["error"] == error
+
+
+def test_add_entry_create_makes_a_new_group(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{Noether1918,\n  title = {Invariant Variational Problems}\n}\n")
+
+    result = CliRunner().invoke(
+        app, ["groups", "add-entry", str(bib), "Noether1918", "Physics", "--create", "--json"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "groups = {Physics}" in bib.read_text()
 
 
 # ---------------------------------------------------------------------------
@@ -1109,7 +1127,8 @@ def test_add_entry_registers_group_in_existing_tree(tmp_path: Path) -> None:
     bib.write_text(write_bib(lib))
 
     result = CliRunner().invoke(
-        app, ["groups", "add-entry", str(bib), "Shockley1949", "Semiconductors", "--json"]
+        app,
+        ["groups", "add-entry", str(bib), "Shockley1949", "Semiconductors", "--create", "--json"],
     )
 
     assert result.exit_code == 0, result.output
@@ -1127,7 +1146,7 @@ def test_add_entry_on_treeless_library_creates_no_tree(tmp_path: Path) -> None:
     bib.write_text("@article{Bardeen1948,\n  title = {Transistor}\n}\n")
 
     result = CliRunner().invoke(
-        app, ["groups", "add-entry", str(bib), "Bardeen1948", "Devices", "--json"]
+        app, ["groups", "add-entry", str(bib), "Bardeen1948", "Devices", "--create", "--json"]
     )
 
     assert result.exit_code == 0, result.output
@@ -1218,7 +1237,7 @@ def test_groups_list_cli_flat_and_tree_union(tmp_path: Path) -> None:
     runner = CliRunner()
 
     add_entry = runner.invoke(
-        app, ["groups", "add-entry", str(bib), "Euclid300BCE", "FlatGroup", "--json"]
+        app, ["groups", "add-entry", str(bib), "Euclid300BCE", "FlatGroup", "--create", "--json"]
     )
     assert add_entry.exit_code == 0, add_entry.output
 
@@ -1372,7 +1391,9 @@ def test_groups_list_entries_cli_unknown_name_errors(tmp_path: Path) -> None:
     bib.write_text("@article{Euclid300BCE,\n  title = {On the Ratios of Straight Lines}\n}\n")
     runner = CliRunner()
     assert (
-        runner.invoke(app, ["groups", "add-entry", str(bib), "Euclid300BCE", "FlatGroup"]).exit_code
+        runner.invoke(
+            app, ["groups", "add-entry", str(bib), "Euclid300BCE", "FlatGroup", "--create"]
+        ).exit_code
         == 0
     )
 

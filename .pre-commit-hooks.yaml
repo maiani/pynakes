@@ -16,7 +16,7 @@
 
 - id: pynakes-lint
   name: pynakes lint
-  description: Validate BibTeX entries and fail on errors (duplicate/empty keys, missing required fields).
+  description: Validate BibTeX entries and fail on any finding not suppressed by lint-ignore, --ignore, or an ignore directive.
   entry: pynakes lint --strict
   language: python
   files: \.bib$

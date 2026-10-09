@@ -333,7 +333,7 @@ def test_ref_compare_with_cli_json(tmp_path: Path) -> None:
         "@article{B,\n  author = {John Smith},\n  title = {A Correct Title}\n}\n"
     )
 
-    result = runner.invoke(app, ["ref", "compare", "A", "--with", "B", str(bib), "--json"])
+    result = runner.invoke(app, ["ref", "compare", str(bib), "A", "--with", "B", "--json"])
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -352,7 +352,7 @@ def test_ref_compare_with_and_online_conflict(tmp_path: Path) -> None:
     bib.write_text("@article{A,\n  title = {T}\n}\n@article{B,\n  title = {U}\n}\n")
 
     result = runner.invoke(
-        app, ["ref", "compare", "A", "--with", "B", "--online", str(bib), "--json"]
+        app, ["ref", "compare", str(bib), "A", "--with", "B", "--online", "--json"]
     )
 
     assert result.exit_code == 1
@@ -368,7 +368,7 @@ def test_ref_compare_cli_json(monkeypatch, tmp_path: Path) -> None:
         "  doi = {10.5555/example}\n}\n"
     )
 
-    result = runner.invoke(app, ["ref", "compare", "A", str(bib), "--online", "--json"])
+    result = runner.invoke(app, ["ref", "compare", str(bib), "A", "--online", "--json"])
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -400,7 +400,8 @@ def test_verify_cli_strict_exits_one_with_json(monkeypatch, tmp_path: Path) -> N
     assert result.exit_code == 1
     assert data["status"] == "success"
     assert data["action"] == "verify"
-    assert data["errors"] == 1
+    assert data["strict"] is True
+    assert data["summary"]["errors"] == 1
 
 
 def test_enrich_cli_dry_run_diff_json(monkeypatch, tmp_path: Path) -> None:
@@ -911,7 +912,7 @@ def test_verify_cli_accepts_concurrency_option(monkeypatch, tmp_path: Path) -> N
     result = runner.invoke(app, ["verify", str(bib), "--online", "-j", "4", "--json"])
 
     assert result.exit_code == 0, result.output
-    assert json.loads(result.output)["checked"] == 2
+    assert json.loads(result.output)["summary"]["checked"] == 2
 
 
 def test_verify_cli_rejects_zero_concurrency(tmp_path: Path) -> None:

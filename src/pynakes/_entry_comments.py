@@ -34,11 +34,18 @@ def attached_comment_indices(lib: BibFile) -> dict[int, list[int]]:
     metadata = {block.comment_index for block in lib.metadata_blocks}
     attached: dict[int, list[int]] = {}
     run: list[int] = []
+    after_removed = False
     for gap, kind, ref in lib.source_layout:
-        if run and not _adjacent(lib.raw_comments[run[-1]], gap):
+        # A comment slot blanked by a staged removal is written out together
+        # with its trailing gap, so the next block's gap does not count either.
+        if run and not after_removed and not _adjacent(lib.raw_comments[run[-1]], gap):
             run = []
+        after_removed = False
         if kind == "comment" and isinstance(ref, int):
             text = lib.raw_comments[ref] if ref < len(lib.raw_comments) else ""
+            if not text and ref not in metadata:
+                after_removed = True
+                continue
             run = [*run, ref] if text.strip() and ref not in metadata else []
         elif kind == "entry":
             if run:

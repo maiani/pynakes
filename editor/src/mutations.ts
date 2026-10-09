@@ -237,7 +237,14 @@ export async function promptGroup(
     }
     group = typed.trim();
   }
-  await runMutation(host, { kind: "group", key, group, member: true });
+  // Only a name typed under "New group…" may create a group.
+  await runMutation(host, {
+    kind: "group",
+    key,
+    group,
+    member: true,
+    create: picked === NEW_GROUP,
+  });
 }
 
 /**

@@ -237,7 +237,8 @@ only when — a `pinax-files-dir` is set:
 | --- | --- | --- |
 | Declare the materials directory | `init --pinax`, or `metadata set pinax-files-dir` | The only step that "creates" a pinax. |
 | See what materials exist | `inspect [--json]` | The report gains per-entry presence and local paths — the [agent surface](#agent-surface). |
-| Validate materials | `asset check [--fix]` | Reports missing/orphan/drift between references and `pinax-files-dir`; reconciles with `--fix`. |
+| Validate materials | `asset check` | Reports missing/orphan/drift between references and `pinax-files-dir`. |
+| Reconcile the manifest | `asset repair [--dry-run --diff]` | Brings the provenance manifest in line with the material files that exist. |
 | Rename / regenerate keys | `keys rename`, `keys generate`, `keys repair` | Every material sharing the key — `<citekey>.published.pdf`, `<citekey>.preprint.pdf`, `<citekey>.source/` — moves with it (see [Coordinated edits](#coordinated-edits-and-atomicity)). |
 | Download missing materials | `asset fetch` (the one new download verb) | See [Fetch](#fetch-the-first-slice). |
 | Combine / split | `corpus combine`, `corpus split` | Produce pinakes; each output entry's materials are copied into the output's `pinax-files-dir`. Non-destructive — inputs untouched. |
@@ -276,7 +277,7 @@ Given an arXiv entry, it downloads the PDF and the source bundle into the right
 place:
 
 ```text
-pynakes asset fetch alvarez2019 refs.bib  →  refs.files/alvarez2019.preprint.pdf
+pynakes asset fetch refs.bib alvarez2019  →  refs.files/alvarez2019.preprint.pdf
                                              refs.files/alvarez2019.source/
 ```
 
@@ -286,7 +287,7 @@ the library with `--file`:
 
 ```bash
 pynakes asset fetch --file refs.bib          # every entry in this library
-pynakes asset fetch alvarez2019 refs.bib     # one entry
+pynakes asset fetch refs.bib alvarez2019     # one entry
 pynakes asset fetch                          # every entry, lone .bib auto-detected
 ```
 
@@ -338,8 +339,8 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
 What `asset fetch` downloads is **governed by metadata** — a single
 `pinax-fetch-policy`
 key, a comma-separated list of artifact names, selects what to download (it never
-triggers network access on its own during offline operations). Per-invocation
-flags `--preprint`, `--published`, `--source`, `--supplement`, and `--bestpdf` override the
+triggers network access on its own during offline operations). A repeatable
+`--material preprint|published|source|supplement|best-pdf` overrides the
 metadata policy for one call:
 
 ```bibtex
@@ -362,8 +363,7 @@ and the two version classes hang off it by name:
 The `pinax-fetch-policy` key selects what `asset fetch` downloads: `preprint` the arXiv
 PDF, `source` the arXiv source tree, `published` the `.published.pdf`
 PDF, and `supplement` the `.supplement.pdf` PDF — set in metadata (or overridden
-per invocation with `--preprint`, `--published`, `--source`, `--supplement`, or
-`--bestpdf`). Supplement fetching writes one unambiguous publisher-advertised
+per invocation with `--material`). Supplement fetching writes one unambiguous publisher-advertised
 PDF; when several files are advertised it reports the candidates without
 choosing one. The `bestpdf` policy (the default)
 tries the published PDF first and falls back to the preprint when no open-access
@@ -375,12 +375,12 @@ to publisher-hosted URLs only, and when no direct `pdf_url` is available,
 [publisher-specific overrides](#published-pdf-resolution-chain) or CrossRef
 are tried as fallbacks.
 
-For subscription content, `asset fetch --published --access institutional`
+For subscription content, `asset fetch --material published --access institutional`
 adds an explicit publisher-landing-page fallback. It uses only access already
 available to the process through an institutional network, VPN, or proxy. It
 does not collect credentials, import browser cookies, automate SSO, or bypass
 publisher controls. A login page is reported as authentication required rather
-than stored as a PDF. The same access mode can be combined with `--supplement`.
+than stored as a PDF. The same access mode can be combined with `--material supplement`.
 
 **The version of record is the canonical copy.** `<citekey>.published.pdf` is
 the *version of record* (what you cite), and it is also the **canonical**
@@ -457,9 +457,10 @@ mechanic, because a `.bib` text commit and a binary file move cannot be one
 atomic transaction.
 
 The rule: **filesystem first (it is reversible), then the `.bib` commit; roll
-back the moves if the commit fails.** `asset check --fix` is the backstop: if a
-process dies mid-operation or a user renames a file by hand, the references and
-materials drift, and `asset check` reports the drift and reconciles it — never by
+back the moves if the commit fails.** `asset check` and `asset repair` are the
+backstop: if a process dies mid-operation or a user renames a file by hand, the
+references and materials drift; `asset check` reports the drift and
+`asset repair` reconciles it — never by
 guessing, always by reporting first. Accepting this reconcile step is the honest
 cost of addressing materials by citation key, and it is acceptable because the
 drift is always detectable and the fix always reviewable.
@@ -582,7 +583,7 @@ checklist.
    `fetch_arxiv_source`, the URL builders, and safe tar extraction; add the
    `FileStore` atomic writers for the preprint PDF and the extracted source.
    Unit-tested with fixtures, no real network. *(Implemented.)*
-3. **The `asset fetch` command.** `pynakes asset fetch [target] [file]
+3. **The `asset fetch` command.** `pynakes asset fetch [file] [target]
     [--dry-run] [--cache-file PATH] [--json]`, with what-to-download governed by
     the `pinax-fetch-policy` metadata key;
     `Bibliography.ensure_files_dir` + `fetch_materials`; the zero-config default
@@ -602,7 +603,7 @@ checklist.
    discards a half-written output.) *(Implemented.)*
 7. **Coordinated key edits (own design pass).** `keys rename` / `generate` /
    `repair` move every `<citekey>*` material *in place* (filesystem first, then
-   commit, rollback on failure); `asset check --fix` reconciles drift. The only
+   commit, rollback on failure); `asset repair` reconciles drift. The only
    in-place material operation, so the riskiest. *(Implemented.)*
 8. **`add --fetch` for arXiv Pinax materials.** One-step import-and-download for
    arXiv references, using the existing Pinax fetch policy for preprint

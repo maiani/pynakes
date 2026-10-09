@@ -36,6 +36,8 @@ class TestGetCapabilities:
         assert formatting["defaults"]["field_order"] == "preferred"
         assert formatting["defaults"]["block_order"] == "canonical"
         assert formatting["choices"]["wrap_values"] == ["off", "stable", "canonical"]
+        assert formatting["defaults"]["entry_type_case"] == "lower"
+        assert formatting["choices"]["entry_type_case"] == ["lower", "preserve"]
         assert "repeated fields" in formatting["lint_gate"]
         assert "format_bibliography" in get_capabilities()["capabilities"]
 
@@ -110,10 +112,10 @@ class TestCommandSchemas:
         inputs = next(a for a in split["arguments"] if a["name"] == "inputs")
         assert inputs["type"] == "list[string]"
         assert inputs["variadic"] is True
-        # the --to option carries its flag and type
-        to_opt = next(o for o in split["options"] if o["name"] == "to")
-        assert to_opt["flags"] == ["--to"]
-        assert to_opt["type"] == "list[string]"
+        # the --route option carries its flag and type
+        route = next(o for o in split["options"] if o["name"] == "route")
+        assert route["flags"] == ["--route"]
+        assert route["type"] == "list[string]"
         # every option records its flags
         assert all(o["flags"] for o in split["options"])
 
@@ -153,7 +155,7 @@ class TestErrorCatalogAndGrammar:
             "search (--where, --key)",
             "format (--where, --key)",
             "corpus combine (--where, --key)",
-            "corpus split (--to)",
+            "corpus split (--route)",
             "batch (fields.* where)",
         ]
         # --key is the no-grammar shorthand, so its relationship to --where has
@@ -171,6 +173,9 @@ class TestCapabilitiesCommand:
         result = runner.invoke(app, ["capabilities", "--json"])
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
+        assert data.pop("status") == "success"
+        assert data.pop("action") == "capabilities"
+        assert data.pop("warnings") == []
         assert data == get_capabilities()
 
     def test_human_output_lists_commands(self) -> None:

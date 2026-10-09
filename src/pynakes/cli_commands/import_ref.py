@@ -15,6 +15,7 @@ import sys
 import typer
 
 from pynakes import importer as importer_ops
+from pynakes.cli_choices import KeySource
 from pynakes.cli_commands._fetch_report import fetch_report_lines
 from pynakes.cli_common import (
     _BACKUP_OPTION,
@@ -24,25 +25,13 @@ from pynakes.cli_common import (
     _check_expected_sha256,
     _emit_conflict,
     _emit_error,
-    _emit_json,
     _finish_mod,
     _resolve_input_bib,
     _safe,
     _verb,
-    bib_file_option,
+    bib_file_argument,
 )
 from pynakes.engine import Bibliography
-
-
-#: Identifiers never end in ``.bib``, so a trailing positional that does marks
-#: the library rather than another thing to resolve. This keeps the long-standing
-#: ``ref import <identifier> <file>`` order working now that the identifier
-#: argument is variadic.
-def split_library_argument(tokens: list[str]) -> tuple[list[str], str | None]:
-    """Split positional tokens into identifiers and an optional library path."""
-    if tokens and tokens[-1].lower().endswith(".bib"):
-        return tokens[:-1], tokens[-1]
-    return tokens, None
 
 
 def read_identifier_lines(text: str) -> list[str]:
@@ -61,19 +50,19 @@ def read_identifier_lines(text: str) -> list[str]:
 
 
 def import_reference(
+    file: str | None = bib_file_argument(),
     identifiers: list[str] = typer.Argument(
         ...,
         help="One or more DOIs, repository identifiers, or supported reference URLs. "
         'Use "-" to read them from stdin, one per line',
     ),
-    file: str | None = bib_file_option(),
     key: str | None = typer.Option(
         None, "--key", help="Citation key to use (only with a single identifier)"
     ),
-    key_source: str = typer.Option(
-        "generated",
+    key_source: KeySource = typer.Option(
+        KeySource.GENERATED,
         "--key-source",
-        help="Citation key source when --key is absent: generated or provider",
+        help="Citation key source when --key is absent",
     ),
     allow_duplicate: bool = typer.Option(
         False, "--allow-duplicate", help="Import even if the reference already exists"
@@ -106,16 +95,7 @@ def import_reference(
         backup=backup,
         expect_sha256=expect_sha256,
     )
-    positional, trailing = split_library_argument(list(identifiers))
-    if trailing is not None:
-        if file is not None:
-            _emit_error(
-                json_output,
-                "InvalidInput",
-                "Specify the library once, not both positionally and with --file",
-            )
-            return
-        file = trailing
+    positional = list(identifiers)
     if positional == ["-"]:
         positional = read_identifier_lines(sys.stdin.read())
         if not positional:
@@ -133,15 +113,6 @@ def import_reference(
         return
 
     file = _resolve_input_bib(file, json_output)
-    if key_source not in importer_ops.KEY_SOURCES:
-        _emit_error(
-            json_output,
-            "InvalidKeySource",
-            f"Invalid key source {key_source!r}; expected one of: "
-            f"{', '.join(sorted(importer_ops.KEY_SOURCES))}",
-        )
-        return
-
     coll = Bibliography.open(file)
     # Before any provider is asked: a stale precondition should cost no lookup.
     _check_expected_sha256(file, coll, params)
@@ -165,30 +136,17 @@ def import_reference(
         _emit_error(json_output, "InvalidIdentifier", str(exc))
         return
     except importer_ops.DuplicateReferenceError as exc:
-        if json_output:
-            _emit_json(
-                {
-                    "status": "conflict",
-                    "error": "DuplicateReference",
-                    "message": str(exc),
-                    "identifier": exc.identifier,
-                    "existing_keys": exc.keys,
-                    "options": [
-                        {
-                            "id": "keep_existing",
-                            "description": "Do not import a duplicate reference",
-                        },
-                        {
-                            "id": "allow_duplicate",
-                            "description": "Retry with --allow-duplicate",
-                        },
-                    ],
-                }
-            )
-        else:
-            typer.echo(f"DuplicateReference: {exc}")
-            typer.echo("Retry with --allow-duplicate to import another copy.")
-        raise typer.Exit(code=2) from exc
+        _emit_conflict(
+            json_output,
+            "DuplicateReference",
+            str(exc),
+            identifier=exc.identifier,
+            existing_keys=exc.keys,
+            options=[
+                {"id": "keep_existing", "description": "Do not import a duplicate reference"},
+                {"id": "allow_duplicate", "description": "Retry with --allow-duplicate"},
+            ],
+        )
     except importer_ops.CitationKeyConflictError as exc:
         _emit_conflict(
             json_output,
@@ -250,7 +208,7 @@ def import_reference(
 
     _finish_mod(
         file,
-        "import",
+        "ref_import",
         coll,
         params,
         human,
@@ -281,7 +239,7 @@ def _import_several(
     ``--allow-duplicate`` is the answer if a second copy really was wanted.
     """
     results: list[dict[str, object]] = []
-    warnings: list[str] = []
+    warnings: list[dict[str, object]] = []
     imported = 0
     for identifier in identifiers:
         try:
@@ -300,7 +258,13 @@ def _import_several(
                     "message": str(exc),
                 }
             )
-            warnings.append(f"{identifier}: already present as {', '.join(exc.keys)}; skipped.")
+            warnings.append(
+                {
+                    "type": "duplicate_reference",
+                    "identifier": identifier,
+                    "message": f"{identifier}: already present as {', '.join(exc.keys)}; skipped.",
+                }
+            )
             continue
         except (
             importer_ops.UnsupportedIdentifierError,
@@ -308,7 +272,13 @@ def _import_several(
             ValueError,
         ) as exc:
             results.append({"identifier": identifier, "status": "failed", "message": str(exc)})
-            warnings.append(f"{identifier}: {exc}")
+            warnings.append(
+                {
+                    "type": "import_failed",
+                    "identifier": identifier,
+                    "message": f"{identifier}: {exc}",
+                }
+            )
             continue
         imported += 1
         results.append(
@@ -338,11 +308,11 @@ def _import_several(
         f"{_verb('import', params, 'Imported')} {imported} of {len(identifiers)} reference(s)"
         f" ({skipped} already present, {failed} unresolved)."
     ]
-    human.extend(f"  {line}" for line in warnings)
+    human.extend(f"  {warning['message']}" for warning in warnings)
 
     _finish_mod(
         file,
-        "import",
+        "ref_import",
         coll,
         params,
         human,

@@ -13,18 +13,20 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
+from pynakes.cli_checks import CheckOutcome, _run_checks, strict_option
 from pynakes.cli_commands._rich_progress import RichProgressBase
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     _CACHE_FILE_OPTION,
     _CONCURRENCY_OPTION,
-    CheckOutcome,
+    _EXPECT_SHA256_OPTION,
     RunParams,
+    _check_expected_sha256,
     _entries,
     _finish_mod,
     _resolve_input_bib,
-    _run_checks,
     _safe,
+    _source_sha256,
     _verb,
     bib_file_argument,
 )
@@ -64,7 +66,6 @@ def _verify_one(
     file: str,
     online: bool,
     cache_file: str | None,
-    strict: bool,
     published: bool,
     json_output: bool,
     concurrency: int,
@@ -81,15 +82,22 @@ def _verify_one(
         "status": "success",
         "action": "verify",
         "file": file,
+        "source_sha256": _source_sha256(coll),
+        "warnings": [],
         "online": online,
-        "strict": strict,
-        **report.to_dict(),
+        "summary": {
+            "checked": report.checked,
+            "errors": report.errors,
+            "warnings": report.warnings,
+            "info": report.infos,
+        },
+        "issues": [issue.to_dict() for issue in report.issues],
     }
     if report.errors and report.checked == 0:
         result["note"] = "No DOIs could be verified — all lookups failed."
     human = [
         f"{file}: verified {report.checked} DOI-backed {_entries(report.checked)}.",
-        f"  errors={report.errors}, warnings={report.warnings}, infos={report.infos}",
+        f"  errors={report.errors}, warnings={report.warnings}, info={report.infos}",
     ]
     if report.errors and report.checked == 0:
         human.append("  No DOIs could be verified — all lookups failed.")
@@ -126,7 +134,7 @@ def _verify_one(
             "checked": report.checked,
             "errors": report.errors,
             "warnings": report.warnings,
-            "infos": report.infos,
+            "info": report.infos,
         },
     )
 
@@ -144,7 +152,7 @@ def verify(
     ),
     cache_file: str | None = _CACHE_FILE_OPTION,
     concurrency: int = _CONCURRENCY_OPTION,
-    strict: bool = typer.Option(False, "--strict", help="Exit 1 if warnings or errors are found"),
+    strict: bool = strict_option("verification finds warnings or errors"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Verify entries against authoritative metadata (read-only).
@@ -155,7 +163,7 @@ def verify(
     _run_checks(
         files,
         "verify",
-        lambda f: _verify_one(f, online, cache_file, strict, published, json_output, concurrency),
+        lambda f: _verify_one(f, online, cache_file, published, json_output, concurrency),
         json_output,
         strict,
     )
@@ -177,6 +185,7 @@ def enrich(
     cache_file: str | None = _CACHE_FILE_OPTION,
     concurrency: int = _CONCURRENCY_OPTION,
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
@@ -188,8 +197,16 @@ def enrich(
     DOI/journal), folding in the former ``published --apply`` operation.
     """
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     coll = Bibliography.open(file)
+    # Before any provider is asked: a stale precondition should cost no lookup.
+    _check_expected_sha256(file, coll, params)
     if online and not json_output:
         with _RichIntegrityProgress("Enriching") as progress:
             report = coll.enrich(

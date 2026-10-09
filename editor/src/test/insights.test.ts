@@ -127,18 +127,25 @@ test("a parent cycle does not hang the projection", () => {
   assert.ok(names.length <= 2);
 });
 
-function lint(issues: LintSuccess["issues"], counts: Partial<LintSuccess> = {}): LintSuccess {
+function lint(
+  issues: LintSuccess["issues"],
+  counts: Partial<LintSuccess["summary"]> = {},
+): LintSuccess {
   return {
     status: "success",
     action: "lint",
     file: "refs.bib",
-    issue_count: issues.length,
-    errors: 0,
-    warnings: 0,
-    info: issues.length,
-    by_category: {},
+    warnings: [],
+    summary: {
+      issues: issues.length,
+      errors: 0,
+      warnings: 0,
+      info: issues.length,
+      suppressed: 0,
+      by_category: {},
+      ...counts,
+    },
     issues,
-    ...counts,
   };
 }
 
@@ -206,11 +213,8 @@ test("indexLint keeps the flat report-order issue list for diagnostics", () => {
     status: "success",
     action: "lint",
     file: "refs.bib",
-    issue_count: issues.length,
-    errors: 0,
-    warnings: 1,
-    info: 1,
-    by_category: {},
+    warnings: [],
+    summary: { issues: issues.length, errors: 0, warnings: 1, info: 1, suppressed: 0, by_category: {} },
     issues: [...issues],
   });
 
@@ -235,7 +239,7 @@ test("groupsByEntry inverts membership and sorts each entry's groups", () => {
 function scan(report: Partial<TexScanSuccess["report"]>): TexScanSuccess {
   return {
     status: "success",
-    action: "used",
+    action: "tex_scan",
     file: "refs.bib",
     report: {
       used: [],
@@ -338,7 +342,7 @@ function paths(key: string, root = "/w/refs.files") {
 test("indexMaterials lists only the Pinax materials that exist", () => {
   const envelope: AssetCheckSuccess = {
     status: "success",
-    action: "files_check",
+    action: "asset_check",
     file: "refs.bib",
     checked: 0,
     ok: 0,
@@ -394,7 +398,7 @@ test("indexMaterials lists only the Pinax materials that exist", () => {
 test("indexMaterials keeps a broken file-field link, marked not present", () => {
   const envelope: AssetCheckSuccess = {
     status: "success",
-    action: "files_check",
+    action: "asset_check",
     file: "refs.bib",
     checked: 2,
     ok: 1,

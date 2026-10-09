@@ -73,8 +73,11 @@ class PinaxManifest:
         target.parent.mkdir(parents=True, exist_ok=True)
         if backup and target.exists():
             shutil.copy2(target, Path(str(target) + ".bak"))
-        text = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
-        self._atomic_write(target, text.encode("utf-8"))
+        self._atomic_write(target, self.manifest_text(manifest).encode("utf-8"))
+
+    def manifest_text(self, manifest: dict[str, object]) -> str:
+        """Return ``manifest`` exactly as :meth:`write_manifest` writes it."""
+        return json.dumps(_normalized_manifest(manifest), indent=2, sort_keys=True) + "\n"
 
     def record_artifact(
         self,
@@ -112,7 +115,18 @@ class PinaxManifest:
     def fix_drift(
         self, keys: Iterable[str], *, added_date: str | None = None, backup: bool = False
     ) -> list[dict[str, str]]:
-        """Reconcile manifest drift against live material files."""
+        """Reconcile manifest drift against live material files, and write it."""
+        manifest, fixed = self.reconcile_manifest(keys, added_date=added_date)
+        self.write_manifest(manifest, backup=backup)
+        return fixed
+
+    def reconcile_manifest(
+        self, keys: Iterable[str], *, added_date: str | None = None
+    ) -> tuple[dict[str, object], list[dict[str, str]]]:
+        """Return the manifest reconciled against live material files, and the repairs.
+
+        Nothing is written; :meth:`fix_drift` writes the result.
+        """
         key_list = _unique_keys(keys)
         known = set(key_list)
         manifest = self.read_manifest()
@@ -164,8 +178,7 @@ class PinaxManifest:
             if not row_existed and not _manifest_row_has_state(row):
                 del files[key]
 
-        self.write_manifest(manifest, backup=backup)
-        return fixed
+        return manifest, fixed
 
     def _manifest_drift(self, known: set[str]) -> list[dict[str, str]]:
         path = self.manifest_path

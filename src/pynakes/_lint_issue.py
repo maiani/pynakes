@@ -9,7 +9,7 @@ from typing import Literal
 LintSeverity = Literal["error", "warning", "info"]
 
 
-LintCategory = Literal["correctness", "content", "layout", "consistency", "profile"]
+LintCategory = Literal["correctness", "content", "formatting", "consistency", "profile"]
 
 
 SEVERITIES: tuple[LintSeverity, ...] = ("error", "warning", "info")
@@ -19,14 +19,14 @@ SEVERITIES: tuple[LintSeverity, ...] = ("error", "warning", "info")
 CATEGORY_FIXERS: dict[LintCategory, str | None] = {
     "correctness": None,
     "content": "normalize",
-    "layout": "format",
+    "formatting": "format",
     "consistency": None,
     "profile": None,
 }
 
 
 # Every finding belongs to exactly one category. ``correctness`` findings are
-# structural problems no command can safely resolve; ``content`` and ``layout``
+# structural problems no command can safely resolve; ``content`` and ``formatting``
 # findings name the command that fixes them; ``consistency`` findings are
 # heuristic observations, not defects.
 ISSUE_CATEGORIES: dict[str, LintCategory] = {
@@ -45,8 +45,8 @@ ISSUE_CATEGORIES: dict[str, LintCategory] = {
     "title_capitalization_unprotected": "content",
     "unknown_journal": "content",
     "unsupported_citation_key_pattern": "content",
-    "noncanonical_entry_type_case": "layout",
-    "noncanonical_field_name_case": "layout",
+    "noncanonical_entry_type_case": "formatting",
+    "noncanonical_field_name_case": "formatting",
     "inconsistent_field": "consistency",
     "missing_doi": "consistency",
     "invalid_profile_setting": "profile",
@@ -55,7 +55,31 @@ ISSUE_CATEGORIES: dict[str, LintCategory] = {
     "invalid_metadata_value": "correctness",
     "duplicate_metadata_block": "correctness",
     "missing_tex_source": "correctness",
+    "invalid_entry_directive": "correctness",
+    "unused_entry_directive": "correctness",
 }
+
+
+# Findings whose ``key`` names a metadata setting or an on-disk file rather
+# than a citation key: no entry-line lookup or per-entry directive applies.
+NON_ENTRY_ISSUE_TYPES = frozenset(
+    {
+        "unknown_metadata_key",
+        "invalid_metadata_value",
+        "duplicate_metadata_block",
+        "missing_tex_source",
+    }
+)
+
+
+# Names ``lint --ignore`` and the ``lint-ignore`` setting accept: a finding type
+# or a whole category. The two sets never share a name.
+IGNORABLE_NAMES: frozenset[str] = frozenset(ISSUE_CATEGORIES) | frozenset(CATEGORY_FIXERS)
+
+
+def unknown_ignore_names(names: tuple[str, ...] | list[str]) -> list[str]:
+    """Return the entries of ``names`` that are neither a finding type nor a category."""
+    return [name for name in names if name not in IGNORABLE_NAMES]
 
 
 def issue_category(issue_type: str) -> LintCategory:
@@ -85,6 +109,10 @@ class LintIssue:
     def category(self) -> LintCategory:
         """Return which kind of problem this finding is."""
         return issue_category(self.type)
+
+    def is_ignored(self, ignores: frozenset[str] | set[str]) -> bool:
+        """Return whether ``ignores`` names this finding's type or category."""
+        return self.type in ignores or self.category in ignores
 
     @property
     def fixer(self) -> str | None:

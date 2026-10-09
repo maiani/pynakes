@@ -279,15 +279,22 @@ export interface LintIssue {
   line?: number | null;
 }
 
+/** Lint's counts. `suppressed` findings were left out by lint-ignore or a directive. */
+export interface LintSummary {
+  issues: number;
+  errors: number;
+  warnings: number;
+  info: number;
+  suppressed: number;
+  by_category: Record<string, number>;
+}
+
 export interface LintSuccess {
   status: "success";
   action: "lint";
   file: string;
-  issue_count: number;
-  errors: number;
-  warnings: number;
-  info: number;
-  by_category: Record<string, number>;
+  warnings: EngineWarning[];
+  summary: LintSummary;
   issues: LintIssue[];
 }
 
@@ -417,7 +424,7 @@ export interface TexScanReport {
 
 export interface TexScanSuccess {
   status: "success";
-  action: "used";
+  action: "tex_scan";
   file: string;
   report: TexScanReport;
 }
@@ -471,7 +478,7 @@ export interface PinaxScan {
 
 export interface AssetCheckSuccess {
   status: "success";
-  action: "files_check";
+  action: "asset_check";
   file: string;
   checked: number;
   ok: number;
@@ -495,6 +502,21 @@ export type AssetCheckEnvelope = AssetCheckSuccess | InspectError;
 // the view run them all through one preview-and-approve path.
 // ---------------------------------------------------------------------------
 
+/**
+ * One engine warning. Every command reports warnings as objects with a `type`
+ * and, usually, a human `message`; some carry further detail keys.
+ */
+export interface EngineWarning {
+  type: string;
+  message?: string;
+  [detail: string]: unknown;
+}
+
+/** A warning as the view shows it: its message, or its type when it has none. */
+export function warningText(warning: EngineWarning | string): string {
+  return typeof warning === "string" ? warning : (warning.message ?? warning.type);
+}
+
 /** The keys every modifying command emits, whatever it changed. */
 export interface MutationSuccess {
   status: "success";
@@ -503,7 +525,7 @@ export interface MutationSuccess {
   dry_run: boolean;
   modified: boolean;
   modified_entries: number;
-  warnings: string[];
+  warnings: EngineWarning[];
   plan?: {
     summary: Record<string, number>;
     entries: RefEditPlanEntry[];
@@ -634,7 +656,7 @@ export interface RefEditOperation {
  * commit — every one of them, or none.
  */
 export interface CorpusBatchSuccess extends MutationSuccess {
-  action: "batch";
+  action: "corpus_batch";
   operations: { op: string; result: Record<string, unknown> }[];
 }
 

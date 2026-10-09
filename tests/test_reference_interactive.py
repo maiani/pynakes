@@ -98,7 +98,7 @@ def test_ref_edit_interactive_uses_current_values_as_defaults(tmp_path, terminal
 
     result = runner.invoke(
         app,
-        ["ref", "edit", "Faraday1852", str(bib)],
+        ["ref", "edit", str(bib), "Faraday1852"],
         input="\n\nRevised Experimental Researches in Electricity\n\n\n",
     )
 
@@ -138,7 +138,7 @@ def test_bare_ref_edit_rejects_non_terminal_stdin(tmp_path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text("@article{Faraday1852,\n  title = {Electricity}\n}\n")
 
-    result = runner.invoke(app, ["ref", "edit", "Faraday1852", str(bib)])
+    result = runner.invoke(app, ["ref", "edit", str(bib), "Faraday1852"])
 
     assert result.exit_code == 1, result.output
     assert "InvalidInput" in result.output

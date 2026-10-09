@@ -312,11 +312,12 @@ def test_cli_json_envelope(tmp_path: Path) -> None:
     data = json.loads(result.output)
     assert data["status"] == "success"
     assert data["action"] == "scrub"
-    assert data["file"] == str(out)
+    assert data["check"] is False
+    assert data["file"] == str(source)
+    assert data["out"] == str(out)
     assert data["written"] is True
     assert data["dry_run"] is False
     assert data["warnings"] == []
-    assert data["source"] == str(source)
     assert data["removed"]["entries"] == 1
     assert data["removed"]["metadata_blocks"] == 3
     assert data["removed"]["comments"] == 1
@@ -357,7 +358,8 @@ def test_cli_check_gates_on_private_content(tmp_path: Path) -> None:
     assert result.exit_code == 1
     data = json.loads(result.output)
     assert data["status"] == "success"
-    assert data["action"] == "scrub-check"
+    assert data["action"] == "scrub"
+    assert data["check"] is True
     assert data["clean"] is False
     assert data["written"] is False
     assert source.read_text() == PRIVATE
@@ -424,7 +426,7 @@ def test_cli_keep_fields_scrubs_blocks_only(tmp_path: Path) -> None:
     source = _bib(tmp_path, "library.bib", PRIVATE)
     out = tmp_path / "public.bib"
     result = runner.invoke(
-        app, ["scrub", str(source), "--out", str(out), "--keep-fields", "--json"]
+        app, ["scrub", str(source), "--out", str(out), "--keep-field", "*", "--json"]
     )
 
     data = json.loads(result.output)

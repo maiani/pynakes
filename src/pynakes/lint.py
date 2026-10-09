@@ -26,25 +26,37 @@ import csv
 from pathlib import Path
 
 from pynakes._identifiers import normalize_doi
+from pynakes._lint_directives import (
+    DIRECTIVE_ISSUE_TYPES,
+    IgnoreRule,
+    directive_findings,
+    entry_ignore_rules,
+    is_waived,
+)
 from pynakes._lint_issue import (
     CATEGORY_FIXERS,
+    IGNORABLE_NAMES,
     ISSUE_CATEGORIES,
+    NON_ENTRY_ISSUE_TYPES,
     SEVERITIES,
     LintCategory,
     LintIssue,
     LintSeverity,
     issue_category,
+    unknown_ignore_names,
 )
 from pynakes._lint_profile import (
     PROFILE_ISSUE_TYPES,
     LintProfile,
     _lint_profile_entry,
     is_profile_issue,
+    library_lint_ignores,
     profile_required_fields,
     resolve_lint_profile,
 )
 from pynakes._lint_required import required_field_rules
 from pynakes.bibtex_parser import parse_raw_string_definition
+from pynakes.canonical import EntryTypeCase, resolve_entry_type_case
 from pynakes.editing import raw_field_names, raw_field_value
 from pynakes.formatters import normalize_page_numbers
 from pynakes.identity import identity_class
@@ -67,18 +79,25 @@ from pynakes.usage import tex_sources_from_metadata, validate_tex_sources
 
 __all__ = [
     "CATEGORY_FIXERS",
+    "DIRECTIVE_ISSUE_TYPES",
+    "IGNORABLE_NAMES",
     "ISSUE_CATEGORIES",
     "PROFILE_ISSUE_TYPES",
     "SEVERITIES",
+    "IgnoreRule",
     "LintCategory",
     "LintIssue",
     "LintProfile",
     "LintSeverity",
+    "entry_ignore_rules",
     "is_profile_issue",
+    "is_waived",
     "issue_category",
+    "library_lint_ignores",
     "lint",
     "profile_required_fields",
     "resolve_lint_profile",
+    "unknown_ignore_names",
 ]
 
 # Entry types for which a missing DOI is worth a (low-severity) warning. This is
@@ -155,18 +174,6 @@ _CONSISTENCY_ALTERNATIVES: dict[str, frozenset[str]] = {
 }
 
 
-# Findings whose ``key`` names a metadata setting or an on-disk file rather
-# than a citation key, so the entry-line lookup must never apply to them.
-_LINE_EXEMPT_TYPES = frozenset(
-    {
-        "unknown_metadata_key",
-        "invalid_metadata_value",
-        "duplicate_metadata_block",
-        "missing_tex_source",
-    }
-)
-
-
 def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
     """Run all validation checks and return the issues found.
 
@@ -179,6 +186,11 @@ def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
     profile = resolve_lint_profile(lib)
     journal_sources = None
     dialect = library_dialect(lib)
+    try:
+        type_case = resolve_entry_type_case(lib)
+    except ValueError:
+        # ``_lint_metadata`` reports the invalid value; check against the default.
+        type_case = "lower"
 
     # A value outside the journal-style enum is reported by ``_lint_metadata``
     # as ``invalid_metadata_value`` (the schema is the single validator); here
@@ -236,7 +248,7 @@ def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
         fields = lib.resolved_fields(entry)
         issues.extend(_lint_duplicate_fields(entry))
         issues.extend(_lint_undefined_string_references(entry, lib))
-        issues.extend(_lint_entry(entry, fields, dialect=dialect))
+        issues.extend(_lint_entry(entry, fields, dialect=dialect, type_case=type_case))
         issues.extend(
             _lint_profile_entry(
                 entry,
@@ -254,6 +266,7 @@ def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
     issues.extend(_lint_field_consistency(lib, dialect=dialect))
     if base_dir is not None:
         issues.extend(_lint_tex_sources(lib, base_dir))
+    issues.extend(directive_findings(lib, issues))
 
     # Locate entry-level findings that could not stamp themselves. The first
     # occurrence of a key wins: with duplicates the finding already names the
@@ -266,7 +279,7 @@ def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
         if entry.start_line is not None and entry.key not in first_line_by_key:
             first_line_by_key[entry.key] = entry.start_line
     for issue in issues:
-        if issue.line is None and issue.key and issue.type not in _LINE_EXEMPT_TYPES:
+        if issue.line is None and issue.key and issue.type not in NON_ENTRY_ISSUE_TYPES:
             issue.line = first_line_by_key.get(issue.key)
     return issues
 
@@ -624,14 +637,20 @@ def _lint_entry(
     fields: dict[str, str] | None = None,
     *,
     dialect: str = "bibtex",
+    type_case: EntryTypeCase = "lower",
 ) -> list[LintIssue]:
-    """Run structural checks on a single entry; return all findings."""
+    """Run structural checks on a single entry; return all findings.
+
+    ``type_case`` is the library's ``format-entry-type-case``: a type is
+    reported exactly when ``format`` would recase it, so never under
+    ``preserve``.
+    """
     if fields is None:
         fields = entry.fields
     etype = entry.type.lower()
 
     issues: list[LintIssue] = []
-    if entry.type != etype:
+    if type_case == "lower" and entry.type != etype:
         issues.append(
             LintIssue(
                 "noncanonical_entry_type_case",

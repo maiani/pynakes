@@ -98,79 +98,83 @@ CHANGELOG under Unreleased. Decisions taken along the way:
 #### Stage 4 — Freeze the surface
 
 The one deliberate batch of breaking CLI changes, so the promise starts from a
-consistent surface. Where an old form can be recognized unambiguously, it keeps
-working through 0.7.x with a `deprecated` warning and is removed in 0.8.0; where
-a flag's meaning changes, the old use fails with an error naming the
-replacement.
+consistent surface. The renamed and reordered forms are removed outright in
+0.7.0, with no aliases: nobody depends on them yet, and the beta promise —
+deprecation before removal — applies from 0.7.0 onward.
 
-- **One positional convention.** There are six today: library first (about 30
-  commands); operand first (`ref show/edit/compare/add`, `asset fetch`,
-  `search`); either order (`keys generate`); library only through `--file`
-  (`ref import`, `tex list/add/remove/clear`); sources as a required `--path`
-  option (`keys usage`); and several files (`lint`, `verify`, `dedupe check`,
-  `keys check`, `asset check`, `corpus combine/split`). Adopt library first,
-  plus a `--file` option on every single-library command. Stop choosing the
-  library slot by `Path.is_file()` — `tex scan paper.tex` parses the `.tex` as
-  the library — and reject a `.bib`-looking token in the wrong slot with an
-  error that says so.
-- **One meaning per flag.** `-f` is `--field` in `ref add/edit` but `--file` in
-  `ref import` and `tex`. Rename the outliers of `--to` (`convert` format vs
-  `corpus split` routing rule), `--from` (`convert` format vs `init` profile),
-  `--type` (`init` dialect vs entry type), `--keys` (`normalize` mode vs
-  `ref show` selection), `--field` (four meanings), `--force` (overwrite vs
-  ignore missing TeX), and `--published` (three meanings).
-- **One flag per concept**: `--abstract` and `--show-abstract`; `--title-field`
-  and `--field`; TeX sources given as positionals, `PATHS`, `--path`, or
-  `--tex/--aux`; `--out`, `--stdout`, and `--to` for output; `--strict` and
-  `--check` for gating; `--bestpdf`; `--keep-field` beside `--keep-fields`.
-- **Enumerated options become `click.Choice`**, so help and `capabilities` list
-  their values: `normalize` (ten options), `init --type`, `--key-source`,
-  `--namespace`, `lint --category`, `--context`.
-- **Envelope.**
-  - `action` is the command path joined by `_` (`ref_edit`, `tex_scan`,
-    `asset_check`), replacing four naming schemes that include the legacy
-    `used` and `files_check`; check modes report `check: true` rather than a
-    separate `format-check` action.
-  - `warnings` is always a list of objects: the `lint`/`verify` counts move to
-    `summary`, and `info`/`infos` settle on one spelling.
-  - `file` is always the input and written paths go in `out`/`outputs`;
-    `scrub` and `corpus combine` currently put the output in `file`.
-  - `convert` gains the modifying-command keys and honors `--diff`;
-    `capabilities` gains `status` and `action`; `tex scan --group/--keyword`
-    returns a `plan`.
-  - Every envelope reports the fingerprint of the file it read, and modifying
-    commands accept it back as a precondition, so a caller's preview → approve
-    → commit cannot overwrite an edit made in between. Modifying envelopes
-    already report `source_sha256`, and the commands the editor writes through
-    accept `--expect-sha256`; what remains is the read-only envelopes and every
-    other modifying command (`capabilities.write_precondition.commands` lists
-    the current set).
-- **Exit codes and errors.**
-  - Usage errors exit 1 in both output modes; outside `--json` they currently
-    exit 2, Click's default and pynakes's conflict code. Human-mode errors go to
-    stderr.
-  - Conflicts are classified consistently: an existing group and an existing
-    key are both conflicts (exit 2), and a missing group is `KeyNotFound`
-    everywhere.
-  - One central error-code enum. Catalogue the nine codes emitted but not
-    listed, reclassify `OnlineLookupRequired` and `ProviderUnavailable`
-    (catalogued as conflicts, emitted with exit 1), merge `NoTeXSources` into
-    `NoSources`, and stop emitting Python class names such as
-    `FileNotFoundError`.
-- **Overwrite policy**: an existing output file requires `--force` everywhere,
-  as `init` already does — `convert --out`, `tex scan --out`,
-  `corpus split --to`, `corpus combine --out`. An output naming one of the
-  command's inputs is refused outright since 0.6.5; requiring `--force` for
-  every other existing file waited for the freeze because it breaks scripts
-  that regenerate their outputs.
-- **Validation**: `groups move-group --parent` and `groups add-entry` refuse a
-  group that does not exist; `ref compare` without `--online` stops telling CLI
-  users to "pass online=True".
-- **Decisions to record before the gate**: whether `asset check --fix` gains
-  `--dry-run`/`--diff`; whether `keys check` stays beside `lint`'s
-  `duplicate_key` finding; whether `ref remove KEY` removes every duplicate
-  sharing that key; where `verify` and `enrich` live. `keys usage` and
+**Done** (on branch `stage-4-freeze`, 2026-10-05 to 2026-10-09; recorded in
+CHANGELOG under Unreleased): library-first positionals with `--file`/`-f`
+on every single-library command and syntactic library detection
+(`pynakes.cli_surface`); one meaning per
+flag and one flag per concept; enumerated options as Typer choices
+(`pynakes.cli_choices`); the beta envelope (`action` naming, warning objects,
+`file`/`out`, `summary`, `source_sha256` everywhere, `--expect-sha256` on every
+modifying command); usage errors exit 1 and human errors on stderr; one error
+catalogue (`pynakes.cli_errors`) that fixes each code's exit code and generates
+`capabilities`; the overwrite policy; the group validations; batch error codes.
+
+Decisions taken:
+
+- `--strict` and `--check` stay two flags with one meaning each: `--strict`
+  gates a command that is read-only anyway (`lint`, `verify`, `dedupe check`,
+  `keys check`, `asset check`); `--check` is the check mode of a transform
+  (`format`, `scrub`), which then writes nothing. Envelopes report `strict` or
+  `check` accordingly.
+- `-f` is `--file` everywhere; `--field` means a `name=value` assignment
+  (`ref add`/`ref edit`), and the field-*name* options got distinct names.
+- `--published` keeps one meaning, "consider preprints' published versions":
+  `verify` reports them, `enrich` applies them; `asset fetch` moved to
+  `--material`.
+- `--out PATH|-` is the one output flag; `format --stdout` became `--out -`.
+- `ref remove KEY` refuses a key shared by several entries
+  (`DuplicateCitationKey`), as `ref show`/`ref edit` do; `keys repair` first.
+- `groups add-entry` refuses an unknown group unless `--create`, which the
+  editor's "New group…" flow needs; batch `groups.add_entry` takes `create`.
+- `scrub --out` naming its own input (in-place scrub) needs no `--force`.
+- `corpus batch` operations report the standalone command's error codes
+  (`KeyNotFound`, `DuplicateCitationKey`, `CitationKeyConflict`) with `index`.
+- For lint gating in a commit hook ([#2](https://github.com/maiani/pynakes/issues/2)):
+  entry-type case is `format-entry-type-case`, not a `lint-` key — settings are
+  named for the command that applies them and `lint` verifies them, as it
+  verifies the `normalize-*` keys, so a layout finding fires exactly when
+  `format` would change the source (field-name case follows the same rule if it
+  ever gets a setting). Rule selection is one `--ignore NAME` taking a finding
+  type or a category, mirrored by one `lint-ignore` key; the command applies it,
+  and the `lint()` function keeps returning every finding.
+- `asset check` is a pure read-only gate; reconciling the Pinax manifest moved
+  to `asset repair`, with `--dry-run`/`--diff`, mirroring
+  `keys check`/`keys repair`.
+- `keys check` stays beside lint's `duplicate_key`: it gates on key uniqueness
+  alone, which `lint --strict` no longer can, and is the read side of
+  `keys repair`.
+- `verify` and `enrich` stay top-level: they are the online counterparts of
+  `lint` (diagnose) and `normalize` (change content). `keys usage` and
   `tex scan` both stay — neither is a subset of the other.
+- No project-level config (`pynakes.toml`, `[tool.pynakes]`) in 0.7: the `.bib`
+  carries its own settings and every client reads them there. Revisit with the
+  v0.8 `Library`, whose directory is the natural home for shared defaults.
+- The Gate 4 contract tests are in `tests/test_contract.py`, read from the live
+  command tree: the positional table, one shape per flag spelling (`--key` and
+  `--title-field` are the recorded exceptions), an offline `--json` sample per
+  command checked against its envelope family (modify, create, read, check,
+  error; `corpus split` reports `outputs`), error codes catalogued both ways,
+  and `capabilities` matching the parsed options.
+- `lint --strict` fails on any finding left after suppression, not only on
+  errors and profile deviations: every other gate already failed on any
+  finding, and once findings can be suppressed explicitly, "strict" can mean
+  clean. `--where` on `ref directive` is how an existing library adopts it.
+- A setting for one entry is a directive comment directly above it
+  (`% pynakes: verb args -- reason`), not a `pynakes-*` field: library settings
+  already live in a comment, and a field would carry tool instructions into
+  exports, interchange formats, and public copies. Both forms survive JabRef
+  (checked with JabKit 6.0-beta.1), so JabRef did not decide it. One generic
+  `ref directive` writes every verb, so a new directive adds a word to the
+  grammar, not a command to the frozen surface.
+- The pre-0.7 forms are removed, not deprecated (2026-10-09): an old order or
+  spelling is a `UsageError`, and `capabilities` lists no deprecations.
+  `tests/test_cli_surface.py` checks that each one fails.
+- The editor moved to the library-first order and the beta envelope in the same
+  branch, with real-engine contract tests for the calls it makes.
 
 **Gate 4**: contract tests enforce the surface instead of sampling it — a table
 test of every command's positional signature; a sweep asserting that each flag
@@ -178,6 +182,10 @@ spelling has one meaning; an envelope-schema test over every command's `--json`
 output; a test that every emitted error code is catalogued with its exit code;
 and a `capabilities` test covering option types, choices, and error codes. The
 editor passes against the new envelope (see the editor track).
+
+**Gate 4** (met, 2026-10-09): `tests/test_contract.py` enforces all five; the
+editor's real-engine contract tests pass against the 0.7 surface. Behavior
+tests the gate did not require moved to Stage 5.
 
 #### Stage 5 — Hardening and scale
 
@@ -190,9 +198,8 @@ editor passes against the new envelope (see the editor track).
 - **Scale.** The parser is quadratic — 8,000 entries take 25 s and 20,000 time
   out — through whole-prefix line counting (`_text_utils._line_number`) and a
   linear `EntryStore.__contains__`. This is v0.9's linear parser path, pulled
-  forward because real libraries are this size. Also: `normalize` loads 66,000
-  journal rows even with journal styling off (about 2.5 s per run), and
-  `format` takes 36 s on a single 2 MB field.
+  forward because real libraries are this size. Also: `format` takes 36 s on a
+  single 2 MB field.
 - **`scrub` completeness.** `scrub --check` passes a file containing comments
   between entries, `%` lines inside entries, JabRef `comment-<user>` fields
   (which name the user), BibDesk and Mendeley fields (`date-added`,
@@ -218,13 +225,38 @@ editor passes against the new envelope (see the editor track).
   - A mixed-ending file gains a CRLF at EOF, a CRLF file without a final newline
     gains one, and a whitespace-only file becomes empty.
   - `--backup` overwrites the previous backup.
+  - `asset check` reports no drift when the Pinax manifest file is absent,
+    while `asset repair` records the material files it finds: the drift scan
+    returns early without a manifest.
   - `*notes.bib` is skipped by auto-discovery with a misleading error.
+- **Stage 4 behavior tests** not yet written: the `--force` overwrite policy
+  per command, `format --out`, `convert --diff`/`--force`/`--expect-sha256` on
+  import, `ref remove` of a duplicated key, and the multi-file checks'
+  catalogued error codes.
 - **Property tests** for invariants the suite currently samples: whole-file
   byte equality including CRLF, BOM, and inter-entry text; a one-field edit
   changes one entry; commit output always parses; `format` and `normalize` are
   idempotent; combine then split round-trips.
-- **Test hygiene**: three tests sleep 5 s in real retry backoff; the shared
-  HTTP layer (`providers/_http`) sits at 79% coverage.
+- **Test hygiene**: the shared HTTP layer (`providers/_http`) sits at 79%
+  coverage. (The suite runs in about 25 s with coverage, after the retry
+  backoff stopped sleeping in tests and the journal tables stopped loading on
+  every `normalize`.)
+- **Type checking with ty** (does not gate Gate 5): replace mypy with Astral's
+  ty, which is far faster and sits beside Ruff in the same toolchain. It is a
+  different checker, not a faster mypy — it infers differently, reports
+  different errors, and does not read `[tool.mypy]` — so the switch runs in
+  order:
+  1. Confirm ty's release status is fit for a CI gate.
+  2. Run ty over `src/pynakes` and triage its findings against mypy's: real
+     defects get fixed; false positives get recorded.
+  3. Rebuild the baseline in ty's own configuration from the modules that still
+     fail, under the same rule as today's `[[tool.mypy.overrides]]` list —
+     shrink it, never grow it. Take the chance to shrink it: the mypy baseline
+     still exempts 36 modules.
+  4. Run both checkers in CI for a while; mypy stays the gate until ty has
+     caught what mypy catches.
+  5. Then swap: ty in the `dev` extra, the CI type-check step, the pre-commit
+     config, and the AGENTS.md check list; drop mypy and `[tool.mypy]`.
 
 **Gate 5**: the hostile-input matrix runs in CI with zero tracebacks and zero
 invalid JSON; profiling shows no quadratic path in parsing, `lint`, or
@@ -263,8 +295,7 @@ not asserted in the correctness suite); the property tests above pass.
   mkdocs `site_url` is a placeholder and no docs deployment exists; README
   relative links break on PyPI; the README claims conformance "verified against
   TeX Live" while those oracle tests skip in CI; fifteen help texts show literal
-  RST double backticks; the agent-evaluation guide moves out of the user
-  navigation.
+  RST double backticks.
 
 **Gate 6**: `mkdocs build --strict` green; every offline shell example in the
 README, quickstart, and usage guide runs in a CI doc test; the command reference
@@ -293,9 +324,9 @@ not library-scoped exploration. See
 [Graphical clients and their scope](docs/vision.md#graphical-clients-and-their-scope).
 The track runs in parallel with the stages above.
 
-- **Move to the beta envelope in the same change as Stage 4**, so the client
-  never depends on a form the engine is deprecating — including the `tex scan`
-  `action` value it reads today.
+- **Move to the beta envelope in the same change as Stage 4.** *(Done on
+  `stage-4-freeze`: library-first arguments, the renamed actions, `lint` counts
+  under `summary`, and `groups add-entry --create`.)*
 - **Thin-client discipline** — no BibTeX parser, metadata schema, or source of
   truth in the client. When the view needs something the engine does not
   expose, the engine grows it; a workaround in TypeScript is a regression even
@@ -366,6 +397,20 @@ rather than worked around in the client.
   `Library`, retaining per-file provenance while adding corpus-wide rollups and
   cross-library coverage/duplication views. Reuse the same typed results rather
   than creating an unrelated statistics implementation.
+- **More per-entry directives.** `% pynakes: ignore` shipped with the
+  `ref directive` writer (see CHANGELOG); each further verb is a word in the
+  same grammar, not a new command. Candidates, each the per-entry form of a
+  library setting or a recurring false positive: `distinct-from KEY` for a pair
+  `dedupe check` flags but that are different works (the same commit-hook
+  problem #2 raised for lint); `no-fetch` or a per-entry fetch policy for
+  `asset fetch`; `keep-key` against key regeneration; and an opt-out from
+  `enrich` when a provider's record for the work is wrong. `ref show` could list
+  an entry's directives.
+- **Type spelling of new entries** (only if asked for): under
+  `format-entry-type-case: preserve`, `ref add` and `ref import` still write
+  `@book`, so a JabRef library mixes spellings until JabRef next saves it. A
+  JabRef spelling value for the setting, or a `consistency` finding for mixed
+  spellings of one type, would close that.
 - **Further import paths**: candidates not yet in the inventory, ordered by the
   size of the community whose canonical identifier is not a DOI: NASA ADS
   (bibcodes; needs a user-supplied API token), RePEc/IDEAS handles, MathSciNet
@@ -394,8 +439,6 @@ rather than worked around in the client.
 - **Editor toward beta**: whatever of the v0.7 alpha feature work remains, plus
   the library-scoped reads the `Library` makes possible. The extension may
   *read* library-scoped things; it never owns or curates them.
-- **Deprecation removals**: the forms deprecated in 0.7.x by the surface freeze
-  are removed in 0.8.0, as the beta promise schedules.
 
 **Done when**: `Library`, `Catalogue`, single-bibliography and library-wide
 analysis, and the

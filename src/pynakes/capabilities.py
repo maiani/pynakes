@@ -6,6 +6,7 @@ the tool rather than guessing. Update this when commands are added or removed.
 
 from pynakes import __all__ as PUBLIC_API_EXPORTS
 from pynakes import __version__ as VERSION
+from pynakes.cli_errors import catalogue_description
 from pynakes.query import FUZZY_THRESHOLD, WHERE_GRAMMAR
 
 # Stable type vocabulary for command-schema introspection. The on-disk click
@@ -13,54 +14,18 @@ from pynakes.query import FUZZY_THRESHOLD, WHERE_GRAMMAR
 # `capabilities` schema does not change shape when Typer/click internals do.
 _TYPE_VOCABULARY = {
     "text": "string",
+    "str": "string",
     "boolean": "boolean",
     "integer": "integer",
+    # Click's current names; ``int range`` is an option with min/max bounds.
+    "int": "integer",
+    "int range": "integer",
+    "float": "number",
+    "float range": "number",
     "path": "path",
     "filename": "path",
     "file": "path",
     "choice": "choice",
-}
-
-# Error/conflict codes a caller may see in the JSON envelope's ``error`` field,
-# enumerated so callers can route on them explicitly. Grouped by the exit
-# code / status they accompany. Kept in sync with the codes the CLI emits.
-_ERROR_CODES = {
-    "error": {
-        "exit_code": 1,
-        "codes": {
-            "FileNotFound": "A given file does not exist.",
-            "MissingTexSource": "normalize key regeneration found a missing linked TeX source; pass --force to proceed without rewriting it.",
-            "FileExists": "init: the target .bib already exists (pass --force to overwrite).",
-            "ParseError": "A .bib or source file could not be parsed (includes 'line').",
-            "InvalidInput": "An argument, option, or predicate was invalid.",
-            "IOError": "A read or write failed.",
-            "OutputIsInput": "convert/tex scan/corpus split: the output path is also an input.",
-            "InternalError": "An unexpected failure inside pynakes (a bug; please report it).",
-            "NoSources": "tex scan: no sources given and no 'tex-sources' metadata to use.",
-            "InvalidNamespace": "metadata set: namespace was not 'jabref' or 'pynakes'.",
-            "InvalidNormalizeOption": "normalize: an option value was not allowed.",
-            "RecursiveFormatError": "format --recursive: one or more files failed.",
-            "FormatLintError": "format: lint errors make a lossless rewrite unsafe.",
-            "KeyNotFound": "A referenced citation key is not in the library (remove, keys rename, etc.).",
-            "InvalidIdentifier": "import: an identifier value was malformed.",
-            "UnsupportedIdentifier": "import: no provider recognized the identifier or URL.",
-            "ReferenceImportError": "import: provider metadata could not be resolved or imported.",
-        },
-    },
-    "conflict": {
-        "exit_code": 2,
-        "codes": {
-            "ExternalModification": "The file changed on disk since it was read, or no longer matches --expect-sha256 (includes 'expected_sha256' and 'source_sha256').",
-            "DuplicateMetadata": "metadata set: multiple blocks match the key (ambiguous).",
-            "DuplicateMergeKey": "combine/split --dedupe: a shared key has differing content.",
-            "DedupeConflict": "dedupe merge: a cluster has irreconcilable field values.",
-            "DuplicateReference": "import: the provider identity is already present.",
-            "OnlineLookupRequired": "ref find: pass --online to allow the index query.",
-            "ProviderUnavailable": "ref find: the bibliographic index could not be reached.",
-            "CitationKeyConflict": "ref add/import: the chosen citation key already exists.",
-            "DuplicateCitationKey": "ref show/edit: the citation key identifies multiple entries.",
-        },
-    },
 }
 
 # One transversal selector surface: the same grammar for every command that
@@ -72,7 +37,7 @@ _PREDICATE_GRAMMAR = {
         "search (--where, --key)",
         "format (--where, --key)",
         "corpus combine (--where, --key)",
-        "corpus split (--to)",
+        "corpus split (--route)",
         "batch (fields.* where)",
     ],
     "key_selector": (
@@ -82,7 +47,7 @@ _PREDICATE_GRAMMAR = {
         "are ANDed). On ref add and ref import, which create an entry rather "
         "than select one, --key names the key to assign."
     ),
-    "bucket_predicates_used_by": ["corpus split (--to)"],
+    "bucket_predicates_used_by": ["corpus split (--route)"],
     **WHERE_GRAMMAR,
 }
 
@@ -190,7 +155,9 @@ def _param_schema(param) -> dict:
         if getattr(param, "nargs", 1) == -1:
             entry["variadic"] = True
     else:
-        entry["flags"] = list(param.opts)
+        # Every spelling, including the negative half of a flag pair
+        # (``--no-blank-lines``) and short forms (``-f``).
+        entry["flags"] = [*param.opts, *getattr(param, "secondary_opts", [])]
         default = param.default
         if isinstance(default, (str, int, float, bool)) or default is None:
             entry["default"] = default
@@ -229,25 +196,27 @@ def command_schemas() -> dict:
     ``"groups add-entry"``) lists the command's help, positional ``arguments``,
     and ``options`` with stable type names, flags, defaults, and choices.
     """
-    from typer.main import get_command
+    import typer.main
 
+    # Imported first: pynakes.cli wires the shared --file option into
+    # typer.main.get_command, which must be looked up after that patch.
     from pynakes.cli import app
 
     schemas: dict = {}
-    _walk_commands(get_command(app), "", schemas)
+    _walk_commands(typer.main.get_command(app), "", schemas)
     return schemas
 
 
 def _write_precondition(schemas: dict) -> dict:
-    """Describe ``--expect-sha256``, listing the commands that accept it today."""
+    """Describe ``--expect-sha256``, listing the commands that accept it."""
     return {
         "option": "--expect-sha256",
         "envelope_key": "source_sha256",
         "conflict": "ExternalModification",
         "description": (
-            "A modifying command reports source_sha256, the digest of the file it read. "
-            "Pass it back as --expect-sha256 on the real run: if the file changed in "
-            "between, the command exits 2 and writes nothing."
+            "Every envelope reports source_sha256, the digest of the library it read. "
+            "Every modifying command accepts it back as --expect-sha256: if the file "
+            "changed in between, the command exits 2 and writes nothing."
         ),
         "commands": sorted(
             name
@@ -295,8 +264,21 @@ def get_capabilities() -> dict:
         "metadata_namespaces": ["jabref-meta", "pynakes-meta"],
         "exit_codes": {
             "0": "success",
-            "1": "error (parse, validation, I/O)",
+            "1": "error (usage, parse, validation, I/O)",
             "2": "conflict (operation blocked; options returned)",
+        },
+        "positional_convention": {
+            "library_first": (
+                "Every command that reads one library takes it as the leading FILE "
+                "argument, or as --file/-f, or not at all when the working directory "
+                "holds exactly one .bib file."
+            ),
+            "library_detection": (
+                "The leading positional is the library when it ends in .bib, or when "
+                "the positionals fill every argument the command has; otherwise the "
+                "lone local .bib is used. A .bib-looking token in any other argument "
+                "is refused as a usage error."
+            ),
         },
         # Read-only checks that accept one or more .bib files and support
         # --strict (exit 1 on findings) — the primitives for CI / pre-commit
@@ -314,6 +296,7 @@ def get_capabilities() -> dict:
             "create_library",
             "inspect_library",
             "lint",
+            "entry_directives",
             "manage_groups",
             "manage_group_tree",
             "manage_fields",
@@ -374,7 +357,8 @@ def get_capabilities() -> dict:
             "inspect": "Inspect a .bib file structure",
             "lint": "Validate entries and report issues",
             "ref": "Create, show, edit, compare, find, import, and remove individual "
-            "references (add, show, edit, compare, find, import, remove)",
+            "references, and set per-entry directives "
+            "(add, show, edit, directive, compare, find, import, remove)",
             "groups": "Manage entry groups and group hierarchy "
             "(list, list-entries, add-entry, remove-entry, tree, add-group, "
             "remove-group, rename-group, move-group, update-group)",
@@ -403,7 +387,7 @@ def get_capabilities() -> dict:
             "of writing)",
             "asset": "Fetch and validate Pinax materials — arXiv PDF/source, "
             "open or institutionally entitled published/supplement PDF download, "
-            "and linked-file checks (fetch, check)",
+            "linked-file checks, and manifest repair (fetch, check, repair)",
             "corpus": "Operate across multiple .bib files (combine, split, batch)",
             "capabilities": "Show this capability description",
         },
@@ -411,7 +395,7 @@ def get_capabilities() -> dict:
         # types) derived from the live CLI, the enumerated error/conflict codes,
         # and the one selector grammar shared by every entry-addressable command.
         "command_schemas": schemas,
-        "error_codes": _ERROR_CODES,
+        "error_codes": catalogue_description(),
         "predicate_grammar": _PREDICATE_GRAMMAR,
         "search_query_grammar": _SEARCH_QUERY_GRAMMAR,
         "formatting": {
@@ -430,6 +414,7 @@ def get_capabilities() -> dict:
                 "block_order": "canonical",
                 "wrap_values": "off",
                 "line_width": 100,
+                "entry_type_case": "lower",
             },
             "choices": {
                 "alignment": ["compact", "equals"],
@@ -437,6 +422,7 @@ def get_capabilities() -> dict:
                 "entry_order": ["preserve", "key", "profile"],
                 "block_order": ["preserve", "canonical"],
                 "wrap_values": ["off", "stable", "canonical"],
+                "entry_type_case": ["lower", "preserve"],
             },
             "wrapping": {
                 "never": [

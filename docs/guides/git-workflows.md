@@ -12,7 +12,7 @@ build. Pass `--strict` to turn a finding into a non-zero exit code:
 
 | Command | `--strict` fails when… |
 | --- | --- |
-| `pynakes lint --strict` | any **error** or stored-profile deviation; ordinary warnings stay advisory |
+| `pynakes lint --strict` | any finding not suppressed by `lint-ignore`, `--ignore`, or an `ignore` directive |
 | `pynakes keys check --strict` | any citation key is duplicated |
 | `pynakes asset check --strict` | any linked file is missing or the wrong type |
 | `pynakes dedupe check --strict` | duplicate works (same DOI/arXiv/title) are present |
@@ -93,6 +93,21 @@ pre-commit run pynakes-dedupe-check --hook-stage manual --all-files
 
 Move them into the default stages (drop the `stages: [manual]`) if you want
 them on every commit.
+
+Because `lint --strict` fails on any finding, an existing library usually needs
+its known, accepted findings recorded before the hook passes — for a group of
+entries at once with `ref directive ... --where`, or for the whole library with
+`lint-ignore`. New findings then fail the commit that introduces them.
+
+A finding your library can never clear fails the lint hook on every commit. Leave
+it out either for the hook alone, with `args`, or for the library itself, with a
+`lint-ignore` setting that every `pynakes lint` run then honors (see
+[lint](usage.md#lint)):
+
+```yaml
+      - id: pynakes-lint
+        args: [--ignore, missing_profile_required_field]
+```
 
 ## GitHub Actions
 

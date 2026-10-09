@@ -46,17 +46,12 @@ def _missing_required_fields(
 
 
 def add(
+    file: str | None = bib_file_argument(),
     key: str | None = typer.Argument(
         None, help="Citation key for the new entry; omit to start interactive mode"
     ),
-    file: str | None = bib_file_argument(),
-    file_option: str | None = typer.Option(
-        None, "--file", help="Library path when the citation-key argument is omitted"
-    ),
     entry_type: str | None = typer.Option(None, "--type", help="BibTeX/BibLaTeX entry type"),
-    field: list[str] = typer.Option(
-        [], "--field", "-f", help="Field assignment, repeatable: name=value"
-    ),
+    field: list[str] = typer.Option([], "--field", help="Field assignment, repeatable: name=value"),
     allow_duplicate: bool = typer.Option(
         False, "--allow-duplicate", help="Append even if the citation key already exists"
     ),
@@ -89,12 +84,6 @@ def add(
                 "No citation key given and stdin is not an interactive terminal; "
                 "pass a key (and --field name=value) to add non-interactively",
             )
-    if file is not None and file_option is not None:
-        _emit_error(
-            json_output,
-            "InvalidInput",
-            "Specify the library once, not both positionally and with --file",
-        )
     params = RunParams(
         dry_run=dry_run,
         diff=diff,
@@ -102,7 +91,7 @@ def add(
         backup=backup,
         expect_sha256=expect_sha256,
     )
-    file = _resolve_input_bib(file_option or file, json_output)
+    file = _resolve_input_bib(file, json_output)
     try:
         fields = parse_field_assignments(field)
         coll = Bibliography.open(file)
@@ -150,18 +139,18 @@ def add(
         return
 
     human = [f"{_verb('add', params)} {entry.type} {entry.key}."]
-    warnings: list[str] = []
+    warnings: list[dict] = []
     missing = _missing_required_fields(coll, entry.type, entry.fields)
     if missing:
         message = (
             f"Entry {entry.key} is missing required field(s) for {entry.type}: "
             f"{', '.join(missing)}."
         )
-        warnings.append(message)
+        warnings.append({"type": "missing_required_fields", "message": message, "fields": missing})
         human.append(f"Warning: {message}")
     _finish_mod(
         file,
-        "add",
+        "ref_add",
         coll,
         params,
         human,

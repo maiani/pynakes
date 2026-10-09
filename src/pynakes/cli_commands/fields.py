@@ -8,6 +8,7 @@ import typer
 
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    _EXPECT_SHA256_OPTION,
     RunParams,
     _entries,
     _finish_mod,
@@ -52,13 +53,20 @@ def fields_rename(
     where: str | None = where_option(),
     key: list[str] | None = key_option(),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
     """Rename a field across matching references."""
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     flt = build_where_filter(where, keys=key)
     _run_field_op(
         file,
@@ -77,13 +85,20 @@ def fields_set(
     where: str | None = where_option(),
     key: list[str] | None = key_option(),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
     """Set or replace a field on matching references."""
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     flt = build_where_filter(where, keys=key)
     _run_field_op(
         file,
@@ -102,13 +117,20 @@ def fields_move(
     where: str | None = where_option(),
     key: list[str] | None = key_option(),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
     """Move a field on matching references, without replacing the target."""
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     flt = build_where_filter(where, keys=key)
     _run_field_op(
         file,
@@ -127,13 +149,20 @@ def fields_append(
     where: str | None = where_option(),
     key: list[str] | None = key_option(),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
     """Append a value to a delimited field on matching references."""
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     flt = build_where_filter(where, keys=key)
     _run_field_op(
         file,
@@ -151,13 +180,20 @@ def fields_clear(
     where: str | None = where_option(),
     key: list[str] | None = key_option(),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
     """Remove a field from matching references."""
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     flt = build_where_filter(where, keys=key)
     _run_field_op(
         file,
@@ -171,29 +207,36 @@ def fields_clear(
 
 def fields_protect_title(
     file: str | None = bib_file_argument(),
-    field: str = typer.Option("title", "--field", help="Title-like field to protect"),
+    title_field: str = typer.Option("title", "--title-field", help="Title-like field to protect"),
     term: list[str] | None = typer.Option(
         None, "--term", help="Additional exact term to brace-protect"
     ),
     where: str | None = where_option(),
     key: list[str] | None = key_option(),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
     """Brace-protect capitalization-sensitive tokens in title-like fields."""
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     flt = build_where_filter(where, keys=key)
     terms = term or []
     _run_field_op(
         file,
         "fields_protect_title",
-        lambda coll: coll.protect_title(field, flt, terms),
+        lambda coll: coll.protect_title(title_field, flt, terms),
         params,
-        {"field": field, "terms": terms, "where": where, "keys": parse_key_selector(key)},
-        f"{_verb('protect', params, 'Protected')} capitalization in field {field!r}",
+        {"field": title_field, "terms": terms, "where": where, "keys": parse_key_selector(key)},
+        f"{_verb('protect', params, 'Protected')} capitalization in field {title_field!r}",
     )
 
 

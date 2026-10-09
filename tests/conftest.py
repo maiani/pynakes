@@ -45,3 +45,18 @@ def _isolated_provider_cache() -> Iterator[None]:
     provider_cache.reset_instances()
     yield
     provider_cache.reset_instances()
+
+
+@pytest.fixture(autouse=True)
+def _instant_http_retries(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Retry failed requests without waiting out the real backoff.
+
+    A test that exercises a network failure otherwise sleeps through every
+    retry delay (5 s each). ``test_http_retry`` asserts the delays themselves
+    and passes its own ``sleep``, so it keeps the real schedule.
+    """
+    if request.module.__name__.endswith("test_http_retry"):
+        return
+    from pynakes.providers import _http
+
+    monkeypatch.setattr(_http, "_retry_delay", lambda attempt, retry_after: 0.0)

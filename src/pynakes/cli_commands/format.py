@@ -10,16 +10,25 @@ from pathlib import Path
 import typer
 
 from pynakes.canonical import CanonicalLayout, FormatLintError, layout_from_metadata
+from pynakes.cli_checks import error_code_for
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    _EXPECT_SHA256_OPTION,
+    _FORCE_OPTION,
     RunParams,
+    _check_expected_sha256,
     _emit,
     _emit_error,
     _entries,
+    _finish_create,
     _finish_mod,
     _preview_or_commit,
+    _refuse_existing_output,
+    _refuse_input_as_output,
     _resolve_input_bib,
     _safe,
+    _source_sha256,
+    _verb,
     bib_file_argument,
     build_where_filter,
     is_auxiliary_bib_file,
@@ -59,6 +68,11 @@ class WrapValuesChoice(str, Enum):
     canonical = "canonical"
 
 
+class EntryTypeCaseChoice(str, Enum):
+    lower = "lower"
+    preserve = "preserve"
+
+
 @dataclass(frozen=True)
 class FormatOverrides:
     indent: str | None
@@ -70,6 +84,7 @@ class FormatOverrides:
     block_order: BlockOrderChoice | None
     wrap_values: WrapValuesChoice | None
     line_width: int | None
+    entry_type_case: EntryTypeCaseChoice | None = None
 
 
 def _layout(
@@ -90,6 +105,9 @@ def _layout(
         block_order=overrides.block_order.value if overrides.block_order is not None else None,
         wrap_values=overrides.wrap_values.value if overrides.wrap_values is not None else None,
         line_width=overrides.line_width,
+        entry_type_case=(
+            overrides.entry_type_case.value if overrides.entry_type_case is not None else None
+        ),
     )
 
 
@@ -124,8 +142,10 @@ def _check_payload(
         )
     return {
         "status": "success",
-        "action": "format-check",
+        "action": "format",
+        "check": True,
         "file": file,
+        "source_sha256": _source_sha256(coll),
         "dry_run": True,
         "modified": modified,
         "modified_entries": coll.changed_entries_count() if modified else 0,
@@ -135,6 +155,13 @@ def _check_payload(
         "plan": coll.change_plan(),
         "message": message,
     }
+
+
+def _failure_code(exc: Exception) -> str:
+    """Return the catalogued code for one file's failure in a recursive run."""
+    if isinstance(exc, FormatLintError):
+        return "FormatLintError"
+    return error_code_for(exc).value
 
 
 def _run_recursive(
@@ -166,7 +193,9 @@ def _run_recursive(
                 payload = {
                     "status": "success",
                     "action": "format",
+                    "check": False,
                     "file": str(path),
+                    "source_sha256": _source_sha256(coll),
                     "dry_run": params.dry_run,
                     "modified": modified,
                     "modified_entries": changed,
@@ -182,14 +211,15 @@ def _run_recursive(
             failures += 1
             failure = {
                 "status": "error",
-                "action": "format-check" if check else "format",
+                "action": "format",
+                "check": check,
                 "file": str(path),
                 "dry_run": check or params.dry_run,
                 "modified": False,
                 "modified_entries": 0,
                 "warnings": [],
-                "error": type(exc).__name__,
-                "message": str(exc),
+                "error": _failure_code(exc),
+                "message": getattr(exc, "message", str(exc)),
             }
             if isinstance(exc, FormatLintError):
                 failure["issues"] = [issue.to_dict() for issue in exc.issues]
@@ -197,7 +227,8 @@ def _run_recursive(
 
     payload = {
         "status": "error" if failures else "success",
-        "action": "format-check" if check else "format",
+        "action": "format",
+        "check": check,
         "file": str(files[0].parent) if files else ".",
         "dry_run": check or params.dry_run,
         "modified": bool(dirty if check else modified_count),
@@ -249,6 +280,11 @@ def format_bibliography(
     line_width: int | None = typer.Option(
         None, "--line-width", min=20, help="Maximum line width for wrapped values"
     ),
+    entry_type_case: EntryTypeCaseChoice | None = typer.Option(
+        None,
+        "--entry-type-case",
+        help="Entry-type spelling: lowercase, or keep each entry's own (e.g. @Article)",
+    ),
     where: str | None = where_option(
         "Reformat only the entries matching this selector; the rest of the file "
         "stays byte-for-byte identical"
@@ -257,15 +293,21 @@ def format_bibliography(
         "Reformat only these citation keys: comma-separated, repeatable. Narrows "
         "--where when both are given"
     ),
-    check: bool = typer.Option(False, "--check", help="Exit 1 when layout changes are needed"),
-    to_stdout: bool = typer.Option(
-        False, "--stdout", help="Write formatted bibliography to stdout"
+    check: bool = typer.Option(
+        False, "--check", help="Write nothing; exit 1 when layout changes are needed"
     ),
+    out: str | None = typer.Option(
+        None,
+        "--out",
+        help="Write the formatted library here instead of in place; - for stdout",
+    ),
+    force: bool = _FORCE_OPTION,
     recursive: bool = typer.Option(False, "--recursive", help="Format .bib files recursively"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Preview without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
 ) -> None:
     """Rewrite layout only; never change bibliographic values or conventions.
 
@@ -274,14 +316,17 @@ def format_bibliography(
     ``--entry-order``, ``--block-order``, and ``--blank-lines`` are whole-file
     policies that cannot be combined with it.
     """
-    if to_stdout and (json_output or check or recursive):
+    to_stdout = out == "-"
+    if out is not None and (check or recursive):
         _emit_error(
-            json_output,
-            "InvalidInput",
-            "--stdout cannot be combined with --json, --check, or --recursive",
+            json_output, "InvalidInput", "--out cannot be combined with --check or --recursive"
         )
+    if to_stdout and json_output:
+        _emit_error(json_output, "InvalidInput", "--out - writes the library itself, not JSON")
     if file == "-" and not to_stdout:
-        _emit_error(json_output, "InvalidInput", "stdin input (-) requires --stdout")
+        _emit_error(json_output, "InvalidInput", "stdin input (-) requires --out -")
+    if recursive and expect_sha256 is not None:
+        _emit_error(json_output, "InvalidInput", "--expect-sha256 names one file's digest")
     selected_keys = parse_key_selector(key)
     selector = build_where_filter(where, keys=key)
     if selector is not None:
@@ -309,8 +354,15 @@ def format_bibliography(
         block_order=block_order,
         wrap_values=wrap_values,
         line_width=line_width,
+        entry_type_case=entry_type_case,
     )
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
 
     if recursive:
         target = Path(file or ".")
@@ -343,7 +395,12 @@ def format_bibliography(
         return
 
     resolved = _resolve_input_bib(file, json_output)
+    if out is not None and not to_stdout:
+        _refuse_input_as_output(json_output, out, [resolved])
+        _refuse_existing_output(json_output, out, force)
     coll = Bibliography.open(resolved)
+    _check_expected_sha256(resolved, coll, params)
+    source_text = coll.preview()
     try:
         selected = coll.format(_layout(coll.lib, overrides), selector)
     except FormatLintError as exc:
@@ -355,6 +412,9 @@ def format_bibliography(
         )
     if to_stdout:
         sys.stdout.write(coll.preview())
+        return
+    if out is not None:
+        _write_copy(resolved, out, coll, params, source_text, where, selected_keys)
         return
     if check:
         payload = _check_payload(resolved, coll, where, selected_keys)
@@ -374,8 +434,38 @@ def format_bibliography(
         params,
         [human],
         warnings=[],
+        check=False,
         where=where,
         keys=selected_keys,
+    )
+
+
+def _write_copy(
+    resolved: str,
+    out: str,
+    coll: Bibliography,
+    params: RunParams,
+    source_text: str,
+    where: str | None,
+    keys: list[str],
+) -> None:
+    """Write the formatted library to ``--out``, leaving the input untouched."""
+    _finish_create(
+        params,
+        out,
+        "format",
+        coll.preview(),
+        [f"{_verb('write', params, 'Wrote')} the formatted library to {out}."],
+        file=resolved,
+        previous_content=source_text,
+        diff_label=resolved,
+        encoding=coll.lib.encoding,
+        check=False,
+        source_sha256=_source_sha256(coll),
+        modified=False,
+        modified_entries=0,
+        where=where,
+        keys=keys,
     )
 
 

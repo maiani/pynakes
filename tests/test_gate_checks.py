@@ -19,15 +19,20 @@ runner = CliRunner()
 FIXTURES = Path(__file__).parent / "fixtures"
 REPO_ROOT = Path(__file__).parent.parent
 
-# simple.bib is clean (only advisory warnings); duplicate_entries.bib has
-# duplicate-key *errors*.
+# simple.bib is clean once its one advisory finding (Brown2022 has no DOI) is
+# waived, which _bib does; duplicate_entries.bib has duplicate-key *errors*.
 CLEAN = FIXTURES / "simple.bib"
 WITH_ERRORS = FIXTURES / "duplicate_entries.bib"
 
 
 def _bib(tmp_path: Path, name: str, src: Path) -> Path:
     dst = tmp_path / name
-    dst.write_text(src.read_text(encoding="utf-8"))
+    text = src.read_text(encoding="utf-8")
+    if src == CLEAN:
+        text = text.replace(
+            "@inproceedings{Brown2022,", "% pynakes: ignore missing_doi\n@inproceedings{Brown2022,"
+        )
+    dst.write_text(text)
     return dst
 
 
@@ -49,21 +54,29 @@ class TestLintStrict:
         result = runner.invoke(app, ["lint", str(bib)])
         assert result.exit_code == 0, result.output
 
-    def test_single_file_envelope_unchanged_by_strict(self, tmp_path: Path) -> None:
-        # --strict must not alter the documented per-file envelope keys.
+    def test_single_file_envelope_is_the_per_file_shape(self, tmp_path: Path) -> None:
+        # --strict records itself but does not alter the per-file envelope keys.
         bib = _bib(tmp_path, "a.bib", CLEAN)
         result = runner.invoke(app, ["lint", str(bib), "--strict", "--json"])
         data = json.loads(result.output)
         assert set(data) == {
             "status",
             "action",
+            "strict",
             "file",
-            "issue_count",
+            "source_sha256",
+            "warnings",
+            "summary",
+            "issues",
+        }
+        assert data["strict"] is True
+        assert set(data["summary"]) == {
+            "issues",
             "errors",
             "warnings",
             "info",
+            "suppressed",
             "by_category",
-            "issues",
         }
         assert "files" not in data  # not the aggregate shape
 
@@ -107,7 +120,7 @@ class TestLintMultiFile:
         assert data["status"] == "error"
         err = next(f for f in data["files"] if f["file"] == str(missing))
         assert err["status"] == "error"
-        assert err["error"] == "FileNotFoundError"
+        assert err["error"] == "FileNotFound"
         assert data["summary"]["failed_files"] == 1
 
     def test_human_output_labels_each_file(self, tmp_path: Path) -> None:
@@ -185,7 +198,8 @@ class TestPreCommitHooks:
         bib = tmp_path / "refs.bib"
         bib.write_text(
             "@article{Euler1748,\n  author = {Euler, Leonhard},\n"
-            "  title = {Introductio},\n  journal = {Opera},\n  year = {1748}\n}\n"
+            "  title = {Introductio},\n  journal = {Opera},\n  year = {1748},\n"
+            "  doi = {10.1234/euler.1748}\n}\n"
         )
         hooks = yaml.safe_load((REPO_ROOT / ".pre-commit-hooks.yaml").read_text())
         for hook in hooks:

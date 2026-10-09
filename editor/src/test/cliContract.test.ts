@@ -309,7 +309,12 @@ test("ref remove takes FILE then the keys, and honors --dry-run", { skip }, asyn
 test("groups add-entry and remove-entry take FILE KEY GROUP", { skip }, async () => {
   const file = tempBib("@article{Smith2020,\n  title = {A Paper}\n}\n");
 
-  const added = await groupsEntry(command, file, "Smith2020", "Reviewed", true, false);
+  // An unknown group is refused unless the caller asks to create it.
+  const refused = await groupsEntry(command, file, "Smith2020", "Reviewed", true, false);
+  assert.equal(refused.status, "error");
+  const added = await groupsEntry(
+    command, file, "Smith2020", "Reviewed", true, false, undefined, undefined, true,
+  );
   if (added.status !== "success") {
     assert.fail(`groups add-entry failed: ${JSON.stringify(added)}`);
   }

@@ -33,7 +33,7 @@ class TestMultiOperationSequences:
         # lint stays clean
         r = runner.invoke(app, ["lint", str(bib), "--json"])
         assert r.exit_code == 0, r.output
-        assert json.loads(r.output)["errors"] == 0
+        assert json.loads(r.output)["summary"]["errors"] == 0
 
         # convert to biblatex, then back to bibtex
         r = runner.invoke(app, ["convert", str(bib), "--to", "biblatex"])

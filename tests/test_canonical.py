@@ -554,6 +554,45 @@ def test_entry_type_recasing_is_not_a_semantic_change() -> None:
     assert write_bib_canonical(reparsed) == output
 
 
+_JABREF_SPELLED = (
+    "@InProceedings{Darwin1858,\n"
+    "  author = {Darwin, Charles},\n"
+    "  title = {On the Tendency of Species to Form Varieties},\n"
+    "  booktitle = {Journal of the Proceedings of the Linnean Society},\n"
+    "  year = {1858},\n"
+    "}\n"
+)
+
+
+@pytest.mark.parametrize("wrap_values", ["off", "stable"])
+def test_preserve_keeps_each_entry_type_spelling(wrap_values: str) -> None:
+    # A library another tool saves as `@InProceedings` must not churn: under
+    # `preserve`, both render paths keep the source spelling.
+    layout = CanonicalLayout(entry_type_case="preserve", wrap_values=wrap_values)
+
+    output = write_bib_canonical(parse_bib(_JABREF_SPELLED), layout)
+
+    assert output.startswith("@InProceedings{Darwin1858,")
+    assert write_bib_canonical(parse_bib(output), layout) == output
+
+
+def test_entry_type_case_resolves_from_metadata_with_cli_precedence() -> None:
+    lib = parse_bib("@comment{pynakes-meta: format-entry-type-case: preserve;}\n" + _JABREF_SPELLED)
+
+    assert layout_from_metadata(lib).entry_type_case == "preserve"
+    assert layout_from_metadata(lib, entry_type_case="lower").entry_type_case == "lower"
+    assert layout_from_metadata(parse_bib(_JABREF_SPELLED)).entry_type_case == "lower"
+
+
+def test_invalid_entry_type_case_is_refused() -> None:
+    lib = parse_bib("@comment{pynakes-meta: format-entry-type-case: title;}\n" + _JABREF_SPELLED)
+
+    with pytest.raises(ValueError, match="format-entry-type-case"):
+        layout_from_metadata(lib)
+    with pytest.raises(ValueError, match="entry-type case"):
+        CanonicalLayout(entry_type_case="title")  # type: ignore[arg-type]
+
+
 def test_surgical_edits_keep_the_entry_type_spelling() -> None:
     # Only `format` recases types; an ordinary write must not touch an entry it
     # was not asked to change.

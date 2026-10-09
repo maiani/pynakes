@@ -11,6 +11,7 @@ policy, not schema, and belongs on the JabRef side instead.
 
 from typing import Literal
 
+from pynakes._lint_issue import unknown_ignore_names
 from pynakes._text_utils import strip_meta_terminator
 from pynakes.metadata.core import metadata_list, metadata_value
 from pynakes.model import BibFile
@@ -68,6 +69,7 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     "format-block-order": CATEGORY_FORMATTING,
     "format-wrap-values": CATEGORY_FORMATTING,
     "format-line-width": CATEGORY_FORMATTING,
+    "format-entry-type-case": CATEGORY_FORMATTING,
     "pinax-files-dir": CATEGORY_PINAX,
     "pinax-fetch-policy": CATEGORY_PINAX,
     # Linked LaTeX sources that cite this library; consulted by the citation-key
@@ -76,6 +78,8 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     # Lint profile settings. ``lint-required-fields`` applies to every entry;
     # the entry-type suffix form adds requirements for one type.
     "lint-required-fields": CATEGORY_LINT,
+    # Finding types and categories the `lint` command leaves out of its report.
+    "lint-ignore": CATEGORY_LINT,
     # Native group tree (hierarchy of StaticGroup nodes).
     "group-tree": CATEGORY_GROUPS,
     # What `scrub` removes when preparing a public copy of this library.
@@ -107,6 +111,7 @@ _FORMAT_CHOICES = {
     "format-entry-order": {"preserve", "key", "profile"},
     "format-block-order": {"preserve", "canonical"},
     "format-wrap-values": {"off", "stable", "canonical"},
+    "format-entry-type-case": {"lower", "preserve"},
 }
 
 
@@ -174,6 +179,17 @@ def validate_metadata_value(key: str, value: str) -> None:
     }:
         if stripped.lower() not in {"true", "false", "yes", "no", "on", "off", "1", "0"}:
             raise ValueError(f"Invalid Boolean value for {normalized_key}: {stripped!r}")
+        return
+
+    if normalized_key == "lint-ignore":
+        unknown = unknown_ignore_names(list(metadata_list(stripped)))
+        if unknown:
+            raise ValueError(
+                f"Unknown lint-ignore name(s) {unknown!r}; expected a finding type "
+                "or a category (correctness, content, formatting, consistency, profile)"
+            )
+        if not metadata_list(stripped):
+            raise ValueError("lint-ignore must name at least one finding type or category")
         return
 
     if normalized_key == "format-line-width":

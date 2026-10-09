@@ -7,17 +7,17 @@ retaining the stable CLI contract.
 import typer
 
 from pynakes import dedupe as dedupe_ops
+from pynakes.cli_checks import CheckOutcome, _run_checks, strict_option
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     _EXPECT_SHA256_OPTION,
-    CheckOutcome,
     RunParams,
     _emit_dedupe_conflict,
     _emit_error,
     _finish_mod,
     _resolve_input_bib,
-    _run_checks,
     _safe,
+    _source_sha256,
     _verb,
     bib_file_argument,
     key_option,
@@ -36,6 +36,8 @@ def _dedupe_check_one(file: str) -> CheckOutcome:
         "status": "success",
         "action": "dedupe_check",
         "file": file,
+        "source_sha256": _source_sha256(coll),
+        "warnings": [],
         "has_duplicates": bool(clusters),
         "cluster_count": len(clusters),
         "duplicate_entries": duplicate_entries,
@@ -59,7 +61,7 @@ def _dedupe_check_one(file: str) -> CheckOutcome:
 
 def dedupe_check(
     files: list[str] = typer.Argument(..., help="One or more .bib files"),
-    strict: bool = typer.Option(False, "--strict", help="Exit 1 if duplicate works are found"),
+    strict: bool = strict_option("duplicate works are found"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Report duplicate works by DOI/arXiv/other IDs and fuzzy title matches."""

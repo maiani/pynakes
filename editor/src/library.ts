@@ -26,7 +26,7 @@ import type {
   RefEditPlanEntry,
   Summary,
 } from "./model";
-import { summarize, toRows } from "./model";
+import { summarize, toRows, warningText } from "./model";
 import {
   type PynakesCommand,
   type RefAddRequest,
@@ -247,7 +247,7 @@ export async function previewEdits(
       plan: envelope.plan?.entries?.find((candidate) => candidate.key === request.key),
     })),
     diff: envelope.diff ?? "",
-    warnings: envelope.warnings ?? [],
+    warnings: (envelope.warnings ?? []).map(warningText),
     sourceSha256: envelope.source_sha256,
   };
 }
@@ -321,7 +321,7 @@ export async function commitEdits(
   return {
     ok: true,
     applied: requests.map((request) => request.key),
-    warnings: envelope.warnings ?? [],
+    warnings: (envelope.warnings ?? []).map(warningText),
   };
 }
 
@@ -372,7 +372,7 @@ export type Mutation =
   | { kind: "add"; request: RefAddRequest }
   | { kind: "import"; request: RefImportRequest }
   | { kind: "remove"; keys: string[]; keepFiles: boolean }
-  | { kind: "group"; key: string; group: string; member: boolean }
+  | { kind: "group"; key: string; group: string; member: boolean; create?: boolean }
   /** `keys` names the cluster(s) to merge; omitted means every cluster. */
   | { kind: "dedupeMerge"; keys?: string[] };
 
@@ -431,6 +431,7 @@ function runMutation(
         dryRun,
         cwd,
         expectSha256,
+        mutation.create ?? false,
       );
     case "dedupeMerge":
       return dedupeMerge(command, filePath, mutation.keys, dryRun, cwd, expectSha256);
@@ -477,7 +478,7 @@ function reduce(envelope: MutationEnvelope): MutationOutcome {
   return {
     ok: true,
     diff: envelope.diff ?? "",
-    warnings: envelope.warnings ?? [],
+    warnings: (envelope.warnings ?? []).map(warningText),
     modified: envelope.modified,
     key: envelope.key,
     sourceSha256: envelope.source_sha256,

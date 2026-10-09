@@ -7,21 +7,23 @@ retaining the stable CLI contract.
 import typer
 
 from pynakes import group_tree as group_tree_ops
+from pynakes.cli_choices import GROUP_CONTEXT_CODES, GroupContext
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     _EXPECT_SHA256_OPTION,
     RunParams,
+    _emit_conflict,
     _emit_error,
     _emit_json,
     _entries,
     _finish_mod,
     _resolve_input_bib,
     _safe,
+    _source_sha256,
     _verb,
     bib_file_argument,
 )
 from pynakes.engine import Bibliography
-from pynakes.io import load_bib
 
 # --- groups ----------------------------------------------------------------
 
@@ -32,12 +34,22 @@ def groups_list(
 ) -> None:
     """List all groups and their members."""
     file = _resolve_input_bib(file, json_output)
-    lib = load_bib(file)
+    coll = Bibliography.open(file)
+    lib = coll.lib
     names = group_tree_ops.known_group_names(lib)
     members = {g: group_tree_ops.list_direct_members(lib, g) for g in names}
 
     if json_output:
-        _emit_json({"status": "success", "action": "groups_list", "file": file, "groups": members})
+        _emit_json(
+            {
+                "status": "success",
+                "action": "groups_list",
+                "file": file,
+                "source_sha256": _source_sha256(coll),
+                "warnings": [],
+                "groups": members,
+            }
+        )
         return
 
     if not names:
@@ -53,8 +65,8 @@ def groups_tree(
 ) -> None:
     """Show the group hierarchy tree."""
     file = _resolve_input_bib(file, json_output)
-    lib = load_bib(file)
-    tree = group_tree_ops.list_tree(lib)
+    coll = Bibliography.open(file)
+    tree = group_tree_ops.list_tree(coll.lib)
 
     if json_output:
         _emit_json(
@@ -62,6 +74,8 @@ def groups_tree(
                 "status": "success",
                 "action": "groups_tree",
                 "file": file,
+                "source_sha256": _source_sha256(coll),
+                "warnings": [],
                 "tree": [n.to_dict() for n in tree] if tree else [],
             }
         )
@@ -85,9 +99,35 @@ def groups_tree(
         typer.echo(line)
 
 
+_CONTEXT_HELP = (
+    "How the group's membership relates to its parent's: independent, "
+    "refining (intersection), or including (union)"
+)
+
+
 def _require_key(lib, key: str, json_output: bool) -> None:
     if key not in lib.entries:
         _emit_error(json_output, "KeyNotFound", f"No entry with key {key!r} in the library")
+
+
+def _group_exists(lib, name: str) -> bool:
+    return name in group_tree_ops.known_group_names(lib)
+
+
+def _require_group(lib, name: str, json_output: bool, hint: str = "") -> None:
+    """Exit with ``KeyNotFound`` unless *name* is a group the library knows."""
+    if not _group_exists(lib, name):
+        _emit_error(json_output, "KeyNotFound", f"Group {name!r} not found{hint}", group=name)
+
+
+def _group_conflict(json_output: bool, name: str) -> None:
+    _emit_conflict(
+        json_output,
+        "GroupConflict",
+        f"Group {name!r} already exists",
+        group=name,
+        options=[{"id": "choose_name", "description": "Retry with a different group name"}],
+    )
 
 
 def _group_mod_entry(
@@ -96,10 +136,14 @@ def _group_mod_entry(
     group: str,
     params: RunParams,
     add: bool,
+    create: bool = False,
 ) -> None:
     """Shared implementation for add-entry and remove-entry."""
     coll = Bibliography.open(file)
     _require_key(coll.lib, key, params.json_output)
+    if not (add and create):
+        hint = "; create it with groups add-group, or pass --create" if add else ""
+        _require_group(coll.lib, group, params.json_output, hint)
     if add:
         action, count = "groups_add_entry", coll.add_to_group(key, group)
         msg = (
@@ -115,13 +159,20 @@ def groups_add_entry(
     file: str | None = bib_file_argument(),
     key: str = typer.Argument(..., help="Citation key to add"),
     group: str = typer.Argument(..., help="Group name"),
+    create: bool = typer.Option(
+        False, "--create", help="Create the group if the library does not have it yet"
+    ),
     backup: bool = _BACKUP_OPTION,
     expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Add an entry to a group."""
+    """Add an entry to a group.
+
+    The group must already exist, so a mistyped name is an error rather than a
+    new group; ``--create`` makes a new one.
+    """
     file = _resolve_input_bib(file, json_output)
     params = RunParams(
         dry_run=dry_run,
@@ -130,7 +181,7 @@ def groups_add_entry(
         backup=backup,
         expect_sha256=expect_sha256,
     )
-    _group_mod_entry(file, key, group, params, add=True)
+    _group_mod_entry(file, key, group, params, add=True, create=create)
 
 
 def groups_remove_entry(
@@ -160,23 +211,31 @@ def groups_add_group(
     name: str = typer.Argument(..., help="Group name to add"),
     parent: str = typer.Option("", "--parent", help="Parent group name"),
     color: str = typer.Option("", "--color", help="Hex RGBA color (e.g. 8a8a8aff)"),
-    context: int = typer.Option(2, "--context", help="0=independent, 1=refining, 2=including"),
+    context: GroupContext = typer.Option(GroupContext.INCLUDING, "--context", help=_CONTEXT_HELP),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Add a group node to the hierarchy tree."""
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     coll = Bibliography.open(file)
-    ok = coll.add_group_node(name, parent=parent, color=color, context=context)
+    tree = coll.list_tree() or []
+    if any(node.name == name for node in tree):
+        _group_conflict(json_output, name)
+    if parent:
+        _require_group(coll.lib, parent, json_output)
+    ok = coll.add_group_node(name, parent=parent, color=color, context=GROUP_CONTEXT_CODES[context])
     if not ok:
-        _emit_error(
-            json_output,
-            "InvalidInput",
-            f"Group {name!r} already exists in the tree",
-        )
+        _emit_error(json_output, "InvalidInput", f"Group {name!r} could not be added to the tree")
     action = "groups_add_group"
     msg = f"{_verb('add', params)} group {name!r} (parent={parent!r})."
     _finish_mod(file, action, coll, params, [msg], group=name, parent=parent)
@@ -186,13 +245,20 @@ def groups_remove_group(
     file: str | None = bib_file_argument(),
     name: str = typer.Argument(..., help="Group name to remove"),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Remove a group node and all its descendants from the hierarchy."""
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     coll = Bibliography.open(file)
     count = coll.remove_group_node(name)
     if not count:
@@ -211,21 +277,29 @@ def groups_rename_group(
     old: str = typer.Argument(..., help="Current group name"),
     new: str = typer.Argument(..., help="New group name"),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Rename a group node, updating parent references in child groups."""
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     coll = Bibliography.open(file)
+    tree = coll.list_tree() or []
+    if not any(node.name == old for node in tree):
+        _emit_error(json_output, "KeyNotFound", f"Group {old!r} not found in the tree", group=old)
+    if old != new and _group_exists(coll.lib, new):
+        _group_conflict(json_output, new)
     ok = coll.rename_group_node(old, new)
     if not ok:
-        _emit_error(
-            json_output,
-            "InvalidInput",
-            f"Group {old!r} not found or {new!r} already exists",
-        )
+        _emit_error(json_output, "InvalidInput", f"Group {old!r} could not be renamed to {new!r}")
     action = "groups_rename_group"
     msg = f"{_verb('rename', params)} group {old!r} to {new!r}."
     _finish_mod(file, action, coll, params, [msg], old=old, new=new)
@@ -236,20 +310,32 @@ def groups_move_group(
     name: str = typer.Argument(..., help="Group name to move"),
     parent: str = typer.Option("", "--parent", help="New parent group name"),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Move a group node to a new parent (empty string for root-level)."""
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     coll = Bibliography.open(file)
+    tree = coll.list_tree() or []
+    if not any(node.name == name for node in tree):
+        _emit_error(json_output, "KeyNotFound", f"Group {name!r} not found in the tree", group=name)
+    if parent:
+        _require_group(coll.lib, parent, json_output)
     ok = coll.move_group_node(name, parent)
     if not ok:
         _emit_error(
             json_output,
             "InvalidInput",
-            f"Group {name!r} not found or move would create a circular reference",
+            f"Moving group {name!r} under {parent!r} would create a circular reference",
         )
     action = "groups_move_group"
     msg = f"{_verb('move', params)} group {name!r} to parent {parent!r}."
@@ -265,27 +351,34 @@ def groups_update_group(
     color: str | None = typer.Option(
         None, "--color", help="Hex RGBA color (e.g. 8a8a8aff); pass '' to clear"
     ),
-    context: int = typer.Option(-1, "--context", help="0=independent, 1=refining, 2=including"),
+    context: GroupContext | None = typer.Option(None, "--context", help=_CONTEXT_HELP),
     expanded: bool | None = typer.Option(None, "--expanded/--collapsed", help="Expanded in the UI"),
     description: str | None = typer.Option(
         None, "--description", help="Group description; pass '' to clear"
     ),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Update properties of a group node in the hierarchy."""
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     coll = Bibliography.open(file)
     kwargs: dict = {}
     if parent is not None:
         kwargs["parent"] = parent
     if color is not None:
         kwargs["color"] = color
-    if context >= 0:
-        kwargs["context"] = context
+    if context is not None:
+        kwargs["context"] = GROUP_CONTEXT_CODES[context]
     if expanded is not None:
         kwargs["expanded"] = expanded
     if description is not None:
@@ -293,6 +386,8 @@ def groups_update_group(
 
     tree = coll.list_tree()
     exists = tree is not None and any(n.name.lower() == name.lower() for n in tree)
+    if parent:
+        _require_group(coll.lib, parent, json_output)
     if not kwargs:
         if not exists:
             _emit_error(
@@ -328,7 +423,8 @@ def groups_list_entries(
 ) -> None:
     """List entries belonging to a group (with descendant propagation by default)."""
     file = _resolve_input_bib(file, json_output)
-    lib = load_bib(file)
+    coll = Bibliography.open(file)
+    lib = coll.lib
     known = group_tree_ops.known_group_names(lib)
     if not any(n.lower() == name.lower() for n in known):
         _emit_error(json_output, "KeyNotFound", f"Group {name!r} not found")
@@ -340,6 +436,8 @@ def groups_list_entries(
                 "status": "success",
                 "action": "groups_list_entries",
                 "file": file,
+                "source_sha256": _source_sha256(coll),
+                "warnings": [],
                 "group": name,
                 "exact": exact,
                 "entries": entries,

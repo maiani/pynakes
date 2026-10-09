@@ -7,8 +7,10 @@ retaining the stable CLI contract.
 import typer
 
 from pynakes import metadata as metadata_ops
+from pynakes.cli_choices import Namespace
 from pynakes.cli_common import (
     _BACKUP_OPTION,
+    _EXPECT_SHA256_OPTION,
     RunParams,
     _emit_conflict,
     _emit_error,
@@ -16,6 +18,7 @@ from pynakes.cli_common import (
     _finish_mod,
     _resolve_input_bib,
     _safe,
+    _source_sha256,
     _verb,
     bib_file_argument,
 )
@@ -30,9 +33,10 @@ def metadata_list(
 ) -> None:
     """List top-level metadata blocks (both jabref-meta and pynakes-meta)."""
     file = _resolve_input_bib(file, json_output)
-    lib = Bibliography.open(file).lib
+    coll = Bibliography.open(file)
+    lib = coll.lib
     all_blocks = lib.metadata_blocks
-    warnings = metadata_ops.aliased_drift_warnings(lib)
+    drift = metadata_ops.aliased_drift_warnings(lib)
 
     if json_output:
         _emit_json(
@@ -40,6 +44,7 @@ def metadata_list(
                 "status": "success",
                 "action": "metadata_list",
                 "file": file,
+                "source_sha256": _source_sha256(coll),
                 "metadata": {
                     "values": dict(lib.jabref_metadata),
                     "blocks": [b.to_dict() for b in lib.jabref_metadata_blocks],
@@ -49,7 +54,7 @@ def metadata_list(
                     "blocks": [b.to_dict() for b in lib.pynakes_metadata_blocks],
                 },
                 "effective": dict(lib.metadata),
-                "warnings": warnings,
+                "warnings": [{"type": "metadata_drift", "message": text} for text in drift],
             }
         )
         return
@@ -63,7 +68,7 @@ def metadata_list(
             f"  [{block.namespace}:{marker}:{block.category}] "
             f"{block.key} = {block.normalized_value}"
         )
-    for warning in warnings:
+    for warning in drift:
         typer.echo(f"  warning: {warning}")
 
 
@@ -71,29 +76,30 @@ def metadata_set(
     file: str | None = bib_file_argument(),
     key: str = typer.Argument(..., help="Metadata key"),
     value: str = typer.Argument(..., help="Metadata value"),
-    namespace: str | None = typer.Option(
+    namespace: Namespace | None = typer.Option(
         None,
         "--namespace",
-        help="Target comment: jabref or pynakes. Default: auto (JabRef-native keys "
-        "→ jabref-meta, everything else → pynakes-meta)",
+        help="Target comment. Default: auto (JabRef-native keys → jabref-meta, "
+        "everything else → pynakes-meta)",
     ),
     allow_unknown: bool = typer.Option(
         False, "--allow-unknown", help="Allow writing an unrecognized key into jabref-meta"
     ),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Set one top-level metadata block (jabref-meta or pynakes-meta)."""
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    if namespace is not None and namespace not in {"jabref", "pynakes"}:
-        _emit_error(
-            json_output,
-            "InvalidNamespace",
-            f"Invalid namespace {namespace!r}; expected jabref or pynakes",
-        )
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     coll = Bibliography.open(file)
     try:
         update = coll.set_metadata(key, value, namespace=namespace, allow_unknown=allow_unknown)
@@ -138,6 +144,7 @@ def metadata_set(
 def metadata_adopt_jabref(
     file: str | None = bib_file_argument(),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
@@ -151,7 +158,13 @@ def metadata_adopt_jabref(
     settings. Running it again once tracked is a no-op.
     """
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     coll = Bibliography.open(file)
     report = coll.adopt_jabref()
 
@@ -181,12 +194,13 @@ def metadata_adopt_jabref(
 def metadata_remove(
     file: str | None = bib_file_argument(),
     key: str = typer.Argument(..., help="Metadata key to remove"),
-    namespace: str | None = typer.Option(
+    namespace: Namespace | None = typer.Option(
         None,
         "--namespace",
-        help="Target comment: jabref or pynakes. Default: auto-detect namespace from the key",
+        help="Target comment. Default: auto-detect the namespace from the key",
     ),
     backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
@@ -197,13 +211,13 @@ def metadata_remove(
     both namespaces, the operation is refused as ambiguous (use --namespace).
     """
     file = _resolve_input_bib(file, json_output)
-    params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    if namespace is not None and namespace not in {"jabref", "pynakes"}:
-        _emit_error(
-            json_output,
-            "InvalidNamespace",
-            f"Invalid namespace {namespace!r}; expected jabref or pynakes",
-        )
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
     coll = Bibliography.open(file)
     try:
         update = coll.remove_metadata(key, namespace=namespace)

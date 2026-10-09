@@ -25,6 +25,19 @@ from pynakes.cli_common import (
 from pynakes.engine import Bibliography
 from pynakes.metadata import DuplicateMetadataError
 
+#: What a caller can do about an operation that refused with a conflict.
+_CONFLICT_OPTIONS = {
+    "DuplicateCitationKey": [
+        {
+            "id": "repair_duplicates",
+            "description": "Run keys repair first, then retry with the unique key",
+        }
+    ],
+    "CitationKeyConflict": [
+        {"id": "choose_key", "description": "Revise the operation to use a different key"}
+    ],
+}
+
 
 def batch(
     file: str | None = bib_file_argument(),
@@ -72,8 +85,10 @@ def batch(
     try:
         op_results = apply_operations(coll, operations)
     except BatchError as exc:
-        _emit_error(json_output, "InvalidInput", str(exc), index=exc.index)
-        return
+        extra: dict = {"index": exc.index, "op": exc.op}
+        if exc.code in _CONFLICT_OPTIONS:
+            extra["options"] = _CONFLICT_OPTIONS[exc.code]
+        _emit_error(json_output, exc.code, str(exc), **extra)
     except DuplicateMetadataError as exc:
         _emit_conflict(
             json_output,
@@ -86,7 +101,7 @@ def batch(
 
     _finish_mod(
         file,
-        "batch",
+        "corpus_batch",
         coll,
         params,
         [f"{_verb('apply', params, 'Applied')} {len(op_results)} operation(s);"],

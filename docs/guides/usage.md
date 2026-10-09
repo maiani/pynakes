@@ -23,7 +23,7 @@ Every command that addresses a *set* of entries takes the same selector: the
 so there are no command-specific filter flags to learn.
 
 Accepted by [`fields`](#fields), [`search`](#search), [`format`](#format),
-[`corpus combine`](#combine), [`corpus split`](#split) (`--to` rules), and the
+[`corpus combine`](#combine), [`corpus split`](#split) (`--route` rules), and the
 `fields.*` operations of `corpus batch`.
 
 Predicates combine with `and`, `or`, and `not`; `and` binds tighter than `or`,
@@ -33,7 +33,7 @@ and parentheses group explicitly:
 pynakes fields set refs.bib note "review" \
   --where 'year >= 2024 and doi missing and type in [article, inproceedings]'
 
-pynakes search widgets refs.bib --where 'not (group "Reviewed" or keywords contains draft)'
+pynakes search refs.bib widgets --where 'not (group "Reviewed" or keywords contains draft)'
 ```
 
 Field operators:
@@ -64,11 +64,11 @@ group membership; the stored field itself is reachable as `groups`.
 Pass an empty query to select by predicate alone:
 
 ```bash
-pynakes search "" refs.bib --where 'key in [Newton1687, Euler1748]'
-pynakes search "" refs.bib --where 'date >= 1900-06 and date <= 1910'
-pynakes search "" refs.bib --where 'abstract missing'          # "entries missing field X"
-pynakes search "" refs.bib --where 'title ~ "quantum computing"'
-pynakes search "" refs.bib --where 'journal matches "^Phys\. Rev\."'
+pynakes search refs.bib "" --where 'key in [Newton1687, Euler1748]'
+pynakes search refs.bib "" --where 'date >= 1900-06 and date <= 1910'
+pynakes search refs.bib "" --where 'abstract missing'          # "entries missing field X"
+pynakes search refs.bib "" --where 'title ~ "quantum computing"'
+pynakes search refs.bib "" --where 'journal matches "^Phys\. Rev\."'
 ```
 
 Use `""`, not a filler query like `.`: a filler is a real search term, so
@@ -80,7 +80,7 @@ required, so a lone path can never be mistaken for a query.
 Quote values containing spaces or punctuation; bare tokens may not contain
 whitespace, brackets, commas, or comparison characters. A comparison against a
 field an entry does not have is false, except `!=` and `missing`, which are
-true. `corpus split --to` additionally accepts the bucket predicates `*`
+true. `corpus split --route` additionally accepts the bucket predicates `*`
 (catch-all), and `used` / `unused` against `--tex`/`--aux` sources, which
 compose with everything else (`used and year >= 2020`).
 
@@ -115,15 +115,15 @@ existing file unless `--force`; pass `--backup` to keep a `.bak` copy.
 
 ```bash
 pynakes init refs.bib                          # default profile (biblatex)
-pynakes init refs.bib --type bibtex            # choose the dialect
+pynakes init refs.bib --dialect bibtex         # choose the dialect
 pynakes init refs.bib --key-pattern '[auth][year]'
-pynakes init refs.bib --from template.bib      # copy another library's profile
+pynakes init refs.bib --profile-from template.bib  # copy another library's profile
 pynakes init refs.bib --dry-run --diff         # preview the seed file
 ```
 
-`--from` copies the template's *conventions* — dialect, key patterns,
+`--profile-from` copies the template's *conventions* — dialect, key patterns,
 `saveActions`, and pynakes normalization/lint settings — but not its own content
-(group tree, linked TeX sources). `--type` / `--key-pattern` override individual
+(group tree, linked TeX sources). `--dialect` / `--key-pattern` override individual
 settings on top of the default (or copied) profile.
 
 ## inspect
@@ -160,6 +160,7 @@ pynakes lint refs.bib
 pynakes lint refs.bib --json
 pynakes lint refs.bib chapters/*.bib --strict   # multi-file CI gate
 pynakes lint refs.bib --category correctness    # only structural problems
+pynakes lint refs.bib --ignore missing_doi --ignore formatting   # leave findings out
 ```
 
 Checks include duplicate citation keys, dialect-aware missing required fields by
@@ -189,7 +190,7 @@ and a **severity** ranking urgency:
 | --- | --- | --- | --- |
 | `correctness` | you decide | `error` | duplicate keys, missing required fields, undefined string references |
 | `content` | `normalize` | `warning` | journal style, malformed DOI, non-BibTeX page range, unprotected title case, key-pattern mismatch |
-| `layout` | `format` | `info` | mixed-case entry types and field names |
+| `formatting` | `format` | `info` | mixed-case field names, and entry types unless `format-entry-type-case` is `preserve` |
 | `consistency` | nothing — an observation | `info` | missing article DOI, a field most comparable peers define |
 | `profile` | you decide | `warning` | deviations from the library's stored lint profile |
 
@@ -203,11 +204,32 @@ reference.
 
 Layout and consistency findings are `info` so that they cannot bury a structural
 `error`; `--category` filters the report, and `--json` adds `info` and
-`by_category` counts plus per-finding `category` and `fixer` keys. Only errors
-and profile deviations gate `--strict` — including metadata drift (unknown
-pynakes keys, invalid metadata values, duplicate blocks). Human output ends
+`by_category` counts plus per-finding `category` and `fixer` keys.
+`--strict` means *clean*: any finding left in the report fails it, whatever its
+severity, as every other check fails on any finding. A finding the library
+accepts is suppressed explicitly — `lint-ignore`, `--ignore`, or an `ignore`
+directive on the entry — rather than tolerated by a severity rule. Human output ends
 with the commands that would clear the fixable findings, for example
 `Run `pynakes format` to resolve 3 of them.`
+
+Some findings can never be fixed — a venue that assigns no DOIs, a journal with
+no volumes — and would keep a commit hook failing or noisy. `--ignore NAME`
+(repeatable) leaves a finding type (`missing_doi`) or a whole category
+(`consistency`) out of the report and out of the `--strict` gate. To make that a
+property of the library rather than of one invocation, store it:
+
+```bibtex
+@comment{pynakes-meta:
+lint-ignore: missing_doi, formatting
+}
+```
+
+`--ignore` adds to the stored list; it cannot re-enable what the library
+ignores. To accept a finding on one entry only — this venue assigns no DOIs —
+write an `ignore` [directive](#per-entry-directives) above it instead. Suppression is never silent: the summary's `suppressed` count, and a
+closing line in human output, report how many findings were left out. An
+unknown name is refused on the command line and reported as
+`invalid_metadata_value` in the stored setting.
 
 `pynakes normalize refs.bib` also repairs bare full month names such as
 `month = june`, which BibTeX interprets as an undefined string reference. It
@@ -219,8 +241,8 @@ casing (`month = Jan` → `month = jan`), while preserving literals such as
 accepts multiple files, or auto-detects a single `.bib` in the current directory
 when no file is given. Auto-detection ignores RevTeX-generated `*Notes.bib`
 auxiliary files; pass one explicitly if you really want to inspect it. These
-checks support `--strict`, which exits `1` for errors or profile deviations so
-it can gate a build. See
+checks support `--strict`, which exits `1` when any finding remains so it can
+gate a build; for `lint`, suppressed findings do not count. See
 [Metadata Reference](metadata-reference.md) for the complete schema and
 [Git Workflows](git-workflows.md) for pre-commit and CI recipes.
 
@@ -263,7 +285,7 @@ pynakes groups rename-group refs.bib "NLP" "Natural Language Processing"
 pynakes groups move-group refs.bib "Deep Learning" "Machine Learning"
 pynakes groups move-group refs.bib "Deep Learning" ""   # move to root
 
-pynakes groups update-group refs.bib "Deep Learning" --color "00ff00ff" --context 2
+pynakes groups update-group refs.bib "Deep Learning" --color "00ff00ff" --context including
 
 pynakes groups remove-group refs.bib "NLP"   # removes group + its children
 ```
@@ -299,13 +321,13 @@ Check, generate, rename, and repair citation keys.
 pynakes keys check refs.bib
 pynakes keys check refs.bib --json
 
-pynakes keys generate OldKey2020 refs.bib --dry-run --diff
+pynakes keys generate refs.bib OldKey2020 --dry-run --diff
 pynakes keys generate refs.bib --all --dry-run --diff
 pynakes keys repair --dry-run --diff              # auto-detects one .bib file
 pynakes keys repair refs.bib --dry-run --diff
 pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/ --dry-run --diff
 
-pynakes keys usage OldKey2020 --path paper.tex --path chapters/ --json
+pynakes keys usage OldKey2020 paper.tex chapters/ --json
 ```
 
 Generated keys default to `AuthorYearTitle`. JabRef metadata is honored when
@@ -350,8 +372,8 @@ update those reference fields the same way; `keys repair` leaves them alone,
 since a reference to a duplicated key is ambiguous. `lint` reports a reference
 field naming a key the library lacks as `missing_reference_target`.
 
-`keys usage` is a read-only lookup: given a key and one or more `--path`
-files/directories, it reports every `\cite`-family occurrence (file and line)
+`keys usage` is a read-only lookup: given a key and one or more `.tex`
+files or directories, it reports every `\cite`-family occurrence (file and line)
 that cites that key, and takes neither a `.bib` file nor `tex-sources`
 metadata. Use it to check a rename's blast radius over `.tex` that is not, and
 may never be, registered with `tex add` — a frozen snapshot, a generated diff,
@@ -482,8 +504,8 @@ This protects acronyms, uppercase/digit tokens, mixed-case terms such as
 Add a manually specified reference entry:
 
 ```bash
-pynakes ref add Manual2026 refs.bib --field title="Manual Reference" --field year=2026
-pynakes ref add Manual2026 refs.bib --type book --field author="Ada Lovelace"
+pynakes ref add refs.bib Manual2026 --field title="Manual Reference" --field year=2026
+pynakes ref add refs.bib Manual2026 --type book --field author="Ada Lovelace"
 pynakes ref add Manual2026 --field title="Manual Reference"  # auto-detects one .bib file
 pynakes ref add  # interactive; auto-detects one .bib file
 pynakes ref add --file refs.bib  # interactive with an explicit library
@@ -505,16 +527,16 @@ mode requires a terminal and errors under `--json` or headless stdin. Use
 Read or transactionally patch one uniquely identified reference:
 
 ```bash
-pynakes ref show Manual2026 refs.bib
-pynakes ref show Manual2026 refs.bib --resolved --json
-pynakes ref show --keys Manual2026,Newton1687 refs.bib --abstract
-pynakes ref edit Manual2026 refs.bib \
+pynakes ref show refs.bib Manual2026
+pynakes ref show refs.bib Manual2026 --resolved --json
+pynakes ref show refs.bib --key Manual2026,Newton1687 --abstract
+pynakes ref edit refs.bib Manual2026 \
   --field title="Revised title" --field year=2027 \
   --clear-field note --type book --dry-run --diff
-pynakes ref edit Manual2026 refs.bib  # interactive when no change options are supplied
+pynakes ref edit refs.bib Manual2026  # interactive when no change options are supplied
 ```
 
-`--keys` turns `ref show` into a **triage view**: instead of every stored field
+`--key` turns `ref show` into a **triage view**: instead of every stored field
 of one reference, it prints a compact summary of each requested reference — the
 title, the first present of `author`/`editor`, the first present of
 `year`/`date`, the most specific venue field (`journaltitle`, `journal`,
@@ -524,9 +546,7 @@ invocation per key. Add `--abstract` to include each abstract; entries that
 store none report `(none)` (JSON `null`), so "no abstract" is distinguishable
 from "not requested". The keys may be comma-separated, the option repeated, or
 both; repeats collapse and the requested order is preserved. Every unknown key
-is reported together in one exit-1 `KeyNotFound` error. With `--keys` the
-positional argument is the library, so `ref show --keys a,b refs.bib` reads
-naturally.
+is reported together in one exit-1 `KeyNotFound` error.
 
 `ref edit` applies all requested field and type changes in one commit. It does
 not rename the citation key: use `keys rename` for that coordinated operation,
@@ -537,6 +557,51 @@ interactive mode automatically and presents the current type and required
 fields as defaults; pressing Enter preserves each value. Interactive mode
 requires a terminal: supplying no change options under `--json` or headless
 stdin is an error rather than a prompt.
+
+## Per-entry directives
+
+A library's settings live in its `pynakes-meta` comment. A setting for **one
+entry** lives in a comment directly above that entry — a *directive*:
+
+```bibtex
+% pynakes: ignore missing_doi -- the venue assigns no DOIs
+@article{Newton1687,
+```
+
+A directive is `pynakes:`, a verb, its comma-separated arguments, and an
+optional reason after ` -- `, written as a `%` line or as
+`@comment{pynakes: ...}`. It must sit directly above the entry: a blank line
+in between makes it a free comment that applies to nothing. Every command that
+moves or drops entries carries it along (see
+[metadata](#metadata)), and BibTeX, Biber, and JabRef leave it alone.
+
+| Verb | Arguments | Effect |
+| --- | --- | --- |
+| `ignore` | finding types or categories, each optionally `NAME:FIELD` | `lint` leaves this entry's matching findings out of its report and its `--strict` gate |
+
+`ref directive` writes and removes directives on the entries named by `--key`
+or selected by `--where`, changing only the directive lines:
+
+```bash
+pynakes ref directive refs.bib ignore missing_doi --key Newton1687 --reason "no DOI assigned"
+pynakes ref directive refs.bib ignore missing_profile_required_field:volume --key Newton1687
+pynakes ref directive refs.bib ignore missing_doi --where 'doi missing and year < 1950' \
+  --reason "pre-DOI era"
+pynakes ref directive refs.bib ignore missing_doi --key Newton1687 --remove
+pynakes ref directive refs.bib ignore --key Newton1687 --remove   # every ignore on it
+```
+
+`--where` is how a library adopts `lint --strict`: waive the findings it has
+accepted, by selection, and every new finding still fails the gate.
+
+Arguments the entry's directives already carry are not repeated; giving a new
+`--reason` for them rewrites the reason. `--remove` takes arguments out of the
+entry's directives of that verb and deletes a directive left with none. A
+directive pynakes cannot act on is refused by `ref directive` and reported by
+`lint` as `invalid_entry_directive`; an `ignore` that no longer matches any
+finding is reported as `unused_entry_directive`, so a waiver does not outlive
+its reason unnoticed. Waived findings count toward the lint summary's
+`suppressed`.
 
 ## find
 
@@ -591,28 +656,28 @@ Import a reference by DOI, repository/preprint identifier, ISBN, or supported
 URL. The type is auto-detected, so the same command handles all of these:
 
 ```bash
-pynakes ref import 10.5555/example refs.bib --dry-run --diff
-pynakes ref import https://doi.org/10.5555/example refs.bib
-pynakes ref import arXiv:2301.00001 refs.bib
-pynakes ref import https://arxiv.org/abs/2301.00001 refs.bib
-pynakes ref import PMID:12345678 refs.bib
-pynakes ref import https://www.nber.org/papers/w12345 refs.bib
-pynakes ref import https://zenodo.org/records/1234567 refs.bib
+pynakes ref import refs.bib 10.5555/example --dry-run --diff
+pynakes ref import refs.bib https://doi.org/10.5555/example
+pynakes ref import refs.bib arXiv:2301.00001
+pynakes ref import refs.bib https://arxiv.org/abs/2301.00001
+pynakes ref import refs.bib PMID:12345678
+pynakes ref import refs.bib https://www.nber.org/papers/w12345
+pynakes ref import refs.bib https://zenodo.org/records/1234567
 ```
 
 Publisher article URLs and book ISBNs work the same way, so a page URL copied
 from a browser can be imported without first digging out its DOI:
 
 ```bash
-pynakes ref import https://link.springer.com/article/10.5555/example refs.bib
-pynakes ref import https://onlinelibrary.wiley.com/doi/10.5555/example refs.bib
-pynakes ref import https://journals.plos.org/plosone/article?id=10.5555/example refs.bib
-pynakes ref import https://iopscience.iop.org/article/10.5555/example refs.bib
-pynakes ref import https://scipost.org/SciPostPhys.10.1.001 refs.bib
-pynakes ref import https://www.jstor.org/stable/1171664 refs.bib
-pynakes ref import https://www.sciencedirect.com/science/article/pii/S0123456789012345 refs.bib
-pynakes ref import 978-0-00-000000-2 refs.bib
-pynakes ref import ISBN:0123456789 refs.bib
+pynakes ref import refs.bib https://link.springer.com/article/10.5555/example
+pynakes ref import refs.bib https://onlinelibrary.wiley.com/doi/10.5555/example
+pynakes ref import refs.bib https://journals.plos.org/plosone/article?id=10.5555/example
+pynakes ref import refs.bib https://iopscience.iop.org/article/10.5555/example
+pynakes ref import refs.bib https://scipost.org/SciPostPhys.10.1.001
+pynakes ref import refs.bib https://www.jstor.org/stable/1171664
+pynakes ref import refs.bib https://www.sciencedirect.com/science/article/pii/S0123456789012345
+pynakes ref import refs.bib 978-0-00-000000-2
+pynakes ref import refs.bib ISBN:0123456789
 ```
 
 SciPost article ids and numeric JSTOR stable ids become their publisher's DOI;
@@ -626,10 +691,10 @@ DOI record omits — eprints and report numbers from INSPIRE, venue and editor
 details from the ACL Anthology:
 
 ```bash
-pynakes ref import INSPIRE:Author:2024abc refs.bib
-pynakes ref import https://inspirehep.net/literature/451647 refs.bib
-pynakes ref import DBLP:journals/cacm/Codd70 refs.bib
-pynakes ref import https://aclanthology.org/2023.acl-long.1 refs.bib
+pynakes ref import refs.bib INSPIRE:Author:2024abc
+pynakes ref import refs.bib https://inspirehep.net/literature/451647
+pynakes ref import refs.bib DBLP:journals/cacm/Codd70
+pynakes ref import refs.bib https://aclanthology.org/2023.acl-long.1
 ```
 
 An INSPIRE texkey is the citation key high-energy physics already uses, so
@@ -647,7 +712,7 @@ Give several identifiers, or pipe a list, and they resolve in one call and
 commit in one write:
 
 ```bash
-pynakes ref import 10.5555/one arXiv:2301.00001 10.5555/two refs.bib --dry-run
+pynakes ref import refs.bib 10.5555/one arXiv:2301.00001 10.5555/two --dry-run
 pbpaste | pynakes ref import - refs.bib --diff
 ```
 
@@ -682,11 +747,11 @@ command's failure, and `--key` applies to the one entry.
 Options:
 
 ```bash
-pynakes ref import 10.5555/example refs.bib --key ManualKey2026
-pynakes ref import 10.5555/example refs.bib --key-source provider
-pynakes ref import 10.5555/example refs.bib --allow-duplicate
-pynakes ref import arXiv:2301.00001 refs.bib --fetch
-pynakes ref import 10.5555/example refs.bib --fetch --cache-file .pynakes-cache
+pynakes ref import refs.bib 10.5555/example --key ManualKey2026
+pynakes ref import refs.bib 10.5555/example --key-source provider
+pynakes ref import refs.bib 10.5555/example --allow-duplicate
+pynakes ref import refs.bib arXiv:2301.00001 --fetch
+pynakes ref import refs.bib 10.5555/example --fetch --cache-file .pynakes-cache
 ```
 
 Each identifier is fetched through its matching provider. By default
@@ -708,8 +773,15 @@ Validate JabRef linked files stored in `file` fields.
 pynakes asset check refs.bib
 pynakes asset check refs.bib --json
 pynakes asset check refs.bib --root ~/papers --json
-pynakes asset check refs.bib --fix --backup
+pynakes asset repair refs.bib --dry-run --diff   # preview the manifest repair
+pynakes asset repair refs.bib --backup
 ```
+
+`asset check` only reports, so it can gate a commit. `asset repair` reconciles
+the Pinax manifest with the material files that exist: it drops records for
+keys the library no longer has and for files that are gone, and records files
+the manifest does not know. It changes only the manifest — no material file and
+no byte of the library.
 
 `asset check` takes one or more libraries as positional arguments (handy for CI
 gating). `asset fetch` downloads materials for one entry or for a whole library;
@@ -717,7 +789,7 @@ its first positional is a citation key, so the whole-library form names the
 library with `--file`:
 
 ```bash
-pynakes asset fetch alvarez2019 refs.bib   # one entry
+pynakes asset fetch refs.bib alvarez2019   # one entry
 pynakes asset fetch --file refs.bib        # every entry with missing materials
 ```
 
@@ -755,10 +827,24 @@ model cannot rewrite losslessly, currently repeated assignments of one field in
 an entry. Other lint findings remain available through `pynakes lint` but do not
 block layout formatting of an incomplete draft.
 
-`format` clears every `layout`-category lint finding: it lowercases entry types
+`format` clears every `formatting`-category lint finding: it lowercases entry types
 and field names, both of which BibTeX treats case-insensitively, so recasing them
-changes no bibliographic value. Only `format` does this — an ordinary surgical
-edit leaves the spelling of entries it was not asked to change untouched.
+changes no bibliographic value. An ordinary surgical edit leaves the spelling of
+entries it was not asked to change untouched.
+
+A library that another tool saves in its own type spelling — JabRef writes
+`@Article` and `@InProceedings` — would churn: `format` lowercases the types and
+the next JabRef save restores them. Set `format-entry-type-case: preserve` (or
+pass `--entry-type-case preserve`) to keep each entry's own spelling. The
+setting governs type case for every command: `format` keeps the spelling,
+`normalize` leaves types alone while still lowercasing field names, and `lint`
+reports a type only when `format` would recase it. `init --jabref` sets it.
+
+```bibtex
+@comment{pynakes-meta:
+format-entry-type-case: preserve
+}
+```
 
 By default, fields use **pynakes' preferred order**. This is not prescribed by
 BibTeX, BibLaTeX, or JabRef; field order has no bibliographic meaning. It is a
@@ -817,7 +903,8 @@ Default behavior:
 - normalize author/editor lists in JabRef style
 - normalize DOI values
 - rewrite page ranges to `start--end`
-- lowercase entry types and field names
+- lowercase entry types and field names (entry types stay as they are under
+  `format-entry-type-case: preserve`; see [format](#format))
 - leave journal titles unchanged unless a journal style is configured
 
 A step the library has turned off reports `off` rather than `0`, because the
@@ -836,7 +923,7 @@ pynakes normalize refs.bib --title-protection off
 pynakes normalize refs.bib --doi-normalization off
 pynakes normalize refs.bib --pages off
 pynakes normalize refs.bib --identifier-case off
-pynakes normalize refs.bib --keys on
+pynakes normalize refs.bib --key-generation on
 ```
 
 Page ranges are rewritten to BibTeX's `start--end`: a Unicode en-dash
@@ -911,7 +998,7 @@ and `grouping` becomes `group-tree`.
 Existing native keys are never overwritten.
 
 To regenerate citation keys from the configured pattern, set
-`normalize-keys: true` in `pynakes-meta` or pass `--keys on`. The
+`normalize-keys: true` in `pynakes-meta` or pass `--key-generation on`. The
 pattern is read from `key-pattern` (native) or
 `keypatterndefault`/`keypattern_<type>` (JabRef fallback). The
 bibliography entry is renamed in the `.bib` file and any Pinax
@@ -982,11 +1069,11 @@ What counts as private is the library's call:
 
 ```bash
 # Add to the set (globs allowed), or spare something from it
-pynakes scrub refs.bib --out public.bib --field abstract --keep-field file
+pynakes scrub refs.bib --out public.bib --drop-field abstract --keep-field file
 
 # Keep a whole kind
 pynakes scrub refs.bib --out public.bib --keep-comments --keep-metadata
-pynakes scrub refs.bib --out public.bib --keep-fields   # blocks only
+pynakes scrub refs.bib --out public.bib --keep-field '*'   # blocks only
 ```
 
 A library can record its own policy instead of repeating flags — see
@@ -1043,7 +1130,7 @@ Combine one or more inputs (merged in memory) and route their entries into
 several output files, each selected by a predicate. This is `1.bib 2.bib → 3.bib
 4.bib` in one step.
 
-Each `--to FILE='predicate'` rule pairs an output file with a selector. The
+Each `--route FILE='predicate'` rule pairs an output file with a selector. The
 predicate is any [`--where`](#selecting-entries-where) expression — including
 `and`/`or`/`not` — plus the bucket predicates `*` (catch-all) and `used` /
 `unused` (against the citations found in `--tex`/`--aux` sources).
@@ -1051,18 +1138,18 @@ predicate is any [`--where`](#selecting-entries-where) expression — including
 ```bash
 # Partition by group (first match wins; `*` collects the rest)
 pynakes corpus split refs.bib extra.bib \
-  --to ml.bib='group "Machine Learning"' \
-  --to rest.bib='*'
+  --route ml.bib='group "Machine Learning"' \
+  --route rest.bib='*'
 
 # Partition into cited vs uncited against a manuscript
 pynakes corpus split refs.bib --tex paper.tex \
-  --to used.bib='used' \
-  --to unused.bib='*' --dry-run --diff
+  --route used.bib='used' \
+  --route unused.bib='*' --dry-run --diff
 
 # Bucket predicates compose with field predicates
 pynakes corpus split refs.bib --tex paper.tex \
-  --to recent-cited.bib='used and year >= 2020' \
-  --to rest.bib='*'
+  --route recent-cited.bib='used and year >= 2020' \
+  --route rest.bib='*'
 ```
 
 Routing is **first match** by default — each entry lands in the first output
@@ -1114,10 +1201,10 @@ Search entries without modifying the library.
 
 ```bash
 pynakes search learning                   # auto-detects one .bib file
-pynakes search learning refs.bib
-pynakes search 'title:"natural language" type:article' refs.bib --json
-pynakes search widgets refs.bib --field title --where 'year = 2024' --json
-pynakes search "" refs.bib --where 'doi missing'    # predicate only, no text match
+pynakes search refs.bib learning
+pynakes search refs.bib 'title:"natural language" type:article' --json
+pynakes search refs.bib widgets --in-field title --where 'year = 2024' --json
+pynakes search refs.bib "" --where 'doi missing'    # predicate only, no text match
 ```
 
 Terms are ANDed. Quoted phrases stay together. `field:term` scopes a term to a
@@ -1127,8 +1214,8 @@ field; plain terms search the key, type, and stored fields.
 normalized similarity, so a half-remembered title still finds its entry:
 
 ```bash
-pynakes search 'nueral widgts' refs.bib --fuzzy
-pynakes search widgets refs.bib --where 'year >= 2020 and abstract missing' --json
+pynakes search refs.bib 'nueral widgts' --fuzzy
+pynakes search refs.bib widgets --where 'year >= 2020 and abstract missing' --json
 ```
 
 Results are ranked by match strength (key > title > author > other fields >
@@ -1143,17 +1230,17 @@ Which entries are searched is a separate question from what matches: `--where`
 answers it with the shared [selector grammar](#selecting-entries-where),
 covering date ranges and missing-field queries without search-specific flags.
 
-`--show-abstract` prints a one-line abstract excerpt under each hit, so a
+`--abstract` prints a one-line abstract excerpt under each hit, so a
 result list can be triaged without a second command; a result with no stored
 abstract says `(no abstract)`. The excerpt is for reading — `--json` always
-carries the full abstract, including when `--field` restricts the fields
+carries the full abstract, including when `--in-field` restricts the fields
 searched, and reporting the abstract never widens what the query matches:
 
 ```bash
-pynakes search 'quantum computing' refs.bib --fuzzy --show-abstract --limit 10
+pynakes search refs.bib 'quantum computing' --fuzzy --abstract --limit 10
 ```
 
-For the promising keys, `ref show --keys k1,k2,…` prints the summarized
+For the promising keys, `ref show --key k1,k2,…` prints the summarized
 entries; a single `ref show <key>` prints one in full.
 
 ## dedupe

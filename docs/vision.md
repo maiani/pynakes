@@ -36,7 +36,8 @@ BibTeX:
   ambiguous operations report conflicts instead of choosing silently.
 - **Preserve unless asked to transform.** Normalization and formatting happen
   only through explicit commands. Lint findings are advisory unless strict mode
-  is requested.
+  is requested, and strict mode accepts only findings the library explicitly
+  suppresses.
 - **Explicit side effects.** Network access is limited to `ref import`, `asset
   fetch`, and operations invoked with `--online`.
 

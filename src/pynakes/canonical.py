@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, cast
 
 from pynakes._canonical_order import _FIELD_ORDER
 from pynakes._canonical_wrap import _render_wrapped_entry
@@ -36,18 +36,21 @@ __all__ = [
     "ALIGNMENTS",
     "BLOCK_ORDERS",
     "ENTRY_ORDERS",
+    "ENTRY_TYPE_CASES",
     "FIELD_ORDERS",
     "WRAP_VALUE_MODES",
     "Alignment",
     "BlockOrder",
     "CanonicalLayout",
     "EntryOrder",
+    "EntryTypeCase",
     "FieldOrder",
     "FormatLintError",
     "WrapValues",
     "format_entry",
     "format_selected_entries",
     "layout_from_metadata",
+    "resolve_entry_type_case",
     "validate_format_input",
     "write_bib_canonical",
 ]
@@ -56,12 +59,14 @@ Alignment = Literal["compact", "equals"]
 FieldOrder = Literal["preferred", "preserve", "alphabetical"]
 EntryOrder = Literal["preserve", "key", "profile"]
 BlockOrder = Literal["preserve", "canonical"]
+EntryTypeCase = Literal["lower", "preserve"]
 WrapValues = Literal["off", "stable", "canonical"]
 
 ALIGNMENTS = ("compact", "equals")
 FIELD_ORDERS = ("preferred", "preserve", "alphabetical")
 ENTRY_ORDERS = ("preserve", "key", "profile")
 BLOCK_ORDERS = ("preserve", "canonical")
+ENTRY_TYPE_CASES = ("lower", "preserve")
 WRAP_VALUE_MODES = ("off", "stable", "canonical")
 
 # ---------------------------------------------------------------------------
@@ -86,6 +91,7 @@ class CanonicalLayout:
     block_order: BlockOrder = "canonical"
     wrap_values: WrapValues = "off"
     line_width: int = 100
+    entry_type_case: EntryTypeCase = "lower"
 
     def __post_init__(self) -> None:
         if not self.indent:
@@ -95,8 +101,18 @@ class CanonicalLayout:
         _validate_choice("entry order", self.entry_order, ENTRY_ORDERS)
         _validate_choice("block order", self.block_order, BLOCK_ORDERS)
         _validate_choice("wrap-values mode", self.wrap_values, WRAP_VALUE_MODES)
+        _validate_choice("entry-type case", self.entry_type_case, ENTRY_TYPE_CASES)
         if self.line_width < 20:
             raise ValueError("format line width must be at least 20")
+
+    def entry_type(self, entry_type: str) -> str:
+        """Return ``entry_type`` as this layout writes it.
+
+        Entry types are case-insensitive in BibTeX, so recasing one is layout.
+        ``preserve`` keeps the source spelling, which is how a library that
+        another tool saves in its own spelling (``@Article``) stays stable.
+        """
+        return entry_type if self.entry_type_case == "preserve" else entry_type.lower()
 
 
 class FormatLintError(ValueError):
@@ -140,6 +156,19 @@ def _metadata_choice(lib: BibFile, key: str, default: str, choices: tuple[str, .
     return normalized
 
 
+def resolve_entry_type_case(lib: BibFile) -> EntryTypeCase:
+    """Return the library's stored ``format-entry-type-case`` (default ``lower``).
+
+    ``format`` writes types in this case, ``normalize`` recases them only under
+    ``lower``, and ``lint`` reports a type exactly when ``format`` would recase
+    it. Raises ``ValueError`` on a value outside :data:`ENTRY_TYPE_CASES`.
+    """
+    return cast(
+        EntryTypeCase,
+        _metadata_choice(lib, "format-entry-type-case", "lower", ENTRY_TYPE_CASES),
+    )
+
+
 def layout_from_metadata(
     lib: BibFile,
     *,
@@ -152,6 +181,7 @@ def layout_from_metadata(
     block_order: BlockOrder | None = None,
     wrap_values: WrapValues | None = None,
     line_width: int | None = None,
+    entry_type_case: EntryTypeCase | None = None,
 ) -> CanonicalLayout:
     """Resolve portable ``format-*`` metadata, with explicit arguments winning."""
     raw_indent = metadata_value(lib, "format-indent")
@@ -205,6 +235,9 @@ def layout_from_metadata(
             else wrap_values
         ),
         line_width=profile_width if line_width is None else line_width,
+        entry_type_case=(
+            resolve_entry_type_case(lib) if entry_type_case is None else entry_type_case
+        ),
     )
 
 
@@ -291,7 +324,7 @@ def format_entry(
         indent=layout.indent,
         tabular=layout.alignment == "equals",
         trailing_comma=layout.trailing_comma,
-        entry_type=entry.type.lower(),
+        entry_type=layout.entry_type(entry.type),
     )
 
 
