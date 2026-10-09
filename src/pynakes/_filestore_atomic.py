@@ -13,7 +13,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from pynakes._atomic import match_mode, replace_file
+from pynakes._atomic import match_mode, replace_file, sync_file
 
 _FILESYSTEM_ERRORS = (OSError, shutil.Error)
 
@@ -81,7 +81,7 @@ def _atomic_write_bytes(path: Path, data: bytes, root: Path) -> None:
     try:
         with tmp:
             tmp.write(data)
-            tmp.flush()
+            sync_file(tmp)
         # Keep the material's permissions. A symlinked material is replaced,
         # never written through: its target may lie outside the store.
         match_mode(tmp_path, path)

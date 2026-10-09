@@ -6,9 +6,15 @@ import re
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from shutil import copyfile, copymode
+from shutil import copyfileobj, copymode
 
-from pynakes._atomic import match_mode, next_backup_path, replace_file, replacement_target
+from pynakes._atomic import (
+    match_mode,
+    next_backup_path,
+    replace_file,
+    replacement_target,
+    sync_file,
+)
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.model import BibFile
@@ -40,7 +46,9 @@ def _write_backup(path: Path) -> str:
     with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as tmp:
         staged_backup = Path(tmp.name)
     try:
-        copyfile(path, staged_backup)
+        with path.open("rb") as source, staged_backup.open("wb") as staged:
+            copyfileobj(source, staged)
+            sync_file(staged)
         copymode(path, staged_backup)
         replace_file(staged_backup, backup_path)
     finally:
@@ -205,7 +213,9 @@ def save_text(
     When backup and atomic writing are both enabled, the backup is staged as a
     copy and published before the destination is atomically replaced. The
     original therefore remains at the destination path until the final replace.
-    Temporary files are removed on handled failures. These mechanics reduce
+    The temporary file is synced to disk before the replace and, on POSIX, the
+    directory after it, so a crash right after a successful save does not lose
+    it. Temporary files are removed on handled failures. These mechanics reduce
     common interruption hazards; they are not a formal durability guarantee
     against every process, operating-system, or storage failure.
     """
@@ -232,6 +242,7 @@ def save_text(
             with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as tmp:
                 tmp_path = Path(tmp.name)
                 tmp.write(data)
+                sync_file(tmp)
 
             if validate:
                 # Read back exactly as a later load would, mark and all.
@@ -258,7 +269,9 @@ def save_text(
             # Non-atomic write — preserve a copied backup first if requested.
             if backup and original_exists:
                 backup_path = _write_backup(path)
-            path.write_bytes(data)
+            with path.open("wb") as f:
+                f.write(data)
+                sync_file(f)
 
         return SaveResult(success=True, file_path=file_path, backup_path=backup_path, error=None)
 

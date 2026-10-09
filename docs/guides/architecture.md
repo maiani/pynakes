@@ -251,8 +251,10 @@ validation for BibTeX text, and replacement of the destination. They return
 `SaveResult` rather than exposing ordinary write failures as raw tracebacks to
 the CLI. With atomic writes and backups enabled, a copied backup is staged
 without moving the original, then the prepared destination replaces the
-original in one filesystem operation. Handled failures clean up temporary
-files. These are safety mechanisms and design goals, not formal guarantees
+original in one filesystem operation. The temporary file is synced to disk
+before that replace and, on POSIX, the directory after it, so a save that
+reported success survives a crash or power loss right after it. Handled
+failures clean up temporary files. These are safety mechanisms and design goals, not formal guarantees
 against every process crash, operating-system failure, or storage failure.
 
 ## Domain modules
