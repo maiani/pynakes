@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=77.0", "wheel"]
+requires = ["setuptools>=77.0", "setuptools-scm>=8", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "pynakes"
-version = "0.7.0"
+dynamic = ["version"]
 description = "Agent-friendly, round-trip-faithful BibTeX/BibLaTeX maintenance toolkit"
 readme = "README.md"
 license = "MIT"
@@ -78,6 +78,14 @@ pynakes = "pynakes.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# The version comes from git. A checkout at tag vX.Y.Z is exactly X.Y.Z; past
+# it, the version names the next minor release plus the distance and commit
+# (0.7.0.dev36+gd42f2cf), so a development install never claims to be a release
+# it is not. A release-* branch bumps the patch number instead. A checkout must
+# have its history and tags: a shallow clone yields 0.1.devN.
+[tool.setuptools_scm]
+version_scheme = "release-branch-semver"
 
 [tool.setuptools.package-data]
 pynakes = [

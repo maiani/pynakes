@@ -194,6 +194,33 @@ def build_where_filter(
     return membership if parsed is None else And((parsed, membership))
 
 
+def select_keys(
+    coll: Bibliography,
+    where: str | None,
+    keys: list[str] | None,
+    json_output: bool,
+    action: str,
+) -> list[str] | None:
+    """Resolve ``--where`` / ``--key`` to the selected citation keys, in file order.
+
+    ``None`` when neither is given: the command acts on every entry. A ``--key``
+    that names no entry is a ``KeyNotFound`` error rather than a quietly smaller
+    selection, so a mistyped key is never read as "nothing to do".
+    """
+    selector = build_where_filter(where, keys=keys)
+    if selector is None:
+        return None
+    missing = [name for name in parse_key_selector(keys) if name not in coll.lib.entries]
+    if missing:
+        _emit_error(
+            json_output,
+            "KeyNotFound",
+            f"No reference with key {', '.join(map(repr, missing))}",
+            action=action,
+        )
+    return list(dict.fromkeys(entry.key for entry in coll.lib.entries.values() if selector(entry)))
+
+
 @dataclass
 class RunParams:
     """Consolidated CLI run parameters.

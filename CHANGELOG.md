@@ -109,6 +109,22 @@ form is a `UsageError`, never silently reinterpreted.
 
 ### Added
 
+- **One entry selector on every command that edits entries.** `enrich`,
+  `normalize`, `keys generate`, and `asset fetch` now take `--key` and `--where`,
+  like `fields`, `format`, and `ref directive`. A lookup for a few references no
+  longer has to run over the whole library or be done by hand. A `--key` naming
+  no entry is a `KeyNotFound` error; a selection that matches nothing writes
+  nothing and warns `no_entries_selected`. A contract test now fails any
+  entry-editing command that lacks the selector without a recorded reason.
+  `keys generate` had its `--key` removed in 0.6 when its positional key became
+  the way to name one entry; it returns as the shared selector.
+- **`normalize --only STEP`** runs just the named steps (comma-separated,
+  repeatable), and `--key`/`--where` just the selected entries:
+  `normalize --key Newton1687,Euler1748 --only journals` abbreviates two journal
+  names and changes nothing else. A selection never re-sorts the file or
+  rearranges its metadata. A flag for a step that cannot run is refused rather
+  than ignored: `--sort-by` with a selection, or `--author-style` with
+  `--only journals`. Each step left out is reported under `operations.skipped`.
 - **Suppressing accepted lint findings**
   ([#2](https://github.com/maiani/pynakes/issues/2)):
   - **`lint --ignore NAME`** (repeatable) and the **`lint-ignore`** library
@@ -161,6 +177,13 @@ form is a `UsageError`, never silently reinterpreted.
 
 ### Changed
 
+- **`ref import` follows the library's declared style.** An imported entry is
+  given the library's `normalize-*` settings and JabRef saveActions (journal
+  and author style, title protection, and the rest) and its `format-*` layout,
+  such as aligned `=`. It used to arrive with full journal names and compact
+  layout in a library that abbreviates and aligns, so `lint` flagged it at once.
+  Only the new entry changes, and a library that declares none of these
+  settings gets the entry as before.
 - `normalize` no longer loads the bundled journal tables when no journal style
   is configured (the default), which saved about 0.4 s per run. With a style,
   the 66,000 bundled rows are parsed once per process instead of on every call.
@@ -208,6 +231,13 @@ form is a `UsageError`, never silently reinterpreted.
 
 ### Fixed
 
+- Editing a field that followed a value containing a braced quote, such as the
+  umlaut in `K{\"o}rper`, appended a second copy of the field instead of
+  replacing the first. The field scanner took the `"` for the start of a quoted
+  value and stopped seeing field names for the rest of the entry. `normalize`,
+  `enrich`, `fields`, and every other command that edits fields were affected.
+- `capabilities` listed only some of the commands that accept `--where`; its
+  `predicate_grammar.used_by` is now read from the live commands.
 - `capabilities` now lists `--file`/`-f` on the 47 commands that take it (the
   schema was read before the option was wired in), the `--no-…` half of every
   flag pair, and integer options as `integer` instead of `string`. A bounded
@@ -274,6 +304,15 @@ form is a `UsageError`, never silently reinterpreted.
   CLI contract tests had skipped on every run for want of the engine's
   dependencies; `PYNAKES_REQUIRE_ENGINE` now makes that a failure in CI.
   `pixi run test-extension` installs the engine too.
+- The package version comes from git through setuptools-scm instead of a
+  number written in `pyproject.toml`. A checkout at tag `vX.Y.Z` is exactly
+  `X.Y.Z`; between tags it is the next minor release with the distance and
+  commit, such as `0.7.0.dev12+g1a2b3c4`. A development install used to report
+  the last release while running unreleased code, which hid why it behaved
+  differently from that release. Building from a checkout now needs its git
+  history and tags; CI fetches them. A release checks that the built wheel and
+  sdist carry the tag's version, and a dry run checks `CHANGELOG.md` for the
+  version the next release would have. The sdist ships the same files as before.
 
 ### Editor
 

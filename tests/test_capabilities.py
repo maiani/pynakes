@@ -150,14 +150,10 @@ class TestErrorCatalogAndGrammar:
         # One transversal selector surface: if a command grows a --where, it
         # belongs here, so an agent can tell where a selector is accepted.
         grammar = get_capabilities()["predicate_grammar"]
-        assert grammar["used_by"] == [
-            "fields (--where, --key)",
-            "search (--where, --key)",
-            "format (--where, --key)",
-            "corpus combine (--where, --key)",
-            "corpus split (--route)",
-            "batch (fields.* where)",
-        ]
+        used_by = grammar["used_by"]
+        for name in ("enrich", "normalize", "keys generate", "asset fetch", "ref directive"):
+            assert f"{name} (--where, --key)" in used_by
+        assert used_by[-2:] == ["corpus split (--route)", "batch (fields.* where)"]
         # --key is the no-grammar shorthand, so its relationship to --where has
         # to be stated where an agent reads the selector surface.
         assert "key in [...]" in grammar["key_selector"]

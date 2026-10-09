@@ -7,6 +7,7 @@ result. Do not import this module directly; use ``pynakes.engine``.
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -47,6 +48,14 @@ class BibliographyKeys:
         rename = key_ops.regenerate_key(self.lib, key)
         self._stage_pinax_renames([rename] if rename is not None else [])
         return rename
+
+    def generate_selected_keys(
+        self, keys: Collection[str]
+    ) -> tuple[list[tuple[str, str]], list[str]]:
+        """Regenerate the citation keys in ``keys``; return renames and skipped duplicates."""
+        renames, duplicated = key_ops.regenerate_selected_keys(self.lib, keys)
+        self._stage_pinax_renames(renames)
+        return renames, duplicated
 
     def repair_keys(self) -> list[tuple[str, str]]:
         """Repair duplicate citation keys."""

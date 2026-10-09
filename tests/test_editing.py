@@ -172,3 +172,19 @@ def test_set_raw_field_edits_first_of_repeated_fields() -> None:
     edited = set_raw_field(raw, "note", "New")
 
     assert edited == "@article{k,\n  note = {New},\n  note = {second}\n}"
+
+
+class TestQuoteInsideBraces:
+    """A ``"`` inside braces is a literal character, never a value delimiter."""
+
+    def test_field_after_an_umlaut_is_edited_in_place(self) -> None:
+        raw = '@article{k,\n  title = {Zur K{\\"o}rper},\n  journal = {Annalen der Physik},\n}'
+        out = set_raw_field(raw, "journal", "Ann. Phys.")
+        assert out.count("journal") == 1
+        assert "journal = {Ann. Phys.}," in out
+        assert raw_field_names(raw) == ["title", "journal"]
+
+    def test_braced_quote_inside_a_quoted_value(self) -> None:
+        raw = '@article{k,\n  title = "Zur K{\\"o}rper",\n  year = {1905},\n}'
+        assert raw_field_names(raw) == ["title", "year"]
+        assert set_raw_field(raw, "year", "1906").count("year") == 1

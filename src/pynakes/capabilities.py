@@ -35,14 +35,6 @@ _TYPE_VOCABULARY = {
 # addresses a set of entries. Described by `pynakes.query`, so the capability
 # description cannot drift from the parser.
 _PREDICATE_GRAMMAR = {
-    "used_by": [
-        "fields (--where, --key)",
-        "search (--where, --key)",
-        "format (--where, --key)",
-        "corpus combine (--where, --key)",
-        "corpus split (--route)",
-        "batch (fields.* where)",
-    ],
     "key_selector": (
         "--key selects by citation key without the expression grammar: "
         "comma-separated, repeatable, equivalent to --where 'key in [...]'. "
@@ -229,6 +221,24 @@ def _write_precondition(schemas: dict) -> dict:
     }
 
 
+def _selector_surfaces(schemas: dict[str, dict]) -> list[str]:
+    """Every place the predicate grammar is accepted, read from the live commands.
+
+    Derived rather than listed, so a command that grows ``--where`` cannot be
+    missing from it.
+    """
+    selecting = sorted(
+        name
+        for name, schema in schemas.items()
+        if "--where" in {flag for option in schema["options"] for flag in option["flags"]}
+    )
+    return [
+        *(f"{name} (--where, --key)" for name in selecting),
+        "corpus split (--route)",
+        "batch (fields.* where)",
+    ]
+
+
 def get_capabilities() -> dict:
     """Return a structured description of supported operations and commands."""
     schemas = command_schemas()
@@ -399,7 +409,7 @@ def get_capabilities() -> dict:
         # and the one selector grammar shared by every entry-addressable command.
         "command_schemas": schemas,
         "error_codes": catalogue_description(),
-        "predicate_grammar": _PREDICATE_GRAMMAR,
+        "predicate_grammar": {"used_by": _selector_surfaces(schemas), **_PREDICATE_GRAMMAR},
         "search_query_grammar": _SEARCH_QUERY_GRAMMAR,
         "formatting": {
             "lint_gate": (

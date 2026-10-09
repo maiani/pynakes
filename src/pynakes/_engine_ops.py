@@ -11,7 +11,7 @@ Group-tree and key operations live in :mod:`pynakes._engine_groups` and
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Collection, Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -31,6 +31,7 @@ from pynakes._engine_helpers import (
     run_fetch_loop,
 )
 from pynakes._entry_comments import attached_comment_indices
+from pynakes._library_style import apply_library_style
 from pynakes.canonical import CanonicalLayout, format_selected_entries, validate_format_input
 from pynakes.editing import set_entry_type
 from pynakes.fetch_progress import FetchProgress
@@ -301,12 +302,17 @@ class BibliographyOperations:
         options: normalize_ops.NormalizeOptions | None = None,
         *,
         force_key_renames: bool = False,
+        keys: Collection[str] | None = None,
     ) -> normalize_ops.NormalizeResult:
-        """Apply configured normalization steps, optionally forcing incomplete key rewrites."""
+        """Apply configured normalization steps, for ``keys`` or every entry.
+
+        ``force_key_renames`` lets key regeneration go ahead when a linked TeX
+        source cannot be rewritten.
+        """
         opts = options or normalize_ops.NormalizeOptions()
-        report = normalize_ops.normalize_library(self.lib, opts)
-        self._consolidate_metadata = normalize_ops.resolve_format_metadata(
-            self.lib, opts.format_metadata
+        report = normalize_ops.normalize_library(self.lib, opts, keys=keys)
+        self._consolidate_metadata = "metadata" not in report.skipped and (
+            normalize_ops.resolve_format_metadata(self.lib, opts.format_metadata)
         )
         if report.sort_entries_count:
             # Sorting reorders _entries in-place. Clearing the snapshot makes
@@ -379,7 +385,9 @@ class BibliographyOperations:
         """Import one reference from a supported identifier or URL into memory.
 
         The identifier type is auto-detected and provider metadata is normalized
-        for the library's BibTeX/BibLaTeX dialect. Returns ``(kind, entry)``.
+        for the library's BibTeX/BibLaTeX dialect. The entry then follows the
+        library's declared ``normalize-*`` and ``format-*`` settings, so it
+        needs no clean-up pass of its own. Returns ``(kind, entry)``.
         """
         kind, entry = importer_ops.prepare_imported_reference(
             self.lib,
@@ -389,6 +397,7 @@ class BibliographyOperations:
             key_source=key_source,
             allow_duplicate=allow_duplicate,
         )
+        apply_library_style(self.lib, entry)
         self.lib.entries.add(entry)
         self._appended_entries.append(entry)
         return kind, entry
@@ -563,14 +572,16 @@ class BibliographyOperations:
         cache_file: str | Path | None = None,
         progress: EntryProgress | None = None,
         concurrency: int = 1,
+        keys: Collection[str] | None = None,
     ) -> integrity_ops.EnrichReport:
-        """Conservatively fill missing metadata in memory."""
+        """Conservatively fill missing metadata in memory, for ``keys`` or every entry."""
         report = integrity_ops.enrich_library(
             self.lib,
             online=online,
             cache_file=cache_file,
             progress=progress,
             concurrency=concurrency,
+            keys=keys,
         )
         return report
 
@@ -581,8 +592,9 @@ class BibliographyOperations:
         cache_file: str | Path | None = None,
         progress: EntryProgress | None = None,
         concurrency: int = 1,
+        keys: Collection[str] | None = None,
     ) -> integrity_ops.PublishedReport:
-        """Apply conservative published-version metadata updates in memory."""
+        """Apply published-version metadata updates in memory, for ``keys`` or every entry."""
         report = integrity_ops.check_published(
             self.lib,
             online=online,
@@ -590,6 +602,7 @@ class BibliographyOperations:
             cache_file=cache_file,
             progress=progress,
             concurrency=concurrency,
+            keys=keys,
         )
         return report
 
@@ -626,6 +639,7 @@ class BibliographyOperations:
         cache_file: str | Path | None = None,
         progress: FetchProgress | None = None,
         access: str = "open",
+        keys: Collection[str] | None = None,
     ) -> dict:
         """Download selected arXiv, published, and supplementary materials for entries.
 
@@ -644,6 +658,7 @@ class BibliographyOperations:
             cache_file: Optional path to a provider-response cache file.
             progress: Optional callback receiving fetch progress events.
             access: Published-material access mode: ``open`` or ``institutional``.
+            keys: Citation keys to fetch for, in place of ``target``; ``None`` for all.
 
         Returns:
             A dict with ``fetched``, ``skipped``, ``failed`` lists, plus
@@ -665,7 +680,7 @@ class BibliographyOperations:
         else:
             resolved = metadata_fetch_policy(self.lib)
 
-        entry_queue = build_fetch_queue(self.lib, target)
+        entry_queue = build_fetch_queue(self.lib, target, keys)
         fetched, skipped, failed = run_fetch_loop(
             entry_queue,
             store,

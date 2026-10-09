@@ -1,5 +1,6 @@
 """High-level bibliography normalization routine."""
 
+from collections.abc import Collection
 from dataclasses import dataclass, field
 
 from pynakes import authors as author_ops
@@ -7,6 +8,13 @@ from pynakes import fields as field_ops
 from pynakes import journals as journal_ops
 from pynakes._calendar import MONTH_ABBR_TO_NAME, MONTH_NUM_TO_ABBR, month_name_to_int
 from pynakes._identifiers import normalize_doi
+from pynakes._normalize_steps import (
+    NOT_IN_ONLY,
+    WHOLE_FILE,
+    WHOLE_FILE_STEPS,
+    entry_view,
+    step_name,
+)
 from pynakes.authors import NAME_FIELDS
 from pynakes.canonical import resolve_entry_type_case
 from pynakes.editing import (
@@ -19,6 +27,7 @@ from pynakes.editing import (
 from pynakes.fields import TITLE_FIELDS
 from pynakes.formatters import FIELD_FORMATTERS, normalize_page_numbers
 from pynakes.keys import regenerate_keys as _regenerate_keys
+from pynakes.keys import regenerate_selected_keys
 from pynakes.metadata import metadata_bool, metadata_list, metadata_value
 from pynakes.metadata.jabref import (
     SAVE_ORDER_KEY_FIELDS,
@@ -82,6 +91,8 @@ class NormalizeOptions:
     # ``field`` or ``field:asc`` / ``field:desc``. ``["original"]`` (or
     # ``["none"]``) forces "keep current order", overriding ``saveOrderConfig``.
     sort_by: list[str] | None = None
+    # Run only these steps (names from :data:`STEPS`); ``None`` runs them all.
+    only: list[str] | None = None
 
 
 @dataclass
@@ -315,17 +326,40 @@ def normalize_month_macros(lib: BibFile) -> int:
     return changed
 
 
-def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> NormalizeResult:
-    """Apply the configured normalization steps to the bibliography in-place."""
+def normalize_library(
+    lib: BibFile,
+    options: NormalizeOptions | None = None,
+    *,
+    keys: Collection[str] | None = None,
+) -> NormalizeResult:
+    """Apply the configured normalization steps to the bibliography in-place.
+
+    ``options.only`` runs just the named steps. ``keys`` limits the run to those
+    citation keys; the whole-file steps in :data:`WHOLE_FILE_STEPS` then do not
+    run, since sorting or consolidating a file is not something a few of its
+    entries can do. Each step that did not run is recorded in ``skipped``.
+    """
     opts = options or NormalizeOptions()
     result = NormalizeResult()
+    only = None if opts.only is None else {step_name(step) for step in opts.only}
+
+    def runs(step: str) -> bool:
+        if only is not None and step not in only:
+            result.skipped[step] = NOT_IN_ONLY
+            return False
+        if keys is not None and step in WHOLE_FILE_STEPS:
+            result.skipped[step] = WHOLE_FILE
+            return False
+        return True
+
+    selection = lib if keys is None else entry_view(lib, keys)
 
     # Adopt JabRef metadata as pynakes-native when the native equivalent is
     # absent. This ensures that a library created or maintained in JabRef gains
     # the corresponding pynakes-native keys silently — no explicit migration
     # step required. Synthetic blocks share the jabref block's raw/comment_index
     # so the post-normalize consolidation step can find and reposition them.
-    for block in lib.metadata_blocks:
+    for block in lib.metadata_blocks if runs("metadata") else ():
         if block.namespace != "jabref":
             continue
         native_key = native_key_for_jabref(block.key)
@@ -365,33 +399,41 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
     else:
         author_default, doi_default, pages_default = "jabref", True, True
 
-    for drop_field in _resolve_drop_fields(lib, opts.drop_fields):
-        result.dropped_fields += field_ops.clear_field(lib, drop_field)
+    if runs("drop_fields"):
+        for drop_field in _resolve_drop_fields(lib, opts.drop_fields):
+            result.dropped_fields += field_ops.clear_field(selection, drop_field)
 
-    if _resolve_bool(lib, opts.protect_titles, "protect-titles", True):
+    if not runs("titles"):
+        pass
+    elif _resolve_bool(lib, opts.protect_titles, "protect-titles", True):
         terms = _resolve_terms(lib, opts.protected_terms)
         for field in _resolve_title_fields(lib, opts.title_fields):
-            changed = field_ops.protect_title_capitalization(lib, field=field, terms=terms)
+            changed = field_ops.protect_title_capitalization(selection, field=field, terms=terms)
             if changed:
                 result.title_fields[field] = changed
     else:
         _record_skip(result, "titles", "title protection is off")
 
-    author_style = _resolve_choice(
-        lib, opts.author_style, "author-style", author_ops.AUTHOR_STYLES, author_default
-    )
-    result.authors = author_ops.normalize_authors(lib, author_style)
-    if author_style == "none":
-        _record_skip(result, "authors", "author style is 'none'")
+    if runs("authors"):
+        author_style = _resolve_choice(
+            lib, opts.author_style, "author-style", author_ops.AUTHOR_STYLES, author_default
+        )
+        result.authors = author_ops.normalize_authors(selection, author_style)
+        if author_style == "none":
+            _record_skip(result, "authors", "author style is 'none'")
 
-    if _resolve_bool(lib, opts.normalize_dois, "dois", doi_default):
-        result.dois, doi_warnings = normalize_dois(lib)
+    if not runs("dois"):
+        pass
+    elif _resolve_bool(lib, opts.normalize_dois, "dois", doi_default):
+        result.dois, doi_warnings = normalize_dois(selection)
         result.warnings.extend(doi_warnings)
     else:
         _record_skip(result, "dois", "DOI normalization is off")
 
-    if _resolve_bool(lib, opts.normalize_pages, "pages", pages_default):
-        result.pages = normalize_pages(lib)
+    if not runs("pages"):
+        pass
+    elif _resolve_bool(lib, opts.normalize_pages, "pages", pages_default):
+        result.pages = normalize_pages(selection)
     elif not pages_default:
         result.skipped["pages"] = (
             "the library's own JabRef saveActions already run normalize_page_numbers "
@@ -404,63 +446,77 @@ def normalize_library(lib: BibFile, options: NormalizeOptions | None = None) -> 
     # not reversible without the right table, so it runs only when a style is
     # configured explicitly (CLI ``--journal-style`` or a ``normalize-journal-style``
     # metadata key).
-    journal_style = _resolve_choice(
-        lib, opts.journal_style, "journal-style", journal_ops.JOURNAL_STYLES, "none"
-    )
-    journal_source = _resolve_choice(
-        lib,
-        opts.journal_source,
-        "journal-source",
-        journal_ops.JOURNAL_SOURCES,
-        journal_ops.DEFAULT_JOURNAL_SOURCE,
-    )
-    journal_table = opts.journal_table or metadata_value(lib, "normalize-journal-table")
-    ltwa_table = opts.ltwa_table or metadata_value(lib, "normalize-ltwa-table")
-    # The bundled tables hold 66,000 rows; load them only for a style that
-    # reads them, as lint does.
-    journal_sources = (
-        journal_ops.load_sources(journal_table, ltwa_table, journal_source)
-        if journal_style != "none"
-        else None
-    )
-    journal_result = journal_ops.normalize_journals(lib, journal_style, journal_sources)
-    result.journals = journal_result.changed
-    result.warnings.extend(journal_ops.unknown_journal_warnings(journal_result.unknown))
-    if journal_style == "none":
-        _record_skip(
-            result,
-            "journals",
-            "no journal style is configured, so journal titles were left as they are",
+    if runs("journals"):
+        journal_style = _resolve_choice(
+            lib, opts.journal_style, "journal-style", journal_ops.JOURNAL_STYLES, "none"
         )
+        journal_source = _resolve_choice(
+            lib,
+            opts.journal_source,
+            "journal-source",
+            journal_ops.JOURNAL_SOURCES,
+            journal_ops.DEFAULT_JOURNAL_SOURCE,
+        )
+        journal_table = opts.journal_table or metadata_value(lib, "normalize-journal-table")
+        ltwa_table = opts.ltwa_table or metadata_value(lib, "normalize-ltwa-table")
+        # The bundled tables hold 66,000 rows; load them only for a style that
+        # reads them, as lint does.
+        journal_sources = (
+            journal_ops.load_sources(journal_table, ltwa_table, journal_source)
+            if journal_style != "none"
+            else None
+        )
+        journal_result = journal_ops.normalize_journals(selection, journal_style, journal_sources)
+        result.journals = journal_result.changed
+        result.warnings.extend(journal_ops.unknown_journal_warnings(journal_result.unknown))
+        if journal_style == "none":
+            _record_skip(
+                result,
+                "journals",
+                "no journal style is configured, so journal titles were left as they are",
+            )
 
     # Apply the remaining JabRef saveActions field formatters (date/month/pages)
     # exactly where the file configures them. There is no pynakes-meta or CLI
     # equivalent: these run because JabRef's own saveActions ask for them.
-    if save_actions is not None and save_actions.enabled:
+    if save_actions is not None and save_actions.enabled and runs("save_actions"):
         result.save_action_fields, formatter_warnings = _apply_save_action_formatters(
-            lib, save_actions
+            selection, save_actions
         )
         result.warnings.extend(formatter_warnings)
 
     # This syntax-specific pass repairs bare full month names and canonicalizes
     # predefined macro spelling without changing literals or custom strings.
-    result.months = normalize_month_macros(lib)
+    if runs("months"):
+        result.months = normalize_month_macros(selection)
 
-    if _resolve_bool(lib, opts.identifier_case, "identifier-case", True):
+    if not runs("identifier_case"):
+        pass
+    elif _resolve_bool(lib, opts.identifier_case, "identifier-case", True):
         result.entry_types, result.field_names = normalize_identifier_case(
-            lib, entry_types=resolve_entry_type_case(lib) == "lower"
+            selection, entry_types=resolve_entry_type_case(lib) == "lower"
         )
     else:
         _record_skip(result, "identifier_case", "identifier-case normalization is off")
 
-    criteria = _resolve_sort_criteria(lib, opts.sort_by)
-    if criteria:
-        sort_entries(lib, criteria)
-        result.sort_criteria = criteria
-        result.sort_entries_count = len(lib.entries)
+    if runs("sort"):
+        criteria = _resolve_sort_criteria(lib, opts.sort_by)
+        if criteria:
+            sort_entries(lib, criteria)
+            result.sort_criteria = criteria
+            result.sort_entries_count = len(lib.entries)
 
-    if _resolve_bool(lib, opts.normalize_keys, "keys", False):
-        renames = _regenerate_keys(lib)
+    if not runs("keys"):
+        pass
+    elif _resolve_bool(lib, opts.normalize_keys, "keys", False):
+        if keys is None:
+            renames = _regenerate_keys(lib)
+        else:
+            renames, duplicated = regenerate_selected_keys(lib, keys)
+            result.warnings.extend(
+                f"Left duplicated key {key!r} as it is; repair duplicates first"
+                for key in duplicated
+            )
         result.keys = len(renames)
         result.renamed_keys = renames
         if renames:

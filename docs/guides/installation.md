@@ -103,6 +103,12 @@ pip install --upgrade setuptools wheel
 pip install -e ".[dev]"
 ```
 
+The version comes from git tags (setuptools-scm), so install from a clone with
+its history and tags: a shallow clone reports a version such as `0.1.dev1`.
+Between releases, `pynakes --version` names the next release, the commits since
+the last tag, and the commit (`0.7.0.dev12+g1a2b3c4`). An editable install
+records the version when it is installed; reinstall to refresh it.
+
 ## Next Steps
 
 - [Quick Start Guide](quickstart.md)

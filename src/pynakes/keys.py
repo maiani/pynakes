@@ -12,7 +12,7 @@ Generation is deterministic — the same entry always yields the same key.
 """
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 
 from pynakes._text_utils import entry_year
 from pynakes.authors import ascii_fold as _ascii_fold
@@ -602,6 +602,29 @@ def regenerate_key(lib: BibFile, key: str) -> tuple[str, str] | None:
         return None
     rewrite_key_references(lib, [(key, new_key)])
     return key, new_key
+
+
+def regenerate_selected_keys(
+    lib: BibFile, keys: Collection[str]
+) -> tuple[list[tuple[str, str]], list[str]]:
+    """Regenerate the keys of the entries named in ``keys``, one at a time.
+
+    Each runs as :func:`regenerate_key` against the whole library, so a new key
+    never collides with an entry outside the selection. A duplicated key cannot
+    be regenerated without first saying which entry is meant, so it is skipped
+    rather than failing the rest. Returns the applied ``(old, new)`` renames and
+    the skipped duplicated keys.
+    """
+    renames: list[tuple[str, str]] = []
+    duplicated: list[str] = []
+    for key in dict.fromkeys(keys):
+        if len(lib.entries.get_all(key)) > 1:
+            duplicated.append(key)
+            continue
+        rename = regenerate_key(lib, key)
+        if rename is not None:
+            renames.append(rename)
+    return renames, duplicated
 
 
 def repair_duplicate_keys(lib: BibFile) -> list[tuple[str, str]]:
