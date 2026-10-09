@@ -231,6 +231,13 @@ form is a `UsageError`, never silently reinterpreted.
 
 ### Fixed
 
+- Large libraries took quadratic time: finding an entry's line number counted
+  every line before it, and looking an entry up by key scanned the whole
+  library, so a 20,000-entry file never finished parsing. Both are now linear
+  in total; 20,000 entries parse in under 3 s, and `lint`, `format --check`,
+  and `normalize` scale with them. Line numbers now count only `\n`, `\r\n`,
+  and `\r` as line breaks, as editors do, rather than also `\f`, `\x85`, and
+  Unicode line separators.
 - Editing a field that followed a value containing a braced quote, such as the
   umlaut in `K{\"o}rper`, appended a second copy of the field instead of
   replacing the first. The field scanner took the `"` for the start of a quoted

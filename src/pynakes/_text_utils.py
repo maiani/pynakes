@@ -175,19 +175,40 @@ def _line_end(text: str, start: int) -> int:
     return carriage_return + 1 if carriage_return != -1 else len(text)
 
 
-def _line_number(text: str, position: int) -> int:
-    """Return the one-based line number at *position* for any line ending.
+def _count_line_breaks(segment: str) -> int:
+    """Count the line breaks in *segment*: ``\\n``, ``\\r\\n``, and a lone ``\\r``."""
+    return segment.count("\n") + segment.count("\r") - segment.count("\r\n")
 
-    Counts the lines *before* the position rather than the lines the prefix
-    spans, so a position in the middle of a line reports that line and not the
-    next one — which matters wherever a match can start mid-line: a second
-    ``@entry`` sharing a line with the previous block's closing brace, or a
-    ``\\cite`` in running text.
+
+class LineCounter:
+    """One-based line numbers for positions in one text, in linear total time.
+
+    Each query counts only the line breaks since the previous one, so numbering
+    every block of a file in order costs one pass over it, where counting from
+    the start for each block cost one pass per block. A query behind the last
+    one starts over from the beginning. Line breaks are ``\\n``, ``\\r\\n``,
+    and a lone ``\\r`` — the ones editors number lines by, so a reported line
+    is the line an editor shows. A position counts the breaks *before* it, so a
+    match starting mid-line — a second ``@entry`` after the previous block's
+    closing brace, a ``\\cite`` in running text — reports its own line.
     """
-    prefix = text[:position]
-    if not prefix:
-        return 1
-    return len(prefix.splitlines()) + (1 if prefix.endswith(("\n", "\r")) else 0)
+
+    def __init__(self, text: str) -> None:
+        self._text = text
+        self._position = 0
+        self._line = 1
+
+    def at(self, position: int) -> int:
+        """Return the line *position* is on."""
+        if position < self._position:
+            self._position, self._line = 0, 1
+        segment = self._text[self._position : position]
+        self._line += _count_line_breaks(segment)
+        if segment.startswith("\n") and self._text[self._position - 1 : self._position] == "\r":
+            # The ``\\r`` of a ``\\r\\n`` ended the last segment and was counted there.
+            self._line -= 1
+        self._position = position
+        return self._line
 
 
 def strip_meta_terminator(value: str) -> str:

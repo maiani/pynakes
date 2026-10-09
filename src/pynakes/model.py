@@ -232,6 +232,13 @@ class MetadataBlock:
         }
 
 
+#: Bumped whenever an existing entry's ``key`` is reassigned, so an
+#: :class:`EntryStore` can tell its key index has gone stale. Keys are renamed
+#: in place (``entry.key = new``) by design, and the entry does not know which
+#: store holds it, so this is the one signal every store can check cheaply.
+_key_generation = 0
+
+
 @dataclass
 class BibEntry:
     """One bibliographic record and its preservation state.
@@ -260,6 +267,12 @@ class BibEntry:
     #: One-based source line of the ``@type{key,`` declaration, set by the
     #: parser; ``None`` for entries constructed in memory.
     start_line: int | None = None
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if name == "key" and "key" in self.__dict__:
+            global _key_generation
+            _key_generation += 1
+        object.__setattr__(self, name, value)
 
     def resolve(self, lookup: Lookup) -> dict[str, str]:
         """Return own fields with BibLaTeX inheritance applied.
@@ -300,6 +313,10 @@ class EntryStore:
         entries: "EntryStore | dict[str, BibEntry] | list[BibEntry] | None" = None,
     ) -> None:
         self._entries: list[BibEntry] = []
+        # Key -> entries in store order, built on first lookup. ``None`` once
+        # the list changes; rebuilt when any entry's key has changed since.
+        self._index: dict[str, list[BibEntry]] | None = None
+        self._index_generation = -1
         if entries is None:
             return
         if isinstance(entries, EntryStore):
@@ -332,39 +349,57 @@ class EntryStore:
 
     # --- dict-like access (first match wins) ---
 
+    def _lookup(self, key: str) -> list[BibEntry]:
+        """Return the entries with ``key`` in store order, through the key index.
+
+        Lookups by key used to scan the whole list, which made every loop that
+        looks an entry up per entry — parsing, lint, key generation — quadratic.
+        """
+        if self._index is None or self._index_generation != _key_generation:
+            index: dict[str, list[BibEntry]] = {}
+            for entry in self._entries:
+                index.setdefault(entry.key, []).append(entry)
+            self._index = index
+            self._index_generation = _key_generation
+        return self._index.get(key, [])
+
     def __contains__(self, key: str) -> bool:
-        return any(entry.key == key for entry in self._entries)
+        return bool(self._lookup(key))
 
     def __getitem__(self, key: str) -> BibEntry:
-        for entry in self._entries:
-            if entry.key == key:
-                return entry
-        raise KeyError(key)
+        matches = self._lookup(key)
+        if not matches:
+            raise KeyError(key)
+        return matches[0]
 
     def __setitem__(self, key: str, entry: BibEntry) -> None:
         """Replace the first entry with ``key``, or append if none exists."""
-        for i, existing in enumerate(self._entries):
-            if existing.key == key:
-                self._entries[i] = entry
-                return
-        self._entries.append(entry)
+        matches = self._lookup(key)
+        if matches:
+            self._entries[self._entries.index(matches[0])] = entry
+        else:
+            self._entries.append(entry)
+        self._index = None
 
     def get(self, key: str, default: BibEntry | None = None) -> BibEntry | None:
         """Return the first entry with ``key``, or ``default``."""
-        for entry in self._entries:
-            if entry.key == key:
-                return entry
-        return default
+        matches = self._lookup(key)
+        return matches[0] if matches else default
 
     # --- duplicate-aware helpers ---
 
     def add(self, entry: BibEntry) -> None:
         """Append an entry, preserving any existing entry with the same key."""
         self._entries.append(entry)
+        if self._index is not None:
+            # Appending keeps every key's list in store order, so the index
+            # stays valid; rebuilding it here would make a loop of adds quadratic.
+            self._index.setdefault(entry.key, []).append(entry)
 
     def remove(self, entry: BibEntry) -> None:
         """Remove one entry object from the store."""
         self._entries.remove(entry)
+        self._index = None
 
     def reorder(self, key: Callable[[BibEntry], object], *, reverse: bool = False) -> None:
         """Stably reorder entries in place by ``key`` (duplicates preserved).
@@ -374,6 +409,7 @@ class EntryStore:
         a multi-criterion sort from least- to most-significant key.
         """
         self._entries.sort(key=key, reverse=reverse)
+        self._index = None
 
     def set_order(self, entries: Iterable[BibEntry]) -> None:
         """Replace the order with exactly *entries*, preserving object identity.
@@ -388,10 +424,11 @@ class EntryStore:
         }:
             raise ValueError("new entry order must contain every existing entry exactly once")
         self._entries = ordered
+        self._index = None
 
     def get_all(self, key: str) -> list[BibEntry]:
         """Return every entry with the given citation key, in order."""
-        return [entry for entry in self._entries if entry.key == key]
+        return list(self._lookup(key))
 
     def duplicate_keys(self) -> dict[str, int]:
         """Return ``{key: count}`` for keys that appear more than once."""
