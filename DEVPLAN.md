@@ -154,6 +154,12 @@ Decisions taken:
 - No project-level config (`pynakes.toml`, `[tool.pynakes]`) in 0.7: the `.bib`
   carries its own settings and every client reads them there. Revisit with the
   v0.8 `Library`, whose directory is the natural home for shared defaults.
+- The Gate 4 contract tests are in `tests/test_contract.py`, read from the live
+  command tree: the positional table, one shape per flag spelling (`--key` and
+  `--title-field` are the recorded exceptions), an offline `--json` sample per
+  command checked against its envelope family (modify, create, read, check,
+  error; `corpus split` reports `outputs`), error codes catalogued both ways,
+  and `capabilities` matching the parsed options.
 - `lint --strict` fails on any finding left after suppression, not only on
   errors and profile deviations: every other gate already failed on any
   finding, and once findings can be suppressed explicitly, "strict" can mean
@@ -175,12 +181,6 @@ Decisions taken:
   `lint` counts at top level and `search`'s `fields`/`show_abstract`; the "New
   group…" flow must pass `groups add-entry --create`. Then
   `npm run compile && npm test`.
-- **Gate 4 contract tests**: the positional-signature table, the
-  flag-spelling sweep, the envelope-schema sweep over every command's `--json`
-  output, the AST test that every emitted code is catalogued, and the
-  `capabilities` option-type/choice/code test. Today
-  `tests/test_write_precondition.py` covers `--expect-sha256` on every
-  modifying command, and the rest is sampled.
 - **Tests for the new behavior** not yet written: each deprecated spelling and
   value (warning shape in JSON, stderr line in human mode), the legacy
   operand-first order per command, the misplaced-`.bib` usage error, `--file`

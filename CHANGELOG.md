@@ -195,6 +195,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `capabilities` now lists `--file`/`-f` on the 47 commands that take it (the
+  schema was read before the option was wired in), the `--no-…` half of every
+  flag pair, and integer options as `integer` instead of `string`. Contract
+  tests over the live command tree now guard the whole CLI surface.
 - The `corpus batch` `ref.edit` operation now validates its input as `ref
   edit` does: field values are trimmed, an invalid field name or a `key`/`type`
   pseudo-field is refused, a field cannot be both set and cleared, and an
