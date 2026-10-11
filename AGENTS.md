@@ -8,11 +8,14 @@ Guidance for coding agents (and humans) **developing** this repository.
 
 ## What this project is
 
-`pynakes` is a headless BibTeX/BibLaTeX maintenance toolkit with a
-custom parser built for round-trip fidelity. At the file layer it interoperates
-losslessly with JabRef and the BibTeX/BibLaTeX toolchain — that compatibility is
-a guarantee it keeps, not its identity. Its optional **Pinax** mode manages a
-`.bib` together with the materials it points to, addressed by citation key.
+`pynakes` is a reference management engine for BibTeX and BibLaTeX bibliographies and their research materials,
+exposed through a Python library and CLI. It acquires, curates, compares and
+validates references, tracks their use in manuscripts, and optionally manages
+PDFs and source materials through **Pinax**, addressed by citation key. Its
+custom parser preserves source fidelity; JabRef and BibTeX/BibLaTeX
+interoperability keep existing libraries usable across tools. The ambition is
+reference management across a research library's lifetime; planned Library,
+Catalogue and client integrations must build on this same engine.
 See [docs/guides/architecture.md](docs/guides/architecture.md) for the design,
 [docs/vision.md](docs/vision.md) for the design philosophy,
 [DEVPLAN.md](DEVPLAN.md) for the phased plan, and
@@ -92,7 +95,7 @@ pre-commit install           # enable ruff hooks on commit
 pytest --cov --cov-fail-under=90
 ruff check src tests         # lint
 ruff format --check src tests
-mypy                         # type-check (baseline in pyproject.toml)
+ty check                     # type-check
 mkdocs build --strict
 mkdocs serve                 # live-preview the docs at localhost:8000
 python -m build              # release artifact check
@@ -103,15 +106,15 @@ The API reference is generated from docstrings by `mkdocstrings`
 ([docs/api/reference.md](docs/api/reference.md)); keep public-module docstrings
 accurate rather than hand-maintaining a symbol list.
 
-For code changes, run the test suite, both Ruff checks, and mypy before
+For code changes, run the test suite, both Ruff checks, and ty before
 considering the change done. Changes under `editor/` run their own checks instead
 (`npm run compile && npm test` in that directory, or `pixi run test-extension`
 from the root). `pixi.toml` provides Node plus a pinned Python 3.12 for building
 the extension — `pixi run build-extension` — and does not replace the pip
 workflow above for engine work. Run the strict docs build when documentation or public APIs change;
-run the artifact checks for packaging or release work. CI runs Python 3.12–3.14
-on Linux, Windows, and macOS (3.15 allowed to fail), a lowest-dependency job,
-the 90% coverage gate, Ruff and mypy, strict docs, and wheel/sdist checks.
+run the artifact checks for packaging or release work. CI runs Python 3.12–3.15
+on Linux, Windows, and macOS, a lowest-dependency job,
+the 90% coverage gate, Ruff and ty, strict docs, and wheel/sdist checks.
 The release workflow reruns the suite against the built wheel before publishing.
 
 ## Invariants to preserve

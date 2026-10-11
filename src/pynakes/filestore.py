@@ -7,7 +7,7 @@ writes. It does not fetch or parse remote content.
 
 import os
 import shutil
-from collections.abc import Iterable, Iterator
+from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -166,6 +166,7 @@ class FileStore(PinaxManifest):
         value = metadata_value(lib, FILES_DIR_KEY)
         if value is None:
             return None
+        _unique_keys(lib.entries.keys())
         path = resolve_files_dir(value, bib_path)
         return cls(root=path, bib_path=_absolute_bib_path(bib_path))
 
@@ -217,7 +218,7 @@ class FileStore(PinaxManifest):
                 raise OSError(f"Refusing to use {path}: it is a symbolic link")
 
     @contextmanager
-    def scratch(self) -> Iterator[Path]:
+    def scratch(self) -> Generator[Path, None, None]:
         """Yield this process's scratch directory, releasing it when empty.
 
         Temporary files stage here instead of beside the materials, so a write
@@ -353,6 +354,13 @@ class FileStore(PinaxManifest):
         copied: list[dict[str, str]] = []
         source_paths = source.paths_for(key)
         target_paths = self.paths_for(key)
+        # Validate all source trees before copying any material.
+        for kind in ARTIFACT_KINDS:
+            src = getattr(source_paths, kind)
+            if getattr(target_paths, kind).is_symlink():
+                raise ValueError(f"Symlink in material destination: {getattr(target_paths, kind)}")
+            if src.is_symlink() or (src.is_dir() and any(p.is_symlink() for p in src.rglob("*"))):
+                raise ValueError(f"Symlink in material source: {src}")
         for kind in ARTIFACT_KINDS:
             src = getattr(source_paths, kind)
             dst = getattr(target_paths, kind)

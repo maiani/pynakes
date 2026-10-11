@@ -109,6 +109,13 @@ form is a `UsageError`, never silently reinterpreted.
 
 ### Added
 
+- Support Python 3.15, with required tests on all three supported operating
+  systems and release wheel checks on the newest interpreter.
+- Property tests for encoded whole-file fidelity, isolated field edits,
+  parseable commits, format/normalize idempotence, and combine/split entry
+  preservation; adversarial input and CLI output-policy regression tests.
+
+
 - **One entry selector on every command that edits entries.** `enrich`,
   `normalize`, `keys generate`, and `asset fetch` now take `--key` and `--where`,
   like `fields`, `format`, and `ref directive`. A lookup for a few references no
@@ -177,6 +184,24 @@ form is a `UsageError`, never silently reinterpreted.
 
 ### Changed
 
+- Describe pynakes as a reference management engine for BibTeX and BibLaTeX
+  bibliographies and their research materials across package metadata, CLI discovery and core documentation. Center
+  reference curation, citation tracking and optional material provenance;
+  distinguish implemented workflows from planned Library/Catalogue APIs.
+
+
+- Replace mypy with pinned ty in development dependencies, CI, pre-commit and
+  contributor checks. Record existing annotation debt per module and rule;
+  the baseline must shrink rather than grow.
+- Validate public network destinations and every redirect, pin DNS results for
+  connections while preserving Host/TLS names, warn on HTTPS downgrades, cap
+  metadata responses at 8 MiB, and bound retry/redirect/stream progress by a
+  shared deadline. Custom injected openers retain their own transport policy.
+- Scrub additional reference-manager bookkeeping and recognizable local paths,
+  plain working comments between entries, and comment lines inside entries;
+  preserve literal percent signs and explicit keep options.
+
+
 - `inspect` reports the encoding of a file with a byte-order mark by its codec
   name: `utf-8-sig`, `utf-16-le`, `utf-16-be`, `utf-32-le`, or `utf-32-be`.
   A UTF-8 file with a mark used to report `utf-8`.
@@ -233,6 +258,19 @@ form is a `UsageError`, never silently reinterpreted.
   `tests/test_contract.py`.
 
 ### Fixed
+
+- Reject nonportable Pinax citation-key paths and case-colliding keys; refuse
+  symlinks in material copies and installed source trees.
+- Sync source-tree contents before atomic installation and make provenance
+  manifest backups synced, atomic and numbered.
+- Rewrite fully braced citation-key references on rename; count escaped braces
+  consistently during wrapping; refuse unbalanced external field values before
+  editing or constructing imported entries.
+- Decode completion libraries, conversion inputs and previous-output diffs with
+  the library encoding rules, including BOM and Latin-1 detection.
+- Exit cleanly when stdout is closed instead of trying to write an error
+  envelope to the same broken stream.
+
 
 - A value with an unmatched `{` or `}` was accepted and could leave a file that
   no longer parsed. `fields set`/`append`, `ref add`/`ref edit --field`,

@@ -4,6 +4,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
 from pynakes._calendar import MONTH_ABBR_TO_NUM as MONTH_NUMBERS
+from pynakes._text_utils import check_balanced_braces
 from pynakes.authors import split_name_list
 from pynakes.entry_types import container_title
 from pynakes.keys import generate_key, unique_key
@@ -111,6 +112,8 @@ def build_bibfile(records: Iterable[object], converter: Callable[..., BibEntry |
     for record in records:
         entry = converter(record, taken)
         if entry is not None:
+            for name, value in entry.fields.items():
+                check_balanced_braces(f"Imported field {name!r}", value)
             store.add(entry)
     return BibFile(entries=store)
 

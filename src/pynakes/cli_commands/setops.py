@@ -37,7 +37,7 @@ from pynakes.cli_common import (
 from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography
 from pynakes.filestore import FILES_DIR_KEY, FileStore
-from pynakes.io import save_text
+from pynakes.io import _decode_bytes, save_text
 from pynakes.metadata import metadata_value, set_metadata
 from pynakes.model import BibFile
 from pynakes.setops import PartitionRule, merge_libraries, partition_library, strip_metadata_blocks
@@ -175,7 +175,7 @@ def combine(
     previous_content = ""
     if params.diff:
         try:
-            previous_content = Path(out).read_text(encoding="utf-8")
+            previous_content = _decode_bytes(Path(out).read_bytes(), Path(out))[0]
         except FileNotFoundError:
             pass
 
@@ -354,7 +354,7 @@ def split(
         previous_content = ""
         if params.diff:
             try:
-                previous_content = Path(rule.label).read_text(encoding="utf-8")
+                previous_content = _decode_bytes(Path(rule.label).read_bytes(), Path(rule.label))[0]
             except FileNotFoundError:
                 pass
 

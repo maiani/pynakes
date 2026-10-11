@@ -41,6 +41,7 @@ nav:
   - Git Workflows: guides/git-workflows.md
   - Philosophy: vision.md
   - Architecture: guides/architecture.md
+  - Type Checking: guides/type-checking.md
   - JabRef Compatibility: guides/jabref-compatibility.md
   - Pinax (corpus layer): guides/pinax.md
   - API Reference:

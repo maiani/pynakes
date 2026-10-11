@@ -101,8 +101,11 @@ def rewrite_key_references(lib: BibFile, renames: list[tuple[str, str]]) -> int:
             parts = value.split(",")
             for index, part in enumerate(parts):
                 key = part.strip()
-                if key in mapping:
-                    parts[index] = part.replace(key, mapping[key], 1)
+                unwrapped = key
+                while unwrapped.startswith("{") and unwrapped.endswith("}"):
+                    unwrapped = unwrapped[1:-1].strip()
+                if unwrapped in mapping:
+                    parts[index] = part.replace(unwrapped, mapping[unwrapped], 1)
             touched |= set_entry_field(entry, name, ",".join(parts))
         changed += touched
     return changed

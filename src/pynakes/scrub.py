@@ -35,7 +35,8 @@ from __future__ import annotations
 import fnmatch
 from dataclasses import dataclass, field
 
-from pynakes.editing import remove_entry_field
+from pynakes._scrub_source import LOCAL_PATH
+from pynakes.editing import remove_entry_comments, remove_entry_field
 from pynakes.metadata import metadata_bool, metadata_list_values, metadata_value
 from pynakes.model import BibFile
 
@@ -53,6 +54,14 @@ DEFAULT_PRIVATE_FIELDS: tuple[str, ...] = (
     "annote",
     "annotation",
     "comment",
+    "comment-*",
+    "date-added",
+    "date-modified",
+    "read",
+    "rating",
+    "mendeley-*",
+    "localfile",
+    "attachments",
     "review",
     "priority",
     "ranking",
@@ -201,7 +210,9 @@ def _scrub_fields(lib: BibFile, patterns: list[str], keep: list[str]) -> tuple[d
     for entry in lib.entries.values():
         touched = False
         for name in list(entry.fields):
-            if not _matches(name, patterns) or _matches(name, keep):
+            if (
+                not _matches(name, patterns) and not LOCAL_PATH.search(entry.fields[name])
+            ) or _matches(name, keep):
                 continue
             if remove_entry_field(entry, name):
                 counts[name] = counts.get(name, 0) + 1
@@ -237,6 +248,8 @@ def scrub_library(lib: BibFile, options: ScrubOptions | None = None) -> ScrubRep
 
     scrub_metadata = _resolve_switch(lib, opts.metadata, SCRUB_METADATA_KEY)
     scrub_comments = _resolve_switch(lib, opts.comments, SCRUB_COMMENTS_KEY)
+    if scrub_comments:
+        report.comments += sum(remove_entry_comments(entry) for entry in lib.entries.values())
     metadata_slots = _metadata_comment_indices(lib)
 
     removed: list[int] = []

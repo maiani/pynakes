@@ -53,7 +53,7 @@ pre-commit run --all-files
 ```
 
 GitHub Actions runs these checks on Linux, Windows, and macOS with Python 3.12,
-3.13, and 3.14, plus once against the lowest dependency versions
+3.13, 3.14, and 3.15, plus once against the lowest dependency versions
 `pyproject.toml` declares.
 
 ## Shell Completion

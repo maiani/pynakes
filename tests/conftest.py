@@ -60,3 +60,11 @@ def _instant_http_retries(request: pytest.FixtureRequest, monkeypatch: pytest.Mo
     from pynakes.providers import _http
 
     monkeypatch.setattr(_http, "_retry_delay", lambda attempt, retry_after: 0.0)
+
+
+@pytest.fixture(autouse=True)
+def _offline_provider_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mocked HTTP tests never depend on real DNS; policy tests override this seam."""
+    from pynakes.providers import _network
+
+    monkeypatch.setattr(_network, "resolve_addresses", lambda host, port: ["93.184.216.34"])

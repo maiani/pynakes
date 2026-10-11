@@ -4,8 +4,8 @@ from pathlib import Path
 
 from click.shell_completion import CompletionItem
 
-from pynakes.bibtex_parser import parse_bib
 from pynakes.cli_common import bib_candidates, single_bib_file
+from pynakes.io import load_bib
 
 
 def _citekey_completer(ctx, incomplete):
@@ -24,7 +24,7 @@ def _citekey_completer(ctx, incomplete):
             return []
         file = str(candidate)
     try:
-        lib = parse_bib(Path(file).read_text(encoding="utf-8"))
+        lib = load_bib(str(file))
         return [
             CompletionItem(key)
             for key in sorted(set(lib.entries.keys()))
@@ -49,7 +49,7 @@ def _bibfile_completer(ctx, incomplete):
         if incomplete.lower() in name.lower():
             items.append(CompletionItem(name))
         try:
-            lib = parse_bib(candidate.read_text(encoding="utf-8"))
+            lib = load_bib(str(candidate))
         except Exception:
             return items
         for key in sorted(set(lib.entries.keys())):

@@ -246,8 +246,10 @@ def get_capabilities() -> dict:
         "tool": "pynakes",
         "version": VERSION,
         "description": (
-            "BibTeX/BibLaTeX maintenance with minimal diffs, dry-run previews, "
-            "atomic writes, structured JSON, and JabRef interoperability."
+            "Reference management engine for BibTeX and BibLaTeX bibliographies and "
+            "their research materials: curation, citation tracking, and optional "
+            "material management, with "
+            "reviewable edits, structured JSON, and JabRef interoperability."
         ),
         "network_access_is_explicit": True,
         "supports_dry_run": True,

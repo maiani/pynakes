@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from pynakes._text_utils import check_balanced_braces
 from pynakes.formatters._pages import normalize_page_numbers
 
 
@@ -50,6 +51,8 @@ class ReferenceMetadata:
             name.strip(): value for name, value in self.field_expressions.items()
         }
         self.identifiers = {name.strip().lower(): value for name, value in self.identifiers.items()}
+        for name, value in self.fields.items():
+            check_balanced_braces(f"Provider field {name!r}", value)
         self._normalize_pages()
 
     def _normalize_pages(self) -> None:

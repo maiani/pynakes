@@ -13,3 +13,9 @@ repos:
         language: system
         pass_filenames: false
         types_or: [python, pyi]
+      - id: ty-check
+        name: ty check
+        entry: ty check
+        language: system
+        pass_filenames: false
+        types_or: [python, pyi]

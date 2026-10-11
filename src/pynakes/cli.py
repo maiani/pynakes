@@ -47,7 +47,7 @@ from pynakes.cli_discovery import AutoBibGroup
 from pynakes.cli_surface import FILE_OPTION, FILE_OPTION_HELP, LIBRARY_ARGUMENT
 
 app = typer.Typer(
-    help="Agent-friendly BibTeX library management tool",
+    help="Reference management engine for BibTeX, BibLaTeX, and their materials",
     cls=AutoBibGroup,
     rich_markup_mode="rich",
 )
@@ -82,7 +82,7 @@ def main(
         help="Show the pynakes version and exit.",
     ),
 ) -> None:
-    """Agent-friendly BibTeX library management tool."""
+    """Reference management engine for BibTeX, BibLaTeX, and their materials."""
 
 
 init.register(app)

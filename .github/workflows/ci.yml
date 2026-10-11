@@ -39,27 +39,19 @@ jobs:
       - name: Ruff format check
         run: ruff format --check src tests
 
-      # Modules listed in pyproject's mypy baseline are skipped; every other
-      # module must type-check clean.
-      - name: Mypy
-        run: mypy
+      # Existing annotation debt is recorded per module and rule in pyproject.
+      - name: Ty
+        run: ty check
 
   # Every operating system and Python version the package metadata claims.
   test:
     name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.12", "3.13", "3.14"]
-        experimental: [false]
-        include:
-          # The next Python, as an early warning; allowed to fail.
-          - os: ubuntu-latest
-            python-version: "3.15"
-            experimental: true
+        python-version: ["3.12", "3.13", "3.14", "3.15"]
 
     steps:
       - name: Check out repository
@@ -72,7 +64,6 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
           cache: pip
 
       - name: Install package

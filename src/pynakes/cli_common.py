@@ -437,6 +437,9 @@ def _safe(fn: _F) -> _F:
             return fn(*args, **kwargs)
         except typer.Exit:
             raise
+        except BrokenPipeError:
+            # The reader closed stdout; attempting another envelope cannot work.
+            raise typer.Exit(1) from None
         except FileNotFoundError as exc:
             _emit_error(json_output, "FileNotFound", str(exc))
         except ParseError as exc:

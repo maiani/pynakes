@@ -1,11 +1,18 @@
 # pynakes development plan
 
-pynakes is a **standalone bib-file engine** — a Python library + CLI, complete
-and valuable on its own. Applications built on top of it (capture, reading, a
-UI, sync) remain separate companion projects rather than layers inside the core
-engine. This plan may track their integration milestones, but they must consume
-the same pinned public API instead of adding a second parser, data model, or
-source of truth.
+pynakes is a **reference management engine for BibTeX and BibLaTeX bibliographies and their research materials**,
+exposed through a Python library and CLI. The product ambition is to support a
+research library throughout its life: reference acquisition and curation,
+material provenance, project bibliographies, manuscript citation maintenance,
+and public release copies.
+
+The current foundation is one authoritative `Bibliography` (`.bib`), optional
+Pinax materials, and explicit operations across files. The next planned step
+extends that foundation to `Library`, a rebuildable `Catalogue`, and analysis
+across collections. Applications for capture, reading, graphical interaction,
+and sync consume the same engine; they share its parser, data model and review
+contract. Planned integrations are tracked here without being advertised as
+implemented features.
 
 This document is the **road to 1.0** and the major releases beyond it.
 Completed work is recorded in [CHANGELOG.md](CHANGELOG.md) and the git log.
@@ -63,7 +70,7 @@ The work is recorded in CHANGELOG under Unreleased: Python 3.12 as the floor, th
 three-OS matrix with 3.15 allowed to fail, a lowest-dependency job, release
 checks and wheel tests before publishing, PyPI before the GitHub release,
 dependabot, the two Windows fixes, and mypy at a recorded baseline (the
-`[[tool.mypy.overrides]]` list in `pyproject.toml`, to shrink and never grow).
+then-current `[[tool.mypy.overrides]]` list, since replaced by the ty baseline).
 Actions are referenced by major version tag, by choice, rather than pinned by
 commit SHA. Running the release workflow by hand is a dry run; its TestPyPI
 option needs a `testpypi` environment and a trusted publisher on test.pypi.org
@@ -189,89 +196,95 @@ tests the gate did not require moved to Stage 5.
 
 #### Stage 5 — Hardening and scale
 
-- **Finish the audit.** Not yet covered: the full hostile-input matrix (deep
-  nesting, `@string` and `crossref` cycles, invalid and UTF-16 encodings, binary
-  input, a closed stdout, invalid option values); the interchange readers (RIS,
-  MODS, EndNote, CSV); symlink-following in `corpus combine`'s material copy;
-  and the JSON output of `ref import` and `asset fetch`. Any data-loss or
-  security finding ships as a 0.6.x patch without waiting for this stage.
-- **Scale.** *(Done, 2026-10-09.)* Line numbering and key lookup were linear
-  per call, which made parsing and everything built on it quadratic; both are
-  now linear in total (`LineCounter`, `EntryStore`'s key index). Measured with
-  `scripts/bench_scale.py` on a synthetic library (one machine; recorded, not
-  asserted) — at 20,000 entries (5.3 MB): parse 2.6 s, `lint` 8.7 s,
-  `format --check` 14.6 s, `normalize --dry-run` 6.7 s, each 5× its 4,000-entry
-  time. A single 4 MB field formats in 8.5 s, linear in its size; the 36 s
-  reported for a 2 MB field no longer reproduces. What remains is constant
-  factors — each entry is parsed about three times in a `format --check` run —
-  which belongs to v0.9's performance work.
-- **`scrub` completeness.** `scrub --check` passes a file containing comments
-  between entries, `%` lines inside entries, JabRef `comment-<user>` fields
-  (which name the user), BibDesk and Mendeley fields (`date-added`,
-  `date-modified`, `read`, `rating`, `mendeley-*`), `localfile`,
-  `attachments`, `file://` URLs, or home-directory paths in `note`, `@string`,
-  or `@preamble`.
-- **Pinax keys as paths**: reject `:` (drive-relative on Windows), NUL, reserved
-  device names, and over-long keys; detect keys that differ only in case, which
-  share one material file on macOS and Windows.
-- **Network limits**: an overall deadline beside the per-operation timeouts,
-  a size cap on metadata responses (downloads are capped since 0.6.5),
-  http(s)-only redirects, refusal of private and loopback addresses, a warning
-  on an https → http downgrade, and an arXiv-id shape check before a URL is
-  built from one.
-- **Durability.** *(Done: atomic writes sync the file before the replace and
-  the directory after it on POSIX.)* Left: the contents of a directory moved
-  into place by `_atomic_replace_dir` (Pinax preprint sources) are not synced,
-  nor is the manifest's `shutil.copy2` backup.
-- **Correctness gaps**:
-  - *(Done: rename paths follow references, now tested through the CLI;
-    unbalanced user values refused; `asset check` without a manifest; REVTeX
-    `Notes.bib` discovery.)* Follow-ups: `_canonical_wrap._balanced_braces`
-    skips escaped braces while the parser counts them, a possible `format` bug;
-    a fully braced reference such as `related = {{Newton1687}}` is not rewritten
-    on rename; values pynakes takes from elsewhere (provider metadata, `file`
-    paths) are not brace-checked.
-  - *(Done: encoding detection by byte-order mark and refusal of mixed bytes,
-    the file's own ending kept on write, numbered backups.)* Left: a few
-    readers still assume UTF-8 and can misread a UTF-16 or Latin-1 library —
-    the previous-content diffs of `convert` and `corpus`, `cli_completion`, and
-    `asset_check`.
-- **Module size.** `fetch.py` (789), `_engine_helpers.py` (773), `normalize.py`
-  (739), and `_engine_ops.py` (713) are near the 800-line limit: split them
-  before adding to them.
-- **Stage 4 behavior tests** not yet written: the `--force` overwrite policy
-  per command, `format --out`, `convert --diff`/`--force`/`--expect-sha256` on
-  import, `ref remove` of a duplicated key, and the multi-file checks'
-  catalogued error codes.
-- **Property tests** for invariants the suite currently samples: whole-file
-  byte equality including CRLF, BOM, and inter-entry text; a one-field edit
-  changes one entry; commit output always parses; `format` and `normalize` are
-  idempotent; combine then split round-trips.
-- **Test hygiene**: the shared HTTP layer (`providers/_http`) sits at 79%
-  coverage. (The suite runs in about 25 s with coverage, after the retry
-  backoff stopped sleeping in tests and the journal tables stopped loading on
-  every `normalize`.)
-- **Type checking with ty** (does not gate Gate 5): replace mypy with Astral's
-  ty, which is far faster and sits beside Ruff in the same toolchain. It is a
-  different checker, not a faster mypy — it infers differently, reports
-  different errors, and does not read `[tool.mypy]` — so the switch runs in
-  order:
-  1. Confirm ty's release status is fit for a CI gate.
-  2. Run ty over `src/pynakes` and triage its findings against mypy's: real
-     defects get fixed; false positives get recorded.
-  3. Rebuild the baseline in ty's own configuration from the modules that still
-     fail, under the same rule as today's `[[tool.mypy.overrides]]` list —
-     shrink it, never grow it. Take the chance to shrink it: the mypy baseline
-     still exempts 36 modules.
-  4. Run both checkers in CI for a while; mypy stays the gate until ty has
-     caught what mypy catches.
-  5. Then swap: ty in the `dev` extra, the CI type-check step, the pre-commit
-     config, and the AGENTS.md check list; drop mypy and `[tool.mypy]`.
+**In progress (2026-10-11).** The completed changes are recorded under
+Unreleased in CHANGELOG. This stage is not closed: the remaining audit and
+network-deadline checks below still need work.
 
-**Gate 5**: the hostile-input matrix runs in CI with zero tracebacks and zero
-invalid JSON; profiling shows no quadratic path in parsing, `lint`, or
-`format --check`, and a 20,000-entry library completes each (timings recorded,
-not asserted in the correctness suite); the property tests above pass.
+**Done and verified locally:**
+
+- **Scale:** the linear parser/key-index fixes remain in place. The latest
+  `scripts/bench_scale.py` run on synthetic libraries measured:
+
+  | Entries | Parse | Lint | `format --check` |
+  | ---: | ---: | ---: | ---: |
+  | 4,000 | 0.40 s | 1.40 s | 2.31 s |
+  | 20,000 | 2.00 s | 6.97 s | 11.56 s |
+
+  These are measurements from one machine, not timing assertions. Each path
+  scales approximately with the entry count. Constant-factor work remains for
+  v0.9; the previous large-field measurement is recorded in the git history.
+- **Scrub:** remove additional JabRef, BibDesk and Mendeley private fields,
+  recognizable local paths in fields/strings/preambles, plain inter-entry
+  working text, and comment lines inside entries. Preserve literal percent
+  signs in values and the explicit keep switches. Repeated staged scrubs use
+  original source positions. Regression tests exercise preview and commit.
+- **Pinax paths:** refuse drive-relative and invalid Windows names, NUL/control
+  characters, reserved devices and over-long keys; refuse case-colliding
+  citation keys. Material copying refuses source-tree and destination artifact
+  symlinks before copying. Source-directory installation also refuses symlinks.
+- **Network policy:** default HTTP transport validates every redirect, refuses
+  non-HTTP(S), credentials, private/loopback destinations and mixed DNS results,
+  pins the validated IP while retaining Host/TLS names, and warns on HTTPS to
+  HTTP redirects. Metadata responses have an 8 MiB cap; material downloads retain
+  their 512 MiB cap. Retry/redirect/stream progress checks share a deadline.
+  arXiv URL helpers validate modern and historical identifier shapes.
+- **Durability:** sync files and directories inside a source tree before its
+  atomic installation; use a synced, atomic, numbered manifest backup.
+- **Correctness:** rename fully braced entry references; make wrapping's brace
+  accounting agree with the parser; validate externally supplied field values
+  before mutation/entry construction. Completion and previous-output diffs use
+  detected library encodings; interchange imports also recognize BOM/Latin-1.
+  `asset check` already uses `Bibliography.open`, so its library read was fixed.
+- **CLI behavior tests:** overwrite refusal and `--force` for every output
+  command, `format --out` and stdout, conversion import diffs/digests with
+  encoded inputs, ambiguous `ref remove`, multi-file catalogued error codes,
+  invalid option choices, and closed stdout without a second error-envelope
+  attempt. Existing import/fetch JSON tests remain passing.
+- **Property tests:** whole-file byte equality with CRLF/BOM/encodings; one field
+  edit changes one entry; committed edits reparse; format/normalize idempotence;
+  combine then split preserves entries and their raw source. These extend the
+  existing arbitrary-input parser properties.
+- **Module sizes:** source-span handling moved out of `_engine_helpers.py`;
+  scrub source staging lives in a focused helper. Every Python module remains
+  below 800 lines. `fetch.py` and `normalize.py` are still near the limit and
+  must be split before adding substantial behavior there.
+- **Python 3.15:** declared supported, required on Linux/Windows/macOS in CI,
+  and included in release wheel testing. A locally built final Python 3.15.0
+  ran the complete suite and coverage gate. Remote CI has not been run for
+  these uncommitted changes.
+- **Type checker:** ty replaces mypy in the dev extra, CI, pre-commit and
+  developer instructions. Ty 0.0.86 is pinned and passes with a per-module,
+  per-rule baseline of 118 existing diagnostics across 30 modules. The initial
+  trial found 134 diagnostics; annotation corrections and removal of an
+  unreachable compatibility fallback reduced it. The baseline must shrink,
+  never grow; see [the type-checking guide](docs/guides/type-checking.md).
+
+**Not yet done:**
+
+- Complete the hostile-input audit beyond the tested inspection/lint/format/
+  normalize paths and representative interchange failures. Exercise the full
+  RIS/MODS/EndNote malformed-input space, and explicitly document/test CSV's
+  export-only boundary. Expand successful/failed provider-response cases for
+  the import/fetch JSON envelope beyond the existing examples.
+- Prove and enforce the overall deadline during stalled DNS resolution and
+  repeated slow body reads, rather than only at request/chunk/retry boundaries.
+  Injected custom openers own their redirect/destination behavior and still read
+  a complete body before enforcing the size cap; decide and test their bounded
+  read contract.
+- Finish HTTP-layer test hygiene: coverage improved from 79% to 83%, but cached
+  JSON failures, metadata status/stream failures, custom-opener caps/deadlines
+  and remaining retry boundaries need targeted tests.
+- Run the required remote CI matrix, including Python 3.15 on Windows/macOS and
+  dependency floors. Local success is not evidence of those remote jobs.
+
+**Local verification (2026-10-11):** 2,846 tests pass on final Python 3.15.0
+with 92.44% coverage. Ruff lint/format, ty, strict documentation build,
+wheel/sdist build and Twine metadata checks pass.
+
+**Gate 5** remains open until the full hostile-input matrix runs in CI with
+zero tracebacks and valid JSON whenever stdout is available. The local scale
+and property-test requirements pass; closed stdout deliberately exits 1 because
+no envelope can be delivered to a reader that has gone away.
 
 #### Stage 6 — Documentation and policy
 
@@ -552,10 +565,16 @@ layout-only; `asset link` and `saved-search` ship with tests and docs;
 
 ### v1.0 — Launch
 
-**A polished single-file maintenance engine, losslessly JabRef-compatible, with
-a pinned public API, released as 1.0.0 on PyPI.** The unit of work is one
-`Bibliography` (one `.bib`). The multi-bib `Library`, `Catalogue`, and MCP
-server ship in v0.8 as optional companions.
+**A reference management engine with a pinned public API and a dependable
+workflow from reference acquisition to project bibliography and release copy.**
+Published as 1.0.0 on PyPI, it preserves authoritative files and interoperates
+with JabRef. `Bibliography` remains the basic working unit; the planned v0.8
+`Library`, `Catalogue` and MCP integration extend its reach across collections.
+
+The launch must document and exercise the complete workflows, including
+reference curation, material provenance and manuscript citation maintenance,
+through the same Python API and CLI. Release claims follow verified behavior
+and completed gates.
 
 - Stable API, semver promise: the CLI contract, in beta since 0.7.0, and the
   Python API both fall under the semantic-versioning policy in

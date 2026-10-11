@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Time pynakes on a large synthetic library, to find and watch quadratic paths.
 
-Developer-only: not part of the package, and not run by the test suite. Gate 5
-asks for a 20,000-entry library to get through parsing, ``lint``, and
-``format --check``, with the timings recorded rather than asserted, since
+Developer-only: not part of the package, and not run by the test suite. The benchmark
+measures parsing, ``lint``, and ``format --check`` on a 20,000-entry library,
+with timings recorded rather than asserted, since
 wall-clock time depends on the machine.
 
 The library is generated deterministically from the entry index: invented

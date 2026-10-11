@@ -12,13 +12,16 @@
 > [!WARNING]
 > `pynakes` is alpha-quality software. Interfaces and behavior may change between releases.
 
-`pynakes` is a command-line bibliography maintenance engine for BibTeX,
-BibLaTeX, and JabRef-compatible files. It supports inspection, validation,
-previewed edits, and structured output for people, scripts, and CI.
+**pynakes is a reference management engine for BibTeX and BibLaTeX bibliographies and their research materials.**
 
-The Python CLI makes small, explicit, reviewable changes to `.bib` files —
-minimal diffs, dry-run previews, and atomic writes — and reports every change
-as structured JSON.
+It curates BibTeX and BibLaTeX bibliographies and optionally manages their PDFs
+and source materials. Researchers, applications, and automation use the same
+Python API and CLI to acquire references, compare and enrich records, track
+citations, and review changes before writing them.
+
+The `.bib` remains authoritative. Edits preserve untouched source, conflicts
+are reported explicitly, and previews, diffs, and structured JSON make the work
+inspectable. JabRef compatibility keeps existing libraries usable across tools.
 
 Requires Python 3.12+ and is packaged as an OS-independent CLI and library.
 
@@ -42,7 +45,7 @@ A `.bib` file is the index card; a **pinax** is the card together with the shelf
 
 ## Two workflows
 
-### 1. Bibliography engine
+### 1. Reference curation
 Load any `.bib` file the BibTeX/BibLaTeX toolchain produces,
 then:
 
@@ -71,19 +74,36 @@ and common key-pattern markers and modifiers. Unsupported formatter names are
 reported rather than silently applied. Every modifying command supports
 `--dry-run --diff` and atomic writes; backups are opt-in.
 
-### 2. Pinax — the corpus layer
+### 2. Pinax — references and their materials
 
 Opt in by setting `pinax-files-dir` in the library metadata. Now every citation key can carry materials:
 
 - **arXiv download** — PDFs and source bundles, automatically fetched, verified, and extracted with provenance tracking (source hash, download timestamp)
-- **Open-access published PDFs** — resolved from DOI via OpenAlex, CrossRef, and publisher-specific URL overrides; `.published.pdf` lands only for genuinely OA papers, never misidentified repository mirrors
+- **Open-access published PDFs** — discover candidate URLs through DOI metadata,
+  OpenAlex, CrossRef, and publisher rules, with source provenance for review
 - **`asset fetch`** — download configured materials for all entries or one key
 - **`asset check`** / **`asset repair`** — validate presence and detect orphans and manifest drift; reconcile the manifest, with a preview
 - **`ref remove`** — removes both the entry and its materials by default
 - **Coordinated key edits** — renaming a key moves its materials
 - **`corpus combine`/`corpus split`** — materials follow their entries
 
-The `.bib` stays the source of truth; Pinax just keeps the shelf tidy.
+The `.bib` stays the source of truth. Pinax connects each reference to its
+materials and their provenance, so citation-key edits and bibliography
+projections can carry the associated files.
+
+## Direction
+
+The ambition is to support a research library throughout its life: acquire and
+curate references, assemble a bibliography for a project, keep its materials
+traceable, maintain citations as the manuscript changes, and prepare a public
+release copy.
+
+The current engine provides those operations for individual bibliographies,
+with explicit combine, split, and batch workflows across files. The next planned
+step is `Library` and a rebuildable `Catalogue`: search, compare, reconcile,
+and analyze a collection without moving its authoritative data into a database.
+Graphical clients and agent integrations will use the same engine. These library
+and catalogue APIs are planned, not implemented; see [DEVPLAN.md](DEVPLAN.md).
 
 ## Installation
 
@@ -97,7 +117,7 @@ For development (with test/lint tools):
 git clone https://github.com/maiani/pynakes.git
 cd pynakes
 pip install -e ".[dev]"
-pre-commit install  # enable ruff hooks on commit
+pre-commit install  # enable Ruff and ty checks on commit
 ```
 
 See the [Installation guide](docs/guides/installation.md) for shell completion and troubleshooting.
@@ -203,16 +223,14 @@ See the [LLM Integration guide](docs/guides/llm-integration.md) for the full JSO
 
 ## Status
 
-v0.5.0 is the first public alpha. It includes the preservation-first
-parser/writer, the documented maintenance command surface, broad JabRef v5.15
-interoperability, machine-readable command discovery, and the optional Pinax
-corpus layer with arXiv and published-PDF material workflows. CI tests Python
-3.12–3.14 on Linux, Windows, and macOS, and enforces a 90% coverage floor.
+This checkout targets v0.7.0: a beta CLI contract and an alpha VS Code client.
+Published pre-0.7 releases remain alpha; the Python API is intended to stabilize
+at 1.0. From 0.7.0, incompatible CLI, JSON-envelope, and error-code changes
+require a documented deprecation period. Pin versions for reproducible workflows.
 
-Until v1.0, pynakes does **not** guarantee backward compatibility for the Python
-API, CLI syntax, or JSON envelopes. The project aims to keep automation
-workflows predictable and documents breaking changes in the changelog, but
-production users should pin exact `0.x` versions.
+CI is configured for Python 3.12–3.15 on Linux, Windows, and macOS, with a 90%
+coverage floor. Current hardening work and remaining release gates are tracked
+in [DEVPLAN.md](DEVPLAN.md).
 
 Parser conformance is verified against the TeX Live 2026 toolchain (BibTeX 0.99d,
 BibLaTeX 3.21, Biber 2.21). The project roadmap is documented in

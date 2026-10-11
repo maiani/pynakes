@@ -6,11 +6,15 @@ usage see the [Usage guide](usage.md); for direct Python use see the
 
 ## Purpose
 
-pynakes is a headless maintenance engine for BibTeX, BibLaTeX, and
-JabRef-compatible .bib files. It makes small, reviewable changes without
-discarding information a reference manager or a human placed in the file.
-The same bounded operations are available to interactive users, scripts, CI,
-and LLM-assisted tools.
+pynakes is a reference management engine for BibTeX and BibLaTeX bibliographies and their research materials. Its
+Python API and CLI expose reference acquisition, curation, comparison,
+validation, citation tracking and optional material management. BibTeX and
+BibLaTeX bibliographies remain authoritative; derived buffers and future indexes
+serve those files.
+
+Preservation, reviewable changes and explicit conflicts are the architectural
+foundation. Researchers, graphical clients, scripts, CI and agents consume the
+same operations, with JabRef interoperability preserving existing workflows.
 
 ## Core invariants
 
@@ -47,7 +51,7 @@ Bibliography when `pynakes-meta` declares a `pinax-files-dir`.
 | Metadata block | MetadataBlock | One top-level metadata comment — `@comment{jabref-meta: ...}` or pynakes' superset `@comment{pynakes-meta: ...}` (tagged by `namespace`) — represented both structurally and as raw text. |
 | Bibliography (working unit) | Bibliography | A staged, reconciled handle over one `.bib` file — "a slice of references covering one aspect of a topic". Supports operations, preview, diff, commit, reset, reload, and external-change detection. |
 | Pinax mode | FileStore + fetch primitives | Optional mode of one Bibliography together with its `pinax-files-dir` of citation-key-addressed materials. Plain bibliographies have no Pinax behavior. Includes agent inspection, file checks/fixes, arXiv material fetch, provenance manifests, set-operation copying, and coordinated key-edit material moves. |
-| Library (corpus) | — (planned) | A directory of pinakes/bibliographies, enabling cross-file search, dedup, and identity resolution across the full research corpus. Not implemented yet (see [Beyond 1.0](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md)). |
+| Library (corpus) | — (planned) | A directory of pinakes/bibliographies, enabling cross-file search, dedup, and identity resolution across the full research corpus. Not implemented yet (see [Roadmap](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md)). |
 | Catalogue (index) | — (planned) | A derived, rebuildable search index over the Library (e.g. SQLite FTS). Never a competing source of truth; the Bibliographies are. Not implemented yet. |
 
 ### BibEntry: record plus preservation state

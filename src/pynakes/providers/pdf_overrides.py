@@ -12,15 +12,11 @@ the direct download link.
 from __future__ import annotations
 
 import json
+from importlib.resources import files
 from typing import Any
 
 
 def _load_rules() -> list[dict[str, Any]]:
-    try:
-        from importlib.resources import files
-    except ImportError:
-        from importlib_resources import files  # type: ignore[import-not-found,no-redef]
-
     ref = files(__package__) / "pdf_overrides.json"  # type: ignore[arg-type]
     data = json.loads(ref.read_text(encoding="utf-8"))
     return data.get("rules", [])

@@ -88,6 +88,7 @@ class Bibliography(
     #: Comment slots a scrub blanked, removed from the source with their
     #: trailing gap so no empty block is left where they were.
     _removed_comments: set[int] = field(default_factory=set)
+    _scrub_edits: list[SpanEdit] = field(default_factory=list)
     #: Directive lines to write directly above an entry (see ``add_entry_directive``).
     _directive_insertions: list[tuple[BibEntry, str]] = field(default_factory=list)
     _pinax_renames: list[tuple[str, str]] = field(default_factory=list)
@@ -298,6 +299,7 @@ class Bibliography(
         self._pinax_material_merges.clear()
         self._consolidate_metadata = False
         self._removed_comments.clear()
+        self._scrub_edits.clear()
         self._directive_insertions.clear()
         self._format_layout = None
         self._tex_rewrites.clear()
@@ -449,7 +451,13 @@ class Bibliography(
         try:
             text = apply_span_edits(
                 self._pristine_text,
-                [*entry_edits, *removed_entry_edits, *comment_edits, *self._directive_edits()],
+                [
+                    *entry_edits,
+                    *removed_entry_edits,
+                    *comment_edits,
+                    *self._directive_edits(),
+                    *self._scrub_edits,
+                ],
             )
         except ValueError as exc:
             raise RuntimeError(f"could not apply surgical source edits: {exc}") from exc

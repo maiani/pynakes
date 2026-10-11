@@ -18,7 +18,7 @@ The two layers:
 import re
 from collections.abc import Callable, Iterable
 
-from pynakes._text_utils import _is_escaped
+from pynakes._text_utils import _is_escaped, check_balanced_braces
 from pynakes.model import BibEntry
 
 # Entry header: ``@type{ key ,`` / ``@type( key ,`` — groups the part before the key, the key, and
@@ -355,6 +355,7 @@ def set_entry_field(entry: BibEntry, name: str, value: str) -> bool:
     """Set a field to an exact value. Returns ``True`` if it changed."""
     if entry.fields.get(name) == value:
         return False
+    check_balanced_braces(f"Value for field {name!r}", value)
     entry.fields[name] = value
     entry.field_expressions[name] = "{" + value + "}"
     _apply(entry, lambda raw: set_raw_field(raw, name, value))
@@ -461,3 +462,34 @@ def append_delimited_field(entry: BibEntry, name: str, value: str, delim: str, j
     entry.fields[name] = new_value
     _apply(entry, lambda raw: set_raw_field(raw, name, new_value))
     return True
+
+
+def remove_entry_comments(entry: BibEntry) -> int:
+    """Remove source comment lines outside field values, preserving literal percent signs."""
+    raw = entry.raw_content
+    if not raw:
+        return 0
+    depth = 0
+    quoted = False
+    spans: list[tuple[int, int]] = []
+    i = 0
+    while i < len(raw):
+        char = raw[i]
+        if char == '"' and depth <= 1 and not _is_escaped(raw, i):
+            quoted = not quoted
+        elif not quoted:
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+            elif char == "%" and depth <= 1 and not _is_escaped(raw, i):
+                end = raw.find("\n", i)
+                end = len(raw) if end < 0 else end
+                spans.append((i, end))
+                i = end
+                continue
+        i += 1
+    for start, end in reversed(spans):
+        raw = raw[:start] + raw[end:]
+    _apply(entry, lambda _: raw)
+    return len(spans)

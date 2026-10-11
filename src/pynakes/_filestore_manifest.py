@@ -11,13 +11,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-import shutil
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, overload
 
-from pynakes._atomic import next_backup_path
+from pynakes.io import _write_backup
 
 if TYPE_CHECKING:
     from pynakes.filestore import FileStore, MaterialPaths, MaterialPresence
@@ -74,7 +73,7 @@ class PinaxManifest:
         target = self.manifest_path
         target.parent.mkdir(parents=True, exist_ok=True)
         if backup and target.exists():
-            shutil.copy2(target, next_backup_path(target))
+            _write_backup(target)
         self._atomic_write(target, self.manifest_text(manifest).encode("utf-8"))
 
     def manifest_text(self, manifest: dict[str, object]) -> str:
@@ -325,7 +324,7 @@ def _manifest_refetchable(manifest: dict[str, object], key: str) -> bool:
     return False
 
 
-def _manifest_row_has_state(row: dict[str, object]) -> bool:
+def _manifest_row_has_state(row: Mapping[str, object]) -> bool:
     return any(kind in row for kind in ARTIFACT_KINDS)
 
 
@@ -369,7 +368,22 @@ def _validate_key(key: str) -> str:
     normalized = key.strip()
     if not normalized:
         raise ValueError("citation key must not be empty")
-    if "/" in normalized or "\\" in normalized or normalized in {".", ".."}:
+    stem = normalized.split(".", 1)[0].upper()
+    devices = {
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        *(f"COM{i}" for i in range(1, 10)),
+        *(f"LPT{i}" for i in range(1, 10)),
+    }
+    if (
+        any(ord(char) < 32 or char in '/\\:<>"|?*' for char in normalized)
+        or normalized.endswith((".", " "))
+        or stem in devices
+        or len(normalized.encode("utf-8")) > 200
+        or normalized in {".", ".."}
+    ):
         raise ValueError(f"citation key {key!r} cannot address Pinax materials")
     return normalized
 
@@ -377,9 +391,15 @@ def _validate_key(key: str) -> str:
 def _unique_keys(keys: Iterable[str]) -> list[str]:
     """Return a deduplicated list of validated keys; silently drops duplicates."""
     seen: set[str] = set()
+    folded: dict[str, str] = {}
     result: list[str] = []
     for key in keys:
         normalized = _validate_key(key)
+        previous = folded.setdefault(normalized.casefold(), normalized)
+        if previous != normalized:
+            raise ValueError(
+                f"Pinax citation keys differ only in case: {previous!r}, {normalized!r}"
+            )
         if normalized in seen:
             continue
         seen.add(normalized)

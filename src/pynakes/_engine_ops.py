@@ -56,6 +56,10 @@ class BibliographyOperations:
         path: Path | None
         _appended_entries: list[BibEntry]
         _removed_entries: list[BibEntry]
+        from pynakes._engine_helpers import SpanEdit
+
+        _pristine_text: str
+        _scrub_edits: list[SpanEdit]
         _removed_comments: set[int]
         _entry_snapshot: dict[int, str | None]
         _format_layout: CanonicalLayout | None
@@ -341,9 +345,9 @@ class BibliographyOperations:
         copy writes elsewhere — and :meth:`commit` writes it back to the bound
         file.
         """
-        report = scrub_ops.scrub_library(self.lib, options)
-        self._removed_comments.update(report.removed_comment_indices)
-        return report
+        from pynakes._scrub_source import stage_scrub
+
+        return stage_scrub(self, options)
 
     def convert(self, target: str) -> convert_ops.ConvertResult:
         """Convert the bibliography in memory to ``target`` conventions."""

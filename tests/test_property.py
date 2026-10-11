@@ -136,3 +136,82 @@ def test_parser_never_crashes_on_arbitrary_text(text: str) -> None:
         return
     # If it parsed, the result must be writable without error.
     assert isinstance(write_bib(lib), str)
+
+
+@settings(max_examples=60, suppress_health_check=[HealthCheck.too_slow])
+@given(
+    _libraries(),
+    st.sampled_from(["\n", "\r\n"]),
+    st.sampled_from(["utf-8", "utf-8-sig", "utf-16-le", "latin-1"]),
+)
+def test_whole_file_bytes_and_single_entry_edits(text, ending, encoding):
+    """A no-op commit preserves bytes; a field edit changes only its entry."""
+    import tempfile
+    from pathlib import Path
+
+    from pynakes.editing import set_entry_field
+    from pynakes.engine import Bibliography
+    from pynakes.io import encode_text
+
+    text = ("% preserved heading\n\n" + text + "\n% preserved trailer\n").replace("\n", ending)
+    try:
+        original = encode_text(text, encoding)
+    except UnicodeEncodeError:
+        return
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "refs.bib"
+        path.write_bytes(original)
+        coll = Bibliography.open(path)
+        assert coll.preview() == text
+        assert not coll.commit(backup=False).modified
+        assert path.read_bytes() == original
+        entry = coll.lib.entries.values()[0]
+        before = entry.raw_content
+        set_entry_field(entry, "title", "Principia")
+        expected = text.replace(before, entry.raw_content, 1)
+        coll.commit(backup=False)
+        assert path.read_bytes() == encode_text(expected, coll.lib.encoding)
+        reparsed = Bibliography.open(path)
+        assert reparsed.lib.entries.values()[0].fields["title"] == "Principia"
+        assert len(reparsed.lib.entries) == len(parse_bib(text).entries)
+
+
+@settings(max_examples=80, suppress_health_check=[HealthCheck.too_slow])
+@given(_libraries())
+def test_format_and_normalize_are_idempotent(text):
+    from pynakes.engine import Bibliography
+
+    coll = Bibliography.from_text(text)
+    coll.format()
+    formatted = coll.preview()
+    second = Bibliography.from_text(formatted)
+    second.format()
+    assert second.preview() == formatted
+    coll = Bibliography.from_text(text)
+    coll.normalize()
+    normalized = coll.preview()
+    second = Bibliography.from_text(normalized)
+    second.normalize()
+    assert second.preview() == normalized
+    assert len(parse_bib(normalized).entries) == len(parse_bib(text).entries)
+
+
+@settings(max_examples=80, suppress_health_check=[HealthCheck.too_slow])
+@given(_libraries())
+def test_combine_then_split_preserves_each_entry(text):
+    from pynakes.setops import PartitionRule, merge_libraries, partition_library
+
+    original = parse_bib(text)
+    entries = original.entries.values()
+    left = original.derive(entries[:1])
+    right = original.derive(entries[1:])
+    merged = merge_libraries([("left", left), ("right", right)]).lib
+    first_key = entries[0].key
+    result = partition_library(
+        merged, [PartitionRule("left", f"key = {first_key}"), PartitionRule("right", "*")]
+    )
+    for name, source in [("left", left), ("right", right)]:
+        reparsed = parse_bib(write_bib(result.buckets[name]))
+        assert [(e.key, e.type, e.fields, e.raw_content) for e in reparsed.entries.values()] == [
+            (e.key, e.type, e.fields, e.raw_content) for e in source.entries.values()
+        ]

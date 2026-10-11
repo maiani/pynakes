@@ -2,21 +2,19 @@
 
 > **Status: core Pinax layer implemented including open-access published PDF
 > import.** This document specifies the optional *Pinax* layer (a bibliography
-> plus its materials) without replacing the plain `.bib` maintenance engine, and
+> plus its materials) within the reference management engine, and
 > scopes what is deliberately deferred. For the engine it builds on, see
 > [Architecture](architecture.md); for philosophy, [vision](../vision.md); for
 > sequencing, [DEVPLAN](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
 
 ## Identity
 
-**pynakes is first a `.bib` maintenance engine.** A plain `.bib` remains
-first-class, offline, reviewable, and free
-of material-management behavior. Pinax is the optional corpus mode layered on
-top: the `.bib` file remains the source of truth and center of gravity, while the
-*corpus* is that file **plus the materials it points to** — PDFs and source
-bundles — addressed by citation key. pynakes keeps the references and their
-materials consistent through explicit, reviewable operations. It is **not** a
-knowledge base.
+**pynakes is a reference management engine for BibTeX and BibLaTeX
+bibliographies and their research materials.** A plain `.bib` is a complete working unit: it supports acquisition,
+curation, validation and citation tracking without requiring any downloaded
+materials. Pinax adds citation-key-addressed PDFs and source bundles, together
+with their provenance. The engine keeps references and materials consistent
+through explicit, reviewable operations; the `.bib` remains authoritative.
 
 The name is the project's own: *pynakes* is the *pinakes* (πίνακες) Callimachus
 compiled for the Library of Alexandria — an index bound to the holdings it

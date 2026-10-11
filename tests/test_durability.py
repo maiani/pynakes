@@ -104,3 +104,30 @@ def test_a_failed_file_sync_fails_the_write_and_keeps_the_original(
     assert "Input/output error" in (result.error or "")
     assert path.read_text() == "@book{Newton1687}\n"
     assert [p.name for p in tmp_path.iterdir()] == ["refs.bib"]
+
+
+def test_source_tree_is_synced_before_install(tmp_path: Path, events: list[str]) -> None:
+    from pynakes._filestore_atomic import _atomic_replace_dir
+
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "main.tex").write_text("Principia", encoding="utf-8")
+    target = tmp_path / "installed"
+    _atomic_replace_dir(source, target, tmp_path)
+    assert "file" in events
+    assert events.index("file") < events.index("replace")
+    assert (target / "main.tex").read_text(encoding="utf-8") == "Principia"
+
+
+def test_manifest_backup_is_synced_before_replacement(tmp_path: Path, events: list[str]) -> None:
+    from pynakes.filestore import FileStore
+
+    store = FileStore(tmp_path / "files", tmp_path / "refs.bib")
+    manifest = {"version": 1, "files": {}}
+    store.write_manifest(manifest)
+    before = store.manifest_path.read_bytes()
+    events.clear()
+    store.write_manifest(manifest, backup=True)
+    assert events.count("file") == 2
+    assert events.index("file") < events.index("replace")
+    assert Path(str(store.manifest_path) + ".bak").read_bytes() == before

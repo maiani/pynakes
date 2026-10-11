@@ -1,17 +1,22 @@
 # pynakes
 
-A Python library and command-line maintenance engine for BibTeX, BibLaTeX, and
-JabRef-compatible files. Pynakes inspects, validates, previews, and applies
-bibliography changes while preserving source text it does not modify. Its
-in-process API, structured CLI output, and exit codes support applications,
-interactive use, scripts, and CI.
+**pynakes is a reference management engine for BibTeX and BibLaTeX bibliographies and their research materials.**
 
-> **Status — v0.5 public alpha.** The single-file bibliography engine is
-> feature-complete for this release, with Pinax material handling implemented
-> through arXiv PDF/source download and open-access published PDF fetches. Until
-> v1.0, pynakes does **not** guarantee backward compatibility for the Python API,
-> CLI syntax, or JSON envelopes; pin exact `0.x` versions for reproducible
-> automation.
+Its Python API and CLI help researchers and automation acquire references,
+curate BibTeX and BibLaTeX bibliographies, compare and enrich records, track
+citations, and optionally manage PDFs and source materials with provenance.
+Previewed edits, explicit conflicts and source preservation keep the work
+reviewable. JabRef compatibility supports existing libraries and workflows.
+
+The ambition is a research library that stays usable across projects and tools.
+The current engine works with individual bibliographies and explicit operations
+across files; `Library`, `Catalogue` and broader client integrations are planned
+in the [roadmap](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
+
+> **Development status.** This checkout targets v0.7.0, with a beta CLI contract
+> and an alpha VS Code client. Published pre-0.7 releases remain alpha. The
+> Python API is intended to stabilize at 1.0; from 0.7.0 the CLI contract requires
+> deprecation before incompatible changes. Pin versions for reproducible use.
 
 ## Overview
 
@@ -45,7 +50,7 @@ pynakes normalize refs.bib
 - Group list/add/remove commands
 - Citation-key check/generate/repair commands
 - Field rename/move/append/clear and title-capitalization protection
-- DOI import via DOI resolver BibTeX content negotiation
+- Reference import through DOI, supported repository identifiers, ISBN and URLs
 - Deduplication and conservative merge workflows
 - Integrity/enrichment workflows with opt-in online provider lookups
 - JabRef linked-file validation through `asset check`

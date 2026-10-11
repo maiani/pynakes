@@ -96,6 +96,7 @@ def test_a_rewritten_tex_source_keeps_its_encoding_line_endings_and_mode(tmp_pat
 def test_metadata_sources_outside_the_project_are_refused(tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()
+    (project / ".git").mkdir()  # Isolate the project from any enclosing test worktree.
     outside = tmp_path / "elsewhere.tex"
     outside.write_text("\\cite{Euler1748}\n")
     bib = _library(project, f"tex-sources:{outside};")
@@ -112,6 +113,7 @@ def test_metadata_sources_outside_the_project_are_refused(tmp_path: Path) -> Non
 def test_sources_named_on_the_command_line_may_lie_anywhere(tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()
+    (project / ".git").mkdir()  # Isolate the project from any enclosing test worktree.
     outside = tmp_path / "elsewhere.tex"
     outside.write_text("\\cite{Euler1748}\n")
     bib = _library(project, "pinax-files-dir:\n")

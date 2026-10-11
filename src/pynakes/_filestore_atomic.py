@@ -13,7 +13,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from pynakes._atomic import match_mode, replace_file, sync_file
+from pynakes._atomic import match_mode, replace_file, sync_directory, sync_file
 
 _FILESYSTEM_ERRORS = (OSError, shutil.Error)
 
@@ -92,6 +92,19 @@ def _atomic_write_bytes(path: Path, data: bytes, root: Path) -> None:
 
 
 def _atomic_replace_dir(source: Path, target: Path, root: Path) -> None:
+    if source.is_symlink():
+        raise ValueError(f"Symlink in material source: {source}")
+    # Sync the entire tree before publishing its name. Never follow symlinks.
+    for directory, dirs, files in os.walk(source, followlinks=False, topdown=False):
+        parent = Path(directory)
+        for name in [*dirs, *files]:
+            item = parent / name
+            if item.is_symlink():
+                raise ValueError(f"Symlink in material source: {item}")
+        for name in files:
+            with (parent / name).open("rb") as handle:
+                os.fsync(handle.fileno())
+        sync_directory(parent)
     backup = root / f".{target.name}.old-{uuid.uuid4().hex}"
     had_target = target.exists()
     if had_target:

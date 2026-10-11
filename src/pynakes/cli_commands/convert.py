@@ -36,7 +36,7 @@ from pynakes.cli_common import (
 from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography
 from pynakes.interchange import export_library, import_library
-from pynakes.io import save_plain_text
+from pynakes.io import _decode_bytes, save_plain_text
 
 _DIALECTS = ("biblatex", "bibtex")
 
@@ -181,7 +181,7 @@ def _convert_export(file: str, to: str, out: str | None, params: RunParams) -> N
 
 def _convert_import(file: str, from_format: str, out: str | None, params: RunParams) -> None:
     raw = Path(file).read_bytes()
-    lib = import_library(raw.decode("utf-8"), from_format)
+    lib = import_library(_decode_bytes(raw, file)[0], from_format)
     content = write_bib(lib)
     source_sha256 = hashlib.sha256(raw).hexdigest()
     _check_expected_digest(file, source_sha256, params)
@@ -207,7 +207,9 @@ def _emit_conversion(
     """
     diff_text = ""
     if out and params.diff:
-        previous = Path(out).read_text(encoding="utf-8") if Path(out).is_file() else ""
+        previous = (
+            _decode_bytes(Path(out).read_bytes(), Path(out))[0] if Path(out).is_file() else ""
+        )
         diff_text = generate_diff(previous, content, out)
     written = False
     if out and not params.dry_run:

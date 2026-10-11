@@ -88,7 +88,7 @@ def parse_json(text: str, identifier: str, *, dialect: str) -> ReferenceMetadata
         published=str(record.get("firstPublicationDate") or record.get("dateOfCreation") or ""),
         abstract=str(record.get("abstractText") or ""),
         url=article_url(identifier),
-        doi=doi,
+        doi=doi or "",
         entry_type="article",
         fields=fields,
         identifiers=identifiers,

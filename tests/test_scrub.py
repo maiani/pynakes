@@ -448,3 +448,18 @@ def test_cli_rejects_stdin(tmp_path: Path) -> None:
     result = runner.invoke(app, ["scrub", "-", "--out", str(tmp_path / "x.bib"), "--json"])
     assert result.exit_code == 1
     assert json.loads(result.output)["error"] == "InvalidInput"
+
+
+def test_repeated_scrub_stages_removals_against_original_positions(tmp_path: Path) -> None:
+    path = _bib(
+        tmp_path,
+        "refs.bib",
+        "private heading\n@string{local={/home/reader/private}}\n@misc{Newton1687,title={Principia}}\nprivate trailer",
+    )
+    coll = Bibliography.open(path)
+    assert not coll.scrub(ScrubOptions(fields=False)).clean
+    assert not coll.scrub().clean
+    assert coll.scrub().clean
+    assert "private" not in coll.preview()
+    coll.commit(backup=False)
+    assert Bibliography.open(path).scrub().clean

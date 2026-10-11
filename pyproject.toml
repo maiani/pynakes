@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pynakes"
 dynamic = ["version"]
-description = "Agent-friendly, round-trip-faithful BibTeX/BibLaTeX maintenance toolkit"
+description = "Reference management engine for BibTeX, BibLaTeX, and their materials"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -36,6 +36,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Topic :: Scientific/Engineering",
     "Topic :: Text Processing :: Markup :: LaTeX",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -55,7 +56,7 @@ dev = [
     "pytest-cov>=4.1.0",
     "coverage>=7.10",
     "hypothesis>=6.100.0",
-    "mypy>=1.19,<2",
+    "ty==0.0.86",
     "pyyaml>=6.0",
     "ruff>=0.16,<0.17",
     "build>=1.2.0",
@@ -112,57 +113,185 @@ ignore = ["E501"]
 preview = true
 explicit-preview-rules = true
 
-[tool.mypy]
-python_version = "3.12"
-files = ["src/pynakes"]
-warn_unused_configs = true
-
-# The baseline: modules that had type errors when mypy entered CI (v0.7,
-# Stage 2). Shrink this list as modules are fixed; never add to it. Every
-# module not listed must type-check clean.
-[[tool.mypy.overrides]]
-module = [
-    "pynakes.batch",
-    "pynakes.bibtex_writer",
-    "pynakes.canonical",
-    "pynakes.cli_commands.convert",
-    "pynakes.cli_commands.dedupe",
-    "pynakes.cli_commands.fetch",
-    "pynakes.cli_commands.fields",
-    "pynakes.cli_commands.format",
-    "pynakes.cli_commands.import_ref",
-    "pynakes.cli_commands.init",
-    "pynakes.cli_commands.inspect",
-    "pynakes.cli_commands.integrity",
-    "pynakes.cli_commands.keys",
-    "pynakes.cli_commands.metadata",
-    "pynakes.cli_commands.remove",
-    "pynakes.cli_commands._rich_progress",
-    "pynakes.cli_commands.search",
-    "pynakes.cli_commands.setops",
-    "pynakes.cli_commands.show",
-    "pynakes.cli_common",
-    "pynakes.cli_discovery",
-    "pynakes.cli",
-    "pynakes._engine_helpers",
-    "pynakes.filestore",
-    "pynakes.formatters._pages",
-    "pynakes.identity",
-    "pynakes.importer",
-    "pynakes._integrity_published",
-    "pynakes.interchange.ris",
-    "pynakes.interchange._shared",
-    "pynakes.model",
-    "pynakes.normalize",
-    "pynakes.provider_cache",
-    "pynakes.providers._http",
-    "pynakes.providers.repositories.europe_pmc",
-    "pynakes.query",
-]
-ignore_errors = true
-
 [tool.coverage.run]
 source = ["src/pynakes"]
 # sys.monitoring (Python 3.12+) measures the same lines at a fraction of the
 # tracing core's cost: the suite with coverage runs in about half the time.
 core = "sysmon"
+
+[tool.ty.environment]
+python-version = "3.12"
+python-platform = "all"
+
+[tool.ty.src]
+include = ["src/pynakes"]
+
+# Type-checking baseline: suppress only recorded rule families in each
+# module. Shrink this list; never broaden it.
+
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/_engine_helpers.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+unresolved-attribute = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/_integrity_published.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+not-iterable = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/bibtex_writer.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+unresolved-attribute = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/canonical.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/cli.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+invalid-assignment = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/cli_commands/dedupe.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/cli_commands/fetch.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/cli_commands/fields.py"]
+[tool.ty.overrides.rules]
+call-non-callable = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/cli_commands/format.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+unresolved-attribute = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/cli_commands/import_ref.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/cli_commands/init.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/cli_commands/inspect.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/cli_commands/integrity.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/cli_commands/keys.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/cli_commands/remove.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/cli_commands/search.py"]
+[tool.ty.overrides.rules]
+unresolved-attribute = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/cli_commands/setops.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/cli_commands/show.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+unresolved-attribute = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/cli_common.py"]
+[tool.ty.overrides.rules]
+invalid-assignment = "ignore"
+invalid-return-type = "ignore"
+invalid-type-form = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/cli_discovery.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+invalid-assignment = "ignore"
+invalid-attribute-access = "ignore"
+invalid-method-override = "ignore"
+unresolved-attribute = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/cli_surface.py"]
+[tool.ty.overrides.rules]
+invalid-assignment = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/fetch.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/filestore.py"]
+[tool.ty.overrides.rules]
+invalid-assignment = "ignore"
+invalid-attribute-override = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/formatters/_pages.py"]
+[tool.ty.overrides.rules]
+unresolved-attribute = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/interchange/_shared.py"]
+[tool.ty.overrides.rules]
+unsupported-operator = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/interchange/ris.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+invalid-assignment = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/model.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+no-matching-overload = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/providers/_http.py"]
+[tool.ty.overrides.rules]
+invalid-context-manager = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/providers/registry.py"]
+[tool.ty.overrides.rules]
+unresolved-attribute = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/pynakes/query.py"]
+[tool.ty.overrides.rules]
+invalid-assignment = "ignore"
+unresolved-attribute = "ignore"

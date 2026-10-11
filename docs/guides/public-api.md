@@ -1,14 +1,14 @@
 # Public API and compatibility
 
-This page describes the intended public surface for pynakes, but v0.5 is still
-an alpha release. Until 1.0, pynakes does **not** guarantee backward
-compatibility for the Python API, CLI syntax, or JSON envelopes. Breaking
-changes may ship in any `0.x` release, and consumers that need reproducibility
-should pin exact versions.
+This page describes the intended public surface of the reference management
+engine. This checkout targets v0.7.0; published pre-0.7 releases retain their
+alpha compatibility policy. From 0.7.0, CLI commands, options, JSON envelopes,
+exit codes and error codes require a documented deprecation period before
+incompatible changes. Additions remain possible in minor releases.
 
-The project still treats these surfaces seriously: intentional incompatibilities
-should be documented in `CHANGELOG.md`, and the 1.0 release is expected to
-freeze the public contract described below.
+The Python API is intended to stabilize at 1.0. Until then, Python API changes
+are documented in `CHANGELOG.md` but do not require deprecation. Consumers
+that need reproducibility should pin exact versions.
 
 The CLI and its JSON envelopes are a co-equal public API. Their command syntax,
 exit codes, and response shapes are defined in the [LLM & automation integration
@@ -100,6 +100,8 @@ Starting with 1.0.0:
   documented operation result, change a CLI command/option/exit-code meaning,
   or make an incompatible JSON-envelope change.
 
-The `capabilities --json` schema and the documented command envelopes follow
-the same policy starting at 1.0.0. Before 1.0, pin exact versions and include
+From 0.7.0, removing or renaming a CLI command, option, envelope key, action,
+exit-code meaning or error code requires one minor release in which the old
+form still works and emits a structured deprecation warning. At 1.0.0, these
+surfaces and the Python API follow the semantic-versioning policy above. Include
 `pynakes.__version__` or `capabilities.VERSION` in diagnostics.

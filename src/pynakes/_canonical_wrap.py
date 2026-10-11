@@ -107,14 +107,8 @@ def _literal_inner(expression: str) -> tuple[str, str, str] | None:
 
 def _balanced_braces(value: str) -> bool:
     depth = 0
-    escaped = False
     for char in value:
-        if escaped:
-            escaped = False
-            continue
-        if char == "\\":
-            escaped = True
-        elif char == "{":
+        if char == "{":
             depth += 1
         elif char == "}":
             depth -= 1

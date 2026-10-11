@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from urllib.parse import quote
 
 from pynakes._calendar import MONTH_NUM_TO_ABBR
-from pynakes._identifiers import normalize_arxiv
+from pynakes._identifiers import _ARXIV_NEW_RE, _ARXIV_OLD_RE, normalize_arxiv
 from pynakes.entry_types import eprint_fields, preprint_entry_type
 from pynakes.providers._http import (
     DEFAULT_TIMEOUT,
@@ -45,12 +45,14 @@ def source_url(identifier: str) -> str:
 
 def atom_url(identifier: str) -> str:
     """Return the arXiv Atom API URL for ``identifier``."""
-    return f"{EXPORT_API}?id_list={quote(identifier)}"
+    return f"{EXPORT_API}?id_list={quote(_normalize_or_raise(identifier))}"
 
 
 def _normalize_or_raise(identifier: str) -> str:
     normalized = normalize_arxiv(identifier)
-    if normalized is None:
+    if normalized is None or not (
+        _ARXIV_NEW_RE.fullmatch(normalized) or _ARXIV_OLD_RE.fullmatch(normalized)
+    ):
         raise ValueError(f"Malformed arXiv identifier: {identifier!r}")
     return normalized
 
@@ -110,7 +112,9 @@ def parse_atom(text: str, identifier: str) -> ArxivRecord:
 def fetch_record(identifier: str, fetcher: FetchArxivAtom | None = None) -> ArxivRecord:
     """Fetch and parse arXiv metadata for ``identifier``."""
     normalized = normalize_arxiv(identifier)
-    if normalized is None:
+    if normalized is None or not (
+        _ARXIV_NEW_RE.fullmatch(normalized) or _ARXIV_OLD_RE.fullmatch(normalized)
+    ):
         raise ProviderFetchError(f"Malformed arXiv identifier: {identifier!r}")
     if fetcher is None:
         fetcher = fetch_atom

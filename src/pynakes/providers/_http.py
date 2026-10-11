@@ -14,6 +14,13 @@ import httpx
 
 from pynakes import __version__
 from pynakes.provider_cache import open_cache
+from pynakes.providers._network import (
+    DEFAULT_DEADLINE,
+    MAX_METADATA_BYTES,
+    PublicTransport,
+    request_guard,
+    validate_url,
+)
 
 USER_AGENT = f"pynakes/{__version__} (+https://github.com/maiani/pynakes)"
 
@@ -87,6 +94,7 @@ def _with_retry(
     *,
     error_class: type[Exception],
     sleep: Callable[[float], None] = time.sleep,
+    deadline: float | None = None,
 ) -> bytes:
     """Run ``attempt_once``, repeating it while it raises :class:`_Transient`.
 
@@ -96,6 +104,7 @@ def _with_retry(
     message is raised as ``error_class``, unchanged, so the final error still
     says what actually went wrong.
     """
+    deadline = deadline if deadline is not None else time.monotonic() + DEFAULT_DEADLINE
     last: _Transient | None = None
     for attempt in range(MAX_ATTEMPTS):
         try:
@@ -104,7 +113,10 @@ def _with_retry(
             last = exc
             if attempt == MAX_ATTEMPTS - 1:
                 break
-            sleep(_retry_delay(attempt, exc.retry_after))
+            delay = _retry_delay(attempt, exc.retry_after)
+            if time.monotonic() + delay >= deadline:
+                raise error_class("Network deadline exceeded") from exc
+            sleep(delay)
     raise error_class(str(last))
 
 
@@ -143,6 +155,8 @@ def fetch_bytes(
     opener: Callable[..., object] | None = None,
     progress: DownloadProgress | None = None,
     sleep: Callable[[float], None] = time.sleep,
+    max_bytes: int | None = None,
+    deadline_seconds: float = DEFAULT_DEADLINE,
 ) -> bytes:
     """Fetch ``url`` and return raw response bytes.
 
@@ -156,6 +170,9 @@ def fetch_bytes(
     with backoff before the error is raised; ``sleep`` is the test seam for
     that wait.
     """
+    max_bytes = MAX_DOWNLOAD_BYTES if max_bytes is None else max_bytes
+    validate_url(url, error_class, resolve=False)
+    deadline = time.monotonic() + deadline_seconds
     headers: dict[str, str] = {"User-Agent": USER_AGENT}
     if accept is not None:
         headers["Accept"] = accept
@@ -164,28 +181,38 @@ def fetch_bytes(
     if opener is None:
 
         def attempt() -> bytes:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise error_class("Network deadline exceeded")
             return _fetch_bytes_httpx(
                 url,
                 headers=headers,
-                timeout=timeout,
+                timeout=min(timeout, remaining),
                 error_class=error_class,
                 display=display,
                 progress=progress,
+                max_bytes=max_bytes,
+                deadline=deadline,
             )
     else:
 
         def attempt() -> bytes:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise error_class("Network deadline exceeded")
             return _fetch_bytes_urllib(
                 url,
                 headers=headers,
-                timeout=timeout,
+                timeout=min(timeout, remaining),
                 error_class=error_class,
                 display=display,
                 opener=opener,
                 progress=progress,
+                max_bytes=max_bytes,
+                deadline=deadline,
             )
 
-    return _with_retry(attempt, error_class=error_class, sleep=sleep)
+    return _with_retry(attempt, error_class=error_class, sleep=sleep, deadline=deadline)
 
 
 def _fetch_bytes_urllib(
@@ -197,11 +224,17 @@ def _fetch_bytes_urllib(
     display: str,
     opener: Callable[..., object],
     progress: DownloadProgress | None,
+    max_bytes: int,
+    deadline: float,
 ) -> bytes:
     request = _UrllibRequest(url, headers=headers)
     try:
         with opener(request, timeout=timeout) as response:  # type: ignore[arg-type]
             data = response.read()
+            if len(data) > max_bytes:
+                raise error_class(f"{display} exceeds response size limit")
+            if time.monotonic() >= deadline:
+                raise error_class("Network deadline exceeded")
     except HTTPError as exc:
         message = f"Server returned HTTP {exc.code} for {display}"
         if exc.code in RETRY_STATUSES:
@@ -226,9 +259,18 @@ def _fetch_bytes_httpx(
     error_class: type[Exception],
     display: str,
     progress: DownloadProgress | None,
+    max_bytes: int,
+    deadline: float,
 ) -> bytes:
     try:
-        with httpx.Client(follow_redirects=True, timeout=timeout, headers=headers) as client:
+        with httpx.Client(
+            transport=PublicTransport(),
+            trust_env=False,
+            follow_redirects=True,
+            timeout=timeout,
+            headers=headers,
+            event_hooks={"request": [request_guard(error_class, deadline)]},
+        ) as client:
             with client.stream("GET", url) as response:
                 try:
                     response.raise_for_status()
@@ -240,18 +282,18 @@ def _fetch_bytes_httpx(
                         raise _Transient(message, retry_after) from exc
                     raise error_class(message) from exc
                 total = _content_length(response)
-                too_large = (
-                    f"{display} is larger than the {MAX_DOWNLOAD_BYTES >> 20} MiB download limit"
-                )
-                if total is not None and total > MAX_DOWNLOAD_BYTES:
+                too_large = f"{display} is larger than the {max_bytes >> 20} MiB download limit"
+                if total is not None and total > max_bytes:
                     raise error_class(too_large)
                 chunks: list[bytes] = []
                 received = 0
                 for chunk in response.iter_bytes():
+                    if time.monotonic() >= deadline:
+                        raise error_class("Network deadline exceeded")
                     if not chunk:
                         continue
                     received += len(chunk)
-                    if received > MAX_DOWNLOAD_BYTES:
+                    if received > max_bytes:
                         raise error_class(too_large)
                     chunks.append(chunk)
                     if progress is not None:
@@ -259,7 +301,9 @@ def _fetch_bytes_httpx(
                 return b"".join(chunks)
     except _Transient:
         raise
-    except httpx.HTTPError as exc:
+    except ValueError as exc:
+        raise error_class(str(exc)) from exc
+    except (httpx.HTTPError, OSError) as exc:
         raise _Transient(f"Network error fetching {display}: {exc}") from exc
 
 
@@ -288,7 +332,13 @@ def fetch_text(
     XML, BibTeX, or other text payloads.
     """
     data = fetch_bytes(
-        url, accept=accept, timeout=timeout, error_class=error_class, label=label, opener=opener
+        url,
+        accept=accept,
+        timeout=timeout,
+        error_class=error_class,
+        label=label,
+        opener=opener,
+        max_bytes=MAX_METADATA_BYTES,
     )
     return data.decode("utf-8", errors="replace")
 
@@ -305,6 +355,7 @@ def fetch_json(
     headers: Mapping[str, str] | None = None,
 ) -> dict | None:
     """Fetch a provider JSON object with deterministic cache support."""
+    validate_url(url, ProviderFetchError, resolve=False)
     cache = open_cache(cache_file)
     cached = cache.get(namespace, identifier, "json")
     text = cached
@@ -349,7 +400,10 @@ def _fetch_text(
     request = _UrllibRequest(url, headers=request_headers)
     try:
         with opener(request, timeout=timeout) as response:  # type: ignore[arg-type]
-            return response.read().decode("utf-8", errors="replace")
+            data = response.read()
+            if len(data) > MAX_METADATA_BYTES:
+                raise ProviderFetchError("Metadata response exceeds size limit")
+            return data.decode("utf-8", errors="replace")
     except HTTPError as exc:
         if exc.code == 404:
             return None
@@ -371,25 +425,36 @@ def _fetch_text_httpx(
 ) -> str | None:
     request_headers = {"User-Agent": USER_AGENT}
     request_headers.update(headers or {})
+    deadline = time.monotonic() + DEFAULT_DEADLINE
     try:
         with httpx.Client(
-            follow_redirects=True, timeout=timeout, headers=request_headers
+            transport=PublicTransport(),
+            trust_env=False,
+            follow_redirects=True,
+            timeout=timeout,
+            headers=request_headers,
+            event_hooks={"request": [request_guard(ProviderFetchError, deadline)]},
         ) as client:
-            response = client.get(url)
-            if response.status_code == 404:
-                return None
-            response.raise_for_status()
-            return response.text
+            with client.stream("GET", url) as response:
+                if response.status_code == 404:
+                    return None
+                response.raise_for_status()
+                total = _content_length(response)
+                if total is not None and total > MAX_METADATA_BYTES:
+                    raise ProviderFetchError("Metadata response exceeds size limit")
+                chunks = []
+                received = 0
+                for chunk in response.iter_bytes():
+                    received += len(chunk)
+                    if received > MAX_METADATA_BYTES:
+                        raise ProviderFetchError("Metadata response exceeds size limit")
+                    if time.monotonic() >= deadline:
+                        raise ProviderFetchError("Network deadline exceeded")
+                    chunks.append(chunk)
+                return b"".join(chunks).decode("utf-8", errors="replace")
     except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 404:
-            return None
         raise ProviderFetchError(
             f"{provider} lookup failed for {identifier!r}: HTTP {exc.response.status_code}"
         ) from exc
-    except httpx.HTTPError as exc:
+    except (httpx.HTTPError, OSError, ValueError) as exc:
         raise ProviderFetchError(f"{provider} lookup failed for {identifier!r}: {exc}") from exc
-    except URLError as exc:
-        reason = getattr(exc, "reason", exc)
-        raise ProviderFetchError(
-            f"{provider} lookup failed for DOI {identifier!r}: {reason}"
-        ) from exc

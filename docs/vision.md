@@ -1,14 +1,19 @@
 # Philosophy
 
-**pynakes makes explicit, reviewable changes to bibliography files while
-preserving source text it does not modify.**
+**pynakes is a reference management engine for BibTeX and BibLaTeX bibliographies and their research materials.**
 
-It is a maintenance engine, not a bibliography application. These are the
-design beliefs that shape it.
+The ambition is to support the lifetime of a research library: acquiring
+references, curating and comparing records, keeping materials traceable,
+assembling project bibliographies, maintaining manuscript citations, and
+preparing public release copies. Researchers, applications and automation
+should be able to do this through the same engine.
 
-Pynakes supplies bounded operations, inspection, validation, previews, conflict
-handling, and atomic writes. The same commands are directly useful to humans,
-scripts, CI, and LLM-assisted tools.
+Its foundation is deliberate: authoritative BibTeX/BibLaTeX files, preservation
+of untouched source, reviewable changes and explicit conflicts. The current
+Python API and CLI implement bibliography operations and optional Pinax material
+management. Library-wide search, reconciliation and analysis are the next planned
+step, through `Library` and a derived `Catalogue`. The roadmap separates those
+plans from what users can do today.
 
 ## Bibfiles in plain text, in git
 
@@ -43,12 +48,10 @@ BibTeX:
 
 ## In JabRef's lineage
 
-pynakes is strongly influenced by JabRef. JabRef is the program that treated a
-`.bib` file as something worth curating with care, and pynakes carries that
-conviction forward in a headless, git-oriented tool. It is a descendant, not a
-rival: it speaks JabRef's metadata vocabulary fluently and reads JabRef's
-configuration as guidance, honoring `saveOrderConfig`, `saveActions`, and key
-patterns whenever a library carries them.
+JabRef helped establish the value of curating a `.bib` as a durable library.
+pynakes carries that conviction into programmable reference management: it
+preserves JabRef metadata and understands its save-order, normalization and
+citation-key conventions wherever a library uses them.
 
 The kinship is interop, not imitation. pynakes keeps its own settings in a
 `pynakes-meta` namespace and treats `jabref-meta` as a projection it maintains on
@@ -59,7 +62,7 @@ their own schedules and either can still open the file and find it whole.
 
 ## Scope
 
-pynakes is a **standalone `.bib` maintenance engine**: the base unit of work is
+pynakes is a **standalone reference management engine**: the base unit of work is
 one `Bibliography` (one `.bib` file), with a load → stage → preview → commit
 lifecycle. It is complete and valuable on its own — for researchers, scripts,
 CI, and agents — with no dependency on any application above it.
@@ -67,7 +70,7 @@ CI, and agents — with no dependency on any application above it.
 The optional Pinax mode keeps that base intact while letting a bibliography own a
 `pinax-files-dir` of citation-key-addressed materials. No `pinax-files-dir` means no Pinax
 behavior. Cross-file corpus work — a `Library` over many pinakes, a derived
-`Catalogue` index — is on the post-1.0 roadmap; see
+`Catalogue` index — is planned for v0.8; see
 [DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
 
 The name points past the single file. The *Pinakes* was Callimachus's catalog of

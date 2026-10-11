@@ -115,7 +115,7 @@ class NormalizeResult:
     field_names: int = 0
     keys: int = 0
     renamed_keys: list[tuple[str, str]] = field(default_factory=list)
-    warnings: list[dict[str, str]] = field(default_factory=list)
+    warnings: list[str | dict[str, str]] = field(default_factory=list)
 
     sort_entries_count: int = 0
     sort_criteria: list[tuple[str, bool]] = field(default_factory=list)
