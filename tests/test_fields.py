@@ -180,6 +180,35 @@ class TestTitleCapitalizationProtection:
         assert lib.entries["A"].fields["title"] == "{DNA} repair"
         assert lib.entries["B"].fields["title"] == "DNA repair"
 
+    @pytest.mark.parametrize(
+        ("title", "expected"),
+        [
+            # A formula is protected whole: braces around only its first part
+            # leave the elements after a subscript to a sentence-case style.
+            ("Spin in KV$_2$Se$_2$O films", "Spin in {KV$_2$Se$_2$O} films"),
+            ("Layered Fe$_3$O$_4$-based junctions", "Layered {Fe$_3$O$_4$-based} junctions"),
+            ("Transport in 2D and 3D systems", "Transport in {2D} and {3D} systems"),
+            ("A $p$-wave state and $T_1$", "A $p$-wave state and {$T_1$}"),
+            (r"Typeset with \LaTeX{} today", r"Typeset with \LaTeX{} today"),
+            ("See https://Example.org/ABC now", "See https://Example.org/ABC now"),
+        ],
+    )
+    def test_protects_whole_tokens_and_skips_control_sequences(
+        self, title: str, expected: str
+    ) -> None:
+        lib = parse_bib("@article{A,\n  title = {" + title + "}\n}\n")
+        protect_title_capitalization(lib)
+        assert lib.entries["A"].fields["title"] == expected
+
+    def test_leaves_provider_markup_alone(self) -> None:
+        title = (
+            'On <mml:math xmlns:mml="http://www.w3.org/1998/Math/MathML">'
+            "<mml:mi>MnO</mml:mi></mml:math> films"
+        )
+        lib = parse_bib("@article{A,\n  title = {" + title + "}\n}\n")
+        assert protect_title_capitalization(lib) == 0
+        assert lib.entries["A"].fields["title"] == title
+
 
 class TestQueryFilter:
     def test_contains(self) -> None:

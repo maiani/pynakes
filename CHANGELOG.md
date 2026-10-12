@@ -399,6 +399,23 @@ form is a `UsageError`, never silently reinterpreted.
 - On Windows, `init --agent-guide` wrote `AGENTS.md` in the locale's code page
   with CRLF line endings, mangling the template's non-ASCII text. It is now
   UTF-8 with LF endings on every platform, like every other file pynakes writes.
+- Titles imported by DOI kept the publisher's MathML, JATS or HTML markup
+  verbatim (`<mml:math ...><mml:msub><mml:mi>Fe</mml:mi>...`, `<i>LC</i>`).
+  Every import, `--fetch` and `enrich` route now converts title-like fields to
+  LaTeX: a chemical formula becomes `Fe$_3$O$_4$`, a symbol becomes inline math
+  (`$p$`, `$\kappa$`), italics become `\textit`. `normalize` converts markup
+  already in a library (whatever the title-protection setting; a field the
+  file's JabRef `html_to_latex` saveAction owns is left to it), `lint` reports
+  it as `title_markup`, and `verify --online` compares titles after the same
+  conversion, so a formula no longer reads as a title mismatch. A title
+  mismatch now quotes both titles and points to `ref compare`.
+- `fields protect-title` (and `normalize`'s title protection) inserted braces
+  inside markup and into control sequences (`\{LaTeX}`), protected only the
+  first part of a formula (`{KV}$_2$Se$_2$O`, leaving `Se` and `O` to a
+  sentence-case style), and missed digit-led tokens such as `2D`. A formula is
+  now protected whole (`{KV$_2$Se$_2$O}`), math with capitals is protected
+  (`{$T_1$}`), `2D`/`3D` are protected, and markup, control sequences and URLs
+  are left alone.
 
 ### Build
 

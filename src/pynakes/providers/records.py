@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from pynakes._markup import TITLE_LIKE_FIELDS, markup_to_latex
 from pynakes._text_utils import check_balanced_braces
 from pynakes.formatters._pages import normalize_page_numbers
 
@@ -54,6 +55,23 @@ class ReferenceMetadata:
         for name, value in self.fields.items():
             check_balanced_braces(f"Provider field {name!r}", value)
         self._normalize_pages()
+        self._convert_title_markup()
+
+    def _convert_title_markup(self) -> None:
+        """Convert MathML/JATS/HTML markup in title-like fields to LaTeX.
+
+        Publishers deposit titles with their structure (APS sends
+        ``<mml:math>`` MathML for ``RuO2``, others ``<i>``), and DOI content
+        negotiation passes it through verbatim. Converting here, like the page
+        repair above, covers every import, ``--fetch`` and ``enrich`` route.
+        """
+        for name, value in list(self.fields.items()):
+            if name.lower() not in TITLE_LIKE_FIELDS:
+                continue
+            converted = markup_to_latex(value)
+            if converted != value:
+                self.fields[name] = converted
+                self.field_expressions[name] = f"{{{converted}}}"
 
     def _normalize_pages(self) -> None:
         """Rewrite an en/em-dash page range to BibTeX's ``start--end``.

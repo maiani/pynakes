@@ -246,6 +246,7 @@ def normalize(
     # "checked, nothing to do".
     counts = [
         ("titles", sum(report.title_fields.values()), "titles"),
+        ("title_markup", report.title_markup, "title_markup"),
         ("authors", report.authors, "authors"),
         ("journals", report.journals, "journals"),
         ("dois", report.dois, "dois"),
@@ -255,8 +256,13 @@ def normalize(
         ("field_names", report.field_names, "identifier_case"),
         ("keys", report.keys, "keys"),
     ]
+    # Markup conversion belongs to the titles step but runs whether or not
+    # title protection is on, so it reads "off" only when the step never ran.
+    skipped = dict(report.skipped)
+    if skipped.get("titles") in (NOT_IN_ONLY, WHOLE_FILE):
+        skipped["title_markup"] = skipped["titles"]
     summary = ", ".join(
-        f"{label}={'off' if step in report.skipped else count}" for label, count, step in counts
+        f"{label}={'off' if step in skipped else count}" for label, count, step in counts
     )
     human = [
         f"{_verb('normalize', params)} entries.",

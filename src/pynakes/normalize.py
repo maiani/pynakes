@@ -8,6 +8,7 @@ from pynakes import fields as field_ops
 from pynakes import journals as journal_ops
 from pynakes._calendar import MONTH_ABBR_TO_NAME, MONTH_NUM_TO_ABBR, month_name_to_int
 from pynakes._identifiers import normalize_doi
+from pynakes._markup import TITLE_LIKE_FIELDS
 from pynakes._normalize_steps import (
     NOT_IN_ONLY,
     WHOLE_FILE,
@@ -43,6 +44,7 @@ from pynakes.model import BibEntry, BibFile, MetadataBlock
 # ``normalize_names`` is handled via the author-style path.
 _DOI_SAVE_ACTION = "clean_up_doi"
 _PAGES_SAVE_ACTION = "normalize_page_numbers"
+_HTML_SAVE_ACTIONS = ("html_to_latex", "html_to_unicode")
 
 # Normalize settings live under the ``normalize-`` key prefix.
 METADATA_PREFIX = "normalize-"
@@ -104,6 +106,8 @@ class NormalizeResult:
     """
 
     title_fields: dict[str, int] = field(default_factory=dict)
+    #: Entries whose title-like fields had provider markup converted to LaTeX.
+    title_markup: int = 0
     dropped_fields: int = 0
     authors: int = 0
     journals: int = 0
@@ -132,6 +136,7 @@ class NormalizeResult:
         """Return the per-domain change counts as a single JSON-friendly dict."""
         return {
             "title_fields": dict(self.title_fields),
+            "title_markup": self.title_markup,
             "dropped_fields": self.dropped_fields,
             "authors": self.authors,
             "journals": self.journals,
@@ -403,7 +408,19 @@ def normalize_library(
         for drop_field in _resolve_drop_fields(lib, opts.drop_fields):
             result.dropped_fields += field_ops.clear_field(selection, drop_field)
 
-    if not runs("titles"):
+    titles_run = runs("titles")
+    if titles_run:
+        # Markup is never wanted in a title, so this runs whatever the
+        # protection setting, and before protection so braces never land
+        # between tags. A field the file's own JabRef saveActions convert from
+        # HTML is left to them, as pages are.
+        owned = (
+            [name for name in TITLE_LIKE_FIELDS if save_actions.has(_HTML_SAVE_ACTIONS, (name,))]
+            if save_actions is not None and save_actions.enabled
+            else []
+        )
+        result.title_markup = field_ops.convert_title_markup(selection, skip_fields=owned)
+    if not titles_run:
         pass
     elif _resolve_bool(lib, opts.protect_titles, "protect-titles", True):
         terms = _resolve_terms(lib, opts.protected_terms)

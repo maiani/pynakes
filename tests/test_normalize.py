@@ -76,6 +76,7 @@ def test_normalize_library_runs_standard_pass() -> None:
     assert entry.fields["doi"] == "10.5555/ABC"
     assert report.operations == {
         "title_fields": {"title": 1},
+        "title_markup": 0,
         "dropped_fields": 0,
         "authors": 1,
         "journals": 0,

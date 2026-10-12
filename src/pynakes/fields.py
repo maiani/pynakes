@@ -10,6 +10,7 @@ import re
 from collections.abc import Iterable, Iterator
 
 from pynakes import query
+from pynakes._markup import TITLE_LIKE_FIELDS, has_markup, markup_to_latex
 from pynakes._text_utils import check_balanced_braces, find_field_name
 from pynakes.editing import (
     append_delimited_field,
@@ -139,7 +140,18 @@ def clear_field(lib: BibFile, field: str, where: QueryFilter = None) -> int:
 
 # --- title capitalization protection ---------------------------------------
 
-_TITLE_TOKEN_RE = re.compile(r"(?:[A-Z]\.){2,}|[A-Za-z][A-Za-z0-9]*(?:[-+][A-Za-z0-9]+)*")
+# A token is a run of words and inline math with no space between them, joined
+# by ``-``/``+``: ``GPT-4``, ``2D``, and a whole chemical formula such as
+# ``KV$_2$Se$_2$O``, which must be protected as one unit or the parts after the
+# first subscript are left to a sentence-case style to lowercase.
+_TITLE_ATOM = r"(?:[A-Za-z0-9]+|\$[^$]*\$)"
+_TITLE_TOKEN_RE = re.compile(
+    rf"(?:[A-Z]\.){{2,}}|(?:[A-Za-z0-9]|\$[^$]*\$){_TITLE_ATOM}*(?:[-+]{_TITLE_ATOM}+)*"
+)
+_INLINE_MATH_RE = re.compile(r"\$[^$]*\$")
+# Spans copied verbatim: a control sequence (``\LaTeX`` must not become
+# ``\{LaTeX}``) and a URL, whose case is significant but not a word's.
+_VERBATIM_RE = re.compile(r"\\(?:[A-Za-z]+|.)|(?:https?|ftp)://[^\s{}]+")
 
 
 def _protect_token(token: str, terms: set[str]) -> bool:
@@ -148,6 +160,14 @@ def _protect_token(token: str, terms: set[str]) -> bool:
         return False
     if token in terms:
         return True
+    if "$" in token:
+        # Math a sentence-case style would lowercase (``$T_1$``, ``$\Delta$``),
+        # or a formula whose letters outside the math need protecting.
+        if any(ch.isupper() for ch in "".join(_INLINE_MATH_RE.findall(token))):
+            return True
+        token = _INLINE_MATH_RE.sub("", token)
+        if not token:
+            return False
     if re.fullmatch(r"(?:[A-Z]\.){2,}", token):
         return True
 
@@ -165,7 +185,14 @@ def _protect_token(token: str, terms: set[str]) -> bool:
 
 
 def _protect_title_value(value: str, terms: set[str]) -> str:
-    """Brace-protect capitalization-sensitive tokens outside existing braces."""
+    """Brace-protect capitalization-sensitive tokens outside existing braces.
+
+    A value that still carries provider markup (MathML, HTML) is returned as
+    it is: braces inserted between tags or inside an attribute would corrupt
+    it, and ``normalize`` converts the markup to LaTeX first.
+    """
+    if has_markup(value):
+        return value
     out: list[str] = []
     depth = 0
     i = 0
@@ -184,8 +211,13 @@ def _protect_title_value(value: str, terms: set[str]) -> str:
             continue
 
         if depth == 0:
+            verbatim = _VERBATIM_RE.match(value, i)
+            if verbatim:
+                out.append(verbatim.group(0))
+                i = verbatim.end()
+                continue
             match = _TITLE_TOKEN_RE.match(value, i)
-            if match:
+            if match and (i == 0 or not value[i - 1].isalnum()):
                 token = match.group(0)
                 out.append(f"{{{token}}}" if _protect_token(token, terms) else token)
                 i = match.end()
@@ -229,6 +261,30 @@ def protect_title_capitalization(
         new_value = _protect_title_value(old_value, protected_terms)
         if set_entry_field(entry, field, new_value):
             count += 1
+    return count
+
+
+def convert_title_markup(
+    lib: BibFile, where: QueryFilter = None, *, skip_fields: Iterable[str] = ()
+) -> int:
+    """Convert MathML/JATS/HTML markup in title-like fields to LaTeX.
+
+    Covers entries imported before pynakes converted provider markup on
+    import, and titles pasted from a provider record. Returns the number of
+    entries changed; a value without markup is never touched. ``skip_fields``
+    leaves fields another converter owns, such as JabRef's ``html_to_latex``.
+    """
+    count = 0
+    skipped = {name.lower() for name in skip_fields}
+    for entry in _selected(lib, where):
+        changed = False
+        for name, value in list(entry.fields.items()):
+            if name.lower() not in TITLE_LIKE_FIELDS or name.lower() in skipped:
+                continue
+            converted = markup_to_latex(value)
+            if converted != value and set_entry_field(entry, name, converted):
+                changed = True
+        count += changed
     return count
 
 

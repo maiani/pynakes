@@ -6,7 +6,8 @@ key, and a message, plus the source line of the finding's entry or metadata
 block when the library was parsed from text. Checks: duplicate keys, missing
 required fields (by entry type), undefined BibTeX string references, cross-entry
 field consistency (a field most entries of a type define but some omit),
-malformed or missing DOIs, malformed JabRef ``groups`` formatting, noncanonical
+malformed or missing DOIs, provider markup in titles, malformed JabRef ``groups``
+formatting, noncanonical
 entry-type / field-name casing, unresolved journal titles, metadata-comment
 schema drift (unknown pynakes keys, invalid values, duplicate blocks), and
 deviations from the library's stored metadata profile.
@@ -55,6 +56,7 @@ from pynakes._lint_profile import (
     resolve_lint_profile,
 )
 from pynakes._lint_required import required_field_rules
+from pynakes._markup import TITLE_LIKE_FIELDS, markup_to_latex
 from pynakes.bibtex_parser import parse_raw_string_definition
 from pynakes.canonical import EntryTypeCase, resolve_entry_type_case
 from pynakes.editing import raw_field_names, raw_field_value
@@ -583,6 +585,28 @@ def _lint_pages(entry: BibEntry, fields: dict[str, str]) -> list[LintIssue]:
     ]
 
 
+def _lint_title_markup(entry: BibEntry, fields: dict[str, str]) -> list[LintIssue]:
+    """Report MathML, JATS, or HTML markup left in a title-like field.
+
+    DOI content negotiation passes publisher titles through verbatim, so an
+    entry imported before pynakes converted markup, or pasted from a provider
+    record, can carry ``<mml:math>`` or ``<i>`` that LaTeX typesets literally.
+    The finding fires exactly when ``normalize`` would convert the value.
+    """
+    return [
+        LintIssue(
+            "title_markup",
+            "warning",
+            f"Entry {entry.key!r} has MathML/HTML markup in {name!r}; "
+            "`normalize` converts it to LaTeX",
+            key=entry.key,
+            field=name,
+        )
+        for name in TITLE_LIKE_FIELDS
+        if (value := fields.get(name)) and markup_to_latex(value) != value
+    ]
+
+
 def _lint_reference_targets(lib: BibFile) -> list[LintIssue]:
     """Report a ``crossref``/``xdata``/... naming a key the library lacks."""
     present = set(lib.entries.keys())
@@ -678,5 +702,6 @@ def _lint_entry(
     issues += _lint_required_fields(entry, fields, dialect)
     issues += _lint_doi(entry, fields)
     issues += _lint_pages(entry, fields)
+    issues += _lint_title_markup(entry, fields)
     issues += _lint_groups(entry)
     return issues

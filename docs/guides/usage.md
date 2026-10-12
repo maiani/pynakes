@@ -761,6 +761,14 @@ with `--pages off` or `normalize-pages: false`. `lint` reports the same values
 as `nonstandard_page_range`, so a range an import or a paste introduced is
 visible before it reaches a build.
 
+Provider markup in titles is converted to LaTeX. Publishers deposit titles
+with MathML, JATS or HTML structure (`<mml:math>…`, `<i>…</i>`), and DOI
+content negotiation passes it on verbatim. Imports convert it on the way in;
+`normalize` converts any already in the library, whatever the title-protection
+setting, and `lint` reports what is left as `title_markup`. A chemical formula
+becomes `Fe$_3$O$_4$`, a symbol becomes inline math (`$p$`), and italics become
+`\textit{…}`.
+
 Journal source tables require `--journal-style abbreviated` (or a stored
 journal style) to request abbreviation.
 

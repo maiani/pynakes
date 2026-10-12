@@ -49,6 +49,7 @@ from pynakes._integrity_published import (
     check_published,
     fetch_arxiv_metadata,
 )
+from pynakes._markup import comparable_title, markup_to_latex
 from pynakes._text_utils import entry_year, title_similarity
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.editing import set_entry_field
@@ -423,13 +424,21 @@ def fetch_doi_entry(doi: str, *, cache_file: str | Path | None = None) -> BibEnt
 def _compare_entry(local: BibEntry, remote: BibEntry) -> list[IntegrityIssue]:
     issues: list[IntegrityIssue] = []
     local_title = local.fields.get("title", "")
-    remote_title = remote.fields.get("title", "")
-    if local_title and remote_title and title_similarity(local_title, remote_title) < 0.86:
+    # Providers send MathML/HTML that pynakes converts on import; compare the
+    # converted form, and flatten LaTeX math on both sides, so ``RuO$_2$``
+    # matches a ``<mml:msub>`` formula instead of failing as a mismatch.
+    remote_title = " ".join(markup_to_latex(remote.fields.get("title", "")).split())
+    if (
+        local_title
+        and remote_title
+        and title_similarity(comparable_title(local_title), comparable_title(remote_title)) < 0.86
+    ):
         issues.append(
             IntegrityIssue(
                 "title_mismatch",
                 "error",
-                "Local title does not match DOI provider title",
+                f"Local title {local_title!r} does not match DOI provider title "
+                f"{remote_title!r}; review with `pynakes ref compare {local.key} --online`",
                 local.key,
                 "title",
                 expected=remote_title,
