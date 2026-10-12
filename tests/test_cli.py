@@ -4545,6 +4545,36 @@ class TestAssetFetchPublished:
         assert len(data["skipped"]) == 1
         assert data["skipped"][0]["reason"] == "no arXiv id"
 
+    def test_fetch_says_materials_present_before_a_missing_doi(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        # An arXiv-only entry whose preprint materials are in place was
+        # reported "no DOI", as though nothing had been checked.
+        from pynakes.filestore import FileStore
+
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@misc{Noether1918,\n  title = {Invariante Variationsprobleme},\n"
+            "  eprint = {1801.00001},\n  archiveprefix = {arXiv}\n}\n"
+            "@comment{pynakes-meta:\npinax-files-dir: refs.files\n"
+            "pinax-fetch-policy: preprint, published, source\n}\n"
+        )
+        paths = FileStore(tmp_path / "refs.files", bib).paths_for("Noether1918")
+        paths.preprint_pdf.parent.mkdir(parents=True)
+        paths.preprint_pdf.write_bytes(b"%PDF-1.4")
+        paths.preprint_source.mkdir()
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["asset", "fetch", "--json"])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["skipped"] == [
+            {
+                "key": "Noether1918",
+                "reason": "materials already present (no DOI for a published version)",
+            }
+        ]
+
     def test_fetch_supplement_with_institutional_access(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text(

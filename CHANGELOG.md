@@ -446,6 +446,11 @@ form is a `UsageError`, never silently reinterpreted.
   `metadata set`/`metadata remove` commands that migrate it, and checks the
   value against the replacement's grammar, so `fetch-policy: prepring` is
   reported as an invalid value too.
+- `asset fetch` reported an arXiv-only entry whose preprint PDF and source were
+  in place as "no DOI", as though nothing had been checked. It now says
+  "materials already present (no DOI for a published version)". Its terminal
+  progress also tracks the entry queue, so a long run of skipped entries no
+  longer shows nothing until the end.
 
 ### Build
 

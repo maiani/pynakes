@@ -10,10 +10,13 @@ from rich.progress import (
     BarColumn,
     DownloadColumn,
     SpinnerColumn,
+    Task,
+    TaskID,
     TextColumn,
     TimeElapsedColumn,
     TransferSpeedColumn,
 )
+from rich.text import Text
 
 from pynakes.cli_choices import Material
 from pynakes.cli_commands._fetch_report import fetch_report_lines
@@ -52,21 +55,54 @@ class FetchAccess(str, Enum):
     INSTITUTIONAL = "institutional"
 
 
+class _DownloadOrCountColumn(DownloadColumn):
+    """Bytes for a download task; ``done/total`` for the entry-queue task."""
+
+    def render(self, task: Task) -> Text:
+        if task.fields.get("entries"):
+            return Text(f"{int(task.completed)}/{int(task.total or 0)} entries")
+        return super().render(task)
+
+
+class _SpeedColumn(TransferSpeedColumn):
+    """Transfer speed for a download task; nothing for the entry-queue task."""
+
+    def render(self, task: Task) -> Text:
+        return Text("") if task.fields.get("entries") else super().render(task)
+
+
 class _RichFetchProgress(RichProgressBase):
-    """Render Pinax fetch progress to stderr for human CLI runs."""
+    """Render Pinax fetch progress to stderr for human CLI runs.
+
+    One task tracks the entry queue, so a long run whose entries are mostly
+    skipped (materials already present) still shows it is moving; each
+    download gets its own byte-level task beneath it.
+    """
 
     def __init__(self) -> None:
         super().__init__(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
-            DownloadColumn(),
-            TransferSpeedColumn(),
+            _DownloadOrCountColumn(),
+            _SpeedColumn(),
             TimeElapsedColumn(),
         )
         self._tasks: dict[tuple[str, FetchArtifact], object] = {}
+        self._entries: TaskID | None = None
+
+    def _track_entry(self, event: FetchProgressEvent) -> None:
+        if not event.entry_total or not event.entry_index:
+            return
+        if self._entries is None:
+            self._entries = self._progress.add_task(
+                "Fetching", total=event.entry_total, entries=True
+            )
+        done = event.entry_index - (1 if event.kind == "entry" else 0)
+        self._progress.update(self._entries, completed=done, description=f"Fetching: {event.key}")
 
     def __call__(self, event: FetchProgressEvent) -> None:
+        self._track_entry(event)
         if event.kind == "fail" and event.artifact is None:
             self._remove_key_tasks(event.key)
             return

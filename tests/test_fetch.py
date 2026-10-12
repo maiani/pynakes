@@ -786,3 +786,17 @@ def test_truncated_single_file_source_is_an_arxiv_error(tmp_path: Path) -> None:
 
     with pytest.raises(ArxivFetchError):
         extract_arxiv_source(data[: len(data) // 2], tmp_path / "src")
+
+
+def test_fetch_progress_tracks_the_entry_queue() -> None:
+    # A long run of skipped entries used to show nothing until the end.
+    from pynakes.cli_commands.fetch import _RichFetchProgress
+    from pynakes.fetch_progress import FetchProgressEvent
+
+    progress = _RichFetchProgress()
+    progress(FetchProgressEvent(kind="entry", key="Euler1748", entry_index=1, entry_total=3))
+    progress(FetchProgressEvent(kind="skip", key="Gauss1801", entry_index=2, entry_total=3))
+
+    (task,) = progress._progress.tasks
+    assert (task.completed, task.total, task.fields["entries"]) == (2, 3, True)
+    assert task.description == "Fetching: Gauss1801"

@@ -491,14 +491,23 @@ def run_fetch_loop(
             wants_doi = policy.published or policy.supplement or policy.bestpdf
             missing_arxiv = wants_arxiv and arxiv_id is None
             missing_doi = wants_doi and not doi
+            # An identifier the policy uses is there, so what it can fetch is
+            # already present: say so first. "no DOI" alone read as though
+            # nothing had been checked for an arXiv entry with its PDF in place.
+            usable = (wants_arxiv and arxiv_id is not None) or (wants_doi and bool(doi))
             if missing_arxiv and missing_doi:
-                skipped.append({"key": key, "reason": "no arXiv id and no DOI"})
+                reason = "no arXiv id and no DOI"
+            elif usable and missing_doi:
+                reason = "materials already present (no DOI for a published version)"
+            elif usable and missing_arxiv:
+                reason = "materials already present (no arXiv id for a preprint)"
             elif missing_arxiv:
-                skipped.append({"key": key, "reason": "no arXiv id"})
+                reason = "no arXiv id"
             elif missing_doi:
-                skipped.append({"key": key, "reason": "no DOI"})
+                reason = "no DOI"
             else:
-                skipped.append({"key": key, "reason": "materials already present"})
+                reason = "materials already present"
+            skipped.append({"key": key, "reason": reason})
             _emit_fetch_progress(
                 progress,
                 FetchProgressEvent(
