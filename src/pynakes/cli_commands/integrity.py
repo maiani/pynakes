@@ -22,6 +22,7 @@ from pynakes.cli_common import (
     _EXPECT_SHA256_OPTION,
     RunParams,
     _check_expected_sha256,
+    _emit_error,
     _entries,
     _finish_mod,
     _resolve_input_bib,
@@ -184,7 +185,7 @@ def enrich(
         False,
         "--published",
         help="Also promote preprints to their published version, writing the "
-        "published DOI/journal when one is available (use with --online)",
+        "published DOI/journal when one is available (requires --online)",
     ),
     where: str | None = where_option(),
     key: list[str] | None = key_option(),
@@ -204,6 +205,15 @@ def enrich(
     `--key` and `--where` limit it to the selected entries, so a lookup
     for a handful of references never reaches the rest of the library.
     """
+    if published and not online:
+        # Offline, the preprint pass has nothing to check against and would
+        # report "Enriched 0 entries" as if it had looked and found nothing.
+        _emit_error(
+            json_output,
+            "OnlineLookupRequired",
+            "enrich --published looks up published versions of preprints; "
+            "pass --online to allow the requests.",
+        )
     file = _resolve_input_bib(file, json_output)
     params = RunParams(
         dry_run=dry_run,

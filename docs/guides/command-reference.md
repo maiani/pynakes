@@ -225,7 +225,7 @@ Conservatively fill missing metadata (modifies the file).
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `--online` | boolean | no | false | — | Fetch DOI provider metadata; otherwise only local DOI URLs are used |
-| `--published` | boolean | no | false | — | Also promote preprints to their published version, writing the published DOI/journal when one is available (use with --online) |
+| `--published` | boolean | no | false | — | Also promote preprints to their published version, writing the published DOI/journal when one is available (requires --online) |
 | `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing. See `pynakes capabilities` for the full grammar. |
 | `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
 | `--cache-file` | string | no | null | — | Keep provider responses in a reusable cache file at this path (safe to delete or .gitignore). Omit it and nothing is written to disk: responses are reused for this run only |

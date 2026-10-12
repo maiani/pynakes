@@ -426,6 +426,8 @@ form is a `UsageError`, never silently reinterpreted.
   at all for a command's warnings, whose text reached only `--json`. Every
   command now prints each warning's message (`warning: Regenerated 3 key(s):
   ...`) unless its own output already states it.
+- `enrich --published` without `--online` reported "Enriched 0 entries" as if
+  it had checked. It now fails with `OnlineLookupRequired`, as `ref find` does.
 
 ### Build
 

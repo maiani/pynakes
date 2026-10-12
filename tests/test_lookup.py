@@ -179,3 +179,16 @@ def test_cli_reports_a_provider_failure_without_a_traceback(monkeypatch) -> None
 
     assert result.exit_code == 1
     assert json.loads(result.output)["error"] == "ProviderUnavailable"
+
+
+def test_enrich_published_requires_online(tmp_path) -> None:
+    """Offline, ``--published`` would silently enrich nothing; it is refused."""
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@misc{Pre,\n  title = {A Preprint},\n  eprint = {2401.00001},\n"
+        "  archiveprefix = {arXiv}\n}\n",
+        encoding="utf-8",
+    )
+    result = runner.invoke(app, ["enrich", str(bib), "--published", "--json"])
+    assert result.exit_code == 1
+    assert json.loads(result.output)["error"] == "OnlineLookupRequired"
