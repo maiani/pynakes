@@ -163,7 +163,12 @@ def _csl_item_to_entry(item: object, taken: set[str]) -> BibEntry | None:
 
 
 def import_csl_json(text: str) -> BibFile:
-    data = json.loads(text) if text.strip() else []
+    try:
+        data = json.loads(text) if text.strip() else []
+    except RecursionError as exc:
+        raise ValueError("CSL-JSON is nested too deeply to import") from exc
     if isinstance(data, dict):
         data = [data]
+    if not isinstance(data, list):
+        raise ValueError("CSL-JSON must be an item object or an array of item objects")
     return build_bibfile(data, _csl_item_to_entry)

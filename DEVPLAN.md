@@ -196,9 +196,9 @@ tests the gate did not require moved to Stage 5.
 
 #### Stage 5 — Hardening and scale
 
-**In progress (2026-10-11).** The completed changes are recorded under
-Unreleased in CHANGELOG. This stage is not closed: the remaining audit and
-network-deadline checks below still need work.
+**Local work complete (2026-10-12).** The completed changes are recorded under
+Unreleased in CHANGELOG. The stage closes when the remote CI matrix runs it
+green; see Gate 5 below.
 
 **Done and verified locally:**
 
@@ -259,27 +259,35 @@ network-deadline checks below still need work.
   unreachable compatibility fallback reduced it. The baseline must shrink,
   never grow; see [the type-checking guide](docs/guides/type-checking.md).
 
+- **Hostile-input matrix:** `tests/test_hostile_input.py` runs Hypothesis
+  properties over CSL-JSON, RIS, EndNote and MODS of arbitrary shape. Each
+  importer returns a reparseable library or raises `ValueError`, and nothing
+  else. The file also covers specific refused and tolerated files through
+  `convert --from`, CSV's export-only boundary (now documented in usage), and
+  13 failed provider responses through `ref import`, plus a recovered throttle
+  and a mixed batch. Every case must yield a JSON envelope with no traceback
+  and leave the library untouched. The audit found and fixed `TypeError`,
+  `RecursionError` and raw XML parse errors. XML with entity declarations is
+  refused in MODS, arXiv and NCBI responses.
+- **Network deadline:** DNS resolution runs on a daemon thread bounded by the
+  deadline. A deadline-aware httpcore network backend gives each socket read
+  and write only the time left, so trickled headers end at the deadline. A
+  socket-pair test hangs without the backend. Injected openers are read in
+  bounded `read(size)` chunks: the cap holds without buffering the whole body,
+  and the deadline is checked between chunks. The architecture guide documents
+  this contract.
+- **HTTP-layer tests:** `tests/test_http_layer.py` covers cached-JSON
+  failures, metadata status and stream failures, opener caps and deadlines,
+  and retry boundaries. `_http.py` coverage rose from 83% to 89%.
+
 **Not yet done:**
 
-- Complete the hostile-input audit beyond the tested inspection/lint/format/
-  normalize paths and representative interchange failures. Exercise the full
-  RIS/MODS/EndNote malformed-input space, and explicitly document/test CSV's
-  export-only boundary. Expand successful/failed provider-response cases for
-  the import/fetch JSON envelope beyond the existing examples.
-- Prove and enforce the overall deadline during stalled DNS resolution and
-  repeated slow body reads, rather than only at request/chunk/retry boundaries.
-  Injected custom openers own their redirect/destination behavior and still read
-  a complete body before enforcing the size cap; decide and test their bounded
-  read contract.
-- Finish HTTP-layer test hygiene: coverage improved from 79% to 83%, but cached
-  JSON failures, metadata status/stream failures, custom-opener caps/deadlines
-  and remaining retry boundaries need targeted tests.
 - Run the required remote CI matrix, including Python 3.15 on Windows/macOS and
-  dependency floors. Local success is not evidence of those remote jobs.
+  dependency floors. Local success is not evidence of those remote jobs. The
+  local `main` is ahead of `origin/main` and needs pushing first.
 
-**Local verification (2026-10-11):** 2,846 tests pass on final Python 3.15.0
-with 92.44% coverage. Ruff lint/format, ty, strict documentation build,
-wheel/sdist build and Twine metadata checks pass.
+**Local verification (2026-10-12):** 2,915 tests pass on Python 3.13 with
+92.73% coverage. Ruff lint/format, ty and the strict documentation build pass.
 
 **Gate 5** remains open until the full hostile-input matrix runs in CI with
 zero tracebacks and valid JSON whenever stdout is available. The local scale

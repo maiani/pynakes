@@ -340,8 +340,10 @@ class _FakeResponse:
     def __exit__(self, *args: object) -> None:
         return None
 
-    def read(self) -> bytes:
-        return self._data
+    def read(self, size: int = -1) -> bytes:
+        size = len(self._data) if size < 0 else size
+        data, self._data = self._data[:size], self._data[size:]
+        return data
 
 
 _OPENALEX_WITH_OA = json.dumps(

@@ -1215,10 +1215,20 @@ pynakes convert records.ris --from ris --out refs.bib
 pynakes convert items.json --from csl-json
 pynakes convert records.xml --from mods
 pynakes convert records.enw --from endnote
+
+# CSV is export-only:
+pynakes convert refs.bib --to csv --out refs.csv
 ```
 
 Export/import map the common entry types and fields; unmapped fields are
 dropped rather than guessed.
+
+CSV is export-only: it cannot carry repeated names, braced capitalization,
+string macros, linked files, comments, or metadata, so `--from csv` is refused
+as an invalid choice. An import that cannot be read — malformed JSON or XML,
+CSL-JSON that is not an item or array of items, MODS that declares XML
+entities, or a value with unbalanced braces — is a JSON error envelope (exit 1)
+and writes no output file.
 
 ## capabilities
 

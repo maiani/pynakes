@@ -9,6 +9,7 @@ from urllib.parse import quote
 
 from pynakes._calendar import MONTH_NUM_TO_ABBR
 from pynakes._identifiers import _ARXIV_NEW_RE, _ARXIV_OLD_RE, normalize_arxiv
+from pynakes._xml import parse_untrusted_xml
 from pynakes.entry_types import eprint_fields, preprint_entry_type
 from pynakes.providers._http import (
     DEFAULT_TIMEOUT,
@@ -83,7 +84,7 @@ def fetch_atom(identifier: str, timeout: float = DEFAULT_TIMEOUT) -> str:
 def parse_atom(text: str, identifier: str) -> ArxivRecord:
     """Parse an arXiv Atom feed into an :class:`ArxivRecord`."""
     try:
-        root = ET.fromstring(text)
+        root = parse_untrusted_xml(text)
     except ET.ParseError as exc:
         raise ProviderFetchError(f"arXiv returned invalid XML for {identifier}") from exc
     entry = root.find("atom:entry", _ATOM_NS)

@@ -39,10 +39,14 @@ def _name_parts(family: str, given: str) -> dict[str, str]:
 
 
 def person_to_bibtex(name: dict[str, str]) -> str:
-    if name.get("literal"):
-        return str(name["literal"])
-    family = (name.get("family") or "").strip()
-    given = (name.get("given") or "").strip()
+    def part(key: str) -> str:
+        value = name.get(key)
+        return value.strip() if isinstance(value, str) else ""
+
+    if part("literal"):
+        return part("literal")
+    family = part("family")
+    given = part("given")
     return f"{family}, {given}" if given else family
 
 

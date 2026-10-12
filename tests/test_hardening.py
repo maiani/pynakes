@@ -204,12 +204,10 @@ def test_private_or_non_http_urls_never_reach_transport(monkeypatch, url):
 
 
 def test_private_dns_and_redirect_are_refused(monkeypatch):
-    monkeypatch.setattr(
-        _network, "resolve_addresses", lambda host, port: ["93.184.216.34", "10.0.0.1"]
-    )
+    monkeypatch.setattr(_network, "_getaddrinfo", lambda host, port: ["93.184.216.34", "10.0.0.1"])
     with pytest.raises(_http.ProviderFetchError, match="non-public"):
         _network.validate_url("https://example.test", _http.ProviderFetchError)
-    monkeypatch.setattr(_network, "resolve_addresses", lambda host, port: ["93.184.216.34"])
+    monkeypatch.setattr(_network, "_getaddrinfo", lambda host, port: ["93.184.216.34"])
     calls = []
 
     def handler(request):
@@ -260,7 +258,7 @@ def test_deadline_stops_a_slow_stream(monkeypatch):
 
 def test_public_transport_pins_dns_and_keeps_host_and_tls_name(monkeypatch):
     sent = []
-    monkeypatch.setattr(_network, "resolve_addresses", lambda host, port: ["93.184.216.34"])
+    monkeypatch.setattr(_network, "_getaddrinfo", lambda host, port: ["93.184.216.34"])
 
     def send(self, request):
         sent.append(request)
@@ -278,7 +276,7 @@ def test_public_transport_pins_dns_and_keeps_host_and_tls_name(monkeypatch):
 
 
 def test_public_transport_refuses_dns_rebinding(monkeypatch):
-    monkeypatch.setattr(_network, "resolve_addresses", lambda host, port: ["127.0.0.1"])
+    monkeypatch.setattr(_network, "_getaddrinfo", lambda host, port: ["127.0.0.1"])
     with _network.PublicTransport() as transport:
         with pytest.raises(ValueError, match="non-public"):
             transport.handle_request(httpx.Request("GET", "https://example.test"))
