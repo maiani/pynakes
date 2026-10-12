@@ -38,6 +38,20 @@ export interface PlannedArtifact {
   fallback?: boolean;
 }
 
+/**
+ * One request the engine made for a material, as it recorded it: the URL asked
+ * for and where redirects ended (both without credentials or token-like query
+ * parameters), the HTTP status, and the content type.
+ */
+export interface FetchAttempt {
+  url: string | null;
+  final_url?: string | null;
+  status?: number | null;
+  content_type?: string | null;
+  /** `pdf`, `not_pdf`, `http_error`, or `network_error`. */
+  outcome?: string;
+}
+
 /** An entry, or one artifact of it, that was not fetched — and why. */
 export interface FetchSkip {
   key: string;
@@ -45,6 +59,8 @@ export interface FetchSkip {
   artifact?: string;
   /** Present on a dry run's "would fetch" items: what a real run would request. */
   planned?: PlannedArtifact[];
+  /** The requests made before giving up, when any were. */
+  attempts?: FetchAttempt[];
 }
 
 /** Files a real run wrote for one entry. */
@@ -59,6 +75,7 @@ export interface FetchFailure {
   key: string;
   error: string;
   artifact?: string;
+  attempts?: FetchAttempt[];
 }
 
 export interface AssetFetchSuccess extends MutationSuccess {
@@ -67,6 +84,18 @@ export interface AssetFetchSuccess extends MutationSuccess {
   fetched: FetchedMaterial[];
   skipped: FetchSkip[];
   failed: FetchFailure[];
+  /**
+   * The run's counts. `requested` is entries; the rest count items, and
+   * `already_present + unavailable + planned` is the length of `skipped`.
+   */
+  summary?: {
+    requested: number;
+    fetched: number;
+    already_present: number;
+    unavailable: number;
+    failed: number;
+    planned: number;
+  };
 }
 
 export type AssetFetchEnvelope = AssetFetchSuccess | MutationConflict | InspectError;
@@ -137,6 +166,30 @@ export interface FetchNote {
   key: string;
   artifact?: string;
   reason: string;
+  /** What the requests behind it got: each host and its HTTP status, or what failed. */
+  tried?: string;
+}
+
+/**
+ * Each request's host and what came back — `journals.aps.org (HTTP 403)` —
+ * from the engine's own record, repeated requests to one host said once.
+ */
+export function triedText(attempts: FetchAttempt[] | undefined): string | undefined {
+  const parts = (attempts ?? []).map((attempt) => {
+    const url = attempt.final_url ?? attempt.url ?? "";
+    let host = url;
+    try {
+      host = new URL(url).host;
+    } catch {
+      // Not a URL the engine recorded in full: show what it gave.
+    }
+    const answer = attempt.status
+      ? `HTTP ${attempt.status}${attempt.content_type ? `, ${attempt.content_type}` : ""}`
+      : (attempt.outcome ?? "no response").replace(/_/g, " ");
+    return `${host} (${answer})`;
+  });
+  const unique = [...new Set(parts)];
+  return unique.length > 0 ? unique.join(", ") : undefined;
 }
 
 export type FetchOutcome =
@@ -177,13 +230,21 @@ export function reduceFetch(envelope: AssetFetchEnvelope): FetchOutcome {
         key: item.key,
         artifact: item.artifact,
         reason: item.reason || "unavailable",
+        tried: triedText(item.attempts),
       });
     }
   }
+  // A failed download is also reported as a `download_failed` warning; the
+  // failure line already says it, so only the warnings that add something
+  // (one a fallback made up for) are shown.
+  const failedKeys = new Set((envelope.failed ?? []).map((item) => item.key));
+  const warnings = (envelope.warnings ?? []).filter(
+    (warning) => warning.type !== "download_failed" || !failedKeys.has(String(warning.key)),
+  );
   return {
     ok: true,
     diff: envelope.diff ?? "",
-    warnings: (envelope.warnings ?? []).map(warningText),
+    warnings: warnings.map(warningText),
     modified: envelope.modified,
     sourceSha256: envelope.source_sha256,
     filesDir: envelope.files_dir ?? null,
@@ -198,6 +259,7 @@ export function reduceFetch(envelope: AssetFetchEnvelope): FetchOutcome {
       key: item.key,
       artifact: item.artifact,
       reason: item.error,
+      tried: triedText(item.attempts),
     })),
   };
 }
@@ -256,6 +318,10 @@ function artifactLine(key: string, item: PlannedArtifact): string {
 function noteLine(note: FetchNote): string {
   const what = note.artifact ? ` ${materialLabel(note.artifact)}` : "";
   return `• ${note.key}${what}: ${note.reason}`;
+}
+
+function triedSuffix(note: FetchNote): string {
+  return note.tried ? ` [tried ${note.tried}]` : "";
 }
 
 /** Count the files a plan would request, fallbacks included. */
@@ -362,14 +428,20 @@ export function fetchResult(
     parts.push(
       "Skipped " +
         skips
-          .map((note) => `${note.key}${note.artifact ? ` ${materialLabel(note.artifact)}` : ""} (${note.reason})`)
+          .map(
+            (note) =>
+              `${note.key}${note.artifact ? ` ${materialLabel(note.artifact)}` : ""} (${note.reason})` +
+              triedSuffix(note),
+          )
           .join("; ") +
         ".",
     );
   }
   if (outcome.failed.length > 0) {
     parts.push(
-      "Failed " + outcome.failed.map((note) => `${note.key} (${note.reason})`).join("; ") + ".",
+      "Failed " +
+        outcome.failed.map((note) => `${note.key} (${note.reason})${triedSuffix(note)}`).join("; ") +
+        ".",
     );
   }
   parts.push(...outcome.warnings);

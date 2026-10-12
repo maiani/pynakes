@@ -25,9 +25,11 @@ import {
   plannedFileCount,
   reduceFetch,
   runFetch,
+  triedText,
   type AssetFetchEnvelope,
+  type AssetFetchSuccess,
 } from "../fetchPlan.js";
-import { PynakesCancelledError, assetFetchArgs } from "../pynakes.js";
+import { PynakesCancelledError, assetFetch, assetFetchArgs } from "../pynakes.js";
 import { command, engineSkipReason, tempBib } from "./engine.js";
 
 const skip = engineSkipReason();
@@ -108,7 +110,7 @@ test("a dry run plans each file at the engine's path, and writes nothing", { ski
   assert.equal(einstein[0].path, path.join(files, "Einstein1905.published.pdf"));
   assert.equal(einstein[1].fallback, true);
   assert.deepEqual(plan.skipped, [
-    { key: "Newton1687", artifact: undefined, reason: "no arXiv id and no DOI" },
+    { key: "Newton1687", artifact: undefined, reason: "no arXiv id and no DOI", tried: undefined },
   ]);
 
   assert.equal(fs.readFileSync(file, "utf-8"), before, "a dry run must not write the .bib");
@@ -241,4 +243,93 @@ test("the result reports what landed, what was skipped and why, and failures", (
   assert.ok(nothing.ok);
   assert.equal(fetchResult(nothing, new Set(["Einstein1905"])).level, "info");
   assert.equal(fetchLabel({}), "Fetch missing materials");
+});
+
+test("the engine's envelope counts what a run planned, skipped and found present", { skip }, async () => {
+  const file = tempBib(LIBRARY);
+  const envelope = (await assetFetch(command, file, {}, true)) as AssetFetchSuccess;
+  assert.equal(envelope.status, "success");
+  assert.deepEqual(envelope.summary, {
+    requested: 3,
+    fetched: 0,
+    already_present: 0,
+    unavailable: 1,
+    failed: 0,
+    planned: 2,
+  });
+});
+
+test("a skip or failure says which hosts were tried and what they answered", () => {
+  const envelope: AssetFetchEnvelope = {
+    status: "success",
+    action: "asset_fetch",
+    file: "refs.bib",
+    dry_run: false,
+    modified: false,
+    modified_entries: 0,
+    warnings: [
+      {
+        type: "download_failed",
+        key: "Einstein1935",
+        artifact: "published_pdf",
+        message: "Server returned HTTP 403",
+      },
+      {
+        type: "download_failed",
+        key: "Bohr1913",
+        artifact: "published_pdf",
+        fallback: "preprint_pdf",
+        message: "Bohr1913: Server returned HTTP 403; fetched the preprint PDF instead",
+      },
+    ],
+    files_dir: "/lib/refs.files",
+    fetched: [{ key: "Bohr1913", pdf_path: "/lib/refs.files/Bohr1913.preprint.pdf", source_path: null }],
+    skipped: [
+      {
+        key: "Noether1918",
+        artifact: "published_pdf",
+        reason: "publisher URL served an HTML page (512 bytes), not a PDF",
+        attempts: [
+          {
+            url: "https://publisher.example/a.pdf",
+            final_url: "https://publisher.example/landing",
+            status: 200,
+            content_type: "text/html",
+            outcome: "not_pdf",
+          },
+        ],
+      },
+    ],
+    failed: [
+      {
+        key: "Einstein1935",
+        artifact: "published_pdf",
+        error: "Server returned HTTP 403",
+        attempts: [
+          { url: "https://journals.aps.org/pr/pdf/10.1103/PhysRev.47.777", status: 403, outcome: "http_error" },
+          { url: "https://link.aps.org/pdf/10.1103/PhysRev.47.777", status: 403, outcome: "http_error" },
+          { url: "http://link.aps.org/pdf/10.1103/PhysRev.47.777", status: 403, outcome: "http_error" },
+        ],
+      },
+    ],
+  };
+  const outcome = reduceFetch(envelope);
+  assert.ok(outcome.ok);
+  // The failure line says it; only the warning a fallback made up for is kept.
+  assert.deepEqual(outcome.warnings, [
+    "Bohr1913: Server returned HTTP 403; fetched the preprint PDF instead",
+  ]);
+
+  const result = fetchResult(outcome, new Set(["Einstein1935", "Noether1918", "Bohr1913"]));
+  assert.equal(result.level, "warning");
+  assert.match(
+    result.message,
+    /Skipped Noether1918 Published PDF \(publisher URL served an HTML page \(512 bytes\), not a PDF\) \[tried publisher\.example \(HTTP 200, text\/html\)\]/,
+  );
+  assert.match(
+    result.message,
+    /Failed Einstein1935 \(Server returned HTTP 403\) \[tried journals\.aps\.org \(HTTP 403\), link\.aps\.org \(HTTP 403\)\]\./,
+  );
+  assert.equal(triedText([]), undefined);
+  assert.equal(triedText([{ url: "https://a.example/x", outcome: "network_error" }]), "a.example (network error)");
 });

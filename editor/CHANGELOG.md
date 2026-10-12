@@ -135,7 +135,9 @@ release. Its version says nothing about which engine it runs.
   the engine would write, where, and by which DOI or arXiv id, plus every entry
   left out with the engine's reason. The write is guarded by `--expect-sha256`,
   downloads run under a cancellable progress notification, and the Materials
-  list re-reads afterwards. Cancelling, like any engine call timing out, stops
+  list re-reads afterwards; results say which hosts were tried and what they
+  answered (HTTP status and content type). Cancelling, like any engine call
+  timing out, stops
   every process the call started (the process group on Linux and macOS,
   `taskkill /T` on Windows), not only the launcher.
 - The view's findings are published as native VS Code diagnostics, so they
