@@ -543,6 +543,16 @@ export interface MutationSuccess {
    * `ref remove` and `dedupe merge`, which can touch several.
    */
   key?: string;
+  /**
+   * `groups remove-group`: every node the removal takes — the named group and
+   * all of its descendants — in tree order.
+   */
+  removed_groups?: string[];
+  /**
+   * `groups rename-group --members`: the keys of the entries whose membership
+   * moved to the new name, in file order. Empty without `--members`.
+   */
+  members_renamed?: string[];
 }
 
 /**

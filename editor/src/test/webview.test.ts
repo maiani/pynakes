@@ -15,10 +15,18 @@
 
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
 import { JSDOM, VirtualConsole } from "jsdom";
-import { findDuplicates, previewEdits, readLibrary } from "../library.js";
+import {
+  applyMutation,
+  findDuplicates,
+  previewEdits,
+  previewMutation,
+  readLibrary,
+  type Mutation,
+} from "../library.js";
 import {
   diffHeading,
   discardEntry,
@@ -222,9 +230,9 @@ function click(view: View, selector: string): number {
   return count;
 }
 
-async function opened(fixture: string): Promise<{ view: View; host: Host }> {
+async function opened(fixture: string, file?: string): Promise<{ view: View; host: Host }> {
   const view = openView();
-  const host = new Host(view, path.join(fixtures, fixture));
+  const host = new Host(view, file ?? path.join(fixtures, fixture));
   await host.drain();
   assertHealthy(view, "on first render");
   return { view, host };
@@ -300,4 +308,219 @@ test("an engine failure and a parse failure show a banner, not an error", { skip
   view.post({ type: "parseError", error: "ParseError", message: "Unbalanced braces", line: 3 });
   assertHealthy(view, "on a parse error");
   assert.match(view.document.getElementById("banner")?.textContent ?? "", /line 3/);
+});
+
+/** What the view asked the host since the last drain, without answering it. */
+function asked(view: View, type: string): Message[] {
+  return view.outbox.filter((message) => message.type === type);
+}
+
+function groupRow(view: View, name: string): HTMLElement | null {
+  return [...view.document.querySelectorAll<HTMLElement>(".group-row")].find(
+    (row) => row.dataset.group === name,
+  ) ?? null;
+}
+
+test("the groups sidebar hands hierarchy edits to the extension", { skip }, async () => {
+  const { view } = await opened("jabref_groups.bib");
+
+  view.document.querySelector<HTMLButtonElement>("button.group-new")?.click();
+  assert.equal(asked(view, "promptNewGroup").length, 1, '"+" should ask for a new group');
+
+  const actions = view.document.querySelector<HTMLButtonElement>(
+    'button.group-actions[data-action-group="All Papers"]',
+  );
+  assert.ok(actions, "every group should carry an actions button");
+  assert.equal(actions.tabIndex, 0, "the actions button must be reachable by keyboard");
+  actions.click();
+  const [request] = asked(view, "groupActions");
+  assert.deepEqual((request.group as Record<string, unknown>).name, "All Papers");
+  assert.equal((request.group as Record<string, unknown>).undeclared, false);
+  const candidates = request.groups as string[];
+  assert.ok(candidates.includes("Machine Learning:AI Papers"));
+  // Entries name "AI Papers" but the hierarchy does not declare it, so it is no move target.
+  assert.ok(!candidates.includes("AI Papers"));
+  assert.ok(!groupRow(view, "All Papers")?.classList.contains("selected"), "not a filter click");
+
+  groupRow(view, "AI Papers")?.dispatchEvent(
+    new view.window.MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
+  );
+  const undeclared = asked(view, "groupActions")[1];
+  assert.equal((undeclared.group as Record<string, unknown>).name, "AI Papers");
+  assert.equal((undeclared.group as Record<string, unknown>).undeclared, true);
+  assertHealthy(view, "after asking for group actions");
+});
+
+test("a renamed group stays the filter, and a removed one stops being it", { skip }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pynakes-webview-"));
+  const file = path.join(dir, "groups.bib");
+  fs.copyFileSync(path.join(fixtures, "jabref_groups.bib"), file);
+  const { view, host } = await opened("jabref_groups.bib", file);
+
+  groupRow(view, "Blockchain:Cryptocurrency")?.click();
+  assert.ok(groupRow(view, "Blockchain:Cryptocurrency")?.classList.contains("selected"));
+
+  // The write itself is the extension's, exactly as `runMutation` performs it.
+  async function write(mutation: Mutation): Promise<void> {
+    const preview = await previewMutation(command, file, mutation);
+    assert.ok(preview.ok, JSON.stringify(preview));
+    const applied = await applyMutation(command, file, mutation, preview.sourceSha256 ?? "");
+    assert.ok(applied.ok, JSON.stringify(applied));
+  }
+
+  // File one entry under the group, so the rename has a member to carry along.
+  await write({ kind: "group", key: "Brown2021", group: "Blockchain:Cryptocurrency", member: true });
+  const rename: Mutation = {
+    kind: "groupTree",
+    edit: { op: "rename", name: "Blockchain:Cryptocurrency", newName: "Ledgers" },
+  };
+  const preview = await previewMutation(command, file, rename);
+  assert.ok(preview.ok && preview.renamedMembers, JSON.stringify(preview));
+  assert.deepEqual(preview.renamedMembers, ["Brown2021"]);
+  await write(rename);
+  view.post({
+    type: "mutationDone",
+    label: "Rename",
+    warnings: [],
+    renamedGroup: { from: "Blockchain:Cryptocurrency", to: "Ledgers" },
+  });
+  view.outbox.push({ type: "refresh" });
+  await host.drain();
+  assertHealthy(view, "after a rename");
+  assert.ok(groupRow(view, "Ledgers")?.classList.contains("selected"), "the filter follows");
+  const shown = [...view.document.querySelectorAll<HTMLElement>("#rows tr")].map(
+    (row) => row.dataset.key,
+  );
+  assert.deepEqual(shown, ["Brown2021"], "and so does the member");
+
+  // A removal keeps memberships, so the member leaves first: otherwise the
+  // group would stay on as one the hierarchy does not declare.
+  await write({ kind: "group", key: "Brown2021", group: "Ledgers", member: false });
+  await write({ kind: "groupTree", edit: { op: "remove", name: "Ledgers" } });
+  view.post({ type: "mutationDone", label: "Remove", warnings: [] });
+  view.outbox.push({ type: "refresh" });
+  await host.drain();
+  assertHealthy(view, "after a removal");
+  assert.equal(groupRow(view, "Ledgers"), null);
+  assert.ok(groupRow(view, "")?.classList.contains("selected"), "back to all entries");
+});
+
+test("fetching materials is handed to the extension, one fetch at a time", { skip }, async () => {
+  const { view } = await opened("simple.bib");
+  click(view, '.tab[data-pane="edit"]');
+  const selected = view.document.querySelector<HTMLElement>("#rows tr.selected, #rows tr");
+  selected?.click();
+
+  const entryFetch = view.document.querySelector<HTMLButtonElement>("button.material-fetch");
+  assert.ok(entryFetch, "the detail pane should offer fetching the entry's materials");
+  assert.equal(entryFetch.textContent, "Fetch missing…");
+  entryFetch.click();
+  const [request] = asked(view, "fetchMaterials");
+  assert.ok(typeof request.key === "string" && request.key, "a per-entry fetch names its key");
+  assertHealthy(view, "after asking to fetch");
+
+  // While it runs, neither the entry's button nor the toolbar's starts another.
+  const busy = view.document.querySelector<HTMLButtonElement>("button.material-fetch");
+  assert.equal(busy?.textContent, "Fetching…");
+  assert.equal(busy?.disabled, true);
+  const toolbar = view.document.getElementById("fetch-materials") as HTMLButtonElement;
+  assert.equal(toolbar.disabled, true);
+
+  view.post({ type: "fetchState", key: request.key, busy: false });
+  view.post({ type: "fetchDone", level: "success", message: "Fetched 1 file." });
+  assertHealthy(view, "after the fetch ended");
+  assert.equal(view.document.querySelector<HTMLButtonElement>("button.material-fetch")?.disabled, false);
+  assert.equal(toolbar.disabled, false);
+  assert.match(view.document.getElementById("notice")?.textContent ?? "", /Fetched 1 file/);
+
+  toolbar.click();
+  const all = asked(view, "fetchMaterials")[1];
+  assert.equal(all.key, undefined, "the toolbar fetches for every entry");
+  assert.equal(view.document.querySelector<HTMLButtonElement>("button.material-fetch")?.disabled, true);
+  view.post({ type: "fetchState", key: null, busy: false });
+  view.post({ type: "mutationError", label: "Fetch missing materials", message: "Online lookups are disabled." });
+  assertHealthy(view, "after a refused fetch");
+  assert.equal(toolbar.disabled, false);
+});
+
+test("citation keys named like Object.prototype members render as entries", { skip }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pynakes-webview-"));
+  const file = path.join(dir, "proto.bib");
+  fs.writeFileSync(
+    file,
+    "@misc{constructor,\n  title = {On Machines},\n  groups = {Mechanics}\n}\n\n" +
+      "@article{toString,\n  title = {On Strings}\n}\n\n" +
+      "@misc{Euler1748,\n  title = {Introductio}\n}\n",
+  );
+  const { view } = await opened("proto.bib", file);
+
+  const keys = [...view.document.querySelectorAll<HTMLElement>("#rows tr")].map(
+    (row) => row.dataset.key,
+  );
+  assert.deepEqual(keys, ["constructor", "toString", "Euler1748"]);
+  click(view, '.tab[data-pane="edit"]');
+  click(view, "#rows tr");
+  assertHealthy(view, "selecting each entry");
+  // An entry with no pending change is not shown as having one.
+  assert.equal(view.document.querySelectorAll("#rows .staged-dot").length, 0);
+});
+
+test("a late answer to an older search does not replace the newer one", { skip }, async () => {
+  const { view } = await opened("simple.bib");
+  const query = view.document.getElementById("query") as HTMLInputElement;
+
+  query.value = "first";
+  query.dispatchEvent(new view.window.Event("input"));
+  query.value = "second";
+  query.dispatchEvent(new view.window.Event("input"));
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  const [sent] = asked(view, "search");
+  assert.equal(sent.query, "second", "only the settled query is sent");
+  const all = [...view.document.querySelectorAll<HTMLElement>("#rows tr")].map((row) => row.dataset.key);
+
+  view.post({ type: "searchResult", seq: (sent.seq as number) - 1, keys: [], ranked: false, count: 0 });
+  assert.equal(view.document.querySelectorAll("#rows tr").length, all.length, "a stale answer is dropped");
+
+  view.post({ type: "searchResult", seq: sent.seq, keys: [all[0]], ranked: false, count: 1 });
+  assert.equal(view.document.querySelectorAll("#rows tr").length, 1, "the current answer is shown");
+  assertHealthy(view, "after out-of-order search answers");
+});
+
+test("a failed action reports itself without blanking the table", { skip }, async () => {
+  const { view } = await opened("simple.bib");
+  const rows = view.document.querySelectorAll("#rows tr").length;
+  click(view, '.tab[data-pane="edit"]');
+  const key = view.document.querySelector<HTMLInputElement>("input.detail-key");
+  assert.ok(key, "the edit pane shows the citation key");
+  key.value = "Renamed1905";
+  key.dispatchEvent(new view.window.Event("blur"));
+  assert.equal(view.document.querySelector<HTMLInputElement>("input.detail-key")?.disabled, true);
+
+  view.post({ type: "actionError", kind: "protocol", message: "keys rename broke", detail: "" });
+
+  assertHealthy(view, "after a failed action");
+  assert.equal(view.document.querySelectorAll("#rows tr").length, rows, "the table stays");
+  assert.match(view.document.getElementById("banner")?.textContent ?? "", /keys rename broke/);
+  assert.equal(
+    view.document.querySelector<HTMLInputElement>("input.detail-key")?.disabled,
+    false,
+    "the key field is usable again",
+  );
+});
+
+test("a JabRef group colour paints its swatch", { skip }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pynakes-webview-"));
+  const file = path.join(dir, "colours.bib");
+  fs.writeFileSync(
+    file,
+    "@comment{jabref-meta: databaseType:bibtex;}\n\n" +
+      "@comment{jabref-meta: grouping:\n0 AllEntriesGroup:;\n" +
+      "1 StaticGroup:Optics\;0\;1\;0x8a8a8aff\;\;\;;\n}\n\n" +
+      "@book{Newton1704,\n  title = {Opticks},\n  groups = {Optics}\n}\n",
+  );
+  const { view } = await opened("colours.bib", file);
+
+  const swatch = groupRow(view, "Optics")?.querySelector<HTMLElement>(".group-color");
+  assert.ok(swatch, "a coloured group shows a swatch");
+  assert.notEqual(swatch.style.backgroundColor, "", "and the swatch is painted");
 });

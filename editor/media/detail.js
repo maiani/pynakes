@@ -61,7 +61,7 @@ window.PV = window.PV || {};
   }
 
   function fieldEditor(row, field, showCompare) {
-    const base = row.fields[field] ?? null;
+    const base = PV.own(row.fields, field) ?? null;
     const staged = PV.stagedField(row.key, field);
     const value = PV.effectiveValue(row, field);
     const cleared = Boolean(staged) && staged.value === null;
@@ -239,7 +239,7 @@ window.PV = window.PV || {};
     const at = document.createElement("span");
     at.className = "detail-at";
     at.textContent = "@";
-    const stagedType = PV.state.staging.entries?.[row.key]?.entryType;
+    const stagedType = PV.stagedEntry(row.key)?.entryType;
     const type = document.createElement("input");
     type.type = "text";
     type.className = "detail-type" + (stagedType ? " staged" : "");
@@ -296,9 +296,86 @@ window.PV = window.PV || {};
     return parts.slice(-2).join("/");
   }
 
+  /**
+   * The entry's materials, and the way to fetch the missing ones.
+   *
+   * Every path listed came from `asset check`; the client never builds one.
+   * Fetching is offered on every entry rather than only on those that look
+   * fetchable: whether an entry has an identifier to fetch by, and whether its
+   * materials are already there, is the engine's judgement, and its plan says
+   * so with a reason before anything is asked.
+   */
+  function materialsSection(row) {
+    const section = document.createElement("div");
+    section.className = "detail-section";
+    const heading = document.createElement("h3");
+    heading.textContent = "Materials";
+    section.appendChild(heading);
+
+    const materials = PV.materialsOf(row.key);
+    if (materials.length === 0) {
+      const note = document.createElement("p");
+      note.className = "hint";
+      note.textContent = "No material on disk for this entry.";
+      section.appendChild(note);
+    }
+    for (const material of materials) {
+      const line = document.createElement("div");
+      line.className = "material" + (material.present ? "" : " material-missing");
+
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "link-button";
+      open.textContent = material.label;
+      open.disabled = !material.present || !material.path;
+      open.title = material.present
+        ? "Open " + material.path
+        : material.path
+          ? "Not on disk: " + material.path
+          : "The engine could not resolve this link to a path";
+      // The path came from the engine and travels back unchanged; the client
+      // never builds a material path of its own.
+      open.addEventListener("click", () =>
+        PV.post({ type: "openMaterial", path: material.path }),
+      );
+      line.appendChild(open);
+
+      if (!material.present) {
+        const note = document.createElement("span");
+        note.className = "material-note";
+        note.textContent = material.status === "wrong_type" ? "wrong type" : "missing";
+        line.appendChild(note);
+      }
+      section.appendChild(line);
+    }
+
+    // Busy for this entry, or for a whole-library fetch that includes it.
+    const busy = PV.state.fetchBusy === row.key || PV.state.fetchBusy === "*";
+    const fetch = document.createElement("button");
+    fetch.type = "button";
+    fetch.className = "button material-fetch";
+    fetch.textContent = busy ? "Fetching…" : "Fetch missing…";
+    fetch.disabled = PV.state.fetchBusy !== null;
+    fetch.title =
+      "Download this entry's missing materials by its DOI or arXiv id. The files " +
+      "it would write are listed for approval first; this reaches the network.";
+    fetch.addEventListener("click", () => {
+      PV.state.fetchBusy = row.key;
+      // One fetch at a time: the toolbar's whole-library fetch waits too.
+      const all = document.getElementById("fetch-materials");
+      if (all) {
+        all.disabled = true;
+      }
+      PV.renderDocks();
+      PV.post({ type: "fetchMaterials", key: row.key });
+    });
+    section.appendChild(fetch);
+    return section;
+  }
+
   function membership(row) {
-    const groups = PV.state.groupsByEntry?.[row.key] || [];
-    const issues = PV.state.lint?.byKey?.[row.key] || [];
+    const groups = PV.own(PV.state.groupsByEntry, row.key) || [];
+    const issues = PV.own(PV.state.lint?.byKey, row.key) || [];
     const fragment = document.createDocumentFragment();
 
     // The Groups section is always shown, unlike the others: it is the only
@@ -348,44 +425,7 @@ window.PV = window.PV || {};
     section.appendChild(list);
     fragment.appendChild(section);
 
-    const materials = PV.materialsOf(row.key);
-    if (materials.length > 0) {
-      const section = document.createElement("div");
-      section.className = "detail-section";
-      const heading = document.createElement("h3");
-      heading.textContent = "Materials";
-      section.appendChild(heading);
-      for (const material of materials) {
-        const line = document.createElement("div");
-        line.className = "material" + (material.present ? "" : " material-missing");
-
-        const open = document.createElement("button");
-        open.type = "button";
-        open.className = "link-button";
-        open.textContent = material.label;
-        open.disabled = !material.present || !material.path;
-        open.title = material.present
-          ? "Open " + material.path
-          : material.path
-            ? "Not on disk: " + material.path
-            : "The engine could not resolve this link to a path";
-        // The path came from the engine and travels back unchanged; the client
-        // never builds a material path of its own.
-        open.addEventListener("click", () =>
-          PV.post({ type: "openMaterial", path: material.path }),
-        );
-        line.appendChild(open);
-
-        if (!material.present) {
-          const note = document.createElement("span");
-          note.className = "material-note";
-          note.textContent = material.status === "wrong_type" ? "wrong type" : "missing";
-          line.appendChild(note);
-        }
-        section.appendChild(line);
-      }
-      fragment.appendChild(section);
-    }
+    fragment.appendChild(materialsSection(row));
 
     const cites = PV.citationsOf(row.key);
     if (PV.state.citations) {

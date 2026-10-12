@@ -35,7 +35,14 @@ import {
   refRemove,
   searchBib,
 } from "../pynakes.js";
-import { applyMutation, commitEdits, previewEdits, previewMutation } from "../library.js";
+import {
+  type Mutation,
+  applyMutation,
+  commitEdits,
+  describeMutation,
+  previewEdits,
+  previewMutation,
+} from "../library.js";
 import { command, engineSkipReason } from "./engine.js";
 
 const skip = engineSkipReason();
@@ -357,4 +364,191 @@ test("dedupe merge without keys still merges every cluster", { skip }, async () 
     assert.fail(`dedupe merge failed: ${JSON.stringify(envelope)}`);
   }
   assert.equal(envelope.merged_clusters, 2);
+});
+
+// --- the group hierarchy -----------------------------------------------------
+//
+// Each sidebar action is one `groupTree` mutation, previewed and then applied
+// with the preview's digest. These run the exact path the view takes, so a
+// wrong argument order, a missing `--expect-sha256`, or an envelope key the
+// approval dialog reads would each fail here rather than in the field.
+
+const HIERARCHY = "@book{Newton1687,\n  title = {Principia}\n}\n";
+
+/** Preview, check the preview wrote nothing, then apply with its digest. */
+async function previewThenApply(file: string, mutation: Mutation) {
+  const before = fs.readFileSync(file, "utf-8");
+  const preview = await previewMutation(command, file, mutation);
+  if (!preview.ok) {
+    assert.fail(`${describeMutation(mutation)} preview failed: ${JSON.stringify(preview)}`);
+  }
+  assert.equal(fs.readFileSync(file, "utf-8"), before, "a preview must write nothing");
+  assert.equal(preview.modified, true);
+  assert.match(preview.sourceSha256 ?? "", /^[0-9a-f]{64}$/);
+  const applied = await applyMutation(command, file, mutation, preview.sourceSha256 ?? "");
+  if (!applied.ok) {
+    assert.fail(`${describeMutation(mutation)} failed: ${JSON.stringify(applied)}`);
+  }
+  return preview;
+}
+
+async function treeNames(file: string): Promise<Array<[string, string]>> {
+  const tree = await groupsTree(command, file);
+  if (tree.status !== "success") {
+    assert.fail(`groups tree failed: ${JSON.stringify(tree)}`);
+  }
+  return tree.tree.map((node) => [node.name, node.parent]);
+}
+
+test("the sidebar's hierarchy edits run add, rename, move and describe", { skip }, async () => {
+  const file = tempBib(HIERARCHY);
+  const edit = (edit: Extract<Mutation, { kind: "groupTree" }>["edit"]): Mutation => ({
+    kind: "groupTree",
+    edit,
+  });
+
+  const added = await previewThenApply(file, edit({ op: "add", name: "Physics" }));
+  assert.match(added.diff, /\+.*Physics/);
+  await previewThenApply(file, edit({ op: "add", name: "Optics", parent: "Physics" }));
+  await previewThenApply(file, edit({ op: "add", name: "Mechanics" }));
+  assert.deepEqual(await treeNames(file), [
+    ["Physics", ""],
+    ["Optics", "Physics"],
+    ["Mechanics", ""],
+  ]);
+
+  await previewThenApply(file, edit({ op: "rename", name: "Optics", newName: "Light" }));
+  await previewThenApply(file, edit({ op: "move", name: "Light", parent: "Mechanics" }));
+  assert.deepEqual(await treeNames(file), [
+    ["Physics", ""],
+    ["Light", "Mechanics"],
+    ["Mechanics", ""],
+  ]);
+  // An empty parent is the top level, and is passed rather than omitted.
+  await previewThenApply(file, edit({ op: "move", name: "Light", parent: "" }));
+  assert.deepEqual((await treeNames(file))[1], ["Light", ""]);
+
+  await previewThenApply(file, edit({ op: "describe", name: "Light", description: "Waves" }));
+  const described = await groupsTree(command, file);
+  assert.equal(
+    described.status === "success" && described.tree.find((n) => n.name === "Light")?.description,
+    "Waves",
+  );
+  await previewThenApply(file, edit({ op: "describe", name: "Light", description: "" }));
+  const cleared = await groupsTree(command, file);
+  assert.equal(
+    cleared.status === "success" && cleared.tree.find((n) => n.name === "Light")?.description,
+    "",
+  );
+});
+
+test("removing a group names every descendant it takes, before writing", { skip }, async () => {
+  const file = tempBib(HIERARCHY);
+  for (const [name, parent] of [
+    ["Physics", ""],
+    ["Optics", "Physics"],
+    ["Lenses", "Optics"],
+    ["Mechanics", ""],
+  ]) {
+    await previewThenApply(file, { kind: "groupTree", edit: { op: "add", name, parent } });
+  }
+
+  const preview = await previewThenApply(file, {
+    kind: "groupTree",
+    edit: { op: "remove", name: "Physics" },
+  });
+
+  assert.deepEqual(preview.removedGroups, ["Physics", "Optics", "Lenses"]);
+  assert.deepEqual(await treeNames(file), [["Mechanics", ""]]);
+});
+
+test("renaming a group moves its members and names them, before writing", { skip }, async () => {
+  const file = tempBib(
+    "@book{Newton1704,\n  title = {Opticks}\n}\n\n" +
+      "@book{Huygens1690,\n  title = {Traité de la lumière}\n}\n\n" +
+      "@book{Galileo1638,\n  title = {Two New Sciences}\n}\n",
+  );
+  await previewThenApply(file, { kind: "groupTree", edit: { op: "add", name: "Optics" } });
+  await previewThenApply(file, { kind: "groupTree", edit: { op: "add", name: "Optics Lab" } });
+  for (const [key, group] of [
+    ["Newton1704", "Optics"],
+    ["Huygens1690", "Optics"],
+    ["Galileo1638", "Optics Lab"],
+  ]) {
+    await previewThenApply(file, { kind: "group", key, group, member: true });
+  }
+  const galileo = /@book\{Galileo1638,[^@]*/.exec(fs.readFileSync(file, "utf-8"))?.[0];
+
+  const preview = await previewThenApply(file, {
+    kind: "groupTree",
+    edit: { op: "rename", name: "Optics", newName: "Light" },
+  });
+
+  assert.deepEqual(preview.renamedMembers, ["Newton1704", "Huygens1690"]);
+  assert.match(preview.diff, /^\+ {2}groups = \{Light\}$/m);
+  const listed = await groupsList(command, file);
+  if (listed.status !== "success") {
+    assert.fail(`groups list failed: ${JSON.stringify(listed)}`);
+  }
+  assert.deepEqual([...listed.groups.Light].sort(), ["Huygens1690", "Newton1704"]);
+  assert.equal(listed.groups.Optics, undefined, "no entry is left under the old name");
+  // An exact-name match: a group whose name only starts with it is untouched.
+  assert.ok(galileo && fs.readFileSync(file, "utf-8").includes(galileo));
+});
+
+test("a hierarchy edit the engine declines is never reported as applied", { skip }, async () => {
+  const file = tempBib(HIERARCHY);
+  await previewThenApply(file, { kind: "groupTree", edit: { op: "add", name: "Physics" } });
+  await previewThenApply(file, {
+    kind: "groupTree",
+    edit: { op: "add", name: "Optics", parent: "Physics" },
+  });
+  const settled = fs.readFileSync(file, "utf-8");
+
+  // A name already taken is the engine's exit-2 conflict, not an error and not a success.
+  const taken = await previewMutation(command, file, {
+    kind: "groupTree",
+    edit: { op: "add", name: "Optics" },
+  });
+  assert.equal(!taken.ok && taken.conflict === true && taken.error, "GroupConflict");
+  const clash = await previewMutation(command, file, {
+    kind: "groupTree",
+    edit: { op: "rename", name: "Physics", newName: "Optics" },
+  });
+  assert.equal(!clash.ok && clash.conflict === true && clash.error, "GroupConflict");
+
+  // A move under its own descendant is refused by the engine; the view never checks.
+  const cycle = await previewMutation(command, file, {
+    kind: "groupTree",
+    edit: { op: "move", name: "Physics", parent: "Optics" },
+  });
+  assert.equal(cycle.ok, false);
+  assert.notEqual(!cycle.ok && cycle.conflict, true);
+
+  const missing = await previewMutation(command, file, {
+    kind: "groupTree",
+    edit: { op: "remove", name: "Chemistry" },
+  });
+  assert.equal(missing.ok, false);
+  assert.equal(fs.readFileSync(file, "utf-8"), settled);
+});
+
+test("a hierarchy edit is applied only to the file its preview read", { skip }, async () => {
+  const file = tempBib(HIERARCHY);
+  await previewThenApply(file, { kind: "groupTree", edit: { op: "add", name: "Physics" } });
+  const mutation: Mutation = {
+    kind: "groupTree",
+    edit: { op: "rename", name: "Physics", newName: "Natural Philosophy" },
+  };
+  const preview = await previewMutation(command, file, mutation);
+  if (!preview.ok) {
+    assert.fail(`preview failed: ${JSON.stringify(preview)}`);
+  }
+  const moved = fs.readFileSync(file, "utf-8") + "\n@misc{Leibniz1684,\n  year = {1684}\n}\n";
+  fs.writeFileSync(file, moved, "utf-8");
+
+  const stale = await applyMutation(command, file, mutation, preview.sourceSha256 ?? "");
+
+  assert.equal(!stale.ok && stale.conflict === true && stale.error, "ExternalModification");
+  assert.equal(fs.readFileSync(file, "utf-8"), moved);
 });

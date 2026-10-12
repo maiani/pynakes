@@ -124,9 +124,35 @@ release. Its version says nothing about which engine it runs.
   a `python3` that can import this repository's `src/pynakes`, and skips itself
   with a clear reason otherwise, so `npm test` still works for editor-only
   contributors.
+- The groups sidebar edits the group hierarchy. **+** adds a top-level group,
+  and each group's **⋯** button or context menu adds a subgroup, renames,
+  moves, edits the description, or removes it. Each change runs the engine's
+  `--dry-run --diff`, shows in the Staged diff pane, is approved, and is written
+  guarded by `--expect-sha256`. Removing a group names every subgroup that goes
+  with it, and a group that entries name but the hierarchy does not declare can
+  be declared. A group used as the sidebar filter stays selected when renamed;
+  the filter returns to All entries when the group is removed.
+  Renaming a group moves its entries to the new name, and the approval names
+  them; a rename that would rewrite an entry with pending staged edits is
+  refused until those edits are applied or discarded.
+- Missing materials can be fetched: **Fetch missing…** in an entry's detail
+  pane, or **Fetch materials…** in the toolbar for every entry, using the
+  library's fetch policy or one chosen material. The approval names each file
+  the engine would write, where, and by which DOI or arXiv id, plus every entry
+  left out with the engine's reason. The write is guarded by `--expect-sha256`,
+  downloads run under a cancellable progress notification, and the Materials
+  list re-reads afterwards. Fetching honors `pynakes.allowOnlineLookups` like
+  Import and Compare. The Materials section now shows for every entry, saying
+  when nothing is on disk.
 
 ### Changed
 
+- The custom editor is split into focused modules, and the stylesheet into
+  `view.css` and `panes.css`; no behavior change.
+- The client is labeled an alpha, and the manifest marks it as a preview.
+  `npm run package:prerelease` produces a VSIX carrying the pre-release
+  marker; with `SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PYNAKES` set, the bundled
+  engine identifies itself as that release version.
 - **The extension uses the 0.7 command surface.** `search`, `ref compare`,
   `ref add`, and `ref import` pass the library first; the view expects the
   actions `tex_scan`, `asset_check`, and `corpus_batch`; and lint counts are
@@ -145,6 +171,25 @@ release. Its version says nothing about which engine it runs.
 
 ### Fixed
 
+- Local Python coverage and test-cache artifacts are excluded from the VSIX.
+- Citation keys, group names and identifiers beginning with `-` are passed to
+  the engine after `--` instead of being read as options.
+- A library with an entry keyed `constructor`, `toString` or `__proto__` no
+  longer fails to open.
+- The status-bar tooltip is no longer trusted Markdown, and escapes the file's
+  own keys and types, so a key cannot render as a command link.
+- Overlapping reads can no longer render stale content, nothing is posted to a
+  closed view, and out-of-order search answers are ignored.
+- A failed write, rename, fetch, preview, search or compare is reported without
+  blanking the table or clearing Problems, and releases the rename field.
+- Undefined-citation diagnostics from two open bibliographies no longer
+  overwrite each other.
+- An engine that was not found is looked for again on the next read and on
+  Refresh, instead of the failure being cached.
+- JabRef group colours paint their sidebar swatch.
+- Only materials present on disk can be opened from the view.
+- Staged edits show in every view of the same file.
+- The buffer mirror's temporary directory is removed if writing it fails.
 - The view left an empty band below its panes. A hidden banner or notice takes
   no grid slot, so the panes slid up into a row sized to their content; each
   part of the view now keeps its own row and the panes fill the window.

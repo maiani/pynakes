@@ -8,3 +8,10 @@ node_modules/**
 scripts/**
 engine/**/__pycache__/**
 engine/**/*.pyc
+
+# Local validation artifacts must not ship in the alpha.
+.coverage*
+coverage.xml
+htmlcov/**
+.pytest_cache/**
+.cache/**

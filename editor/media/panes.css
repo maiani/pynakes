@@ -1,0 +1,597 @@
+/*
+ * The bibliography view's panes: the detail pane, the docked panes and their
+ * tabs, compare, the commit bar, citation and material state, and duplicate
+ * clusters. Loaded after view.css, which holds the base, the layout, the
+ * groups sidebar, and the table; the same theme-variable-only rule applies.
+ */
+
+/* Detail pane ------------------------------------------------------------ */
+
+.detail-key {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 2px 4px;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 1.05em;
+  font-weight: 600;
+}
+
+.detail-key:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.detail-key:disabled {
+  opacity: 0.6;
+}
+
+.detail-type-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 4px 0 0;
+}
+
+.detail-at {
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family);
+}
+
+.detail-type {
+  width: 12em;
+  padding: 1px 4px;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: inherit;
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 12px;
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "name actions" "value value";
+  gap: 2px 6px;
+  align-items: center;
+}
+
+.field-name {
+  grid-area: name;
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.85em;
+}
+
+.field-actions {
+  grid-area: actions;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.field-value {
+  grid-area: value;
+  width: 100%;
+  padding: 3px 6px;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.92em;
+  resize: vertical;
+}
+
+.field-value:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.field-row.staged .field-name {
+  color: var(--vscode-gitDecoration-modifiedResourceForeground, var(--vscode-charts-blue, #3794ff));
+  font-weight: 600;
+}
+
+.field-row.staged .field-value {
+  border-color: var(--vscode-gitDecoration-modifiedResourceForeground, var(--vscode-charts-blue, #3794ff));
+}
+
+.field-row.cleared .field-name {
+  text-decoration: line-through;
+  color: var(--vscode-gitDecoration-deletedResourceForeground, var(--vscode-errorForeground, #f14c4c));
+}
+
+.field-cleared-note {
+  grid-area: value;
+  color: var(--vscode-gitDecoration-deletedResourceForeground, var(--vscode-errorForeground, #f14c4c));
+  font-size: 0.9em;
+}
+
+.detail-type.staged {
+  border-color: var(--vscode-gitDecoration-modifiedResourceForeground, var(--vscode-charts-blue, #3794ff));
+}
+
+.add-field {
+  display: flex;
+  gap: 4px;
+  margin: 12px 0;
+}
+
+.add-field-name {
+  flex: 1 1 6em;
+  min-width: 0;
+}
+
+.add-field-value {
+  flex: 2 1 8em;
+  min-width: 0;
+}
+
+.add-field input {
+  padding: 3px 6px;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.9em;
+}
+
+.detail-section {
+  margin-top: 14px;
+}
+
+.detail-section h3 {
+  margin: 0 0 4px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.85em;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip {
+  padding: 0 6px;
+  border-radius: 8px;
+  background-color: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  font-size: 0.85em;
+}
+
+.finding {
+  margin: 2px 0;
+  font-size: 0.92em;
+}
+
+.finding-error {
+  color: var(--vscode-errorForeground, #f14c4c);
+}
+
+.finding-warning {
+  color: var(--vscode-editorWarning-foreground, #cca700);
+}
+
+.finding-info {
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Panes --------------------------------------------------------- */
+
+.pane-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 4px 8px 0;
+}
+
+.pane-tabs-inner {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.pane-tab-holder {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.pane-move {
+  margin-left: -6px;
+  padding: 0 2px;
+  min-width: 18px;
+  min-height: 20px;
+  font-size: 0.9em;
+}
+
+.panel-toggle {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.tab {
+  padding: 3px 10px;
+  color: var(--vscode-descriptionForeground);
+  background: none;
+  border: none;
+  border-bottom: 1px solid transparent;
+  font-family: inherit;
+  font-size: 0.92em;
+  cursor: pointer;
+}
+
+.tab.active {
+  color: var(--vscode-foreground);
+  border-bottom-color: var(--vscode-focusBorder);
+}
+
+.pane-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 10px 10px;
+}
+
+.finding-group,
+.diff-group {
+  margin-bottom: 10px;
+}
+
+.finding-group h4,
+.diff-group h4 {
+  margin: 6px 0 3px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.85em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.diff-group h4 {
+  font-family: var(--vscode-editor-font-family);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.finding-row {
+  display: flex;
+  gap: 8px;
+  padding: 1px 0;
+  font-size: 0.92em;
+}
+
+.finding-severity {
+  flex: 0 0 4.5em;
+  font-size: 0.85em;
+  text-transform: uppercase;
+}
+
+.finding-file {
+  flex: 0 0 auto;
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+
+.finding-message {
+  flex: 1 1 auto;
+  color: var(--vscode-foreground);
+}
+
+.diff-warning {
+  margin: 2px 0;
+  color: var(--vscode-editorWarning-foreground, #cca700);
+  font-size: 0.9em;
+}
+
+.diff {
+  margin: 0;
+  padding: 6px 8px;
+  overflow-x: auto;
+  background-color: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.1));
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+
+.diff-add {
+  color: var(--vscode-gitDecoration-addedResourceForeground, #487e02);
+}
+
+.diff-del {
+  color: var(--vscode-gitDecoration-deletedResourceForeground, #f14c4c);
+}
+
+.diff-hunk {
+  color: var(--vscode-textLink-foreground);
+}
+
+.diff-file {
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Compare ------------------------------------------------------- */
+
+.compare-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 6px 0 10px;
+  overflow-x: auto;
+}
+
+.compare-row {
+  display: grid;
+  grid-template-columns: 7em 1fr 1fr 1fr;
+  align-items: start;
+  gap: 8px;
+  min-width: 640px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+  font-size: 0.92em;
+}
+
+.compare-header {
+  padding-bottom: 4px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.8em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+}
+
+.compare-field-name {
+  padding-top: 4px;
+  color: var(--vscode-descriptionForeground);
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.compare-value {
+  padding: 3px 6px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  background-color: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.1));
+  border: 1px solid transparent;
+  border-radius: 2px;
+}
+
+.compare-value.compare-missing {
+  color: var(--vscode-descriptionForeground);
+  background: none;
+  font-style: italic;
+}
+
+.compare-value.compare-selectable {
+  cursor: pointer;
+}
+
+.compare-value.compare-selectable:hover {
+  border-color: var(--vscode-panel-border, rgba(128, 128, 128, 0.5));
+}
+
+.compare-value.compare-selected {
+  border-color: var(--vscode-focusBorder);
+}
+
+.diff-word-add {
+  border-radius: 2px;
+  background-color: var(--vscode-diffEditor-insertedTextBackground, rgba(72, 126, 2, 0.25));
+}
+
+.diff-word-del {
+  border-radius: 2px;
+  background-color: var(--vscode-diffEditor-removedTextBackground, rgba(241, 76, 76, 0.2));
+  text-decoration: line-through;
+}
+
+.compare-merged-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.compare-merged-value {
+  width: 100%;
+  min-height: 1.8em;
+  padding: 3px 6px;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  font-family: inherit;
+  font-size: inherit;
+  resize: vertical;
+}
+
+.compare-merged-value:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+/* Commit bar -------------------------------------------------- */
+
+.commit-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  background-color: var(--vscode-editorWidget-background, var(--vscode-sideBar-background));
+}
+
+.commit-summary {
+  flex: 1 1 auto;
+  color: var(--vscode-gitDecoration-modifiedResourceForeground, var(--vscode-foreground));
+}
+
+
+/* Citation and material state: per-row markers, and the detail-pane lists. */
+.uncited-mark {
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.7;
+}
+
+.material-mark {
+  color: var(--vscode-charts-blue, var(--vscode-textLink-foreground));
+}
+
+.material-mark.material-broken {
+  color: var(--vscode-editorWarning-foreground);
+}
+
+.material,
+.citation {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+  padding: 1px 0;
+}
+
+.material-note {
+  color: var(--vscode-editorWarning-foreground);
+  font-size: 0.9em;
+}
+
+.material-fetch {
+  margin-top: 4px;
+}
+
+.citation-macro {
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.9em;
+}
+
+/* A text-like button for a path that opens something. */
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--vscode-textLink-foreground);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.link-button:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.link-button:disabled {
+  color: var(--vscode-descriptionForeground);
+  cursor: default;
+}
+
+/* Duplicate clusters: one block per cluster, each entry a compact row so two
+   near-identical records can be compared without scrolling between them. */
+.dup-cluster {
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+}
+
+.dup-cluster:last-child {
+  border-bottom: none;
+}
+
+.dup-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.dup-reason {
+  padding: 0 6px;
+  border-radius: 8px;
+  background-color: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  font-size: 0.85em;
+}
+
+.dup-identity {
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family, monospace);
+  overflow-wrap: anywhere;
+}
+
+.dup-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.dup-entry .dup-key {
+  flex: 0 0 auto;
+  font-family: var(--vscode-editor-font-family, monospace);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.dup-entry .dup-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-descriptionForeground);
+}
+
+.dup-survivor {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}
+
+/* A group chip gains a remove affordance only where membership is editable. */
+.chip-removable {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chip-remove {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1;
+}
+
+.chip-remove:hover {
+  opacity: 1;
+}

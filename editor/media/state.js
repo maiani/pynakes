@@ -15,6 +15,16 @@ window.PV = window.PV || {};
   const vscode = acquireVsCodeApi();
   PV.post = (message) => vscode.postMessage(message);
 
+  /**
+   * The value `map` holds under `key` itself, never one inherited.
+   *
+   * Citation keys, field and group names are the file's text, and
+   * `constructor` or `toString` is a valid citation key: a plain lookup would
+   * find `Object.prototype`'s function and treat it as this entry's data.
+   */
+  PV.own = (map, key) =>
+    map != null && Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined;
+
   const persisted = vscode.getState() || {};
 
   PV.state = {
@@ -84,6 +94,8 @@ window.PV = window.PV || {};
     compareBusy: null,
     /** Citation key currently awaiting a rename response, or null. */
     renameBusy: null,
+    /** Citation key whose materials are being fetched, "*" for every entry, or null. */
+    fetchBusy: null,
   };
 
   PV.persist = () => {
@@ -160,7 +172,7 @@ window.PV = window.PV || {};
   };
 
   /** The pending change for one field, or undefined. */
-  PV.stagedField = (key, field) => PV.state.staging.entries?.[key]?.fields?.[field];
+  PV.stagedField = (key, field) => PV.own(PV.stagedEntry(key)?.fields, field);
 
   /**
    * True when a linked TeX source cites this key.
@@ -175,17 +187,20 @@ window.PV = window.PV || {};
     if (!index) {
       return false;
     }
-    return index.includeAll || (index.byKey?.[key] || []).length > 0;
+    return index.includeAll || (PV.own(index.byKey, key) || []).length > 0;
   };
 
   /** Where this key is cited, in scan order. */
-  PV.citationsOf = (key) => PV.state.citations?.byKey?.[key] || [];
+  PV.citationsOf = (key) => PV.own(PV.state.citations?.byKey, key) || [];
 
   /** The materials this entry points to, present ones first. */
-  PV.materialsOf = (key) => PV.state.materials?.byKey?.[key] || [];
+  PV.materialsOf = (key) => PV.own(PV.state.materials?.byKey, key) || [];
+
+  /** The pending changes to one entry, or undefined. */
+  PV.stagedEntry = (key) => PV.own(PV.state.staging.entries, key);
 
   /** True when the entry has any pending change. */
-  PV.entryStaged = (key) => Boolean(PV.state.staging.entries?.[key]);
+  PV.entryStaged = (key) => Boolean(PV.stagedEntry(key));
 
   /** Displayed value of a field: the staged one when present, else the file's. */
   PV.effectiveValue = (row, field) => {
@@ -193,13 +208,13 @@ window.PV = window.PV || {};
     if (staged) {
       return staged.value;
     }
-    return row.fields[field] ?? null;
+    return PV.own(row.fields, field) ?? null;
   };
 
   /** Field names to show for an entry: stored fields plus any staged additions. */
   PV.fieldNames = (row) => {
     const names = new Set(Object.keys(row.fields));
-    const staged = PV.state.staging.entries?.[row.key];
+    const staged = PV.stagedEntry(row.key);
     for (const field of Object.keys(staged?.fields || {})) {
       names.add(field);
     }

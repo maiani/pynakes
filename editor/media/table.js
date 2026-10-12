@@ -203,12 +203,12 @@ window.PV = window.PV || {};
         dot.title = "Has changes not yet applied";
         status.appendChild(dot);
       }
-      const severity = s.lint?.worstByKey?.[row.key];
+      const severity = PV.own(s.lint?.worstByKey, row.key);
       if (severity && s.showFindings !== false) {
         const mark = document.createElement("span");
         mark.className = `severity severity-${severity}`;
-        mark.textContent = SEVERITY_MARK[severity] || "•";
-        const issues = s.lint.byKey[row.key] || [];
+        mark.textContent = PV.own(SEVERITY_MARK, severity) || "•";
+        const issues = PV.own(s.lint.byKey, row.key) || [];
         mark.title = issues.map((issue) => `${issue.severity}: ${issue.message}`).join("\n");
         status.appendChild(mark);
       }

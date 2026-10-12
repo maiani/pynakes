@@ -30,6 +30,7 @@ window.PV = window.PV || {};
     importEntry: document.getElementById("import-entry"),
     addEntry: document.getElementById("add-entry"),
     findDuplicates: document.getElementById("find-duplicates"),
+    fetchMaterials: document.getElementById("fetch-materials"),
     sidebarSplitter: document.getElementById("sidebar-splitter"),
     detailSplitter: document.getElementById("detail-splitter"),
     panelSplitter: document.getElementById("panel-splitter"),
@@ -72,6 +73,13 @@ window.PV = window.PV || {};
   // builds an entry or a group name itself.
   elements.importEntry.addEventListener("click", () => PV.post({ type: "promptImport" }));
   elements.addEntry.addEventListener("click", () => PV.post({ type: "promptAdd" }));
+  elements.fetchMaterials.addEventListener("click", () => {
+    // Every entry's; the extension plans it and asks before anything is fetched.
+    PV.state.fetchBusy = "*";
+    elements.fetchMaterials.disabled = true;
+    PV.renderDocks();
+    PV.post({ type: "fetchMaterials" });
+  });
   elements.findDuplicates.addEventListener("click", () => {
     PV.state.duplicates = "loading";
     PV.showPane("duplicates");
@@ -85,6 +93,11 @@ window.PV = window.PV || {};
   });
 
   let searchTimer;
+  /**
+   * Numbers each search sent. Every search is its own engine process, and they
+   * can answer out of order; only the answer to the latest one is shown.
+   */
+  let searchSeq = 0;
   function requestSearch() {
     const s = PV.state.search;
     s.query = elements.query.value;
@@ -92,6 +105,8 @@ window.PV = window.PV || {};
     s.fuzzy = elements.fuzzy.checked;
     PV.persist();
     clearTimeout(searchTimer);
+    // Whatever is still running answers a question no longer asked.
+    searchSeq += 1;
     if (!s.query.trim() && !s.where.trim()) {
       s.keys = null;
       s.error = null;
@@ -103,7 +118,7 @@ window.PV = window.PV || {};
     s.busy = true;
     PV.renderTable();
     searchTimer = setTimeout(() => {
-      PV.post({ type: "search", query: s.query, where: s.where, fuzzy: s.fuzzy });
+      PV.post({ type: "search", seq: searchSeq, query: s.query, where: s.where, fuzzy: s.fuzzy });
     }, SEARCH_DEBOUNCE_MS);
   }
 
@@ -197,6 +212,8 @@ window.PV = window.PV || {};
   window.addEventListener("message", (event) => {
     const message = event.data;
     const s = PV.state;
+    const staleSearch =
+      typeof message.seq === "number" && message.seq !== searchSeq;
 
     switch (message.type) {
       case "render": {
@@ -246,6 +263,9 @@ window.PV = window.PV || {};
         PV.renderTable();
         break;
       case "searchResult":
+        if (staleSearch) {
+          break;
+        }
         s.search.keys = message.keys;
         s.search.ranked = message.ranked;
         s.search.error = null;
@@ -254,6 +274,9 @@ window.PV = window.PV || {};
         clearNotice();
         break;
       case "searchCleared":
+        if (staleSearch) {
+          break;
+        }
         s.search.keys = null;
         s.search.error = null;
         s.search.busy = false;
@@ -261,6 +284,9 @@ window.PV = window.PV || {};
         clearNotice();
         break;
       case "searchError":
+        if (staleSearch) {
+          break;
+        }
         s.search.busy = false;
         s.search.error = message.message;
         notify("error", "Search rejected: " + message.message);
@@ -271,7 +297,9 @@ window.PV = window.PV || {};
         PV.showPane("diff");
         break;
       case "compareResult":
-        s.compareBusy = null;
+        if (s.compareBusy === message.key) {
+          s.compareBusy = null;
+        }
         s.compare = {
           key: message.key,
           source: message.source,
@@ -282,7 +310,9 @@ window.PV = window.PV || {};
         PV.showPane("compare");
         break;
       case "compareError":
-        s.compareBusy = null;
+        if (s.compareBusy === message.key) {
+          s.compareBusy = null;
+        }
         s.compare = { key: message.key, error: message.message };
         PV.showPane("compare");
         break;
@@ -300,12 +330,27 @@ window.PV = window.PV || {};
         // remove can empty one, an import can create one. Clearing it says
         // "ask again" rather than showing a cluster that no longer exists.
         s.duplicates = null;
+        if (message.renamedGroup && s.selectedGroup === message.renamedGroup.from) {
+          s.selectedGroup = message.renamedGroup.to;
+          PV.persist();
+        }
         if (message.select) {
           // The reload that follows renders the table; remembering the key here
           // means the new entry is selected as soon as it exists.
           s.selectedKey = message.select;
           PV.persist();
         }
+        break;
+      case "fetchState":
+        // The fetch is over, whatever its outcome: its buttons work again.
+        if (!message.busy) {
+          s.fetchBusy = null;
+          elements.fetchMaterials.disabled = false;
+          PV.renderDocks();
+        }
+        break;
+      case "fetchDone":
+        notify(message.level || "info", message.message);
         break;
       case "mutationNoop":
         notify("info", message.message);
@@ -375,6 +420,19 @@ window.PV = window.PV || {};
         );
         renderAll();
         elements.empty.hidden = true;
+        break;
+      case "actionError":
+        // An action failed, but the file is as the last read showed it: the
+        // table stays, and whatever was waiting on the action is released.
+        s.renameBusy = null;
+        s.compareBusy = null;
+        showBanner(
+          "error",
+          message.message,
+          message.detail,
+          message.kind === "unavailable" ? { label: "Open settings", message: "openSettings" } : null,
+        );
+        PV.renderDocks();
         break;
       case "engineError":
         s.rows = [];

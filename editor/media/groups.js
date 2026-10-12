@@ -1,5 +1,12 @@
 // @ts-check
-/** The groups sidebar: the declared hierarchy, plus membership counts. */
+/**
+ * The groups sidebar: the declared hierarchy, plus membership counts.
+ *
+ * Its edit affordances — "+" in the heading, "⋯" on each group, or the
+ * context menu — only name the node and hand off to the extension, which asks
+ * what to change and runs it through preview and approval. No rule about the
+ * hierarchy lives here.
+ */
 window.PV = window.PV || {};
 
 (function (PV) {
@@ -10,9 +17,57 @@ window.PV = window.PV || {};
   PV.groupsInit = (element) => {
     container = element;
     container.addEventListener("click", onClick);
+    container.addEventListener("contextmenu", onContextMenu);
   };
 
+  /** Ask the extension what to do with one group node. */
+  function requestActions(name) {
+    const node = PV.findGroup(name);
+    if (!node) {
+      return;
+    }
+    PV.post({
+      type: "groupActions",
+      group: { name: node.name, undeclared: !!node.undeclared, description: node.description || "" },
+      // Candidate parents for a move: what the hierarchy declares. Which of
+      // them would make a cycle is the engine's question, not this view's.
+      groups: declaredNames(),
+    });
+  }
+
+  function declaredNames() {
+    const names = [];
+    const walk = (nodes) => {
+      for (const node of nodes) {
+        if (!node.undeclared) {
+          names.push(node.name);
+        }
+        walk(node.children || []);
+      }
+    };
+    walk(PV.state.groups || []);
+    return names;
+  }
+
+  function onContextMenu(event) {
+    const row = event.target.closest(".group-row[data-group]");
+    if (!row || !row.dataset.group) {
+      return;
+    }
+    event.preventDefault();
+    requestActions(row.dataset.group);
+  }
+
   function onClick(event) {
+    if (event.target.closest("button.group-new")) {
+      PV.post({ type: "promptNewGroup" });
+      return;
+    }
+    const actions = event.target.closest("button.group-actions");
+    if (actions) {
+      requestActions(actions.dataset.actionGroup);
+      return;
+    }
     const sidebarToggle = event.target.closest("button.sidebar-toggle");
     if (sidebarToggle) {
       PV.state.sidebarCollapsed = !PV.state.sidebarCollapsed;
@@ -57,6 +112,11 @@ window.PV = window.PV || {};
 
   PV.renderGroups = () => {
     const s = PV.state;
+    // A group that was removed or renamed elsewhere cannot stay the filter.
+    if (s.selectedGroup && !PV.findGroup(s.selectedGroup)) {
+      s.selectedGroup = null;
+      PV.persist();
+    }
     container.classList.toggle("collapsed", s.sidebarCollapsed);
     PV.applyPaneSizes();
     const fragment = document.createDocumentFragment();
@@ -72,6 +132,15 @@ window.PV = window.PV || {};
     toggle.className = "icon-button collapse-toggle sidebar-toggle";
     toggle.title = s.sidebarCollapsed ? "Expand groups" : "Collapse groups";
     toggle.textContent = s.sidebarCollapsed ? "▸" : "◂";
+    if (!s.sidebarCollapsed) {
+      const add = document.createElement("button");
+      add.type = "button";
+      add.className = "icon-button group-new";
+      add.title = "New group";
+      add.setAttribute("aria-label", "New group");
+      add.textContent = "+";
+      heading.appendChild(add);
+    }
     heading.appendChild(toggle);
     fragment.appendChild(heading);
 
@@ -96,7 +165,7 @@ window.PV = window.PV || {};
     if (rows.length === 0) {
       const empty = document.createElement("p");
       empty.className = "hint";
-      empty.textContent = "This file declares no groups.";
+      empty.textContent = "This file declares no groups. Use + to add one.";
       fragment.appendChild(empty);
     }
 
@@ -148,6 +217,15 @@ window.PV = window.PV || {};
       count.className = "group-count";
       count.textContent = String(PV.groupKeys(node).size);
       row.appendChild(count);
+
+      const actions = document.createElement("button");
+      actions.type = "button";
+      actions.className = "icon-button group-actions";
+      actions.dataset.actionGroup = node.name;
+      actions.textContent = "⋯";
+      actions.title = "Change this group";
+      actions.setAttribute("aria-label", 'Change group "' + node.name + '"');
+      row.appendChild(actions);
 
       fragment.appendChild(row);
     }

@@ -7,87 +7,57 @@
  *
  * Staged edits live here rather than in the webview, because a webview is
  * disposed whenever its tab is hidden and pending changes must survive that.
+ *
+ * This module is the glue: it reads, renders, and routes the webview's
+ * messages. What a message *does* lives beside it — `stagedCommit.ts` and
+ * `keyRename.ts` for writes from the detail pane, `mutations.ts` and
+ * `groupHierarchy.ts` for entry- and group-level changes, `materialFetch.ts` for
+ * downloading materials, `navigation.ts` for leaving the view, `diagnostics.ts`
+ * and `statusBar.ts` for what is published outside it, and `documentAccess.ts`
+ * for the questions every engine call asks about the document.
  */
 
-import * as fs from "node:fs/promises";
-import * as os from "node:os";
-import * as path from "node:path";
 import * as vscode from "vscode";
-import { resolveEngine, type ResolvedEngine } from "./engineDiscovery";
+import { FindingsPublisher } from "./diagnostics";
 import {
-  citationDiagnostics,
-  lintDiagnostics,
-  type CitationIndex,
-  type LintIndex,
-  type MaterialIndex,
-} from "./insights";
-import type { LintSeverity, Summary } from "./model";
-import {
-  FILE_MOVED_MESSAGE,
-  NO_FINGERPRINT_MESSAGE,
-  commitEdits,
-  compareEntry,
-  previewEdits,
-  readLibrary,
-  renameEntryKey,
-  runSearch,
-  type LibraryRead,
-  type Mutation,
-} from "./library";
+  describeFailure,
+  neighbourPath,
+  onlineLookupsAllowed,
+  reconcileBuffer,
+  sourceFor,
+  viewSettings,
+  workingDirectory,
+  type TempMirror,
+} from "./documentAccess";
+import { resetEngineDiscovery, resolveEngine, type ResolvedEngine } from "./engineDiscovery";
+import { promptGroupAction, promptNewGroup, type GroupActionRequest } from "./groupHierarchy";
+import { renameKey } from "./keyRename";
+import { promptFetch } from "./materialFetch";
+import { compareEntry, readLibrary, runSearch, type LibraryRead, type Mutation } from "./library";
 import {
   promptAdd,
   promptGroup,
   promptImport,
   reportDuplicates,
   runMutation,
-  type MutationHost,
 } from "./mutations";
+import { collectOpenablePaths, openCitation, openMaterial, revealEntry } from "./navigation";
+import { type PynakesCommand, describeCommand } from "./pynakes";
+import { commitStaged, previewStaged, type StagingHost } from "./stagedCommit";
 import {
-  type PynakesCommand,
-  PynakesProtocolError,
-  PynakesUnavailableError,
-  describeCommand,
-} from "./pynakes";
-import {
-  diffHeading,
   discardEntry,
   emptyStaging,
-  findConflicts,
-  isEmpty,
   stageField,
   stageType,
   stagedCount,
-  toRequests,
   unstageField,
-  type StagingConflict,
   type StagingState,
 } from "./staging";
+import { EngineStatusBar } from "./statusBar";
 import { renderShell } from "./webview";
 
 /** Coalesce bursts of keystrokes into a single engine read. */
 const REFRESH_DEBOUNCE_MS = 250;
-
-/** Engine finding severities onto VS Code's diagnostic scale. */
-const DIAGNOSTIC_SEVERITY: Record<LintSeverity, vscode.DiagnosticSeverity> = {
-  error: vscode.DiagnosticSeverity.Error,
-  warning: vscode.DiagnosticSeverity.Warning,
-  info: vscode.DiagnosticSeverity.Information,
-};
-
-interface TempMirror {
-  /** Path pynakes should read. */
-  source: string;
-  /** Removes the mirror, if one was created. */
-  release(): Promise<void>;
-}
-
-/** Settings the view honors, re-read on every render so changes apply live. */
-interface ViewSettings {
-  /** Initial state of the search box's fuzzy toggle. */
-  fuzzy: boolean;
-  /** Whether per-row severity markers and the findings panel are shown. */
-  showFindings: boolean;
-}
 
 /** Everything an engine read needs besides the webview it reports to. */
 interface MirrorContext {
@@ -95,14 +65,6 @@ interface MirrorContext {
   command: PynakesCommand;
   cwd: string | undefined;
   source: string;
-}
-
-/** What the status bar item reports about one open bibliography. */
-interface StatusDetails {
-  summary: Summary;
-  findings?: { errors: number; warnings: number; info: number; total: number };
-  engine: { version?: string; source: string; reason: string };
-  dirty: boolean;
 }
 
 /** Messages the webview sends. */
@@ -119,6 +81,8 @@ interface ViewMessage {
   query?: string;
   where?: string;
   fuzzy?: boolean;
+  /** Which search this is, echoed back so a late answer to an older one is ignored. */
+  seq?: number;
   /** Absolute path, for `openMaterial` and `openCitation`. */
   path?: string;
   /** One-based position within that file, for `openCitation`. */
@@ -126,8 +90,10 @@ interface ViewMessage {
   column?: number;
   /** The entry- or group-level change requested, for `mutate`. */
   mutation?: Mutation;
-  /** Group names the view already knows about, for `promptGroup`. */
+  /** Group names the view already knows about, for `promptGroup` and the group actions. */
   groups?: string[];
+  /** The group node a sidebar action was invoked on, for `groupActions`. */
+  group?: GroupActionRequest;
 }
 
 export class BibliographyEditorProvider implements vscode.CustomTextEditorProvider {
@@ -136,40 +102,10 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
   /** Refresh callbacks for every live view, driven by the refresh command. */
   private readonly liveViews = new Set<() => void>();
 
-  /** Every open panel, so a closing one can hand the status bar to a sibling. */
-  private readonly openPanels = new Set<vscode.WebviewPanel>();
-
   /** Pending edits per document, surviving webview disposal. */
   private readonly staging = new Map<string, StagingState>();
 
-  /**
-   * File and engine details for each open view.
-   *
-   * They are shown in VS Code's status bar rather than inside the view: it is
-   * ambient information, rarely read, and a permanent row of the editor is too
-   * much space for it. One item is shared by every view and re-pointed at
-   * whichever one is active.
-   */
-  private readonly statusByPanel = new WeakMap<vscode.WebviewPanel, StatusDetails>();
-
-  /**
-   * The engine's lint findings, published as native diagnostics so they also
-   * appear in VS Code's Problems panel (and as squiggles in any text editor
-   * showing the same file). One collection for the whole extension; per-file
-   * entries are set on every read and cleared when a read fails or the file
-   * closes, so Problems can never report what the view no longer does.
-   */
-  private readonly diagnostics: vscode.DiagnosticCollection;
-
-  /**
-   * Undefined citations, published against the `.tex` files that make them.
-   *
-   * A separate collection from the lint findings because it describes different
-   * files: a citation with no entry behind it is a problem in the source that
-   * cites it, so that is where the squiggle belongs. Keeping it separate also
-   * means clearing one can never silently drop the other.
-   */
-  private readonly citationDiagnostics: vscode.DiagnosticCollection;
+  private readonly findings = new FindingsPublisher();
 
   /**
    * Paths the engine reported for the file currently shown in each panel.
@@ -180,18 +116,29 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
    */
   private readonly openablePaths = new WeakMap<vscode.WebviewPanel, Set<string>>();
 
+  /** Every open panel per document, so a staging change reaches each view of it. */
+  private readonly panelsByDocument = new Map<string, Set<vscode.WebviewPanel>>();
+
+  /** Panels already closed: a read still in flight must not post to one. */
+  private readonly disposedPanels = new WeakSet<vscode.WebviewPanel>();
+
+  /**
+   * The newest read started for each panel. Reads run concurrently — a burst of
+   * typing, a save, a write's reload — and finish in any order, so only the
+   * newest one may render; an older one finishing late would show stale text.
+   */
+  private readonly readGeneration = new WeakMap<vscode.WebviewPanel, number>();
+
   private constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly statusItem: vscode.StatusBarItem,
-  ) {
-    this.diagnostics = vscode.languages.createDiagnosticCollection("pynakes");
-    this.citationDiagnostics = vscode.languages.createDiagnosticCollection("pynakes-citations");
-  }
+    private readonly statusBar: EngineStatusBar,
+  ) {}
 
   public static register(context: vscode.ExtensionContext): vscode.Disposable {
     const statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
     statusItem.command = "pynakes.refreshBibliography";
-    const provider = new BibliographyEditorProvider(context, statusItem);
+    const statusBar = new EngineStatusBar(statusItem);
+    const provider = new BibliographyEditorProvider(context, statusBar);
     const registration = vscode.window.registerCustomEditorProvider(
       BibliographyEditorProvider.viewType,
       provider,
@@ -205,17 +152,14 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         void vscode.window.showInformationMessage("No Pynakes bibliography view is open.");
         return;
       }
+      // An explicit re-read also re-decides which engine runs, so installing
+      // or upgrading pynakes takes effect without reloading the window.
+      resetEngineDiscovery();
       for (const refresh of provider.liveViews) {
         refresh();
       }
     });
-    return vscode.Disposable.from(
-      registration,
-      refreshCommand,
-      statusItem,
-      provider.diagnostics,
-      provider.citationDiagnostics,
-    );
+    return vscode.Disposable.from(registration, refreshCommand, statusBar, provider.findings);
   }
 
   public async resolveCustomTextEditor(
@@ -244,7 +188,11 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
     };
 
     this.liveViews.add(load);
-    this.openPanels.add(panel);
+    this.statusBar.track(panel);
+    const documentId = document.uri.toString();
+    const siblings = this.panelsByDocument.get(documentId) ?? new Set<vscode.WebviewPanel>();
+    siblings.add(panel);
+    this.panelsByDocument.set(documentId, siblings);
     const subscriptions: vscode.Disposable[] = [
       vscode.workspace.onDidChangeTextDocument((event) => {
         const sameDocument = event.document.uri.toString() === document.uri.toString();
@@ -269,22 +217,28 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       vscode.workspace.onDidCloseTextDocument((closed) => {
         if (closed.uri.toString() === document.uri.toString()) {
           this.staging.delete(document.uri.toString());
-          this.diagnostics.delete(document.uri);
-          this.citationDiagnostics.clear();
+          this.findings.clear(document);
         }
       }),
       panel.webview.onDidReceiveMessage((message: ViewMessage) => {
-        void this.handleMessage(document, panel, message);
+        // Every handler reports its own failures; this catches what escapes
+        // one, so nothing becomes an unhandled rejection.
+        this.handleMessage(document, panel, message).catch((error: unknown) =>
+          this.post(panel, { ...describeFailure(error), type: "actionError" }),
+        );
       }),
       // The item describes one bibliography, so it follows the active tab.
-      panel.onDidChangeViewState(() => this.syncStatusBar(panel)),
+      panel.onDidChangeViewState(() => this.statusBar.sync(panel)),
     ];
 
     panel.onDidDispose(() => {
       disposed = true;
-      this.openPanels.delete(panel);
-      this.statusByPanel.delete(panel);
-      this.repointStatusBar();
+      this.disposedPanels.add(panel);
+      siblings.delete(panel);
+      if (siblings.size === 0) {
+        this.panelsByDocument.delete(documentId);
+      }
+      this.statusBar.forget(panel);
       if (pending) {
         clearTimeout(pending);
       }
@@ -302,43 +256,74 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
    *
    * Resolves the engine, mirrors the buffer when it has unsaved changes, and
    * releases the mirror afterwards whatever the outcome. A thrown error becomes
-   * an `engineError` message unless `reportFailure` reshapes it first — the
-   * hook `compareRemote` uses to keep its failures scoped to one entry rather
-   * than blanking the whole view.
+   * an `engineError` message — blanking the view and withdrawing its findings —
+   * unless `reportFailure` reshapes it first, the hook every action-scoped read
+   * (compare, search, preview, duplicates) uses to keep its failure its own.
    */
   private async withMirror(
     document: vscode.TextDocument,
     panel: vscode.WebviewPanel,
     body: (ctx: MirrorContext) => Promise<void>,
-    reportFailure: (
-      failure: Record<string, unknown>,
-    ) => Record<string, unknown> = (failure) => failure,
+    reportFailure?: (failure: Record<string, unknown>) => Record<string, unknown>,
+    superseded: () => boolean = () => false,
   ): Promise<void> {
     let mirror: TempMirror | undefined;
     try {
       const engine = await resolveEngine(document.uri);
-      const cwd = this.workingDirectory(document);
-      mirror = await this.sourceFor(document);
+      const cwd = workingDirectory(document);
+      mirror = await sourceFor(document);
       await body({ engine, command: engine.command, cwd, source: mirror.source });
     } catch (error) {
-      // A failed read leaves the previous findings pointing into content the
-      // engine could no longer read; Problems must go quiet with the view.
-      this.diagnostics.delete(document.uri);
-      this.citationDiagnostics.clear();
-      void panel.webview.postMessage(reportFailure(await this.describeFailure(error, document)));
+      // A newer read owns the view now; this one's failure is about old text.
+      if (superseded()) {
+        return;
+      }
+      if (!reportFailure) {
+        // A failed read of the library leaves the previous findings pointing
+        // into content the engine could no longer read; Problems must go quiet
+        // with the view. A failure scoped to one action (a compare, a search,
+        // a preview) leaves both the view and Problems as they were.
+        this.findings.clear(document);
+        this.post(panel, describeFailure(error));
+        return;
+      }
+      this.post(panel, reportFailure(describeFailure(error)));
     } finally {
-      await mirror?.release();
+      await mirror?.release().catch(() => undefined);
+    }
+  }
+
+  /**
+   * Send one message to a panel, unless it has closed.
+   *
+   * A read or a write can outlive its panel — the tab closed while the engine
+   * ran — and posting to a disposed webview throws.
+   */
+  private post(panel: vscode.WebviewPanel, message: Record<string, unknown>): void {
+    if (this.disposedPanels.has(panel)) {
+      return;
+    }
+    try {
+      void panel.webview.postMessage(message);
+    } catch {
+      // Disposed between the check and the post: nothing is listening.
     }
   }
 
   /** Read the document through the engine and hand the result to the view. */
   private async load(document: vscode.TextDocument, panel: vscode.WebviewPanel): Promise<void> {
+    const generation = (this.readGeneration.get(panel) ?? 0) + 1;
+    this.readGeneration.set(panel, generation);
+    const superseded = (): boolean =>
+      this.disposedPanels.has(panel) || this.readGeneration.get(panel) !== generation;
     await this.withMirror(document, panel, async ({ engine, command, cwd, source }) => {
-      const result = await readLibrary(command, source, cwd, this.neighbourPath(document));
+      const result = await readLibrary(command, source, cwd, neighbourPath(document));
+      if (superseded()) {
+        return;
+      }
       if (!result.ok) {
-        this.diagnostics.delete(document.uri);
-        this.citationDiagnostics.clear();
-        void panel.webview.postMessage({
+        this.findings.clear(document);
+        this.post(panel, {
           type: "parseError",
           error: result.error.error,
           message: result.error.message,
@@ -346,24 +331,22 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         });
         return;
       }
-      const settings = this.viewSettings(document);
-      this.publishDiagnostics(document, result.read.lint, settings.showFindings);
-      this.publishCitationDiagnostics(result.read.citations, settings.showFindings);
-      this.openablePaths.set(panel, collectOpenablePaths(result.read.citations, result.read.materials));
-      this.statusByPanel.set(panel, {
+      const settings = viewSettings(document);
+      this.findings.publishLint(document, result.read.lint, settings.showFindings);
+      this.findings.publishCitations(document, result.read.citations, settings.showFindings);
+      this.openablePaths.set(
+        panel,
+        collectOpenablePaths(result.read.citations, result.read.materials),
+      );
+      this.statusBar.update(panel, {
         summary: result.read.summary,
         findings: result.read.lint?.counts,
-        engine: {
-          version: engine.version,
-          source: engine.source,
-          reason: engine.reason,
-        },
+        engine: { version: engine.version, source: engine.source, reason: engine.reason },
         dirty: document.isDirty,
       });
-      this.syncStatusBar(panel);
-      void panel.webview.postMessage({
+      this.post(panel, {
         type: "render",
-        payload: this.toPayload(result.read),
+        payload: toPayload(result.read),
         engine: {
           command: describeCommand(engine.command),
           version: engine.version,
@@ -374,251 +357,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         staging: this.stagingFor(document),
         settings,
       });
-    });
-  }
-
-  /**
-   * Publish (or withdraw) one file's findings as native diagnostics.
-   *
-   * The same `pynakes.showFindings` setting that gates the in-view markers
-   * gates Problems, so the two can never disagree. Ranges are whole lines:
-   * the engine locates a finding at its entry's declaration, which is all a
-   * squiggle needs to be useful.
-   */
-  private publishDiagnostics(
-    document: vscode.TextDocument,
-    lint: LintIndex | null,
-    showFindings: boolean,
-  ): void {
-    if (!showFindings || !lint) {
-      this.diagnostics.delete(document.uri);
-      return;
-    }
-    // Clamp rather than trust: the buffer may have moved on since the engine
-    // read its mirror, and `lineAt` would throw on a stale out-of-range line.
-    const lastLine = Math.max(0, document.lineCount - 1);
-    const diagnostics = lintDiagnostics(lint.issues).map((item) => {
-      const line = Math.min(item.line, lastLine);
-      const diagnostic = new vscode.Diagnostic(
-        document.lineAt(line).range,
-        item.message,
-        DIAGNOSTIC_SEVERITY[item.severity],
-      );
-      diagnostic.source = "pynakes";
-      diagnostic.code = item.code;
-      return diagnostic;
-    });
-    this.diagnostics.set(document.uri, diagnostics);
-  }
-
-  /** Point the shared status bar item at this view, or hide it. */
-  private syncStatusBar(panel: vscode.WebviewPanel): void {
-    const details = this.statusByPanel.get(panel);
-    if (!panel.active || !details) {
-      this.statusItem.hide();
-      return;
-    }
-    const engine = details.engine;
-    this.statusItem.text = engine.version
-      ? `$(book) pynakes ${engine.version}`
-      : "$(book) pynakes";
-    this.statusItem.tooltip = this.buildTooltip(details);
-    this.statusItem.show();
-  }
-
-  /** The detail that used to occupy a row of the view, now one hover away. */
-  private buildTooltip(details: StatusDetails): vscode.MarkdownString {
-    const { summary, findings, engine } = details;
-    const lines: string[] = [`**${path.basename(summary.file)}**`, ""];
-
-    const entries = `${summary.entryCount} ${summary.entryCount === 1 ? "entry" : "entries"}`;
-    const types = summary.typeCounts
-      .slice(0, 4)
-      .map(([type, count]) => `${count} ${type}`)
-      .join(", ");
-    lines.push(types ? `${entries} — ${types}` : entries);
-
-    if (findings && findings.total > 0) {
-      lines.push(
-        `${findings.total} findings — ${findings.errors} error, ` +
-          `${findings.warnings} warning, ${findings.info} info`,
-      );
-    }
-    if (summary.duplicateKeys.length > 0) {
-      const names = summary.duplicateKeys.map(([key, count]) => `${key} (${count})`).join(", ");
-      lines.push(`Duplicate keys: ${names}`);
-    }
-    if (summary.stringCount > 0) {
-      lines.push(`${summary.stringCount} \`@string\` definitions`);
-    }
-
-    const namespaces = [
-      summary.jabrefKeys.length > 0 ? "jabref-meta" : null,
-      summary.pynakesKeys.length > 0 ? "pynakes-meta" : null,
-    ].filter(Boolean);
-    if (namespaces.length > 0) {
-      lines.push(`Metadata: ${namespaces.join(", ")}`);
-    }
-
-    lines.push(`Encoding: ${summary.encoding}, ${summary.lineEnding.toUpperCase()} line endings`);
-    if (details.dirty) {
-      lines.push("_Reading the unsaved buffer, not the file on disk._");
-    }
-    lines.push("", `Engine: **${engine.source}**. ${engine.reason}`);
-    lines.push("", "Click to re-read the file.");
-
-    const tooltip = new vscode.MarkdownString(lines.join("\n\n"));
-    tooltip.isTrusted = true;
-    return tooltip;
-  }
-
-  /** Shape one read for the webview. */
-  private toPayload(read: LibraryRead): Record<string, unknown> {
-    return {
-      rows: read.rows,
-      summary: read.summary,
-      groups: read.groups,
-      groupsByEntry: read.groupsByEntry,
-      lint: read.lint,
-      citations: read.citations,
-      materials: read.materials,
-      warnings: read.warnings,
-    };
-  }
-
-  /**
-   * The document's real path on disk, for the reads about its neighbours.
-   *
-   * A dirty buffer is mirrored to a temporary file for every other read, but
-   * `tex-sources`, `pinax-files-dir`, and relative `file` paths all resolve
-   * from the `.bib`'s own directory — from a temp directory they resolve to
-   * nothing. A document with no path on disk (never saved, or not a local
-   * file) has no neighbours to read.
-   */
-  private neighbourPath(document: vscode.TextDocument): string | undefined {
-    return document.uri.scheme === "file" ? document.uri.fsPath : undefined;
-  }
-
-  /**
-   * Publish (or withdraw) undefined citations as diagnostics on the `.tex`
-   * files that make them.
-   *
-   * Gated by the same `pynakes.showFindings` setting as the lint findings: both
-   * are advisory validation, and a user who turned findings off did not ask for
-   * one kind to keep reporting. The whole collection is replaced on every read,
-   * so a citation that has since been resolved cannot linger.
-   */
-  private publishCitationDiagnostics(
-    citations: CitationIndex | null,
-    showFindings: boolean,
-  ): void {
-    this.citationDiagnostics.clear();
-    if (!showFindings || !citations) {
-      return;
-    }
-    for (const file of citationDiagnostics(citations)) {
-      const diagnostics = file.items.map((item) => {
-        const start = new vscode.Position(item.line, item.column);
-        const diagnostic = new vscode.Diagnostic(
-          new vscode.Range(start, start.translate(0, item.length)),
-          item.message,
-          vscode.DiagnosticSeverity.Warning,
-        );
-        diagnostic.source = "pynakes";
-        diagnostic.code = "undefined-citation";
-        return diagnostic;
-      });
-      this.citationDiagnostics.set(vscode.Uri.file(file.path), diagnostics);
-    }
-  }
-
-  /**
-   * Hand the status bar to whichever other bibliography view is active, or
-   * hide it when there is none — a closing panel must not blank the item a
-   * sibling view is still using.
-   */
-  private repointStatusBar(): void {
-    for (const panel of this.openPanels) {
-      if (panel.active && this.statusByPanel.get(panel)) {
-        this.syncStatusBar(panel);
-        return;
-      }
-    }
-    this.statusItem.hide();
-  }
-
-  /** The webview-facing settings for one document. */
-  private viewSettings(document: vscode.TextDocument): ViewSettings {
-    const config = vscode.workspace.getConfiguration("pynakes", document.uri);
-    return {
-      fuzzy: config.get<boolean>("search.fuzzy", false),
-      showFindings: config.get<boolean>("showFindings", true),
-    };
-  }
-
-  /** Turn a thrown boundary error into something the view can explain. */
-  private async describeFailure(
-    error: unknown,
-    document: vscode.TextDocument,
-  ): Promise<Record<string, unknown>> {
-    if (error instanceof PynakesUnavailableError) {
-      return {
-        type: "engineError",
-        kind: "unavailable",
-        message: `Could not run the pynakes engine as "${error.command}".`,
-        detail:
-          "No usable engine was found. The extension ships one, which needs a " +
-          "Python 3.12+ interpreter on the system; if there is none, install the " +
-          "engine with `pip install pynakes`. The `pynakes.executable` setting " +
-          "overrides discovery entirely, and `pynakes.engine` can force the " +
-          "bundled or the installed engine.",
-      };
-    }
-    if (error instanceof PynakesProtocolError) {
-      return { type: "engineError", kind: "protocol", message: error.message, detail: error.detail };
-    }
-    void document;
-    return {
-      type: "engineError",
-      kind: "unknown",
-      message: "Reading the bibliography failed.",
-      detail: error instanceof Error ? (error.stack ?? error.message) : String(error),
-    };
-  }
-
-  /**
-   * Decide what pynakes should read.
-   *
-   * A saved local file is read in place. An unsaved buffer — or any document
-   * that is not a local file — is mirrored to a temporary file first, so the
-   * view always reflects the text on screen rather than the text on disk.
-   */
-  private async sourceFor(document: vscode.TextDocument): Promise<TempMirror> {
-    if (document.uri.scheme === "file" && !document.isDirty) {
-      return { source: document.uri.fsPath, release: async () => {} };
-    }
-    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "pynakes-vscode-"));
-    const basename = path.basename(document.uri.path) || "bibliography.bib";
-    const source = path.join(directory, basename.endsWith(".bib") ? basename : `${basename}.bib`);
-    await fs.writeFile(source, document.getText(), "utf8");
-    return {
-      source,
-      release: async () => {
-        await fs.rm(directory, { recursive: true, force: true });
-      },
-    };
-  }
-
-  /** Run the engine from the workspace folder so relative paths resolve. */
-  private workingDirectory(document: vscode.TextDocument): string | undefined {
-    const folder = vscode.workspace.getWorkspaceFolder(document.uri);
-    if (folder?.uri.scheme === "file") {
-      return folder.uri.fsPath;
-    }
-    if (document.uri.scheme === "file") {
-      return path.dirname(document.uri.fsPath);
-    }
-    return undefined;
+    }, undefined, superseded);
   }
 
   // -- staging --------------------------------------------------------------
@@ -633,12 +372,23 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
     return state;
   }
 
+  /**
+   * Tell every view of this document what is pending now.
+   *
+   * The pending edits belong to the document, and a second view of the same
+   * file (a split editor) commits them just as the first does, so each must
+   * show them — not only the view that made the change.
+   */
   private postStaging(document: vscode.TextDocument, panel: vscode.WebviewPanel): void {
-    void panel.webview.postMessage({
+    const message = {
       type: "staging",
       staging: this.stagingFor(document),
       counts: stagedCount(this.stagingFor(document)),
-    });
+    };
+    const panels = this.panelsByDocument.get(document.uri.toString()) ?? new Set([panel]);
+    for (const view of panels) {
+      this.post(view, message);
+    }
   }
 
   // -- messages -------------------------------------------------------------
@@ -648,10 +398,9 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
     panel: vscode.WebviewPanel,
     message: ViewMessage,
   ): Promise<void> {
+    const host = (): StagingHost => this.host(document, panel);
     switch (message.type) {
       case "ready":
-        await this.load(document, panel);
-        return;
       case "refresh":
         await this.load(document, panel);
         return;
@@ -693,7 +442,10 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         this.postStaging(document, panel);
         return;
       case "preview":
-        await this.preview(document, panel);
+        await previewStaged(host());
+        return;
+      case "commit":
+        await commitStaged(host());
         return;
       case "compareRemote":
         if (message.key) {
@@ -702,15 +454,12 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         return;
       case "renameKey":
         if (message.key && message.newKey) {
-          await this.renameKey(document, panel, message.key, message.newKey);
+          await renameKey(host(), message.key, message.newKey);
         }
-        return;
-      case "commit":
-        await this.commit(document, panel);
         return;
       case "reveal":
         if (message.key) {
-          await this.revealEntry(document, message.key);
+          await revealEntry(document, message.key);
         }
         return;
       case "copyKey":
@@ -728,40 +477,53 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         await vscode.commands.executeCommand("workbench.action.openSettings", "pynakes");
         return;
       case "openMaterial":
-        await this.openMaterial(panel, message.path);
+        await openMaterial(this.openablePaths.get(panel), message.path);
         return;
       case "openCitation":
-        await this.openCitation(panel, message.path, message.line, message.column);
+        await openCitation(
+          this.openablePaths.get(panel),
+          message.path,
+          message.line,
+          message.column,
+        );
         return;
       case "mutate":
         if (message.mutation) {
-          await runMutation(this.mutationHost(document, panel), message.mutation);
+          await runMutation(host(), message.mutation);
         }
         return;
       case "promptAdd":
-        await promptAdd(this.mutationHost(document, panel));
+        await promptAdd(host());
         return;
       case "promptImport":
-        await promptImport(this.mutationHost(document, panel));
+        await promptImport(host());
         return;
       case "promptGroup":
         if (message.key) {
-          await promptGroup(
-            this.mutationHost(document, panel),
-            message.key,
-            message.groups ?? [],
-          );
+          await promptGroup(host(), message.key, message.groups ?? []);
         }
         return;
+      case "groupActions":
+        if (message.group?.name) {
+          await promptGroupAction(host(), message.group, message.groups ?? []);
+        }
+        return;
+      case "promptNewGroup":
+        await promptNewGroup(host());
+        return;
+      case "fetchMaterials":
+        // No key fetches for every entry; the plan and the approval say which.
+        await promptFetch(host(), message.key || undefined);
+        return;
       case "findDuplicates":
-        await reportDuplicates(this.mutationHost(document, panel));
+        await reportDuplicates(host());
         return;
       default:
         return;
     }
   }
 
-  // -- search ---------------------------------------------------------------
+  // -- reads on request -----------------------------------------------------
 
   private async search(
     document: vscode.TextDocument,
@@ -771,37 +533,30 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
     const query = message.query ?? "";
     const where = message.where ?? "";
     if (!query.trim() && !where.trim()) {
-      void panel.webview.postMessage({ type: "searchCleared" });
+      this.post(panel, { type: "searchCleared", seq: message.seq });
       return;
     }
-    await this.withMirror(document, panel, async ({ command, cwd, source }) => {
-      const outcome = await runSearch(
-        command,
-        source,
-        { query, where, fuzzy: message.fuzzy },
-        cwd,
-      );
-      void panel.webview.postMessage(
-        outcome.ok
-          ? { type: "searchResult", keys: outcome.keys, ranked: outcome.ranked, count: outcome.count }
-          : { type: "searchError", message: outcome.message },
-      );
-    });
-  }
-
-  // -- compare with remote ---------------------------------------------------
-
-  /**
-   * Whether this view may reach the network for this document.
-   *
-   * Every network-backed action reads this one place, so "no lookups" means the
-   * same thing for comparing and for importing rather than depending on which
-   * button was pressed.
-   */
-  private onlineLookupsAllowed(document: vscode.TextDocument): boolean {
-    return vscode.workspace
-      .getConfiguration("pynakes", document.uri)
-      .get<boolean>("allowOnlineLookups", true);
+    const seq = message.seq;
+    await this.withMirror(
+      document,
+      panel,
+      async ({ command, cwd, source }) => {
+        const outcome = await runSearch(command, source, { query, where, fuzzy: message.fuzzy }, cwd);
+        this.post(
+          panel,
+          outcome.ok
+            ? { type: "searchResult", seq, keys: outcome.keys, ranked: outcome.ranked, count: outcome.count }
+            : { type: "searchError", seq, message: outcome.message },
+        );
+      },
+      // A search that could not run says so in the search box's notice; the
+      // table still shows the last good read rather than going blank.
+      (failure) => ({
+        type: "searchError",
+        seq,
+        message: typeof failure.message === "string" ? failure.message : "Search failed.",
+      }),
+    );
   }
 
   /**
@@ -818,13 +573,14 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
     panel: vscode.WebviewPanel,
     key: string,
   ): Promise<void> {
-    const online = this.onlineLookupsAllowed(document);
+    const online = onlineLookupsAllowed(document);
     await this.withMirror(
       document,
       panel,
       async ({ command, cwd, source }) => {
         const outcome = await compareEntry(command, source, key, online, cwd);
-        void panel.webview.postMessage(
+        this.post(
+          panel,
           outcome.ok
             ? {
                 type: "compareResult",
@@ -848,102 +604,31 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
     );
   }
 
-  // -- citation key rename ----------------------------------------------------
+  // -- the slice handed to the write modules ----------------------------------
 
   /**
-   * Rename one citation key, after reconciling the buffer and an explicit
-   * approval. Unlike a field edit this also rewrites any linked TeX
-   * `\cite{...}` keys, a wider blast radius that warrants asking first —
-   * the same confirmation `commit` uses before writing.
-   */
-  private async renameKey(
-    document: vscode.TextDocument,
-    panel: vscode.WebviewPanel,
-    oldKey: string,
-    newKey: string,
-  ): Promise<void> {
-    const trimmed = newKey.trim();
-    if (!trimmed || trimmed === oldKey) {
-      return;
-    }
-    // The staging map is keyed by the entry's current citation key; renaming
-    // out from under a pending field/type edit would orphan it.
-    if (this.stagingFor(document).entries[oldKey]) {
-      void panel.webview.postMessage({
-        type: "renameKeyError",
-        key: oldKey,
-        message: "Discard or apply this entry's pending changes before renaming its key.",
-      });
-      return;
-    }
-    if (document.uri.scheme !== "file") {
-      void panel.webview.postMessage({
-        type: "renameKeyError",
-        key: oldKey,
-        message: "This document is not a local file, so it cannot be written.",
-      });
-      return;
-    }
-    if (!(await this.reconcileBuffer(document))) {
-      void panel.webview.postMessage({
-        type: "renameKeyError",
-        key: oldKey,
-        message: "Rename cancelled: the file still has unsaved changes.",
-      });
-      return;
-    }
-
-    const approval = await vscode.window.showWarningMessage(
-      `Rename citation key "${oldKey}" to "${trimmed}"?`,
-      {
-        modal: true,
-        detail: "Updates the entry and rewrites matching \\cite{...} keys in any linked TeX sources.",
-      },
-      "Rename",
-    );
-    if (approval !== "Rename") {
-      void panel.webview.postMessage({ type: "renameKeyCancelled", key: oldKey });
-      return;
-    }
-
-    try {
-      const { command } = await resolveEngine(document.uri);
-      const cwd = this.workingDirectory(document);
-      const filePath = document.uri.fsPath;
-      const outcome = await renameEntryKey(command, filePath, oldKey, trimmed, cwd);
-      if (!outcome.ok) {
-        void panel.webview.postMessage({ type: "renameKeyError", key: oldKey, message: outcome.message });
-        return;
-      }
-      void panel.webview.postMessage({ type: "keyRenamed", oldKey, newKey: outcome.new });
-      await this.load(document, panel);
-    } catch (error) {
-      void panel.webview.postMessage(await this.describeFailure(error, document));
-    }
-  }
-
-  // -- entry and group mutations --------------------------------------------
-
-  /**
-   * The slice of this provider that `mutations.ts` is allowed to use.
+   * The slice of this provider that the write modules are allowed to use.
    *
    * Built per message rather than held, because every capability it exposes is
    * already scoped to one document and one panel; handing over the provider
-   * itself would let that module reach state it has no business touching.
+   * itself would let those modules reach state they have no business touching.
    */
-  private mutationHost(
-    document: vscode.TextDocument,
-    panel: vscode.WebviewPanel,
-  ): MutationHost {
+  private host(document: vscode.TextDocument, panel: vscode.WebviewPanel): StagingHost {
     return {
       document,
-      post: (message) => void panel.webview.postMessage(message),
+      post: (message) => this.post(panel, message),
       stagedKeys: () => new Set(Object.keys(this.stagingFor(document).entries)),
-      reconcileBuffer: () => this.reconcileBuffer(document),
-      workingDirectory: () => this.workingDirectory(document),
-      onlineLookupsAllowed: () => this.onlineLookupsAllowed(document),
+      staging: () => this.stagingFor(document),
+      resetStaging: () => this.staging.set(document.uri.toString(), emptyStaging()),
+      postStaging: () => this.postStaging(document, panel),
+      reconcileBuffer: () => reconcileBuffer(document),
+      workingDirectory: () => workingDirectory(document),
+      onlineLookupsAllowed: () => onlineLookupsAllowed(document),
       reload: () => this.load(document, panel),
-      describeFailure: (error) => this.describeFailure(error, document),
+      // A write that failed leaves the file as it was, so the view keeps
+      // showing it: `actionError` reports the failure without blanking the
+      // table the way a failed read (`engineError`) does.
+      describeFailure: async (error) => ({ ...describeFailure(error), type: "actionError" }),
       withMirror: (body, reportFailure) =>
         this.withMirror(
           document,
@@ -953,338 +638,18 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         ),
     };
   }
-
-  // -- preview and commit ---------------------------------------------------
-
-  /**
-   * Dry-run the staged changes and show the exact diff.
-   *
-   * Previews run against the buffer, mirror included, so an unsaved document can
-   * still be inspected. Committing is stricter — see `commit`.
-   */
-  private async preview(
-    document: vscode.TextDocument,
-    panel: vscode.WebviewPanel,
-  ): Promise<void> {
-    const state = this.stagingFor(document);
-    if (isEmpty(state)) {
-      void panel.webview.postMessage({ type: "diff", entries: [] });
-      return;
-    }
-    await this.withMirror(document, panel, async ({ command, cwd, source }) => {
-      const requests = toRequests(state);
-      const result = await previewEdits(command, source, requests, cwd);
-      if (!result.ok) {
-        void panel.webview.postMessage({
-          type: "commitError",
-          message: `Preview failed: ${result.message}`,
-        });
-        return;
-      }
-      void panel.webview.postMessage({
-        type: "diff",
-        entries: [
-          {
-            key: diffHeading(requests.map((request) => request.key)),
-            diff: result.diff,
-            warnings: result.warnings,
-          },
-        ],
-      });
-    });
-  }
-
-  /**
-   * Apply the staged changes, after a diff and an explicit approval.
-   *
-   * The order matters. The buffer is reconciled with disk first, because the
-   * engine writes to the file and a dirty buffer would either be overwritten or
-   * would overwrite the commit. Then a dry run produces the diff *and* the
-   * current values, which are checked against what each edit was staged
-   * against — that is what stops a commit from silently reverting a change
-   * someone else made in between. Only then is approval requested.
-   *
-   * The write is one `corpus batch`, so it lands whole or not at all, and it
-   * carries the digest the dry run reported, so a change made while the
-   * approval dialog was open is refused rather than overwritten. Anything short
-   * of success leaves every staged edit in place: nothing was written.
-   */
-  private async commit(document: vscode.TextDocument, panel: vscode.WebviewPanel): Promise<void> {
-    const state = this.stagingFor(document);
-    if (isEmpty(state)) {
-      return;
-    }
-    if (document.uri.scheme !== "file") {
-      void panel.webview.postMessage({
-        type: "commitError",
-        message: "This document is not a local file, so it cannot be written.",
-      });
-      return;
-    }
-    if (!(await this.reconcileBuffer(document))) {
-      void panel.webview.postMessage({
-        type: "commitError",
-        message: "Apply cancelled: the file still has unsaved changes.",
-      });
-      return;
-    }
-
-    const requests = toRequests(state);
-    try {
-      const { command } = await resolveEngine(document.uri);
-      const cwd = this.workingDirectory(document);
-      const filePath = document.uri.fsPath;
-
-      const preview = await previewEdits(command, filePath, requests, cwd);
-      if (!preview.ok) {
-        void panel.webview.postMessage({
-          type: "commitError",
-          message: `Cannot apply: ${preview.message}`,
-        });
-        return;
-      }
-      const sourceSha256 = preview.sourceSha256;
-      if (!sourceSha256) {
-        void panel.webview.postMessage({ type: "commitError", message: NO_FINGERPRINT_MESSAGE });
-        return;
-      }
-
-      const conflicts: StagingConflict[] = [];
-      for (const entry of preview.entries) {
-        const staged = state.entries[entry.key];
-        if (staged) {
-          conflicts.push(...findConflicts(staged, entry.plan));
-        }
-      }
-      if (conflicts.length > 0) {
-        void panel.webview.postMessage({
-          type: "conflict",
-          conflicts,
-          message:
-            "The file changed since these edits were made. Nothing was written — " +
-            "review the current values and edit again.",
-        });
-        await this.load(document, panel);
-        return;
-      }
-
-      // Put the diff on screen before asking, so approval is informed.
-      void panel.webview.postMessage({
-        type: "diff",
-        entries: [
-          {
-            key: diffHeading(requests.map((request) => request.key)),
-            diff: preview.diff,
-            warnings: preview.warnings,
-          },
-        ],
-      });
-
-      const counts = stagedCount(state);
-      const name = path.basename(filePath);
-      const approval = await vscode.window.showWarningMessage(
-        `Apply ${counts.fields} ${counts.fields === 1 ? "change" : "changes"} to ` +
-          `${counts.entries} ${counts.entries === 1 ? "entry" : "entries"} in ${name}?`,
-        { modal: true, detail: "The exact diff is shown in the bibliography view." },
-        "Apply",
-      );
-      if (approval !== "Apply") {
-        void panel.webview.postMessage({ type: "commitCancelled" });
-        return;
-      }
-
-      const result = await commitEdits(command, filePath, requests, sourceSha256, cwd);
-      if (!result.ok) {
-        // Nothing was written, so every staged edit stays staged. A file that
-        // moved is reported as the conflict it is; the reload below shows what
-        // it holds now, and the next apply re-checks each edit against it.
-        if (result.conflict && result.error === "ExternalModification") {
-          void panel.webview.postMessage({
-            type: "conflict",
-            conflicts: [],
-            message: FILE_MOVED_MESSAGE,
-          });
-        } else {
-          void panel.webview.postMessage({
-            type: "commitError",
-            message: `Nothing was written: ${result.message}`,
-          });
-        }
-      } else {
-        this.staging.set(document.uri.toString(), emptyStaging());
-        void panel.webview.postMessage({
-          type: "committed",
-          applied: result.applied,
-          warnings: result.warnings,
-        });
-      }
-      this.postStaging(document, panel);
-      await this.load(document, panel);
-    } catch (error) {
-      void panel.webview.postMessage(await this.describeFailure(error, document));
-    }
-  }
-
-  /**
-   * Bring the buffer and the file on disk into agreement before writing.
-   *
-   * The editor's own `files.autoSave` decides how: when autosave is on the
-   * buffer is saved without asking, because that is what the editor would do
-   * moments later anyway. With autosave off, saving is the user's decision, so
-   * it is asked for rather than assumed.
-   */
-  private async reconcileBuffer(document: vscode.TextDocument): Promise<boolean> {
-    if (!document.isDirty) {
-      return true;
-    }
-    const autoSave = vscode.workspace
-      .getConfiguration("files", document.uri)
-      .get<string>("autoSave", "off");
-    if (autoSave !== "off") {
-      return document.save();
-    }
-    const name = path.basename(document.uri.fsPath);
-    const choice = await vscode.window.showWarningMessage(
-      `${name} has unsaved changes.`,
-      {
-        modal: true,
-        detail:
-          "Applying writes to the file, so the buffer has to be saved first. " +
-          "Save it now and continue?",
-      },
-      "Save and Apply",
-    );
-    if (choice !== "Save and Apply") {
-      return false;
-    }
-    return document.save();
-  }
-
-  // -- navigation -----------------------------------------------------------
-
-  /**
-   * Open one of an entry's materials.
-   *
-   * Handed to the operating system rather than opened in VS Code: a material is
-   * a PDF or a source archive, and the editor has no viewer for either. A
-   * directory is revealed in the file manager instead of "opened".
-   */
-  private async openMaterial(panel: vscode.WebviewPanel, target?: string): Promise<void> {
-    const resolved = this.resolveOpenable(panel, target);
-    if (!resolved) {
-      return;
-    }
-    const uri = vscode.Uri.file(resolved);
-    let isDirectory = false;
-    try {
-      isDirectory = (await vscode.workspace.fs.stat(uri)).type === vscode.FileType.Directory;
-    } catch {
-      void vscode.window.showWarningMessage(
-        `${path.basename(resolved)} is no longer there. Re-read the file to refresh its materials.`,
-      );
-      return;
-    }
-    if (isDirectory) {
-      await vscode.commands.executeCommand("revealFileInOS", uri);
-      return;
-    }
-    await vscode.env.openExternal(uri);
-  }
-
-  /** Open a `.tex` source at one `\cite` occurrence. */
-  private async openCitation(
-    panel: vscode.WebviewPanel,
-    target?: string,
-    line?: number,
-    column?: number,
-  ): Promise<void> {
-    const resolved = this.resolveOpenable(panel, target);
-    if (!resolved) {
-      return;
-    }
-    let document: vscode.TextDocument;
-    try {
-      document = await vscode.workspace.openTextDocument(vscode.Uri.file(resolved));
-    } catch {
-      void vscode.window.showWarningMessage(`Could not open ${path.basename(resolved)}.`);
-      return;
-    }
-    // The engine reports one-based positions, and the source may have been
-    // edited since it read them, so both are clamped rather than trusted.
-    const row = Math.min(Math.max(0, (line ?? 1) - 1), Math.max(0, document.lineCount - 1));
-    const text = document.lineAt(row);
-    const col = Math.min(Math.max(0, (column ?? 1) - 1), text.text.length);
-    const position = new vscode.Position(row, col);
-    const selection = new vscode.Range(position, position);
-    const editor = await vscode.window.showTextDocument(document, {
-      viewColumn: vscode.ViewColumn.Beside,
-      preview: false,
-      selection,
-    });
-    editor.revealRange(selection, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
-  }
-
-  /**
-   * Accept a path from the webview only when the last read reported it.
-   *
-   * The webview is this extension's least trustworthy input, and both open
-   * actions hand a path to the operating system, so the path has to have come
-   * from the engine rather than merely arrived in a message.
-   */
-  private resolveOpenable(panel: vscode.WebviewPanel, target?: string): string | undefined {
-    if (target && this.openablePaths.get(panel)?.has(target)) {
-      return target;
-    }
-    void vscode.window.showWarningMessage(
-      "That file is not one this bibliography reported. Re-read the file and try again.",
-    );
-    return undefined;
-  }
-
-  /** Open the source text beside the view, at the entry's declaration. */
-  private async revealEntry(document: vscode.TextDocument, key: string): Promise<void> {
-    const pattern = new RegExp(`@[A-Za-z]+\\s*[{(]\\s*${escapeRegExp(key)}\\s*,`);
-    const match = pattern.exec(document.getText());
-    const position = match ? document.positionAt(match.index) : new vscode.Position(0, 0);
-    const range = new vscode.Range(position, position);
-    const editor = await vscode.window.showTextDocument(document, {
-      viewColumn: vscode.ViewColumn.Beside,
-      preview: false,
-      selection: range,
-    });
-    editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
-    if (!match) {
-      void vscode.window.showWarningMessage(`Could not locate "${key}" in the source text.`);
-    }
-  }
 }
 
-/**
- * Every path the view may ask to open: citation sources and existing materials.
- *
- * Built from the engine's own output, so the check in `resolveOpenable` accepts
- * exactly what this read reported and nothing else.
- */
-function collectOpenablePaths(
-  citations: CitationIndex | null,
-  materials: MaterialIndex | null,
-): Set<string> {
-  const paths = new Set<string>();
-  for (const occurrences of Object.values(citations?.byKey ?? {})) {
-    for (const occurrence of occurrences) {
-      paths.add(occurrence.path);
-    }
-  }
-  for (const list of Object.values(materials?.byKey ?? {})) {
-    for (const material of list) {
-      if (material.path) {
-        paths.add(material.path);
-      }
-    }
-  }
-  return paths;
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** Shape one read for the webview. */
+function toPayload(read: LibraryRead): Record<string, unknown> {
+  return {
+    rows: read.rows,
+    summary: read.summary,
+    groups: read.groups,
+    groupsByEntry: read.groupsByEntry,
+    lint: read.lint,
+    citations: read.citations,
+    materials: read.materials,
+    warnings: read.warnings,
+  };
 }

@@ -15,6 +15,7 @@ import type {
   MaterialPresence,
   TexScanSuccess,
 } from "./model";
+import { own, record } from "./records";
 
 /** A group as the sidebar shows it: hierarchy position plus its membership. */
 export interface GroupNode {
@@ -22,6 +23,7 @@ export interface GroupNode {
   /** Nesting depth, 0 for a root group. */
   depth: number;
   groupType: string;
+  /** The group's colour as CSS accepts it, or `""` when it has none (see `cssColor`). */
   color: string;
   description: string;
   /** Citation keys that declare membership in this group. */
@@ -50,9 +52,9 @@ export function buildGroupTree(
       name: node.name,
       depth: 0,
       groupType: node.group_type,
-      color: node.color,
+      color: cssColor(node.color),
       description: node.description,
-      keys: membership[node.name] ?? [],
+      keys: own(membership, node.name) ?? [],
       undeclared: false,
       children: [],
     });
@@ -79,7 +81,7 @@ export function buildGroupTree(
 
   const declared = new Set(nodes.map((node) => node.name));
   for (const [name, keys] of Object.entries(membership)) {
-    if (declared.has(name) || keys.length === 0) {
+    if (declared.has(name) || !Array.isArray(keys) || keys.length === 0) {
       continue;
     }
     roots.push({
@@ -96,6 +98,22 @@ export function buildGroupTree(
 
   assignDepth(roots, 0, new Set());
   return roots;
+}
+
+/**
+ * A group colour as CSS spells it.
+ *
+ * Display tidying only, like the rest of this module: the engine reports the
+ * colour exactly as the file stores it, and a JabRef file stores `0x8a8a8aff`
+ * (pynakes documents bare `8a8a8aff`), neither of which CSS accepts — so the
+ * swatch never painted. The engine refuses any other form on write; one it
+ * did not write and that is not hex is simply not painted.
+ */
+export function cssColor(color: string | undefined): string {
+  const hex = /^(?:#|0[xX])?([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.exec(
+    (color ?? "").trim(),
+  );
+  return hex ? `#${hex[1].toLowerCase()}` : "";
 }
 
 /** True when following declared parents from `name` loops instead of ending. */
@@ -149,8 +167,8 @@ export function worseSeverity(left: LintSeverity, right: LintSeverity): LintSeve
 
 /** Index lint findings by entry and by category. */
 export function indexLint(envelope: LintSuccess): LintIndex {
-  const byKey: Record<string, LintIssue[]> = {};
-  const worstByKey: Record<string, LintSeverity> = {};
+  const byKey = record<LintIssue[]>();
+  const worstByKey = record<LintSeverity>();
   const fileLevel: LintIssue[] = [];
   const categories = new Map<string, LintIssue[]>();
 
@@ -215,7 +233,7 @@ export function lintDiagnostics(issues: LintIssue[]): LintDiagnosticItem[] {
 
 /** Group membership per entry, for the detail pane. */
 export function groupsByEntry(envelope: GroupsListSuccess): Record<string, string[]> {
-  const byEntry: Record<string, string[]> = {};
+  const byEntry = record<string[]>();
   for (const [group, keys] of Object.entries(envelope.groups)) {
     for (const key of keys) {
       (byEntry[key] ??= []).push(group);
@@ -271,7 +289,7 @@ export function isCited(index: CitationIndex | null, key: string): boolean {
   if (!index) {
     return false;
   }
-  return index.includeAll || (index.byKey[key]?.length ?? 0) > 0;
+  return index.includeAll || (own(index.byKey, key)?.length ?? 0) > 0;
 }
 
 /** Undefined citations shaped for native diagnostics, grouped by source file. */
@@ -298,7 +316,7 @@ export interface CitationDiagnosticFile {
 export function citationDiagnostics(index: CitationIndex): CitationDiagnosticFile[] {
   const byPath = new Map<string, CitationDiagnosticFile["items"]>();
   for (const key of index.undefinedKeys) {
-    for (const occurrence of index.byKey[key] ?? []) {
+    for (const occurrence of own(index.byKey, key) ?? []) {
       const items = byPath.get(occurrence.path) ?? [];
       items.push({
         key,
@@ -362,6 +380,14 @@ const PINAX_KINDS: Array<{ kind: keyof MaterialPresence & string; label: string 
 ];
 
 /**
+ * The label for a Pinax material kind, as the Materials list shows it; an
+ * unfamiliar kind is shown as the engine named it rather than dropped.
+ */
+export function materialLabel(kind: string): string {
+  return PINAX_KINDS.find((item) => item.kind === kind)?.label ?? kind;
+}
+
+/**
  * Index an `asset check` read by citation key.
  *
  * Every path here comes from the engine. The client must never *build* one:
@@ -370,7 +396,7 @@ const PINAX_KINDS: Array<{ kind: keyof MaterialPresence & string; label: string 
  * the envelope is not shown.
  */
 export function indexMaterials(envelope: AssetCheckSuccess): MaterialIndex {
-  const byKey: Record<string, Material[]> = {};
+  const byKey = record<Material[]>();
 
   for (const presence of envelope.pinax?.entries ?? []) {
     const materials: Material[] = [];

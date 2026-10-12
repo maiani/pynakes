@@ -23,8 +23,9 @@ import {
   findDuplicates,
   previewMutation,
   type Mutation,
+  type MutationOutcome,
 } from "./library";
-import type { PynakesCommand } from "./pynakes";
+import type { GroupTreeEdit, PynakesCommand } from "./pynakes";
 
 /** What a mutation needs from the view it runs in. */
 export interface MutationHost {
@@ -89,6 +90,11 @@ function mutationKeys(mutation: Mutation): string[] {
       // and approved like the rest; what matters here is the named cluster,
       // whose entries are about to be rewritten or removed.
       return mutation.keys ?? [];
+    case "groupTree":
+      // The hierarchy lives in the file's metadata, not in any entry. The
+      // entries a rename moves are known only from its preview, and are
+      // checked against the staging map there.
+      return [];
   }
 }
 
@@ -98,7 +104,7 @@ function mutationKeys(mutation: Mutation): string[] {
  * Each line names a consequence the diff itself does not show — deleted files,
  * a network request — so approving is never a surprise.
  */
-function approvalDetail(mutation: Mutation, warnings: string[]): string {
+function approvalDetail(mutation: Mutation, preview: PreviewedMutation): string {
   const lines: string[] = [];
   switch (mutation.kind) {
     case "remove":
@@ -118,12 +124,82 @@ function approvalDetail(mutation: Mutation, warnings: string[]): string {
           : "Folds every duplicate in the file into its first entry and removes the copies.",
       );
       break;
+    case "groupTree":
+      lines.push(...groupTreeDetail(mutation.edit, preview));
+      break;
     default:
       break;
   }
-  lines.push(...warnings);
+  lines.push(...preview.warnings);
   lines.push("The diff above is exactly what will be written.");
   return lines.join("\n\n");
+}
+
+/** What the approval dialog reads from a successful preview. */
+type PreviewedMutation = Extract<MutationOutcome, { ok: true }>;
+
+/**
+ * What a hierarchy edit does that its diff hides or scatters.
+ *
+ * The hierarchy and membership are separate records. A rename carries its
+ * members along (`--members`), and the dialog names the entries the engine
+ * reported moving; a removal changes the hierarchy only, and says so. The
+ * descendants of a removed group are likewise the ones the engine reported it
+ * would take — neither list is worked out here.
+ */
+function groupTreeDetail(edit: GroupTreeEdit, preview: PreviewedMutation): string[] {
+  switch (edit.op) {
+    case "remove": {
+      const others = (preview.removedGroups ?? []).filter((name) => name !== edit.name);
+      return [
+        others.length > 0
+          ? `Also removes ${others.length === 1 ? "its subgroup" : `its ${others.length} subgroups`}: ` +
+            others.map((name) => `"${name}"`).join(", ") + "."
+          : `"${edit.name}" has no subgroups.`,
+        "Entries keep their memberships: any entry filed under a removed group shows it " +
+          "as a group the hierarchy does not declare.",
+      ];
+    }
+    case "rename": {
+      const moved = preview.renamedMembers ?? [];
+      return [
+        moved.length > 0
+          ? `Moves ${moved.length === 1 ? "its entry" : `its ${moved.length} entries`} ` +
+            `to "${edit.newName}": ${listKeys(moved)}.`
+          : `No entry is filed under "${edit.name}", so only the hierarchy changes.`,
+      ];
+    }
+    case "move":
+      return ["Its subgroups move with it."];
+    default:
+      return [];
+  }
+}
+
+/** Citation keys for a dialog: all of a short list, the first few of a long one. */
+function listKeys(keys: string[], shown = 12): string {
+  if (keys.length <= shown) {
+    return keys.join(", ");
+  }
+  return `${keys.slice(0, shown).join(", ")} and ${keys.length - shown} more`;
+}
+
+/** The approval question, which for a removal counts what goes with the group. */
+function approvalTitle(label: string, mutation: Mutation, preview: PreviewedMutation): string {
+  if (mutation.kind === "groupTree" && mutation.edit.op === "remove") {
+    const removed = mutation.edit.name;
+    const subgroups = (preview.removedGroups ?? []).filter((name) => name !== removed);
+    if (subgroups.length > 0) {
+      return `${label} and ${subgroups.length === 1 ? "its subgroup" : `its ${subgroups.length} subgroups`}?`;
+    }
+  }
+  if (mutation.kind === "groupTree" && mutation.edit.op === "rename") {
+    const moved = preview.renamedMembers ?? [];
+    if (moved.length > 0) {
+      return `${label}, moving ${moved.length === 1 ? "its entry" : `its ${moved.length} entries`}?`;
+    }
+  }
+  return `${label}?`;
 }
 
 /**
@@ -318,6 +394,11 @@ export async function runMutation(
       fail(preview.message);
       return;
     }
+    const rewritten = (preview.renamedMembers ?? []).filter((key) => staged.has(key));
+    if (rewritten.length > 0) {
+      fail(`Discard or apply the pending changes to ${rewritten.join(", ")} before this.`);
+      return;
+    }
     if (!preview.modified) {
       host.post({
         type: "mutationNoop",
@@ -342,8 +423,8 @@ export async function runMutation(
     });
 
     const approval = await vscode.window.showWarningMessage(
-      `${label}?`,
-      { modal: true, detail: approvalDetail(mutation, preview.warnings) },
+      approvalTitle(label, mutation, preview),
+      { modal: true, detail: approvalDetail(mutation, preview) },
       "Apply",
     );
     if (approval !== "Apply") {
@@ -371,6 +452,11 @@ export async function runMutation(
       // next — a `ref add` deliberately arrives empty. The engine names it,
       // including the key it generated for an import.
       select: mutation.kind === "add" || mutation.kind === "import" ? applied.key : undefined,
+      // A renamed group that was the sidebar's filter stays the filter.
+      renamedGroup:
+        mutation.kind === "groupTree" && mutation.edit.op === "rename"
+          ? { from: mutation.edit.name, to: mutation.edit.newName }
+          : undefined,
     });
     await host.reload();
   } catch (error) {

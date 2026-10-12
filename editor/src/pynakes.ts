@@ -4,18 +4,20 @@
  * Everything the view knows about a bibliography arrives through the engine's
  * stable JSON envelope, and every change leaves through it. The extension
  * deliberately has no BibTeX parser, metadata schema, or selector-grammar
- * implementation of its own, so this is the only module that may spawn a
- * process, and no other module may interpret `.bib` text.
+ * implementation of its own, so this module — with `engineProcess.ts`, which
+ * holds the one function that spawns a process — is the only way to reach the
+ * engine, and no other module may interpret `.bib` text.
  *
  * Which engine gets run is decided in `engineDiscovery.ts`.
  */
 
-import { execFile } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { PynakesCommand } from "./engineDiscovery";
+import { run, runJson } from "./engineProcess";
 import { extractVersion } from "./version";
+import type { AssetFetchEnvelope } from "./fetchPlan";
 import type {
   AssetCheckEnvelope,
   CorpusBatchEnvelope,
@@ -34,100 +36,27 @@ import type {
 } from "./model";
 
 export type { PynakesCommand } from "./engineDiscovery";
-
-/** Output JSON for a large library is well past `execFile`'s 1 MB default. */
-const MAX_BUFFER = 64 * 1024 * 1024;
-
-/** Upper bound on a single engine call, so a wedged process cannot hang the view. */
-const TIMEOUT_MS = 60_000;
-
-/** The engine could not be started at all — usually a wrong command setting. */
-export class PynakesUnavailableError extends Error {
-  constructor(
-    public readonly command: string,
-    public readonly reason: unknown,
-  ) {
-    super(`Could not run "${command}".`);
-    this.name = "PynakesUnavailableError";
-  }
-}
-
-/** The engine ran but produced something other than a JSON envelope. */
-export class PynakesProtocolError extends Error {
-  constructor(
-    message: string,
-    public readonly detail: string,
-  ) {
-    super(message);
-    this.name = "PynakesProtocolError";
-  }
-}
-
-/** Human-readable form of an invocation, for error messages. */
-export function describeCommand(command: PynakesCommand): string {
-  return [command.executable, ...command.leadingArgs].join(" ");
-}
-
-interface RunResult {
-  stdout: string;
-  stderr: string;
-  code: number;
-}
-
-/** Run one pynakes subcommand, resolving even when it exits non-zero. */
-function run(command: PynakesCommand, args: string[], cwd?: string): Promise<RunResult> {
-  const argv = [...command.leadingArgs, ...args];
-  return new Promise((resolve, reject) => {
-    execFile(
-      command.executable,
-      argv,
-      { cwd, maxBuffer: MAX_BUFFER, timeout: TIMEOUT_MS, windowsHide: true },
-      (error, stdout, stderr) => {
-        if (error && typeof (error as NodeJS.ErrnoException).errno === "number") {
-          const spawnFailure = (error as NodeJS.ErrnoException).code;
-          if (spawnFailure === "ENOENT" || spawnFailure === "EACCES") {
-            reject(new PynakesUnavailableError(describeCommand(command), error));
-            return;
-          }
-        }
-        const code = error && typeof error.code === "number" ? error.code : 0;
-        resolve({ stdout, stderr, code });
-      },
-    );
-  });
-}
+export {
+  PynakesCancelledError,
+  PynakesProtocolError,
+  PynakesUnavailableError,
+  describeCommand,
+} from "./engineProcess";
 
 /**
- * Run a subcommand with `--json` and return its envelope.
+ * End of options: every token after it is an operand.
  *
- * An error envelope is a legitimate result, not an exception: the engine reports
- * a malformed file or a rejected query on exit 1 with `{"status": "error", ...}`,
- * and the view displays it. Only a broken *contract* throws.
+ * Citation keys, group names, identifiers and search queries are the user's
+ * text, and one that begins with `-` (a group called `-draft`, say) would
+ * otherwise be read as an option. So every builder below that passes such a
+ * value puts its options first and its operands after this marker, and
+ * `runJson` adds `--json` before it.
  */
-async function runJson<T>(command: PynakesCommand, args: string[], cwd?: string): Promise<T> {
-  const result = await run(command, [...args, "--json"], cwd);
-  const text = result.stdout.trim();
-  const label = `${describeCommand(command)} ${args[0] ?? ""}`.trim();
-  if (!text) {
-    throw new PynakesProtocolError(
-      `${label} produced no output (exit ${result.code}).`,
-      result.stderr.trim(),
-    );
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    throw new PynakesProtocolError(
-      `${label} did not return JSON (exit ${result.code}).`,
-      [result.stderr.trim(), text.slice(0, 2000)].filter(Boolean).join("\n\n"),
-    );
-  }
-  const status = (parsed as { status?: string })?.status;
-  if (status !== "success" && status !== "error" && status !== "conflict") {
-    throw new PynakesProtocolError(`${label} returned an unrecognized envelope.`, text.slice(0, 2000));
-  }
-  return parsed as T;
+export const END_OF_OPTIONS = "--";
+
+/** `head` (subcommand and library), then the options, then the operands. */
+function invocation(head: string[], options: string[], operands: string[]): string[] {
+  return operands.length > 0 ? [...head, ...options, END_OF_OPTIONS, ...operands] : [...head, ...options];
 }
 
 /**
@@ -226,34 +155,39 @@ export function searchBib(
   options: SearchOptions,
   cwd?: string,
 ): Promise<SearchEnvelope> {
-  const args = ["search", filePath, options.query];
+  return runJson<SearchEnvelope>(command, searchArgs(filePath, options), cwd);
+}
+
+export function searchArgs(filePath: string, options: SearchOptions): string[] {
+  const flags: string[] = [];
   if (options.where?.trim()) {
-    args.push("--where", options.where.trim());
+    flags.push("--where", options.where.trim());
   }
   if (options.fuzzy) {
-    args.push("--fuzzy");
+    flags.push("--fuzzy");
   }
   if (options.caseSensitive) {
-    args.push("--case-sensitive");
+    flags.push("--case-sensitive");
   }
-  return runJson<SearchEnvelope>(command, args, cwd);
+  return invocation(["search", filePath], flags, [options.query]);
 }
 
 /**
- * The tail every modifying invocation shares: `--dry-run` for a preview, the
+ * The flags every modifying invocation shares: `--dry-run` for a preview, the
  * diff always, and — on the write a preview was approved for — the digest that
  * preview reported, so the engine refuses rather than writes if the file moved
- * while the approval was pending.
+ * while the approval was pending. Appended to `flags`, which go before any
+ * operand.
  */
-function modifyingFlags(args: string[], dryRun: boolean, expectSha256?: string): string[] {
+function modifyingFlags(flags: string[], dryRun: boolean, expectSha256?: string): string[] {
   if (dryRun) {
-    args.push("--dry-run");
+    flags.push("--dry-run");
   }
-  args.push("--diff");
+  flags.push("--diff");
   if (expectSha256) {
-    args.push("--expect-sha256", expectSha256);
+    flags.push("--expect-sha256", expectSha256);
   }
-  return args;
+  return flags;
 }
 
 /** A field-level change to one entry, as a `ref.edit` batch operation expresses it. */
@@ -344,13 +278,17 @@ export function refCompare(
   cwd?: string,
   withKey?: string,
 ): Promise<RefCompareEnvelope> {
-  const args = ["ref", "compare", filePath, key];
+  const flags: string[] = [];
   if (withKey) {
-    args.push("--with", withKey);
+    flags.push("--with", withKey);
   } else if (online) {
-    args.push("--online");
+    flags.push("--online");
   }
-  return runJson<RefCompareEnvelope>(command, args, cwd);
+  return runJson<RefCompareEnvelope>(
+    command,
+    invocation(["ref", "compare", filePath], flags, [key]),
+    cwd,
+  );
 }
 
 /**
@@ -364,7 +302,11 @@ export function keysRename(
   newKey: string,
   cwd?: string,
 ): Promise<KeysRenameEnvelope> {
-  return runJson<KeysRenameEnvelope>(command, ["keys", "rename", filePath, oldKey, newKey], cwd);
+  return runJson<KeysRenameEnvelope>(command, keysRenameArgs(filePath, oldKey, newKey), cwd);
+}
+
+export function keysRenameArgs(filePath: string, oldKey: string, newKey: string): string[] {
+  return invocation(["keys", "rename", filePath], [], [oldKey, newKey]);
 }
 
 /**
@@ -396,13 +338,17 @@ export function refAddArgs(
   dryRun: boolean,
   expectSha256?: string,
 ): string[] {
-  const args = ["ref", "add", filePath, request.key, "--type", request.entryType];
+  const flags = ["--type", request.entryType];
   for (const [field, value] of Object.entries(request.fields)) {
     if (value.trim()) {
-      args.push("--field", `${field}=${value}`);
+      flags.push("--field", `${field}=${value}`);
     }
   }
-  return modifyingFlags(args, dryRun, expectSha256);
+  return invocation(
+    ["ref", "add", filePath],
+    modifyingFlags(flags, dryRun, expectSha256),
+    [request.key],
+  );
 }
 
 export function refAdd(
@@ -441,14 +387,18 @@ export function refImportArgs(
   dryRun: boolean,
   expectSha256?: string,
 ): string[] {
-  const args = ["ref", "import", filePath, request.identifier];
+  const flags: string[] = [];
   if (request.key?.trim()) {
-    args.push("--key", request.key.trim());
+    flags.push("--key", request.key.trim());
   }
   if (request.allowDuplicate) {
-    args.push("--allow-duplicate");
+    flags.push("--allow-duplicate");
   }
-  return modifyingFlags(args, dryRun, expectSha256);
+  return invocation(
+    ["ref", "import", filePath],
+    modifyingFlags(flags, dryRun, expectSha256),
+    [request.identifier],
+  );
 }
 
 export function refImport(
@@ -480,11 +430,12 @@ export function refRemoveArgs(
   dryRun: boolean,
   expectSha256?: string,
 ): string[] {
-  const args = ["ref", "remove", filePath, ...keys];
-  if (keepFiles) {
-    args.push("--keep-files");
-  }
-  return modifyingFlags(args, dryRun, expectSha256);
+  const flags = keepFiles ? ["--keep-files"] : [];
+  return invocation(
+    ["ref", "remove", filePath],
+    modifyingFlags(flags, dryRun, expectSha256),
+    keys,
+  );
 }
 
 export function refRemove(
@@ -513,19 +464,14 @@ export function groupsEntryArgs(
   expectSha256?: string,
   create = false,
 ): string[] {
-  const args = [
-    "groups",
-    member ? "add-entry" : "remove-entry",
-    filePath,
-    key,
-    group,
-  ];
   // The engine refuses a group it does not know unless asked to create it, so
   // a typo in a group the library already has is never silently a new one.
-  if (member && create) {
-    args.push("--create");
-  }
-  return modifyingFlags(args, dryRun, expectSha256);
+  const flags = member && create ? ["--create"] : [];
+  return invocation(
+    ["groups", member ? "add-entry" : "remove-entry", filePath],
+    modifyingFlags(flags, dryRun, expectSha256),
+    [key, group],
+  );
 }
 
 export function groupsEntry(
@@ -542,6 +488,85 @@ export function groupsEntry(
   return runJson<MutationEnvelope>(
     command,
     groupsEntryArgs(filePath, key, group, member, dryRun, expectSha256, create),
+    cwd,
+  );
+}
+
+/**
+ * One edit to the declared group hierarchy — a node of `groups tree`, not an
+ * entry's membership of one.
+ *
+ * Every rule about the tree is the engine's: whether a name is taken, whether a
+ * move would make a cycle, which descendants a removal takes with it, which
+ * entries a rename moves to the new name. The view
+ * names the node and the requested change and nothing more.
+ */
+export type GroupTreeEdit =
+  | { op: "add"; name: string; parent?: string }
+  | { op: "rename"; name: string; newName: string }
+  /** `parent` is `""` for the top level. */
+  | { op: "move"; name: string; parent: string }
+  | { op: "remove"; name: string }
+  | { op: "describe"; name: string; description: string };
+
+export function groupTreeArgs(
+  filePath: string,
+  edit: GroupTreeEdit,
+  dryRun: boolean,
+  expectSha256?: string,
+): string[] {
+  let subcommand: string;
+  let flags: string[];
+  let operands: string[];
+  switch (edit.op) {
+    case "add":
+      subcommand = "add-group";
+      flags = edit.parent ? ["--parent", edit.parent] : [];
+      operands = [edit.name];
+      break;
+    case "rename":
+      // `--members` carries the group's entries along, so a renamed group keeps
+      // its members instead of leaving them under a name nothing declares.
+      subcommand = "rename-group";
+      flags = ["--members"];
+      operands = [edit.name, edit.newName];
+      break;
+    case "move":
+      // An empty parent is the engine's spelling of "top level", so it is
+      // passed rather than omitted.
+      subcommand = "move-group";
+      flags = ["--parent", edit.parent];
+      operands = [edit.name];
+      break;
+    case "remove":
+      subcommand = "remove-group";
+      flags = [];
+      operands = [edit.name];
+      break;
+    case "describe":
+      subcommand = "update-group";
+      flags = ["--description", edit.description];
+      operands = [edit.name];
+      break;
+  }
+  return invocation(
+    ["groups", subcommand, filePath],
+    modifyingFlags(flags, dryRun, expectSha256),
+    operands,
+  );
+}
+
+export function groupTree(
+  command: PynakesCommand,
+  filePath: string,
+  edit: GroupTreeEdit,
+  dryRun: boolean,
+  cwd?: string,
+  expectSha256?: string,
+): Promise<MutationEnvelope> {
+  return runJson<MutationEnvelope>(
+    command,
+    groupTreeArgs(filePath, edit, dryRun, expectSha256),
     cwd,
   );
 }
@@ -572,11 +597,11 @@ export function dedupeMergeArgs(
   dryRun: boolean,
   expectSha256?: string,
 ): string[] {
-  const args = ["dedupe", "merge", filePath];
+  const flags: string[] = [];
   for (const key of keys ?? []) {
-    args.push("--key", key);
+    flags.push("--key", key);
   }
-  return modifyingFlags(args, dryRun, expectSha256);
+  return invocation(["dedupe", "merge", filePath], modifyingFlags(flags, dryRun, expectSha256), []);
 }
 
 export function dedupeMerge(
@@ -591,6 +616,53 @@ export function dedupeMerge(
     command,
     dedupeMergeArgs(filePath, keys, dryRun, expectSha256),
     cwd,
+  );
+}
+
+/**
+ * Download an entry's missing Pinax materials — or every entry's, with no key.
+ *
+ * `material` is one of the engine's own `--material` values; without it the
+ * library's `pinax-fetch-policy` decides. A dry run makes no network request
+ * and creates nothing: it reports, per entry, each artifact a real run would
+ * request and the path it would land at, which is what the approval names.
+ * The real run is the only call here that may run for minutes, so it takes no
+ * timeout and can be stopped through `signal` instead — every file it writes
+ * lands atomically, so stopping it leaves no half-written material.
+ */
+export interface AssetFetchRequest {
+  key?: string;
+  material?: string;
+}
+
+export function assetFetchArgs(
+  filePath: string,
+  request: AssetFetchRequest,
+  dryRun: boolean,
+  expectSha256?: string,
+): string[] {
+  const flags = request.material ? ["--material", request.material] : [];
+  return invocation(
+    ["asset", "fetch", filePath],
+    modifyingFlags(flags, dryRun, expectSha256),
+    request.key ? [request.key] : [],
+  );
+}
+
+export function assetFetch(
+  command: PynakesCommand,
+  filePath: string,
+  request: AssetFetchRequest,
+  dryRun: boolean,
+  cwd?: string,
+  expectSha256?: string,
+  signal?: AbortSignal,
+): Promise<AssetFetchEnvelope> {
+  return runJson<AssetFetchEnvelope>(
+    command,
+    assetFetchArgs(filePath, request, dryRun, expectSha256),
+    cwd,
+    dryRun ? undefined : { signal, timeoutMs: 0 },
   );
 }
 

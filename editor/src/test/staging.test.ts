@@ -2,7 +2,17 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { corpusBatchArgs, refAddArgs, refEditOperation } from "../pynakes.js";
+import {
+  corpusBatchArgs,
+  groupTreeArgs,
+  groupsEntryArgs,
+  keysRenameArgs,
+  refAddArgs,
+  refEditOperation,
+  refImportArgs,
+  refRemoveArgs,
+  searchArgs,
+} from "../pynakes.js";
 import {
   diffHeading,
   discardEntry,
@@ -132,10 +142,53 @@ test("a batch preview and its commit differ only by --dry-run and the preconditi
 test("a mutation passes the precondition only when given one", () => {
   const request = { key: "Newton1687", entryType: "book", fields: {} };
   assert.ok(!refAddArgs("refs.bib", request, true).includes("--expect-sha256"));
-  assert.deepEqual(refAddArgs("refs.bib", request, false, "cd".repeat(32)).slice(-2), [
+  assert.deepEqual(refAddArgs("refs.bib", request, false, "cd".repeat(32)).slice(-4), [
     "--expect-sha256",
     "cd".repeat(32),
+    "--",
+    "Newton1687",
   ]);
+});
+
+test("a hierarchy edit previews and applies as the same groups command", () => {
+  const move = { op: "move" as const, name: "Optics", parent: "" };
+  assert.deepEqual(groupTreeArgs("refs.bib", move, true), [
+    "groups",
+    "move-group",
+    "refs.bib",
+    // The top level is an explicit empty parent, never an omitted option.
+    "--parent",
+    "",
+    "--dry-run",
+    "--diff",
+    "--",
+    "Optics",
+  ]);
+  assert.deepEqual(groupTreeArgs("refs.bib", move, false, "ef".repeat(32)).slice(3), [
+    "--parent",
+    "",
+    "--diff",
+    "--expect-sha256",
+    "ef".repeat(32),
+    "--",
+    "Optics",
+  ]);
+  assert.deepEqual(groupTreeArgs("refs.bib", { op: "add", name: "Optics" }, true), [
+    "groups",
+    "add-group",
+    "refs.bib",
+    "--dry-run",
+    "--diff",
+    "--",
+    "Optics",
+  ]);
+  assert.ok(!groupTreeArgs("refs.bib", { op: "add", name: "Optics" }, true).includes("--parent"));
+  // A rename always carries the group's members along.
+  assert.deepEqual(
+    groupTreeArgs("refs.bib", { op: "rename", name: "Optics", newName: "Light" }, true),
+    ["groups", "rename-group", "refs.bib", "--members", "--dry-run", "--diff", "--", "Optics", "Light"],
+  );
+  assert.ok(!groupTreeArgs("refs.bib", { op: "remove", name: "Optics" }, true).includes("--members"));
 });
 
 test("the diff heading names the entries one commit covers", () => {
@@ -233,4 +286,25 @@ test("a type change the plan omits is not a conflict", () => {
     findConflicts(state.entries.Franklin1953, { change: "modified", key: "Franklin1953", fields: {} }),
     [],
   );
+});
+
+test("every name the user typed follows the end of options, so a leading dash stays a name", () => {
+  const dashed = (args: string[], ...operands: string[]): void => {
+    const marker = args.indexOf("--");
+    assert.ok(marker > 0, `no end-of-options marker in ${JSON.stringify(args)}`);
+    assert.deepEqual(args.slice(marker + 1), operands);
+    assert.ok(
+      args.slice(0, marker).every((arg) => !operands.includes(arg)),
+      "an operand must not also appear before the marker",
+    );
+  };
+  dashed(groupTreeArgs("refs.bib", { op: "add", name: "-x", parent: "-p" }, true), "-x");
+  dashed(groupTreeArgs("refs.bib", { op: "rename", name: "-x", newName: "-y" }, true), "-x", "-y");
+  dashed(groupTreeArgs("refs.bib", { op: "describe", name: "-x", description: "-d" }, true), "-x");
+  dashed(groupsEntryArgs("refs.bib", "-k", "-x", true, true, undefined, true), "-k", "-x");
+  dashed(refAddArgs("refs.bib", { key: "-k", entryType: "misc", fields: {} }, true), "-k");
+  dashed(refImportArgs("refs.bib", { identifier: "-i" }, true), "-i");
+  dashed(refRemoveArgs("refs.bib", ["-k", "-j"], false, true), "-k", "-j");
+  dashed(keysRenameArgs("refs.bib", "-k", "-j"), "-k", "-j");
+  dashed(searchArgs("refs.bib", { query: "-quantum", where: "year > 1900" }), "-quantum");
 });

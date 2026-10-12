@@ -14,6 +14,7 @@
 
 import type { RefEditPlanEntry } from "./model";
 import type { RefEditRequest } from "./pynakes";
+import { own, record } from "./records";
 
 /** One field's pending change. */
 export interface StagedField {
@@ -37,7 +38,7 @@ export interface StagingState {
 }
 
 export function emptyStaging(): StagingState {
-  return { entries: {} };
+  return { entries: record<StagedEntry>() };
 }
 
 /** True when nothing is pending. */
@@ -47,7 +48,7 @@ export function isEmpty(state: StagingState): boolean {
 
 /** Drop an entry that no longer holds any pending change. */
 function prune(state: StagingState, key: string): void {
-  const entry = state.entries[key];
+  const entry = own(state.entries, key);
   if (!entry) {
     return;
   }
@@ -57,7 +58,13 @@ function prune(state: StagingState, key: string): void {
 }
 
 function entryFor(state: StagingState, key: string): StagedEntry {
-  return (state.entries[key] ??= { key, fields: {} });
+  const existing = own(state.entries, key);
+  if (existing) {
+    return existing;
+  }
+  const created: StagedEntry = { key, fields: record<StagedField>() };
+  state.entries[key] = created;
+  return created;
 }
 
 /**
@@ -79,7 +86,7 @@ export function stageField(
     delete entry.fields[field];
   } else {
     // Preserve the original base across repeated edits of the same field.
-    const existing = entry.fields[field];
+    const existing = own(entry.fields, field);
     entry.fields[field] = { value, base: existing ? existing.base : base };
   }
   prune(state, key);
@@ -88,7 +95,7 @@ export function stageField(
 
 /** Discard one field's pending change. */
 export function unstageField(state: StagingState, key: string, field: string): StagingState {
-  const entry = state.entries[key];
+  const entry = own(state.entries, key);
   if (entry) {
     delete entry.fields[field];
     prune(state, key);
@@ -201,7 +208,7 @@ export function findConflicts(
   const conflicts: StagingConflict[] = [];
   const planned = plan?.fields ?? {};
   for (const [field, staged] of Object.entries(entry.fields)) {
-    const change = planned[field];
+    const change = own(planned, field);
     if (!change) {
       continue;
     }

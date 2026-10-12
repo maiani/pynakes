@@ -38,7 +38,11 @@ const SCRIPTS = [
 export function renderShell(webview: vscode.Webview, extensionUri: vscode.Uri): string {
   const asset = (...parts: string[]): vscode.Uri =>
     webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, ...parts));
-  const styleUri = asset("media", "view.css");
+  // Two stylesheets, loaded in this order: the base, layout, sidebar and
+  // table, then the panes.
+  const styles = ["view.css", "panes.css"]
+    .map((name) => `<link href="${asset("media", name)}" rel="stylesheet">`)
+    .join("\n");
   const token = nonce();
   // `unsafe-inline` covers style *properties* set through the CSSOM: the group
   // sidebar indents by depth and paints each group's declared colour. Values are
@@ -69,7 +73,7 @@ export function renderShell(webview: vscode.Webview, extensionUri: vscode.Uri): 
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link href="${styleUri}" rel="stylesheet">
+${styles}
 <title>Bibliography</title>
 </head>
 <body>
@@ -92,6 +96,8 @@ export function renderShell(webview: vscode.Webview, extensionUri: vscode.Uri): 
             title="Add an empty entry to fill in here">New entry</button>
     <button id="find-duplicates" class="button" type="button"
             title="Find entries the engine judges to be the same work">Duplicates</button>
+    <button id="fetch-materials" class="button" type="button"
+            title="Download every entry's missing materials, after approving the files it would write">Fetch materials…</button>
   </span>
 </header>
 <div id="banner" class="banner" hidden></div>

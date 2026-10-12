@@ -6,6 +6,7 @@
   "publisher": "pynakes",
   "license": "MIT",
   "private": true,
+  "preview": true,
   "icon": "media/icon.png",
   "repository": {
     "type": "git",
@@ -118,7 +119,7 @@
         "pynakes.allowOnlineLookups": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Allow the bibliography view to reach the network: \"Compare with remote\" (`ref compare --online`) and importing a reference by identifier (`ref import`). On by default; disable to keep the view fully offline — compare still runs and reports that lookups are disabled, and Import says so instead of failing at the provider.",
+          "markdownDescription": "Allow the bibliography view to reach the network: \"Compare with remote\" (`ref compare --online`), importing a reference by identifier (`ref import`), and fetching an entry's missing materials (`asset fetch`). On by default; disable to keep the view fully offline — compare still runs and reports that lookups are disabled, and Import and Fetch say so instead of failing at the provider.",
           "scope": "window"
         }
       }
@@ -134,7 +135,8 @@
     "vscode:prepublish": "npm run vendor-engine && npm run compile",
     "package:clean": "node -e \"require('fs').rmSync('engine',{recursive:true,force:true})\" && npm run package",
     "install-vsix": "node -e \"const p=require('./package.json');const f=p.name+'-'+p.version+'.vsix';require('node:child_process').execFileSync('code',['--install-extension',f,'--force'],{stdio:'inherit'});console.log('Installed '+f)\"",
-    "clean": "node -e \"const fs=require('fs');for (const t of ['engine','out']) fs.rmSync(t,{recursive:true,force:true});for (const f of fs.readdirSync('.')) if (f.endsWith('.vsix')) fs.rmSync(f)\""
+    "clean": "node -e \"const fs=require('fs');for (const t of ['engine','out']) fs.rmSync(t,{recursive:true,force:true});for (const f of fs.readdirSync('.')) if (f.endsWith('.vsix')) fs.rmSync(f)\"",
+    "package:prerelease": "npx --yes @vscode/vsce package --pre-release --no-dependencies"
   },
   "devDependencies": {
     "@types/jsdom": "^30.0.0",

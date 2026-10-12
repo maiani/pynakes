@@ -28,6 +28,7 @@ import type {
 } from "./model";
 import { summarize, toRows, warningText } from "./model";
 import {
+  type GroupTreeEdit,
   type PynakesCommand,
   type RefAddRequest,
   type RefEditRequest,
@@ -39,6 +40,7 @@ import {
   dedupeMerge,
   groupsEntry,
   groupsList,
+  groupTree,
   groupsTree,
   inspectBib,
   keysRename,
@@ -374,7 +376,9 @@ export type Mutation =
   | { kind: "remove"; keys: string[]; keepFiles: boolean }
   | { kind: "group"; key: string; group: string; member: boolean; create?: boolean }
   /** `keys` names the cluster(s) to merge; omitted means every cluster. */
-  | { kind: "dedupeMerge"; keys?: string[] };
+  | { kind: "dedupeMerge"; keys?: string[] }
+  /** A change to the declared hierarchy itself, not to any entry. */
+  | { kind: "groupTree"; edit: GroupTreeEdit };
 
 /** A short label for the diff panel and the confirmation prompt. */
 export function describeMutation(mutation: Mutation): string {
@@ -395,6 +399,29 @@ export function describeMutation(mutation: Mutation): string {
       return mutation.keys?.length
         ? `Merge ${mutation.keys.join(", ")}`
         : "Merge every duplicate";
+    case "groupTree":
+      return describeGroupTreeEdit(mutation.edit);
+  }
+}
+
+function describeGroupTreeEdit(edit: GroupTreeEdit): string {
+  switch (edit.op) {
+    case "add":
+      return edit.parent
+        ? `Add group "${edit.name}" under "${edit.parent}"`
+        : `Add group "${edit.name}"`;
+    case "rename":
+      return `Rename group "${edit.name}" to "${edit.newName}"`;
+    case "move":
+      return edit.parent
+        ? `Move group "${edit.name}" under "${edit.parent}"`
+        : `Move group "${edit.name}" to the top level`;
+    case "remove":
+      return `Remove group "${edit.name}"`;
+    case "describe":
+      return edit.description
+        ? `Describe group "${edit.name}"`
+        : `Clear the description of group "${edit.name}"`;
   }
 }
 
@@ -435,6 +462,8 @@ function runMutation(
       );
     case "dedupeMerge":
       return dedupeMerge(command, filePath, mutation.keys, dryRun, cwd, expectSha256);
+    case "groupTree":
+      return groupTree(command, filePath, mutation.edit, dryRun, cwd, expectSha256);
   }
 }
 
@@ -447,6 +476,10 @@ export type MutationOutcome =
       key?: string;
       /** The file's digest as this call read it; a preview's goes back on the write. */
       sourceSha256?: string;
+      /** Every group node a `groups remove-group` takes with it, as the engine named them. */
+      removedGroups?: string[];
+      /** Every entry a `groups rename-group --members` moves to the new name. */
+      renamedMembers?: string[];
     }
   /**
    * The engine refused and named the choices — exit 2, never guessed past.
@@ -482,6 +515,8 @@ function reduce(envelope: MutationEnvelope): MutationOutcome {
     modified: envelope.modified,
     key: envelope.key,
     sourceSha256: envelope.source_sha256,
+    removedGroups: envelope.removed_groups,
+    renamedMembers: envelope.members_renamed,
   };
 }
 

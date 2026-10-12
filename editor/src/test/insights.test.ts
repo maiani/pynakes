@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildGroupTree,
+  cssColor,
   citationDiagnostics,
   groupsByEntry,
   indexCitations,
@@ -180,7 +181,7 @@ test("findings without an entry key are kept as file-level", () => {
   );
 
   assert.equal(index.fileLevel.length, 1);
-  assert.deepEqual(index.byKey, {});
+  assert.deepEqual({ ...index.byKey }, {});
 });
 
 test("worseSeverity ranks error above warning above info", () => {
@@ -446,4 +447,45 @@ test("indexMaterials keeps a broken file-field link, marked not present", () => 
   assert.equal(broken.label, "Linked file");
   assert.equal(index.brokenCount, 1);
   assert.equal(index.pinaxRoot, null);
+});
+
+// --- names that Object.prototype also has -----------------------------------
+
+test("citation keys named like Object.prototype members are ordinary keys", () => {
+  // `constructor` and `toString` are valid citation keys; a plain object
+  // literal would find the inherited function under them and fail the read.
+  const findings = indexLint(
+    lint([
+      { type: "missing_doi", severity: "info", category: "consistency", fixer: null, message: "no DOI", key: "constructor" },
+      { type: "bad_year", severity: "error", category: "validity", fixer: null, message: "bad", key: "toString" },
+    ]),
+  );
+  assert.equal(findings.byKey.constructor.length, 1);
+  assert.equal(findings.worstByKey.toString, "error");
+
+  const byEntry = groupsByEntry({
+    status: "success",
+    action: "groups_list",
+    file: "refs.bib",
+    groups: { Mechanics: ["constructor", "__proto__"] },
+  });
+  assert.deepEqual(byEntry.constructor, ["Mechanics"]);
+  assert.deepEqual(Object.getOwnPropertyDescriptor(byEntry, "__proto__")?.value, ["Mechanics"]);
+
+  const citations = indexCitations(scan({ usages: {} }));
+  assert.equal(isCited(citations, "constructor"), false);
+  assert.equal(isCited(citations, "hasOwnProperty"), false);
+
+  const tree = buildGroupTree([node("toString")], {});
+  assert.deepEqual(tree[0].keys, []);
+});
+
+test("a group colour is handed to CSS in a spelling CSS accepts", () => {
+  assert.equal(cssColor("0x8a8a8aff"), "#8a8a8aff");
+  assert.equal(cssColor("8A8A8A"), "#8a8a8a");
+  assert.equal(cssColor("#fff"), "#fff");
+  assert.equal(cssColor(""), "");
+  assert.equal(cssColor("red; background: url(x)"), "");
+  const [group] = buildGroupTree([node("Optics", "", { color: "0xff0000ff" })], {});
+  assert.equal(group.color, "#ff0000ff");
 });

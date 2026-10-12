@@ -2,10 +2,10 @@
 
 A graphical client for `.bib` files, built on the pynakes engine.
 
-> **Status: early, and not published.** It browses a bibliography, searches it,
+> **Status: alpha prerelease, not yet published.** It browses a bibliography, searches it,
 > shows its groups, validation findings, citations and linked materials, and can
-> add, remove, group, merge and edit entries — each reviewed as a diff before
-> anything is written. Nothing about its UI or settings is settled.
+> add, remove, group, merge and edit entries, fetch their materials, and reshape the
+> group hierarchy — each reviewed as a diff before anything is written. Nothing about its UI or settings is settled.
 
 ## The one rule this client keeps
 
@@ -33,7 +33,9 @@ approval added `--expect-sha256` and the `source_sha256` it takes back, rather
 than the client hashing the file itself; and committing staged entries as one
 `corpus batch` exposed that its `ref.edit` neither trimmed values nor checked
 field names the way `ref edit` does, so the batch operation was fixed rather
-than the values trimmed here.
+than the values trimmed here. Confirming a group removal added
+`removed_groups` to `groups remove-group`, rather than the client walking the
+tree to find which subgroups would go with it.
 
 `src/model.ts` is the only place that transforms engine output, and it only does
 display tidying: collapsing wrapped whitespace, rendering the `and` name
@@ -142,16 +144,56 @@ instead). The client never *builds* a material path: `<key><suffix>.pdf` is the
 Pinax store's addressing scheme, and every path shown here came from
 `asset check --json`.
 
-These two reads are about the files *around* the bibliography, so they read the
-`.bib` as saved, at its real location — `tex-sources`, `pinax-files-dir`, and a
-relative `file` path all resolve from the `.bib`'s own directory, and the
-temporary mirror used for an unsaved buffer has neither. The cost is that an
+**Fetch missing…** in the same section downloads what the entry lacks, and the
+toolbar's **Fetch materials…** does it for every entry; either asks first which
+materials — the library's `pinax-fetch-policy`, or one of the engine's own
+`--material` choices. This is `asset fetch`, through the same preview, approval
+and guarded write as everything above, with one difference in what the dialog
+has to say: a fetch's real work is files beside the `.bib` and requests to the
+network, which no diff of the `.bib` shows. So the engine's dry run — which
+makes no request and creates nothing — names each file a real run would
+request, the DOI or arXiv id it would be requested by, and the path it would
+land at, and the approval lists exactly those, along with every entry left out
+and the engine's reason (no identifier, already present). An entry with nothing
+to fetch says why instead of asking. The `.bib` changes only when the library
+has no Pinax store yet, and then the diff shows the `pinax-files-dir` it
+records. Downloads run under a cancellable progress notification; every
+material lands atomically, so stopping one keeps what finished and leaves
+nothing half-written. A provider that cannot supply a file is a skip with its
+reason, not an error, and the Materials list re-reads when the fetch ends. Like
+Import, fetching honors `pynakes.allowOnlineLookups`: with lookups off it says
+so rather than failing at the provider. Wanting the planned paths in that
+dialog is what added the dry run's per-entry `planned` list to the engine — and
+exposed that a dry run used to create the files directory it was only planning
+to fill.
+
+These two reads, and the fetch, are about the files *around* the bibliography,
+so they use the `.bib` as saved, at its real location — `tex-sources`,
+`pinax-files-dir`, and a relative `file` path all resolve from the `.bib`'s own
+directory, and the temporary mirror used for an unsaved buffer has neither. A
+fetch may write, so an unsaved buffer is saved first, under the same
+autosave-or-ask rule a commit follows. For the reads, the cost is that an
 unsaved edit to a `file` field or to `tex-sources` is not reflected until you
 save.
 
-Not yet: editing the group *hierarchy* itself — adding, renaming, moving or
-removing a group node — which is a different operation from an entry's
-membership of one. `groups add-group` and friends cover it at the CLI.
+**Edit the group hierarchy.** The groups sidebar edits the hierarchy itself,
+which is a different thing from an entry's membership of a group: **+** in its
+heading adds a top-level group, and each group's **⋯** button (or its context
+menu) offers adding a subgroup, renaming, moving under another group or to the
+top level, editing the description, and removing. These are the engine's
+`groups add-group`, `rename-group`, `move-group`, `update-group` and
+`remove-group`, through the same preview, approval and guarded write as
+everything above. The client knows none of the tree's rules: a name already
+taken is the engine's conflict, a move under the group's own descendant is the
+engine's refusal, and when a group is removed the approval dialog names every
+subgroup that goes with it, as the engine reported them. A rename carries the
+group's members along (`rename-group --members`): every entry filed under exactly
+the old name is moved to the new one, the approval dialog says how many and
+which, as the engine's preview named them, and a sidebar filter on the group
+follows it. Removing a node leaves entries' memberships as they were, and the
+dialog says so — an entry still filed under a removed group shows it as a group
+the hierarchy does not declare, which that group's **⋯** offers to declare
+again.
 
 ## Scope: this client is project-scoped
 
@@ -285,7 +327,15 @@ engine's own suite.
 ```
 src/
   extension.ts           activation: registers the editor and commands
-  bibliographyEditor.ts  the custom editor: buffer sync, staging, preview, commit
+  bibliographyEditor.ts  the custom editor: buffer sync, reads, message routing
+  documentAccess.ts      mirror, working directory, settings, buffer reconciliation
+  stagedCommit.ts        previews and commits the staged field edits
+  keyRename.ts           renames one citation key, after approval
+  mutations.ts           entry-level changes: preview, approve, guarded write
+  groupHierarchy.ts      sidebar prompts for editing the group hierarchy
+  navigation.ts          opens sources, citations, and materials
+  diagnostics.ts         findings and undefined citations as native diagnostics
+  statusBar.ts           the engine/file status bar item
   library.ts             composes the engine reads; runs preview and commit
   pynakes.ts             the only module that spawns the engine
   engineDiscovery.ts     which engine to run, and why
@@ -312,7 +362,17 @@ entries it covers.
 
 ## Packaging
 
+Use `npm run package:prerelease` for the 0.1.0 alpha. It sets the VSIX's
+prerelease marker and runs the same vendoring/compilation steps as `package`.
+When the engine is ready for the coordinated release, set
+`SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PYNAKES=0.7.0` for the package command
+so the bundle identifies itself as the final Beta version. Local RC bundles
+are validation artifacts. The extension keeps its own
+0.1.0 version. See [the release checklist](../RELEASE.md).
+
+
 `npm run package` produces a `.vsix` installable with
 `code --install-extension`. It is not published: the `pynakes` publisher
-namespace is not claimed on the Marketplace or Open VSX, and the extension should
-not be published while it is this incomplete.
+namespace must be verified before publication on the Marketplace or Open VSX.
+The alpha has no UI/settings compatibility promise; its engine consumes the
+beta JSON envelope.

@@ -125,6 +125,14 @@ export function resolveEngine(scope?: vscode.Uri): Promise<ResolvedEngine> {
   if (!resolved) {
     resolved = selectEngine(settings, folder);
     cache.set(key, resolved);
+    // A failure is not remembered: "no engine" is often fixed by installing
+    // one, and the next read must look again rather than repeat the old answer.
+    const attempt = resolved;
+    attempt.catch(() => {
+      if (cache.get(key) === attempt) {
+        cache.delete(key);
+      }
+    });
   }
   return resolved;
 }
