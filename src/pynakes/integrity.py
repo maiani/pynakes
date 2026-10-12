@@ -60,7 +60,7 @@ from pynakes.metadata import library_dialect
 from pynakes.model import BibEntry, BibFile
 from pynakes.progress import EntryProgress, EntryProgressEvent
 from pynakes.provider_cache import open_cache
-from pynakes.providers._http import ProviderFetchError
+from pynakes.providers._http import ProviderFetchError, ProviderRateLimitedError
 from pynakes.providers.metadata import aps as aps_provider
 from pynakes.providers.metadata import crossref as crossref_provider
 from pynakes.providers.metadata import doi as doi_provider
@@ -171,6 +171,21 @@ def verify_library(
 
         result = result_by_pos[index - 1]
         if isinstance(result, MetadataFetchError):
+            if isinstance(result.__cause__, ProviderRateLimitedError):
+                # A throttle says nothing about the entry: the DOI went
+                # unchecked, so it is a warning, not an entry error.
+                report.issues.append(
+                    IntegrityIssue(
+                        "rate_limited",
+                        "warning",
+                        f"{result}; the DOI was not checked. Rerun later or with a "
+                        "lower --concurrency",
+                        entry.key,
+                        "doi",
+                        actual=data,
+                    )
+                )
+                continue
             issue_type = (
                 "provider_error"
                 if isinstance(result.__cause__, ProviderFetchError)

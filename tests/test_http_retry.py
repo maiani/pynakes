@@ -249,3 +249,18 @@ def test_httpx_transport_stops_an_undeclared_oversized_download(monkeypatch) -> 
 
     with pytest.raises(ProviderFetchError, match="download limit"):
         fetch_bytes("https://example.test/paper.pdf", sleep=lambda _s: None)
+
+
+def test_a_throttle_that_outlasts_every_retry_is_reported_as_rate_limiting() -> None:
+    opener = _opener_raising(*[_http_error(429) for _ in range(_http.MAX_ATTEMPTS)])
+
+    with pytest.raises(_http.ProviderRateLimitedError, match="HTTP 429"):
+        fetch_bytes("https://example.test", opener=opener, sleep=lambda _: None)
+
+
+def test_a_server_error_that_outlasts_every_retry_is_not_rate_limiting() -> None:
+    opener = _opener_raising(*[_http_error(503) for _ in range(_http.MAX_ATTEMPTS)])
+
+    with pytest.raises(ProviderFetchError) as caught:
+        fetch_bytes("https://example.test", opener=opener, sleep=lambda _: None)
+    assert not isinstance(caught.value, _http.ProviderRateLimitedError)

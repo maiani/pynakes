@@ -54,9 +54,12 @@ MAX_DOWNLOAD_BYTES = 512 * 1024 * 1024
 class _Transient(Exception):
     """Internal signal: this attempt failed in a way worth repeating."""
 
-    def __init__(self, message: str, retry_after: float | None = None) -> None:
+    def __init__(
+        self, message: str, retry_after: float | None = None, *, status: int | None = None
+    ) -> None:
         super().__init__(message)
         self.retry_after = retry_after
+        self.status = status
 
 
 def _parse_retry_after(value: str | None) -> float | None:
@@ -119,13 +122,31 @@ def _with_retry(
                 break
             delay = _retry_delay(attempt, exc.retry_after)
             if time.monotonic() + delay >= deadline:
-                raise error_class("Network deadline exceeded") from exc
+                raise _give_up(exc, error_class, "Network deadline exceeded") from exc
             sleep(delay)
-    raise error_class(str(last))
+    assert last is not None
+    raise _give_up(last, error_class, str(last))
+
+
+def _give_up(last: _Transient, error_class: type[Exception], message: str) -> Exception:
+    """Return the error to raise once retrying stops.
+
+    A provider still throttling after every retry is reported as
+    :class:`ProviderRateLimitedError`, so a caller can tell "the provider asked
+    us to slow down" apart from a failure that says something about the record.
+    A domain ``error_class`` other than :class:`ProviderFetchError` is kept.
+    """
+    if last.status == 429 and error_class is ProviderFetchError:
+        return ProviderRateLimitedError(f"{message} (rate limited: HTTP 429)")
+    return error_class(message)
 
 
 class ProviderFetchError(Exception):
     """Raised when an external provider response cannot be fetched or parsed."""
+
+
+class ProviderRateLimitedError(ProviderFetchError):
+    """The provider kept answering HTTP 429 (slow down) through every retry."""
 
 
 def iter_strings(value: object) -> list[str]:
@@ -245,7 +266,7 @@ def _fetch_bytes_urllib(
         message = f"Server returned HTTP {exc.code} for {display}"
         if exc.code in RETRY_STATUSES:
             retry_after = _parse_retry_after((exc.headers or {}).get("Retry-After"))
-            raise _Transient(message, retry_after) from exc
+            raise _Transient(message, retry_after, status=exc.code) from exc
         raise error_class(message) from exc
     except URLError as exc:
         reason = getattr(exc, "reason", exc)
@@ -318,7 +339,7 @@ def _fetch_bytes_httpx(
                     message = f"Server returned HTTP {status} for {display}"
                     if status in RETRY_STATUSES:
                         retry_after = _parse_retry_after(exc.response.headers.get("Retry-After"))
-                        raise _Transient(message, retry_after) from exc
+                        raise _Transient(message, retry_after, status=status) from exc
                     raise error_class(message) from exc
                 total = _content_length(response)
                 too_large = f"{display} is larger than the {max_bytes >> 20} MiB download limit"

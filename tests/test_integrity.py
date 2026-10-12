@@ -1063,3 +1063,20 @@ def test_published_report_counts_promotions_and_links_apart() -> None:
     assert report.promoted == 1
     assert report.linked == 0
     assert report.to_dict()["promoted"] == 1
+
+
+def test_verify_reports_rate_limiting_as_a_warning_not_an_entry_error(monkeypatch) -> None:
+    from pynakes.providers._http import ProviderRateLimitedError
+
+    def throttled(doi: str) -> str:
+        raise ProviderRateLimitedError(f"Server returned HTTP 429 for {doi}")
+
+    monkeypatch.setattr(doi, "fetch_bibtex", throttled)
+    lib = parse_bib("@article{A,\n  title = {A Paper},\n  doi = {10.5555/example}\n}\n")
+
+    report = verify_library(lib, online=True)
+
+    assert report.errors == 0
+    (issue,) = report.issues
+    assert (issue.type, issue.severity) == ("rate_limited", "warning")
+    assert "--concurrency" in issue.message

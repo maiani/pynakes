@@ -435,6 +435,11 @@ form is a `UsageError`, never silently reinterpreted.
 - Author normalization dotted a single initial (`Euler, L` to `Euler, L.`) but
   not spaced ones: `Euler, L P` stayed as it was. Each is now dotted
   (`Euler, L. P.`).
+- `verify --online` reported a DOI lookup that doi.org kept throttling
+  (HTTP 429 through every Retry-After-honouring retry) as an entry error, as if
+  the entry were wrong. It is now a `rate_limited` warning saying the DOI went
+  unchecked and suggesting a lower `--concurrency`; the transport raises
+  `ProviderRateLimitedError` (a `ProviderFetchError`) for it.
 
 ### Build
 
