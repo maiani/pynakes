@@ -62,6 +62,7 @@ Download Pinax materials, optionally using existing institutional network access
 | `--access` | choice | no | "open" | open, institutional | Publisher access context: open or institutional (uses existing network access) |
 | `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing. See `pynakes capabilities` for the full grammar. |
 | `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
+| `--strict` | boolean | no | false | — | Exit 1 when a requested material failed to download or was unavailable (materials already present pass) (for CI and pre-commit gating) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 

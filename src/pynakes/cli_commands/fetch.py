@@ -18,6 +18,7 @@ from rich.progress import (
 )
 from rich.text import Text
 
+from pynakes.cli_checks import strict_option
 from pynakes.cli_choices import Material
 from pynakes.cli_commands._fetch_report import fetch_report_lines
 from pynakes.cli_commands._rich_progress import RichProgressBase
@@ -174,12 +175,18 @@ def fetch(
     ),
     where: str | None = where_option(),
     key: list[str] | None = key_option(),
+    strict: bool = strict_option(
+        "a requested material failed to download or was unavailable "
+        "(materials already present pass)"
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Download Pinax materials, optionally using existing institutional network access.
 
     With no citation key every entry with configured missing materials is
-    fetched; `--key` / `--where` fetch for the selected entries only.
+    fetched; `--key` / `--where` fetch for the selected entries only. The
+    result is reported in full either way; `--strict` then exits 1 when the
+    run was incomplete.
     """
     params = RunParams(
         dry_run=dry_run,
@@ -232,6 +239,8 @@ def fetch(
             )
 
     human = fetch_report_lines(report)
+    summary = report["summary"]
+    incomplete = bool(summary["failed"] or summary["unavailable"])
 
     if coll.files is not None:
         files_dir = str(coll.files.root)
@@ -245,13 +254,18 @@ def fetch(
         coll,
         params,
         human,
+        warnings=report["warnings"],
         files_dir=files_dir,
         access=report["access"],
         fetch_policy=report["fetch_policy"],
+        strict=strict,
+        summary=summary,
         fetched=report["fetched"],
         skipped=report["skipped"],
         failed=report["failed"],
     )
+    if strict and incomplete:
+        raise typer.Exit(code=1)
 
 
 def register(app: typer.Typer) -> None:

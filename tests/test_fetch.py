@@ -750,7 +750,7 @@ def test_dry_run_lines_say_what_would_happen_rather_than_skipped() -> None:
 def test_tar_source_over_the_size_limit_is_refused_before_extraction(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("pynakes.fetch.MAX_SOURCE_BYTES", 1024)
+    monkeypatch.setattr("pynakes._fetch_source.MAX_SOURCE_BYTES", 1024)
     target = tmp_path / "src"
 
     with pytest.raises(ArxivFetchError, match="unpacks to more than"):
@@ -762,7 +762,7 @@ def test_tar_source_over_the_size_limit_is_refused_before_extraction(
 def test_tar_source_with_too_many_members_is_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("pynakes.fetch.MAX_SOURCE_MEMBERS", 3)
+    monkeypatch.setattr("pynakes._fetch_source.MAX_SOURCE_MEMBERS", 3)
     files = {f"part{i}.tex": b"x" for i in range(5)}
 
     with pytest.raises(ArxivFetchError, match="members"):
@@ -772,7 +772,7 @@ def test_tar_source_with_too_many_members_is_refused(
 def test_single_file_source_over_the_size_limit_is_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("pynakes.fetch.MAX_SOURCE_BYTES", 1024)
+    monkeypatch.setattr("pynakes._fetch_source.MAX_SOURCE_BYTES", 1024)
     target = tmp_path / "src"
 
     with pytest.raises(ArxivFetchError, match="unpacks to more than"):

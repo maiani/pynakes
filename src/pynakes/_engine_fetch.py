@@ -6,6 +6,7 @@ point.
 """
 
 from collections.abc import Callable, Collection
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -16,6 +17,80 @@ from pynakes.model import BibEntry, BibFile
 if TYPE_CHECKING:
     from pynakes.fetch import FetchAccess
     from pynakes.filestore import FileStore, MaterialPresence
+
+#: Where a skip names a missing arXiv id for an entry that has a DOI: the
+#: engine's existing DOI-to-arXiv backfill. Nothing attaches one automatically.
+ARXIV_LOOKUP_HINT = "`pynakes enrich --published --online` can look one up by DOI"
+
+
+@dataclass
+class FetchLoopResult:
+    """What :func:`run_fetch_loop` did, item by item, and how each skip counts.
+
+    ``already_present``, ``unavailable`` and ``planned`` partition ``skipped``:
+    a skip because what the policy selects is already in the store, a skip
+    because a requested material could not be had, and a dry run's planned
+    work. ``warnings`` holds one structured warning per failed download.
+    """
+
+    entries: int = 0
+    fetched: list[dict] = field(default_factory=list)
+    skipped: list[dict] = field(default_factory=list)
+    failed: list[dict] = field(default_factory=list)
+    warnings: list[dict] = field(default_factory=list)
+    already_present: int = 0
+    unavailable: int = 0
+    planned: int = 0
+
+    def skip(self, item: dict, kind: str) -> None:
+        """Record a skipped item, counted as ``already_present``, ``unavailable`` or ``planned``."""
+        self.skipped.append(item)
+        setattr(self, kind, getattr(self, kind) + 1)
+
+    def fail(self, key: str, exc: Exception, artifact: str | None = None) -> dict:
+        """Record a failed download, with its requests and a warning naming it."""
+        item = failure_item(key, exc, artifact)
+        self.failed.append(item)
+        self.warnings.append(download_warning(item))
+        return item
+
+    def summary(self) -> dict[str, int]:
+        """Return the envelope's ``summary`` counts."""
+        return {
+            "requested": self.entries,
+            "fetched": len(self.fetched),
+            "already_present": self.already_present,
+            "unavailable": self.unavailable,
+            "failed": len(self.failed),
+            "planned": self.planned,
+        }
+
+
+def failure_item(key: str, exc: Exception, artifact: str | None = None) -> dict:
+    """Return the ``failed`` item for *exc*: the error, the artifact, and the requests made."""
+    item: dict[str, object] = {"key": key, "error": str(exc)}
+    named = getattr(exc, "artifact", None) or artifact
+    if named:
+        item["artifact"] = named
+    item["attempts"] = list(getattr(exc, "attempts", ()))
+    return item
+
+
+def download_warning(item: dict, *, fallback: str | None = None) -> dict:
+    """Return the structured warning for one failed download.
+
+    The message is the failure's own error, so human output, which prints a
+    warning only when its text is not already shown, does not repeat it.
+    """
+    warning: dict[str, object] = {"type": "download_failed", "key": item["key"]}
+    if item.get("artifact"):
+        warning["artifact"] = item["artifact"]
+    message = str(item["error"])
+    if fallback is not None:
+        warning["fallback"] = fallback
+        message = f"{item['key']}: {message}; fetched the preprint PDF instead"
+    warning["message"] = message
+    return warning
 
 
 def build_fetch_queue(
@@ -75,7 +150,7 @@ def run_fetch_loop(
     cache_file: str | Path | None = None,
     progress: FetchProgress | None = None,
     access: str = "open",
-) -> tuple[list[dict], list[dict], list[dict]]:
+) -> FetchLoopResult:
     """Iterate *entry_queue* and download materials into *store*.
 
     For entries with an arXiv id, downloads the preprint PDF and/or source
@@ -85,7 +160,7 @@ def run_fetch_loop(
     ``policy.bestpdf`` means "try published PDF first, fall back to preprint
     PDF when no open-access copy is available".
 
-    Returns ``(fetched, skipped, failed)`` lists.
+    Returns a :class:`FetchLoopResult`.
     """
     from pynakes.fetch import (
         ArxivFetchError,
@@ -97,16 +172,15 @@ def run_fetch_loop(
     )
     from pynakes.identity import entry_arxiv_id
 
-    fetched: list[dict] = []
-    skipped: list[dict] = []
-    failed: list[dict] = []
+    run = FetchLoopResult(entries=len(entry_queue))
+    fetched, skipped = run.fetched, run.skipped
     # ``Bibliography.fetch_materials`` has already rejected any other value.
     fetch_access = cast("FetchAccess", access)
 
     entry_total = len(entry_queue)
     for index, entry in enumerate(entry_queue, start=1):
         if not entry.key.strip():
-            skipped.append({"key": entry.key, "reason": "empty key"})
+            run.skip({"key": entry.key, "reason": "empty key"}, "unavailable")
             _emit_fetch_progress(
                 progress,
                 FetchProgressEvent(
@@ -153,19 +227,32 @@ def run_fetch_loop(
             # already present: say so first. "no DOI" alone read as though
             # nothing had been checked for an arXiv entry with its PDF in place.
             usable = (wants_arxiv and arxiv_id is not None) or (wants_doi and bool(doi))
+            # What is present counts as complete unless the policy names the
+            # missing material itself; best-pdf is satisfied by either PDF.
+            kind = "unavailable"
+            hint = f"; {ARXIV_LOOKUP_HINT}" if doi else ""
             if missing_arxiv and missing_doi:
                 reason = "no arXiv id and no DOI"
             elif usable and missing_doi:
                 reason = "materials already present (no DOI for a published version)"
+                if not (policy.published or policy.supplement):
+                    kind = "already_present"
             elif usable and missing_arxiv:
-                reason = "materials already present (no arXiv id for a preprint)"
+                if policy.preprint or policy.source:
+                    reason = f"materials already present (no arXiv id for a preprint{hint})"
+                else:
+                    reason = "materials already present (no arXiv id for a preprint)"
+                    kind = "already_present"
             elif missing_arxiv:
-                reason = "no arXiv id"
+                # The backfill looks an arXiv id up by DOI, so name it when
+                # there is a DOI to look one up by.
+                reason = f"no arXiv id ({ARXIV_LOOKUP_HINT})" if doi else "no arXiv id"
             elif missing_doi:
                 reason = "no DOI"
             else:
                 reason = "materials already present"
-            skipped.append({"key": key, "reason": reason})
+                kind = "already_present"
+            run.skip({"key": key, "reason": reason}, kind)
             _emit_fetch_progress(
                 progress,
                 FetchProgressEvent(
@@ -205,7 +292,7 @@ def run_fetch_loop(
                 source=can_fetch_source,
                 supplement=can_fetch_supplement,
             )
-            skipped.append({"key": key, "reason": WOULD_FETCH, "planned": planned})
+            run.skip({"key": key, "reason": WOULD_FETCH, "planned": planned}, "planned")
             _emit_fetch_progress(
                 progress,
                 FetchProgressEvent(
@@ -235,24 +322,22 @@ def run_fetch_loop(
                 if result.pdf_path is not None or result.source_path is not None:
                     fetched.append(result.to_dict())
                 if result.source_unavailable:
-                    skipped.append(
-                        {"key": key, "reason": "no arXiv source archive (PDF-only submission)"}
+                    run.skip(
+                        {
+                            "key": key,
+                            "artifact": "preprint_source",
+                            "reason": "no arXiv source archive (PDF-only submission)",
+                        },
+                        "unavailable",
                     )
             except ArxivFetchError as exc:
-                failed.append({"key": key, "error": str(exc)})
-                _emit_fetch_progress(
-                    progress,
-                    FetchProgressEvent(
-                        kind="fail",
-                        key=key,
-                        entry_index=index,
-                        entry_total=entry_total,
-                        message=str(exc),
-                    ),
-                )
+                run.fail(key, exc)
+                _emit_fail(progress, key, index, entry_total, exc)
 
         # --- Fetch published PDF ---
         if fetch_published_now:
+            pub_result = None
+            pub_error: PublishedPdfFetchError | None = None
             try:
                 pub_result = download_published_material(
                     store,
@@ -265,59 +350,67 @@ def run_fetch_loop(
                     progress=progress,
                     access=fetch_access,
                 )
-                if pub_result.pdf_path is not None:
-                    fetched.append(pub_result.to_dict())
-                    # bestpdf: published succeeded, so we're done (skip preprint).
-                elif policy.bestpdf and not presence.preprint_pdf and arxiv_id is not None:
-                    # bestpdf fallback: try preprint PDF now
-                    try:
-                        result = download_arxiv_materials(
-                            store,
-                            key,
-                            arxiv_id,
-                            pdf=True,
-                            source=False,
-                            pdf_fetcher=pdf_fetcher,
-                            progress=progress,
-                        )
-                        if result.pdf_path is not None:
-                            fetched.append(result.to_dict())
-                    except ArxivFetchError as exc:
-                        failed.append({"key": key, "error": str(exc)})
-                        _emit_fetch_progress(
-                            progress,
-                            FetchProgressEvent(
-                                kind="fail",
-                                key=key,
-                                entry_index=index,
-                                entry_total=entry_total,
-                                message=str(exc),
-                            ),
-                        )
-                else:
-                    skipped.append(
-                        {"key": key, "artifact": "published_pdf", "reason": pub_result.reason}
-                    )
-                    _emit_fetch_progress(
-                        progress,
-                        FetchProgressEvent(
-                            kind="skip",
-                            key=key,
-                            entry_index=index,
-                            entry_total=entry_total,
-                            message=pub_result.reason or "published PDF unavailable",
-                        ),
-                    )
             except PublishedPdfFetchError as exc:
-                failed.append({"key": key, "error": str(exc)})
+                pub_error = exc
+            if pub_result is not None and pub_result.pdf_path is not None:
+                fetched.append(pub_result.to_dict())
+            elif policy.bestpdf and not presence.preprint_pdf and arxiv_id is not None:
+                # best-pdf: no published PDF, whether unavailable or failed, so
+                # the preprint is the best PDF there is.
+                landed = False
+                try:
+                    result = download_arxiv_materials(
+                        store,
+                        key,
+                        arxiv_id,
+                        pdf=True,
+                        source=False,
+                        pdf_fetcher=pdf_fetcher,
+                        progress=progress,
+                    )
+                    if result.pdf_path is not None:
+                        fetched.append(result.to_dict())
+                        landed = True
+                except ArxivFetchError as exc:
+                    run.fail(key, exc)
+                    _emit_fail(progress, key, index, entry_total, exc)
+                if pub_error is not None:
+                    item = failure_item(key, pub_error, "published_pdf")
+                    if landed:
+                        run.warnings.append(download_warning(item, fallback="preprint_pdf"))
+                    else:
+                        run.fail(key, pub_error, "published_pdf")
+                        _emit_fail(progress, key, index, entry_total, pub_error)
+            elif pub_error is not None:
+                run.fail(key, pub_error, "published_pdf")
+                _emit_fail(progress, key, index, entry_total, pub_error)
+            else:
+                assert pub_result is not None
+                reason = pub_result.reason or "published PDF unavailable"
+                kind = "unavailable"
+                if policy.bestpdf and presence.preprint_pdf:
+                    # The preprint already in the store is the best PDF there is.
+                    reason = f"{reason}; the preprint PDF is already present"
+                    kind = "already_present"
+                elif policy.bestpdf and arxiv_id is None:
+                    reason = f"{reason}; no arXiv id for a preprint fallback ({ARXIV_LOOKUP_HINT})"
+                run.skip(
+                    {
+                        "key": key,
+                        "artifact": "published_pdf",
+                        "reason": reason,
+                        "attempts": list(pub_result.attempts),
+                    },
+                    kind,
+                )
                 _emit_fetch_progress(
                     progress,
                     FetchProgressEvent(
-                        kind="fail",
+                        kind="skip",
                         key=key,
                         entry_index=index,
                         entry_total=entry_total,
-                        message=str(exc),
+                        message=reason,
                     ),
                 )
 
@@ -336,7 +429,7 @@ def run_fetch_loop(
                 if supplement_result.pdf_path is not None:
                     fetched.append(supplement_result.to_dict())
                 else:
-                    skipped.append(supplement_result.to_dict())
+                    run.skip(supplement_result.to_dict(), "unavailable")
                     _emit_fetch_progress(
                         progress,
                         FetchProgressEvent(
@@ -348,19 +441,10 @@ def run_fetch_loop(
                         ),
                     )
             except SupplementPdfFetchError as exc:
-                failed.append({"key": key, "artifact": "supplement_pdf", "error": str(exc)})
-                _emit_fetch_progress(
-                    progress,
-                    FetchProgressEvent(
-                        kind="fail",
-                        key=key,
-                        entry_index=index,
-                        entry_total=entry_total,
-                        message=str(exc),
-                    ),
-                )
+                run.fail(key, exc, "supplement_pdf")
+                _emit_fail(progress, key, index, entry_total, exc)
 
-    return fetched, skipped, failed
+    return run
 
 
 def _planned_artifacts(
@@ -412,3 +496,14 @@ def _planned_artifacts(
 def _emit_fetch_progress(progress: FetchProgress | None, event: FetchProgressEvent) -> None:
     if progress is not None:
         progress(event)
+
+
+def _emit_fail(
+    progress: FetchProgress | None, key: str, index: int, entry_total: int, exc: Exception
+) -> None:
+    _emit_fetch_progress(
+        progress,
+        FetchProgressEvent(
+            kind="fail", key=key, entry_index=index, entry_total=entry_total, message=str(exc)
+        ),
+    )

@@ -17,6 +17,11 @@ build. Pass `--strict` to turn a finding into a non-zero exit code:
 | `pynakes asset check --strict` | any linked file is missing or the wrong type |
 | `pynakes dedupe check --strict` | duplicate works (same DOI/arXiv/title) are present |
 | `pynakes verify --strict` | any **error or warning** vs. authoritative metadata |
+| `pynakes asset fetch --strict` | any requested material failed to download or was unavailable (already-present materials pass) |
+
+`asset fetch --strict` is the one gate on a command that is not read-only and
+not offline: it downloads, then gates on completeness, and still emits its full
+envelope (see [Pinax](pinax.md#fetch-the-first-slice)). It takes one library.
 
 `verify --strict` is intentionally broader: its warnings flag integrity
 mismatches against authoritative DOI metadata, which you usually *do* want to

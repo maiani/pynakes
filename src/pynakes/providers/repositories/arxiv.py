@@ -179,22 +179,42 @@ def fetch_metadata(
 
 
 def fetch_pdf(
-    identifier: str, timeout: float = 30.0, progress: DownloadProgress | None = None
+    identifier: str,
+    timeout: float = 30.0,
+    progress: DownloadProgress | None = None,
+    response_info: dict | None = None,
 ) -> bytes:
-    """Fetch arXiv PDF bytes for ``identifier``."""
+    """Fetch arXiv PDF bytes for ``identifier``.
+
+    ``response_info`` is passed to :func:`~pynakes.providers._http.fetch_bytes`.
+    """
     arxiv_id = _normalize_or_raise(identifier)
     return fetch_bytes(
-        pdf_url(arxiv_id), timeout=timeout, label=f"{arxiv_id} PDF", progress=progress
+        pdf_url(arxiv_id),
+        timeout=timeout,
+        label=f"{arxiv_id} PDF",
+        progress=progress,
+        response_info=response_info,
     )
 
 
 def fetch_source(
-    identifier: str, timeout: float = 30.0, progress: DownloadProgress | None = None
+    identifier: str,
+    timeout: float = 30.0,
+    progress: DownloadProgress | None = None,
+    response_info: dict | None = None,
 ) -> bytes:
-    """Fetch arXiv source archive bytes for ``identifier``."""
+    """Fetch arXiv source archive bytes for ``identifier``.
+
+    ``response_info`` is passed to :func:`~pynakes.providers._http.fetch_bytes`.
+    """
     arxiv_id = _normalize_or_raise(identifier)
     return fetch_bytes(
-        source_url(arxiv_id), timeout=timeout, label=f"{arxiv_id} source", progress=progress
+        source_url(arxiv_id),
+        timeout=timeout,
+        label=f"{arxiv_id} source",
+        progress=progress,
+        response_info=response_info,
     )
 
 

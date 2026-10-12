@@ -225,6 +225,13 @@ This choice belongs to the caller rather than to a pynakes operation.
 - `2`: conflict. Read and report `options`; do not retry by guessing.
 
 Gate commands may also use exit `1` for findings when `--strict` is enabled.
+On `asset fetch`, `--strict` gates completeness rather than findings: it exits
+`1` when any requested material failed to download or was unavailable (an entry
+with nothing to fetch it by counts; a material already present does not). The
+full envelope is still emitted with `status: "success"`, so read `summary`,
+`fetched`, `skipped`, and `failed` to see what did land. Without `--strict`, a
+partial run exits `0`: check `summary.failed` and `summary.unavailable` rather
+than `modified`, which describes only the `.bib`.
 `format --check` exits `1` when formatting is needed, and `scrub --check` exits
 `1` when private content is present, but their JSON still has
 `status: "success"` (with `modified: true` and `clean: false` respectively). A genuine failure has

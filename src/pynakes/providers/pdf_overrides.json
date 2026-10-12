@@ -9,7 +9,7 @@
     {
       "description": "APS DOI prefix → harvest PDF URL",
       "doi_prefix": "10.1103/",
-      "doi_to_url": "http://harvest.aps.org/v2/journals/articles/{doi}/fulltext"
+      "doi_to_url": "https://harvest.aps.org/v2/journals/articles/{doi}/fulltext"
     },
     {
       "description": "AIP Publishing: /article-abstract/ → /article/pdf/",

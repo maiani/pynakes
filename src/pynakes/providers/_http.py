@@ -182,6 +182,7 @@ def fetch_bytes(
     sleep: Callable[[float], None] = time.sleep,
     max_bytes: int | None = None,
     deadline_seconds: float = DEFAULT_DEADLINE,
+    response_info: dict | None = None,
 ) -> bytes:
     """Fetch ``url`` and return raw response bytes.
 
@@ -194,6 +195,12 @@ def fetch_bytes(
     Throttles (HTTP 429), transient server errors, and read timeouts are retried
     with backoff before the error is raised; ``sleep`` is the test seam for
     that wait.
+
+    When ``response_info`` is a dict, the last response seen is described in
+    it — ``final_url`` (after redirects), ``status``, and ``content_type`` —
+    whether the request succeeded or raised, so a caller can report what a
+    server actually answered. No header value other than the content type, and
+    nothing of the body, is recorded.
     """
     max_bytes = MAX_DOWNLOAD_BYTES if max_bytes is None else max_bytes
     validate_url(url, error_class, resolve=False)
@@ -218,6 +225,7 @@ def fetch_bytes(
                 progress=progress,
                 max_bytes=max_bytes,
                 deadline=deadline,
+                info=response_info,
             )
     else:
 
@@ -235,6 +243,7 @@ def fetch_bytes(
                 progress=progress,
                 max_bytes=max_bytes,
                 deadline=deadline,
+                info=response_info,
             )
 
     return _with_retry(attempt, error_class=error_class, sleep=sleep, deadline=deadline)
@@ -251,10 +260,12 @@ def _fetch_bytes_urllib(
     progress: DownloadProgress | None,
     max_bytes: int,
     deadline: float,
+    info: dict | None = None,
 ) -> bytes:
     request = _UrllibRequest(url, headers=headers)
     try:
         with opener(request, timeout=timeout) as response:  # type: ignore[arg-type]
+            _describe_response(info, url, response)
             data = _read_bounded(
                 response,
                 max_bytes=max_bytes,
@@ -263,6 +274,7 @@ def _fetch_bytes_urllib(
                 expired=error_class("Network deadline exceeded"),
             )
     except HTTPError as exc:
+        _describe_response(info, url, exc, status=exc.code)
         message = f"Server returned HTTP {exc.code} for {display}"
         if exc.code in RETRY_STATUSES:
             retry_after = _parse_retry_after((exc.headers or {}).get("Retry-After"))
@@ -278,6 +290,25 @@ def _fetch_bytes_urllib(
     if progress is not None:
         progress(len(data), len(data))
     return data
+
+
+def _describe_response(
+    info: dict | None, url: str, response: object, *, status: int | None = None
+) -> None:
+    """Record what an injected opener's response (or HTTP error) says about itself."""
+    if info is None:
+        return
+    geturl = getattr(response, "geturl", None)
+    final_url = geturl() if callable(geturl) else None
+    if status is None:
+        status = getattr(response, "status", None)
+    headers = getattr(response, "headers", None)
+    content_type = headers.get("Content-Type") if headers is not None else None
+    info.update(
+        final_url=final_url if isinstance(final_url, str) else url,
+        status=status if isinstance(status, int) else None,
+        content_type=content_type if isinstance(content_type, str) else None,
+    )
 
 
 def _read_bounded(
@@ -321,6 +352,7 @@ def _fetch_bytes_httpx(
     progress: DownloadProgress | None,
     max_bytes: int,
     deadline: float,
+    info: dict | None = None,
 ) -> bytes:
     try:
         with httpx.Client(
@@ -332,6 +364,12 @@ def _fetch_bytes_httpx(
             event_hooks={"request": [request_guard(error_class, deadline)]},
         ) as client:
             with client.stream("GET", url) as response:
+                if info is not None:
+                    info.update(
+                        final_url=str(response.url),
+                        status=response.status_code,
+                        content_type=response.headers.get("content-type"),
+                    )
                 try:
                     response.raise_for_status()
                 except httpx.HTTPStatusError as exc:

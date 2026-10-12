@@ -297,16 +297,19 @@ def get_capabilities() -> dict:
                 "is refused as a usage error."
             ),
         },
-        # Read-only checks that accept one or more .bib files and support
-        # --strict (exit 1 on findings) — the primitives for CI / pre-commit
-        # gating. A single file keeps the per-file envelope; multiple files
-        # emit an aggregate {status, action, strict, files, summary} envelope.
+        # Commands with a --strict gate (exit 1, envelope still emitted in
+        # full). The read-only checks accept one or more .bib files: a single
+        # file keeps the per-file envelope; multiple files emit an aggregate
+        # {status, action, strict, files, summary} envelope. `asset fetch
+        # --strict` gates completeness: exit 1 when a requested material
+        # failed or was unavailable.
         "gate_commands": [
             "lint",
             "verify",
             "keys check",
             "asset check",
             "dedupe check",
+            "asset fetch",
         ],
         "capabilities": [
             "parse_bibtex",

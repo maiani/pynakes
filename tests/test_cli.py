@@ -1622,7 +1622,6 @@ class TestImportCommand:
         monkeypatch.setattr(
             "pynakes.fetch.fetch_published_pdf", lambda url, **kwargs: b"%PDF published"
         )
-        monkeypatch.setattr("pynakes.fetch._url_serves_pdf", lambda url: True)
 
         result = runner.invoke(
             app,
@@ -4443,7 +4442,6 @@ class TestAssetFetchPublished:
         monkeypatch.setattr(
             "pynakes.fetch.fetch_published_pdf", lambda url, **kwargs: b"%PDF published"
         )
-        monkeypatch.setattr("pynakes.fetch._url_serves_pdf", lambda url: True)
         monkeypatch.chdir(tmp_path)
 
         result = runner.invoke(app, ["asset", "fetch", "--json"])
@@ -4571,7 +4569,18 @@ class TestAssetFetchPublished:
         }
         assert len(data["fetched"]) == 0
         assert len(data["skipped"]) == 1
-        assert data["skipped"][0]["reason"] == "no arXiv id"
+        # The entry has a DOI, so the reason names the backfill that finds an arXiv id.
+        assert data["skipped"][0]["reason"] == (
+            "no arXiv id (`pynakes enrich --published --online` can look one up by DOI)"
+        )
+        assert data["summary"] == {
+            "requested": 1,
+            "fetched": 0,
+            "already_present": 0,
+            "unavailable": 1,
+            "failed": 0,
+            "planned": 0,
+        }
 
     def test_fetch_says_materials_present_before_a_missing_doi(
         self, tmp_path: Path, monkeypatch

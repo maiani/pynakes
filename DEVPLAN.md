@@ -61,7 +61,9 @@ Decisions that still constrain new work:
 - The Python API is its own interface: a `Bibliography` method no command calls
   is not dead code for that reason alone.
 - `--strict` gates a read-only command (`lint`, `verify`, `dedupe check`,
-  `keys check`, `asset check`); `--check` is a transform's check mode
+  `keys check`, `asset check`) or the completeness of `asset fetch`, always
+  emitting the full envelope before exiting 1; `--check` is a transform's
+  check mode
   (`format`, `scrub`). `-f` is `--file` everywhere, `--field` is a
   `name=value` assignment, and `--out PATH|-` is the one output flag.
 - Settings are named for the command that applies them and `lint` verifies

@@ -128,7 +128,13 @@ class BibliographyMaterials:
 
         Returns:
             A dict with ``fetched``, ``skipped``, ``failed`` lists, plus
-            ``fetch_policy`` dict reflecting the resolved Pinax fetch policy.
+            ``fetch_policy`` dict reflecting the resolved Pinax fetch policy,
+            ``access``, a ``summary`` of counts (``requested`` entries, items
+            ``fetched``, skips split into ``already_present``, ``unavailable``
+            and dry-run ``planned``, and ``failed``), and ``warnings``: one
+            ``download_failed`` object per failed download. A skipped or failed
+            item for which a download was tried lists the requests in
+            ``attempts``.
         """
         if access not in {"open", "institutional"}:
             raise ValueError(f"Unknown fetch access mode: {access!r}")
@@ -149,7 +155,7 @@ class BibliographyMaterials:
             resolved = metadata_fetch_policy(self.lib)
 
         entry_queue = build_fetch_queue(self.lib, target, keys)
-        fetched, skipped, failed = run_fetch_loop(
+        run = run_fetch_loop(
             entry_queue,
             store,
             resolved,
@@ -165,7 +171,7 @@ class BibliographyMaterials:
             progress=progress,
             access=access,
         )
-        if bootstrapped and not _anything_landed(fetched, skipped, dry_run):
+        if bootstrapped and not _anything_landed(run.fetched, run.skipped, dry_run):
             # The store was only ever needed to hold what this run fetched;
             # with nothing fetched the library keeps no store it did not have.
             self.remove_metadata(FILES_DIR_KEY)
@@ -181,7 +187,9 @@ class BibliographyMaterials:
                 "bestpdf": resolved.bestpdf,
             },
             "access": access,
-            "fetched": fetched,
-            "skipped": skipped,
-            "failed": failed,
+            "fetched": run.fetched,
+            "skipped": run.skipped,
+            "failed": run.failed,
+            "summary": run.summary(),
+            "warnings": run.warnings,
         }

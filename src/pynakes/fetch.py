@@ -1,30 +1,38 @@
 """Download arXiv materials and open-access published PDFs into a Pinax ``FileStore``.
 
 The public functions are split for testability: URL construction and network
-fetching are small injectable pieces, while archive extraction is local and
-deterministic. The CLI layer decides when online fetching is allowed.
+fetching are small injectable pieces, while archive extraction (in
+:mod:`pynakes._fetch_source`, re-exported here) is local and deterministic. The
+CLI layer decides when online fetching is allowed.
 """
 
 from __future__ import annotations
 
-import re
-import shutil
-import tarfile
 import tempfile
-import zlib
 from collections.abc import Callable
-from dataclasses import dataclass
-from io import BytesIO
-from pathlib import Path, PurePosixPath
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal
 
-import httpx
-
+from pynakes._fetch_attempts import (
+    DiagnosedFetchError,
+    attempt_record,
+    candidate_urls,
+    redact_url,
+    status_from_message,
+)
+from pynakes._fetch_source import (
+    MAX_SOURCE_BYTES,
+    MAX_SOURCE_MEMBERS,
+    ArxivFetchError,
+    ArxivSourceUnavailableError,
+    extract_arxiv_source,
+)
 from pynakes._identifiers import normalize_arxiv, normalize_doi
 from pynakes.fetch_progress import FetchArtifact, FetchProgress, FetchProgressEvent
 from pynakes.filestore import FileStore
 from pynakes.providers import publisher
-from pynakes.providers._http import USER_AGENT, ProviderFetchError, fetch_bytes
+from pynakes.providers._http import ProviderFetchError, fetch_bytes
 from pynakes.providers.metadata import crossref, openalex
 from pynakes.providers.repositories import arxiv
 
@@ -33,40 +41,42 @@ FetchPublishedPdfUrl = Callable[[str], str | None]
 UrlPdfValidator = Callable[[str], bool]
 FetchAccess = Literal["open", "institutional"]
 
-_GZIP_MAGIC = b"\x1f\x8b"
-_GZIP_FEXTRA = 0x04
-_GZIP_FNAME = 0x08
-_PLAIN_FILE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*")
-_SINGLE_FILE_FALLBACK = "main.tex"
+__all__ = [
+    "MAX_SOURCE_BYTES",
+    "MAX_SOURCE_MEMBERS",
+    "ArxivDownloadResult",
+    "ArxivFetchError",
+    "ArxivSourceUnavailableError",
+    "PublishedDownloadResult",
+    "PublishedPdfFetchError",
+    "SupplementDownloadResult",
+    "SupplementPdfFetchError",
+    "crossref_oa_pdf_url",
+    "download_arxiv_materials",
+    "download_published_material",
+    "download_supplement_material",
+    "extract_arxiv_source",
+    "fetch_arxiv_pdf",
+    "fetch_arxiv_source",
+    "fetch_published_pdf",
+    "institutional_pdf_url",
+    "openalex_oa_pdf_url",
+    "publisher_supplement_pdf_urls",
+]
 
-# Limits on what one arXiv source bundle may unpack to. The bundle is content
-# its author controls, and a few hundred kilobytes of gzip can expand to
-# gigabytes or to hundreds of thousands of files.
-MAX_SOURCE_BYTES = 1024 * 1024 * 1024
-MAX_SOURCE_MEMBERS = 20_000
 
+class PublishedPdfFetchError(DiagnosedFetchError):
+    """Raised when open-access published PDF resolution or download fails.
 
-class ArxivFetchError(Exception):
-    """Raised when arXiv material download or extraction fails."""
-
-
-class ArxivSourceUnavailableError(ArxivFetchError):
-    """Raised when arXiv has no TeX/source archive for a preprint.
-
-    Distinct from a corrupt-archive failure: it means the e-print endpoint
-    returned a PDF-only submission rather than an extractable source bundle, so
-    there is simply nothing to extract. A subclass of :class:`ArxivFetchError`
-    so existing ``except ArxivFetchError`` handlers still catch it, while callers
-    that care can treat it as a benign "no source" outcome.
+    ``attempts`` records each download request made before giving up.
     """
 
 
-class PublishedPdfFetchError(Exception):
-    """Raised when open-access published PDF resolution or download fails."""
+class SupplementPdfFetchError(DiagnosedFetchError):
+    """Raised when supplementary-PDF discovery or download fails.
 
-
-class SupplementPdfFetchError(Exception):
-    """Raised when supplementary-PDF discovery or download fails."""
+    ``attempts`` records each download request made before giving up.
+    """
 
 
 @dataclass(frozen=True)
@@ -98,15 +108,17 @@ class PublishedDownloadResult:
     pdf_path: Path | None = None
     access: FetchAccess | None = None
     reason: str | None = None
+    attempts: tuple[dict, ...] = field(default_factory=tuple)
 
-    def to_dict(self) -> dict[str, str | None]:
+    def to_dict(self) -> dict[str, object]:
         """Serialize the result to a JSON-friendly dict.
 
         Includes ``arxiv_id`` and ``source_path`` (always ``None``) so the
         CLI loop can iterate both :class:`ArxivDownloadResult` and
-        :class:`PublishedDownloadResult` items uniformly.
+        :class:`PublishedDownloadResult` items uniformly. ``attempts`` is
+        listed only for a result that fetched nothing.
         """
-        result = {
+        result: dict[str, object] = {
             "key": self.key,
             "doi": self.doi,
             "arxiv_id": None,
@@ -117,6 +129,8 @@ class PublishedDownloadResult:
             result["access"] = self.access
         if self.reason is not None:
             result["reason"] = self.reason
+        if self.pdf_path is None:
+            result["attempts"] = list(self.attempts)
         return result
 
 
@@ -130,6 +144,7 @@ class SupplementDownloadResult:
     access: FetchAccess | None = None
     reason: str | None = None
     candidates: int = 0
+    attempts: tuple[dict, ...] = field(default_factory=tuple)
 
     def to_dict(self) -> dict[str, object]:
         """Serialize the result to a JSON-friendly dict."""
@@ -147,6 +162,8 @@ class SupplementDownloadResult:
             result["reason"] = self.reason
         if self.candidates:
             result["candidates"] = self.candidates
+        if self.pdf_path is None:
+            result["attempts"] = list(self.attempts)
         return result
 
 
@@ -161,14 +178,19 @@ def fetch_arxiv_pdf(
     Thin wrapper over :func:`pynakes.providers.repositories.arxiv.fetch_pdf` translating
     provider errors into :class:`ArxivFetchError`.
     """
+    info: dict = {}
     try:
         return arxiv.fetch_pdf(
             identifier,
             timeout=timeout,
             progress=_byte_progress(progress, key, "preprint_pdf"),
+            response_info=info,
         )
-    except (ProviderFetchError, ValueError) as exc:
-        raise ArxivFetchError(str(exc)) from exc
+    except ValueError as exc:
+        raise ArxivFetchError(str(exc), artifact="preprint_pdf") from exc
+    except ProviderFetchError as exc:
+        attempt = attempt_record(arxiv.pdf_url(identifier), info, _error_outcome(exc, info))
+        raise ArxivFetchError(str(exc), attempts=[attempt], artifact="preprint_pdf") from exc
 
 
 def fetch_arxiv_source(
@@ -182,14 +204,19 @@ def fetch_arxiv_source(
     Thin wrapper over :func:`pynakes.providers.repositories.arxiv.fetch_source` translating
     provider errors into :class:`ArxivFetchError`.
     """
+    info: dict = {}
     try:
         return arxiv.fetch_source(
             identifier,
             timeout=timeout,
             progress=_byte_progress(progress, key, "preprint_source"),
+            response_info=info,
         )
-    except (ProviderFetchError, ValueError) as exc:
-        raise ArxivFetchError(str(exc)) from exc
+    except ValueError as exc:
+        raise ArxivFetchError(str(exc), artifact="preprint_source") from exc
+    except ProviderFetchError as exc:
+        attempt = attempt_record(arxiv.source_url(identifier), info, _error_outcome(exc, info))
+        raise ArxivFetchError(str(exc), attempts=[attempt], artifact="preprint_source") from exc
 
 
 def download_arxiv_materials(
@@ -217,10 +244,14 @@ def download_arxiv_materials(
 
     if pdf:
         _emit_progress(progress, "artifact_start", key, "preprint_pdf")
-        if pdf_fetcher is None:
-            pdf_bytes = fetch_arxiv_pdf(arxiv_id, progress=progress, key=key)
-        else:
-            pdf_bytes = pdf_fetcher(arxiv_id)
+        try:
+            if pdf_fetcher is None:
+                pdf_bytes = fetch_arxiv_pdf(arxiv_id, progress=progress, key=key)
+            else:
+                pdf_bytes = pdf_fetcher(arxiv_id)
+        except ArxivFetchError as exc:
+            _diagnose(exc, "preprint_pdf", arxiv.pdf_url(arxiv_id))
+            raise
         pdf_path = store.write_preprint_pdf(key, pdf_bytes)
         store.record_artifact(
             key,
@@ -233,10 +264,14 @@ def download_arxiv_materials(
 
     if source:
         _emit_progress(progress, "artifact_start", key, "preprint_source")
-        if source_fetcher is None:
-            source_bytes = fetch_arxiv_source(arxiv_id, progress=progress, key=key)
-        else:
-            source_bytes = source_fetcher(arxiv_id)
+        try:
+            if source_fetcher is None:
+                source_bytes = fetch_arxiv_source(arxiv_id, progress=progress, key=key)
+            else:
+                source_bytes = source_fetcher(arxiv_id)
+        except ArxivFetchError as exc:
+            _diagnose(exc, "preprint_source", arxiv.source_url(arxiv_id))
+            raise
         store.ensure_root()
         try:
             with (
@@ -345,23 +380,29 @@ def fetch_published_pdf(
     urlopen: Callable[..., object] | None = None,
     progress: FetchProgress | None = None,
     key: str = "",
+    response_info: dict | None = None,
 ) -> bytes:
     """Fetch the bytes of an open-access published PDF from ``url``.
 
     ``urlopen`` is injectable for testing (same signature as
-    ``urllib.request.urlopen``).
+    ``urllib.request.urlopen``). ``response_info``, when given, is filled with
+    what the server answered (see :func:`~pynakes.providers._http.fetch_bytes`).
     """
+    shown = redact_url(url) or url
     try:
         return fetch_bytes(
             url,
             timeout=30.0,
             error_class=PublishedPdfFetchError,
-            label=url,
+            label=shown,
             opener=urlopen,
             progress=_byte_progress(progress, key, "published_pdf"),
+            response_info=response_info,
         )
     except PublishedPdfFetchError as exc:
-        raise PublishedPdfFetchError(f"Failed to download published PDF from {url}: {exc}") from exc
+        raise PublishedPdfFetchError(
+            f"Failed to download published PDF from {shown}: {exc}"
+        ) from exc
 
 
 def _describe_content(data: bytes) -> str:
@@ -371,29 +412,6 @@ def _describe_content(data: bytes) -> str:
     if data.startswith(b"<") or data.startswith(b"<!") or data.startswith(b"<?"):
         return f"HTML ({len(data)} bytes)"
     return f"{len(data)} bytes"
-
-
-def _url_serves_pdf(url: str, *, timeout: float = 8.0) -> bool:
-    """Return ``True`` when *url* serves content that starts with ``%PDF``.
-
-    Uses a streaming GET and reads only the first few bytes to check the magic
-    bytes, so the full body is never downloaded for validation. Follows
-    redirects. Returns ``False`` on any error or when the content does not
-    start with ``%PDF``.
-    """
-    headers = {"User-Agent": USER_AGENT}
-    try:
-        with httpx.Client(follow_redirects=True, timeout=timeout, headers=headers) as client:
-            with client.stream("GET", url) as response:
-                response.raise_for_status()
-                header = b""
-                for chunk in response.iter_bytes():
-                    header += chunk
-                    if len(header) >= 256:
-                        break
-                return header.startswith(b"%PDF")
-    except httpx.HTTPError:
-        return False
 
 
 def download_published_material(
@@ -416,18 +434,25 @@ def download_published_material(
     (or ``None`` when no OA copy exists). ``pdf_fetcher`` receives the resolved
     URL and returns bytes. Both are injectable for testing.
 
-    ``url_validator`` receives the resolved PDF URL and returns ``True``
-    when the URL appears to serve PDF content. By default a streaming GET
-    checks the first 256 bytes for ``%PDF`` magic bytes. Pass ``lambda _: True``
-    to skip validation.
+    Each resolved URL is tried in the order
+    :func:`pynakes._fetch_attempts.candidate_urls` gives — an APS article's
+    canonical ``journals.aps.org`` PDF URL first, an ``https://`` form before a
+    plain ``http://`` one — until one serves a PDF. Each request is a single
+    GET whose bytes are kept only when they start with ``%PDF``.
+
+    ``url_validator``, when given, is asked first about each open-access URL and
+    a ``False`` skips it without a download.
 
     Returns a ``PublishedDownloadResult`` with ``pdf_path`` set when the
-    download succeeded, or ``None`` when no OA copy was found.
+    download succeeded; otherwise its ``reason`` says why and its
+    ``attempts`` records every request made. Raises
+    :class:`PublishedPdfFetchError`, with the same ``attempts``, when a request
+    failed with an error that is not an access refusal.
     """
     try:
         normalized = normalize_doi(doi)
     except ValueError as exc:
-        raise PublishedPdfFetchError(str(exc)) from exc
+        raise PublishedPdfFetchError(str(exc), artifact="published_pdf") from exc
     if access not in {"open", "institutional"}:
         raise ValueError(f"Unknown fetch access mode: {access!r}")
     resolver = url_resolver or (
@@ -466,50 +491,77 @@ def download_published_material(
         return PublishedDownloadResult(key=key, doi=normalized, reason=reason)
 
     _emit_progress(progress, "artifact_start", key, "published_pdf")
+    attempts: list[dict] = []
+    errors: list[PublishedPdfFetchError] = []
+    tried: set[str] = set()
     last_reason = "publisher URL did not serve PDF content"
     for candidate_url, candidate_access in candidates:
-        try:
-            if pdf_fetcher is not None:
-                data = pdf_fetcher(candidate_url)
-            else:
-                if candidate_access == "open":
-                    validate_url = url_validator or _url_serves_pdf
-                    if not validate_url(candidate_url):
-                        continue
-                data = fetch_published_pdf(candidate_url, progress=progress, key=key)
-        except PublishedPdfFetchError as exc:
-            access_reason = _access_error_reason(exc)
-            if candidate_access == "institutional" and access_reason is not None:
-                last_reason = access_reason
+        for url in candidate_urls(candidate_url, normalized):
+            if url in tried:
                 continue
-            raise
-        if not data.startswith(b"%PDF"):
-            last_reason = _non_pdf_reason(data)
-            continue
-        pdf_path = store.write_published_pdf(key, data)
-        store.record_artifact(
-            key,
-            "published_pdf",
-            source=candidate_url,
-            fetched_date=fetched_date,
-            refetchable=True,
-            access=candidate_access,
-        )
-        _emit_progress(progress, "artifact_done", key, "published_pdf", total_bytes=len(data))
-        return PublishedDownloadResult(
-            key=key,
-            doi=normalized,
-            pdf_path=pdf_path,
-            access=candidate_access if candidate_access == "institutional" else None,
-        )
-    _emit_progress(
-        progress,
-        "artifact_skip",
-        key,
-        "published_pdf",
-        message=last_reason,
+            tried.add(url)
+            info: dict = {}
+            try:
+                data = _published_bytes(
+                    url, candidate_access, pdf_fetcher, url_validator, info, progress, key
+                )
+            except PublishedPdfFetchError as exc:
+                if info.get("status") is None:
+                    info["status"] = status_from_message(str(exc))
+                attempts.append(attempt_record(url, info, _error_outcome(exc, info)))
+                access_reason = _access_error_reason(exc)
+                if candidate_access == "institutional" and access_reason is not None:
+                    last_reason = access_reason
+                else:
+                    errors.append(exc)
+                continue
+            if data is None or not data.startswith(b"%PDF"):
+                attempts.append(attempt_record(url, info, "not_pdf"))
+                if data is not None:
+                    last_reason = _non_pdf_reason(data, candidate_access)
+                continue
+            pdf_path = store.write_published_pdf(key, data)
+            store.record_artifact(
+                key,
+                "published_pdf",
+                source=url,
+                fetched_date=fetched_date,
+                refetchable=True,
+                access=candidate_access,
+            )
+            _emit_progress(progress, "artifact_done", key, "published_pdf", total_bytes=len(data))
+            return PublishedDownloadResult(
+                key=key,
+                doi=normalized,
+                pdf_path=pdf_path,
+                access=candidate_access if candidate_access == "institutional" else None,
+            )
+    if errors:
+        message = str(errors[0])
+        if len(attempts) > 1:
+            message = f"{message} ({len(attempts)} URLs tried)"
+        raise PublishedPdfFetchError(message, attempts=attempts, artifact="published_pdf")
+    _emit_progress(progress, "artifact_skip", key, "published_pdf", message=last_reason)
+    return PublishedDownloadResult(
+        key=key, doi=normalized, reason=last_reason, attempts=tuple(attempts)
     )
-    return PublishedDownloadResult(key=key, doi=normalized, reason=last_reason)
+
+
+def _published_bytes(
+    url: str,
+    access: FetchAccess,
+    pdf_fetcher: Callable[[str], bytes] | None,
+    url_validator: UrlPdfValidator | None,
+    info: dict,
+    progress: FetchProgress | None,
+    key: str,
+) -> bytes | None:
+    """Request one published-PDF URL; ``None`` when ``url_validator`` refused it."""
+    if pdf_fetcher is not None:
+        return pdf_fetcher(url)
+    if access == "open" and url_validator is not None and not url_validator(url):
+        return None
+    return fetch_published_pdf(url, progress=progress, key=key, response_info=info)
 
 
 def download_supplement_material(
@@ -526,12 +578,14 @@ def download_supplement_material(
     """Download one unambiguous supplementary PDF advertised for *doi*.
 
     Multiple candidates are reported without choosing one, because the v1
-    Pinax layout has one deterministic ``.supplement.pdf`` path.
+    Pinax layout has one deterministic ``.supplement.pdf`` path. A result that
+    fetched nothing, and a raised :class:`SupplementPdfFetchError`, carry the
+    request made in ``attempts``.
     """
     try:
         normalized = normalize_doi(doi)
     except ValueError as exc:
-        raise SupplementPdfFetchError(str(exc)) from exc
+        raise SupplementPdfFetchError(str(exc), artifact="supplement_pdf") from exc
     if access not in {"open", "institutional"}:
         raise ValueError(f"Unknown fetch access mode: {access!r}")
     resolver = url_resolver or publisher_supplement_pdf_urls
@@ -549,6 +603,8 @@ def download_supplement_material(
         )
 
     url = urls[0]
+    shown = redact_url(url) or url
+    info: dict = {}
     _emit_progress(progress, "artifact_start", key, "supplement_pdf")
     try:
         if pdf_fetcher is not None:
@@ -558,19 +614,34 @@ def download_supplement_material(
                 url,
                 timeout=30.0,
                 error_class=SupplementPdfFetchError,
-                label=url,
+                label=shown,
                 progress=_byte_progress(progress, key, "supplement_pdf"),
+                response_info=info,
             )
     except SupplementPdfFetchError as exc:
+        if info.get("status") is None:
+            info["status"] = status_from_message(str(exc))
+        attempts = (attempt_record(url, info, _error_outcome(exc, info)),)
         access_reason = _access_error_reason(exc)
         if access == "institutional" and access_reason is not None:
             _emit_progress(progress, "artifact_skip", key, "supplement_pdf", message=access_reason)
-            return SupplementDownloadResult(key=key, doi=normalized, reason=access_reason)
-        raise SupplementPdfFetchError(f"Failed to download supplement from {url}: {exc}") from exc
+            return SupplementDownloadResult(
+                key=key, doi=normalized, reason=access_reason, attempts=attempts
+            )
+        raise SupplementPdfFetchError(
+            f"Failed to download supplement from {shown}: {exc}",
+            attempts=attempts,
+            artifact="supplement_pdf",
+        ) from exc
     if not data.startswith(b"%PDF"):
-        reason = _non_pdf_reason(data)
+        reason = _non_pdf_reason(data, access)
         _emit_progress(progress, "artifact_skip", key, "supplement_pdf", message=reason)
-        return SupplementDownloadResult(key=key, doi=normalized, reason=reason)
+        return SupplementDownloadResult(
+            key=key,
+            doi=normalized,
+            reason=reason,
+            attempts=(attempt_record(url, info, "not_pdf"),),
+        )
 
     pdf_path = store.write_supplement_pdf(key, data)
     store.record_artifact(
@@ -585,9 +656,11 @@ def download_supplement_material(
     return SupplementDownloadResult(key=key, doi=normalized, pdf_path=pdf_path, access=access)
 
 
-def _non_pdf_reason(data: bytes) -> str:
+def _non_pdf_reason(data: bytes, access: FetchAccess = "institutional") -> str:
     description = _describe_content(data)
     if data.lstrip().lower().startswith((b"<html", b"<!doctype html")):
+        if access == "open":
+            return f"publisher URL served an HTML page ({len(data)} bytes), not a PDF"
         return f"authentication required or publisher returned HTML ({len(data)} bytes)"
     return f"publisher URL returned {description}, not a PDF"
 
@@ -601,107 +674,20 @@ def _access_error_reason(exc: Exception) -> str | None:
     return None
 
 
-def extract_arxiv_source(data: bytes, target_dir: str | Path) -> Path:
-    """Safely extract an arXiv source bundle into ``target_dir``.
+def _error_outcome(exc: Exception, info: dict) -> str:
+    """Classify a failed request: an HTTP error status, or no usable response at all."""
+    status = info.get("status") or status_from_message(str(exc))
+    return "http_error" if isinstance(status, int) and status >= 400 else "network_error"
 
-    The e-print endpoint serves a multi-file submission as a gzipped tar, and an
-    old single-file submission as that one file gzipped, with no tar around it.
-    A tar is extracted member by member; a single file is written under the name
-    its gzip header records, or ``main.tex`` when the header records no plain
-    file name.
 
-    Raises :class:`ArxivSourceUnavailableError` when the e-print endpoint
-    returned a PDF instead of a source bundle (a PDF-only submission has no
-    extractable TeX/source), and :class:`ArxivFetchError` when the bytes are an
-    actual but unreadable/corrupt archive.
-    """
-    if data.startswith(b"%PDF"):
-        raise ArxivSourceUnavailableError(
-            "arXiv has no TeX/source archive for this preprint; the e-print "
-            "endpoint returned a PDF (PDF-only submission)"
+def _diagnose(exc: DiagnosedFetchError, artifact: str, url: str) -> None:
+    """Name the artifact a fetch failed for, and its request, when the raiser did not."""
+    if exc.artifact is None:
+        exc.artifact = artifact
+    if not exc.attempts:
+        exc.attempts = (
+            attempt_record(url, {"status": status_from_message(str(exc))}, _error_outcome(exc, {})),
         )
-    target = Path(target_dir)
-    target.mkdir(parents=True, exist_ok=True)
-    root = target.resolve(strict=False)
-    try:
-        try:
-            archive = tarfile.open(fileobj=BytesIO(data), mode="r:*")
-        except tarfile.ReadError:
-            if not data.startswith(_GZIP_MAGIC):
-                raise
-            _write_single_file_source(data, root)
-            return target
-        with archive:
-            members = archive.getmembers()
-            _check_source_size(members)
-            for member in members:
-                _validate_tar_member(member, root)
-            for member in members:
-                _extract_validated_member(archive, member, root)
-    except tarfile.TarError as exc:
-        raise ArxivFetchError("arXiv source archive is not a readable tar archive") from exc
-    except (EOFError, zlib.error) as exc:
-        # tarfile lets these escape from a truncated or damaged gzip stream.
-        raise ArxivFetchError("arXiv source archive is truncated or corrupt") from exc
-    return target
-
-
-def _check_source_size(members: list[tarfile.TarInfo]) -> None:
-    """Refuse a tar whose headers declare more than the source limits."""
-    if len(members) > MAX_SOURCE_MEMBERS:
-        raise ArxivFetchError(
-            f"arXiv source archive has {len(members)} members, "
-            f"more than the {MAX_SOURCE_MEMBERS} allowed"
-        )
-    if sum(member.size for member in members if member.isfile()) > MAX_SOURCE_BYTES:
-        raise ArxivFetchError(
-            f"arXiv source archive unpacks to more than {MAX_SOURCE_BYTES >> 20} MiB"
-        )
-
-
-def _write_single_file_source(data: bytes, root: Path) -> None:
-    """Decompress a single gzipped source file in bounded chunks."""
-    target = root / _gzip_member_name(data)
-    decompressor = zlib.decompressobj(wbits=31)
-    written = 0
-    try:
-        with target.open("wb") as output:
-            pending = data
-            while not decompressor.eof:
-                chunk = decompressor.decompress(pending, 1 << 20)
-                pending = decompressor.unconsumed_tail
-                if not chunk and not pending:
-                    raise ArxivFetchError("arXiv source file is truncated or corrupt")
-                written += len(chunk)
-                if written > MAX_SOURCE_BYTES:
-                    raise ArxivFetchError(
-                        f"arXiv source file unpacks to more than {MAX_SOURCE_BYTES >> 20} MiB"
-                    )
-                output.write(chunk)
-    except zlib.error as exc:
-        target.unlink(missing_ok=True)
-        raise ArxivFetchError("arXiv source file is not a readable gzip file") from exc
-    except ArxivFetchError:
-        target.unlink(missing_ok=True)
-        raise
-
-
-def _gzip_member_name(data: bytes) -> str:
-    """Return the file name an already-validated gzip header records (RFC 1952).
-
-    Only the final path component is kept, and only when it is a plain name,
-    so a recorded name can never place the file outside the source directory;
-    otherwise the file is ``main.tex``.
-    """
-    flags = data[3]
-    if not flags & _GZIP_FNAME:
-        return _SINGLE_FILE_FALLBACK
-    start = 10
-    if flags & _GZIP_FEXTRA:
-        start += 2 + int.from_bytes(data[10:12], "little")
-    recorded = data[start : data.index(b"\0", start)].decode("latin-1")
-    name = re.split(r"[\\/]", recorded)[-1]
-    return name if _PLAIN_FILE_NAME.fullmatch(name) else _SINGLE_FILE_FALLBACK
 
 
 def _normalize_or_raise(identifier: str) -> str:
@@ -753,37 +739,3 @@ def _emit_progress(
             message=message,
         )
     )
-
-
-def _validate_tar_member(member: tarfile.TarInfo, root: Path) -> None:
-    name = member.name
-    if not name or "\\" in name:
-        raise ArxivFetchError(f"Unsafe arXiv source archive path: {name!r}")
-
-    parts = PurePosixPath(name).parts
-    if PurePosixPath(name).is_absolute() or ".." in parts:
-        raise ArxivFetchError(f"Unsafe arXiv source archive path: {name!r}")
-
-    target = (root / Path(*parts)).resolve(strict=False)
-    if not target.is_relative_to(root):
-        raise ArxivFetchError(f"Unsafe arXiv source archive path: {name!r}")
-
-    if member.issym() or member.islnk():
-        raise ArxivFetchError(f"Unsafe arXiv source archive link: {name!r}")
-    if not (member.isfile() or member.isdir()):
-        raise ArxivFetchError(f"Unsupported arXiv source archive member: {name!r}")
-
-
-def _extract_validated_member(
-    archive: tarfile.TarFile, member: tarfile.TarInfo, root: Path
-) -> None:
-    target = root / Path(*PurePosixPath(member.name).parts)
-    if member.isdir():
-        target.mkdir(parents=True, exist_ok=True)
-        return
-    target.parent.mkdir(parents=True, exist_ok=True)
-    source = archive.extractfile(member)
-    if source is None:
-        raise ArxivFetchError(f"Could not read arXiv source archive member: {member.name!r}")
-    with source, target.open("wb") as output:
-        shutil.copyfileobj(source, output)

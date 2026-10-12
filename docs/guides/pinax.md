@@ -314,6 +314,18 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
   `similarity-checking` links (e.g. `harvest.aps.org` URLs that serve the
   actual PDF). A step silently returns `None` when it does not know the paper;
   the chain stops at the first hit.
+- **Which URL is requested.** A resolved URL is tried as given, with two
+  adjustments ahead of it. An APS-hosted URL (`link.aps.org`,
+  `harvest.aps.org`, …) for an APS article DOI `10.1103/<Journal>.<…>` is
+  preceded by the article's canonical `https://journals.aps.org/<code>/pdf/<doi>`
+  URL (`PhysRev` → `pr`, `PhysRevLett` → `prl`, `PhysRevX` → `prx`,
+  `RevModPhys` → `rmp`, …), because the legacy redirector is often refused or
+  answered with an HTML page. A plain `http://` URL is preceded by its
+  `https://` form. Each candidate is requested once, by a single GET, and the
+  first whose bytes start with `%PDF` is stored; the provenance manifest records
+  that URL. APS's newer opaque DOIs name no journal, so they get only the HTTPS
+  upgrade. `PYNAKES_APS_API_TOKEN` is not sent with PDF downloads: it
+  authenticates APS Harvest *metadata* requests only.
 - **Zero-config.** If the `.bib` is not yet a pinax, `asset fetch` records the default
   `pinax-files-dir` (`<stem>.files`) and creates it — one command bootstraps the corpus.
 - **Atomic writes.** A download lands in a temporary name inside `pinax-files-dir` and
@@ -328,10 +340,48 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
   An entry with no arXiv id and no resolvable open-access DOI simply has nothing
   to fetch — it lands in `skipped` with a reason, not `failed`. A PDF-only e-print
   (no source tree) skips the source step, so no empty `<citekey>.source/` is
-  created. `failed` is reserved for an actual download or I/O error.
+  created. `failed` is reserved for an actual download or I/O error. When an
+  entry needs an arXiv id it does not have — `--material preprint`/`source`, or
+  `best-pdf` with no open-access published PDF — and it has a DOI, the skip
+  reason says so and names `pynakes enrich --published --online`, which looks
+  one up by DOI ([backfill](#recovering-the-arxiv-source-for-published-papers-doi-to-arxiv-backfill)).
+  Nothing attaches a preprint automatically.
+- **`best-pdf` falls back on failure too.** When the published PDF is
+  unavailable *or* its download fails, `best-pdf` fetches the preprint PDF
+  instead. A failure the preprint made up for is not in `failed`; it is
+  reported as a `download_failed` warning with `fallback: "preprint_pdf"`.
 - **Envelope.** `asset fetch` extends the standard JSON envelope with `fetched` /
   `skipped` / `failed` lists; `modified` reflects whether the `.bib` changed (e.g.
-  a `pinax-files-dir` was recorded), not the downloads themselves.
+  a `pinax-files-dir` was recorded), not the downloads themselves. The counts are
+  in `summary`:
+
+  | Key | Counts |
+  | --- | --- |
+  | `requested` | entries the run considered (the selection, or the whole library) |
+  | `fetched` | items in `fetched` |
+  | `already_present` | skips because what the policy selects is already stored |
+  | `unavailable` | skips because a requested material could not be had: no identifier, no open-access copy, a page that was not a PDF, … |
+  | `failed` | items in `failed` |
+  | `planned` | a dry run's would-fetch items |
+
+  `already_present + unavailable + planned` is the length of `skipped`. Each
+  failed download also adds a warning object
+  `{"type": "download_failed", "key", "artifact", "message"}`.
+- **Attempts.** Every failed item, and every skipped published or supplement
+  PDF, carries `attempts`: one object per request, in order, with `url` (as
+  requested), `final_url` (after redirects), the HTTP `status`, the response
+  `content_type`, and an `outcome` — `pdf`, `not_pdf`, `http_error`, or
+  `network_error`. Any of the middle three is `null` when the request never got
+  that far. URLs are recorded without userinfo, fragments, or query parameters
+  that look like tokens, keys or signatures; no header, cookie, or response body
+  is kept. Human output summarizes them as host, status and content type. A skip
+  that needed no request (an entry with no DOI, say) has no `attempts`; a
+  published PDF for which resolution found no URL has `attempts: []`.
+- **`--strict`.** By default a partial run exits `0` with `status: "success"`.
+  `--strict` makes it a completeness gate: exit `1` when `summary.failed` or
+  `summary.unavailable` is non-zero. Already-present materials pass. The full
+  envelope, with `strict: true`, is emitted either way, so a caller still sees
+  what landed.
   A `--dry-run` makes no network request and creates nothing — not even the
   files directory. Each entry it would fetch for appears in `skipped` with
   reason `would fetch` and a `planned` list naming every artifact a real run

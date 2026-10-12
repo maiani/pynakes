@@ -298,7 +298,7 @@ def test_publisher_pdf_url_doi_prefix_aps() -> None:
         "https://doi.org/10.1103/f6nc-vsnx",
         doi="10.1103/f6nc-vsnx",
     )
-    assert url == "http://harvest.aps.org/v2/journals/articles/10.1103/f6nc-vsnx/fulltext"
+    assert url == "https://harvest.aps.org/v2/journals/articles/10.1103/f6nc-vsnx/fulltext"
 
 
 def test_publisher_pdf_url_doi_prefix_no_doi_skips_doi_rules() -> None:

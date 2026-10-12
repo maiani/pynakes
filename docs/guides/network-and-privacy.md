@@ -38,12 +38,20 @@ The built-in HTTP client identifies itself as
 format. The client does not send a Crossref/OpenAlex `mailto` parameter and has
 no configuration option for one.
 
+pynakes does not imitate a browser's `User-Agent`. A publisher's edge (bot
+protection, a CDN) may answer this client differently from a browser — a `403`
+or an HTML challenge page where a browser gets the PDF. `asset fetch` reports
+the HTTP status, content type and final URL of each request in `attempts`, so
+such a refusal is visible rather than silent.
+
 `PYNAKES_APS_API_TOKEN` supplies an optional APS-issued bearer token to the APS
-Harvest metadata endpoint (`harvest.aps.org`). Institutional IP access may work
+Harvest metadata endpoint (`harvest.aps.org`); it is not sent with PDF
+downloads. Institutional IP access may work
 without a token. Do not put credentials in bibliography fields, example URLs,
 committed configuration, or shared cache files. The HTTP client rejects URLs with embedded username/password credentials
 and private/local network destinations, including redirect targets.
-HTTPS-to-HTTP redirects emit a warning; they are not blocked.
+HTTPS-to-HTTP redirects emit a warning; they are not blocked. `asset fetch`
+tries a plain-HTTP material URL's HTTPS form first.
 Each HTTP fetch has a bounded overall
 deadline, 120 seconds by default.
 

@@ -1,5 +1,6 @@
 """Human-readable formatting for Pinax fetch reports."""
 
+from pynakes._fetch_attempts import describe_attempts
 from pynakes.fetch_progress import WOULD_FETCH
 
 
@@ -9,7 +10,11 @@ def fetch_report_lines(
     skipped_prefix: str = "Skipped",
     failed_prefix: str = "Failed",
 ) -> list[str]:
-    """Return concise human-readable lines for a ``fetch_materials`` report."""
+    """Return concise human-readable lines for a ``fetch_materials`` report.
+
+    A skip or failure for which downloads were tried names each request's
+    host, HTTP status, and content type, and the report ends with its counts.
+    """
     lines: list[str] = []
     for item in report["fetched"]:
         lines.append(_fetched_line(item))
@@ -20,10 +25,33 @@ def fetch_report_lines(
         if item["reason"] == WOULD_FETCH:
             lines.append(f"Would fetch {item['key']}.")
         else:
-            lines.append(f"{skipped_prefix} {item['key']} ({item['reason']}).")
+            lines.append(f"{skipped_prefix} {item['key']} ({item['reason']}){_tried(item)}.")
     for item in report["failed"]:
-        lines.append(f"{failed_prefix} {item['key']} ({item['error']}).")
+        lines.append(f"{failed_prefix} {item['key']} ({item['error']}){_tried(item)}.")
+    summary = report.get("summary")
+    if summary and (report["skipped"] or report["failed"]):
+        lines.append(_summary_line(summary))
     return lines
+
+
+def _tried(item: dict) -> str:
+    attempts = item.get("attempts")
+    return f"; tried {describe_attempts(attempts)}" if attempts else ""
+
+
+def _summary_line(summary: dict) -> str:
+    parts = [
+        f"{summary.get(name, 0)} {label}"
+        for name, label in (
+            ("fetched", "fetched"),
+            ("already_present", "already present"),
+            ("unavailable", "unavailable"),
+            ("failed", "failed"),
+            ("planned", "planned"),
+        )
+        if summary.get(name) or name in {"fetched", "failed"}
+    ]
+    return f"Summary: {summary.get('requested', 0)} requested; {', '.join(parts)}."
 
 
 def _fetched_line(item: dict) -> str:

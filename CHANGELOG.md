@@ -125,6 +125,17 @@ form is a `UsageError`, never silently reinterpreted.
 
 ### Added
 
+- `asset fetch` reports a `summary` (`requested`, `fetched`,
+  `already_present`, `unavailable`, `failed`, `planned`) and one
+  `download_failed` warning per failed download; failed items name their
+  `artifact`. Skipped and failed materials list `attempts`: each request's
+  URL, final URL, HTTP status, content type and outcome, with credentials and
+  token-like query parameters removed.
+- `asset fetch --strict` exits 1, still emitting the full envelope, when a
+  requested material failed or was unavailable; already-present materials
+  pass. `asset fetch` is listed in `gate_commands`.
+- A skip caused by a missing arXiv id names `pynakes enrich --published
+  --online`, which can look one up by DOI.
 - Support Python 3.15, with required tests on all three supported operating
   systems and release wheel checks on the newest interpreter.
 - Property tests for encoded whole-file fidelity, isolated field edits,
@@ -302,6 +313,13 @@ form is a `UsageError`, never silently reinterpreted.
 
 ### Fixed
 
+- Published-PDF downloads prefer an APS article's canonical
+  `https://journals.aps.org/<code>/pdf/<doi>` URL over legacy `link.aps.org`
+  and `harvest.aps.org` links, try `https://` before a plain `http://` URL,
+  and fall back through the candidates. Each URL gets one guarded GET; the
+  separate probe request, which bypassed the network policy, is gone.
+- `best-pdf` falls back to the preprint when the published download fails,
+  not only when it is unavailable.
 - Malformed interchange imports are clean `ValueError`s (a JSON error envelope
   from `convert --from`), never a `TypeError`, `RecursionError` or raw XML
   parse error. This covers CSL-JSON that is not an item or array of items,
