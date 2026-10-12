@@ -313,6 +313,21 @@ form is a `UsageError`, never silently reinterpreted.
 
 ### Fixed
 
+- `asset fetch --access institutional` and supplement discovery look up the
+  publisher landing page through the same guarded HTTP client as every other
+  request (public destinations only, redirects included; address pinning; one
+  deadline; a size cap; no environment proxies). The lookup used an unguarded
+  client before.
+- The Pinax provenance manifest records a downloaded file's source URL without
+  userinfo, fragment, or token-like query parameters, using the same redaction
+  as `attempts`; existing manifests are left unchanged.
+- When `asset fetch` stored an arXiv preprint PDF and the source download or
+  extraction then failed, the PDF is listed in `fetched` and the source in
+  `failed` (`artifact: "preprint_source"`). The PDF used to be missing from the
+  report, and a first run on a new library could drop `pinax-files-dir` while
+  the PDF stayed on disk. `ArxivFetchError.partial` holds what was installed.
+- The Pinax and network guides say institutional access relies on network
+  location (campus network or institutional VPN); `HTTP(S)_PROXY` is not used.
 - Published-PDF downloads prefer an APS article's canonical
   `https://journals.aps.org/<code>/pdf/<doi>` URL over legacy `link.aps.org`
   and `harvest.aps.org` links, try `https://` before a plain `http://` URL,

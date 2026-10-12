@@ -331,6 +331,9 @@ def run_fetch_loop(
                         "unavailable",
                     )
             except ArxivFetchError as exc:
+                if exc.partial is not None:
+                    # The preprint PDF landed before the source failed.
+                    fetched.append(exc.partial.to_dict())
                 run.fail(key, exc)
                 _emit_fail(progress, key, index, entry_total, exc)
 

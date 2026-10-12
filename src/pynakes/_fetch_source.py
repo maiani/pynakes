@@ -12,8 +12,12 @@ import tarfile
 import zlib
 from io import BytesIO
 from pathlib import Path, PurePosixPath
+from typing import TYPE_CHECKING
 
 from pynakes._fetch_attempts import DiagnosedFetchError
+
+if TYPE_CHECKING:
+    from pynakes.fetch import ArxivDownloadResult
 
 _GZIP_MAGIC = b"\x1f\x8b"
 _GZIP_FEXTRA = 0x04
@@ -29,7 +33,14 @@ MAX_SOURCE_MEMBERS = 20_000
 
 
 class ArxivFetchError(DiagnosedFetchError):
-    """Raised when arXiv material download or extraction fails."""
+    """Raised when arXiv material download or extraction fails.
+
+    ``partial`` is what was installed before the failure — the preprint PDF,
+    as an :class:`~pynakes.fetch.ArxivDownloadResult`, when only the source
+    failed after it — or ``None`` when nothing landed.
+    """
+
+    partial: ArxivDownloadResult | None = None
 
 
 class ArxivSourceUnavailableError(ArxivFetchError):

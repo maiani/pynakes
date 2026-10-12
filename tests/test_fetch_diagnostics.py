@@ -25,6 +25,7 @@ from pynakes.cli import app
 from pynakes.fetch import (
     ArxivFetchError,
     PublishedPdfFetchError,
+    download_arxiv_materials,
     download_published_material,
     download_supplement_material,
     fetch_arxiv_pdf,
@@ -338,6 +339,112 @@ def test_arxiv_failures_name_the_artifact_and_request(monkeypatch) -> None:
     assert caught.value.artifact == "preprint_pdf"
     assert caught.value.attempts[0]["url"] == "https://arxiv.org/pdf/2345.6789"
     assert caught.value.attempts[0]["status"] == 404
+
+
+# --- what lands is what is reported -----------------------------------------
+
+
+def test_a_source_failure_after_the_preprint_pdf_carries_the_installed_pdf(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+
+    def unavailable(arxiv_id: str) -> bytes:
+        raise ArxivFetchError("Server returned HTTP 503 for arXiv source")
+
+    with pytest.raises(ArxivFetchError) as caught:
+        download_arxiv_materials(
+            store,
+            "Turing1936",
+            "2345.6789",
+            pdf_fetcher=lambda arxiv_id: PDF,
+            source_fetcher=unavailable,
+        )
+
+    error = caught.value
+    assert error.artifact == "preprint_source"
+    assert error.attempts[0]["url"] == "https://arxiv.org/e-print/2345.6789"
+    assert error.partial is not None
+    assert error.partial.pdf_path == tmp_path / "refs.files" / "Turing1936.preprint.pdf"
+    assert error.partial.pdf_path.read_bytes() == PDF
+    row = store.read_manifest()["files"]["Turing1936"]
+    assert row["preprint_pdf"]["source"] == "https://arxiv.org/pdf/2345.6789"
+    assert "preprint_source" not in row
+
+
+def test_a_corrupt_source_after_the_preprint_pdf_names_the_source(tmp_path: Path) -> None:
+    with pytest.raises(ArxivFetchError) as caught:
+        download_arxiv_materials(
+            _store(tmp_path),
+            "Turing1936",
+            "2345.6789",
+            pdf_fetcher=lambda arxiv_id: PDF,
+            source_fetcher=lambda arxiv_id: b"not a tarball",
+        )
+    assert caught.value.artifact == "preprint_source"
+    assert caught.value.partial is not None
+
+
+def test_a_source_failure_alone_carries_nothing_installed(tmp_path: Path) -> None:
+    def unavailable(arxiv_id: str) -> bytes:
+        raise ArxivFetchError("Server returned HTTP 503 for arXiv source")
+
+    with pytest.raises(ArxivFetchError) as caught:
+        download_arxiv_materials(
+            _store(tmp_path), "Turing1936", "2345.6789", pdf=False, source_fetcher=unavailable
+        )
+    assert caught.value.partial is None
+
+
+def test_the_envelope_reports_a_preprint_pdf_fetched_before_its_source_failed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@misc{Turing1936,\n  title = {On Computable Numbers},\n"
+        "  eprint = {2345.6789},\n  archiveprefix = {arXiv},\n}\n",
+        encoding="utf-8",
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.startswith("/pdf/"):
+            return _pdf(request)
+        return httpx.Response(404)
+
+    _mock_http(monkeypatch, handler)
+
+    result = runner.invoke(
+        app,
+        ["asset", "fetch", str(bib), "--material", "preprint", "--material", "source", "--json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    [fetched] = data["fetched"]
+    assert fetched["key"] == "Turing1936"
+    assert fetched["pdf_path"].endswith("Turing1936.preprint.pdf")
+    assert fetched["source_path"] is None
+    [failure] = data["failed"]
+    assert failure["artifact"] == "preprint_source"
+    assert failure["attempts"][0]["status"] == 404
+    assert data["summary"]["fetched"] == 1
+    assert data["summary"]["failed"] == 1
+    manifest = json.loads((tmp_path / "refs.files" / ".pinax" / "manifest.json").read_text())
+    assert set(manifest["files"]["Turing1936"]) == {"preprint_pdf"}
+
+
+def test_the_manifest_records_a_redacted_published_source(tmp_path: Path, monkeypatch) -> None:
+    signed = "https://cdn.example/paper.pdf?Expires=1&Signature=abc&Key-Pair-Id=k&page=1"
+    _mock_http(monkeypatch, _pdf)
+
+    result = download_published_material(
+        _store(tmp_path), "Noether1918", "10.5555/noether", url_resolver=lambda doi: signed
+    )
+
+    assert result.pdf_path is not None
+    manifest = json.loads((tmp_path / "refs.files" / ".pinax" / "manifest.json").read_text())
+    recorded = manifest["files"]["Noether1918"]["published_pdf"]["source"]
+    assert recorded == "https://cdn.example/paper.pdf?page=1"
 
 
 # --- the CLI envelope: summary, warnings, --strict ----------------------------

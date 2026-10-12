@@ -356,27 +356,27 @@ def test_resolve_identifier_rejects_unknown(value: str) -> None:
     [
         # nature.com: slug IS the DOI suffix under 10.1038
         (
-            "https://www.nature.com/articles/s41535-025-00801-3",
-            "10.1038/s41535-025-00801-3",
+            "https://www.nature.com/articles/s41535-099-00042-7",
+            "10.1038/s41535-099-00042-7",
         ),
         (
-            "https://nature.com/articles/s41586-024-07487-w",
-            "10.1038/s41586-024-07487-w",
+            "https://nature.com/articles/s41586-099-00017-x",
+            "10.1038/s41586-099-00017-x",
         ),
         # APS: DOI embedded literally in the abstract URL
         (
-            "https://journals.aps.org/rmp/abstract/10.1103/k13g-z9s8",
-            "10.1103/k13g-z9s8",
+            "https://journals.aps.org/rmp/abstract/10.1103/w4rv-n8cj",
+            "10.1103/w4rv-n8cj",
         ),
         # APS PDF variant
         (
-            "https://journals.aps.org/rmp/pdf/10.1103/k13g-z9s8",
-            "10.1103/k13g-z9s8",
+            "https://journals.aps.org/rmp/pdf/10.1103/w4rv-n8cj",
+            "10.1103/w4rv-n8cj",
         ),
         # APS Physical Review Letters
         (
-            "https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.132.010601",
-            "10.1103/PhysRevLett.132.010601",
+            "https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.999.010601",
+            "10.1103/PhysRevLett.999.010601",
         ),
     ],
 )
@@ -401,16 +401,16 @@ def test_extract_publisher_doi_returns_none_for_unknown(url: str) -> None:
     "url,expected",
     [
         (
-            "https://www.nature.com/articles/s41535-025-00801-3",
-            (DOI, "10.1038/s41535-025-00801-3"),
+            "https://www.nature.com/articles/s41535-099-00042-7",
+            (DOI, "10.1038/s41535-099-00042-7"),
         ),
         (
-            "https://journals.aps.org/rmp/abstract/10.1103/k13g-z9s8",
-            (DOI, "10.1103/k13g-z9s8"),
+            "https://journals.aps.org/rmp/abstract/10.1103/w4rv-n8cj",
+            (DOI, "10.1103/w4rv-n8cj"),
         ),
         (
-            "https://journals.aps.org/rmp/pdf/10.1103/k13g-z9s8",
-            (DOI, "10.1103/k13g-z9s8"),
+            "https://journals.aps.org/rmp/pdf/10.1103/w4rv-n8cj",
+            (DOI, "10.1103/w4rv-n8cj"),
         ),
     ],
 )

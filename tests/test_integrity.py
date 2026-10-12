@@ -36,13 +36,13 @@ PROVIDER_BIBTEX = """@article{provider,
 }
 """
 
-APS_BIBTEX = """@article{1bmy-6yp4,
+APS_BIBTEX = """@article{q7zt-k2wx,
   journal = {Phys. Rev. B},
   issue = {8},
-  pages = {L080507},
+  pages = {L999001},
   numpages = {7},
   month = {Aug},
-  doi = {10.1103/1bmy-6yp4}
+  doi = {10.1103/q7zt-k2wx}
 }
 """
 
@@ -172,7 +172,7 @@ def test_enrich_prefers_aps_metadata_and_adds_page_count(monkeypatch) -> None:
         lambda _doi, _journal, **_kwargs: aps.ReferenceMetadata(
             provider="American Physical Society",
             entry_type="article",
-            fields={"number": "8", "pages": "L080507", "numpages": "7", "month": "Aug"},
+            fields={"number": "8", "pages": "L999001", "numpages": "7", "month": "Aug"},
         ),
     )
     doi_calls: list[str] = []
@@ -180,20 +180,20 @@ def test_enrich_prefers_aps_metadata_and_adds_page_count(monkeypatch) -> None:
         doi, "fetch_bibtex", lambda value: doi_calls.append(value) or PROVIDER_BIBTEX
     )
     lib = parse_bib(
-        "@article{Levitan_2026,\n  journal = {Physical Review B},\n  doi = {10.1103/1bmy-6yp4}\n}\n"
+        "@article{Faraday_1831,\n  journal = {Physical Review B},\n  doi = {10.1103/q7zt-k2wx}\n}\n"
     )
 
     report = enrich_library(lib, online=True)
 
     assert doi_calls == []
     assert {(update.field, update.value) for update in report.updates} >= {
-        ("pages", "L080507"),
+        ("pages", "L999001"),
         ("numpages", "7"),
         ("month", "Aug"),
     }
-    entry = lib.entries["Levitan_2026"]
+    entry = lib.entries["Faraday_1831"]
     assert entry.fields["number"] == "8"
-    assert entry.fields["pages"] == "L080507"
+    assert entry.fields["pages"] == "L999001"
     assert entry.fields["numpages"] == "7"
 
 

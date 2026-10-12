@@ -423,7 +423,7 @@ _CROSSREF_WITH_PDF = json.dumps(
         "message": {
             "link": [
                 {
-                    "URL": "https://www.nature.com/articles/s41586-023-06747-5.pdf",
+                    "URL": "https://www.nature.com/articles/s41586-099-00023-1.pdf",
                     "content-type": "application/pdf",
                     "content-version": "vor",
                     "intended-application": "text-mining",
@@ -439,7 +439,7 @@ _CROSSREF_WITH_SIMILARITY = json.dumps(
         "message": {
             "link": [
                 {
-                    "URL": "http://harvest.aps.org/v2/journals/articles/10.1103/f6nc-vsnx/fulltext",
+                    "URL": "http://harvest.aps.org/v2/journals/articles/10.1103/h3pd-x9mv/fulltext",
                     "content-type": "unspecified",
                     "content-version": "vor",
                     "intended-application": "similarity-checking",
@@ -465,16 +465,16 @@ def test_crossref_oa_pdf_url_resolves_pdf_link(tmp_path: Path) -> None:
         assert "api.crossref.org/works/" in str(target)
         return _FakeResponse(_CROSSREF_WITH_PDF)
 
-    url = crossref_oa_pdf_url("10.1038/s41586-023-06747-5", urlopen=fake_urlopen)
-    assert url == "https://www.nature.com/articles/s41586-023-06747-5.pdf"
+    url = crossref_oa_pdf_url("10.1038/s41586-099-00023-1", urlopen=fake_urlopen)
+    assert url == "https://www.nature.com/articles/s41586-099-00023-1.pdf"
 
 
 def test_crossref_oa_pdf_url_falls_back_to_similarity_checking(tmp_path: Path) -> None:
     def fake_urlopen(request: object, timeout: float = 30.0) -> _FakeResponse:
         return _FakeResponse(_CROSSREF_WITH_SIMILARITY)
 
-    url = crossref_oa_pdf_url("10.1103/f6nc-vsnx", urlopen=fake_urlopen)
-    assert url == "http://harvest.aps.org/v2/journals/articles/10.1103/f6nc-vsnx/fulltext"
+    url = crossref_oa_pdf_url("10.1103/h3pd-x9mv", urlopen=fake_urlopen)
+    assert url == "http://harvest.aps.org/v2/journals/articles/10.1103/h3pd-x9mv/fulltext"
 
 
 def test_crossref_oa_pdf_url_returns_none_when_no_links(tmp_path: Path) -> None:

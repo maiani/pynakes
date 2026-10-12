@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 from pynakes.provider_cache import open_cache
-from pynakes.providers import identity, publisher
+from pynakes.providers import _network, identity, publisher
 from pynakes.providers._http import ProviderFetchError
 from pynakes.providers.metadata import openalex, semantic_scholar
 from pynakes.providers.records import ReferenceMetadata
@@ -122,9 +122,9 @@ def test_import_provider_registry_rejects_unknown_kind() -> None:
         ("https://doi.org/10.5555/test", "doi", "10.5555/test", "doi.org"),
         ("https://arxiv.org/pdf/2301.00001v2.pdf", "arxiv", "2301.00001", "arXiv"),
         (
-            "https://www.nature.com/articles/s41535-025-00801-3",
+            "https://www.nature.com/articles/s41535-099-00042-7",
             "doi",
-            "10.1038/s41535-025-00801-3",
+            "10.1038/s41535-099-00042-7",
             "Nature",
         ),
     ],
@@ -280,8 +280,8 @@ def test_fetch_semantic_scholar_paper_reads_deterministic_cache(tmp_path: Path) 
 def test_publisher_pdf_url_abstract_to_pdf() -> None:
     from pynakes.providers.pdf_overrides import publisher_pdf_url
 
-    url = publisher_pdf_url("https://journals.aps.org/prb/abstract/10.1103/PhysRevB.111.224421")
-    assert url == "https://journals.aps.org/prb/pdf/10.1103/PhysRevB.111.224421"
+    url = publisher_pdf_url("https://journals.aps.org/prb/abstract/10.1103/PhysRevB.999.224421")
+    assert url == "https://journals.aps.org/prb/pdf/10.1103/PhysRevB.999.224421"
 
 
 def test_publisher_pdf_url_no_match_returns_none() -> None:
@@ -295,16 +295,16 @@ def test_publisher_pdf_url_doi_prefix_aps() -> None:
     from pynakes.providers.pdf_overrides import publisher_pdf_url
 
     url = publisher_pdf_url(
-        "https://doi.org/10.1103/f6nc-vsnx",
-        doi="10.1103/f6nc-vsnx",
+        "https://doi.org/10.1103/h3pd-x9mv",
+        doi="10.1103/h3pd-x9mv",
     )
-    assert url == "https://harvest.aps.org/v2/journals/articles/10.1103/f6nc-vsnx/fulltext"
+    assert url == "https://harvest.aps.org/v2/journals/articles/10.1103/h3pd-x9mv/fulltext"
 
 
 def test_publisher_pdf_url_doi_prefix_no_doi_skips_doi_rules() -> None:
     from pynakes.providers.pdf_overrides import publisher_pdf_url
 
-    url = publisher_pdf_url("https://doi.org/10.1103/f6nc-vsnx")
+    url = publisher_pdf_url("https://doi.org/10.1103/h3pd-x9mv")
     assert url is None
 
 
@@ -323,14 +323,7 @@ def test_discover_publisher_artifacts_reads_pdf_meta_and_supplement(
             ),
         )
 
-    transport = httpx.MockTransport(handler)
-
-    class MockClient(httpx.Client):
-        def __init__(self, *args, **kwargs) -> None:
-            kwargs["transport"] = transport
-            super().__init__(*args, **kwargs)
-
-    monkeypatch.setattr("pynakes.providers.publisher.httpx.Client", MockClient)
+    _mock_guarded_client(monkeypatch, handler)
 
     artifacts = publisher.discover_artifacts_for_doi("10.5555/entitled")
 
@@ -338,3 +331,101 @@ def test_discover_publisher_artifacts_reads_pdf_meta_and_supplement(
     assert artifacts.supplement_pdf_urls == (
         "https://doi.org/10.5555/files/supporting-information.pdf",
     )
+
+
+def _mock_guarded_client(monkeypatch: pytest.MonkeyPatch, handler) -> list[dict]:
+    """Serve requests from *handler* inside the guarded client, keeping its request guard.
+
+    Returns the keyword arguments of every client built, so a test can check
+    the guard's configuration.
+    """
+    transport = httpx.MockTransport(handler)
+    original = httpx.Client
+    built: list[dict] = []
+
+    def client(**kwargs):
+        built.append(dict(kwargs))
+        return original(**{**kwargs, "transport": transport})
+
+    monkeypatch.setattr(httpx, "Client", client)
+    return built
+
+
+def test_discover_publisher_artifacts_uses_the_guarded_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    built = _mock_guarded_client(
+        monkeypatch,
+        lambda request: httpx.Response(
+            200, headers={"content-type": "text/html; charset=latin-1"}, content=b"<html></html>"
+        ),
+    )
+
+    publisher.discover_artifacts_for_doi("10.5555/entitled")
+
+    assert len(built) == 1
+    assert built[0]["trust_env"] is False
+    assert isinstance(built[0]["transport"], _network.PublicTransport)
+    assert built[0]["event_hooks"]["request"]
+
+
+def test_discover_publisher_artifacts_refuses_a_redirect_to_a_private_address(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requested: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(str(request.url))
+        return httpx.Response(302, headers={"location": "http://10.0.0.7/landing"})
+
+    _mock_guarded_client(monkeypatch, handler)
+
+    with pytest.raises(ProviderFetchError, match="non-public"):
+        publisher.discover_artifacts_for_doi("10.5555/entitled")
+    assert requested == ["https://doi.org/10.5555/entitled"]
+
+
+def test_discover_publisher_artifacts_refuses_a_host_resolving_privately(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(302, headers={"location": "https://landing.example/article"})
+
+    _mock_guarded_client(monkeypatch, handler)
+    monkeypatch.setattr(
+        _network,
+        "_getaddrinfo",
+        lambda host, port: ["192.168.1.20"] if host == "landing.example" else ["93.184.216.34"],
+    )
+
+    with pytest.raises(ProviderFetchError, match="non-public"):
+        publisher.discover_artifacts_for_doi("10.5555/entitled")
+
+
+def test_discover_publisher_artifacts_with_an_injected_opener_follows_the_final_url() -> None:
+    class Response:
+        status = 200
+        headers = {"Content-Type": "text/html"}
+
+        def __init__(self) -> None:
+            self._body = b'<meta name="citation_pdf_url" content="/main.pdf">'
+
+        def geturl(self) -> str:
+            return "https://landing.example/article/42"
+
+        def read(self, size: int = -1) -> bytes:
+            body, self._body = self._body, b""
+            return body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc) -> None:
+            return None
+
+    artifacts = publisher.discover_artifacts_for_doi(
+        "10.5555/entitled", opener=lambda request, timeout: Response()
+    )
+
+    assert artifacts.landing_url == "https://landing.example/article/42"
+    assert artifacts.published_pdf_url == "https://landing.example/main.pdf"

@@ -143,6 +143,54 @@ def test_manifest_records_canonical_annotation_and_drift(tmp_path: Path) -> None
     assert scan.drift == [{"key": "A", "kind": "preprint_pdf", "reason": "manifest without file"}]
 
 
+@pytest.mark.parametrize(
+    ("source", "recorded"),
+    [
+        (
+            "https://reader:s3cr3t@publisher.example/a.pdf?id=7&token=abc&Signature=xyz#page=2",
+            "https://publisher.example/a.pdf?id=7",
+        ),
+        (
+            "https://cdn.example/a.pdf?X-Amz-Credential=k&v=" + "A" * 40,
+            "https://cdn.example/a.pdf",
+        ),
+        ("https://arxiv.org/pdf/1905.00001", "https://arxiv.org/pdf/1905.00001"),
+        (
+            "https://reader:pw@publisher.example:99999/a.pdf?key=k",
+            "https://publisher.example:99999/a.pdf",
+        ),
+        ("manual", "manual"),
+    ],
+)
+def test_manifest_records_a_redacted_source(tmp_path: Path, source: str, recorded: str) -> None:
+    root = tmp_path / "refs.files"
+    root.mkdir()
+    (root / "A.published.pdf").write_bytes(b"%PDF")
+    store = FileStore(root=root, bib_path=tmp_path / "refs.bib")
+
+    store.record_artifact("A", "published_pdf", source=source, refetchable=True)
+
+    assert store.read_manifest()["files"]["A"]["published_pdf"]["source"] == recorded
+
+
+def test_an_existing_manifest_source_is_read_unchanged(tmp_path: Path) -> None:
+    root = tmp_path / "refs.files"
+    (root / ".pinax").mkdir(parents=True)
+    (root / "A.published.pdf").write_bytes(b"%PDF")
+    (root / "B.preprint.pdf").write_bytes(b"%PDF")
+    legacy = "https://publisher.example/a.pdf?token=abc"
+    manifest = {
+        "version": 1,
+        "files": {"A": {"published_pdf": {"source": legacy, "refetchable": True}}},
+    }
+    (root / ".pinax" / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    store = FileStore(root=root, bib_path=tmp_path / "refs.bib")
+
+    store.record_artifact("B", "preprint_pdf", source="https://arxiv.org/pdf/1", refetchable=True)
+
+    assert store.read_manifest()["files"]["A"]["published_pdf"]["source"] == legacy
+
+
 def test_copy_materials_copies_files_and_manifest_row(tmp_path: Path) -> None:
     source_root = tmp_path / "source.files"
     source_root.mkdir()

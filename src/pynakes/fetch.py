@@ -236,6 +236,11 @@ def download_arxiv_materials(
     ``pdf_fetcher`` and ``source_fetcher`` receive the normalized arXiv id and
     return bytes, allowing unit tests and callers to provide deterministic
     fixtures instead of making network requests.
+
+    The preprint PDF is installed (and recorded in the manifest) before the
+    source is requested. When the source then fails, the raised
+    :class:`ArxivFetchError` names ``preprint_source`` as its ``artifact`` and
+    carries the installed PDF in ``partial``, so the caller can report both.
     """
     arxiv_id = _normalize_or_raise(identifier)
     pdf_path: Path | None = None
@@ -263,48 +268,17 @@ def download_arxiv_materials(
         _emit_progress(progress, "artifact_done", key, "preprint_pdf", total_bytes=len(pdf_bytes))
 
     if source:
-        _emit_progress(progress, "artifact_start", key, "preprint_source")
         try:
-            if source_fetcher is None:
-                source_bytes = fetch_arxiv_source(arxiv_id, progress=progress, key=key)
-            else:
-                source_bytes = source_fetcher(arxiv_id)
+            source_path, source_unavailable = _download_arxiv_source(
+                store, key, arxiv_id, source_fetcher, fetched_date, progress
+            )
         except ArxivFetchError as exc:
-            _diagnose(exc, "preprint_source", arxiv.source_url(arxiv_id))
+            if exc.artifact is None:
+                exc.artifact = "preprint_source"
+            if pdf_path is not None:
+                # The preprint PDF is installed and recorded; say so with the failure.
+                exc.partial = ArxivDownloadResult(key=key, arxiv_id=arxiv_id, pdf_path=pdf_path)
             raise
-        store.ensure_root()
-        try:
-            with (
-                store.scratch() as scratch,
-                tempfile.TemporaryDirectory(prefix=f"{key}.source.", dir=scratch) as tmp,
-            ):
-                extracted = Path(tmp) / "source"
-                extracted.mkdir()
-                extract_arxiv_source(source_bytes, extracted)
-                source_path = store.write_preprint_source(key, extracted)
-        except ArxivSourceUnavailableError:
-            # PDF-only deposit: nothing to extract. Not a corrupt-archive failure,
-            # so don't discard a PDF fetched above — report it as unavailable.
-            source_unavailable = True
-            _emit_progress(
-                progress,
-                "artifact_done",
-                key,
-                "preprint_source",
-                total_bytes=len(source_bytes),
-                message="no arXiv source archive (PDF-only submission)",
-            )
-        else:
-            store.record_artifact(
-                key,
-                "preprint_source",
-                source=arxiv.source_url(arxiv_id),
-                fetched_date=fetched_date,
-                refetchable=True,
-            )
-            _emit_progress(
-                progress, "artifact_done", key, "preprint_source", total_bytes=len(source_bytes)
-            )
 
     return ArxivDownloadResult(
         key=key,
@@ -313,6 +287,62 @@ def download_arxiv_materials(
         source_path=source_path,
         source_unavailable=source_unavailable,
     )
+
+
+def _download_arxiv_source(
+    store: FileStore,
+    key: str,
+    arxiv_id: str,
+    source_fetcher: FetchArxivBytes | None,
+    fetched_date: str | None,
+    progress: FetchProgress | None,
+) -> tuple[Path | None, bool]:
+    """Fetch and install one arXiv source bundle: its path, and whether arXiv had none."""
+    source_path: Path | None = None
+    source_unavailable = False
+    _emit_progress(progress, "artifact_start", key, "preprint_source")
+    try:
+        if source_fetcher is None:
+            source_bytes = fetch_arxiv_source(arxiv_id, progress=progress, key=key)
+        else:
+            source_bytes = source_fetcher(arxiv_id)
+    except ArxivFetchError as exc:
+        _diagnose(exc, "preprint_source", arxiv.source_url(arxiv_id))
+        raise
+    store.ensure_root()
+    try:
+        with (
+            store.scratch() as scratch,
+            tempfile.TemporaryDirectory(prefix=f"{key}.source.", dir=scratch) as tmp,
+        ):
+            extracted = Path(tmp) / "source"
+            extracted.mkdir()
+            extract_arxiv_source(source_bytes, extracted)
+            source_path = store.write_preprint_source(key, extracted)
+    except ArxivSourceUnavailableError:
+        # PDF-only deposit: nothing to extract. Not a corrupt-archive failure,
+        # so don't discard a PDF fetched above — report it as unavailable.
+        source_unavailable = True
+        _emit_progress(
+            progress,
+            "artifact_done",
+            key,
+            "preprint_source",
+            total_bytes=len(source_bytes),
+            message="no arXiv source archive (PDF-only submission)",
+        )
+    else:
+        store.record_artifact(
+            key,
+            "preprint_source",
+            source=arxiv.source_url(arxiv_id),
+            fetched_date=fetched_date,
+            refetchable=True,
+        )
+        _emit_progress(
+            progress, "artifact_done", key, "preprint_source", total_bytes=len(source_bytes)
+        )
+    return source_path, source_unavailable
 
 
 def openalex_oa_pdf_url(

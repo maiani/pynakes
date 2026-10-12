@@ -344,7 +344,9 @@ provider implementations; `importer.py`, `integrity.py`, and `fetch.py`
 translate provider failures into their domain errors. Tests mock or fixture
 this boundary so the normal suite never relies on external availability.
 
-The default HTTP transport validates every request, redirects included: only
+Every request goes through one guarded client in `providers/_http.py`
+(publisher landing-page discovery included); it ignores environment proxy
+settings. The default HTTP transport validates every request, redirects included: only
 `http`/`https` without credentials, and only to public addresses. It pins the
 validated address, so a second DNS answer cannot redirect the connection to a
 private one. Each fetch has one overall deadline, 120 seconds by default.

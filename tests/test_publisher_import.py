@@ -135,13 +135,13 @@ OPEN_LIBRARY_JSON = json.dumps(
         ),
         # SciPost URLs come in a DOI form and a bare article-id form.
         (
-            "https://scipost.org/10.21468/SciPostPhys.10.1.001",
-            (DOI, "10.21468/SciPostPhys.10.1.001"),
+            "https://scipost.org/10.21468/SciPostPhys.99.1.001",
+            (DOI, "10.21468/SciPostPhys.99.1.001"),
         ),
-        ("https://scipost.org/SciPostPhys.10.1.001", (DOI, "10.21468/SciPostPhys.10.1.001")),
+        ("https://scipost.org/SciPostPhys.99.1.001", (DOI, "10.21468/SciPostPhys.99.1.001")),
         (
-            "https://scipost.org/SciPostPhysCore.6.1.001/pdf",
-            (DOI, "10.21468/SciPostPhysCore.6.1.001"),
+            "https://scipost.org/SciPostPhysCore.99.1.001/pdf",
+            (DOI, "10.21468/SciPostPhysCore.99.1.001"),
         ),
         # JSTOR: a numeric stable id is the suffix of a 10.2307 DOI.
         ("https://www.jstor.org/stable/1171664", (DOI, "10.2307/1171664")),
@@ -184,20 +184,20 @@ OPEN_LIBRARY_JSON = json.dumps(
         ("https://pubs.acs.org/doi/10.5555/acs.article.4/", (DOI, "10.5555/acs.article.4")),
         # Royal Society of Chemistry: the DOI is derived from the article suffix.
         (
-            "https://pubs.rsc.org/en/content/articlelanding/2023/ra/d3ra90060f",
-            (DOI, "10.1039/d3ra90060f"),
+            "https://pubs.rsc.org/en/content/articlelanding/2099/ra/d9ra99901k",
+            (DOI, "10.1039/d9ra99901k"),
         ),
         (
-            "https://pubs.rsc.org/en/content/articlepdf/2023/ra/d3ra90060f",
-            (DOI, "10.1039/d3ra90060f"),
+            "https://pubs.rsc.org/en/content/articlepdf/2099/ra/d9ra99901k",
+            (DOI, "10.1039/d9ra99901k"),
         ),
         (
-            "https://pubs.rsc.org/en/content/articlehtml/2023/ra/d3ra90060f?page=search",
-            (DOI, "10.1039/d3ra90060f"),
+            "https://pubs.rsc.org/en/content/articlehtml/2099/ra/d9ra99901k?page=search",
+            (DOI, "10.1039/d9ra99901k"),
         ),
         (
-            "https://pubs.rsc.org/en/content/articlelanding/2023/ra/d3ra90060f/",
-            (DOI, "10.1039/d3ra90060f"),
+            "https://pubs.rsc.org/en/content/articlelanding/2099/ra/d9ra99901k/",
+            (DOI, "10.1039/d9ra99901k"),
         ),
         # Project Euclid: the DOI is the final path segment and contains a slash.
         (
@@ -236,7 +236,7 @@ def test_resolve_identifier_accepts_publisher_and_catalogue_urls(
 def test_rsc_rule_does_not_resolve_an_out_of_scope_url_shape() -> None:
     # Only /en/content/article{landing,html,pdf}/ carries a derivable DOI; other
     # RSC content-path shapes must fall through rather than produce a wrong one.
-    url = "https://pubs.rsc.org/en/content/chapter/2023/ra/d3ra90060f"
+    url = "https://pubs.rsc.org/en/content/chapter/2099/ra/d9ra99901k"
 
     assert extract_publisher_doi(url) is None
     with pytest.raises(UnsupportedIdentifierError):
@@ -301,14 +301,14 @@ def test_publisher_url_rules_report_their_source() -> None:
             "10.5555/journal.pone.1",
         ),
         ("https://iopscience.iop.org/article/10.5555/iop.1", "10.5555/iop.1"),
-        ("https://scipost.org/SciPostPhys.10.1.001", "10.21468/SciPostPhys.10.1.001"),
+        ("https://scipost.org/SciPostPhys.99.1.001", "10.21468/SciPostPhys.99.1.001"),
         ("https://www.jstor.org/stable/1171664", "10.2307/1171664"),
         ("https://aip.scitation.org/doi/10.5555/aip.1", "10.5555/aip.1"),
         ("https://dl.acm.org/doi/10.5555/acm.1", "10.5555/acm.1"),
         ("https://pubs.acs.org/doi/10.5555/acs.1", "10.5555/acs.1"),
         (
-            "https://pubs.rsc.org/en/content/articlelanding/2023/ra/d3ra90060f",
-            "10.1039/d3ra90060f",
+            "https://pubs.rsc.org/en/content/articlelanding/2099/ra/d9ra99901k",
+            "10.1039/d9ra99901k",
         ),
         (
             "https://projecteuclid.org/journals/statistical-science/volume-8/issue-1/"

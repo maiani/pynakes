@@ -6,34 +6,34 @@ from pynakes.providers.preferred_metadata import preferred_metadata_provider
 
 def test_physical_review_b_prefers_aps_metadata() -> None:
     assert preferred_metadata_provider("Physical Review B") == "aps"
-    assert aps.request_url("10.1103/1bmy-6yp4", "Physical Review B") == (
-        "https://harvest.aps.org/v2/journals/articles/10.1103/1bmy-6yp4"
+    assert aps.request_url("10.1103/q7zt-k2wx", "Physical Review B") == (
+        "https://harvest.aps.org/v2/journals/articles/10.1103/q7zt-k2wx"
     )
 
 
 def test_aps_metadata_preserves_article_id_and_page_count() -> None:
     metadata = aps.fetch_metadata(
-        "10.1103/1bmy-6yp4",
+        "10.1103/q7zt-k2wx",
         "Physical Review B",
         fetcher=lambda _doi: {
-            "title": {"value": "Optical spectroscopy"},
-            "authors": [{"surname": "Levitan", "firstname": "Benjamin A."}],
+            "title": {"value": "Experimental researches in electricity"},
+            "authors": [{"surname": "Faraday", "firstname": "Michael"}],
             "journal": {"abbreviatedName": "Phys. Rev. B"},
-            "volume": {"number": "114"},
+            "volume": {"number": "38"},
             "issue": {"number": "8"},
-            "pageStart": "L080507",
+            "pageStart": "L999001",
             "numPages": 7,
-            "date": "2026-08-25",
-            "identifiers": {"doi": "10.1103/1bmy-6yp4"},
+            "date": "1931-08-25",
+            "identifiers": {"doi": "10.1103/q7zt-k2wx"},
         },
     )
 
     assert metadata is not None
     assert metadata.fields["number"] == "8"
-    assert metadata.fields["pages"] == "L080507"
+    assert metadata.fields["pages"] == "L999001"
     assert metadata.fields["numpages"] == "7"
     assert metadata.fields["month"] == "aug"
-    assert metadata.fields["author"] == "Levitan, Benjamin A."
+    assert metadata.fields["author"] == "Faraday, Michael"
 
 
 def test_aps_metadata_strips_inline_mathml_without_losing_text() -> None:
@@ -42,14 +42,14 @@ def test_aps_metadata_strips_inline_mathml_without_losing_text() -> None:
         "Physical Review Letters",
         fetcher=lambda _doi: {
             "title": {
-                "value": ("Altermagnetism in <math><mrow><mi>Mn</mi><mi>Te</mi></mrow></math>")
+                "value": ("On the magnetism of <math><mrow><mi>Fe</mi><mi>O</mi></mrow></math>")
             },
             "identifiers": {"doi": "10.1103/example"},
         },
     )
 
     assert metadata is not None
-    assert metadata.fields["title"] == "Altermagnetism in MnTe"
+    assert metadata.fields["title"] == "On the magnetism of FeO"
 
 
 def test_harvest_uses_institutional_access_without_token(monkeypatch) -> None:

@@ -323,7 +323,8 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
   answered with an HTML page. A plain `http://` URL is preceded by its
   `https://` form. Each candidate is requested once, by a single GET, and the
   first whose bytes start with `%PDF` is stored; the provenance manifest records
-  that URL. APS's newer opaque DOIs name no journal, so they get only the HTTPS
+  that URL, without userinfo, fragment, or query parameters that look like
+  tokens, signatures or keys. APS's newer opaque DOIs name no journal, so they get only the HTTPS
   upgrade. `PYNAKES_APS_API_TOKEN` is not sent with PDF downloads: it
   authenticates APS Harvest *metadata* requests only.
 - **Zero-config.** If the `.bib` is not yet a pinax, `asset fetch` records the default
@@ -429,8 +430,15 @@ to publisher-hosted URLs only, and when no direct `pdf_url` is available,
 are tried as fallbacks.
 
 For subscription content, `asset fetch --material published --access institutional`
-adds an explicit publisher-landing-page fallback. It uses only access already
-available to the process through an institutional network, VPN, or proxy. It
+adds an explicit publisher-landing-page fallback. It relies only on where the
+request comes from: publishers that grant access by network address accept it
+from a campus network, or from an institutional VPN that routes the traffic
+through the institution. Requests connect directly; environment proxy settings
+(`HTTP_PROXY`, `HTTPS_PROXY`) are ignored, and a library proxy that rewrites
+URLs (EZproxy and the like) is not used. The landing-page request and every
+download go through the same guarded client as all other requests (public
+destinations only, redirects included; see
+[Network and privacy](network-and-privacy.md#headers-and-credentials)). It
 does not collect credentials, import browser cookies, automate SSO, or bypass
 publisher controls. A login page is reported as authentication required rather
 than stored as a PDF. The same access mode can be combined with `--material supplement`.

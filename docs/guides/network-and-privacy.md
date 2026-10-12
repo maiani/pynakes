@@ -47,9 +47,20 @@ such a refusal is visible rather than silent.
 `PYNAKES_APS_API_TOKEN` supplies an optional APS-issued bearer token to the APS
 Harvest metadata endpoint (`harvest.aps.org`); it is not sent with PDF
 downloads. Institutional IP access may work
-without a token. Do not put credentials in bibliography fields, example URLs,
-committed configuration, or shared cache files. The HTTP client rejects URLs with embedded username/password credentials
-and private/local network destinations, including redirect targets.
+without a token.
+
+`asset fetch --access institutional` relies only on the network location the
+process already has: a campus network, or an institutional VPN that routes
+traffic through the institution. The HTTP client connects directly and ignores
+environment proxy settings (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`):
+pinning each connection to a validated public address depends on it. A proxy,
+or a split-tunnel VPN whose DNS answers with private addresses for a
+publisher, therefore does not give access.
+
+Do not put credentials in bibliography fields, example URLs,
+committed configuration, or shared cache files. The HTTP client — every request, the institutional landing-page lookup included —
+rejects URLs with embedded username/password credentials and private/local
+network destinations, including redirect targets.
 HTTPS-to-HTTP redirects emit a warning; they are not blocked. `asset fetch`
 tries a plain-HTTP material URL's HTTPS form first.
 Each HTTP fetch has a bounded overall
@@ -61,7 +72,10 @@ Provider responses are persisted across runs only when `--cache-file PATH` is
 supplied. The cache stores queried identifiers (including free-text queries)
 and provider results; treat it as research data before sharing or committing
 it. Pinax downloads and manifests record local material paths, source URLs,
-fetch dates and hashes. A manifest's stored hash is provenance:
+fetch dates and hashes. A recorded source URL, like a URL in a fetch's
+`attempts`, keeps no userinfo, fragment, or query parameter that looks like a
+token, signature or key; a manifest written by an earlier version is left as it
+is. A manifest's stored hash is provenance:
 `asset check` does not recompute checksums.
 
 `scrub` prepares a public bibliography copy by removing configured private

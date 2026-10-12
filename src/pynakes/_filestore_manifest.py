@@ -15,7 +15,9 @@ from collections.abc import Iterable, Mapping
 from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, overload
+from urllib.parse import urlsplit
 
+from pynakes._fetch_attempts import redact_url
 from pynakes.io import _write_backup
 
 if TYPE_CHECKING:
@@ -91,14 +93,20 @@ class PinaxManifest:
         added_date: str | None = None,
         access: str | None = None,
     ) -> None:
-        """Record provenance for one material artifact."""
+        """Record provenance for one material artifact.
+
+        A web ``source`` is recorded redacted, as a fetch attempt is: without
+        userinfo, fragment, or query parameters that look like tokens,
+        signatures or keys.
+        Rows already in the manifest are left as they are.
+        """
         if kind not in ARTIFACT_KINDS:
             raise ValueError(f"Unknown Pinax artifact kind: {kind}")
         if fetched_date is None and added_date is None:
             fetched_date = date.today().isoformat()
         path = getattr(self.paths_for(key), kind)
         record = {
-            "source": source,
+            "source": _recorded_source(source),
             "sha256": _sha256_path(path),
             "refetchable": bool(refetchable),
         }
@@ -405,3 +413,20 @@ def _unique_keys(keys: Iterable[str]) -> list[str]:
         seen.add(normalized)
         result.append(normalized)
     return result
+
+
+def _recorded_source(source: str) -> str:
+    """Return *source* as the manifest records it: a web URL without its secrets."""
+    try:
+        scheme = urlsplit(source).scheme.lower()
+    except ValueError:
+        scheme = source.partition("://")[0].lower()
+    if scheme not in {"http", "https"}:
+        return source
+    redacted = redact_url(source)
+    if redacted is not None:
+        return redacted
+    # Too malformed to parse (a bad port, say): keep no query, fragment or userinfo.
+    rest = source.split("#", 1)[0].split("?", 1)[0].partition("://")[2]
+    netloc, slash, path = rest.partition("/")
+    return f"{scheme}://{netloc.rsplit('@', 1)[-1]}{slash}{path}"
