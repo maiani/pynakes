@@ -1008,7 +1008,10 @@ def test_consistency_still_flags_a_gap_within_one_identity_class() -> None:
     assert _consistency(lint(lib)) == [("P4", "volume")]
 
 
-@pytest.mark.parametrize("decoration", ["issn", "publisher", "month", "url", "abstract"])
+@pytest.mark.parametrize(
+    "decoration",
+    ["issn", "publisher", "month", "url", "abstract", "eprint", "archiveprefix", "updated"],
+)
 def test_consistency_ignores_publisher_decoration(decoration: str) -> None:
     # A record from a metadata-sparse source legitimately lacks these; their
     # absence reports provenance, not a bibliographic gap.

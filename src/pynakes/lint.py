@@ -148,19 +148,28 @@ _CONSISTENCY_SKIP_FIELDS = frozenset(
 # the publisher decoration that DOI content negotiation supplies, so comparing
 # these across peers reports provenance, not a bibliographic gap. Fields that
 # a type genuinely requires are already excluded by ``required_field_rules``.
+# Preprint provenance (``eprint`` and its companions, arXiv's ``updated``) is
+# the same: ``enrich --published`` backfills it on the articles that have a
+# preprint, and an article without one has nothing missing.
 _CONSISTENCY_DECORATION_FIELDS = frozenset(
     {
         "abstract",
+        "archiveprefix",
         "copyright",
         "day",
         "eissn",
+        "eprint",
+        "eprintclass",
+        "eprinttype",
         "isbn",
         "issn",
         "keywords",
         "language",
         "month",
         "pagetotal",
+        "primaryclass",
         "publisher",
+        "updated",
         "url",
         "urldate",
     }

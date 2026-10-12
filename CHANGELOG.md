@@ -454,6 +454,11 @@ form is a `UsageError`, never silently reinterpreted.
 - `fields protect-title` reported only a count of changed entries; its human
   output (dry run included) now lists each changed entry with its protected
   value.
+- After `enrich --published` backfilled `eprint`/`archiveprefix` on the articles
+  that have a preprint, `lint` reported every other article as missing them
+  (`inconsistent_field`). Preprint provenance (`eprint`, `archiveprefix`,
+  `primaryclass`, `eprinttype`, `eprintclass`, `updated`) is now treated like
+  publisher decoration, whose absence is not a gap.
 
 ### Build
 
