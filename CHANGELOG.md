@@ -451,6 +451,9 @@ form is a `UsageError`, never silently reinterpreted.
   "materials already present (no DOI for a published version)". Its terminal
   progress also tracks the entry queue, so a long run of skipped entries no
   longer shows nothing until the end.
+- `fields protect-title` reported only a count of changed entries; its human
+  output (dry run included) now lists each changed entry with its protected
+  value.
 
 ### Build
 

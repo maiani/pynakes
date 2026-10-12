@@ -33,17 +33,24 @@ def _run_field_op(
     params: RunParams,
     details: dict,
     verb: str,
+    *,
+    list_values: str | None = None,
 ) -> None:
+    """Run one field operation and report it.
+
+    ``list_values`` names a field whose new value is listed per changed entry,
+    for an operation whose result cannot be predicted from the command line
+    alone (title protection decides token by token).
+    """
     coll = Bibliography.open(file)
     count = op(coll)
-    _finish_mod(
-        file,
-        action,
-        coll,
-        params,
-        [f"{verb} ({count} {_entries(count)} changed)."],
-        **details,
-    )
+    human = [f"{verb} ({count} {_entries(count)} changed)."]
+    if list_values is not None:
+        for change in coll.change_plan()["entries"]:
+            value = change.get("fields", {}).get(list_values)
+            if change["change"] == "modified" and value is not None:
+                human.append(f"  {change['key']}: {value['new']}")
+    _finish_mod(file, action, coll, params, human, **details)
 
 
 def fields_rename(
@@ -237,6 +244,7 @@ def fields_protect_title(
         params,
         {"field": title_field, "terms": terms, "where": where, "keys": parse_key_selector(key)},
         f"{_verb('protect', params, 'Protected')} capitalization in field {title_field!r}",
+        list_values=title_field,
     )
 
 
