@@ -176,11 +176,11 @@ window.PV = window.PV || {};
     label.className = "sidebar-heading-label";
     label.textContent = "Groups";
     heading.appendChild(label);
-    const toggle = document.createElement("button");
-    toggle.type = "button";
-    toggle.className = "icon-button collapse-toggle sidebar-toggle";
-    toggle.title = s.sidebarCollapsed ? "Expand groups" : "Collapse groups";
-    toggle.textContent = s.sidebarCollapsed ? "▸" : "◂";
+    const toggle = PV.button(
+      "icon-button collapse-toggle sidebar-toggle",
+      s.sidebarCollapsed ? "▸" : "◂",
+      s.sidebarCollapsed ? "Expand groups" : "Collapse groups",
+    );
     if (!s.sidebarCollapsed) {
       const add = document.createElement("button");
       add.type = "button";

@@ -407,7 +407,7 @@ export type KeysRenameEnvelope = KeysRenameSuccess | MutationConflict | InspectE
 // The bibliography's neighbours: the TeX sources that cite it, and the
 // materials it points to. Both describe files *around* the `.bib`, which is
 // why they are read from the saved file at its real location — see
-// `readNeighbours` in `library.ts`.
+// `readLibrary`'s `neighbourPath` in `library.ts`.
 // ---------------------------------------------------------------------------
 
 /** One `\cite`-family occurrence, as `tex scan --json` locates it. */

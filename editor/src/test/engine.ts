@@ -11,8 +11,12 @@
  * and a green job hid that none of them ran.
  */
 
+import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
+import { applyMutation, describeMutation, previewMutation, type Mutation } from "../library.js";
 import type { PynakesCommand } from "../pynakes.js";
 
 // out/test/engine.js -> out/test -> out -> editor -> repo root
@@ -38,4 +42,32 @@ export function engineSkipReason(): string | false {
     }
     return reason;
   }
+}
+
+/** Write `contents` as `name` in a fresh temporary directory, and return its path. */
+export function tempBib(contents: string, name = "refs.bib"): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pynakes-test-"));
+  const file = path.join(dir, name);
+  fs.writeFileSync(file, contents, "utf-8");
+  return file;
+}
+
+/**
+ * Run one mutation as the view does: preview, check the preview wrote nothing
+ * and reported a digest, then apply guarded by that digest.
+ */
+export async function previewThenApply(file: string, mutation: Mutation) {
+  const before = fs.readFileSync(file, "utf-8");
+  const preview = await previewMutation(command, file, mutation);
+  if (!preview.ok) {
+    assert.fail(`${describeMutation(mutation)} preview failed: ${JSON.stringify(preview)}`);
+  }
+  assert.equal(fs.readFileSync(file, "utf-8"), before, "a preview must write nothing");
+  assert.equal(preview.modified, true);
+  assert.match(preview.sourceSha256 ?? "", /^[0-9a-f]{64}$/);
+  const applied = await applyMutation(command, file, mutation, preview.sourceSha256 ?? "");
+  if (!applied.ok) {
+    assert.fail(`${describeMutation(mutation)} failed: ${JSON.stringify(applied)}`);
+  }
+  return preview;
 }

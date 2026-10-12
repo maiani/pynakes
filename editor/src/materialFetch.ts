@@ -29,8 +29,8 @@ import {
   planFetch,
   runFetch,
 } from "./fetchPlan";
-import { FILE_MOVED_MESSAGE, NO_FINGERPRINT_MESSAGE } from "./library";
-import type { MutationHost } from "./mutations";
+import { NO_FINGERPRINT_MESSAGE } from "./library";
+import { reportRefusal, type MutationHost } from "./mutations";
 import { PynakesCancelledError, type AssetFetchRequest } from "./pynakes";
 
 /** Ask which material to fetch; `undefined` when the pick was dismissed. */
@@ -161,12 +161,7 @@ async function fetchMaterials(host: MutationHost, key: string | undefined): Prom
   }
 
   if (!applied.ok) {
-    if (applied.conflict && applied.error === "ExternalModification") {
-      fail(FILE_MOVED_MESSAGE);
-      await host.reload();
-      return;
-    }
-    fail(applied.conflict ? `Nothing was written: ${applied.message}` : applied.message);
+    await reportRefusal(host, fail, applied);
     return;
   }
   const result = fetchResult(applied, new Set(plan.planned.map((entry) => entry.key)));

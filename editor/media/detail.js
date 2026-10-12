@@ -110,10 +110,7 @@ window.PV = window.PV || {};
     actions.className = "field-actions";
     if (showCompare) {
       const comparing = PV.state.compareBusy === row.key;
-      const compare = document.createElement("button");
-      compare.type = "button";
-      compare.className = "icon-button";
-      compare.textContent = comparing ? "…" : "⇄";
+      const compare = PV.button("icon-button", comparing ? "…" : "⇄");
       compare.disabled = comparing;
       compare.title = comparing
         ? "Comparing…"
@@ -126,23 +123,14 @@ window.PV = window.PV || {};
       actions.appendChild(compare);
     }
     if (staged) {
-      const revert = document.createElement("button");
-      revert.type = "button";
-      revert.className = "icon-button";
-      revert.textContent = "undo";
-      revert.title = "Discard this pending change";
-      revert.addEventListener("click", () =>
+      const revert = PV.button("icon-button", "undo", "Discard this pending change", () =>
         PV.post({ type: "unstageField", key: row.key, field }),
       );
       actions.appendChild(revert);
     }
     if (!cleared) {
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.className = "icon-button";
-      remove.textContent = "remove";
-      remove.title = base === null ? "Drop this new field" : "Remove this field from the entry";
-      remove.addEventListener("click", () => {
+      const title = base === null ? "Drop this new field" : "Remove this field from the entry";
+      const remove = PV.button("icon-button", "remove", title, () => {
         if (base === null) {
           PV.post({ type: "unstageField", key: row.key, field });
         } else {
@@ -171,10 +159,7 @@ window.PV = window.PV || {};
     value.placeholder = "value";
     value.spellcheck = false;
 
-    const add = document.createElement("button");
-    add.type = "button";
-    add.className = "button";
-    add.textContent = "Add field";
+    const add = PV.button("button", "Add field");
     const submit = () => {
       const field = name.value.trim().toLowerCase();
       if (!field) {
@@ -254,22 +239,14 @@ window.PV = window.PV || {};
 
     const actions = document.createElement("div");
     actions.className = "detail-actions";
-    const reveal = document.createElement("button");
-    reveal.className = "button";
-    reveal.type = "button";
-    reveal.textContent = "Show source";
-    reveal.addEventListener("click", () => PV.post({ type: "reveal", key: row.key }));
-    const copy = document.createElement("button");
-    copy.className = "button";
-    copy.type = "button";
-    copy.textContent = "Copy key";
-    copy.addEventListener("click", () => PV.post({ type: "copyKey", key: row.key }));
-    const remove = document.createElement("button");
-    remove.className = "button";
-    remove.type = "button";
-    remove.textContent = "Remove";
-    remove.title = "Remove this entry, after reviewing the diff";
-    remove.addEventListener("click", () =>
+    const reveal = PV.button("button", "Show source", null, () =>
+      PV.post({ type: "reveal", key: row.key }),
+    );
+    const copy = PV.button("button", "Copy key", null, () =>
+      PV.post({ type: "copyKey", key: row.key }),
+    );
+    const removeTitle = "Remove this entry, after reviewing the diff";
+    const remove = PV.button("button", "Remove", removeTitle, () =>
       PV.post({
         type: "mutate",
         // Pinax materials go with the entry unless asked otherwise; the
@@ -279,11 +256,9 @@ window.PV = window.PV || {};
     );
     actions.append(reveal, copy, remove);
     if (PV.entryStaged(row.key)) {
-      const discard = document.createElement("button");
-      discard.className = "button";
-      discard.type = "button";
-      discard.textContent = "Discard entry changes";
-      discard.addEventListener("click", () => PV.post({ type: "discardEntry", key: row.key }));
+      const discard = PV.button("button", "Discard entry changes", null, () =>
+        PV.post({ type: "discardEntry", key: row.key }),
+      );
       actions.appendChild(discard);
     }
     head.appendChild(actions);
@@ -339,10 +314,7 @@ window.PV = window.PV || {};
       const openWith = (opener) =>
         PV.post({ type: "openMaterial", path: material.path, opener });
 
-      const open = document.createElement("button");
-      open.type = "button";
-      open.className = "link-button";
-      open.textContent = material.label;
+      const open = PV.button("link-button", material.label);
       open.disabled = !openable;
       open.title = material.present
         ? OPENER_TITLE[preferred] + material.path + " (Alt+click: " + OPENER_LABEL[other] + ")"
@@ -374,10 +346,7 @@ window.PV = window.PV || {};
 
     // Busy for this entry, or for a whole-library fetch that includes it.
     const busy = PV.state.fetchBusy === row.key || PV.state.fetchBusy === "*";
-    const fetch = document.createElement("button");
-    fetch.type = "button";
-    fetch.className = "button material-fetch";
-    fetch.textContent = busy ? "Fetching…" : "Fetch missing…";
+    const fetch = PV.button("button material-fetch", busy ? "Fetching…" : "Fetch missing…");
     fetch.disabled = PV.state.fetchBusy !== null;
     fetch.title =
       "Download this entry's missing materials by its DOI or arXiv id. The files " +
@@ -416,11 +385,7 @@ window.PV = window.PV || {};
       chip.className = "chip chip-removable";
       const name = document.createElement("span");
       name.textContent = group;
-      const drop = document.createElement("button");
-      drop.className = "chip-remove";
-      drop.type = "button";
-      drop.textContent = "×";
-      drop.title = 'Remove ' + row.key + ' from "' + group + '"';
+      const drop = PV.button("chip-remove", "×", 'Remove ' + row.key + ' from "' + group + '"');
       drop.setAttribute("aria-label", 'Remove from group "' + group + '"');
       drop.addEventListener("click", () =>
         PV.post({
@@ -431,11 +396,7 @@ window.PV = window.PV || {};
       chip.append(name, drop);
       list.appendChild(chip);
     }
-    const add = document.createElement("button");
-    add.className = "button";
-    add.type = "button";
-    add.textContent = groups.length ? "+ group" : "Add to a group";
-    add.addEventListener("click", () =>
+    const add = PV.button("button", groups.length ? "+ group" : "Add to a group", null, () =>
       PV.post({
         type: "promptGroup",
         key: row.key,
@@ -468,12 +429,8 @@ window.PV = window.PV || {};
       for (const cite of cites) {
         const line = document.createElement("div");
         line.className = "citation";
-        const open = document.createElement("button");
-        open.type = "button";
-        open.className = "link-button";
-        open.textContent = shortPath(cite.path) + ":" + cite.line;
-        open.title = cite.text + "\n" + cite.path;
-        open.addEventListener("click", () =>
+        const label = shortPath(cite.path) + ":" + cite.line;
+        const open = PV.button("link-button", label, cite.text + "\n" + cite.path, () =>
           PV.post({
             type: "openCitation",
             path: cite.path,

@@ -502,7 +502,8 @@
   font-size: 0.9em;
 }
 
-/* A text-like button for a path that opens something. */
+/* A text-like button for a path that opens something, or a key that selects
+   its entry. The one definition: view.css only adds its focus ring. */
 .link-button {
   background: none;
   border: none;

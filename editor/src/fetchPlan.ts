@@ -13,6 +13,7 @@
  */
 
 import { materialLabel } from "./insights";
+import { notApplied, type NotApplied } from "./library";
 import {
   warningText,
   type InspectError,
@@ -157,16 +158,11 @@ export type FetchOutcome =
       fetched: Array<{ key: string; paths: string[] }>;
       failed: FetchNote[];
     }
-  | { ok: false; conflict: boolean; error?: string; message: string };
+  | NotApplied;
 
 export function reduceFetch(envelope: AssetFetchEnvelope): FetchOutcome {
   if (envelope.status !== "success") {
-    return {
-      ok: false,
-      conflict: envelope.status === "conflict",
-      error: envelope.error,
-      message: envelope.message,
-    };
+    return notApplied(envelope);
   }
   const planned: FetchPlanEntry[] = [];
   const unplanned: string[] = [];

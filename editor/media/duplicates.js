@@ -67,12 +67,9 @@ window.PV = window.PV || {};
       for (const [index, entry] of (cluster.entries || []).entries()) {
         const line = document.createElement("div");
         line.className = "dup-entry";
-        const key = document.createElement("button");
-        key.type = "button";
-        key.className = "link-button dup-key";
-        key.textContent = entry.key;
-        key.title = "Select this entry";
-        key.addEventListener("click", () => PV.select(entry.key));
+        const key = PV.button("link-button dup-key", entry.key, "Select this entry", () =>
+          PV.select(entry.key),
+        );
         line.appendChild(key);
         const title = document.createElement("span");
         title.className = "dup-title";
@@ -87,19 +84,19 @@ window.PV = window.PV || {};
         section.appendChild(line);
       }
 
-      const merge = document.createElement("button");
-      merge.className = "button";
-      merge.type = "button";
-      merge.textContent = "Merge this pair";
-      merge.title = "Fold the copies into the first entry, after reviewing the diff";
-      merge.addEventListener("click", () => {
-        PV.post({
-          type: "mutate",
-          // The cluster is named by a key inside it, so the engine re-finds it
-          // rather than the view describing a merge it cannot perform.
-          mutation: { kind: "dedupeMerge", keys: cluster.keys },
-        });
-      });
+      const merge = PV.button(
+        "button",
+        "Merge this pair",
+        "Fold the copies into the first entry, after reviewing the diff",
+        () => {
+          PV.post({
+            type: "mutate",
+            // The cluster is named by a key inside it, so the engine re-finds it
+            // rather than the view describing a merge it cannot perform.
+            mutation: { kind: "dedupeMerge", keys: cluster.keys },
+          });
+        },
+      );
       section.appendChild(merge);
       target.appendChild(section);
     }

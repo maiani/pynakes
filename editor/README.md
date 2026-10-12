@@ -18,26 +18,33 @@ engine reads correctly cannot be displayed wrongly by the client.
 
 The consequence worth knowing: when this client needs something the engine cannot
 express, the fix goes into the engine, not into TypeScript here. That rule is
-recorded in [AGENTS.md](../AGENTS.md), and it has already been exercised — the
-engine gained a predicate-only `search` (`pynakes search "" --where 'doi
-missing'`) because the selector grammar had no read-only path, and the
-alternative would have been evaluating predicates in the client. Reviewing one
-duplicate pair at a time added `dedupe merge --key`, because the alternative —
-deciding in TypeScript which entries to fold together — is the merge algorithm
-itself. Two envelope bugs surfaced the same way and were fixed in the engine:
-`ref remove --diff` emitted its warnings in the `diff` field and dropped them
-from `warnings`, and `ref add` reported a taken citation key as an exit-1
-error while `ref import` reported the identical situation as an exit-2
-conflict with options. Guarding a commit against a change made during its
-approval added `--expect-sha256` and the `source_sha256` it takes back, rather
-than the client hashing the file itself; and committing staged entries as one
-`corpus batch` exposed that its `ref.edit` neither trimmed values nor checked
+recorded in [AGENTS.md](../AGENTS.md), and it has already been exercised:
+
+- a predicate-only `search` (`pynakes search "" --where 'doi missing'`), because
+  the selector grammar had no read-only path, and the alternative was evaluating
+  predicates in the client;
+- `dedupe merge --key`, for reviewing one duplicate pair at a time, because the
+  alternative — deciding in TypeScript which entries to fold together — is the
+  merge algorithm itself;
+- `--expect-sha256` and the `source_sha256` it takes back, to guard a commit
+  against a change made during its approval, rather than the client hashing the
+  file itself;
+- `removed_groups` on `groups remove-group`, `rename-group --members` with its
+  `members_renamed`, and `pinax_materials` on `keys rename`, so the approval
+  dialogs name the subgroups, entries and material files a change takes along
+  instead of the client walking the tree or working out which
+  `<key>.<kind>.pdf` files would change name;
+- the `planned` list on an `asset fetch` dry run, so the approval can name each
+  file a fetch would write — which also exposed that a dry run created the files
+  directory it was only planning to fill.
+
+Envelope bugs surfaced the same way and were fixed in the engine: `ref remove
+--diff` emitted its warnings in the `diff` field and dropped them from
+`warnings`; `ref add` reported a taken citation key as an exit-1 error while
+`ref import` reported the identical situation as an exit-2 conflict with
+options; and `corpus batch`'s `ref.edit` neither trimmed values nor checked
 field names the way `ref edit` does, so the batch operation was fixed rather
-than the values trimmed here. Confirming a group removal added
-`removed_groups` to `groups remove-group`, rather than the client walking the
-tree to find which subgroups would go with it; and confirming a citation-key
-rename added `pinax_materials` to `keys rename`, rather than the client working
-out which `<key>.<kind>.pdf` files would change name.
+than the values trimmed here.
 
 `src/model.ts` is the only place that transforms engine output, and it only does
 display tidying: collapsing wrapped whitespace, rendering the `and` name
@@ -199,12 +206,9 @@ material lands atomically, so stopping one keeps what finished and leaves
 nothing half-written. A provider that cannot supply a file is a skip with its
 reason, not an error, and the Materials list re-reads when the fetch ends. Like
 Import, fetching honors `pynakes.allowOnlineLookups`: with lookups off it says
-so rather than failing at the provider. Wanting the planned paths in that
-dialog is what added the dry run's per-entry `planned` list to the engine — and
-exposed that a dry run used to create the files directory it was only planning
-to fill.
+so rather than failing at the provider.
 
-These two reads, and the fetch, are about the files *around* the bibliography,
+The citation and material reads, and the fetch, are about the files *around* the bibliography,
 so they use the `.bib` as saved, at its real location — `tex-sources`,
 `pinax-files-dir`, and a relative `file` path all resolve from the `.bib`'s own
 directory, and the temporary mirror used for an unsaved buffer has neither. A
@@ -330,7 +334,7 @@ entry's source.
 npm install
 npm run compile        # tsc -> out/
 npm run watch          # incremental
-npm test               # node --test over the pure modules
+npm test               # node --test over out/test, the real engine included
 npm run vendor-engine  # build the bundled engine into engine/ (git-ignored)
 npm run package        # .vsix, vendoring and compiling first
 ```
@@ -350,7 +354,7 @@ repository root carries a [pixi](https://pixi.sh) manifest that provides both:
 ```bash
 pixi run build-extension    # -> editor/pynakes-vscode-<version>.vsix
 pixi run install-extension  # builds, then installs it into VS Code
-pixi run test-extension     # compile and run the unit tests
+pixi run test-extension     # compile and run the tests, engine included
 pixi run clean-extension    # drop engine/, out/, and any .vsix
 ```
 
@@ -360,11 +364,16 @@ by hand with `code --install-extension editor/pynakes-vscode-<version>.vsix`, or
 let `pixi run install-extension` resolve the filename for you. Pixi pins Python
 to 3.12 to match CI, so a bundle built locally is the bundle CI proves.
 
-Tests cover the pure modules — `model.ts`, `insights.ts`, `staging.ts`,
-`version.ts` — and nothing else. That is deliberate: those hold the logic worth
-pinning, while the rest is thin glue whose behavior lives in VS Code and in the
-engine. Do not grow a bibliography fixture corpus here; that belongs to the
-engine's own suite.
+Most tests pin the pure modules (`model.ts`, `insights.ts`, `staging.ts`,
+`version.ts`, the material-opening decision). The rest run the real engine from
+this repository's `src/` against temporary `.bib` files: argument order and
+envelope shapes (`cliContract`, `operandContract`, `fetchContract`), the write
+path with only the dialogs stood in (`mutationFlow`), and the real webview
+scripts in jsdom (`webview`). Those skip with a reason when `python3` cannot
+import pynakes, and `PYNAKES_REQUIRE_ENGINE=1` — set in CI — turns the skip
+into a failure. `src/test/engine.ts` holds the shared engine command and
+temp-file helpers. Do not grow a bibliography fixture corpus here; that belongs
+to the engine's own suite.
 
 ### Layout
 
@@ -377,6 +386,8 @@ src/
   keyRename.ts           renames one citation key, as a previewed mutation
   mutations.ts           entry-level changes: preview, approve, guarded write
   groupHierarchy.ts      sidebar prompts for editing the group hierarchy
+  materialFetch.ts       fetching materials: plan, approve, cancellable run
+  fetchPlan.ts           the asset fetch envelope, and what the dialogs say about it
   navigation.ts          opens sources, citations, and materials
   materialOpener.ts      where a material opens: in VS Code or with the system
   diagnostics.ts         findings and undefined citations as native diagnostics
@@ -389,6 +400,7 @@ src/
   model.ts               engine envelope types + projection to table rows
   insights.ts            group-tree and lint projections
   staging.ts             pending edits, and the conflict check that guards a commit
+  records.ts             own-property lookups for maps keyed by the file's text
   webview.ts             webview HTML shell, CSP, resource URIs
 scripts/
   vendor-engine.mjs      builds the bundled engine
@@ -423,9 +435,6 @@ so the bundle identifies itself as the final Beta version. Local RC bundles
 are validation artifacts. The extension keeps its own
 0.1.0 version. See [the release checklist](../RELEASE.md).
 
-
-`npm run package` produces a `.vsix` installable with
-`code --install-extension`. It is not published: the `pynakes` publisher
-namespace must be verified before publication on the Marketplace or Open VSX.
-The alpha has no UI/settings compatibility promise; its engine consumes the
-beta JSON envelope.
+The VSIX is not published: the `pynakes` publisher namespace must be verified
+before publication on the Marketplace or Open VSX. The alpha has no UI/settings
+compatibility promise; its engine consumes the beta JSON envelope.

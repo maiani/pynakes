@@ -9,10 +9,9 @@
 
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
-import { command, engineSkipReason } from "./engine.js";
+import { command, engineSkipReason, tempBib } from "./engine.js";
 
 const skip = engineSkipReason();
 
@@ -46,13 +45,6 @@ const { runMutation } = require("../mutations.js") as typeof import("../mutation
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { renameKey } = require("../keyRename.js") as typeof import("../keyRename.js");
 type MutationHost = import("../mutations.js").MutationHost;
-
-function tempBib(contents: string): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pynakes-flow-"));
-  const file = path.join(dir, "refs.bib");
-  fs.writeFileSync(file, contents, "utf-8");
-  return file;
-}
 
 /** A host over one file, recording what it posts; `staged` are keys with pending edits. */
 function hostFor(file: string, staged: string[] = []) {

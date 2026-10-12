@@ -253,22 +253,22 @@ window.PV = window.PV || {};
     }
     target.appendChild(table);
 
-    const apply = document.createElement("button");
-    apply.type = "button";
-    apply.className = "button primary";
-    apply.textContent = "Apply merged";
-    apply.title = "Stage each field's merged value for review in the staged diff";
-    apply.addEventListener("click", () => {
-      for (const { field, value } of merged) {
-        PV.post({
-          type: "stageField",
-          key: compare.key,
-          field: field.field,
-          value: value.value,
-          base: field.local,
-        });
-      }
-    });
+    const apply = PV.button(
+      "button primary",
+      "Apply merged",
+      "Stage each field's merged value for review in the staged diff",
+      () => {
+        for (const { field, value } of merged) {
+          PV.post({
+            type: "stageField",
+            key: compare.key,
+            field: field.field,
+            value: value.value,
+            base: field.local,
+          });
+        }
+      },
+    );
     target.appendChild(apply);
   };
 })(window.PV);

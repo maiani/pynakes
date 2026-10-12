@@ -15,12 +15,10 @@
 
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
 import { JSDOM, VirtualConsole } from "jsdom";
 import {
-  applyMutation,
   findDuplicates,
   previewEdits,
   previewMutation,
@@ -37,7 +35,7 @@ import {
   toRequests,
   unstageField,
 } from "../staging.js";
-import { command, engineSkipReason, repoRoot } from "./engine.js";
+import { command, engineSkipReason, previewThenApply, repoRoot, tempBib } from "./engine.js";
 
 const skip = engineSkipReason();
 
@@ -355,21 +353,17 @@ test("the groups sidebar hands hierarchy edits to the extension", { skip }, asyn
 });
 
 test("a renamed group stays the filter, and a removed one stops being it", { skip }, async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pynakes-webview-"));
-  const file = path.join(dir, "groups.bib");
-  fs.copyFileSync(path.join(fixtures, "jabref_groups.bib"), file);
+  const file = tempBib(
+    fs.readFileSync(path.join(fixtures, "jabref_groups.bib"), "utf-8"),
+    "groups.bib",
+  );
   const { view, host } = await opened("jabref_groups.bib", file);
 
   groupRow(view, "Blockchain:Cryptocurrency")?.click();
   assert.ok(groupRow(view, "Blockchain:Cryptocurrency")?.classList.contains("selected"));
 
   // The write itself is the extension's, exactly as `runMutation` performs it.
-  async function write(mutation: Mutation): Promise<void> {
-    const preview = await previewMutation(command, file, mutation);
-    assert.ok(preview.ok, JSON.stringify(preview));
-    const applied = await applyMutation(command, file, mutation, preview.sourceSha256 ?? "");
-    assert.ok(applied.ok, JSON.stringify(applied));
-  }
+  const write = (mutation: Mutation) => previewThenApply(file, mutation);
 
   // File one entry under the group, so the rename has a member to carry along.
   await write({ kind: "group", key: "Brown2021", group: "Blockchain:Cryptocurrency", member: true });
@@ -447,15 +441,13 @@ test("fetching materials is handed to the extension, one fetch at a time", { ski
 });
 
 test("a material opens where the setting says, or the other way on request", { skip }, async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pynakes-webview-"));
-  const file = path.join(dir, "materials.bib");
-  const pdf = path.join(dir, "Newton1687.pdf");
-  fs.writeFileSync(pdf, "%PDF-1.4\n");
-  fs.writeFileSync(
-    file,
+  const file = tempBib(
     "@book{Newton1687,\n  author = {Isaac Newton},\n  title = {Principia},\n" +
       "  year = {1687},\n  file = {:Newton1687.pdf:PDF}\n}\n",
+    "materials.bib",
   );
+  const pdf = path.join(path.dirname(file), "Newton1687.pdf");
+  fs.writeFileSync(pdf, "%PDF-1.4\n");
   const { view, host } = await opened("", file);
   click(view, '.tab[data-pane="edit"]');
   view.document.querySelector<HTMLElement>("#rows tr")?.click();
@@ -504,13 +496,11 @@ test("a material opens where the setting says, or the other way on request", { s
 });
 
 test("citation keys named like Object.prototype members render as entries", { skip }, async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pynakes-webview-"));
-  const file = path.join(dir, "proto.bib");
-  fs.writeFileSync(
-    file,
+  const file = tempBib(
     "@misc{constructor,\n  title = {On Machines},\n  groups = {Mechanics}\n}\n\n" +
       "@article{toString,\n  title = {On Strings}\n}\n\n" +
       "@misc{Euler1748,\n  title = {Introductio}\n}\n",
+    "proto.bib",
   );
   const { view } = await opened("proto.bib", file);
 
@@ -569,14 +559,12 @@ test("a failed action reports itself without blanking the table", { skip }, asyn
 });
 
 test("a JabRef group colour paints its swatch", { skip }, async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pynakes-webview-"));
-  const file = path.join(dir, "colours.bib");
-  fs.writeFileSync(
-    file,
+  const file = tempBib(
     "@comment{jabref-meta: databaseType:bibtex;}\n\n" +
       "@comment{jabref-meta: grouping:\n0 AllEntriesGroup:;\n" +
       "1 StaticGroup:Optics\;0\;1\;0x8a8a8aff\;\;\;;\n}\n\n" +
       "@book{Newton1704,\n  title = {Opticks},\n  groups = {Optics}\n}\n",
+    "colours.bib",
   );
   const { view } = await opened("colours.bib", file);
 
@@ -634,15 +622,11 @@ test("group rows are focusable toggles that Enter and Space operate", { skip }, 
 });
 
 test("duplicate-cluster keys are buttons that select their entry", { skip }, async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pynakes-webview-"));
-  const file = path.join(dir, "refs.bib");
-  fs.writeFileSync(
-    file,
+  const file = tempBib(
     "@article{Lovelace1843,\n  author = {Ada Lovelace},\n  title = {Notes on the Engine},\n" +
       "  year = {1843},\n  doi = {10.5555/engine}\n}\n" +
       "@article{Lovelace1843b,\n  author = {Ada Lovelace},\n  title = {Notes on the Engine},\n" +
       "  year = {1843},\n  doi = {10.5555/engine}\n}\n",
-    "utf-8",
   );
   const { view, host } = await opened("refs.bib", file);
   view.document.getElementById("find-duplicates")?.click();

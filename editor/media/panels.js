@@ -214,12 +214,7 @@ window.PV = window.PV || {};
         line.appendChild(severity);
 
         if (issue.key) {
-          const key = document.createElement("button");
-          key.type = "button";
-          key.className = "link-button";
-          key.textContent = issue.key;
-          key.title = "Select this entry";
-          key.addEventListener("click", () => {
+          const key = PV.button("link-button", issue.key, "Select this entry", () => {
             PV.select(issue.key);
           });
           line.appendChild(key);
@@ -303,16 +298,16 @@ window.PV = window.PV || {};
 
   function collapseToggle() {
     const s = PV.state;
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "icon-button collapse-toggle panel-toggle";
-    button.title = s.panelCollapsed ? "Expand this panel" : "Collapse this panel";
-    button.textContent = s.panelCollapsed ? "▴" : "▾";
-    button.addEventListener("click", () => {
-      PV.state.panelCollapsed = !PV.state.panelCollapsed;
-      PV.persist();
-      PV.renderDocks();
-    });
+    const button = PV.button(
+      "icon-button collapse-toggle panel-toggle",
+      s.panelCollapsed ? "▴" : "▾",
+      s.panelCollapsed ? "Expand this panel" : "Collapse this panel",
+      () => {
+        PV.state.panelCollapsed = !PV.state.panelCollapsed;
+        PV.persist();
+        PV.renderDocks();
+      },
+    );
     return button;
   }
   function renderCommitBar() {
@@ -332,34 +327,26 @@ window.PV = window.PV || {};
       entries + (entries === 1 ? " entry" : " entries") +
       " — not written yet";
 
-    const preview = document.createElement("button");
-    preview.type = "button";
-    preview.className = "button";
-    preview.textContent = "Preview";
-    preview.addEventListener("click", () => {
+    const preview = PV.button("button", "Preview", null, () => {
       PV.state.dock[locationOf("diff")] = "diff";
       PV.state.panelCollapsed = false;
       PV.persist();
       PV.post({ type: "preview" });
     });
 
-    const discard = document.createElement("button");
-    discard.type = "button";
-    discard.className = "button";
-    discard.textContent = "Discard all";
-    discard.addEventListener("click", () => PV.post({ type: "discardAll" }));
+    const discard = PV.button("button", "Discard all", null, () => PV.post({ type: "discardAll" }));
 
-    const commit = document.createElement("button");
-    commit.type = "button";
-    commit.className = "button primary";
-    commit.textContent = "Apply";
-    commit.title = "Show the diff and ask for confirmation before writing";
-    commit.addEventListener("click", () => {
-      PV.state.dock[locationOf("diff")] = "diff";
-      PV.state.panelCollapsed = false;
-      PV.persist();
-      PV.post({ type: "commit" });
-    });
+    const commit = PV.button(
+      "button primary",
+      "Apply",
+      "Show the diff and ask for confirmation before writing",
+      () => {
+        PV.state.dock[locationOf("diff")] = "diff";
+        PV.state.panelCollapsed = false;
+        PV.persist();
+        PV.post({ type: "commit" });
+      },
+    );
 
     els.commitBar.replaceChildren(summary, preview, discard, commit);
     els.commitBar.hidden = false;

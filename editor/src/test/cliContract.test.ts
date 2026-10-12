@@ -17,7 +17,6 @@
 
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
 import {
@@ -39,20 +38,12 @@ import {
   type Mutation,
   applyMutation,
   commitEdits,
-  describeMutation,
   previewEdits,
   previewMutation,
 } from "../library.js";
-import { command, engineSkipReason } from "./engine.js";
+import { command, engineSkipReason, previewThenApply, tempBib } from "./engine.js";
 
 const skip = engineSkipReason();
-
-function tempBib(contents: string): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pynakes-contract-"));
-  const file = path.join(dir, "refs.bib");
-  fs.writeFileSync(file, contents, "utf-8");
-  return file;
-}
 
 test("inspect/groups/lint/search return their documented envelope shape", { skip }, async () => {
   const file = tempBib(
@@ -451,23 +442,6 @@ test("dedupe merge without keys still merges every cluster", { skip }, async () 
 // approval dialog reads would each fail here rather than in the field.
 
 const HIERARCHY = "@book{Newton1687,\n  title = {Principia}\n}\n";
-
-/** Preview, check the preview wrote nothing, then apply with its digest. */
-async function previewThenApply(file: string, mutation: Mutation) {
-  const before = fs.readFileSync(file, "utf-8");
-  const preview = await previewMutation(command, file, mutation);
-  if (!preview.ok) {
-    assert.fail(`${describeMutation(mutation)} preview failed: ${JSON.stringify(preview)}`);
-  }
-  assert.equal(fs.readFileSync(file, "utf-8"), before, "a preview must write nothing");
-  assert.equal(preview.modified, true);
-  assert.match(preview.sourceSha256 ?? "", /^[0-9a-f]{64}$/);
-  const applied = await applyMutation(command, file, mutation, preview.sourceSha256 ?? "");
-  if (!applied.ok) {
-    assert.fail(`${describeMutation(mutation)} failed: ${JSON.stringify(applied)}`);
-  }
-  return preview;
-}
 
 async function treeNames(file: string): Promise<Array<[string, string]>> {
   const tree = await groupsTree(command, file);

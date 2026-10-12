@@ -15,7 +15,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { PynakesCommand } from "./engineDiscovery";
-import { run, runJson } from "./engineProcess";
+import { END_OF_OPTIONS, run, runJson } from "./engineProcess";
 import { extractVersion } from "./version";
 import type { AssetFetchEnvelope } from "./fetchPlan";
 import type {
@@ -44,17 +44,14 @@ export {
 } from "./engineProcess";
 
 /**
- * End of options: every token after it is an operand.
+ * `head` (subcommand and library), then the options, then the operands.
  *
  * Citation keys, group names, identifiers and search queries are the user's
  * text, and one that begins with `-` (a group called `-draft`, say) would
  * otherwise be read as an option. So every builder below that passes such a
- * value puts its options first and its operands after this marker, and
- * `runJson` adds `--json` before it.
+ * value goes through this, which puts the operands after `END_OF_OPTIONS`;
+ * `runJson` adds `--json` before that marker.
  */
-export const END_OF_OPTIONS = "--";
-
-/** `head` (subcommand and library), then the options, then the operands. */
 function invocation(head: string[], options: string[], operands: string[]): string[] {
   return operands.length > 0 ? [...head, ...options, END_OF_OPTIONS, ...operands] : [...head, ...options];
 }

@@ -74,6 +74,32 @@ const ENTRY_TYPES = [
   "software",
 ];
 
+/** Why the engine did not apply a call: its message, and whether it was a conflict. */
+interface Refusal {
+  conflict?: boolean;
+  error?: string;
+  message: string;
+}
+
+/**
+ * Report a call the engine refused. A conflict is the engine declining — a
+ * taken key, a merge it will not guess — so it is said to have written nothing
+ * rather than to have failed. A write refused because the file moved while the
+ * approval was open is re-read, so what the view shows is what is there.
+ */
+export async function reportRefusal(
+  host: MutationHost,
+  fail: (message: string) => void,
+  refusal: Refusal,
+): Promise<void> {
+  if (refusal.conflict === true && refusal.error === "ExternalModification") {
+    fail(FILE_MOVED_MESSAGE);
+    await host.reload();
+    return;
+  }
+  fail(refusal.conflict === true ? `Nothing was written: ${refusal.message}` : refusal.message);
+}
+
 /** Citation keys a mutation would rewrite or remove, for the staging check. */
 function mutationKeys(mutation: Mutation): string[] {
   switch (mutation.kind) {
@@ -446,9 +472,7 @@ export async function runMutation(
       preview = await previewMutation(command, filePath, mutation, cwd);
     }
     if (!preview.ok) {
-      // A conflict is the engine declining — a taken key, a merge it will not
-      // guess — and a dry run never writes, so say so rather than "failed".
-      fail(preview.conflict === true ? `Nothing was written: ${preview.message}` : preview.message);
+      await reportRefusal(host, fail, preview);
       return;
     }
     // Everything the engine says this would rewrite or remove, which for a
@@ -494,14 +518,7 @@ export async function runMutation(
 
     const applied = await applyMutation(command, filePath, mutation, sourceSha256, cwd);
     if (!applied.ok) {
-      // Not applied, whichever way it was refused. A file that moved while the
-      // dialog was open is re-read, so what the view shows is what is there.
-      if (applied.conflict === true && applied.error === "ExternalModification") {
-        fail(FILE_MOVED_MESSAGE);
-        await host.reload();
-        return;
-      }
-      fail(applied.conflict === true ? `Nothing was written: ${applied.message}` : applied.message);
+      await reportRefusal(host, fail, applied);
       return;
     }
     host.post({

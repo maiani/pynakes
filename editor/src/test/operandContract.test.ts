@@ -7,40 +7,12 @@
  */
 
 import assert from "node:assert/strict";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
 import { test } from "node:test";
-import {
-  type Mutation,
-  applyMutation,
-  describeMutation,
-  previewMutation,
-  runSearch,
-} from "../library.js";
+import { runSearch } from "../library.js";
 import { groupsList, groupsTree, inspectBib } from "../pynakes.js";
-import { command, engineSkipReason } from "./engine.js";
+import { command, engineSkipReason, previewThenApply, tempBib } from "./engine.js";
 
 const skip = engineSkipReason();
-
-function tempBib(contents: string): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pynakes-operands-"));
-  const file = path.join(dir, "refs.bib");
-  fs.writeFileSync(file, contents, "utf-8");
-  return file;
-}
-
-async function previewThenApply(file: string, mutation: Mutation) {
-  const preview = await previewMutation(command, file, mutation);
-  if (!preview.ok) {
-    assert.fail(`${describeMutation(mutation)} preview failed: ${JSON.stringify(preview)}`);
-  }
-  const applied = await applyMutation(command, file, mutation, preview.sourceSha256 ?? "");
-  if (!applied.ok) {
-    assert.fail(`${describeMutation(mutation)} failed: ${JSON.stringify(applied)}`);
-  }
-  return preview;
-}
 
 async function treeNames(file: string): Promise<string[]> {
   const tree = await groupsTree(command, file);

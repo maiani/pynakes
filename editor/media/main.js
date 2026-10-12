@@ -183,11 +183,9 @@ window.PV = window.PV || {};
       elements.banner.appendChild(paragraph);
     }
     if (action) {
-      const button = document.createElement("button");
-      button.className = "button";
-      button.type = "button";
-      button.textContent = action.label;
-      button.addEventListener("click", () => PV.post({ type: action.message }));
+      const button = PV.button("button", action.label, null, () =>
+        PV.post({ type: action.message }),
+      );
       elements.banner.appendChild(button);
     }
     elements.banner.hidden = false;

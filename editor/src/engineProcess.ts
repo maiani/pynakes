@@ -11,6 +11,9 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { PynakesCommand } from "./engineDiscovery";
 
+/** End of options: every token after it is an operand, however it begins. */
+export const END_OF_OPTIONS = "--";
+
 /** Output JSON for a large library runs to megabytes; past this, something is wrong. */
 const MAX_BUFFER = 64 * 1024 * 1024;
 
@@ -243,7 +246,7 @@ export async function runJson<T>(
 ): Promise<T> {
   // Before any end-of-options marker, so it stays an option rather than
   // becoming one more operand.
-  const marker = args.indexOf("--");
+  const marker = args.indexOf(END_OF_OPTIONS);
   const withJson =
     marker === -1 ? [...args, "--json"] : [...args.slice(0, marker), "--json", ...args.slice(marker)];
   const result = await run(command, withJson, cwd, options);

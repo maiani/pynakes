@@ -13,7 +13,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
 import {
@@ -29,7 +28,7 @@ import {
   type AssetFetchEnvelope,
 } from "../fetchPlan.js";
 import { PynakesCancelledError, assetFetchArgs } from "../pynakes.js";
-import { command, engineSkipReason } from "./engine.js";
+import { command, engineSkipReason, tempBib } from "./engine.js";
 
 const skip = engineSkipReason();
 
@@ -50,13 +49,6 @@ const LIBRARY = `@article{Einstein1905,
   title = {Principia},
 }
 `;
-
-function tempBib(contents = LIBRARY): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pynakes-fetch-"));
-  const file = path.join(dir, "refs.bib");
-  fs.writeFileSync(file, contents, "utf-8");
-  return file;
-}
 
 test("assetFetchArgs names the key, the material, and the guard", () => {
   assert.deepEqual(assetFetchArgs("/lib/refs.bib", { key: "Turing1936" }, true), [
@@ -93,7 +85,7 @@ test("the material choices are the engine's own --material values", { skip }, ()
 });
 
 test("a dry run plans each file at the engine's path, and writes nothing", { skip }, async () => {
-  const file = tempBib();
+  const file = tempBib(LIBRARY);
   const before = fs.readFileSync(file, "utf-8");
   const files = path.join(path.dirname(file), "refs.files");
 
@@ -124,7 +116,7 @@ test("a dry run plans each file at the engine's path, and writes nothing", { ski
 });
 
 test("the approval names the network, every file and where, and the skips", { skip }, async () => {
-  const file = tempBib();
+  const file = tempBib(LIBRARY);
   const plan = await planFetch(command, file, {});
   assert.ok(plan.ok);
 
@@ -145,7 +137,7 @@ test("the approval names the network, every file and where, and the skips", { sk
 });
 
 test("one material for one entry plans only that", { skip }, async () => {
-  const file = tempBib();
+  const file = tempBib(LIBRARY);
   const plan = await planFetch(command, file, { key: "Turing1936", material: "source" });
   assert.ok(plan.ok, JSON.stringify(plan));
   assert.deepEqual(
@@ -158,7 +150,7 @@ test("one material for one entry plans only that", { skip }, async () => {
 });
 
 test("an entry with nothing to fetch says why, without asking", { skip }, async () => {
-  const file = tempBib();
+  const file = tempBib(LIBRARY);
   const plan = await planFetch(command, file, { key: "Newton1687" });
   assert.ok(plan.ok);
   assert.equal(plan.planned.length, 0);
@@ -169,14 +161,14 @@ test("an entry with nothing to fetch says why, without asking", { skip }, async 
 });
 
 test("an unknown key is the engine's error, not an empty plan", { skip }, async () => {
-  const file = tempBib();
+  const file = tempBib(LIBRARY);
   const plan = await planFetch(command, file, { key: "Nobody1900" });
   assert.equal(plan.ok, false);
   assert.match(plan.ok ? "" : plan.message, /No entry with key 'Nobody1900'/);
 });
 
 test("a fetch over a file that moved after its plan is refused before any download", { skip }, async () => {
-  const file = tempBib();
+  const file = tempBib(LIBRARY);
   const plan = await planFetch(command, file, { key: "Turing1936" });
   assert.ok(plan.ok && plan.sourceSha256);
   fs.appendFileSync(file, "\n@misc{Kepler1609, title = {Astronomia Nova}}\n");
@@ -190,7 +182,7 @@ test("a fetch over a file that moved after its plan is refused before any downlo
 });
 
 test("a fetch stopped before it starts is a cancellation, not a protocol error", { skip }, async () => {
-  const file = tempBib();
+  const file = tempBib(LIBRARY);
   const controller = new AbortController();
   controller.abort();
   await assert.rejects(

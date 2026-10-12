@@ -175,16 +175,6 @@ body {
   text-decoration: none;
 }
 
-.link-button {
-  padding: 0;
-  color: var(--vscode-textLink-foreground);
-  background: none;
-  border: none;
-  font-family: var(--vscode-editor-font-family);
-  font-size: inherit;
-  cursor: pointer;
-}
-
 /* Banner and notice ------------------------------------------------------ */
 
 .banner[hidden],

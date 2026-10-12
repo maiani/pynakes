@@ -218,7 +218,12 @@ export type PreviewResult =
     }
   | NotApplied;
 
-function notApplied(envelope: { status: "error" | "conflict"; error: string; message: string }): NotApplied {
+/** The `NotApplied` an error or conflict envelope means. */
+export function notApplied(envelope: {
+  status: "error" | "conflict";
+  error: string;
+  message: string;
+}): NotApplied {
   return {
     ok: false,
     conflict: envelope.status === "conflict",

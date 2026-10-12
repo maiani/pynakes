@@ -25,6 +25,24 @@ window.PV = window.PV || {};
   PV.own = (map, key) =>
     map != null && Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined;
 
+  /**
+   * A `type="button"` button with its classes and label, plus a tooltip and a
+   * click handler when given (`null` for no tooltip).
+   */
+  PV.button = (className, text, title, onClick) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = className;
+    button.textContent = text;
+    if (title) {
+      button.title = title;
+    }
+    if (onClick) {
+      button.addEventListener("click", onClick);
+    }
+    return button;
+  };
+
   const persisted = vscode.getState() || {};
 
   PV.state = {
