@@ -55,6 +55,11 @@ form is a `UsageError`, never silently reinterpreted.
   order. Without the flag a rename still edits only the hierarchy, and
   `remove-group` still keeps memberships. Python API:
   `Bibliography.rename_group_members(old, new)`.
+- `keys rename` reports the Pinax material files it moves as
+  `pinax_materials`, dry run included, and a dry run refuses a material move
+  whose target already exists, as the write always did. Python API:
+  `FileStore.plan_material_rename()` and `Bibliography.planned_pinax_renames()`
+  return the planned moves without touching disk.
 
 ### Fixed
 

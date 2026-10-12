@@ -389,12 +389,6 @@ The track runs in parallel with the stages above.
   - *Opening materials:* a `file`-field path is handed to the OS handler; on
     Windows an executable named by an untrusted `.bib` could run. Decide on an
     allow-list or a confirmation.
-  - *Key rename* is the one write with no preview diff or `--expect-sha256`.
-  - *Whole-file `dedupe merge`* does not check pending staged edits on the
-    entries it removes.
-  - *Cancellation* kills only the spawned process, not a launcher's child.
-  - *Keyboard access:* duplicate-cluster keys and sidebar group rows are not
-    focusable.
   - *Fetch progress:* the engine reports no per-file progress in `--json`
     mode, and the view does not offer `--access institutional`.
 

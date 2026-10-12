@@ -499,6 +499,21 @@ class Bibliography(
                 continue
             self._pinax_renames.append((old, new))
 
+    def planned_pinax_renames(self) -> list[dict[str, str]]:
+        """Return every Pinax material move the staged key renames would make.
+
+        Read-only: each item names the source and target key, the material
+        kind, and both paths. Raises :class:`ValueError` when a move's target
+        already exists, as the commit would.
+        """
+        store = self.files
+        if store is None:
+            return []
+        planned: list[dict[str, str]] = []
+        for old, new in self._pinax_renames:
+            planned.extend(store.plan_material_rename(old, new))
+        return planned
+
     def _apply_pinax_renames(self) -> list[PinaxRenameTransaction]:
         if not self._pinax_renames:
             return []

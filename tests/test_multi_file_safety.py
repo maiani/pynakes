@@ -154,3 +154,77 @@ def test_a_failed_removal_commit_keeps_the_materials(tmp_path: Path) -> None:
     assert result.exit_code == 1, result.output
     assert material.read_bytes() == b"%PDF"
     assert "Euler1748" in bib.read_text()
+
+
+def _pinax_library(tmp_path: Path) -> tuple[Path, Path]:
+    bib = _library(tmp_path, "pinax-files-dir:\n")
+    files = tmp_path / "refs.files"
+    files.mkdir()
+    (files / "Euler1748.preprint.pdf").write_bytes(b"pdf")
+    return bib, files
+
+
+def test_a_rename_dry_run_names_the_material_files_it_would_move(tmp_path: Path) -> None:
+    bib, files = _pinax_library(tmp_path)
+    before = bib.read_text()
+
+    result = _rename(bib, "--dry-run", "--diff")
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["pinax_materials"] == [
+        {
+            "source_key": "Euler1748",
+            "target_key": "Euler1748a",
+            "kind": "preprint_pdf",
+            "source_path": str(files / "Euler1748.preprint.pdf"),
+            "target_path": str(files / "Euler1748a.preprint.pdf"),
+        }
+    ]
+    assert bib.read_text() == before
+    assert (files / "Euler1748.preprint.pdf").exists()
+    assert not (files / "Euler1748a.preprint.pdf").exists()
+
+
+def test_a_rename_without_a_pinax_store_names_no_materials(tmp_path: Path) -> None:
+    bib = _library(tmp_path)
+    (tmp_path / "paper.tex").write_text("\\cite{Euler1748}\n")
+
+    result = _rename(bib, "--dry-run")
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["pinax_materials"] == []
+
+
+def test_a_rename_dry_run_refuses_a_material_move_the_commit_would_refuse(
+    tmp_path: Path,
+) -> None:
+    bib, files = _pinax_library(tmp_path)
+    (files / "Euler1748a.preprint.pdf").write_bytes(b"already here")
+
+    result = _rename(bib, "--dry-run")
+
+    assert result.exit_code == 1, result.output
+    assert json.loads(result.output)["status"] == "error"
+
+
+def test_a_previewed_rename_lands_only_on_the_file_the_preview_read(tmp_path: Path) -> None:
+    bib, files = _pinax_library(tmp_path)
+    preview = json.loads(_rename(bib, "--dry-run", "--diff").output)
+    digest = preview["source_sha256"]
+
+    bib.write_text(bib.read_text() + "@misc{Gauss1801,\n  title = {Disquisitiones}\n}\n")
+    stale = _rename(bib, "--expect-sha256", digest)
+
+    assert stale.exit_code == 2, stale.output
+    assert json.loads(stale.output)["error"] == "ExternalModification"
+    assert (files / "Euler1748.preprint.pdf").exists()
+    assert "@article{Euler1748," in bib.read_text()
+
+    fresh = json.loads(_rename(bib, "--dry-run").output)["source_sha256"]
+    applied = _rename(bib, "--expect-sha256", fresh)
+
+    assert applied.exit_code == 0, applied.output
+    assert json.loads(applied.output)["pinax_materials"][0]["kind"] == "preprint_pdf"
+    assert (files / "Euler1748a.preprint.pdf").read_bytes() == b"pdf"
+    assert "@article{Euler1748a," in bib.read_text()

@@ -1746,7 +1746,7 @@ packages:
   - pytest-cov>=4.1.0 ; extra == 'dev'
   - coverage>=7.10 ; extra == 'dev'
   - hypothesis>=6.100.0 ; extra == 'dev'
-  - mypy>=1.19,<2 ; extra == 'dev'
+  - ty==0.0.86 ; extra == 'dev'
   - pyyaml>=6.0 ; extra == 'dev'
   - ruff>=0.16,<0.17 ; extra == 'dev'
   - build>=1.2.0 ; extra == 'dev'

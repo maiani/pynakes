@@ -401,6 +401,10 @@ def keys_rename(
     coll.rename_key(old, new)
     # Counts the renamed entry and every entry whose crossref/xdata followed it.
     bib_changed = coll.changed_entries_count()
+    # The material files that move with the key, which no diff of the .bib
+    # shows. Planned before any TeX is staged, so a move that the commit would
+    # refuse (its target exists) stops a dry run just as it stops the write.
+    pinax_materials = coll.planned_pinax_renames()
     source_changes, source_diff_parts, total_source_occurrences, source_warnings = (
         _rewrite_tex_sources(
             file,
@@ -415,6 +419,10 @@ def keys_rename(
     human = [
         f"{_verb('rename', params)} citation key {old!r} to {new!r}.",
         f"  bib entries changed={bib_changed}, TeX citations changed={total_source_occurrences}",
+    ]
+    human += [
+        f"  {_verb('move', params)} {item['source_path']} -> {item['target_path']}"
+        for item in pinax_materials
     ]
 
     # A rename with no TeX sources configured succeeds (a fresh library has no
@@ -453,6 +461,7 @@ def keys_rename(
         new=new,
         source_occurrences=total_source_occurrences,
         sources=source_changes,
+        pinax_materials=pinax_materials,
     )
 
 

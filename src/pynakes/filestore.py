@@ -443,6 +443,39 @@ class FileStore(PinaxManifest):
             raise
         return transaction
 
+    def plan_material_rename(self, old: str, new: str) -> list[dict[str, str]]:
+        """Return the material moves renaming ``old`` to ``new`` would make (no-op).
+
+        Same shape as :meth:`plan_material_merge`, so a dry run can name every
+        file a key rename would move — something no diff of the ``.bib`` shows.
+        Raises :class:`ValueError` when a target already exists, exactly as the
+        rename itself would, so a preview refuses what the commit would refuse.
+        """
+        old = _validate_key(old)
+        new = _validate_key(new)
+        if old == new:
+            return []
+        old_paths = self.paths_for(old)
+        new_paths = self.paths_for(new)
+        planned: list[dict[str, str]] = []
+        for kind in ARTIFACT_KINDS:
+            src = getattr(old_paths, kind)
+            dst = getattr(new_paths, kind)
+            if not src.exists():
+                continue
+            if dst.exists():
+                raise ValueError(f"Cannot move Pinax material {src}: target exists: {dst}")
+            planned.append(
+                {
+                    "source_key": old,
+                    "target_key": new,
+                    "kind": kind,
+                    "source_path": str(src),
+                    "target_path": str(dst),
+                }
+            )
+        return planned
+
     def rename_materials(self, old: str, new: str) -> PinaxRenameTransaction:
         """Move one key's materials and manifest row in place."""
         old = _validate_key(old)
@@ -456,17 +489,10 @@ class FileStore(PinaxManifest):
         if old == new:
             return transaction
 
-        old_paths = self.paths_for(old)
-        new_paths = self.paths_for(new)
-        planned: list[tuple[Path, Path]] = []
-        for kind in ARTIFACT_KINDS:
-            src = getattr(old_paths, kind)
-            dst = getattr(new_paths, kind)
-            if not src.exists():
-                continue
-            if dst.exists():
-                raise ValueError(f"Cannot move Pinax material {src}: target exists: {dst}")
-            planned.append((src, dst))
+        planned = [
+            (Path(item["source_path"]), Path(item["target_path"]))
+            for item in self.plan_material_rename(old, new)
+        ]
 
         try:
             for src, dst in planned:
