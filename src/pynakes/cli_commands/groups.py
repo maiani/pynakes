@@ -229,7 +229,9 @@ def groups_add_group(
     )
     coll = Bibliography.open(file)
     tree = coll.list_tree() or []
-    if any(node.name == name for node in tree):
+    # The tree refuses a name differing from an existing node only in case, so
+    # that is a conflict too, not a failure to add.
+    if any(node.name.lower() == name.lower() for node in tree):
         _group_conflict(json_output, name)
     if parent:
         _require_group(coll.lib, parent, json_output)
@@ -260,7 +262,12 @@ def groups_remove_group(
         expect_sha256=expect_sha256,
     )
     coll = Bibliography.open(file)
+    before = [node.name for node in coll.list_tree() or []]
     count = coll.remove_group_node(name)
+    remaining = {node.name for node in coll.list_tree() or []}
+    # Named, in tree order, so a caller confirming the removal can say which
+    # descendants go with the group without walking the tree itself.
+    removed = [group for group in before if group not in remaining]
     if not count:
         _emit_error(
             json_output,
@@ -269,20 +276,39 @@ def groups_remove_group(
         )
     action = "groups_remove_group"
     msg = f"{_verb('remove', params)} group {name!r} ({count} nodes removed)."
-    _finish_mod(file, action, coll, params, [msg], group=name, removed_count=count)
+    _finish_mod(
+        file,
+        action,
+        coll,
+        params,
+        [msg],
+        group=name,
+        removed_count=count,
+        removed_groups=removed,
+    )
 
 
 def groups_rename_group(
     file: str | None = bib_file_argument(),
     old: str = typer.Argument(..., help="Current group name"),
     new: str = typer.Argument(..., help="New group name"),
+    members: bool = typer.Option(
+        False,
+        "--members",
+        help="Also move the group's members: rewrite OLD to NEW in every entry's "
+        "groups field (exact name match)",
+    ),
     backup: bool = _BACKUP_OPTION,
     expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Rename a group node, updating parent references in child groups."""
+    """Rename a group node, updating parent references in child groups.
+
+    Entries filed under OLD keep that membership unless `--members` is given,
+    which renames it to NEW in each of them too.
+    """
     file = _resolve_input_bib(file, json_output)
     params = RunParams(
         dry_run=dry_run,
@@ -295,14 +321,31 @@ def groups_rename_group(
     tree = coll.list_tree() or []
     if not any(node.name == old for node in tree):
         _emit_error(json_output, "KeyNotFound", f"Group {old!r} not found in the tree", group=old)
-    if old != new and _group_exists(coll.lib, new):
+    # A case-only rename (``Optics`` to ``OPTICS``) is the node itself, not a
+    # clash; another node differing from NEW only in case is one.
+    clashes_in_tree = any(node.name.lower() == new.lower() and node.name != old for node in tree)
+    if old != new and (clashes_in_tree or _group_exists(coll.lib, new)):
         _group_conflict(json_output, new)
     ok = coll.rename_group_node(old, new)
     if not ok:
         _emit_error(json_output, "InvalidInput", f"Group {old!r} could not be renamed to {new!r}")
+    # Named, in file order, so a caller confirming the rename can say which
+    # entries move with the group.
+    renamed = coll.rename_group_members(old, new) if members else []
     action = "groups_rename_group"
-    msg = f"{_verb('rename', params)} group {old!r} to {new!r}."
-    _finish_mod(file, action, coll, params, [msg], old=old, new=new)
+    moved = f" ({len(renamed)} {_entries(len(renamed))} moved with it)" if members else ""
+    msg = f"{_verb('rename', params)} group {old!r} to {new!r}{moved}."
+    _finish_mod(
+        file,
+        action,
+        coll,
+        params,
+        [msg],
+        old=old,
+        new=new,
+        members=members,
+        members_renamed=renamed,
+    )
 
 
 def groups_move_group(

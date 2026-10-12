@@ -547,6 +547,7 @@ Rename a group node, updating parent references in child groups.
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `OLD` | string | yes | — | — | Current group name |
 | `NEW` | string | yes | — | — | New group name |
+| `--members` | boolean | no | false | — | Also move the group's members: rewrite OLD to NEW in every entry's groups field (exact name match) |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
 | `--dry-run` | boolean | no | false | — | Show changes without writing |

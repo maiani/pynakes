@@ -121,6 +121,31 @@ def _entry_to_csl(entry: BibEntry) -> dict:
     return item
 
 
+def _issued_year(issued: object) -> str:
+    """Return the year of a CSL ``issued`` date, or ``""`` when it has none.
+
+    Only the documented shape ``{"date-parts": [[year, ...], ...]}`` with an
+    integer (or all-digit string) year is read; any other shape is a date this
+    importer cannot interpret, so the entry imports without a year.
+    """
+    if not isinstance(issued, dict):
+        return ""
+    date_parts = issued.get("date-parts")
+    if not isinstance(date_parts, list) or not date_parts:
+        return ""
+    first = date_parts[0]
+    if not isinstance(first, list) or not first:
+        return ""
+    year = first[0]
+    if isinstance(year, bool):
+        return ""
+    if isinstance(year, int):
+        return str(year)
+    if isinstance(year, str) and year.strip().isdigit():
+        return year.strip()
+    return ""
+
+
 def _csl_to_entry(item: dict, taken: set[str]) -> BibEntry:
     bib_type = _CSL_TO_BIB_TYPE.get(str(item.get("type", "")).lower(), "misc")
     fields: dict[str, str] = {}
@@ -137,11 +162,8 @@ def _csl_to_entry(item: dict, taken: set[str]) -> BibEntry:
             names = names_to_bibtex(item[role])
             if names:
                 fields[role] = names
-    issued = item.get("issued")
-    if isinstance(issued, dict) and issued.get("date-parts"):
-        parts = issued["date-parts"][0]
-        if parts:
-            fields["year"] = str(parts[0])
+    if year := _issued_year(item.get("issued")):
+        fields["year"] = year
     if isinstance(item.get("keyword"), str):
         fields["keywords"] = item["keyword"]
 

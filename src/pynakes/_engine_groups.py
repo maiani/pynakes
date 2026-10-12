@@ -82,6 +82,18 @@ class BibliographyGroups:
         ok = group_tree_ops.rename_node(self.lib, old_name, new_name)
         return ok
 
+    def rename_group_members(self, old_name: str, new_name: str) -> list[str]:
+        """Move every entry filed under ``old_name`` to ``new_name``.
+
+        The membership half of a group rename, separate from
+        :meth:`rename_group_node` (the hierarchy half) as membership and the
+        tree are separate records; ``groups rename-group --members`` calls
+        both. Matches the exact name only and never duplicates ``new_name`` in
+        an entry. Returns the keys of the entries whose ``groups`` field changed,
+        in file order.
+        """
+        return group_ops.rename_group_memberships(self.lib, old_name, new_name)
+
     def move_group_node(self, name: str, new_parent: str) -> bool:
         """Move a group node to a new parent."""
         ok = group_tree_ops.move_node(self.lib, name, new_parent)

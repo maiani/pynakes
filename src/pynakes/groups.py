@@ -73,3 +73,55 @@ def remove_from_group(lib: BibFile, key: str, group: str) -> int:
             remove_entry_field(entry, "groups")
         count += 1
     return count
+
+
+def _renamed_value(value: str, old: str, new: str) -> str | None:
+    """Return ``value`` with membership ``old`` renamed to ``new``, or ``None``.
+
+    Matches whole names only, so ``Optics Lab`` is not a membership of
+    ``Optics``. The first membership that is (or becomes) ``new`` keeps its
+    place and its surrounding spacing; every later one is dropped, so an entry
+    that already named ``new``, or named ``old`` twice, ends up naming ``new``
+    exactly once. Memberships of other groups keep their text and separators.
+    """
+    pieces = value.split(GROUPS_DELIM)
+    if old not in (piece.strip() for piece in pieces):
+        return None
+    kept: list[str] = []
+    seen_new = False
+    for piece in pieces:
+        name = piece.strip()
+        if name in (old, new):
+            if seen_new:
+                continue
+            seen_new = True
+            if name == old:
+                lead = piece[: len(piece) - len(piece.lstrip())]
+                trail = piece[len(piece.rstrip()) :]
+                piece = f"{lead}{new}{trail}"
+        kept.append(piece)
+    return GROUPS_DELIM.join(kept)
+
+
+def rename_group_memberships(lib: BibFile, old: str, new: str) -> list[str]:
+    """Rename membership ``old`` to ``new`` in every entry's ``groups`` field.
+
+    Exact-name matching: only a membership spelled exactly ``old`` changes.
+    Each changed entry is edited surgically, so only its ``groups`` line
+    differs and every other entry stays byte-identical. Returns the keys of the
+    changed entries in file order, each once even when the key is duplicated.
+    Modifies ``lib`` in place.
+    """
+    check_balanced_braces(f"Group name {new!r}", new)
+    changed: list[str] = []
+    for entry in lib.entries.values():
+        value = entry.fields.get("groups")
+        if not value:
+            continue
+        renamed = _renamed_value(value, old, new)
+        if renamed is None or renamed == value:
+            continue
+        set_entry_field(entry, "groups", renamed)
+        if entry.key not in changed:
+            changed.append(entry.key)
+    return changed

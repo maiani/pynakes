@@ -111,3 +111,54 @@ def test_removed_spelling_is_a_usage_error(bib: Path, tmp_path: Path, args: list
 
 def test_capabilities_lists_no_deprecated_forms() -> None:
     assert "deprecations" not in get_capabilities()
+
+
+# --- operands that look like options -------------------------------------------
+
+
+def _envelope(args: list[str]) -> dict:
+    result = runner.invoke(app, args)
+    assert "Traceback" not in result.output
+    return json.loads(result.output)
+
+
+def test_double_dash_passes_a_dash_led_group_name(bib: Path) -> None:
+    added = _envelope(["groups", "add-group", str(bib), "--json", "--", "-x"])
+    assert added["status"] == "success", added
+    assert added["group"] == "-x"
+
+    filed = _envelope(["groups", "add-entry", str(bib), "--json", "--", "Smith2020", "-x"])
+    assert filed["status"] == "success", filed
+
+    renamed = _envelope(
+        ["groups", "rename-group", str(bib), "--members", "--json", "--", "-x", "-y"]
+    )
+    assert renamed["status"] == "success", renamed
+    assert renamed["members_renamed"] == ["Smith2020"]
+
+
+def test_double_dash_passes_a_dash_led_citation_key(bib: Path) -> None:
+    added = _envelope(["ref", "add", str(bib), "--type", "misc", "--json", "--", "-k"])
+    assert added["status"] == "success", added
+    assert "@misc{-k," in bib.read_text(encoding="utf-8")
+
+    renamed = _envelope(["keys", "rename", str(bib), "--json", "--", "-k", "-j"])
+    assert renamed["status"] == "success", renamed
+
+    removed = _envelope(["ref", "remove", str(bib), "--json", "--", "-j"])
+    assert removed["status"] == "success", removed
+    assert "{-j," not in bib.read_text(encoding="utf-8")
+
+
+def test_double_dash_with_an_autodetected_library(bib: Path, monkeypatch) -> None:
+    monkeypatch.chdir(bib.parent)
+
+    added = _envelope(["groups", "add-group", "--json", "--", "-x"])
+
+    assert added["status"] == "success", added
+    assert added["file"] == "refs.bib"
+
+
+def test_double_dash_passes_a_dash_led_search_query(bib: Path) -> None:
+    found = _envelope(["search", str(bib), "--json", "--", "-nothing-matches"])
+    assert found["status"] == "success", found

@@ -303,25 +303,58 @@ shell completion and terminal help no longer carry misleading syntax. The
 placeholder site URL was removed; no hosted documentation deployment is claimed.
 See [CHANGELOG.md](CHANGELOG.md) for the completed changes.
 
-**Gate 6** (met locally, 2026-10-12): `mkdocs build --strict` passes;
+**Gate 6** (met, 2026-10-12): `mkdocs build --strict` passes;
 every offline shell example in README, quickstart and usage runs in
 `tests/test_doc_examples.py` with network access blocked; the generated command
 reference is checked for drift; current engine documents report no alpha status.
-The CI documentation job runs these tests before building. Validation of this
-unstaged change on the remote matrix awaits a later authorized commit/push.
+The CI documentation job runs these tests before building. Commit `3a8642d`
+passed all 17 jobs in [CI run 38232952387](https://github.com/maiani/pynakes/actions/runs/38232952387),
+including the full platform matrix, lowest dependencies and editor checks.
 
-#### Stage 7 — Release candidate → 0.7.0
+#### Stage 7 — Engine readiness, then editor, then coordinated publication
 
-- Publish `0.7.0rc1` to PyPI with the `Development Status :: 4 - Beta`
-  classifier and the README status updated.
-- Run the agent evaluation harness and dogfood the candidate on real libraries
-  (locally; nothing derived from them is committed).
-- Between the candidate and 0.7.0, fix regressions only; anything else waits for
-  0.7.1 or v0.8.
+- Prepare **pynakes 0.7.0 Beta** first: Beta metadata, release notes, built-wheel
+  CLI contract/workflow tests, and disposable-copy dogfooding. Local RC builds
+  may support validation; no separate PyPI RC publication is required.
+- Once engine readiness is established, move to the editor and finish the
+  **0.1.0 Alpha** acceptance and packaging gates against that engine.
+- Publish **0.7.0 Beta and editor 0.1.0 Alpha together**, after both are ready.
+  Do not publish the engine while editor readiness is still open.
+- Record manual agent acceptance independently of automated engine tests. The
+  former hand-run agent evaluation harness was deliberately removed in
+  `0ef2951`; it is not an available release check.
+- During release-candidate observation, fix regressions only; new features wait
+  for 0.7.1 or 0.8.
 
-**Done when**: every stage gate holds; the candidate has run without a data-loss
-or contract regression; the editor alpha is published; CHANGELOG updated;
-version bumped to 0.7.0.
+**Done when**: every stage gate holds; candidate use has shown no data-loss or
+contract regression; both distributions are published in the coordinated
+release; CHANGELOG updated; the engine tag names 0.7.0.
+
+**Preparation**: Beta metadata, release notes and the checklist are in
+[RELEASE.md](RELEASE.md). Local builds use temporary setuptools-scm overrides;
+preparation creates no release tag. Manual acceptance, remaining editor work,
+and coordinated publication remain open.
+
+**Local engine preflight (2026-10-12)**: the installed 0.7.0rc1 wheel passed
+all 2,921 tests without a checkout source tree. Disposable copies of two real
+libraries (272 entries total) passed round-trip, layout semantic equality and
+normalization idempotence checks; originals stayed unchanged. Final-version
+0.7.0 Beta rehearsal wheel/sdist metadata and version checks passed. Source
+Ruff, formatting, ty and strict docs passed. The built-wheel audit exposed and
+fixed a test that had assumed `src/` was present. Logs, hashes and artifacts
+remain local under `.cache/stage7/`. This is scoped automated/agent-driven
+smoke validation, not a formal agent benchmark or a publication claim.
+
+**Next**: review/commit these preparation changes when authorized and validate
+that commit in CI, then finish editor acceptance and remaining work. An early
+editor packaging rehearsal passed 82 tests and produced a verified 0.1.0
+prerelease VSIX bundling the RC. A second rehearsal (2026-10-12) bundled the
+engine as 0.7.0, built with Python 3.12, and verified the pre-release and
+preview markers, the bundle's reported version, and the launcher. A third
+rehearsal, after the alpha features and the bug-fix audit, passed 114 editor
+tests and 3,025 engine tests and verified the same markers. All are drafts,
+not the editor release: it must be rebuilt from the clean release commit
+against the ready 0.7.0 Beta engine.
 
 #### Editor track (alpha)
 
@@ -344,12 +377,26 @@ The track runs in parallel with the stages above.
   and the extension evolve together in this repository, so an engine gap and
   its client consumer land in one reviewable change. A second client is what
   would justify splitting them apart.
-- **Feature work that does not gate 0.7.0**: group *hierarchy* editing in the
-  sidebar (add, rename, move, remove — `groups add-group`, `rename-group`,
-  `move-group`, `remove-group`, and `update-group` already exist with
-  `--dry-run --diff`), and `asset fetch` from the view under the
-  `pynakes.allowOnlineLookups` switch that already covers compare and import.
-  Whatever is unfinished carries into v0.8.
+- **Alpha feature work** *(done for 0.1.0; see CHANGELOG)*: group hierarchy
+  editing in the sidebar, with renames carrying members
+  (`groups rename-group --members`), and `asset fetch` from the view under
+  `pynakes.allowOnlineLookups`.
+- **Open after the 0.1.0 audit** (not gating the alpha unless noted):
+  - *Groups-field separator:* pynakes reads and writes `groups` memberships on
+    `;`, while JabRef's default keyword separator is `,`. A multi-group entry
+    from a default JabRef setup reads as one group. Decide how the separator
+    is declared or detected before 1.0.
+  - *Opening materials:* a `file`-field path is handed to the OS handler; on
+    Windows an executable named by an untrusted `.bib` could run. Decide on an
+    allow-list or a confirmation.
+  - *Key rename* is the one write with no preview diff or `--expect-sha256`.
+  - *Whole-file `dedupe merge`* does not check pending staged edits on the
+    entries it removes.
+  - *Cancellation* kills only the spawned process, not a launcher's child.
+  - *Keyboard access:* duplicate-cluster keys and sidebar group rows are not
+    focusable.
+  - *Fetch progress:* the engine reports no per-file progress in `--json`
+    mode, and the view does not offer `--access institutional`.
 
 **Editor alpha gate**: the `.vsix` is published as a pre-release; its checks run
 in CI against the beta envelope; every gap it surfaced was closed in the engine

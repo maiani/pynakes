@@ -55,6 +55,10 @@ Exit codes:
 - `1`: error, such as parse, I/O, or validation failure
 - `2`: conflict, such as duplicate DOI import without `--allow-duplicate`
 
+A citation key, group name, or query that begins with `-` would be read as an
+option. Put the options first and such values after `--`, which ends the
+options: `pynakes groups add-entry refs.bib --create -- Newton1687 -draft`.
+
 ## Selecting entries (`--where`)
 
 Every command that addresses a *set* of entries takes the same selector: the
@@ -276,6 +280,21 @@ descendant-inclusive membership, or `--exact` to restrict it to direct members.
 A group name that matches neither a tree node nor a flat tag is a `KeyNotFound`
 error rather than an empty result, so a typo is distinguishable from a group
 that genuinely has no members.
+
+The tree and per-entry membership are separate records, and the tree commands
+edit only the first unless asked. `groups rename-group OLD NEW` renames the node
+(and the parent reference of each child); entries filed under `OLD` keep that
+membership, which then shows up as a group the tree does not declare. Pass
+`--members` to carry the members along: every entry whose `groups` field names
+exactly `OLD` is rewritten to `NEW` (`Optics Lab` is not a member of `Optics`),
+an entry never ends up naming `NEW` twice, and only those `groups` lines change.
+The JSON envelope lists the moved entries' keys as `members_renamed` (empty
+without `--members`), so a preview can name them before the write.
+`groups remove-group` never edits entries: a removed group's members keep it.
+
+```bash
+pynakes groups rename-group refs.bib Classics "Natural Philosophy" --members --dry-run --diff
+```
 
 `groups update-group` distinguishes an omitted option from an explicit empty
 one: passing `--parent ""`, `--color ""`, or `--description ""` clears that

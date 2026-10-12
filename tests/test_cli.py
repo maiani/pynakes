@@ -4518,8 +4518,23 @@ class TestAssetFetchPublished:
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         assert data["fetched"] == []
-        assert data["skipped"] == [{"key": "Einstein1905", "reason": "would fetch"}]
+        assert data["skipped"] == [
+            {
+                "key": "Einstein1905",
+                "reason": "would fetch",
+                "planned": [
+                    {
+                        "artifact": "published_pdf",
+                        "path": str(tmp_path / "refs.files" / "Einstein1905.published.pdf"),
+                        "doi": "10.1002/andp.19053221004",
+                        "fallback": False,
+                    }
+                ],
+            }
+        ]
         assert data["failed"] == []
+        # A dry run creates nothing, not even the files directory it plans to fill.
+        assert not (tmp_path / "refs.files").exists()
 
     def test_fetch_published_skips_when_disabled(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"

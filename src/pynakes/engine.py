@@ -38,6 +38,7 @@ from pynakes._engine_helpers import (
     snapshot_source_spans,
 )
 from pynakes._engine_keys import BibliographyKeys
+from pynakes._engine_materials import BibliographyMaterials
 from pynakes._engine_ops import BibliographyOperations
 from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
@@ -59,7 +60,11 @@ __all__ = [
 
 @dataclass
 class Bibliography(
-    BibliographyKeys, BibliographyGroups, BibliographyDirectives, BibliographyOperations
+    BibliographyKeys,
+    BibliographyGroups,
+    BibliographyDirectives,
+    BibliographyOperations,
+    BibliographyMaterials,
 ):
     """One in-memory bibliography.
 

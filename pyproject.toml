@@ -27,7 +27,7 @@ keywords = [
     "agent",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
@@ -129,12 +129,6 @@ include = ["src/pynakes"]
 # Type-checking baseline: suppress only recorded rule families in each
 # module. Shrink this list; never broaden it.
 
-
-[[tool.ty.overrides]]
-include = ["src/pynakes/_engine_helpers.py"]
-[tool.ty.overrides.rules]
-invalid-argument-type = "ignore"
-unresolved-attribute = "ignore"
 
 [[tool.ty.overrides]]
 include = ["src/pynakes/_integrity_published.py"]

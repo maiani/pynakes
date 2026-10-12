@@ -594,7 +594,7 @@ def test_update_node() -> None:
 
 def test_update_node_not_found() -> None:
     lib = _fresh_lib()
-    assert not update_node(lib, "Nope", color="red")
+    assert not update_node(lib, "Nope", color="ff0000")
 
 
 # ---------------------------------------------------------------------------

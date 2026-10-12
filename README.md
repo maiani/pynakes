@@ -207,7 +207,9 @@ See the [LLM Integration guide](https://github.com/maiani/pynakes/blob/main/docs
 
 ## Status
 
-This checkout targets v0.7.0: a beta CLI contract and an experimental VS Code client.
+This checkout prepares **0.7.0 Beta**, not yet published. Engine readiness
+comes first, followed by the **editor 0.1.0 Alpha**; both will be published
+together once their release gates pass. Local RC builds are validation artifacts.
 The Python API is intended to stabilize at 1.0. From 0.7.0, incompatible CLI, JSON-envelope, and error-code changes
 require a documented deprecation period. Pin versions for reproducible workflows.
 

@@ -234,7 +234,9 @@ file; pynakes commands report it as having no explicit members until JabRef
 are not fully independent of the tree: when a tree already exists, adding an
 entry to a group that has no node registers one, so the tree stays a complete
 index of the groups in use. `groups list` reads both views and reports their
-union. See the [Usage guide](usage.md#groups) for the full CLI surface,
+union. The tree commands leave entries alone, with one opt-in exception:
+`groups rename-group --members` also renames the membership in every entry
+filed under the old name. See the [Usage guide](usage.md#groups) for the full CLI surface,
 including the CRUD commands available on the tree.
 
 ## Lint conformance

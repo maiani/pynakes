@@ -51,7 +51,8 @@ def person_to_bibtex(name: dict[str, str]) -> str:
 
 
 def names_to_bibtex(names: list[dict[str, str]]) -> str:
-    return " and ".join(person_to_bibtex(n) for n in names if isinstance(n, dict))
+    people = (person_to_bibtex(n) for n in names if isinstance(n, dict))
+    return " and ".join(person for person in people if person)
 
 
 def split_pages(value: str) -> tuple[str, str]:

@@ -29,7 +29,7 @@ NOT_ENTRY_SELECTABLE = {
     "groups move-group": "edits the group tree, not entries",
     "groups remove-entry": "names one entry positionally",
     "groups remove-group": "edits the group tree, not entries",
-    "groups rename-group": "edits the group tree, not entries",
+    "groups rename-group": "renames one group; --members follows it into every entry",
     "groups update-group": "edits the group tree, not entries",
     "init": "creates a library",
     "keys rename": "names one entry positionally",

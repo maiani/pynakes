@@ -16,13 +16,16 @@ import pytest
 import typer.main
 from typer.testing import CliRunner
 
+import pynakes
 from pynakes.capabilities import command_schemas, get_capabilities
 from pynakes.cli import app
 from pynakes.cli_errors import CATALOGUE, ErrorCode
 
 runner = CliRunner()
 FIXTURES = Path(__file__).parent / "fixtures"
-SRC = Path(__file__).parent.parent / "src" / "pynakes"
+# Audit the package actually under test: src/ in development, site-packages/
+# in the release workflow after it removes the checkout's source tree.
+SRC = Path(pynakes.__file__).resolve().parent
 
 SCHEMAS = command_schemas()
 
@@ -389,7 +392,7 @@ def test_an_error_envelope_names_a_catalogued_code(tmp_path: Path) -> None:
 
 
 def _emitted_codes() -> tuple[set[str], set[str]]:
-    """Return (string-literal codes, ``ErrorCode`` members) the source emits."""
+    """Return (string-literal codes, ``ErrorCode`` members) the loaded package emits."""
     literals: set[str] = set()
     members: set[str] = set()
     for path in SRC.rglob("*.py"):

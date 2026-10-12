@@ -332,6 +332,12 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
 - **Envelope.** `asset fetch` extends the standard JSON envelope with `fetched` /
   `skipped` / `failed` lists; `modified` reflects whether the `.bib` changed (e.g.
   a `pinax-files-dir` was recorded), not the downloads themselves.
+  A `--dry-run` makes no network request and creates nothing — not even the
+  files directory. Each entry it would fetch for appears in `skipped` with
+  reason `would fetch` and a `planned` list naming every artifact a real run
+  would request: its `artifact` kind, the `path` it would be written to, the
+  `doi` or `arxiv_id` it would be requested by, and `fallback: true` on the
+  preprint `best-pdf` only falls back to when no published PDF is found.
 
 What `asset fetch` downloads is **governed by metadata** — a single
 `pinax-fetch-policy`

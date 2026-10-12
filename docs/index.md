@@ -13,8 +13,9 @@ The current engine works with individual bibliographies and explicit operations
 across files; `Library`, `Catalogue` and broader client integrations are planned
 in the [roadmap](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
 
-> **Development status.** This checkout targets v0.7.0, with a beta CLI contract
-> and a separately versioned experimental VS Code client. The
+> **Development status.** This checkout prepares 0.7.0 Beta (not yet published), with a beta CLI contract
+> and an experimental VS Code client. Engine readiness precedes editor work;
+> the engine and editor 0.1.0 will be published together. The
 > Python API is intended to stabilize at 1.0; from 0.7.0 the CLI contract requires
 > deprecation before incompatible changes. Pin versions for reproducible use.
 

@@ -50,6 +50,38 @@ def test_csl_json_round_trip_preserves_core_fields() -> None:
     assert "journal" not in chapter.fields
 
 
+@pytest.mark.parametrize(
+    "issued",
+    [
+        {"date-parts": {"type": None}},
+        {"date-parts": [{"0": 1905}]},
+        {"date-parts": [[None]]},
+        {"date-parts": [[True]]},
+        {"date-parts": [["nineteen"]]},
+        {"date-parts": "1905"},
+        [1905],
+    ],
+)
+def test_csl_json_malformed_issued_imports_without_a_year(issued) -> None:
+    item = {"id": "Einstein1905", "title": "On the Electrodynamics", "issued": issued}
+    entry = import_library(json.dumps(item), "csl-json").entries["Einstein1905"]
+    assert "year" not in entry.fields
+
+
+def test_csl_json_issued_year_may_be_a_digit_string() -> None:
+    item = {"id": "Einstein1905", "issued": {"date-parts": [["1905", "6"]]}}
+    assert import_library(json.dumps(item), "csl-json").entries["Einstein1905"].fields["year"] == (
+        "1905"
+    )
+
+
+def test_csl_json_nameless_people_are_dropped() -> None:
+    item = {"id": "Anon1850", "author": [{}, {"family": "Faraday"}, {"given": ""}]}
+    assert import_library(json.dumps(item), "csl-json").entries["Anon1850"].fields["author"] == (
+        "Faraday"
+    )
+
+
 def test_ris_export_shape() -> None:
     ris = export_library(parse_bib(_SRC), "ris")
     record = ris.split("\n\n")[0].splitlines()

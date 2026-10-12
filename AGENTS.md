@@ -56,7 +56,7 @@ src/pynakes/
   cli_surface.py      library-first positionals, --file, and every deprecated form
   cli_errors.py       the error-code catalogue (status + exit code per code)
   cli_choices.py cli_checks.py cli_completion.py   option choices, gates, completion
-tests/                pytest suite, conformance fixtures, and opt-in agent eval
+tests/                pytest suite, conformance fixtures, and CLI workflow tests
 editor/               VS Code extension companion (TypeScript, own toolchain)
 ```
 

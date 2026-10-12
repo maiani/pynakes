@@ -19,6 +19,18 @@ surface first, this release makes one batch of breaking changes, listed
 together below. The pre-0.7 spellings are **removed, not deprecated**: an old
 form is a `UsageError`, never silently reinterpreted.
 
+### Release preparation
+
+- Classify pynakes 0.7.0 as Beta; its Python API remains experimental until
+  1.0. Finish engine readiness first, then the editor 0.1.0 Alpha, and publish
+  both together. Internal RC artifacts are validation builds, not a separate
+  publication milestone.
+- Add the coordinated release checklist and audit the loaded package's error
+  codes so contract tests work against an installed wheel without `src/`.
+- Replace the stale agent-harness requirement with existing contract/workflow
+  tests and separately recorded manual acceptance; the old harness was
+  deliberately removed in `0ef2951`.
+
 ### Added
 
 - Generated command reference from the live CLI, including every argument,
@@ -29,9 +41,42 @@ form is a `UsageError`, never silently reinterpreted.
   providers, User-Agent, optional caches and `PYNAKES_APS_API_TOKEN`.
 - Documentation of `init --agent-guide`, which writes an agent guide when
   creating or enabling a Pinax library without overwriting an existing guide.
+- `groups remove-group` reports `removed_groups`: every group node the removal
+  takes, the group and its descendants, by name in tree order, alongside
+  `removed_count`.
+- `asset fetch --dry-run` names what a real run would request: each `would
+  fetch` item in `skipped` carries a `planned` list with the artifact kind,
+  destination path, the DOI or arXiv id it would be requested by, and
+  `fallback` for the best-pdf preprint fallback.
+- `groups rename-group --members` also moves the group's members: every entry
+  whose `groups` field names exactly the old name is rewritten to the new one,
+  only those lines change, and the new name is never listed twice in an entry.
+  The envelope adds `members` and `members_renamed`, the moved keys in file
+  order. Without the flag a rename still edits only the hierarchy, and
+  `remove-group` still keeps memberships. Python API:
+  `Bibliography.rename_group_members(old, new)`.
 
 ### Fixed
 
+- `asset fetch --dry-run` created the Pinax files directory; a dry run now
+  creates nothing.
+- `asset fetch` no longer records `pinax-files-dir`, or leaves an empty store
+  directory, when nothing was fetched; a dry run with nothing to fetch no
+  longer plans that change.
+- `groups rename-group` renames a group to a different case of its own name
+  (`Optics` to `OPTICS`, with or without `--members`) instead of failing with
+  `InvalidInput`. Renaming or adding a name that differs from another group
+  only in case is a `GroupConflict`.
+- `groups add-group` and `update-group --color` refuse a colour JabRef cannot
+  read with `InvalidInput`; hex digits are accepted bare or after `#` or `0x`.
+- A membership that differs from a declared group only in case (`optics`
+  beside `Optics`) is listed as its own group and can be removed.
+  `groups list-entries` includes descendants whatever case the name is given
+  in, and lists a flat-only group's members when a tree exists.
+- CSL-JSON import ignores a malformed `issued` date instead of crashing, and
+  drops nameless authors and editors instead of writing an empty name.
+- The usage guide documents `--` for citation keys, group names and queries
+  that begin with `-`.
 - Documentation now describes the beta compatibility/deprecation policy,
   default journal preservation, Pinax presence checks without checksum
   verification, manifest repair, explicit network authorization and actual

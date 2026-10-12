@@ -25,6 +25,7 @@ All four JabRef group types are fully supported and the dynamic types
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Literal
 
@@ -122,11 +123,33 @@ def _parent_of(nodes: list[GroupNode], name: str) -> GroupNode | None:
 
 
 def _node_by_name(nodes: list[GroupNode], name: str) -> GroupNode | None:
-    """Return the first node matching *name* (case-insensitive)."""
+    """Return the node named *name*, preferring an exact match.
+
+    A node spelled exactly *name* wins; failing that, the first node whose name
+    matches case-insensitively. Preferring the exact spelling keeps a lookup
+    from landing on a different node when two names differ only in case.
+    """
+    for n in nodes:
+        if n.name == name:
+            return n
     for n in nodes:
         if n.name.lower() == name.lower():
             return n
     return None
+
+
+#: A group color as JabRef reads one: hex digits, bare or after ``#`` or ``0x``,
+#: in the RGB, RGBA, RRGGBB, or RRGGBBAA form (JabRef itself writes ``0xRRGGBBAA``).
+_COLOR_PATTERN = re.compile(r"(?:#|0[xX])?(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
+
+
+def check_group_color(color: str) -> None:
+    """Raise ``ValueError`` unless *color* is empty or a hex color JabRef can read."""
+    if color and not _COLOR_PATTERN.fullmatch(color):
+        raise ValueError(
+            f"Group color {color!r} is not a hex color: expected RRGGBB or RRGGBBAA "
+            "hex digits, optionally after '#' or '0x' (e.g. 0x8a8a8aff), or '' to clear"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -398,6 +421,7 @@ def add_node(
     name already exists.
     """
     check_balanced_braces(f"Group name {name!r}", name)
+    check_group_color(color)
     tree = library_group_tree(lib) or []
     if _node_by_name(tree, name):
         return False
@@ -427,17 +451,23 @@ def rename_node(lib: BibFile, old_name: str, new_name: str) -> bool:
     """Rename a group node, updating parent references in children.
 
     Returns ``True`` if a node was renamed, ``False`` if *old_name* was not
-    found or *new_name* already exists.
+    found or *new_name* names another node. A rename that changes only the case
+    of the name (``Optics`` to ``OPTICS``) is a rename of the node itself, not a
+    clash with it.
     """
     check_balanced_braces(f"Group name {new_name!r}", new_name)
     tree = library_group_tree(lib) or []
     node = _node_by_name(tree, old_name)
-    if node is None or _node_by_name(tree, new_name):
+    if node is None:
         return False
+    clash = _node_by_name(tree, new_name)
+    if clash is not None and clash is not node:
+        return False
+    previous = node.name
     node.name = new_name
     # Update parent refs in children
     for n in tree:
-        if n.parent.lower() == old_name.lower():
+        if n.parent == previous:
             n.parent = new_name
     _write_tree(lib, tree)
     return True
@@ -454,7 +484,7 @@ def move_node(lib: BibFile, name: str, new_parent: str) -> bool:
     if node is None:
         return False
     # Prevent circular reference (descendant_names returns strings)
-    if new_parent and new_parent.lower() in {n.lower() for n in _descendant_names(tree, name)}:
+    if new_parent and new_parent.lower() in {n.lower() for n in _descendant_names(tree, node.name)}:
         return False
     node.parent = new_parent
     _write_tree(lib, tree)
@@ -473,6 +503,8 @@ def update_node(lib: BibFile, name: str, **kwargs) -> bool:
     for key, value in kwargs.items():
         if isinstance(value, str):
             check_balanced_braces(f"Group {key} {value!r}", value)
+    if isinstance(kwargs.get("color"), str):
+        check_group_color(kwargs["color"])
     tree = library_group_tree(lib) or []
     node = _node_by_name(tree, name)
     if node is None:
@@ -549,16 +581,17 @@ def list_entries_in_group_tree(lib: BibFile, group: str, *, exact: bool = False)
     are returned (JabRef-compatible behavior).  Both modes evaluate
     ``KeywordGroup`` and ``SearchGroup`` expressions.
     """
-    tree = library_group_tree(lib)
-    if tree is None:
-        return sorted([entry.key for entry in lib.entries.values() if group in entry_groups(entry)])
+    tree = library_group_tree(lib) or []
+    flat = sorted(entry.key for entry in lib.entries.values() if group in entry_groups(entry))
     node = _node_by_name(tree, group)
-    if node is None:
-        return []
+    if node is None or (node.name != group and flat):
+        # No node by that name, or only a node spelled differently while some
+        # entry is filed under exactly *group*: that tag is its own flat group.
+        return flat
     if exact:
         return sorted(_group_entry_keys(lib, node))
     keys: set[str] = set()
-    for name in _descendant_names(tree, group):
+    for name in _descendant_names(tree, node.name):
         descendant = _node_by_name(tree, name)
         if descendant:
             keys.update(_group_entry_keys(lib, descendant))
@@ -573,17 +606,19 @@ def known_group_names(lib: BibFile) -> list[str]:
     tree node (or when no tree is defined at all) — follow, in first-seen
     order. This is the deterministic union that ``groups list`` and
     ``groups list-entries`` (for unknown-name detection) share, so a flat-only
-    group is never dropped just because an unrelated tree exists.
+    group is never dropped just because an unrelated tree exists. Names compare
+    exactly, as membership does, so a tag differing from a node only in case is
+    listed as a group of its own rather than hidden behind the node.
     """
     from pynakes.groups import list_groups as _flat_group_names
 
     tree = library_group_tree(lib)
     tree_names = [n.name for n in tree] if tree else []
-    seen = {n.lower() for n in tree_names}
+    seen = set(tree_names)
     result = list(tree_names)
     for name in _flat_group_names(lib):
-        if name.lower() not in seen:
-            seen.add(name.lower())
+        if name not in seen:
+            seen.add(name)
             result.append(name)
     return result
 
@@ -594,10 +629,12 @@ def list_direct_members(lib: BibFile, name: str) -> list[str]:
     Resolves *name* against a tree node when one exists (evaluating its
     explicit/dynamic membership), otherwise falls back to entries whose flat
     ``groups`` field tags *name* directly. This covers flat-only group tags
-    even when an unrelated tree is present elsewhere in the library.
+    even when an unrelated tree is present elsewhere in the library. The name
+    is matched exactly, as membership is: a flat ``optics`` tag is its own
+    group, not a member of an ``Optics`` node.
     """
     tree = library_group_tree(lib)
-    node = _node_by_name(tree, name) if tree else None
+    node = next((n for n in tree if n.name == name), None) if tree else None
     if node is not None:
         return sorted(_group_entry_keys(lib, node))
     return sorted(entry.key for entry in lib.entries.values() if name in entry_groups(entry))

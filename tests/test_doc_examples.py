@@ -71,7 +71,10 @@ def test_current_engine_docs_do_not_claim_alpha_status() -> None:
     paths = [ROOT / "README.md", *(ROOT / "docs").rglob("*.md")]
     for path in paths:
         for line in path.read_text(encoding="utf-8").splitlines():
-            assert not re.search(r"\balpha\b", line, re.I), f"{path}: {line}"
+            if re.search(r"\balpha\b", line, re.I):
+                # The engine is Beta; the independently versioned editor Alpha
+                # is explicitly part of the coordinated release.
+                assert re.search(r"\beditor\b|\bVS Code\b", line, re.I), f"{path}: {line}"
 
 
 def test_terminal_help_has_no_literal_rst_quotes() -> None:

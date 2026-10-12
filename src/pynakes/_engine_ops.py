@@ -11,7 +11,7 @@ Group-tree and key operations live in :mod:`pynakes._engine_groups` and
 
 from __future__ import annotations
 
-from collections.abc import Callable, Collection, Iterable
+from collections.abc import Collection, Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -25,20 +25,13 @@ from pynakes import journals as journal_ops
 from pynakes import metadata as metadata_ops
 from pynakes import normalize as normalize_ops
 from pynakes import scrub as scrub_ops
-from pynakes._engine_helpers import (
-    build_fetch_queue,
-    metadata_fetch_policy,
-    run_fetch_loop,
-)
 from pynakes._entry_comments import attached_comment_indices
 from pynakes._library_style import apply_library_style
 from pynakes.canonical import CanonicalLayout, format_selected_entries, validate_format_input
 from pynakes.editing import set_entry_type
-from pynakes.fetch_progress import FetchProgress
 from pynakes.filestore import FILES_DIR_KEY, FileStore, resolve_files_dir
 from pynakes.lint import LintIssue
 from pynakes.lint import lint as lint_lib
-from pynakes.metadata import FetchPolicy
 from pynakes.model import BibEntry, BibFile, QueryFilter
 from pynakes.progress import EntryProgress
 from pynakes.usage import tex_sources_from_metadata, validate_tex_sources
@@ -614,109 +607,3 @@ class BibliographyOperations:
             keys=keys,
         )
         return report
-
-    # --- Pinax fetch/ensure operations -----------------------------------
-
-    def ensure_files_dir(self) -> bool:
-        """Bootstrap ``pinax-files-dir`` metadata if not already configured.
-
-        Returns True if metadata was set (bibliography marked dirty), False if
-        ``pinax-files-dir`` was already present.
-        """
-        for name in self.lib.metadata:
-            if name.strip().lower() == FILES_DIR_KEY:
-                return False
-        if self.path is None:
-            raise ValueError("ensure_files_dir requires a bound path")
-        default = f"{self.path.stem}.files"
-        self.set_metadata(FILES_DIR_KEY, default)
-        return True
-
-    def fetch_materials(
-        self,
-        target: str | None = None,
-        *,
-        policy: FetchPolicy | None = None,
-        dry_run: bool = False,
-        pdf_fetcher: Callable[[str], bytes] | None = None,
-        source_fetcher: Callable[[str], bytes] | None = None,
-        published_url_fetcher: Callable[[str], str | None] | None = None,
-        institutional_url_fetcher: Callable[[str], str | None] | None = None,
-        published_pdf_fetcher: Callable[[str], bytes] | None = None,
-        supplement_url_fetcher: Callable[[str], tuple[str, ...]] | None = None,
-        supplement_pdf_fetcher: Callable[[str], bytes] | None = None,
-        cache_file: str | Path | None = None,
-        progress: FetchProgress | None = None,
-        access: str = "open",
-        keys: Collection[str] | None = None,
-    ) -> dict:
-        """Download selected arXiv, published, and supplementary materials for entries.
-
-        Args:
-            target: Optional single citation key to fetch. If None, fetch all.
-            policy: Optional explicit fetch policy. When provided, overrides the
-                library's metadata ``pinax-fetch-policy`` setting.
-            dry_run: If True, report what would be fetched without downloading.
-            pdf_fetcher: Injectable arXiv PDF fetcher for testing.
-            source_fetcher: Injectable arXiv source fetcher for testing.
-            published_url_fetcher: Injectable OA PDF URL resolver for testing.
-            institutional_url_fetcher: Injectable publisher PDF URL resolver.
-            published_pdf_fetcher: Injectable published PDF bytes fetcher.
-            supplement_url_fetcher: Injectable supplement URL resolver.
-            supplement_pdf_fetcher: Injectable supplement PDF bytes fetcher.
-            cache_file: Optional path to a provider-response cache file.
-            progress: Optional callback receiving fetch progress events.
-            access: Published-material access mode: ``open`` or ``institutional``.
-            keys: Citation keys to fetch for, in place of ``target``; ``None`` for all.
-
-        Returns:
-            A dict with ``fetched``, ``skipped``, ``failed`` lists, plus
-            ``fetch_policy`` dict reflecting the resolved Pinax fetch policy.
-        """
-        if access not in {"open", "institutional"}:
-            raise ValueError(f"Unknown fetch access mode: {access!r}")
-        store = self.files
-        if store is None:
-            self.ensure_files_dir()
-            store = self.files
-            if store is None:
-                raise ValueError("could not resolve pinax-files-dir after bootstrapping")
-
-        store.ensure_root()
-
-        if policy is not None:
-            resolved = policy
-        else:
-            resolved = metadata_fetch_policy(self.lib)
-
-        entry_queue = build_fetch_queue(self.lib, target, keys)
-        fetched, skipped, failed = run_fetch_loop(
-            entry_queue,
-            store,
-            resolved,
-            dry_run,
-            pdf_fetcher=pdf_fetcher,
-            source_fetcher=source_fetcher,
-            published_url_fetcher=published_url_fetcher,
-            institutional_url_fetcher=institutional_url_fetcher,
-            published_pdf_fetcher=published_pdf_fetcher,
-            supplement_url_fetcher=supplement_url_fetcher,
-            supplement_pdf_fetcher=supplement_pdf_fetcher,
-            cache_file=cache_file,
-            progress=progress,
-            access=access,
-        )
-
-        return {
-            "fetch_policy": {
-                "preprint": resolved.preprint,
-                "published": resolved.published,
-                "source": resolved.source,
-                "supplement": resolved.supplement,
-                "bestpdf": resolved.bestpdf,
-            },
-            "access": access,
-            "fetched": fetched,
-            "skipped": skipped,
-            "failed": failed,
-        }
