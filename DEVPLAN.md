@@ -23,22 +23,21 @@ Completed work is recorded in [CHANGELOG.md](CHANGELOG.md) and the git log.
 
 v0.7.0 moves the **CLI** to beta: its command syntax, options, JSON envelope,
 exit codes, and error codes become a contract that changes only through a
-documented deprecation. The **VS Code editor** ships alongside it as an
-**alpha** pre-release — usable, with no compatibility promise of its own, and a
-consumer of nothing but the beta envelope. The Python API keeps its current
-status — the intended public surface in
+documented deprecation. The **VS Code editor** ships alongside it as a
+**0.1.0 alpha** pre-release — usable, with no compatibility promise of its own,
+and a consumer of nothing but the beta envelope. The Python API keeps its
+current status — the intended public surface in
 [docs/guides/public-api.md](docs/guides/public-api.md), with breaking changes
 documented but not deprecated — until 1.0 pins it.
 
-The plan below comes from a pre-beta audit (2026-09-30) of CLI consistency,
-error paths, documentation, security, data integrity, platforms and packaging,
-and dead code. The work runs as seven stages in order, each closed by a gate.
-Stage 1 ships as a 0.6.x patch because it affects current users; every later
-stage lands in 0.7.0.
+The pre-beta audit's six engineering stages are closed (gates met between
+2026-10-01 and 2026-10-12), and the editor's alpha features and bug-fix audit
+are done. Their changes are in [CHANGELOG.md](CHANGELOG.md) under 0.6.5 and
+0.7.0 and in `editor/CHANGELOG.md`. What remains is the release itself.
 
 #### The beta promise
 
-What 0.7.0 commits to, and what every gate below tests for:
+What 0.7.0 commits to, and what every later change is held to:
 
 - **A frozen surface, with deprecation.** From 0.7.0, removing or renaming a
   command, option, envelope key, `action` value, exit-code meaning, or error
@@ -55,320 +54,63 @@ What 0.7.0 commits to, and what every gate below tests for:
 - **Docs describe the real surface**, with a command reference generated from
   the live CLI.
 
-#### Stage 1 — Stop-ship fixes → 0.6.5
+#### Standing decisions from the audit
 
-Done: the fixes are recorded in CHANGELOG under 0.6.5, and 0.6.4 and 0.6.5 were
-published on 2026-10-01. The local-only `v0.6.2` tag was never released; retire
-it or leave it unpushed.
+Decisions that still constrain new work:
 
-**Gate 1** (met): 0.6.5 is on PyPI.
+- The Python API is its own interface: a `Bibliography` method no command calls
+  is not dead code for that reason alone.
+- `--strict` gates a read-only command (`lint`, `verify`, `dedupe check`,
+  `keys check`, `asset check`); `--check` is a transform's check mode
+  (`format`, `scrub`). `-f` is `--file` everywhere, `--field` is a
+  `name=value` assignment, and `--out PATH|-` is the one output flag.
+- Settings are named for the command that applies them and `lint` verifies
+  them. A setting for one entry is a directive comment above it
+  (`% pynakes: verb args -- reason`), never a `pynakes-*` field; a new
+  directive adds a word to `ref directive`, not a command.
+- No project-level config (`pynakes.toml`, `[tool.pynakes]`): the `.bib` carries
+  its own settings. Revisit with the v0.8 `Library`.
+- Group-tree commands edit the hierarchy, not entries, unless asked:
+  `rename-group --members` moves memberships, and `remove-group` keeps them.
+- The surface contract is enforced by `tests/test_contract.py`, read from the
+  live command tree; tests read option choices from `capabilities --json`,
+  never from rendered `--help`.
+- The ty baseline (`[[tool.ty.overrides]]` in `pyproject.toml`) only shrinks.
+  No module exceeds 800 lines; `fetch.py`, `normalize.py` and `lint.py` are
+  near it and must be split before substantial additions.
+- Actions are referenced by major version tag, not commit SHA. The release
+  workflow's TestPyPI option needs a `testpypi` environment and a trusted
+  publisher on test.pypi.org first. The local-only `v0.6.2` tag was never
+  released; retire it or leave it unpushed.
 
-#### Stage 2 — CI, release pipeline, platforms
+#### Release — engine 0.7.0 Beta with editor 0.1.0 Alpha
 
-Done: every later stage is now tested everywhere the beta claims to run.
-The work is recorded in CHANGELOG under Unreleased: Python 3.12 as the floor, the
-three-OS matrix with 3.15 allowed to fail, a lowest-dependency job, release
-checks and wheel tests before publishing, PyPI before the GitHub release,
-dependabot, the two Windows fixes, and mypy at a recorded baseline (the
-then-current `[[tool.mypy.overrides]]` list, since replaced by the ty baseline).
-Actions are referenced by major version tag, by choice, rather than pinned by
-commit SHA. Running the release workflow by hand is a dry run; its TestPyPI
-option needs a `testpypi` environment and a trusted publisher on test.pypi.org
-first.
+The checklist is [RELEASE.md](RELEASE.md). Remaining:
 
-**Gate 2** (met, 2026-10-01): the full matrix is green, the lowest-dependency
-job included; a release dry run passed every new check.
+1. CI green on the release commit, the full matrix and the editor job.
+2. Manual acceptance in VS Code against the ready engine, and manual agent
+   acceptance recorded separately (the former hand-run harness was removed in
+   `0ef2951`; `test_contract.py` and `test_workflows.py` are automated tests,
+   not an agent evaluation).
+3. Choose the editor's distribution channel (VS Code Marketplace, Open VSX, or
+   both) and claim the `pynakes` publisher there.
+4. Rebuild both artifacts from the clean release commit (the editor with
+   `npm run package:prerelease` against the 0.7.0 engine), validate them, date
+   both changelogs, then push the `v0.7.0` tag and publish the editor in the
+   same window.
 
-#### Stage 3 — Cleanup before the freeze
+Until then, fix regressions only; new features wait for 0.7.1 or v0.8.
 
-Done: the deletions, consolidations, renames, and splits are recorded in
-CHANGELOG under Unreleased. Decisions taken along the way:
+**Done when**: candidate use has shown no data-loss or contract regression; both
+distributions are published in the coordinated release; the engine tag names
+0.7.0.
 
-- Of the `Bibliography` methods no command calls, only `import_doi` went; the
-  Python API is its own interface, and `journals_check`,
-  `abbreviate_journals`, `expand_journals`, and `rename_citekey` are
-  conveniences nothing else in it covers.
-- The Pinax `preprint_canonical` flag was removed rather than finished: nothing
-  could set it. A setter is an addition that can return after the freeze.
-- `importer` fell to 589 lines with its dead arXiv helpers gone, so its arXiv
-  section stayed put.
-- Splits keep public names defined in, or listed in `__all__` of, their public
-  module, so the generated API reference is unchanged: `canonical` lost its
-  field-order table and value wrapping, `lint` its issue type and profile
-  checks, `filestore` its manifest (a mixin), `metadata/jabref` its group
-  grammar.
+#### Editor track
 
-**Gate 3** (met, 2026-10-04): no module over 800 lines (the largest is
-`fetch.py`, 789); vulture at 80% confidence reports nothing; the suite and the
-90% coverage floor hold.
+The extension's scope is a bibliography belonging to a document or repository
+being edited, not library-scoped exploration (see
+[Graphical clients and their scope](docs/vision.md#graphical-clients-and-their-scope)).
 
-#### Stage 4 — Freeze the surface
-
-The one deliberate batch of breaking CLI changes, so the promise starts from a
-consistent surface. The renamed and reordered forms are removed outright in
-0.7.0, with no aliases: nobody depends on them yet, and the beta promise —
-deprecation before removal — applies from 0.7.0 onward.
-
-**Done** (on branch `stage-4-freeze`, 2026-10-05 to 2026-10-09; recorded in
-CHANGELOG under Unreleased): library-first positionals with `--file`/`-f`
-on every single-library command and syntactic library detection
-(`pynakes.cli_surface`); one meaning per
-flag and one flag per concept; enumerated options as Typer choices
-(`pynakes.cli_choices`); the beta envelope (`action` naming, warning objects,
-`file`/`out`, `summary`, `source_sha256` everywhere, `--expect-sha256` on every
-modifying command); usage errors exit 1 and human errors on stderr; one error
-catalogue (`pynakes.cli_errors`) that fixes each code's exit code and generates
-`capabilities`; the overwrite policy; the group validations; batch error codes.
-
-Decisions taken:
-
-- `--strict` and `--check` stay two flags with one meaning each: `--strict`
-  gates a command that is read-only anyway (`lint`, `verify`, `dedupe check`,
-  `keys check`, `asset check`); `--check` is the check mode of a transform
-  (`format`, `scrub`), which then writes nothing. Envelopes report `strict` or
-  `check` accordingly.
-- `-f` is `--file` everywhere; `--field` means a `name=value` assignment
-  (`ref add`/`ref edit`), and the field-*name* options got distinct names.
-- `--published` keeps one meaning, "consider preprints' published versions":
-  `verify` reports them, `enrich` applies them; `asset fetch` moved to
-  `--material`.
-- `--out PATH|-` is the one output flag; `format --stdout` became `--out -`.
-- `ref remove KEY` refuses a key shared by several entries
-  (`DuplicateCitationKey`), as `ref show`/`ref edit` do; `keys repair` first.
-- `groups add-entry` refuses an unknown group unless `--create`, which the
-  editor's "New group…" flow needs; batch `groups.add_entry` takes `create`.
-- `scrub --out` naming its own input (in-place scrub) needs no `--force`.
-- `corpus batch` operations report the standalone command's error codes
-  (`KeyNotFound`, `DuplicateCitationKey`, `CitationKeyConflict`) with `index`.
-- For lint gating in a commit hook ([#2](https://github.com/maiani/pynakes/issues/2)):
-  entry-type case is `format-entry-type-case`, not a `lint-` key — settings are
-  named for the command that applies them and `lint` verifies them, as it
-  verifies the `normalize-*` keys, so a layout finding fires exactly when
-  `format` would change the source (field-name case follows the same rule if it
-  ever gets a setting). Rule selection is one `--ignore NAME` taking a finding
-  type or a category, mirrored by one `lint-ignore` key; the command applies it,
-  and the `lint()` function keeps returning every finding.
-- `asset check` is a pure read-only gate; reconciling the Pinax manifest moved
-  to `asset repair`, with `--dry-run`/`--diff`, mirroring
-  `keys check`/`keys repair`.
-- `keys check` stays beside lint's `duplicate_key`: it gates on key uniqueness
-  alone, which `lint --strict` no longer can, and is the read side of
-  `keys repair`.
-- `verify` and `enrich` stay top-level: they are the online counterparts of
-  `lint` (diagnose) and `normalize` (change content). `keys usage` and
-  `tex scan` both stay — neither is a subset of the other.
-- No project-level config (`pynakes.toml`, `[tool.pynakes]`) in 0.7: the `.bib`
-  carries its own settings and every client reads them there. Revisit with the
-  v0.8 `Library`, whose directory is the natural home for shared defaults.
-- The Gate 4 contract tests are in `tests/test_contract.py`, read from the live
-  command tree: the positional table, one shape per flag spelling (`--key` and
-  `--title-field` are the recorded exceptions), an offline `--json` sample per
-  command checked against its envelope family (modify, create, read, check,
-  error; `corpus split` reports `outputs`), error codes catalogued both ways,
-  and `capabilities` matching the parsed options.
-- `lint --strict` fails on any finding left after suppression, not only on
-  errors and profile deviations: every other gate already failed on any
-  finding, and once findings can be suppressed explicitly, "strict" can mean
-  clean. `--where` on `ref directive` is how an existing library adopts it.
-- A setting for one entry is a directive comment directly above it
-  (`% pynakes: verb args -- reason`), not a `pynakes-*` field: library settings
-  already live in a comment, and a field would carry tool instructions into
-  exports, interchange formats, and public copies. Both forms survive JabRef
-  (checked with JabKit 6.0-beta.1), so JabRef did not decide it. One generic
-  `ref directive` writes every verb, so a new directive adds a word to the
-  grammar, not a command to the frozen surface.
-- The pre-0.7 forms are removed, not deprecated (2026-10-09): an old order or
-  spelling is a `UsageError`, and `capabilities` lists no deprecations.
-  `tests/test_cli_surface.py` checks that each one fails.
-- The editor moved to the library-first order and the beta envelope in the same
-  branch, with real-engine contract tests for the calls it makes.
-
-**Gate 4**: contract tests enforce the surface instead of sampling it — a table
-test of every command's positional signature; a sweep asserting that each flag
-spelling has one meaning; an envelope-schema test over every command's `--json`
-output; a test that every emitted error code is catalogued with its exit code;
-and a `capabilities` test covering option types, choices, and error codes. The
-editor passes against the new envelope (see the editor track).
-
-**Gate 4** (met, 2026-10-09): `tests/test_contract.py` enforces all five; the
-editor's real-engine contract tests pass against the 0.7 surface. Behavior
-tests the gate did not require moved to Stage 5.
-
-#### Stage 5 — Hardening and scale
-
-**Closed (2026-10-12).** The completed changes are recorded under Unreleased
-in CHANGELOG.
-
-**Done and verified locally:**
-
-- **Scale:** the linear parser/key-index fixes remain in place. The latest
-  `scripts/bench_scale.py` run on synthetic libraries measured:
-
-  | Entries | Parse | Lint | `format --check` |
-  | ---: | ---: | ---: | ---: |
-  | 4,000 | 0.40 s | 1.40 s | 2.31 s |
-  | 20,000 | 2.00 s | 6.97 s | 11.56 s |
-
-  These are measurements from one machine, not timing assertions. Each path
-  scales approximately with the entry count. Constant-factor work remains for
-  v0.9; the previous large-field measurement is recorded in the git history.
-- **Scrub:** remove additional JabRef, BibDesk and Mendeley private fields,
-  recognizable local paths in fields/strings/preambles, plain inter-entry
-  working text, and comment lines inside entries. Preserve literal percent
-  signs in values and the explicit keep switches. Repeated staged scrubs use
-  original source positions. Regression tests exercise preview and commit.
-- **Pinax paths:** refuse drive-relative and invalid Windows names, NUL/control
-  characters, reserved devices and over-long keys; refuse case-colliding
-  citation keys. Material copying refuses source-tree and destination artifact
-  symlinks before copying. Source-directory installation also refuses symlinks.
-- **Network policy:** default HTTP transport validates every redirect, refuses
-  non-HTTP(S), credentials, private/loopback destinations and mixed DNS results,
-  pins the validated IP while retaining Host/TLS names, and warns on HTTPS to
-  HTTP redirects. Metadata responses have an 8 MiB cap; material downloads retain
-  their 512 MiB cap. Retry/redirect/stream progress checks share a deadline.
-  arXiv URL helpers validate modern and historical identifier shapes.
-- **Durability:** sync files and directories inside a source tree before its
-  atomic installation; use a synced, atomic, numbered manifest backup.
-- **Correctness:** rename fully braced entry references; make wrapping's brace
-  accounting agree with the parser; validate externally supplied field values
-  before mutation/entry construction. Completion and previous-output diffs use
-  detected library encodings; interchange imports also recognize BOM/Latin-1.
-  `asset check` already uses `Bibliography.open`, so its library read was fixed.
-- **CLI behavior tests:** overwrite refusal and `--force` for every output
-  command, `format --out` and stdout, conversion import diffs/digests with
-  encoded inputs, ambiguous `ref remove`, multi-file catalogued error codes,
-  invalid option choices, and closed stdout without a second error-envelope
-  attempt. Existing import/fetch JSON tests remain passing.
-- **Property tests:** whole-file byte equality with CRLF/BOM/encodings; one field
-  edit changes one entry; committed edits reparse; format/normalize idempotence;
-  combine then split preserves entries and their raw source. These extend the
-  existing arbitrary-input parser properties.
-- **Module sizes:** source-span handling moved out of `_engine_helpers.py`;
-  scrub source staging lives in a focused helper. Every Python module remains
-  below 800 lines. `fetch.py` and `normalize.py` are still near the limit and
-  must be split before adding substantial behavior there.
-- **Python 3.15:** declared supported, required on Linux/Windows/macOS in CI,
-  and included in release wheel testing. A locally built final Python 3.15.0
-  ran the complete suite and coverage gate. Remote CI has not been run for
-  these uncommitted changes.
-- **Type checker:** ty replaces mypy in the dev extra, CI, pre-commit and
-  developer instructions. Ty 0.0.86 is pinned and passes with a per-module,
-  per-rule baseline of 118 existing diagnostics across 30 modules. The initial
-  trial found 134 diagnostics; annotation corrections and removal of an
-  unreachable compatibility fallback reduced it. The baseline must shrink,
-  never grow; see [the type-checking guide](docs/guides/type-checking.md).
-
-- **Hostile-input matrix:** `tests/test_hostile_input.py` runs Hypothesis
-  properties over CSL-JSON, RIS, EndNote and MODS of arbitrary shape. Each
-  importer returns a reparseable library or raises `ValueError`, and nothing
-  else. The file also covers specific refused and tolerated files through
-  `convert --from`, CSV's export-only boundary (now documented in usage), and
-  13 failed provider responses through `ref import`, plus a recovered throttle
-  and a mixed batch. Every case must yield a JSON envelope with no traceback
-  and leave the library untouched. The audit found and fixed `TypeError`,
-  `RecursionError` and raw XML parse errors. XML with entity declarations is
-  refused in MODS, arXiv and NCBI responses.
-- **Network deadline:** DNS resolution runs on a daemon thread bounded by the
-  deadline. A deadline-aware httpcore network backend gives each socket read
-  and write only the time left, so trickled headers end at the deadline. A
-  socket-pair test hangs without the backend. Injected openers are read in
-  bounded `read(size)` chunks: the cap holds without buffering the whole body,
-  and the deadline is checked between chunks. The architecture guide documents
-  this contract.
-- **HTTP-layer tests:** `tests/test_http_layer.py` covers cached-JSON
-  failures, metadata status and stream failures, opener caps and deadlines,
-  and retry boundaries. `_http.py` coverage rose from 83% to 89%.
-
-- **Remote CI:** CI run 38228820300 (commit 8085707) is green on all 17
-  jobs. They cover Python 3.12–3.15 on Linux, Windows and macOS, the
-  lowest-dependency job, lint and ty, strict docs, distribution, and the
-  editor extension. The first run found Windows-only failures, all fixed: a
-  source-tree sync that failed with `EBADF` (a real bug), and tests that
-  assumed POSIX directory syncs, untranslated newlines, or short test ids.
-
-**Gate 5** (met, 2026-10-12): the full hostile-input matrix runs in CI on
-every platform, with zero tracebacks and valid JSON whenever stdout is
-available. The scale and property-test requirements pass. Closed stdout
-deliberately exits 1, because no envelope can reach a reader that has gone
-away.
-
-#### Stage 6 — Documentation and policy
-
-Implemented (2026-10-12): compatibility and CHANGELOG deprecation conventions,
-per-command stability markers, a command reference generated from the live
-Click tree, executable offline documentation walkthroughs, and a network/privacy
-guide. Current engine docs describe the beta target and the actual normalization,
-Pinax, network, cache and JSON behavior. README links work outside the repository;
-shell completion and terminal help no longer carry misleading syntax. The
-placeholder site URL was removed; no hosted documentation deployment is claimed.
-See [CHANGELOG.md](CHANGELOG.md) for the completed changes.
-
-**Gate 6** (met, 2026-10-12): `mkdocs build --strict` passes;
-every offline shell example in README, quickstart and usage runs in
-`tests/test_doc_examples.py` with network access blocked; the generated command
-reference is checked for drift; current engine documents report no alpha status.
-The CI documentation job runs these tests before building. Commit `3a8642d`
-passed all 17 jobs in [CI run 38232952387](https://github.com/maiani/pynakes/actions/runs/38232952387),
-including the full platform matrix, lowest dependencies and editor checks.
-
-#### Stage 7 — Engine readiness, then editor, then coordinated publication
-
-- Prepare **pynakes 0.7.0 Beta** first: Beta metadata, release notes, built-wheel
-  CLI contract/workflow tests, and disposable-copy dogfooding. Local RC builds
-  may support validation; no separate PyPI RC publication is required.
-- Once engine readiness is established, move to the editor and finish the
-  **0.1.0 Alpha** acceptance and packaging gates against that engine.
-- Publish **0.7.0 Beta and editor 0.1.0 Alpha together**, after both are ready.
-  Do not publish the engine while editor readiness is still open.
-- Record manual agent acceptance independently of automated engine tests. The
-  former hand-run agent evaluation harness was deliberately removed in
-  `0ef2951`; it is not an available release check.
-- During release-candidate observation, fix regressions only; new features wait
-  for 0.7.1 or 0.8.
-
-**Done when**: every stage gate holds; candidate use has shown no data-loss or
-contract regression; both distributions are published in the coordinated
-release; CHANGELOG updated; the engine tag names 0.7.0.
-
-**Preparation**: Beta metadata, release notes and the checklist are in
-[RELEASE.md](RELEASE.md). Local builds use temporary setuptools-scm overrides;
-preparation creates no release tag. Manual acceptance, remaining editor work,
-and coordinated publication remain open.
-
-**Local engine preflight (2026-10-12)**: the installed 0.7.0rc1 wheel passed
-all 2,921 tests without a checkout source tree. Disposable copies of two real
-libraries (272 entries total) passed round-trip, layout semantic equality and
-normalization idempotence checks; originals stayed unchanged. Final-version
-0.7.0 Beta rehearsal wheel/sdist metadata and version checks passed. Source
-Ruff, formatting, ty and strict docs passed. The built-wheel audit exposed and
-fixed a test that had assumed `src/` was present. Logs, hashes and artifacts
-remain local under `.cache/stage7/`. This is scoped automated/agent-driven
-smoke validation, not a formal agent benchmark or a publication claim.
-
-**Next**: review/commit these preparation changes when authorized and validate
-that commit in CI, then finish editor acceptance and remaining work. An early
-editor packaging rehearsal passed 82 tests and produced a verified 0.1.0
-prerelease VSIX bundling the RC. A second rehearsal (2026-10-12) bundled the
-engine as 0.7.0, built with Python 3.12, and verified the pre-release and
-preview markers, the bundle's reported version, and the launcher. A third
-rehearsal, after the alpha features and the bug-fix audit, passed 114 editor
-tests and 3,025 engine tests and verified the same markers. All are drafts,
-not the editor release: it must be rebuilt from the clean release commit
-against the ready 0.7.0 Beta engine.
-
-#### Editor track (alpha)
-
-The extension ships with 0.7.0 as an alpha: a pre-release `.vsix`, labeled alpha
-in its README and listing, with no compatibility promise of its own. It is the
-first graphical client and the consumer that makes the envelope load-bearing;
-its scope is a bibliography belonging to a document or repository being edited,
-not library-scoped exploration. See
-[Graphical clients and their scope](docs/vision.md#graphical-clients-and-their-scope).
-The track runs in parallel with the stages above.
-
-- **Move to the beta envelope in the same change as Stage 4.** *(Done on
-  `stage-4-freeze`: library-first arguments, the renamed actions, `lint` counts
-  under `summary`, and `groups add-entry --create`.)*
 - **Thin-client discipline** — no BibTeX parser, metadata schema, or source of
   truth in the client. When the view needs something the engine does not
   expose, the engine grows it; a workaround in TypeScript is a regression even
@@ -377,20 +119,18 @@ The track runs in parallel with the stages above.
   and the extension evolve together in this repository, so an engine gap and
   its client consumer land in one reviewable change. A second client is what
   would justify splitting them apart.
-- **Alpha feature work** *(done for 0.1.0; see CHANGELOG)*: group hierarchy
-  editing in the sidebar, with renames carrying members
-  (`groups rename-group --members`), and `asset fetch` from the view under
-  `pynakes.allowOnlineLookups`.
-- **Open after the 0.1.0 audit** (not gating the alpha unless noted):
+- **Open after the 0.1.0 audit** (not gating the alpha):
   - *Groups-field separator:* pynakes reads and writes `groups` memberships on
     `;`, while JabRef's default keyword separator is `,`. A multi-group entry
     from a default JabRef setup reads as one group. Decide how the separator
     is declared or detected before 1.0.
-  - *Opening materials:* a `file`-field path is handed to the OS handler; on
-    Windows an executable named by an untrusted `.bib` could run. Decide on an
-    allow-list or a confirmation.
+  - *Opening materials with the system handler:* a `file`-field path is handed
+    to the OS; on Windows an executable named by an untrusted `.bib` could run.
+    Decide on an allow-list or a confirmation.
   - *Fetch progress:* the engine reports no per-file progress in `--json`
     mode, and the view does not offer `--access institutional`.
+  - `keys generate` and `keys repair` move Pinax materials but do not report
+    `pinax_materials` as `keys rename` does.
 
 **Editor alpha gate**: the `.vsix` is published as a pre-release; its checks run
 in CI against the beta envelope; every gap it surfaced was closed in the engine
@@ -503,8 +243,16 @@ version bumped to 0.8.0.
 
 Measure and improve the offline paths that become important once v0.8 can work
 across many bibliographies. Performance claims must be backed by reproducible
-results, not estimates. The linear parser path moved to v0.7 Stage 5, because a
+results, not estimates. The linear parser path was fixed in v0.7, because a
 single real library already reaches the sizes where it matters.
+
+Starting point, from `scripts/bench_scale.py` on synthetic libraries at the
+close of v0.7 (one machine; measurements, not assertions):
+
+| Entries | Parse | Lint | `format --check` |
+| ---: | ---: | ---: | ---: |
+| 4,000 | 0.40 s | 1.40 s | 2.31 s |
+| 20,000 | 2.00 s | 6.97 s | 11.56 s |
 
 - **Reproducible benchmark suite**: add generated and fixture-backed corpora at
   documented sizes; measure parse, unchanged write, lint, search, dedupe,

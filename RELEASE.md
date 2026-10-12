@@ -74,4 +74,4 @@ independent even though publication is coordinated.
 Artifacts, logs and hashes live in `.cache/stage7/`, ignored by Git. Engine
 readiness is assessed before further editor feature work. Manual acceptance,
 remaining editor work and coordinated publication stay open until actually
-completed; a local RC build alone does not close Stage 7.
+completed; a local RC build alone does not complete the release.
