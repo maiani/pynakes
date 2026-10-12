@@ -432,6 +432,9 @@ form is a `UsageError`, never silently reinterpreted.
   written as `  name = {value}` with no trailing comma, whatever the entry's
   layout. It now takes the entry's indent, its `=` column when the entry is
   aligned (`format-alignment: equals`), and its trailing-comma style.
+- Author normalization dotted a single initial (`Euler, L` to `Euler, L.`) but
+  not spaced ones: `Euler, L P` stayed as it was. Each is now dotted
+  (`Euler, L. P.`).
 
 ### Build
 

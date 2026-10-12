@@ -568,3 +568,10 @@ def test_normalize_pages_honors_a_stored_metadata_preference() -> None:
     normalize_library(lib)
 
     assert lib.entries["A"].fields["pages"] == "1052–1055"
+
+
+def test_jabref_style_dots_each_initial_of_a_spaced_given_name() -> None:
+    assert (
+        normalize_name_list("Newton, I and Euler, L P and Gauss, C. F.")
+        == "Newton, I. and Euler, L. P. and Gauss, C. F."
+    )

@@ -193,7 +193,10 @@ def _normalize_jabref_name(name: str) -> str:
 
     comma_parts = _split_top_level(collapsed, ",")
     if len(comma_parts) > 1:
-        return ", ".join(_normalize_initials(part) for part in comma_parts if part)
+        # Each given-name word is its own initial: ``Austing, D G`` is two.
+        family, *rest = comma_parts
+        given = [" ".join(_normalize_initials(word) for word in part.split()) for part in rest]
+        return ", ".join(part for part in (_normalize_initials(family), *given) if part)
 
     tokens = collapsed.split()
     if len(tokens) < 2:
