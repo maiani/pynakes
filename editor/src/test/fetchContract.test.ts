@@ -76,14 +76,19 @@ test("assetFetchArgs names the key, the material, and the guard", () => {
 
 test("the material choices are the engine's own --material values", { skip }, () => {
   const values = FETCH_MATERIALS.map((choice) => choice.value).filter(Boolean);
-  // The engine's --help lists its choices; every one offered must be accepted.
-  const help = execFileSync(
-    command.executable,
-    [...command.leadingArgs, "asset", "fetch", "--help"],
-    { env: { ...process.env, COLUMNS: "300", NO_COLOR: "1" } },
-  ).toString();
+  // Read the choices from the machine-readable command schema, not --help: help
+  // is rendered for a terminal, and its wrapping and colour vary by environment.
+  const capabilities = JSON.parse(
+    execFileSync(command.executable, [...command.leadingArgs, "capabilities", "--json"]).toString(),
+  ) as {
+    command_schemas: Record<string, { options: { flags: string[]; choices?: string[] }[] }>;
+  };
+  const material = capabilities.command_schemas["asset fetch"].options.find((option) =>
+    option.flags.includes("--material"),
+  );
+  assert.ok(material?.choices, "asset fetch should declare --material choices");
   for (const value of values) {
-    assert.match(help, new RegExp(`\\b${value}\\b`), `--material ${value} should exist`);
+    assert.ok(material.choices.includes(value as string), `--material ${value} should exist`);
   }
 });
 
