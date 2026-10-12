@@ -153,8 +153,6 @@ def _convert_dialect(file: str, to: str, params: RunParams) -> None:
         f"fields_renamed={report.fields_renamed}, "
         f"types_changed={report.types_changed}, dates_changed={report.dates_changed}",
     ]
-    if report.warnings:
-        human.append(f"  {len(report.warnings)} warning(s).")
 
     _finish_mod(
         file,

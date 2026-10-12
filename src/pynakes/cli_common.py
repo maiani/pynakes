@@ -151,11 +151,36 @@ def _emit(
             result["diff"] = diff_text
         _emit_json(result)
         return
-    for line in human:
+    warnings = result.get("warnings")
+    for line in _with_warnings(human, warnings if isinstance(warnings, list) else None):
         typer.echo(line)
     if show_diff and diff_text:
         typer.echo("")
         typer.echo(diff_text)
+
+
+def _warning_text(warning: object) -> str:
+    """Return a warning's message, whether it is a string or a structured dict."""
+    if isinstance(warning, dict):
+        return str(warning.get("message") or warning.get("type") or warning)
+    return str(warning)
+
+
+def _with_warnings(human: list[str], warnings: list | None) -> list[str]:
+    """Return ``human`` plus a line for each warning it does not already state.
+
+    The envelope's ``warnings`` used to reach only ``--json``: human output
+    printed at most a count, so a message such as normalize's list of
+    regenerated keys was invisible without it. A warning a command already
+    spells out in its own lines is not repeated.
+    """
+    lines = list(human)
+    shown = "\n".join(lines)
+    for warning in warnings or []:
+        text = _warning_text(warning)
+        if text and text not in shown:
+            lines.append(f"  warning: {text}")
+    return lines
 
 
 def _entries(count: int) -> str:

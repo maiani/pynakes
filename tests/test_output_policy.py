@@ -154,3 +154,17 @@ def test_closed_stdout_does_not_attempt_a_second_error_envelope(tmp_path, monkey
     assert result.exit_code == 1
     assert len(calls) == 1
     assert isinstance(result.exception, SystemExit)
+
+
+def test_human_output_states_each_warning(tmp_path) -> None:
+    """A warning's message reaches human output, not only ``--json``."""
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@comment{pynakes-meta: key-pattern: [Auth][year]}\n\n"
+        "@article{Old,\n  author = {Euler, Leonhard},\n  title = {Mechanica},\n"
+        "  year = {1736}\n}\n",
+        encoding="utf-8",
+    )
+    result = runner.invoke(app, ["normalize", str(bib), "--key-generation", "on", "--dry-run"])
+    assert result.exit_code == 0, result.output
+    assert "warning: Regenerated 1 key(s): Old -> Euler1736" in result.output

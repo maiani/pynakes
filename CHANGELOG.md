@@ -422,6 +422,10 @@ form is a `UsageError`, never silently reinterpreted.
   kept; naming the one key (`keys generate FILE KEY`) still renames it. Keys
   cited in linked `tex-sources` were already rewritten there, not silently
   broken.
+- Human output printed only "N warning(s)." (`normalize`, `convert`) or nothing
+  at all for a command's warnings, whose text reached only `--json`. Every
+  command now prints each warning's message (`warning: Regenerated 3 key(s):
+  ...`) unless its own output already states it.
 
 ### Build
 

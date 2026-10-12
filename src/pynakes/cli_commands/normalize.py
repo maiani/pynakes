@@ -283,8 +283,6 @@ def normalize(
         warnings.append(
             {"type": "no_entries_selected", "message": "No entry matched the selection"}
         )
-    if warnings:
-        human.append(f"  {len(warnings)} warning(s).")
 
     _finish_mod(
         file,
