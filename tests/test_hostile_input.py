@@ -157,7 +157,12 @@ TOLERATED = [
 ]
 
 
-@pytest.mark.parametrize("fmt,text", REFUSED)
+def _case_id(case: object) -> str:
+    # pytest exports the test id in an environment variable; Windows caps those at 32,767 chars.
+    return str(case)[:40]
+
+
+@pytest.mark.parametrize("fmt,text", REFUSED, ids=[f"{f}-{_case_id(t)}" for f, t in REFUSED])
 def test_refused_interchange_is_a_json_error_without_output(tmp_path, fmt, text):
     source = tmp_path / "source.txt"
     source.write_text(text, encoding="utf-8")
@@ -170,7 +175,7 @@ def test_refused_interchange_is_a_json_error_without_output(tmp_path, fmt, text)
     assert not out.exists()
 
 
-@pytest.mark.parametrize("fmt,text", TOLERATED)
+@pytest.mark.parametrize("fmt,text", TOLERATED, ids=[f"{f}-{_case_id(t)}" for f, t in TOLERATED])
 def test_odd_but_parseable_interchange_converts(tmp_path, fmt, text):
     source = tmp_path / "source.txt"
     source.write_text(text, encoding="utf-8")

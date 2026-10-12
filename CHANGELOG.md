@@ -277,6 +277,9 @@ form is a `UsageError`, never silently reinterpreted.
   symlinks in material copies and installed source trees.
 - Sync source-tree contents before atomic installation and make provenance
   manifest backups synced, atomic and numbered.
+  On Windows, files are synced through a handle with write access, because
+  `fsync` fails on a read-only handle there; installing a source tree no longer
+  fails with `EBADF`.
 - Rewrite fully braced citation-key references on rename; count escaped braces
   consistently during wrapping; refuse unbalanced external field values before
   editing or constructing imported entries.

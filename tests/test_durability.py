@@ -18,6 +18,9 @@ from pynakes._filestore_atomic import _atomic_write_bytes
 from pynakes.io import save_text
 from pynakes.provider_cache import _atomic_write_text
 
+# Directory syncs happen on POSIX only; Windows cannot open a directory to sync.
+DIR = [] if _atomic.sys.platform == "win32" else ["dir"]
+
 
 @pytest.fixture
 def events(monkeypatch: pytest.MonkeyPatch) -> list[str]:
@@ -42,7 +45,7 @@ def test_save_text_syncs_the_file_then_the_directory(tmp_path: Path, events: lis
     path = tmp_path / "refs.bib"
     path.write_text("@book{Newton1687}\n")
     assert save_text("@book{Euler1748}\n", str(path), backup=False).success
-    assert events == ["file", "replace", "dir"]
+    assert events == ["file", "replace", *DIR]
     assert path.read_text() == "@book{Euler1748}\n"
 
 
@@ -50,7 +53,7 @@ def test_the_staged_backup_is_synced_too(tmp_path: Path, events: list[str]) -> N
     path = tmp_path / "refs.bib"
     path.write_text("@book{Newton1687}\n")
     assert save_text("@book{Euler1748}\n", str(path), backup=True).success
-    assert events == ["file", "file", "replace", "dir", "replace", "dir"]
+    assert events == ["file", "file", "replace", *DIR, "replace", *DIR]
     assert (tmp_path / "refs.bib.bak").read_text() == "@book{Newton1687}\n"
 
 
@@ -63,7 +66,7 @@ def test_a_non_atomic_write_is_synced(tmp_path: Path, events: list[str]) -> None
 def test_the_provider_cache_and_material_store_sync(tmp_path: Path, events: list[str]) -> None:
     _atomic_write_text(tmp_path / "cache.jsonl", "{}\n")
     _atomic_write_bytes(tmp_path / "Newton1687.pdf", b"%PDF", tmp_path)
-    assert events == ["file", "replace", "dir"] * 2
+    assert events == ["file", "replace", *DIR] * 2
 
 
 def test_windows_skips_the_directory_sync(

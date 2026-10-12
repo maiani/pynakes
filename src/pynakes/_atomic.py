@@ -70,6 +70,16 @@ def sync_file(handle: IO[bytes] | IO[str]) -> None:
     os.fsync(handle.fileno())
 
 
+def sync_path(path: Path) -> None:
+    """Make an existing file's data durable.
+
+    Windows' ``fsync`` (``_commit``) needs a handle with write access; a
+    read-only handle fails with ``EBADF``. The file is never written.
+    """
+    with path.open("r+b" if sys.platform == "win32" else "rb") as handle:
+        os.fsync(handle.fileno())
+
+
 def sync_directory(directory: Path) -> None:
     """Make a rename or a new name in ``directory`` durable, where possible.
 

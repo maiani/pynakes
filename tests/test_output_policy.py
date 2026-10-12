@@ -83,7 +83,7 @@ def test_conversion_import_diff_and_digest_use_exact_source_bytes(tmp_path, enco
 
 def test_format_out_and_stdout_leave_input_alone(tmp_path):
     bib = tmp_path / "refs.bib"
-    bib.write_text(LIBRARY, encoding="utf-8")
+    bib.write_bytes(LIBRARY.encode("utf-8"))  # no newline translation on Windows
     out = tmp_path / "out.bib"
     result = runner.invoke(app, ["format", str(bib), "--out", str(out), "--json"])
     assert result.exit_code == 0, result.output

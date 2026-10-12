@@ -171,7 +171,7 @@ def test_scrub_completeness_and_literal_percent(tmp_path):
 def test_scrub_keep_everything_preserves_bytes(tmp_path):
     text = "private prose\n@misc{Newton1687,\n% private\ntitle={Principia},note={/home/reader/private}}"
     path = tmp_path / "refs.bib"
-    path.write_text(text, encoding="utf-8")
+    path.write_bytes(text.encode("utf-8"))  # no newline translation on Windows
     coll = Bibliography.open(path)
     assert coll.scrub(ScrubOptions(fields=False, comments=False, metadata=False)).clean
     assert coll.preview() == text
