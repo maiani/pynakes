@@ -1,4 +1,8 @@
-"""``groups rename-group --members`` carries a group's members along with its name."""
+"""``groups rename-group --members`` carries a group's members along with its name.
+
+``groups remove-group``, which keeps memberships, is covered here too: its
+envelope names every node the removal takes.
+"""
 
 import json
 from pathlib import Path
@@ -177,6 +181,34 @@ def test_remove_group_still_keeps_memberships(tmp_path: Path) -> None:
 
     assert result.exit_code == 0, result.output
     assert NEWTON in bib.read_text()
+
+
+def test_remove_group_names_the_group_and_its_descendants(tmp_path: Path) -> None:
+    # A caller confirming a removal must be able to say which subgroups go with
+    # the group without walking the tree itself.
+    bib = _library(tmp_path, GALILEO)
+    original = bib.read_text()
+
+    result = runner.invoke(
+        app, ["groups", "remove-group", str(bib), "Optics", "--dry-run", "--json"]
+    )
+
+    assert result.exit_code == 0, result.output
+    envelope = json.loads(result.output)
+    assert envelope["removed_count"] == 2
+    assert envelope["removed_groups"] == ["Optics", "Lenses"]
+    assert bib.read_text() == original
+
+
+def test_remove_group_without_descendants_names_only_itself(tmp_path: Path) -> None:
+    bib = _library(tmp_path, GALILEO)
+
+    result = runner.invoke(app, ["groups", "remove-group", str(bib), "Mechanics", "--json"])
+
+    assert result.exit_code == 0, result.output
+    envelope = json.loads(result.output)
+    assert envelope["removed_groups"] == ["Mechanics"]
+    assert "Mechanics" not in bib.read_text()
 
 
 def test_python_api_never_duplicates_the_new_name() -> None:

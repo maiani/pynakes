@@ -12,11 +12,8 @@ from collections.abc import Callable, Collection
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pynakes._engine_helpers import (
-    build_fetch_queue,
-    metadata_fetch_policy,
-    run_fetch_loop,
-)
+from pynakes._engine_fetch import build_fetch_queue, run_fetch_loop
+from pynakes._engine_helpers import metadata_fetch_policy
 from pynakes.fetch_progress import WOULD_FETCH, FetchProgress
 from pynakes.filestore import FILES_DIR_KEY
 from pynakes.metadata import FetchPolicy

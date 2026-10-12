@@ -7,7 +7,7 @@ writes. It does not fetch or parse remote content.
 
 import os
 import shutil
-from collections.abc import Generator, Iterable
+from collections.abc import Callable, Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -391,27 +391,7 @@ class FileStore(PinaxManifest):
         new = _validate_key(new)
         if old == new:
             return []
-
-        planned: list[dict[str, str]] = []
-        old_paths = self.paths_for(old)
-        new_paths = self.paths_for(new)
-        for kind in ARTIFACT_KINDS:
-            src = getattr(old_paths, kind)
-            dst = getattr(new_paths, kind)
-            if not _material_exists(src, kind):
-                continue
-            if dst.exists():
-                raise ValueError(f"Cannot merge Pinax material {src}: target exists: {dst}")
-            planned.append(
-                {
-                    "source_key": old,
-                    "target_key": new,
-                    "kind": kind,
-                    "source_path": str(src),
-                    "target_path": str(dst),
-                }
-            )
-
+        planned = self._plan_moves(old, new, "merge", _material_exists)
         if self.manifest_path.exists():
             self._validate_manifest_row_merge(old, new)
         return planned
@@ -455,16 +435,25 @@ class FileStore(PinaxManifest):
         new = _validate_key(new)
         if old == new:
             return []
+        return self._plan_moves(old, new, "move", lambda src, _kind: src.exists())
+
+    def _plan_moves(
+        self, old: str, new: str, verb: str, present: Callable[[Path, str], bool]
+    ) -> list[dict[str, str]]:
+        """Pair each material of ``old`` that ``present`` accepts with ``new``'s path.
+
+        Raises :class:`ValueError` when a target already exists.
+        """
         old_paths = self.paths_for(old)
         new_paths = self.paths_for(new)
         planned: list[dict[str, str]] = []
         for kind in ARTIFACT_KINDS:
             src = getattr(old_paths, kind)
             dst = getattr(new_paths, kind)
-            if not src.exists():
+            if not present(src, kind):
                 continue
             if dst.exists():
-                raise ValueError(f"Cannot move Pinax material {src}: target exists: {dst}")
+                raise ValueError(f"Cannot {verb} Pinax material {src}: target exists: {dst}")
             planned.append(
                 {
                     "source_key": old,

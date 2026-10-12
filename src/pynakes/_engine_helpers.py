@@ -11,12 +11,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from pynakes._engine_fetch import (
-    build_fetch_queue as build_fetch_queue,
-)
-from pynakes._engine_fetch import (
-    run_fetch_loop as run_fetch_loop,
-)
 from pynakes._engine_source import (
     SourceSnapshot as SourceSnapshot,
 )

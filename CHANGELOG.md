@@ -31,65 +31,6 @@ form is a `UsageError`, never silently reinterpreted.
   tests and separately recorded manual acceptance; the old harness was
   deliberately removed in `0ef2951`.
 
-### Added
-
-- Generated command reference from the live CLI, including every argument,
-  option, choice and per-command stability marker in `capabilities`.
-- CI execution of all offline shell walkthroughs in README, quickstart and
-  usage, with network access blocked and disposable example libraries.
-- Network and privacy guide covering transmitted identifiers/free-text,
-  providers, User-Agent, optional caches and `PYNAKES_APS_API_TOKEN`.
-- Documentation of `init --agent-guide`, which writes an agent guide when
-  creating or enabling a Pinax library without overwriting an existing guide.
-- `groups remove-group` reports `removed_groups`: every group node the removal
-  takes, the group and its descendants, by name in tree order, alongside
-  `removed_count`.
-- `asset fetch --dry-run` names what a real run would request: each `would
-  fetch` item in `skipped` carries a `planned` list with the artifact kind,
-  destination path, the DOI or arXiv id it would be requested by, and
-  `fallback` for the best-pdf preprint fallback.
-- `groups rename-group --members` also moves the group's members: every entry
-  whose `groups` field names exactly the old name is rewritten to the new one,
-  only those lines change, and the new name is never listed twice in an entry.
-  The envelope adds `members` and `members_renamed`, the moved keys in file
-  order. Without the flag a rename still edits only the hierarchy, and
-  `remove-group` still keeps memberships. Python API:
-  `Bibliography.rename_group_members(old, new)`.
-- `keys rename` reports the Pinax material files it moves as
-  `pinax_materials`, dry run included, and a dry run refuses a material move
-  whose target already exists, as the write always did. Python API:
-  `FileStore.plan_material_rename()` and `Bibliography.planned_pinax_renames()`
-  return the planned moves without touching disk.
-
-### Fixed
-
-- `asset fetch --dry-run` created the Pinax files directory; a dry run now
-  creates nothing.
-- `asset fetch` no longer records `pinax-files-dir`, or leaves an empty store
-  directory, when nothing was fetched; a dry run with nothing to fetch no
-  longer plans that change.
-- `groups rename-group` renames a group to a different case of its own name
-  (`Optics` to `OPTICS`, with or without `--members`) instead of failing with
-  `InvalidInput`. Renaming or adding a name that differs from another group
-  only in case is a `GroupConflict`.
-- `groups add-group` and `update-group --color` refuse a colour JabRef cannot
-  read with `InvalidInput`; hex digits are accepted bare or after `#` or `0x`.
-- A membership that differs from a declared group only in case (`optics`
-  beside `Optics`) is listed as its own group and can be removed.
-  `groups list-entries` includes descendants whatever case the name is given
-  in, and lists a flat-only group's members when a tree exists.
-- CSL-JSON import ignores a malformed `issued` date instead of crashing, and
-  drops nameless authors and editors instead of writing an empty name.
-- The usage guide documents `--` for citation keys, group names and queries
-  that begin with `-`.
-- Documentation now describes the beta compatibility/deprecation policy,
-  default journal preservation, Pinax presence checks without checksum
-  verification, manifest repair, explicit network authorization and actual
-  conflict envelopes. README links work on PyPI; shell completion no longer
-  passes an ignored shell-name argument. Terminal help uses single backticks.
-- Removed the placeholder documentation URL; docs remain built and checked
-  locally and in CI without advertising a deployment that does not exist.
-
 ### Breaking changes
 
 - **The library comes first.** Every command that reads one library takes it
@@ -179,9 +120,8 @@ form is a `UsageError`, never silently reinterpreted.
   output file needs `--force`: `convert --out`, `tex scan --out`,
   `corpus combine --out`, `corpus split` outputs, `format --out`, and
   `scrub --out` (except in place).
-- **Python 3.12 is the minimum.** Python 3.11 is no longer supported; 3.12,
-  3.13, and 3.14 are, and each runs the full suite on Linux, Windows, and
-  macOS.
+- **Python 3.12 is the minimum.** Python 3.11 is no longer supported; 3.12
+  through 3.15 are, and each runs the full suite on Linux, Windows, and macOS.
 
 ### Added
 
@@ -190,7 +130,6 @@ form is a `UsageError`, never silently reinterpreted.
 - Property tests for encoded whole-file fidelity, isolated field edits,
   parseable commits, format/normalize idempotence, and combine/split entry
   preservation; adversarial input and CLI output-policy regression tests.
-
 
 - **One entry selector on every command that edits entries.** `enrich`,
   `normalize`, `keys generate`, and `asset fetch` now take `--key` and `--where`,
@@ -257,6 +196,33 @@ form is a `UsageError`, never silently reinterpreted.
   `convert --to/--from`, `ref import --key-source`, `metadata --namespace`,
   `lint --category`, `groups --context`, `asset fetch --material`.
 - `capabilities` describes the positional convention.
+- Generated command reference from the live CLI, including every argument,
+  option, choice and per-command stability marker in `capabilities`.
+- CI execution of all offline shell walkthroughs in README, quickstart and
+  usage, with network access blocked and disposable example libraries.
+- Network and privacy guide covering transmitted identifiers/free-text,
+  providers, User-Agent, optional caches and `PYNAKES_APS_API_TOKEN`.
+- Documentation of `init --agent-guide`, which writes an agent guide when
+  creating or enabling a Pinax library without overwriting an existing guide.
+- `groups remove-group` reports `removed_groups`: every group node the removal
+  takes, the group and its descendants, by name in tree order, alongside
+  `removed_count`.
+- `asset fetch --dry-run` names what a real run would request: each `would
+  fetch` item in `skipped` carries a `planned` list with the artifact kind,
+  destination path, the DOI or arXiv id it would be requested by, and
+  `fallback` for the best-pdf preprint fallback.
+- `groups rename-group --members` also moves the group's members: every entry
+  whose `groups` field names exactly the old name is rewritten to the new one,
+  only those lines change, and the new name is never listed twice in an entry.
+  The envelope adds `members` and `members_renamed`, the moved keys in file
+  order. Without the flag a rename still edits only the hierarchy, and
+  `remove-group` still keeps memberships. Python API:
+  `Bibliography.rename_group_members(old, new)`.
+- `keys rename` reports the Pinax material files it moves as
+  `pinax_materials`, dry run included, and a dry run refuses a material move
+  whose target already exists, as the write always did. Python API:
+  `FileStore.plan_material_rename()` and `Bibliography.planned_pinax_renames()`
+  return the planned moves without touching disk.
 
 ### Changed
 
@@ -265,10 +231,6 @@ form is a `UsageError`, never silently reinterpreted.
   reference curation, citation tracking and optional material provenance;
   distinguish implemented workflows from planned Library/Catalogue APIs.
 
-
-- Replace mypy with pinned ty in development dependencies, CI, pre-commit and
-  contributor checks. Record existing annotation debt per module and rule;
-  the baseline must shrink rather than grow.
 - Validate public network destinations and every redirect, pin DNS results for
   connections while preserving Host/TLS names, warn on HTTPS downgrades, cap
   metadata responses at 8 MiB, and bound retry/redirect/stream progress by a
@@ -282,7 +244,6 @@ form is a `UsageError`, never silently reinterpreted.
 - Scrub additional reference-manager bookkeeping and recognizable local paths,
   plain working comments between entries, and comment lines inside entries;
   preserve literal percent signs and explicit keep options.
-
 
 - `inspect` reports the encoding of a file with a byte-order mark by its codec
   name: `utf-8-sig`, `utf-16-le`, `utf-16-be`, `utf-32-le`, or `utf-32-be`.
@@ -363,7 +324,6 @@ form is a `UsageError`, never silently reinterpreted.
   the library encoding rules, including BOM and Latin-1 detection.
 - Exit cleanly when stdout is closed instead of trying to write an error
   envelope to the same broken stream.
-
 
 - A value with an unmatched `{` or `}` was accepted and could leave a file that
   no longer parsed. `fields set`/`append`, `ref add`/`ref edit --field`,
@@ -509,12 +469,38 @@ form is a `UsageError`, never silently reinterpreted.
   (`inconsistent_field`). Preprint provenance (`eprint`, `archiveprefix`,
   `primaryclass`, `eprinttype`, `eprintclass`, `updated`) is now treated like
   publisher decoration, whose absence is not a gap.
+- `asset fetch --dry-run` created the Pinax files directory; a dry run now
+  creates nothing.
+- `asset fetch` no longer records `pinax-files-dir`, or leaves an empty store
+  directory, when nothing was fetched; a dry run with nothing to fetch no
+  longer plans that change.
+- `groups rename-group` renames a group to a different case of its own name
+  (`Optics` to `OPTICS`, with or without `--members`) instead of failing with
+  `InvalidInput`. Renaming or adding a name that differs from another group
+  only in case is a `GroupConflict`.
+- `groups add-group` and `update-group --color` refuse a colour JabRef cannot
+  read with `InvalidInput`; hex digits are accepted bare or after `#` or `0x`.
+- A membership that differs from a declared group only in case (`optics`
+  beside `Optics`) is listed as its own group and can be removed.
+  `groups list-entries` includes descendants whatever case the name is given
+  in, and lists a flat-only group's members when a tree exists.
+- CSL-JSON import ignores a malformed `issued` date instead of crashing, and
+  drops nameless authors and editors instead of writing an empty name.
+- The usage guide documents `--` for citation keys, group names and queries
+  that begin with `-`.
+- Documentation now describes the beta compatibility/deprecation policy,
+  default journal preservation, Pinax presence checks without checksum
+  verification, manifest repair, explicit network authorization and actual
+  conflict envelopes. README links work on PyPI; shell completion no longer
+  passes an ignored shell-name argument. Terminal help uses single backticks.
+- Removed the placeholder documentation URL; docs remain built and checked
+  locally and in CI without advertising a deployment that does not exist.
 
 ### Build
 
 - CI tests every operating system and Python version the package metadata
-  claims, plus Python 3.15 as an allowed-to-fail pre-release, and adds a job
-  that installs each runtime dependency at its declared floor.
+  claims, and adds a job that installs each runtime dependency at its declared
+  floor.
 - Releases are checked before anything is published: the tag must match the
   package version and be on `main`, and `CHANGELOG.md` must have a section for
   it. The suite then runs against the built wheel on all three operating
@@ -528,10 +514,12 @@ form is a `UsageError`, never silently reinterpreted.
 - The suite runs in about 25 s with coverage, down from about 250 s: network
   retry backoff no longer sleeps in tests, `normalize` no longer reloads the
   journal tables, and coverage uses the `sys.monitoring` core (coverage ≥ 7.10).
-- mypy runs in CI. Modules with type errors when it was added are recorded as
-  a baseline in `pyproject.toml`; every other module must type-check clean.
+- A pinned ty type-checks in CI, pre-commit and the contributor checks.
+  Existing annotation debt is recorded per module and rule as a baseline in
+  `pyproject.toml`; the baseline must shrink rather than grow, and every other
+  module must type-check clean.
 - Ruff now flags text I/O without an explicit encoding (`PLW1514`). Dependabot
-  watches GitHub Actions and pip. The `dev` extra declares `pyyaml` and `mypy`
+  watches GitHub Actions and pip. The `dev` extra declares `pyyaml` and `ty`
   and bounds `ruff`, and the `docs` extra bounds `mkdocs` below 2.
 - The editor job installs the engine before running the extension's tests. Its
   CLI contract tests had skipped on every run for want of the engine's
