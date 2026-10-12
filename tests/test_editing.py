@@ -39,6 +39,27 @@ class TestRawFieldEdits:
         assert "doi = {10.1/x}" in out
         assert out.rstrip().endswith("}")
 
+    def test_added_field_follows_aligned_trailing_comma_layout(self) -> None:
+        raw = "@article{k,\n    author  = {Newton, Isaac},\n    title   = {Principia},\n}"
+        out = set_raw_field(raw, "pages", "1--10")
+        assert out == (
+            "@article{k,\n    author  = {Newton, Isaac},\n    title   = {Principia},\n"
+            "    pages   = {1--10},\n}"
+        )
+
+    def test_added_field_without_trailing_comma_style_gets_none(self) -> None:
+        out = set_raw_field(RAW, "doi", "10.1/x")
+        assert (
+            out
+            == "@article{k,\n  title = {The {DNA} Helix},\n  year = {1953},\n  doi = {10.1/x}\n}"
+        )
+
+    def test_added_field_longer_than_alignment_keeps_one_space(self) -> None:
+        raw = "@article{k,\n  year  = {1687},\n  title = {Principia}\n}"
+        assert "  publisher = {Royal Society}\n}" in set_raw_field(
+            raw, "publisher", "Royal Society"
+        )
+
     def test_set_field_handles_quoted_value(self) -> None:
         raw = '@article{k, title = "Quoted Title", year = {2020}}'
         out = set_raw_field(raw, "title", "New")

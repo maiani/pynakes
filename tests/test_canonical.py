@@ -669,7 +669,8 @@ def test_selective_format_survives_a_later_surgical_edit() -> None:
     coll.set_field("note", "checked", "key = A")
 
     output = coll.preview()
-    assert "  year = {2020},\n  note = {checked}\n}" in output
+    # The added field follows the reformatted entry's trailing-comma style.
+    assert "  year = {2020},\n  note = {checked},\n}" in output
     assert "@book{B,   title={Second},  publisher={Elsevier}  }" in output
 
 

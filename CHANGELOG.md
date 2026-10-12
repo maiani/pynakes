@@ -428,6 +428,10 @@ form is a `UsageError`, never silently reinterpreted.
   ...`) unless its own output already states it.
 - `enrich --published` without `--online` reported "Enriched 0 entries" as if
   it had checked. It now fails with `OnlineLookupRequired`, as `ref find` does.
+- A field added to an entry (`ref edit`, `enrich`, `fields set`, ...) was
+  written as `  name = {value}` with no trailing comma, whatever the entry's
+  layout. It now takes the entry's indent, its `=` column when the entry is
+  aligned (`format-alignment: equals`), and its trailing-comma style.
 
 ### Build
 

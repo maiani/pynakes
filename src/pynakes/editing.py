@@ -223,11 +223,41 @@ def set_raw_field(raw: str, field_name: str, new_value: str) -> str:
         return raw
     body = raw[:close].rstrip()
     last = _last_significant_index(body)
-    if last is not None and body[last] != ",":
+    trailing_comma = last is not None and body[last] == ","
+    if last is not None and not trailing_comma:
         # Put the separator straight after the last value, not at the end of
         # the body: a trailing ``% comment`` would otherwise swallow it.
         body = body[: last + 1] + "," + body[last + 1 :]
-    return f"{body}{line_ending}  {field_name} = {{{new_value}}}{line_ending}{raw[close:]}"
+    indent, equals_column = _field_layout(raw)
+    padding = " " * max(1, equals_column - len(indent) - len(field_name)) if equals_column else " "
+    line = f"{indent}{field_name}{padding}= {{{new_value}}}{',' if trailing_comma else ''}"
+    return f"{body}{line_ending}{line}{line_ending}{raw[close:]}"
+
+
+def _field_layout(raw: str) -> tuple[str, int | None]:
+    """Return the indent of an entry's field lines and its ``=`` column if aligned.
+
+    A field added to an entry follows the entry's own layout: the indent of its
+    field lines and, when every field line puts ``=`` in one column with some
+    name padded to reach it (``format-alignment: equals``), that column. An
+    entry with no field on a line of its own gets the two-space default.
+    """
+    indents: list[str] = []
+    columns: set[int] = set()
+    padded = False
+    for start, end in _raw_field_name_spans(raw):
+        line_start = max(raw.rfind("\n", 0, start), raw.rfind("\r", 0, start)) + 1
+        indent = raw[line_start:start]
+        if indent.strip():
+            continue
+        equals = raw.index("=", end)
+        indents.append(indent)
+        columns.add(equals - line_start)
+        padded = padded or equals - end > 1
+    if not indents:
+        return "  ", None
+    aligned = len(columns) == 1 and padded
+    return indents[0], columns.pop() if aligned else None
 
 
 def _last_significant_index(body: str) -> int | None:
