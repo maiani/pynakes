@@ -1182,3 +1182,12 @@ def test_other_consistency_findings_are_unaffected() -> None:
     issues = lint(parse_bib(text))
 
     assert [i for i in issues if i.field == "volume" and i.type == "inconsistent_field"]
+
+
+def test_former_metadata_key_names_its_replacement_and_checks_its_value() -> None:
+    lib = parse_bib("@comment{pynakes-meta:\nfetch-policy: prepring, source\n}\n")
+    issues = [issue for issue in lint(lib) if issue.key == "fetch-policy"]
+    assert [issue.type for issue in issues] == ["unknown_metadata_key", "invalid_metadata_value"]
+    assert "former name of 'pinax-fetch-policy'" in issues[0].message
+    assert "metadata set FILE pinax-fetch-policy" in issues[0].message
+    assert "prepring" in issues[1].message

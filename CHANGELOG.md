@@ -440,6 +440,12 @@ form is a `UsageError`, never silently reinterpreted.
   the entry were wrong. It is now a `rate_limited` warning saying the DOI went
   unchecked and suggesting a lower `--concurrency`; the transport raises
   `ProviderRateLimitedError` (a `ProviderFetchError`) for it.
+- `lint` reported a former `pynakes-meta` key (`fetch-policy`, `files-dir`,
+  `protected-terms`, `journal-table`, `ltwa-table`) only as unrecognized. It
+  now names the replacement (`pinax-fetch-policy`, ...) with the
+  `metadata set`/`metadata remove` commands that migrate it, and checks the
+  value against the replacement's grammar, so `fetch-policy: prepring` is
+  reported as an invalid value too.
 
 ### Build
 

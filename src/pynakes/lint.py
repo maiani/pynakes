@@ -76,6 +76,7 @@ from pynakes.metadata import (
     metadata_category,
     validate_metadata_value,
 )
+from pynakes.metadata.schema import RENAMED_METADATA_KEYS
 from pynakes.model import BibEntry, BibFile, MetadataBlock, undefined_string_references
 from pynakes.usage import tex_sources_from_metadata, validate_tex_sources
 
@@ -319,17 +320,7 @@ def _lint_metadata(lib: BibFile) -> list[LintIssue]:
 
         if metadata_category(block.key) == "unknown":
             if block.namespace == "pynakes":
-                issues.append(
-                    LintIssue(
-                        "unknown_metadata_key",
-                        "warning",
-                        f"Metadata key {block.key!r} in pynakes-meta is not recognized by the "
-                        "pynakes key schema",
-                        key=block.key,
-                        field=block.key,
-                        line=block.start_line,
-                    )
-                )
+                issues.extend(_lint_unknown_metadata_key(block))
             continue
 
         try:
@@ -362,6 +353,57 @@ def _lint_metadata(lib: BibFile) -> list[LintIssue]:
                 )
             )
 
+    return issues
+
+
+def _lint_unknown_metadata_key(block: MetadataBlock) -> list[LintIssue]:
+    """Report an unrecognized pynakes-meta key, naming its replacement if renamed.
+
+    A former key name (``fetch-policy``) is silently ignored by every command,
+    so a library carrying one is not configured the way it reads. The finding
+    names the replacement and the commands that migrate it, and checks the
+    value against the replacement's grammar, so a typo (``prepring``) is
+    caught now rather than after the rename.
+    """
+    replacement = RENAMED_METADATA_KEYS.get(block.key.lower())
+    if replacement is None:
+        return [
+            LintIssue(
+                "unknown_metadata_key",
+                "warning",
+                f"Metadata key {block.key!r} in pynakes-meta is not recognized by the "
+                "pynakes key schema",
+                key=block.key,
+                field=block.key,
+                line=block.start_line,
+            )
+        ]
+    issues = [
+        LintIssue(
+            "unknown_metadata_key",
+            "warning",
+            f"Metadata key {block.key!r} in pynakes-meta is the former name of "
+            f"{replacement!r} and is no longer read; rename it: `pynakes metadata set FILE "
+            f"{replacement} VALUE` then `pynakes metadata remove FILE {block.key}`",
+            key=block.key,
+            field=block.key,
+            line=block.start_line,
+        )
+    ]
+    try:
+        validate_metadata_value(replacement, block.value)
+    except ValueError as exc:
+        issues.append(
+            LintIssue(
+                "invalid_metadata_value",
+                "warning",
+                f"Metadata key {block.key!r} in pynakes-meta has a value that would be "
+                f"invalid as {replacement!r}: {exc}",
+                key=block.key,
+                field=block.key,
+                line=block.start_line,
+            )
+        )
     return issues
 
 

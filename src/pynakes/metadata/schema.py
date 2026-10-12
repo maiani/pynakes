@@ -46,6 +46,16 @@ CATEGORY_PINAX: MetadataCategory = "pinax"
 CATEGORY_SCRUB: MetadataCategory = "scrub"
 CATEGORY_UNKNOWN: MetadataCategory = "unknown"
 
+#: Former ``pynakes-meta`` key names, mapped to the key that replaced them. They
+#: are no longer read; ``lint`` names the replacement so the fix is one rename.
+RENAMED_METADATA_KEYS: dict[str, str] = {
+    "files-dir": "pinax-files-dir",
+    "fetch-policy": "pinax-fetch-policy",
+    "protected-terms": "normalize-protected-terms",
+    "journal-table": "normalize-journal-table",
+    "ltwa-table": "normalize-ltwa-table",
+}
+
 # pynakes-owned metadata keys. These live in ``pynakes-meta`` by default because
 # they have no JabRef equivalent or deliberately extend JabRef behavior.
 PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
