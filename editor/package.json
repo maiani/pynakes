@@ -116,6 +116,20 @@
           "markdownDescription": "Show `lint` findings in the bibliography view: a severity marker per row and a findings panel. Findings are advisory and never change the file.",
           "scope": "window"
         },
+        "pynakes.openMaterialsWith": {
+          "type": "string",
+          "enum": [
+            "editor",
+            "system"
+          ],
+          "enumDescriptions": [
+            "Open materials inside VS Code, in whatever editor is associated with the file (a PDF viewer extension, the image preview, the text editor).",
+            "Open materials with the operating system's default application."
+          ],
+          "default": "editor",
+          "markdownDescription": "Where a click on a material in the detail pane's **Materials** list opens it. `editor` (the default) opens it inside VS Code, beside the view; this never runs the file. VS Code has no built-in PDF viewer, so without a PDF viewer extension a PDF opens to the binary-file placeholder and a one-time notification offers the system viewer instead. `system` hands it to the operating system's default application. Each material also offers the other choice as a secondary action, and Alt-click (Option-click) takes it. A directory is revealed rather than opened: in the Explorer when it is inside the workspace and `editor` applies, otherwise in the system file manager.",
+          "scope": "window"
+        },
         "pynakes.allowOnlineLookups": {
           "type": "boolean",
           "default": true,

@@ -54,6 +54,8 @@ window.PV = window.PV || {};
       busy: false,
     },
     showFindings: true,
+    /** Where a plain click opens a material: "editor" (VS Code) or "system". */
+    openMaterialsWith: "editor",
     /** When set, the table shows only entries no linked TeX source cites. */
     uncitedOnly: Boolean(persisted.uncitedOnly),
     selectedGroup: persisted.selectedGroup || null,

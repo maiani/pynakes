@@ -12,6 +12,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { asMaterialOpener, DEFAULT_MATERIAL_OPENER, type MaterialOpener } from "./materialOpener";
 import { PynakesProtocolError, PynakesUnavailableError } from "./pynakes";
 
 export interface TempMirror {
@@ -27,6 +28,8 @@ export interface ViewSettings {
   fuzzy: boolean;
   /** Whether per-row severity markers and the findings panel are shown. */
   showFindings: boolean;
+  /** Where a material opens on a plain click: `"editor"` or `"system"`. */
+  openMaterialsWith: MaterialOpener;
 }
 
 /**
@@ -91,6 +94,8 @@ export function viewSettings(document: vscode.TextDocument): ViewSettings {
   return {
     fuzzy: config.get<boolean>("search.fuzzy", false),
     showFindings: config.get<boolean>("showFindings", true),
+    openMaterialsWith:
+      asMaterialOpener(config.get<unknown>("openMaterialsWith")) ?? DEFAULT_MATERIAL_OPENER,
   };
 }
 

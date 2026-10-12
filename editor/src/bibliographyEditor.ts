@@ -85,6 +85,8 @@ interface ViewMessage {
   seq?: number;
   /** Absolute path, for `openMaterial` and `openCitation`. */
   path?: string;
+  /** Where a material should open, for `openMaterial`; absent means the setting. */
+  opener?: string;
   /** One-based position within that file, for `openCitation`. */
   line?: number;
   column?: number;
@@ -477,7 +479,12 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         await vscode.commands.executeCommand("workbench.action.openSettings", "pynakes");
         return;
       case "openMaterial":
-        await openMaterial(this.openablePaths.get(panel), message.path);
+        await openMaterial(
+          this.openablePaths.get(panel),
+          message.path,
+          message.opener,
+          document.uri,
+        );
         return;
       case "openCitation":
         await openCitation(

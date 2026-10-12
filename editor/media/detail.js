@@ -296,6 +296,13 @@ window.PV = window.PV || {};
     return parts.slice(-2).join("/");
   }
 
+  /** The secondary action's label, by the opener it uses. */
+  const OPENER_LABEL = { editor: "Open in Code", system: "Open externally" };
+  const OPENER_TITLE = {
+    editor: "Open in VS Code: ",
+    system: "Open with the system's default application: ",
+  };
+
   /**
    * The entry's materials, and the way to fetch the missing ones.
    *
@@ -323,22 +330,38 @@ window.PV = window.PV || {};
       const line = document.createElement("div");
       line.className = "material" + (material.present ? "" : " material-missing");
 
+      // The path came from the engine and travels back unchanged; the client
+      // never builds a material path of its own. A plain click opens it where
+      // the setting says; the secondary action, or Alt-click, the other way.
+      const preferred = PV.state.openMaterialsWith === "system" ? "system" : "editor";
+      const other = preferred === "system" ? "editor" : "system";
+      const openable = material.present && Boolean(material.path);
+      const openWith = (opener) =>
+        PV.post({ type: "openMaterial", path: material.path, opener });
+
       const open = document.createElement("button");
       open.type = "button";
       open.className = "link-button";
       open.textContent = material.label;
-      open.disabled = !material.present || !material.path;
+      open.disabled = !openable;
       open.title = material.present
-        ? "Open " + material.path
+        ? OPENER_TITLE[preferred] + material.path + " (Alt+click: " + OPENER_LABEL[other] + ")"
         : material.path
           ? "Not on disk: " + material.path
           : "The engine could not resolve this link to a path";
-      // The path came from the engine and travels back unchanged; the client
-      // never builds a material path of its own.
-      open.addEventListener("click", () =>
-        PV.post({ type: "openMaterial", path: material.path }),
-      );
+      open.addEventListener("click", (event) => openWith(event.altKey ? other : preferred));
       line.appendChild(open);
+
+      if (openable) {
+        const alternate = document.createElement("button");
+        alternate.type = "button";
+        alternate.className = "link-button material-alt";
+        alternate.dataset.opener = other;
+        alternate.textContent = OPENER_LABEL[other];
+        alternate.title = OPENER_TITLE[other] + material.path;
+        alternate.addEventListener("click", () => openWith(other));
+        line.appendChild(alternate);
+      }
 
       if (!material.present) {
         const note = document.createElement("span");

@@ -11,6 +11,7 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
 import type { CitationIndex, MaterialIndex } from "./insights";
+import { customEditorsOf, hasCustomViewer, planMaterialOpen } from "./materialOpener";
 
 /**
  * Every path the view may ask to open: citation sources and existing materials.
@@ -52,15 +53,20 @@ function resolveOpenable(openable: Set<string> | undefined, target?: string): st
 }
 
 /**
- * Open one of an entry's materials.
+ * Open one of an entry's materials, inside VS Code or with the system.
  *
- * Handed to the operating system rather than opened in VS Code: a material is
- * a PDF or a source archive, and the editor has no viewer for either. A
- * directory is revealed in the file manager instead of "opened".
+ * `requested` is the click's own choice (the row's secondary action, or an
+ * Alt-click); without one, `pynakes.openMaterialsWith` decides. In VS Code the
+ * file opens beside the view in whatever editor is associated with it, and
+ * nothing is executed. A file VS Code has no viewer for (a PDF with no viewer
+ * extension) still opens there, to VS Code's binary placeholder, and a
+ * notification once per format per session offers the system's viewer instead.
  */
 export async function openMaterial(
   openable: Set<string> | undefined,
   target?: string,
+  requested?: unknown,
+  scope?: vscode.Uri,
 ): Promise<void> {
   const resolved = resolveOpenable(openable, target);
   if (!resolved) {
@@ -76,11 +82,72 @@ export async function openMaterial(
     );
     return;
   }
-  if (isDirectory) {
-    await vscode.commands.executeCommand("revealFileInOS", uri);
-    return;
+  const extension = path.extname(resolved).toLowerCase();
+  const plan = planMaterialOpen({
+    setting: vscode.workspace.getConfiguration("pynakes", scope ?? null).get("openMaterialsWith"),
+    requested,
+    isDirectory,
+    inWorkspace: isDirectory && vscode.workspace.getWorkspaceFolder(uri) !== undefined,
+    hasViewer: !isDirectory && installedViewerFor(resolved, scope),
+    extension,
+  });
+  switch (plan.action) {
+    case "revealInExplorer":
+      await vscode.commands.executeCommand("revealInExplorer", uri);
+      return;
+    case "revealInOS":
+      await vscode.commands.executeCommand("revealFileInOS", uri);
+      return;
+    case "system":
+      await vscode.env.openExternal(uri);
+      return;
+    case "editor":
+      await vscode.commands.executeCommand("vscode.open", uri, {
+        viewColumn: vscode.ViewColumn.Beside,
+        preview: false,
+      });
+      if (plan.suggestViewer && !hinted.has(extension)) {
+        hinted.add(extension);
+        void suggestViewer(uri, extension);
+      }
+      return;
   }
-  await vscode.env.openExternal(uri);
+}
+
+/** Formats already hinted about this session, so the notification shows once each. */
+const hinted = new Set<string>();
+
+/** Whether an installed custom editor would show this file when VS Code opens it. */
+function installedViewerFor(filePath: string, scope?: vscode.Uri): boolean {
+  const editors = customEditorsOf(vscode.extensions.all.map((extension) => extension.packageJSON));
+  const associations = vscode.workspace
+    .getConfiguration("workbench", scope ?? null)
+    .get<unknown>("editorAssociations");
+  return hasCustomViewer(filePath, editors, associations);
+}
+
+/** Offer the system's viewer, without blocking: the file is already open. */
+async function suggestViewer(uri: vscode.Uri, extension: string): Promise<void> {
+  const external = "Open Externally";
+  const always = "Always Open Externally";
+  const find = "Find a PDF Viewer";
+  const choices = extension === ".pdf" ? [external, always, find] : [external, always];
+  const choice = await vscode.window.showInformationMessage(
+    `VS Code has no viewer for ${extension} files, so ${path.basename(uri.fsPath)} opened as ` +
+      "binary. Open it with the system's viewer instead, or install a viewer extension.",
+    ...choices,
+  );
+  if (choice === external || choice === always) {
+    await vscode.env.openExternal(uri);
+  }
+  if (choice === always) {
+    await vscode.workspace
+      .getConfiguration("pynakes")
+      .update("openMaterialsWith", "system", vscode.ConfigurationTarget.Global);
+  }
+  if (choice === find) {
+    await vscode.commands.executeCommand("workbench.extensions.search", "pdf viewer");
+  }
 }
 
 /** Open a `.tex` source at one `\cite` occurrence. */

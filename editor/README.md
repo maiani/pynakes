@@ -156,11 +156,30 @@ nothing, and re-reads the file.
 **Materials.** Entries whose linked files exist carry a `🗎` marker, and the
 detail pane lists them by kind — published PDF, preprint, source, supplement,
 erratum for a Pinax store, plus any BibLaTeX `file`-field link — with a missing
-or wrong-type link marked rather than hidden. Clicking one opens it with the
-operating system's handler (a directory is revealed in the file manager
-instead). The client never *builds* a material path: `<key><suffix>.pdf` is the
-Pinax store's addressing scheme, and every path shown here came from
-`asset check --json`.
+or wrong-type link marked rather than hidden. Clicking one opens it inside VS
+Code, beside the view, in whatever editor is associated with the file — a PDF
+viewer extension, the built-in image preview, the text editor — and opening it
+there never runs it. Each row also offers **Open externally**, which hands the
+file to the operating system's default application instead, and `Alt`-click
+(`Option`-click) on the material does the same. The `pynakes.openMaterialsWith`
+setting swaps the two: with `"system"`, a click opens externally and the row
+offers **Open in Code**.
+
+```jsonc
+{ "pynakes.openMaterialsWith": "editor" } // default; or "system"
+```
+
+VS Code has no PDF viewer of its own. Without a viewer extension a PDF still
+opens in VS Code, to its binary-file placeholder, and a notification — once per
+format per session, never blocking — offers to open it externally, to always
+open materials externally (setting `"system"`), or to search for a PDF viewer.
+Whether a viewer exists is read from the installed extensions' custom editors
+and `workbench.editorAssociations`. A directory is never opened: it is revealed
+in the Explorer when it lies inside the workspace and the choice is VS Code,
+and in the system file manager otherwise. Only materials the engine found on
+disk can be opened. The client never *builds* a material path:
+`<key><suffix>.pdf` is the Pinax store's addressing scheme, and every path shown
+here came from `asset check --json`.
 
 **Fetch missing…** in the same section downloads what the entry lacks, and the
 toolbar's **Fetch materials…** does it for every entry; either asks first which
@@ -294,7 +313,8 @@ To make it the default for `.bib`:
 ```
 
 In the view: type to search, click a column header to sort, click a group to
-filter, click a material or a citation to open it, `↑`/`↓` to move between
+filter, click a material or a citation to open it (`Alt`-click a material to
+open it the other way, see **Materials**), `↑`/`↓` to move between
 entries, `Enter` or a double-click to open the entry's declaration in the source
 text, `Ctrl`/`Cmd`+`F` to focus the search box.
 
@@ -358,6 +378,7 @@ src/
   mutations.ts           entry-level changes: preview, approve, guarded write
   groupHierarchy.ts      sidebar prompts for editing the group hierarchy
   navigation.ts          opens sources, citations, and materials
+  materialOpener.ts      where a material opens: in VS Code or with the system
   diagnostics.ts         findings and undefined citations as native diagnostics
   statusBar.ts           the engine/file status bar item
   library.ts             composes the engine reads; runs preview and commit

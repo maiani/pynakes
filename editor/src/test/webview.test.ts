@@ -115,6 +115,9 @@ function openView(): View {
 class Host {
   private staging = emptyStaging();
 
+  /** The view settings each render carries; a test may change them. */
+  settings: Record<string, unknown> = { fuzzy: false, showFindings: true };
+
   constructor(
     private readonly view: View,
     private readonly file: string,
@@ -150,7 +153,7 @@ class Host {
           engine: { command: "python3 -m pynakes", version: "test", source: "setting", reason: "" },
           dirty: false,
           staging: this.staging,
-          settings: { fuzzy: false, showFindings: true },
+          settings: this.settings,
         });
         return;
       }
@@ -441,6 +444,63 @@ test("fetching materials is handed to the extension, one fetch at a time", { ski
   view.post({ type: "mutationError", label: "Fetch missing materials", message: "Online lookups are disabled." });
   assertHealthy(view, "after a refused fetch");
   assert.equal(toolbar.disabled, false);
+});
+
+test("a material opens where the setting says, or the other way on request", { skip }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pynakes-webview-"));
+  const file = path.join(dir, "materials.bib");
+  const pdf = path.join(dir, "Newton1687.pdf");
+  fs.writeFileSync(pdf, "%PDF-1.4\n");
+  fs.writeFileSync(
+    file,
+    "@book{Newton1687,\n  author = {Isaac Newton},\n  title = {Principia},\n" +
+      "  year = {1687},\n  file = {:Newton1687.pdf:PDF}\n}\n",
+  );
+  const { view, host } = await opened("", file);
+  click(view, '.tab[data-pane="edit"]');
+  view.document.querySelector<HTMLElement>("#rows tr")?.click();
+
+  const material = () => view.document.querySelector<HTMLButtonElement>(".material .link-button");
+  const alternate = () => view.document.querySelector<HTMLButtonElement>(".material .material-alt");
+  assert.ok(material(), "the linked PDF should be listed");
+  assert.equal(alternate()?.textContent, "Open externally", "the default is VS Code");
+  assert.equal(alternate()?.tagName, "BUTTON", "a button, so Tab reaches it and Enter activates it");
+  assert.equal(alternate()?.disabled, false);
+  assert.match(material()?.title ?? "", /^Open in VS Code: .*Alt\+click: Open externally/);
+
+  material()?.click();
+  alternate()?.click();
+  material()?.dispatchEvent(new view.window.MouseEvent("click", { bubbles: true, altKey: true }));
+  assert.deepEqual(
+    asked(view, "openMaterial").map((message) => [message.path, message.opener]),
+    [
+      [pdf, "editor"],
+      [pdf, "system"],
+      [pdf, "system"],
+    ],
+  );
+  assertHealthy(view, "after opening a material");
+
+  // Keyboard: Tab reaches the alternative, and Enter on it is its own click,
+  // not the table's "open the selected entry's source".
+  alternate()?.focus();
+  assert.equal(view.document.activeElement, alternate());
+  alternate()?.dispatchEvent(new view.window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  assert.deepEqual(asked(view, "reveal"), [], "Enter on a material button is not a reveal");
+
+  // With the setting flipped, the plain click and the alternative swap.
+  view.outbox.length = 0;
+  host.settings = { ...host.settings, openMaterialsWith: "system" };
+  view.outbox.push({ type: "refresh" });
+  await host.drain();
+  assert.equal(alternate()?.textContent, "Open in Code");
+  material()?.click();
+  alternate()?.click();
+  assert.deepEqual(
+    asked(view, "openMaterial").map((message) => message.opener),
+    ["system", "editor"],
+  );
+  assertHealthy(view, "after the setting changed");
 });
 
 test("citation keys named like Object.prototype members render as entries", { skip }, async () => {

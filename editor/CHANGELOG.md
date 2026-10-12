@@ -152,6 +152,14 @@ release. Its version says nothing about which engine it runs.
   list re-reads afterwards. Fetching honors `pynakes.allowOnlineLookups` like
   Import and Compare. The Materials section now shows for every entry, saying
   when nothing is on disk.
+- Materials open inside VS Code by default, beside the view, in whatever
+  editor is associated with the file; opening there never runs the file.
+  `pynakes.openMaterialsWith` (`"editor"` | `"system"`) chooses the
+  operating system's default application instead, and each material offers
+  the other choice as a secondary action or with Alt/Option-click. A PDF with
+  no viewer installed still opens in VS Code, and a one-time notification
+  offers to open it externally or to find a PDF viewer extension. A material
+  directory inside the workspace is revealed in the Explorer.
 
 ### Changed
 

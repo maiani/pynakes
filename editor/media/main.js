@@ -251,6 +251,8 @@ window.PV = window.PV || {};
         s.counts = countStaged(s.staging);
         if (message.settings) {
           s.showFindings = message.settings.showFindings !== false;
+          s.openMaterialsWith =
+            message.settings.openMaterialsWith === "system" ? "system" : "editor";
           if (s.search.fuzzy === null && typeof message.settings.fuzzy === "boolean") {
             // First render: seed the toggle from the setting. Afterwards the
             // user's own toggle (persisted) decides.

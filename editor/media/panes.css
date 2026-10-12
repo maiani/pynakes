@@ -481,6 +481,17 @@
   font-size: 0.9em;
 }
 
+/* The other way to open a material: quieter than the material itself. */
+.link-button.material-alt {
+  color: var(--vscode-descriptionForeground);
+  font-family: inherit;
+  font-size: 0.9em;
+}
+
+.link-button.material-alt:hover {
+  color: var(--vscode-textLink-foreground);
+}
+
 .material-fetch {
   margin-top: 4px;
 }
