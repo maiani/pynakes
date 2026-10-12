@@ -2,6 +2,7 @@
 
 from xml.etree import ElementTree as ET
 
+from pynakes._xml import parse_untrusted_xml
 from pynakes.authors import split_name_list
 from pynakes.entry_types import CONTAINER_FIELDS, container_title
 from pynakes.interchange._shared import (
@@ -183,7 +184,10 @@ def export_mods(lib: BibFile) -> str:
 def _parse_xml(text: str) -> ET.Element | None:
     if not text.strip():
         return None
-    return ET.fromstring(text)
+    try:
+        return parse_untrusted_xml(text)
+    except ET.ParseError as exc:
+        raise ValueError(f"Malformed MODS XML: {exc}") from exc
 
 
 def _mods_records(root: ET.Element) -> list[ET.Element]:

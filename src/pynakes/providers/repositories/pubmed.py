@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from urllib.parse import urlencode
 
+from pynakes._xml import parse_untrusted_xml
 from pynakes.providers._common import clean_text, person_name, repository_metadata
 from pynakes.providers._http import ProviderFetchError, fetch_text
 from pynakes.providers.records import ReferenceMetadata
@@ -196,7 +197,7 @@ def _pmc_metadata(root: ET.Element, identifier: str, dialect: str) -> ReferenceM
 def parse_xml(text: str, identifier: str, *, kind: str, dialect: str) -> ReferenceMetadata:
     """Parse an NCBI EFetch response."""
     try:
-        root = ET.fromstring(text)
+        root = parse_untrusted_xml(text)
     except ET.ParseError as exc:
         raise ProviderFetchError(f"NCBI returned invalid XML for {identifier!r}") from exc
     if kind == "pmcid":

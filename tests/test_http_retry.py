@@ -15,8 +15,10 @@ class _Response:
     def __init__(self, data: bytes) -> None:
         self._data = data
 
-    def read(self) -> bytes:
-        return self._data
+    def read(self, size: int = -1) -> bytes:
+        size = len(self._data) if size < 0 else size
+        data, self._data = self._data[:size], self._data[size:]
+        return data
 
     def __enter__(self) -> "_Response":
         return self

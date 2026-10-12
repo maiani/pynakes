@@ -7,6 +7,7 @@ import json
 import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as _UrllibRequest
 
@@ -41,6 +42,9 @@ RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 MAX_ATTEMPTS = 3
 BACKOFF_SECONDS = (1.0, 4.0)
 MAX_RETRY_AFTER = 30.0
+
+# Bytes requested per read from an injected opener's response.
+READ_CHUNK = 64 * 1024
 
 # The largest download accepted. Papers, source bundles, and supplements are far
 # smaller; the cap keeps a misbehaving or hostile server from filling memory.
@@ -230,11 +234,13 @@ def _fetch_bytes_urllib(
     request = _UrllibRequest(url, headers=headers)
     try:
         with opener(request, timeout=timeout) as response:  # type: ignore[arg-type]
-            data = response.read()
-            if len(data) > max_bytes:
-                raise error_class(f"{display} exceeds response size limit")
-            if time.monotonic() >= deadline:
-                raise error_class("Network deadline exceeded")
+            data = _read_bounded(
+                response,
+                max_bytes=max_bytes,
+                deadline=deadline,
+                too_large=error_class(f"{display} exceeds response size limit"),
+                expired=error_class("Network deadline exceeded"),
+            )
     except HTTPError as exc:
         message = f"Server returned HTTP {exc.code} for {display}"
         if exc.code in RETRY_STATUSES:
@@ -245,10 +251,43 @@ def _fetch_bytes_urllib(
         reason = getattr(exc, "reason", exc)
         raise _Transient(f"Network error fetching {display}: {reason}") from exc
     except OSError as exc:
+        if time.monotonic() >= deadline:
+            raise error_class("Network deadline exceeded") from exc
         raise _Transient(f"Network error fetching {display}: {exc}") from exc
     if progress is not None:
         progress(len(data), len(data))
     return data
+
+
+def _read_bounded(
+    response: Any,
+    *,
+    max_bytes: int,
+    deadline: float,
+    too_large: Exception,
+    expired: Exception,
+) -> bytes:
+    """Read an injected opener's response in chunks, bounded in size and time.
+
+    The contract for a custom ``opener`` (same signature as
+    :func:`urllib.request.urlopen`): its response's ``read(size)`` returns at
+    most ``size`` bytes and ``b""`` at the end. The opener owns redirects,
+    destinations and per-read socket timeouts; this loop enforces the size cap
+    without holding more than one chunk past it, and the overall deadline
+    between chunks.
+    """
+    chunks: list[bytes] = []
+    received = 0
+    while True:
+        if time.monotonic() >= deadline:
+            raise expired
+        chunk = response.read(min(READ_CHUNK, max_bytes + 1 - received))
+        if not chunk:
+            return b"".join(chunks)
+        received += len(chunk)
+        if received > max_bytes:
+            raise too_large
+        chunks.append(chunk)
 
 
 def _fetch_bytes_httpx(
@@ -264,7 +303,7 @@ def _fetch_bytes_httpx(
 ) -> bytes:
     try:
         with httpx.Client(
-            transport=PublicTransport(),
+            transport=PublicTransport(deadline=deadline),
             trust_env=False,
             follow_redirects=True,
             timeout=timeout,
@@ -304,6 +343,8 @@ def _fetch_bytes_httpx(
     except ValueError as exc:
         raise error_class(str(exc)) from exc
     except (httpx.HTTPError, OSError) as exc:
+        if time.monotonic() >= deadline:
+            raise error_class("Network deadline exceeded") from exc
         raise _Transient(f"Network error fetching {display}: {exc}") from exc
 
 
@@ -391,18 +432,28 @@ def _fetch_text(
     timeout: float,
     headers: Mapping[str, str] | None,
 ) -> str | None:
+    deadline = time.monotonic() + DEFAULT_DEADLINE
     if opener is None:
         return _fetch_text_httpx(
-            url, provider=provider, identifier=identifier, timeout=timeout, headers=headers
+            url,
+            provider=provider,
+            identifier=identifier,
+            timeout=timeout,
+            headers=headers,
+            deadline=deadline,
         )
     request_headers = {"User-Agent": USER_AGENT}
     request_headers.update(headers or {})
     request = _UrllibRequest(url, headers=request_headers)
     try:
         with opener(request, timeout=timeout) as response:  # type: ignore[arg-type]
-            data = response.read()
-            if len(data) > MAX_METADATA_BYTES:
-                raise ProviderFetchError("Metadata response exceeds size limit")
+            data = _read_bounded(
+                response,
+                max_bytes=MAX_METADATA_BYTES,
+                deadline=deadline,
+                too_large=ProviderFetchError("Metadata response exceeds size limit"),
+                expired=ProviderFetchError("Network deadline exceeded"),
+            )
             return data.decode("utf-8", errors="replace")
     except HTTPError as exc:
         if exc.code == 404:
@@ -413,6 +464,8 @@ def _fetch_text(
     except URLError as exc:
         reason = getattr(exc, "reason", exc)
         raise ProviderFetchError(f"{provider} lookup failed for {identifier!r}: {reason}") from exc
+    except OSError as exc:
+        raise ProviderFetchError(f"{provider} lookup failed for {identifier!r}: {exc}") from exc
 
 
 def _fetch_text_httpx(
@@ -422,13 +475,13 @@ def _fetch_text_httpx(
     identifier: str,
     timeout: float,
     headers: Mapping[str, str] | None,
+    deadline: float,
 ) -> str | None:
     request_headers = {"User-Agent": USER_AGENT}
     request_headers.update(headers or {})
-    deadline = time.monotonic() + DEFAULT_DEADLINE
     try:
         with httpx.Client(
-            transport=PublicTransport(),
+            transport=PublicTransport(deadline=deadline),
             trust_env=False,
             follow_redirects=True,
             timeout=timeout,
@@ -457,4 +510,8 @@ def _fetch_text_httpx(
             f"{provider} lookup failed for {identifier!r}: HTTP {exc.response.status_code}"
         ) from exc
     except (httpx.HTTPError, OSError, ValueError) as exc:
+        if time.monotonic() >= deadline:
+            raise ProviderFetchError(
+                f"{provider} lookup failed for {identifier!r}: network deadline exceeded"
+            ) from exc
         raise ProviderFetchError(f"{provider} lookup failed for {identifier!r}: {exc}") from exc

@@ -197,6 +197,12 @@ form is a `UsageError`, never silently reinterpreted.
   connections while preserving Host/TLS names, warn on HTTPS downgrades, cap
   metadata responses at 8 MiB, and bound retry/redirect/stream progress by a
   shared deadline. Custom injected openers retain their own transport policy.
+- The overall network deadline now also bounds DNS resolution and every socket
+  read and write. A stalled resolver or a server trickling response headers
+  fails the fetch at the deadline instead of holding it open. A custom
+  `urlopen`-style opener's response is read in bounded `read(size)` chunks,
+  so its size cap holds without buffering the whole body, and the deadline is
+  checked between chunks.
 - Scrub additional reference-manager bookkeeping and recognizable local paths,
   plain working comments between entries, and comment lines inside entries;
   preserve literal percent signs and explicit keep options.
@@ -259,6 +265,14 @@ form is a `UsageError`, never silently reinterpreted.
 
 ### Fixed
 
+- Malformed interchange imports are clean `ValueError`s (a JSON error envelope
+  from `convert --from`), never a `TypeError`, `RecursionError` or raw XML
+  parse error. This covers CSL-JSON that is not an item or array of items,
+  non-text CSL name parts, nesting deep enough to exhaust recursion, and
+  malformed MODS. MODS imports and arXiv/NCBI responses that declare XML
+  entities are refused, which rules out entity-expansion bombs.
+- A socket error from a provider metadata lookup through an injected opener
+  is a `ProviderFetchError`, not an unhandled `OSError`.
 - Reject nonportable Pinax citation-key paths and case-colliding keys; refuse
   symlinks in material copies and installed source trees.
 - Sync source-tree contents before atomic installation and make provenance

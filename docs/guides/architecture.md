@@ -342,6 +342,20 @@ provider implementations; `importer.py`, `integrity.py`, and `fetch.py`
 translate provider failures into their domain errors. Tests mock or fixture
 this boundary so the normal suite never relies on external availability.
 
+The default HTTP transport validates every request, redirects included: only
+`http`/`https` without credentials, and only to public addresses. It pins the
+validated address, so a second DNS answer cannot redirect the connection to a
+private one. Each fetch has one overall deadline, 120 seconds by default.
+Retries, DNS resolution, and every socket read and write are bounded by it, so
+a stalled resolver or a server trickling bytes cannot extend a request past it.
+Metadata responses are capped at 8 MiB and material downloads at 512 MiB.
+Provider XML with entity declarations is refused.
+
+A caller-injected `urlopen`-style opener owns its redirects, destinations, and
+per-read timeouts. pynakes validates only the initial URL, then reads the
+response in bounded chunks with `read(size)`. It enforces the size cap and
+checks the overall deadline between chunks.
+
 ## Testing and change discipline
 
 Tests cover model behavior, parser/writer fidelity, operation modules, the

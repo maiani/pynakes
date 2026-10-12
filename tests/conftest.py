@@ -67,4 +67,4 @@ def _offline_provider_dns(monkeypatch: pytest.MonkeyPatch) -> None:
     """Mocked HTTP tests never depend on real DNS; policy tests override this seam."""
     from pynakes.providers import _network
 
-    monkeypatch.setattr(_network, "resolve_addresses", lambda host, port: ["93.184.216.34"])
+    monkeypatch.setattr(_network, "_getaddrinfo", lambda host, port: ["93.184.216.34"])
