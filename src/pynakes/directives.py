@@ -16,6 +16,9 @@ for people and changes nothing. The verbs pynakes understands:
     ``lint`` leaves this entry's findings of finding type or category ``NAME``
     out of its report, limited to ``FIELD`` when one is given
     (``missing_profile_required_field:volume``).
+    Ignoring ``citation_key_pattern_mismatch`` also keeps the entry's key
+    through bulk and selected key regeneration
+    (:func:`pynakes.keys.directive_kept_keys`).
 
 A directive with an unknown verb or argument is reported by ``lint`` rather than
 silently doing nothing, as is an ``ignore`` that no longer matches a finding.

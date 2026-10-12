@@ -416,6 +416,12 @@ form is a `UsageError`, never silently reinterpreted.
   now protected whole (`{KV$_2$Se$_2$O}`), math with capitals is protected
   (`{$T_1$}`), `2D`/`3D` are protected, and markup, control sequences and URLs
   are left alone.
+- `normalize` with key generation (and `keys generate --all`/`--key`/`--where`)
+  renamed entries whose `% pynakes: ignore citation_key_pattern_mismatch`
+  directive marks their key as deliberately off-pattern. Those keys are now
+  kept; naming the one key (`keys generate FILE KEY`) still renames it. Keys
+  cited in linked `tex-sources` were already rewritten there, not silently
+  broken.
 
 ### Build
 

@@ -14,6 +14,8 @@ Generation is deterministic — the same entry always yields the same key.
 import re
 from collections.abc import Callable, Collection
 
+from pynakes._lint_directives import entry_ignore_rules
+from pynakes._lint_issue import LintIssue
 from pynakes._text_utils import entry_year
 from pynakes.authors import ascii_fold as _ascii_fold
 from pynakes.authors import last_name as _last_name
@@ -537,17 +539,36 @@ def is_key_regeneration_exempt(entry: BibEntry) -> bool:
     return entry.type.lower() in _STRUCTURAL_ENTRY_TYPES or _lacks_key_material(entry)
 
 
+def directive_kept_keys(lib: BibFile) -> set[str]:
+    """Return the keys an entry directive marks as deliberately off-pattern.
+
+    An entry that carries ``% pynakes: ignore citation_key_pattern_mismatch``
+    (or ignores the whole ``content`` category) has told lint its key is meant
+    to differ from the pattern — typically because a manuscript cites it. Bulk
+    and selected regeneration honour that and keep the key; only naming the one
+    key explicitly (``keys generate FILE KEY``) still renames it.
+    """
+    kept: set[str] = set()
+    for key, rules in entry_ignore_rules(lib).items():
+        probe = LintIssue("citation_key_pattern_mismatch", "warning", "", key=key)
+        if any(rule.matches(probe) for rule in rules):
+            kept.add(key)
+    return kept
+
+
 def planned_regenerated_keys(lib: BibFile) -> list[tuple[BibEntry, str]]:
     """Return the deterministic citation key each eligible entry would receive.
 
     Collisions among generated keys are disambiguated with letter suffixes
     (``Smith2020``, ``Smith2020a``, ...). Entries exempted by
-    :func:`is_key_regeneration_exempt` retain their existing keys instead.
+    :func:`is_key_regeneration_exempt`, or kept by a directive (see
+    :func:`directive_kept_keys`), retain their existing keys instead.
     """
     planned: list[tuple[BibEntry, str]] = []
     taken: set[str] = set()
+    kept = directive_kept_keys(lib)
     for entry in lib.entries.values():
-        if is_key_regeneration_exempt(entry):
+        if is_key_regeneration_exempt(entry) or entry.key in kept:
             taken.add(entry.key)
             continue
         new_key = unique_key(generate_key(entry, lib), taken)
@@ -615,12 +636,16 @@ def regenerate_selected_keys(
     Each runs as :func:`regenerate_key` against the whole library, so a new key
     never collides with an entry outside the selection. A duplicated key cannot
     be regenerated without first saying which entry is meant, so it is skipped
-    rather than failing the rest. Returns the applied ``(old, new)`` renames and
-    the skipped duplicated keys.
+    rather than failing the rest. An entry a directive keeps (see
+    :func:`directive_kept_keys`) is left as it is. Returns the applied
+    ``(old, new)`` renames and the skipped duplicated keys.
     """
     renames: list[tuple[str, str]] = []
     duplicated: list[str] = []
+    kept = directive_kept_keys(lib)
     for key in dict.fromkeys(keys):
+        if key in kept:
+            continue
         if len(lib.entries.get_all(key)) > 1:
             duplicated.append(key)
             continue

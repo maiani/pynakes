@@ -478,6 +478,11 @@ moves or drops entries carries it along (see
 | --- | --- | --- |
 | `ignore` | finding types or categories, each optionally `NAME:FIELD` | `lint` leaves this entry's matching findings out of its report and its `--strict` gate |
 
+An `ignore` that waives `citation_key_pattern_mismatch` (directly or through
+its `content` category) also says the key is deliberately off-pattern, so
+`normalize` with key generation and `keys generate --all` or `--key`/`--where`
+keep it. Only naming that one key, `keys generate FILE KEY`, still renames it.
+
 `ref directive` writes and removes directives on the entries named by `--key`
 or selected by `--where`, changing only the directive lines.
 

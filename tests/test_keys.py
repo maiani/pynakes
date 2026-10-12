@@ -625,3 +625,45 @@ class TestRenameFollowsReferencesThroughTheCli:
         fields = parse_bib(bib.read_text(encoding="utf-8")).entries["Euler1748"].fields
         assert fields["crossref"] == "Newton1687"
         assert fields["related"] == "Common,Newton1687"
+
+
+_KEPT_LIBRARY = (
+    "@comment{pynakes-meta: key-pattern: [Auth][year]}\n\n"
+    "% pynakes: ignore citation_key_pattern_mismatch -- cited in the manuscript\n"
+    "@article{Kept,\n  author = {Newton, Isaac},\n  title = {Principia},\n  year = {1687}\n}\n\n"
+    "@article{Moved,\n  author = {Euler, Leonhard},\n  title = {Mechanica},\n  year = {1736}\n}\n"
+)
+
+
+class TestDirectiveKeptKeys:
+    """An ``ignore citation_key_pattern_mismatch`` directive keeps the key."""
+
+    def test_bulk_regeneration_keeps_directive_marked_keys(self) -> None:
+        lib = parse_bib(_KEPT_LIBRARY)
+        assert regenerate_keys(lib) == [("Moved", "Euler1736")]
+        assert "Kept" in lib.entries
+
+    def test_selected_regeneration_keeps_directive_marked_keys(self) -> None:
+        from pynakes.keys import regenerate_selected_keys
+
+        lib = parse_bib(_KEPT_LIBRARY)
+        assert regenerate_selected_keys(lib, ["Kept", "Moved"]) == ([("Moved", "Euler1736")], [])
+
+    def test_category_ignore_keeps_the_key_too(self) -> None:
+        lib = parse_bib(_KEPT_LIBRARY.replace("citation_key_pattern_mismatch", "content"))
+        assert [old for old, _new in regenerate_keys(lib)] == ["Moved"]
+
+    def test_naming_the_key_still_regenerates_it(self) -> None:
+        lib = parse_bib(_KEPT_LIBRARY)
+        assert regenerate_key(lib, "Kept") == ("Kept", "Newton1687")
+
+    def test_normalize_keeps_directive_marked_keys_and_lint_still_waives(self) -> None:
+        from pynakes.lint import lint
+        from pynakes.normalize import NormalizeOptions, normalize_library
+
+        lib = parse_bib(_KEPT_LIBRARY)
+        report = normalize_library(lib, NormalizeOptions(normalize_keys=True))
+        assert report.renamed_keys == [("Moved", "Euler1736")]
+        types = {issue.type for issue in lint(lib)}
+        # The directive is still in use: lint reports the mismatch it waives.
+        assert "unused_entry_directive" not in types
