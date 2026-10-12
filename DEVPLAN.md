@@ -196,9 +196,8 @@ tests the gate did not require moved to Stage 5.
 
 #### Stage 5 — Hardening and scale
 
-**Local work complete (2026-10-12).** The completed changes are recorded under
-Unreleased in CHANGELOG. The stage closes when the remote CI matrix runs it
-green; see Gate 5 below.
+**Closed (2026-10-12).** The completed changes are recorded under Unreleased
+in CHANGELOG.
 
 **Done and verified locally:**
 
@@ -280,19 +279,18 @@ green; see Gate 5 below.
   failures, metadata status and stream failures, opener caps and deadlines,
   and retry boundaries. `_http.py` coverage rose from 83% to 89%.
 
-**Not yet done:**
+- **Remote CI:** CI run 38228820300 (commit 8085707) is green on all 17
+  jobs. They cover Python 3.12–3.15 on Linux, Windows and macOS, the
+  lowest-dependency job, lint and ty, strict docs, distribution, and the
+  editor extension. The first run found Windows-only failures, all fixed: a
+  source-tree sync that failed with `EBADF` (a real bug), and tests that
+  assumed POSIX directory syncs, untranslated newlines, or short test ids.
 
-- Run the required remote CI matrix, including Python 3.15 on Windows/macOS and
-  dependency floors. Local success is not evidence of those remote jobs. The
-  local `main` is ahead of `origin/main` and needs pushing first.
-
-**Local verification (2026-10-12):** 2,915 tests pass on Python 3.13 with
-92.73% coverage. Ruff lint/format, ty and the strict documentation build pass.
-
-**Gate 5** remains open until the full hostile-input matrix runs in CI with
-zero tracebacks and valid JSON whenever stdout is available. The local scale
-and property-test requirements pass; closed stdout deliberately exits 1 because
-no envelope can be delivered to a reader that has gone away.
+**Gate 5** (met, 2026-10-12): the full hostile-input matrix runs in CI on
+every platform, with zero tracebacks and valid JSON whenever stdout is
+available. The scale and property-test requirements pass. Closed stdout
+deliberately exits 1, because no envelope can reach a reader that has gone
+away.
 
 #### Stage 6 — Documentation and policy
 
