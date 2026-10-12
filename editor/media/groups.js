@@ -18,7 +18,49 @@ window.PV = window.PV || {};
     container = element;
     container.addEventListener("click", onClick);
     container.addEventListener("contextmenu", onContextMenu);
+    container.addEventListener("keydown", onKeyDown);
   };
+
+  /**
+   * A row is focusable and acts like a toggle button: Enter or Space filters
+   * by it, as a click does. Only when the row itself has focus — its twisty
+   * and "⋯" are real buttons with their own activation. Shift+F10 or the
+   * context-menu key opens the group's actions, as a right-click does.
+   */
+  function onKeyDown(event) {
+    const row = event.target;
+    if (!(row instanceof HTMLElement) || !row.classList.contains("group-row")) {
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggleFilter(row.dataset.group || "");
+    } else if ((event.key === "F10" && event.shiftKey) || event.key === "ContextMenu") {
+      if (row.dataset.group) {
+        event.preventDefault();
+        requestActions(row.dataset.group);
+      }
+    }
+  }
+
+  /** Filter by a group — or clear the filter when it is already the one. */
+  function toggleFilter(name) {
+    PV.state.selectedGroup = PV.state.selectedGroup === name ? null : name || null;
+    PV.persist();
+    PV.renderGroups();
+    PV.renderTable();
+    focusRow(name);
+  }
+
+  /** Re-rendering replaces every row, so put the keyboard back where it was. */
+  function focusRow(name) {
+    for (const row of container.querySelectorAll(".group-row")) {
+      if (row instanceof HTMLElement && (row.dataset.group || "") === name) {
+        row.focus();
+        return;
+      }
+    }
+  }
 
   /** Ask the extension what to do with one group node. */
   function requestActions(name) {
@@ -91,12 +133,19 @@ window.PV = window.PV || {};
     if (!row) {
       return;
     }
-    const name = row.dataset.group;
     // Clicking the selected group clears the filter, so the sidebar is a toggle.
-    PV.state.selectedGroup = PV.state.selectedGroup === name ? null : name || null;
-    PV.persist();
-    PV.renderGroups();
-    PV.renderTable();
+    toggleFilter(row.dataset.group || "");
+  }
+
+  /**
+   * Make a row a keyboard-reachable toggle. Not a `<button>`, because it holds
+   * buttons of its own (the twisty and "⋯"), which a button may not contain.
+   */
+  function filterRow(row, label, pressed) {
+    row.tabIndex = 0;
+    row.setAttribute("role", "button");
+    row.setAttribute("aria-label", label);
+    row.setAttribute("aria-pressed", pressed ? "true" : "false");
   }
 
   /** Flatten the tree in display order, skipping collapsed subtrees. */
@@ -152,6 +201,7 @@ window.PV = window.PV || {};
     const all = document.createElement("div");
     all.className = "group-row" + (s.selectedGroup === null ? " selected" : "");
     all.dataset.group = "";
+    filterRow(all, "All entries", s.selectedGroup === null);
     const allLabel = document.createElement("span");
     allLabel.className = "group-name";
     allLabel.textContent = "All entries";
@@ -173,6 +223,7 @@ window.PV = window.PV || {};
       const row = document.createElement("div");
       row.className = "group-row" + (s.selectedGroup === node.name ? " selected" : "");
       row.dataset.group = node.name;
+      filterRow(row, 'Filter by group "' + node.name + '"', s.selectedGroup === node.name);
       row.style.paddingLeft = `${6 + node.depth * 14}px`;
 
       const hasChildren = (node.children || []).length > 0;

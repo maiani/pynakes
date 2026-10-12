@@ -323,8 +323,13 @@ export type SearchEnvelope = SearchSuccess | InspectError;
 
 /** What a modifying command's `plan` reports about one entry's change. */
 export interface RefEditPlanEntry {
+  /** `added`, `removed`, `modified`, or `renamed`. */
   change: string;
-  key: string;
+  /** Every change but a rename names the entry by its key... */
+  key?: string;
+  /** ...and a rename names it by the key it had and the key it gets. */
+  from?: string;
+  to?: string;
   fields?: Record<string, { old: string | null; new: string | null }>;
   /** Present when the entry type changed. */
   type?: { old: string; new: string };
@@ -361,32 +366,42 @@ export interface RefCompareSuccess {
 
 export type RefCompareEnvelope = RefCompareSuccess | InspectError;
 
-/** What `keys rename` reports. */
-export interface KeysRenameSuccess {
-  status: "success";
-  action: "keys_rename";
-  file: string;
-  dry_run: boolean;
+/** One linked TeX source a `keys rename` rewrites, or would. */
+export interface RenamedSource {
+  path: string;
   modified: boolean;
-  modified_entries: number;
-  warnings: { type: string; message: string }[];
+  /** `\cite{...}` occurrences of the old key in this file. */
+  occurrences: number;
+}
+
+/**
+ * One Pinax material file a key rename or a duplicate merge moves, as the
+ * engine planned it — reported by a dry run too, since no diff of the `.bib`
+ * shows a file beside it changing name.
+ */
+export interface PinaxMaterialMove {
+  source_key: string;
+  target_key: string;
+  kind: string;
+  source_path: string;
+  target_path: string;
+}
+
+/**
+ * What `keys rename` reports. The diff covers the `.bib` and every rewritten
+ * TeX source; a taken key or a duplicated old key is an exit-2 conflict.
+ */
+export interface KeysRenameSuccess extends MutationSuccess {
+  action: "keys_rename";
   old: string;
   new: string;
   /** `\cite{...}` occurrences rewritten across linked TeX sources. */
   source_occurrences: number;
-  diff?: string;
+  sources: RenamedSource[];
+  pinax_materials: PinaxMaterialMove[];
 }
 
-/** The new key is already taken, or the old one is ambiguous (a duplicate). */
-export interface KeysRenameConflict {
-  status: "conflict";
-  error: string;
-  message: string;
-  key?: string;
-  options: { id: string; description: string }[];
-}
-
-export type KeysRenameEnvelope = KeysRenameSuccess | KeysRenameConflict | InspectError;
+export type KeysRenameEnvelope = KeysRenameSuccess | MutationConflict | InspectError;
 
 // ---------------------------------------------------------------------------
 // The bibliography's neighbours: the TeX sources that cite it, and the
@@ -553,6 +568,10 @@ export interface MutationSuccess {
    * moved to the new name, in file order. Empty without `--members`.
    */
   members_renamed?: string[];
+  /** `keys rename`: the TeX sources whose citations it rewrites. */
+  sources?: RenamedSource[];
+  /** `keys rename` and `dedupe merge`: material files that move with a key. */
+  pinax_materials?: PinaxMaterialMove[];
 }
 
 /**
@@ -647,6 +666,7 @@ export interface DedupeMergeSuccess extends MutationSuccess {
   merged_clusters: number;
   removed_entries: number;
   field_changes: number;
+  pinax_materials: PinaxMaterialMove[];
 }
 
 // A cluster whose copies disagree irreconcilably is an exit-2 `DedupeConflict`.

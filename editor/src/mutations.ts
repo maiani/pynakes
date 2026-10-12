@@ -86,10 +86,16 @@ function mutationKeys(mutation: Mutation): string[] {
     case "group":
       return [mutation.key];
     case "dedupeMerge":
-      // A whole-file merge (no keys) could touch anything, but it is previewed
-      // and approved like the rest; what matters here is the named cluster,
-      // whose entries are about to be rewritten or removed.
+      // The named cluster is refused up front. Which other entries a merge
+      // rewrites or removes — every cluster's, for a whole-file merge — only
+      // the engine knows, and its preview's plan names them; they are checked
+      // against the staging map there.
       return mutation.keys ?? [];
+    case "renameKey":
+      // The staging map is keyed by citation key, so a pending edit on the
+      // renamed entry would be orphaned. Entries whose `crossref` follows the
+      // rename are named by the preview's plan.
+      return [mutation.oldKey];
     case "groupTree":
       // The hierarchy lives in the file's metadata, not in any entry. The
       // entries a rename moves are known only from its preview, and are
@@ -123,6 +129,10 @@ function approvalDetail(mutation: Mutation, preview: PreviewedMutation): string 
           ? "Folds this pair into its first entry and removes the copies."
           : "Folds every duplicate in the file into its first entry and removes the copies.",
       );
+      lines.push(...materialMoveDetail(preview, "into the surviving entry's"));
+      break;
+    case "renameKey":
+      lines.push(...renameKeyDetail(mutation.oldKey, preview));
       break;
     case "groupTree":
       lines.push(...groupTreeDetail(mutation.edit, preview));
@@ -174,6 +184,51 @@ function groupTreeDetail(edit: GroupTreeEdit, preview: PreviewedMutation): strin
     default:
       return [];
   }
+}
+
+/**
+ * What a key rename writes beyond the `.bib`, as the engine's preview named it.
+ *
+ * The diff on screen covers the rewritten TeX sources too, but a source can be
+ * far down it; and the Pinax files that change name appear in no diff at all.
+ */
+function renameKeyDetail(oldKey: string, preview: PreviewedMutation): string[] {
+  const sources = preview.rewrittenSources ?? [];
+  const lines: string[] = [];
+  if (sources.length > 0) {
+    const total = sources.reduce((sum, source) => sum + source.occurrences, 0);
+    lines.push(
+      `Also rewrites ${total === 1 ? "one citation" : `${total} citations`} of ${oldKey} in ` +
+        `${sources.length === 1 ? "a linked TeX source" : `${sources.length} linked TeX sources`}: ` +
+        sources.map((source) => `${baseName(source.path)} (${source.occurrences})`).join(", ") +
+        ".",
+    );
+  } else {
+    lines.push(`No linked TeX source cites ${oldKey}, so only the bibliography changes.`);
+  }
+  lines.push(...materialMoveDetail(preview, "to the new key's"));
+  return lines;
+}
+
+/** The Pinax files a preview says would change name — never shown in a diff. */
+function materialMoveDetail(preview: PreviewedMutation, destination: string): string[] {
+  const moves = preview.materialMoves ?? [];
+  if (moves.length === 0) {
+    return [];
+  }
+  return [
+    `Moves ${moves.length === 1 ? "one material file" : `${moves.length} material files`} ` +
+      `${destination} name on disk: ` +
+      moves
+        .map((move) => `${baseName(move.source_path)} → ${baseName(move.target_path)}`)
+        .join(", ") +
+      ".",
+  ];
+}
+
+/** The last path segment, for a dialog line; the path itself came from the engine. */
+function baseName(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
 }
 
 /** Citation keys for a dialog: all of a short list, the first few of a long one. */
@@ -391,10 +446,15 @@ export async function runMutation(
       preview = await previewMutation(command, filePath, mutation, cwd);
     }
     if (!preview.ok) {
-      fail(preview.message);
+      // A conflict is the engine declining — a taken key, a merge it will not
+      // guess — and a dry run never writes, so say so rather than "failed".
+      fail(preview.conflict === true ? `Nothing was written: ${preview.message}` : preview.message);
       return;
     }
-    const rewritten = (preview.renamedMembers ?? []).filter((key) => staged.has(key));
+    // Everything the engine says this would rewrite or remove, which for a
+    // whole-file merge or a group rename is known only now.
+    const rewritten = [...new Set([...(preview.renamedMembers ?? []), ...preview.rewrittenKeys])]
+      .filter((key) => staged.has(key));
     if (rewritten.length > 0) {
       fail(`Discard or apply the pending changes to ${rewritten.join(", ")} before this.`);
       return;
@@ -456,6 +516,11 @@ export async function runMutation(
       renamedGroup:
         mutation.kind === "groupTree" && mutation.edit.op === "rename"
           ? { from: mutation.edit.name, to: mutation.edit.newName }
+          : undefined,
+      // A renamed entry that was selected stays selected under its new key.
+      renamedKey:
+        mutation.kind === "renameKey"
+          ? { from: mutation.oldKey, to: mutation.newKey }
           : undefined,
     });
     await host.reload();

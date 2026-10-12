@@ -150,6 +150,33 @@ test("a mutation passes the precondition only when given one", () => {
   ]);
 });
 
+test("a key rename previews and applies as the same keys command", () => {
+  assert.deepEqual(keysRenameArgs("refs.bib", "Newton1687", "Principia1687", true), [
+    "keys",
+    "rename",
+    "refs.bib",
+    "--dry-run",
+    "--diff",
+    "--",
+    "Newton1687",
+    "Principia1687",
+  ]);
+  assert.deepEqual(
+    keysRenameArgs("refs.bib", "Newton1687", "Principia1687", false, "ab".repeat(32)),
+    [
+      "keys",
+      "rename",
+      "refs.bib",
+      "--diff",
+      "--expect-sha256",
+      "ab".repeat(32),
+      "--",
+      "Newton1687",
+      "Principia1687",
+    ],
+  );
+});
+
 test("a hierarchy edit previews and applies as the same groups command", () => {
   const move = { op: "move" as const, name: "Optics", parent: "" };
   assert.deepEqual(groupTreeArgs("refs.bib", move, true), [
@@ -305,6 +332,6 @@ test("every name the user typed follows the end of options, so a leading dash st
   dashed(refAddArgs("refs.bib", { key: "-k", entryType: "misc", fields: {} }, true), "-k");
   dashed(refImportArgs("refs.bib", { identifier: "-i" }, true), "-i");
   dashed(refRemoveArgs("refs.bib", ["-k", "-j"], false, true), "-k", "-j");
-  dashed(keysRenameArgs("refs.bib", "-k", "-j"), "-k", "-j");
+  dashed(keysRenameArgs("refs.bib", "-k", "-j", true), "-k", "-j");
   dashed(searchArgs("refs.bib", { query: "-quantum", where: "year > 1900" }), "-quantum");
 });

@@ -149,7 +149,14 @@ window.PV = window.PV || {};
       elements.query.select();
       return;
     }
-    if (typing) {
+    // A key a control already handled — a group row's Enter, say — is not
+    // also the table's; and Enter on a button is that button's click, not a
+    // request to open the selected entry's source.
+    const control =
+      target && typeof target.closest === "function"
+        ? target.closest("button, select, a, [role='button']")
+        : null;
+    if (typing || event.defaultPrevented) {
       return;
     }
     if (event.key === "ArrowDown") {
@@ -158,7 +165,7 @@ window.PV = window.PV || {};
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       PV.moveSelection(-1);
-    } else if (event.key === "Enter" && PV.state.selectedKey) {
+    } else if (event.key === "Enter" && !control && PV.state.selectedKey) {
       event.preventDefault();
       PV.post({ type: "reveal", key: PV.state.selectedKey });
     }
@@ -203,6 +210,9 @@ window.PV = window.PV || {};
     elements.notice.textContent = "";
   }
 
+  /** Messages that end a mutation, whatever its outcome. */
+  const MUTATION_ENDS = new Set(["mutationDone", "mutationNoop", "mutationCancelled", "mutationError"]);
+
   function renderAll() {
     PV.renderGroups();
     PV.renderTable();
@@ -214,6 +224,16 @@ window.PV = window.PV || {};
     const s = PV.state;
     const staleSearch =
       typeof message.seq === "number" && message.seq !== searchSeq;
+
+    // A key rename is a mutation like any other, so whichever way one ends —
+    // written, declined, cancelled, nothing to do — the key field is released
+    // and re-rendered from the entry as it now is.
+    if (MUTATION_ENDS.has(message.type) && s.renameBusy) {
+      s.renameBusy = null;
+      if (message.type !== "mutationDone") {
+        PV.renderDocks();
+      }
+    }
 
     switch (message.type) {
       case "render": {
@@ -334,6 +354,10 @@ window.PV = window.PV || {};
           s.selectedGroup = message.renamedGroup.to;
           PV.persist();
         }
+        if (message.renamedKey && s.selectedKey === message.renamedKey.from) {
+          s.selectedKey = message.renamedKey.to;
+          PV.persist();
+        }
         if (message.select) {
           // The reload that follows renders the table; remembering the key here
           // means the new entry is selected as soon as it exists.
@@ -356,27 +380,12 @@ window.PV = window.PV || {};
         notify("info", message.message);
         break;
       case "mutationCancelled":
-        notify("info", message.label + ": cancelled, nothing written.");
+        if (!message.quiet) {
+          notify("info", message.label + ": cancelled, nothing written.");
+        }
         break;
       case "mutationError":
         notify("error", message.label + ": " + message.message);
-        break;
-      case "keyRenamed":
-        s.renameBusy = null;
-        if (s.selectedKey === message.oldKey) {
-          s.selectedKey = message.newKey;
-          PV.persist();
-        }
-        notify("success", "Renamed " + message.oldKey + " to " + message.newKey + ".");
-        break;
-      case "renameKeyCancelled":
-        s.renameBusy = null;
-        PV.renderDocks();
-        break;
-      case "renameKeyError":
-        s.renameBusy = null;
-        notify("error", "Rename failed: " + message.message);
-        PV.renderDocks();
         break;
       case "conflict": {
         const detail = message.conflicts

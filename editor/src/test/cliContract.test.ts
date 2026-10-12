@@ -221,7 +221,7 @@ test(
 test("keys rename takes FILE OLD NEW, not OLD NEW FILE", { skip }, async () => {
   const file = tempBib("@article{OldKey2020,\n  title = {A Paper}\n}\n");
 
-  const envelope = await keysRename(command, file, "OldKey2020", "NewKey2020");
+  const envelope = await keysRename(command, file, "OldKey2020", "NewKey2020", false);
   if (envelope.status !== "success") {
     assert.fail(`keys rename failed: ${JSON.stringify(envelope)}`);
   }
@@ -231,6 +231,67 @@ test("keys rename takes FILE OLD NEW, not OLD NEW FILE", { skip }, async () => {
   const rewritten = fs.readFileSync(file, "utf-8");
   assert.match(rewritten, /@article\{NewKey2020,/);
   assert.doesNotMatch(rewritten, /@article\{OldKey2020,/);
+});
+
+test("a key rename previews its TeX and material changes, then lands guarded", { skip }, async () => {
+  const file = tempBib(
+    "@book{Newton1687,\n  title = {Principia}\n}\n" +
+      "@inbook{Newton1687a,\n  crossref = {Newton1687},\n  title = {Book III}\n}\n" +
+      "@comment{pynakes-meta: tex-sources:paper.tex;\npinax-files-dir:\n}\n",
+  );
+  const dir = path.dirname(file);
+  const tex = path.join(dir, "paper.tex");
+  fs.writeFileSync(tex, "See \\cite{Newton1687} and \\cite{Newton1687}.\n", "utf-8");
+  const files = path.join(dir, "refs.files");
+  fs.mkdirSync(files);
+  fs.writeFileSync(path.join(files, "Newton1687.preprint.pdf"), "pdf");
+
+  const mutation: Mutation = { kind: "renameKey", oldKey: "Newton1687", newKey: "Principia1687" };
+  const preview = await previewThenApply(file, mutation);
+  assert.match(preview.diff, /\+@book\{Principia1687,/);
+  assert.match(preview.diff, /\\cite\{Principia1687\}/, "the diff covers the TeX source");
+  // The entry that follows by crossref is named, so a pending edit on it is caught.
+  assert.deepEqual([...preview.rewrittenKeys].sort(), ["Newton1687", "Newton1687a"]);
+  assert.equal(preview.rewrittenSources?.length, 1);
+  assert.equal(preview.rewrittenSources?.[0].occurrences, 2);
+  assert.equal(path.basename(preview.rewrittenSources?.[0].path ?? ""), "paper.tex");
+  assert.deepEqual(
+    preview.materialMoves?.map((move) => [path.basename(move.source_path), path.basename(move.target_path)]),
+    [["Newton1687.preprint.pdf", "Principia1687.preprint.pdf"]],
+  );
+
+  assert.match(fs.readFileSync(tex, "utf-8"), /\\cite\{Principia1687\}/);
+  assert.ok(fs.existsSync(path.join(files, "Principia1687.preprint.pdf")));
+  assert.ok(!fs.existsSync(path.join(files, "Newton1687.preprint.pdf")));
+});
+
+test("a key rename onto a taken key is the engine's conflict, nothing written", { skip }, async () => {
+  const file = tempBib(
+    "@book{Newton1687,\n  title = {Principia}\n}\n@book{Newton1704,\n  title = {Opticks}\n}\n",
+  );
+  const before = fs.readFileSync(file, "utf-8");
+
+  const preview = await previewMutation(command, file, {
+    kind: "renameKey",
+    oldKey: "Newton1687",
+    newKey: "Newton1704",
+  });
+  assert.equal(preview.ok, false);
+  assert.equal(!preview.ok && preview.conflict, true);
+  assert.equal(!preview.ok && preview.conflict === true && preview.error, "CitationKeyConflict");
+  assert.equal(fs.readFileSync(file, "utf-8"), before);
+});
+
+test("a key rename approved against a file that moved is refused", { skip }, async () => {
+  const file = tempBib("@book{Newton1687,\n  title = {Principia}\n}\n");
+  const mutation: Mutation = { kind: "renameKey", oldKey: "Newton1687", newKey: "Principia1687" };
+  const preview = await previewMutation(command, file, mutation);
+  assert.ok(preview.ok && preview.sourceSha256, JSON.stringify(preview));
+  fs.appendFileSync(file, "@book{Newton1704,\n  title = {Opticks}\n}\n", "utf-8");
+
+  const applied = await applyMutation(command, file, mutation, preview.sourceSha256 ?? "");
+  assert.equal(!applied.ok && applied.conflict === true && applied.error, "ExternalModification");
+  assert.match(fs.readFileSync(file, "utf-8"), /@book\{Newton1687,/);
 });
 
 // --- entry and group mutations ---------------------------------------------
@@ -354,6 +415,22 @@ test("dedupe merge --key merges one cluster and leaves the other", { skip }, asy
   assert.doesNotMatch(written, /@article\{Alpha2,/);
   assert.match(written, /@article\{Beta1,/, "an unapproved cluster must survive");
   assert.match(written, /@article\{Beta2,/, "an unapproved cluster must survive");
+});
+
+test("a merge preview names every entry it rewrites or removes", { skip }, async () => {
+  const file = tempBib(TWO_DUPLICATE_PAIRS);
+
+  const whole = await previewMutation(command, file, { kind: "dedupeMerge" });
+  assert.ok(whole.ok, JSON.stringify(whole));
+  // The removed copies always; a survivor only when the merge changes it.
+  for (const key of ["Alpha2", "Beta2"]) {
+    assert.ok(whole.ok && whole.rewrittenKeys.includes(key), `${key} must be named`);
+  }
+
+  const one = await previewMutation(command, file, { kind: "dedupeMerge", keys: ["Alpha2"] });
+  assert.ok(one.ok, JSON.stringify(one));
+  assert.ok(one.ok && one.rewrittenKeys.includes("Alpha2"));
+  assert.ok(one.ok && !one.rewrittenKeys.some((key) => key.startsWith("Beta")));
 });
 
 test("dedupe merge without keys still merges every cluster", { skip }, async () => {

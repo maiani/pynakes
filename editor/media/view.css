@@ -391,6 +391,11 @@ body.resizing-row * {
   background-color: var(--vscode-list-hoverBackground);
 }
 
+.group-row:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
 .group-row.selected {
   color: var(--vscode-list-activeSelectionForeground);
   background-color: var(--vscode-list-activeSelectionBackground);

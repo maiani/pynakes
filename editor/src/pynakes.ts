@@ -293,20 +293,41 @@ export function refCompare(
 
 /**
  * Rename one citation key, rewriting matching `\cite{...}` keys in any TeX
- * sources the library's `tex-sources` metadata names.
+ * sources the library's `tex-sources` metadata names, and moving the key's
+ * Pinax materials with it.
+ *
+ * A modifying command like the mutations below, and run the same way: a
+ * `--dry-run --diff` preview whose diff covers the `.bib` and every rewritten
+ * source, then the identical call guarded by `--expect-sha256`.
  */
 export function keysRename(
   command: PynakesCommand,
   filePath: string,
   oldKey: string,
   newKey: string,
+  dryRun: boolean,
   cwd?: string,
+  expectSha256?: string,
 ): Promise<KeysRenameEnvelope> {
-  return runJson<KeysRenameEnvelope>(command, keysRenameArgs(filePath, oldKey, newKey), cwd);
+  return runJson<KeysRenameEnvelope>(
+    command,
+    keysRenameArgs(filePath, oldKey, newKey, dryRun, expectSha256),
+    cwd,
+  );
 }
 
-export function keysRenameArgs(filePath: string, oldKey: string, newKey: string): string[] {
-  return invocation(["keys", "rename", filePath], [], [oldKey, newKey]);
+export function keysRenameArgs(
+  filePath: string,
+  oldKey: string,
+  newKey: string,
+  dryRun: boolean,
+  expectSha256?: string,
+): string[] {
+  return invocation(
+    ["keys", "rename", filePath],
+    modifyingFlags([], dryRun, expectSha256),
+    [oldKey, newKey],
+  );
 }
 
 /**

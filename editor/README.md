@@ -35,7 +35,9 @@ than the client hashing the file itself; and committing staged entries as one
 field names the way `ref edit` does, so the batch operation was fixed rather
 than the values trimmed here. Confirming a group removal added
 `removed_groups` to `groups remove-group`, rather than the client walking the
-tree to find which subgroups would go with it.
+tree to find which subgroups would go with it; and confirming a citation-key
+rename added `pinax_materials` to `keys rename`, rather than the client working
+out which `<key>.<kind>.pdf` files would change name.
 
 `src/model.ts` is the only place that transforms engine output, and it only does
 display tidying: collapsing wrapped whitespace, rendering the `and` name
@@ -126,7 +128,23 @@ the diff cannot show — materials that would be deleted, a network request that
 was made — and approving re-runs the identical invocation without `--dry-run`,
 conditional on the file still being the one the preview read. Nothing here is
 staged, because none of it is a field edit; what it shares with the field editor
-is that the diff you approve is the diff that lands.
+is that the diff you approve is the diff that lands. None of it may rewrite an
+entry that still has pending field edits: the engine's preview names every entry
+a change would remove, modify or re-key — including every cluster a whole-file
+**Merge every duplicate** reaches, and a pair's surviving entry when the merge
+fills it in — and the change is refused, with nothing written, if any of them
+has pending edits.
+
+**Rename a citation key.** Editing the key at the top of the detail pane is
+`keys rename`, through the same preview, approval and guarded write. It reaches
+further than the `.bib`: the engine also rewrites matching `\cite{...}` keys in
+the linked TeX sources, re-points any `crossref` naming the entry, and moves the
+key's Pinax material files. The Staged diff pane shows the `.bib` and every
+rewritten source; the approval dialog says how many citations change in which
+source, and lists each material file that would change name, since no diff
+shows that. A key already taken is the engine's conflict, reported with nothing
+written. A rename is refused while the entry — or an entry whose `crossref`
+follows it — has pending field edits, because those are keyed by the old key.
 
 A conflict is the engine declining to guess rather than a failure — and never a
 success: whatever answered with one wrote nothing, and is reported as such.
@@ -280,6 +298,12 @@ filter, click a material or a citation to open it, `↑`/`↓` to move between
 entries, `Enter` or a double-click to open the entry's declaration in the source
 text, `Ctrl`/`Cmd`+`F` to focus the search box.
 
+Everything clickable is reachable with `Tab` and shows a focus ring. A group row
+filters on `Enter` or `Space` and opens its actions on `Shift`+`F10` (or the
+context-menu key); a key in a duplicate cluster, a finding, a material or a
+citation is a button, so `Enter` activates it rather than opening the selected
+entry's source.
+
 ## Developing
 
 ```bash
@@ -330,14 +354,15 @@ src/
   bibliographyEditor.ts  the custom editor: buffer sync, reads, message routing
   documentAccess.ts      mirror, working directory, settings, buffer reconciliation
   stagedCommit.ts        previews and commits the staged field edits
-  keyRename.ts           renames one citation key, after approval
+  keyRename.ts           renames one citation key, as a previewed mutation
   mutations.ts           entry-level changes: preview, approve, guarded write
   groupHierarchy.ts      sidebar prompts for editing the group hierarchy
   navigation.ts          opens sources, citations, and materials
   diagnostics.ts         findings and undefined citations as native diagnostics
   statusBar.ts           the engine/file status bar item
   library.ts             composes the engine reads; runs preview and commit
-  pynakes.ts             the only module that spawns the engine
+  pynakes.ts             builds every engine invocation
+  engineProcess.ts       the only module that spawns the engine; stops whole trees
   engineDiscovery.ts     which engine to run, and why
   version.ts             PEP 440 parsing and comparison
   model.ts               engine envelope types + projection to table rows
@@ -346,13 +371,20 @@ src/
   webview.ts             webview HTML shell, CSP, resource URIs
 scripts/
   vendor-engine.mjs      builds the bundled engine
-media/                   webview client: state, table, groups, detail, panels, main
+media/                   webview client: state, table, groups, detail, compare,
+                         duplicates, panels, layout, main
 ```
 
 The view is a `CustomTextEditorProvider` rather than a standalone webview so VS
 Code keeps ownership of the document: the text buffer stays authoritative,
 external edits arrive as change events, and the extension holds no file state
 beyond pending edits.
+
+A call that is cancelled or runs past its time limit is stopped along with
+every process it started — the engine is often reached through a launcher whose
+Python child does the work. On Linux and macOS the engine runs as the leader of
+its own process group and the whole group is signalled; on Windows `taskkill
+/T /F` stops the tree.
 
 Reads run concurrently (`inspect`, `groups tree`, `groups list`, `lint` are
 independent reads of an unchanging file) while writes run strictly sequentially,

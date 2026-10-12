@@ -524,3 +524,116 @@ test("a JabRef group colour paints its swatch", { skip }, async () => {
   assert.ok(swatch, "a coloured group shows a swatch");
   assert.notEqual(swatch.style.backgroundColor, "", "and the swatch is painted");
 });
+
+// --- keyboard access ---------------------------------------------------------
+
+function press(view: View, target: Element, key: string, init: KeyboardEventInit = {}): void {
+  target.dispatchEvent(
+    new view.window.KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init }),
+  );
+}
+
+test("group rows are focusable toggles that Enter and Space operate", { skip }, async () => {
+  const { view } = await opened("jabref_groups.bib");
+
+  const row = groupRow(view, "All Papers");
+  assert.ok(row, "the group should render");
+  assert.equal(row.tabIndex, 0, "a group row must be reachable by Tab");
+  assert.equal(row.getAttribute("role"), "button");
+  assert.equal(row.getAttribute("aria-pressed"), "false");
+  assert.equal(groupRow(view, "")?.tabIndex, 0, '"All entries" is reachable too');
+
+  row.focus();
+  press(view, row, "Enter");
+  const selected = groupRow(view, "All Papers");
+  assert.ok(selected?.classList.contains("selected"), "Enter filters by the group");
+  assert.equal(selected?.getAttribute("aria-pressed"), "true");
+  assert.equal(view.document.activeElement, selected, "focus survives the re-render");
+  assert.equal(asked(view, "reveal").length, 0, "Enter on a group is not the table's Enter");
+
+  press(view, selected, " ");
+  assert.equal(
+    groupRow(view, "All Papers")?.classList.contains("selected"),
+    false,
+    "Space on the filtering group clears the filter",
+  );
+
+  const again = groupRow(view, "All Papers");
+  assert.ok(again);
+  press(view, again, "F10", { shiftKey: true });
+  const [request] = asked(view, "groupActions");
+  assert.equal((request?.group as Record<string, unknown>)?.name, "All Papers");
+
+  // Keys pressed on the row's own buttons are theirs, not the row's.
+  const twisty = groupRow(view, "All Papers")?.querySelector<HTMLElement>("button.twisty");
+  if (twisty) {
+    press(view, twisty, "Enter");
+    assert.equal(groupRow(view, "All Papers")?.classList.contains("selected"), false);
+  }
+  assertHealthy(view, "after operating groups by keyboard");
+});
+
+test("duplicate-cluster keys are buttons that select their entry", { skip }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pynakes-webview-"));
+  const file = path.join(dir, "refs.bib");
+  fs.writeFileSync(
+    file,
+    "@article{Lovelace1843,\n  author = {Ada Lovelace},\n  title = {Notes on the Engine},\n" +
+      "  year = {1843},\n  doi = {10.5555/engine}\n}\n" +
+      "@article{Lovelace1843b,\n  author = {Ada Lovelace},\n  title = {Notes on the Engine},\n" +
+      "  year = {1843},\n  doi = {10.5555/engine}\n}\n",
+    "utf-8",
+  );
+  const { view, host } = await opened("refs.bib", file);
+  view.document.getElementById("find-duplicates")?.click();
+  await host.drain();
+
+  const keys = [...view.document.querySelectorAll<HTMLElement>(".dup-key")];
+  assert.deepEqual(
+    keys.map((key) => key.textContent),
+    ["Lovelace1843", "Lovelace1843b"],
+  );
+  for (const key of keys) {
+    assert.equal(key.tagName, "BUTTON", "a cluster key must be a real, focusable button");
+    assert.equal((key as HTMLButtonElement).type, "button");
+    assert.ok(key.classList.contains("link-button"), "styled, and focus-ringed, like other links");
+  }
+  keys[1].focus();
+  assert.equal(view.document.activeElement, keys[1]);
+  press(view, keys[1], "Enter");
+  assert.equal(asked(view, "reveal").length, 0, "Enter on a button is its click, not a reveal");
+  keys[1].click();
+  assert.equal(
+    view.document.querySelector<HTMLElement>("#rows tr.selected")?.dataset.key,
+    "Lovelace1843b",
+    "activating the key selects its entry",
+  );
+  assertHealthy(view, "after selecting from a cluster");
+});
+
+test("a key rename holds the key field until its mutation ends, however it ends", { skip }, async () => {
+  const { view } = await opened("simple.bib");
+  click(view, '.tab[data-pane="edit"]');
+  const field = () => view.document.querySelector<HTMLInputElement>("input.detail-key");
+  const original = field()?.value ?? "";
+  assert.ok(original, "the edit pane shows the citation key");
+
+  for (const ending of [
+    { type: "mutationError", label: `Rename ${original}`, message: "Nothing was written: taken" },
+    { type: "mutationCancelled", label: `Rename ${original}` },
+    { type: "mutationNoop", label: `Rename ${original}`, message: "nothing to change" },
+  ]) {
+    const input = field();
+    assert.ok(input);
+    input.value = "Renamed1905";
+    input.dispatchEvent(new view.window.Event("blur"));
+    const [request] = view.outbox.splice(0).filter((message) => message.type === "renameKey");
+    assert.deepEqual([request?.key, request?.newKey], [original, "Renamed1905"]);
+    assert.equal(field()?.disabled, true, "the field waits while the rename is reviewed");
+
+    view.post(ending);
+    assert.equal(field()?.disabled, false, `released by ${ending.type}`);
+    assert.equal(field()?.value, original, `and showing the key as it is, after ${ending.type}`);
+  }
+  assertHealthy(view, "after renames that wrote nothing");
+});

@@ -22,8 +22,10 @@ import type {
   FieldComparison,
   InspectError,
   MutationEnvelope,
+  PinaxMaterialMove,
   RefCompareWarning,
   RefEditPlanEntry,
+  RenamedSource,
   Summary,
 } from "./model";
 import { summarize, toRows, warningText } from "./model";
@@ -327,36 +329,6 @@ export async function commitEdits(
   };
 }
 
-/** Outcome of renaming one citation key. */
-export type RenameKeyOutcome =
-  | { ok: true; old: string; new: string; sourceOccurrences: number }
-  | { ok: false; message: string };
-
-/**
- * Rename one citation key, rewriting matching `\cite{...}` keys in any linked
- * TeX sources. The engine itself refuses a target key that already exists or
- * a source key that is ambiguous (a duplicate) — both surface here as `ok: false`.
- */
-export async function renameEntryKey(
-  command: PynakesCommand,
-  filePath: string,
-  oldKey: string,
-  newKey: string,
-  cwd?: string,
-): Promise<RenameKeyOutcome> {
-  const envelope = await keysRename(command, filePath, oldKey, newKey, cwd);
-  if (envelope.status !== "success") {
-    return { ok: false, message: envelope.message };
-  }
-  return {
-    ok: true,
-    old: envelope.old,
-    new: envelope.new,
-    sourceOccurrences: envelope.source_occurrences,
-  };
-}
-
-
 // ---------------------------------------------------------------------------
 // Entry- and group-level mutations
 // ---------------------------------------------------------------------------
@@ -378,7 +350,9 @@ export type Mutation =
   /** `keys` names the cluster(s) to merge; omitted means every cluster. */
   | { kind: "dedupeMerge"; keys?: string[] }
   /** A change to the declared hierarchy itself, not to any entry. */
-  | { kind: "groupTree"; edit: GroupTreeEdit };
+  | { kind: "groupTree"; edit: GroupTreeEdit }
+  /** One citation key, with the TeX citations and Pinax materials that follow it. */
+  | { kind: "renameKey"; oldKey: string; newKey: string };
 
 /** A short label for the diff panel and the confirmation prompt. */
 export function describeMutation(mutation: Mutation): string {
@@ -401,6 +375,8 @@ export function describeMutation(mutation: Mutation): string {
         : "Merge every duplicate";
     case "groupTree":
       return describeGroupTreeEdit(mutation.edit);
+    case "renameKey":
+      return `Rename ${mutation.oldKey} to ${mutation.newKey}`;
   }
 }
 
@@ -464,6 +440,16 @@ function runMutation(
       return dedupeMerge(command, filePath, mutation.keys, dryRun, cwd, expectSha256);
     case "groupTree":
       return groupTree(command, filePath, mutation.edit, dryRun, cwd, expectSha256);
+    case "renameKey":
+      return keysRename(
+        command,
+        filePath,
+        mutation.oldKey,
+        mutation.newKey,
+        dryRun,
+        cwd,
+        expectSha256,
+      );
   }
 }
 
@@ -480,6 +466,16 @@ export type MutationOutcome =
       removedGroups?: string[];
       /** Every entry a `groups rename-group --members` moves to the new name. */
       renamedMembers?: string[];
+      /**
+       * Every existing entry the engine's plan says this would remove, modify,
+       * or re-key — named by the engine, so the staging check covers whatever
+       * the command reaches, including a whole-file merge.
+       */
+      rewrittenKeys: string[];
+      /** TeX sources whose citations a key rename rewrites. */
+      rewrittenSources?: RenamedSource[];
+      /** Pinax material files that move with a key. */
+      materialMoves?: PinaxMaterialMove[];
     }
   /**
    * The engine refused and named the choices — exit 2, never guessed past.
@@ -517,7 +513,22 @@ function reduce(envelope: MutationEnvelope): MutationOutcome {
     sourceSha256: envelope.source_sha256,
     removedGroups: envelope.removed_groups,
     renamedMembers: envelope.members_renamed,
+    rewrittenKeys: rewrittenKeys(envelope.plan?.entries ?? []),
+    rewrittenSources: envelope.sources?.filter((source) => source.modified),
+    materialMoves: envelope.pinax_materials,
   };
+}
+
+/** The existing entries a plan touches: what it removes, modifies, or re-keys. */
+function rewrittenKeys(entries: RefEditPlanEntry[]): string[] {
+  const keys: string[] = [];
+  for (const entry of entries) {
+    const key = entry.change === "renamed" ? entry.from : entry.change === "added" ? undefined : entry.key;
+    if (key !== undefined && !keys.includes(key)) {
+      keys.push(key);
+    }
+  }
+  return keys;
 }
 
 /** Preview a mutation: what it would change, written nowhere. */

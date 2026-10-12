@@ -29,6 +29,8 @@ const SCRIPTS = [
   "table.js",
   "groups.js",
   "detail.js",
+  "compare.js",
+  "duplicates.js",
   "panels.js",
   "layout.js",
   "main.js",

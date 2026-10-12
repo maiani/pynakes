@@ -16,7 +16,6 @@ import {
   applyMutation,
   describeMutation,
   previewMutation,
-  renameEntryKey,
   runSearch,
 } from "../library.js";
 import { groupsList, groupsTree, inspectBib } from "../pynakes.js";
@@ -82,8 +81,7 @@ test("a citation key named like an option is still a key", { skip }, async () =>
     kind: "add",
     request: { key: "-k", entryType: "misc", fields: { title: "-dashed title" } },
   });
-  const renamed = await renameEntryKey(command, file, "-k", "-j");
-  assert.ok(renamed.ok, JSON.stringify(renamed));
+  await previewThenApply(file, { kind: "renameKey", oldKey: "-k", newKey: "-j" });
 
   const found = await runSearch(command, file, { query: "-dashed" });
   assert.ok(found.ok, JSON.stringify(found));

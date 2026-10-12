@@ -135,6 +135,14 @@ release. Its version says nothing about which engine it runs.
   Renaming a group moves its entries to the new name, and the approval names
   them; a rename that would rewrite an entry with pending staged edits is
   refused until those edits are applied or discarded.
+- Renaming a citation key goes through the same preview, Staged diff,
+  approval and `--expect-sha256`-guarded write as other changes; the dialog
+  names the TeX citations rewritten and the material files moved.
+- Every entry-level change, duplicate merges included, is refused when the
+  engine's preview shows it would rewrite or remove an entry with pending
+  staged edits.
+- Group rows and duplicate-cluster keys are reachable by keyboard: Enter or
+  Space filters by a group, and Shift+F10 opens its actions.
 - Missing materials can be fetched: **Fetch missing…** in an entry's detail
   pane, or **Fetch materials…** in the toolbar for every entry, using the
   library's fetch policy or one chosen material. The approval names each file
@@ -147,8 +155,9 @@ release. Its version says nothing about which engine it runs.
 
 ### Changed
 
-- The custom editor is split into focused modules, and the stylesheet into
-  `view.css` and `panes.css`; no behavior change.
+- The custom editor is split into focused modules, the stylesheet into
+  `view.css` and `panes.css`, and the panes script into `panels.js`,
+  `compare.js` and `duplicates.js`; no behavior change.
 - The client is labeled an alpha, and the manifest marks it as a preview.
   `npm run package:prerelease` produces a VSIX carrying the pre-release
   marker; with `SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PYNAKES` set, the bundled
@@ -190,6 +199,10 @@ release. Its version says nothing about which engine it runs.
 - Only materials present on disk can be opened from the view.
 - Staged edits show in every view of the same file.
 - The buffer mirror's temporary directory is removed if writing it fails.
+- Cancelling or timing out an engine call stops every process it started (the
+  process group on Linux and macOS, `taskkill /T` on Windows), not only the
+  launcher.
+- Enter on a button no longer also opens the selected entry's source.
 - The view left an empty band below its panes. A hidden banner or notice takes
   no grid slot, so the panes slid up into a row sized to their content; each
   part of the view now keeps its own row and the panes fill the window.

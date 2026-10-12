@@ -8,10 +8,10 @@
  * one place.
  */
 
-import { execFile } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import type { PynakesCommand } from "./engineDiscovery";
 
-/** Output JSON for a large library is well past `execFile`'s 1 MB default. */
+/** Output JSON for a large library runs to megabytes; past this, something is wrong. */
 const MAX_BUFFER = 64 * 1024 * 1024;
 
 /** Upper bound on a single engine call, so a wedged process cannot hang the view. */
@@ -74,6 +74,48 @@ export interface RunOptions {
   timeoutMs?: number;
 }
 
+/** How long a stopped process tree has to exit on SIGTERM before it is killed outright. */
+const KILL_GRACE_MS = 2_000;
+
+/**
+ * Stop a process and everything it started.
+ *
+ * Killing only the spawned process is not enough: the engine is often run
+ * through a launcher — a shell shim, `conda run`, a venv's console script —
+ * whose Python child would keep running, and keep writing, after its parent
+ * was stopped. On Linux and macOS the engine is spawned as the leader of its
+ * own process group (`detached`), so signalling the negative pid reaches the
+ * whole group. Windows has no process groups to signal; `taskkill /T` walks
+ * the tree from the pid instead.
+ */
+export function killProcessTree(child: ChildProcess): void {
+  const pid = child.pid;
+  if (pid === undefined) {
+    return;
+  }
+  if (process.platform === "win32") {
+    // `/T` takes the children with it, `/F` because a console process ignores
+    // a polite request. Its own failure (the tree already gone) is not ours.
+    const killer = spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
+      windowsHide: true,
+      stdio: "ignore",
+    });
+    killer.on("error", () => child.kill());
+    return;
+  }
+  const signalGroup = (signal: NodeJS.Signals): void => {
+    try {
+      process.kill(-pid, signal);
+    } catch {
+      // ESRCH: the group has already gone.
+    }
+  };
+  signalGroup("SIGTERM");
+  // A process that traps SIGTERM still goes; one that has already exited makes
+  // this a no-op. Unref'd so a pending grace timer never holds the host open.
+  setTimeout(() => signalGroup("SIGKILL"), KILL_GRACE_MS).unref();
+}
+
 /** Run one pynakes subcommand, resolving even when it exits non-zero. */
 export function run(
   command: PynakesCommand,
@@ -82,33 +124,107 @@ export function run(
   options: RunOptions = {},
 ): Promise<RunResult> {
   const argv = [...command.leadingArgs, ...args];
+  const label = describeCommand(command);
   return new Promise((resolve, reject) => {
-    execFile(
-      command.executable,
-      argv,
-      {
+    const { signal } = options;
+    if (signal?.aborted) {
+      reject(new PynakesCancelledError(label));
+      return;
+    }
+    let child: ChildProcess;
+    try {
+      child = spawn(command.executable, argv, {
         cwd,
-        maxBuffer: MAX_BUFFER,
-        timeout: options.timeoutMs ?? TIMEOUT_MS,
         windowsHide: true,
-        signal: options.signal,
-      },
-      (error, stdout, stderr) => {
-        if (options.signal?.aborted) {
-          reject(new PynakesCancelledError(describeCommand(command)));
+        // Its own process group on POSIX, so a stop reaches its children too.
+        // Not on Windows, where it would open a console window instead.
+        detached: process.platform !== "win32",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (error) {
+      reject(new PynakesUnavailableError(label, error));
+      return;
+    }
+
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    let size = 0;
+    let stopped: "cancelled" | "timeout" | "overflow" | undefined;
+    let settled = false;
+
+    const stop = (reason: NonNullable<typeof stopped>): void => {
+      if (stopped === undefined) {
+        stopped = reason;
+        killProcessTree(child);
+      }
+    };
+    const collect = (into: Buffer[]) => (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > MAX_BUFFER) {
+        stop("overflow");
+        return;
+      }
+      into.push(chunk);
+    };
+    child.stdout?.on("data", collect(stdout));
+    child.stderr?.on("data", collect(stderr));
+
+    const timeoutMs = options.timeoutMs ?? TIMEOUT_MS;
+    const timer = timeoutMs > 0 ? setTimeout(() => stop("timeout"), timeoutMs) : undefined;
+    const onAbort = (): void => stop("cancelled");
+    signal?.addEventListener("abort", onAbort, { once: true });
+
+    const finish = (): void => {
+      settled = true;
+      if (timer) {
+        clearTimeout(timer);
+      }
+      signal?.removeEventListener("abort", onAbort);
+    };
+
+    child.on("error", (error: NodeJS.ErrnoException) => {
+      if (settled) {
+        return;
+      }
+      // Only a failure to start leaves no `close` to wait for.
+      if (error.code === "ENOENT" || error.code === "EACCES") {
+        finish();
+        reject(new PynakesUnavailableError(label, error));
+      }
+    });
+    // `close`, not `exit`: the pipes are drained, and the process reaped.
+    child.on("close", (code) => {
+      if (settled) {
+        return;
+      }
+      finish();
+      const out = Buffer.concat(stdout).toString("utf8");
+      const err = Buffer.concat(stderr).toString("utf8");
+      switch (stopped) {
+        case "cancelled":
+          reject(new PynakesCancelledError(label));
           return;
-        }
-        if (error && typeof (error as NodeJS.ErrnoException).errno === "number") {
-          const spawnFailure = (error as NodeJS.ErrnoException).code;
-          if (spawnFailure === "ENOENT" || spawnFailure === "EACCES") {
-            reject(new PynakesUnavailableError(describeCommand(command), error));
-            return;
-          }
-        }
-        const code = error && typeof error.code === "number" ? error.code : 0;
-        resolve({ stdout, stderr, code });
-      },
-    );
+        case "overflow":
+          reject(
+            new PynakesProtocolError(
+              `${label} ${args[0] ?? ""} produced more than ${MAX_BUFFER} bytes of output.`.trim(),
+              err.trim(),
+            ),
+          );
+          return;
+        case "timeout":
+          resolve({
+            stdout: out,
+            stderr: [err, `Stopped after ${timeoutMs} ms without finishing.`]
+              .filter(Boolean)
+              .join("\n"),
+            code: code ?? -1,
+          });
+          return;
+        default:
+          resolve({ stdout: out, stderr: err, code: code ?? -1 });
+      }
+    });
   });
 }
 
