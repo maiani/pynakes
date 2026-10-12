@@ -143,7 +143,7 @@ def fetch(
     """Download Pinax materials, optionally using existing institutional network access.
 
     With no citation key every entry with configured missing materials is
-    fetched; ``--key`` / ``--where`` fetch for the selected entries only.
+    fetched; `--key` / `--where` fetch for the selected entries only.
     """
     params = RunParams(
         dry_run=dry_run,

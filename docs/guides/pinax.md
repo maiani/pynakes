@@ -211,7 +211,7 @@ These extend the core invariants in
    pynakes **reports** it and offers a reconcile; it never silently resolves it.
 6. **Determinism and the offline default hold.** Fetching is network I/O, but it
    only happens when the user runs the explicit `asset fetch` command or passes
-   `add --fetch`. Nothing about a pinax introduces hidden time, randomness, or
+   `ref import --fetch`. Nothing about a pinax introduces hidden time, randomness, or
    network into core logic.
 7. **Operations preserve the pinax.** Any operation that produces a `.bib` from a
    pinax produces a *pinax* — carrying the materials and per-entry state for the
@@ -280,11 +280,10 @@ pynakes asset fetch refs.bib alvarez2019  →  refs.files/alvarez2019.preprint.p
 ```
 
 Omit the citation key to fetch every entry with configured missing materials.
-Because the key is the first positional argument, that whole-library form names
-the library with `--file`:
+The library is the first positional argument; `--file` is an alternative:
 
 ```bash
-pynakes asset fetch --file refs.bib          # every entry in this library
+pynakes asset fetch refs.bib                 # every entry in this library
 pynakes asset fetch refs.bib alvarez2019     # one entry
 pynakes asset fetch                          # every entry, lone .bib auto-detected
 ```
@@ -603,7 +602,7 @@ checklist.
    `repair` move every `<citekey>*` material *in place* (filesystem first, then
    commit, rollback on failure); `asset repair` reconciles drift. The only
    in-place material operation, so the riskiest. *(Implemented.)*
-8. **`add --fetch` for arXiv Pinax materials.** One-step import-and-download for
+8. **`ref import --fetch` for arXiv Pinax materials.** One-step import-and-download for
    arXiv references, using the existing Pinax fetch policy for preprint
    PDF/source materials. *(Implemented.)*
 9. **Open-access published PDFs.** DOI → open-access resolver landing the
@@ -624,11 +623,10 @@ checklist.
 
 Settled in discussion:
 
-- **`asset fetch` is a top-level command** (like `add` / `normalize`), not a new
-  namespace.
-- **What to fetch is metadata-driven** — the `pinax-fetch-policy` key, not a
-   per-invocation flag.
-- **`add --fetch` is a convenience trigger** — it imports the reference, then
+- **`asset fetch` belongs to the `asset` resource family**.
+- **What to fetch defaults to metadata** — `pinax-fetch-policy`;
+  `--material` overrides the selection for one invocation.
+- **`ref import --fetch` is a convenience trigger** — it imports the reference, then
   runs the same metadata-driven fetch policy for the new key.
 - **Canonical is the published PDF**, falling back to the preprint and its source.
 - **PDF-only e-prints** are handled gracefully (the source step is skipped).
@@ -651,3 +649,11 @@ Still open:
    `asset check` exactly as today; a pinax adds a separate, clearly-labeled
    materials section (presence / orphans / drift) while still validating any
    legacy `file` descriptors it finds.
+
+## Presence checks and stored hashes
+
+`asset check` reports missing files, orphans and manifest drift. It does not
+recompute or compare SHA-256 checksums. Hashes recorded at installation or
+reconciliation provide provenance; their presence is not evidence that a
+subsequent check verified the material bytes. `asset repair` reconciles the
+manifest explicitly and supports a dry-run preview.

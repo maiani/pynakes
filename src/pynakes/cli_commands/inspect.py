@@ -62,14 +62,14 @@ def inspect(
     """Inspect a .bib file structure.
 
     The JSON form is the canonical structured read of a library: every entry
-    with its fields, the ``@string``/``@preamble``/comment declarations, both
+    with its fields, the `@string`/`@preamble`/comment declarations, both
     metadata namespaces, encoding, line ending, and duplicate keys. With
-    ``--resolved`` each entry also carries its inherited (crossref/xdata) field
-    view. With ``--display`` each entry also carries a ``display`` view: title
+    `--resolved` each entry also carries its inherited (crossref/xdata) field
+    view. With `--display` each entry also carries a `display` view: title
     fields with LaTeX markup and braces cleaned to readable text, and
-    ``author``/``editor`` split into individual, cleaned names — a presentation
+    `author`/`editor` split into individual, cleaned names — a presentation
     projection for a UI, never a value to write back. Cleaning is applied to
-    the resolved fields when ``--resolved`` is also given, otherwise to the
+    the resolved fields when `--resolved` is also given, otherwise to the
     entry's own fields.
     """
     file = _resolve_input_bib(file, json_output)

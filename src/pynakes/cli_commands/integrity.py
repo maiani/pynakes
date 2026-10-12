@@ -161,7 +161,7 @@ def verify(
 ) -> None:
     """Verify entries against authoritative metadata (read-only).
 
-    Checks DOI-backed entries against provider metadata; with ``--published`` it
+    Checks DOI-backed entries against provider metadata; with `--published` it
     also reports preprints that now have a published version available.
     """
     _run_checks(
@@ -198,10 +198,10 @@ def enrich(
 ) -> None:
     """Conservatively fill missing metadata (modifies the file).
 
-    Fills missing DOI/date/identifier fields; with ``--published`` it also
+    Fills missing DOI/date/identifier fields; with `--published` it also
     promotes preprints to their published version (writing the published
-    DOI/journal), folding in the former ``published --apply`` operation.
-    ``--key`` and ``--where`` limit it to the selected entries, so a lookup
+    DOI/journal), folding in the former `published --apply` operation.
+    `--key` and `--where` limit it to the selected entries, so a lookup
     for a handful of references never reaches the rest of the library.
     """
     file = _resolve_input_bib(file, json_output)

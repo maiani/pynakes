@@ -1,7 +1,6 @@
 site_name: pynakes
-site_description: Agent-friendly BibTeX library management tool
+site_description: Reference management engine for BibTeX, BibLaTeX, and their materials
 site_author: Andrea Maiani
-site_url: https://pynakes.example.com
 repo_url: https://github.com/maiani/pynakes
 copyright: Copyright &copy; 2026 The authors
 
@@ -34,6 +33,8 @@ nav:
   - Quick Start: guides/quickstart.md
   - Installation: guides/installation.md
   - Usage: guides/usage.md
+  - Command Reference: guides/command-reference.md
+  - Network and Privacy: guides/network-and-privacy.md
   - Import Providers: guides/import-providers.md
   - Metadata Reference: guides/metadata-reference.md
   - Public API: guides/public-api.md
@@ -49,6 +50,9 @@ nav:
       - Module Reference: api/reference.md
   - Examples: examples/index.md
   - FAQ: guides/faq.md
+
+hooks:
+  - docs/hooks.py
 
 plugins:
   - search

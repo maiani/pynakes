@@ -1,8 +1,7 @@
 # Public API and compatibility
 
 This page describes the intended public surface of the reference management
-engine. This checkout targets v0.7.0; published pre-0.7 releases retain their
-alpha compatibility policy. From 0.7.0, CLI commands, options, JSON envelopes,
+engine. This checkout targets the v0.7.0 CLI beta contract. From 0.7.0, CLI commands, options, JSON envelopes,
 exit codes and error codes require a documented deprecation period before
 incompatible changes. Additions remain possible in minor releases.
 
@@ -28,12 +27,11 @@ points, their result types, and the exceptions callers commonly need to handle.
 `pynakes.__all__` is the authoritative list. Domain-specific operations remain
 in the modules below instead of being duplicated wholesale at package level.
 
-The following modules are the intended public Python surface. During the alpha
-period, non-underscore classes, functions, exceptions, and constants in these
+The following modules are the intended public Python surface. Until 1.0, non-underscore classes, functions, exceptions, and constants in these
 modules are the supported way to integrate with pynakes, but they are not yet
 covered by a backward-compatibility guarantee.
 
-| Area | Stable modules |
+| Area | Public modules (experimental until 1.0) |
 | --- | --- |
 | Data and lifecycle | `pynakes`, `pynakes.model`, `pynakes.io`, `pynakes.engine`, `pynakes.bibtex_parser`, `pynakes.bibtex_writer`, `pynakes.diff` |
 | Bibliography operations | `pynakes.authors`, `pynakes.convert`, `pynakes.importer`, `pynakes.fields`, `pynakes.groups`, `pynakes.journals`, `pynakes.keys`, `pynakes.normalize` |
@@ -105,3 +103,26 @@ exit-code meaning or error code requires one minor release in which the old
 form still works and emits a structured deprecation warning. At 1.0.0, these
 surfaces and the Python API follow the semantic-versioning policy above. Include
 `pynakes.__version__` or `capabilities.VERSION` in diagnostics.
+
+## Stability markers
+
+`capabilities.command_schemas` marks each command `stable` or `experimental`.
+All current commands are stable under the 0.7 CLI contract, including Pinax
+and corpus operations. The generated command reference shows the same marker.
+An experimental addition must be explicitly marked before it ships; it has no
+compatibility guarantee. Stability does not imply that a development checkout
+is a published release.
+
+The beta promise covers command syntax, options, envelope keys, `action` values,
+exit codes and error codes. Before removal or incompatible replacement, the old
+form must work for one minor release and emit a structured warning with
+`type: deprecated`, `old` and `new`. Minor releases may add compatible features;
+patch releases fix bugs and documentation only. No known data-loss bugs or
+uncaught tracebacks are acceptable release regressions. The advertised platform
+and dependency matrix and generated documentation must be tested.
+
+Use **Breaking changes** in CHANGELOG for incompatible behavior and
+**Deprecated** for old forms entering their deprecation period. Each deprecation
+entry identifies the replacement, warning and earliest removal release; each
+breaking entry states the migration. Python API changes before 1.0 belong under
+Breaking changes even though they do not require a deprecation period.

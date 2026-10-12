@@ -46,13 +46,13 @@ def directive(
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Add or remove a per-entry directive: a ``% pynakes:`` line above each entry.
+    """Add or remove a per-entry directive: a `% pynakes:` line above each entry.
 
-    ``ref directive refs.bib ignore missing_doi --key Newton1687 --reason "no DOI"``
-    writes ``% pynakes: ignore missing_doi -- no DOI`` directly above the entry,
-    and ``lint`` then leaves that finding out. ``--where`` applies it to a whole
+    `ref directive refs.bib ignore missing_doi --key Newton1687 --reason "no DOI"`
+    writes `% pynakes: ignore missing_doi -- no DOI` directly above the entry,
+    and `lint` then leaves that finding out. `--where` applies it to a whole
     selection at once, e.g. every pre-DOI article. Arguments an entry already
-    carries are not repeated. ``--remove`` takes them out again; a directive left
+    carries are not repeated. `--remove` takes them out again; a directive left
     with no arguments is removed whole.
     """
     verb = words[0].lower()

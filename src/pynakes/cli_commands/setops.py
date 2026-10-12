@@ -130,7 +130,7 @@ def combine(
 ) -> None:
     """Combine several .bib files into one (optionally deduping by citation key).
 
-    With ``--where`` the output keeps only the entries matching the shared
+    With `--where` the output keeps only the entries matching the shared
     selector grammar, so combining a focused subset out of several libraries is
     one command rather than a combine-then-prune script.
     """
@@ -296,7 +296,7 @@ def split(
     Each output carries the source library's jabref-meta/pynakes-meta blocks
     (groups, save-order config, Pinax fetch settings) and copies any linked
     Pinax materials, since a bucket is usually still a working library. Pass
-    ``--minimal`` for a bucket that's meant as a standalone snippet instead
+    `--minimal` for a bucket that's meant as a standalone snippet instead
     (e.g. one entry pulled out to hand to a collaborator): it drops those
     metadata blocks entirely and skips materials copying.
     """

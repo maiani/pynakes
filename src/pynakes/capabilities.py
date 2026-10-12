@@ -130,7 +130,7 @@ def _plain_help(text: str) -> str:
     (``in \\[a, b]``). The capability description is data, not a rendered
     console line, so it reports the text as a reader would type it.
     """
-    return text.replace("\\[", "[")
+    return text.replace("\\[", "[").replace("``", "`")
 
 
 def _param_schema(param) -> dict:
@@ -166,6 +166,7 @@ def _command_schema(command) -> dict:
     options = [_param_schema(p) for p in command.params if p.param_type_name == "option"]
     return {
         "help": help_text[0] if help_text else "",
+        "stability": "stable",
         "arguments": arguments,
         "options": options,
     }
@@ -259,6 +260,7 @@ def get_capabilities() -> dict:
         "supports_multiple_files": True,
         "write_precondition": _write_precondition(schemas),
         "python_api": {
+            "stability": "experimental",
             "facade": "pynakes.Bibliography",
             "public_exports": list(PUBLIC_API_EXPORTS),
             "constructors": [

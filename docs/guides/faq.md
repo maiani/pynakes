@@ -47,8 +47,8 @@ convert BibTeX field/type conventions in place.
 ### Q: How do I handle entry types that pynakes doesn't recognize?
 
 A: pynakes preserves unknown entry types and fields automatically. Full
-BibTeX/BibLaTeX input conformance is a hard gate for 0.4; the development plan
-records the pinned grammar and corpus requirements.
+The conformance corpus targets TeX Live 2026; external BibTeX/Biber oracle
+tests skip when those tools are unavailable.
 
 ### Q: What if I have a very large bibliography?
 
@@ -77,7 +77,7 @@ DOI import reports a conflict when the DOI is already present:
 ```json
 {
   "status": "conflict",
-  "error": "DuplicateDOI",
+  "error": "DuplicateReference",
   "options": [
     {"id": "keep_existing", "description": "Do not import a duplicate reference"},
     {"id": "allow_duplicate", "description": "Retry with --allow-duplicate"}
@@ -110,7 +110,8 @@ Otherwise use git (or your editor's history) to revert.
 A: Yes. Use `pynakes asset check refs.bib --json`. It validates JabRef `file`
 fields, including multiple attachments, directory links, relative paths,
 explicit `--root` directories, and JabRef `fileDirectory*` metadata. It is
-read-only; linked-file repair is planned separately.
+read-only. In Pinax mode, `asset repair` reconciles the material manifest
+with files on disk; it does not repair arbitrary JabRef attachment paths.
 
 ### Q: What BibTeX entry types are supported?
 
@@ -147,7 +148,8 @@ pynakes ref import refs.bib 10.5555/example --dry-run --diff
 
 `verify` and `enrich` also support opt-in provider lookups with `--online` (and
 a `--published` flag for preprint published-version checks/promotion); responses
-are cached and modifying enrichment commands support `--dry-run --diff`.
+are cached across runs only when `--cache-file` is supplied. Modifying
+enrichment commands support `--dry-run --diff`, which still performs lookups.
 Abstract/PDF metadata extraction is still out of scope.
 
 ## Agent & Automation

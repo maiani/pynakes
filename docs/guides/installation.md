@@ -8,7 +8,7 @@
 
 ## Installation Methods
 
-### From PyPI (Public Alpha)
+### From PyPI
 
 Install with pip:
 
@@ -42,7 +42,9 @@ Run the same checks as CI:
 ```bash
 ruff check src tests
 ruff format --check src tests
-pytest
+ty check
+pytest --cov --cov-fail-under=90
+mkdocs build --strict
 ```
 
 Install local pre-commit hooks:
@@ -58,18 +60,15 @@ GitHub Actions runs these checks on Linux, Windows, and macOS with Python 3.12,
 
 ## Shell Completion
 
-Install shell completion for bash, zsh, or fish:
+Run this in the target bash, zsh, or fish shell. Typer detects the shell;
+a shell-name argument is ignored and does not select a different shell:
 
 ```bash
-# Bash
-pynakes --install-completion bash
-
-# Zsh
-pynakes --install-completion zsh
-
-# Fish
-pynakes --install-completion fish
+pynakes --install-completion
 ```
+
+To print the completion script for the detected shell, use
+`pynakes --show-completion`.
 
 ## Troubleshooting
 

@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+Use **Breaking changes** for incompatible behavior and migrations, and
+**Deprecated** for old forms entering a deprecation period (replacement,
+warning and earliest removal release). Additions and fixes use their usual
+sections. Historical releases retain their original headings.
+
 ## [0.7.0] - Unreleased
 
 The CLI moves to beta. From 0.7.0, its commands, options, JSON envelope, exit
@@ -13,6 +18,27 @@ codes, and error codes change only through a documented deprecation (see
 surface first, this release makes one batch of breaking changes, listed
 together below. The pre-0.7 spellings are **removed, not deprecated**: an old
 form is a `UsageError`, never silently reinterpreted.
+
+### Added
+
+- Generated command reference from the live CLI, including every argument,
+  option, choice and per-command stability marker in `capabilities`.
+- CI execution of all offline shell walkthroughs in README, quickstart and
+  usage, with network access blocked and disposable example libraries.
+- Network and privacy guide covering transmitted identifiers/free-text,
+  providers, User-Agent, optional caches and `PYNAKES_APS_API_TOKEN`.
+- Documentation of `init --agent-guide`, which writes an agent guide when
+  creating or enabling a Pinax library without overwriting an existing guide.
+
+### Fixed
+
+- Documentation now describes the beta compatibility/deprecation policy,
+  default journal preservation, Pinax presence checks without checksum
+  verification, manifest repair, explicit network authorization and actual
+  conflict envelopes. README links work on PyPI; shell completion no longer
+  passes an ignored shell-name argument. Terminal help uses single backticks.
+- Removed the placeholder documentation URL; docs remain built and checked
+  locally and in CI without advertising a deployment that does not exist.
 
 ### Breaking changes
 

@@ -151,10 +151,10 @@ def metadata_adopt_jabref(
 ) -> None:
     """Start maintaining a JabRef metadata projection for this library.
 
-    pynakes-native libraries keep their settings in ``pynakes-meta``. This writes
-    the equivalent ``jabref-meta`` blocks (relocating any JabRef-native keys and
-    anchoring a ``databaseType``) so that, from now on, pynakes also keeps
-    ``jabref-meta`` in sync — the file works in JabRef without losing its pynakes
+    pynakes-native libraries keep their settings in `pynakes-meta`. This writes
+    the equivalent `jabref-meta` blocks (relocating any JabRef-native keys and
+    anchoring a `databaseType`) so that, from now on, pynakes also keeps
+    `jabref-meta` in sync — the file works in JabRef without losing its pynakes
     settings. Running it again once tracked is a no-op.
     """
     file = _resolve_input_bib(file, json_output)

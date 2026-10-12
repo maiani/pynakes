@@ -171,7 +171,7 @@ def groups_add_entry(
     """Add an entry to a group.
 
     The group must already exist, so a mistyped name is an error rather than a
-    new group; ``--create`` makes a new one.
+    new group; `--create` makes a new one.
     """
     file = _resolve_input_bib(file, json_output)
     params = RunParams(

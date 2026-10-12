@@ -41,7 +41,7 @@ Treat this output, rather than a copied command list, as the source of truth.
 It includes:
 
 - `command_groups` and `command_schemas`: the live commands, arguments,
-  options, types, defaults, and help text.
+  options, types, defaults, help text and per-command `stability` markers.
 - `error_codes`: the error and conflict codes on which a caller can branch.
 - `predicate_grammar`: the one selector grammar every entry-addressable
   command accepts, including boolean composition and its operator table. Its
@@ -92,8 +92,8 @@ commands and their semantics.
    ```
 
    `capabilities.write_precondition.commands` lists the commands that accept
-   it: today `ref edit`, `ref add`, `ref import`, `ref remove`, `groups
-   add-entry`, `groups remove-entry`, `dedupe merge`, and `corpus batch`.
+   it. Every modifying command accepts it; use the generated inventory rather
+   than maintaining a partial command list.
 
 4. Run the checks affected by the edit. A complete local validation pass is:
 
@@ -324,8 +324,11 @@ Errors exit `1`:
 Conflicts exit `2` and include resolutions:
 
 ```json
-{"status":"conflict","error":"DuplicateCitationKey","message":"...",
- "options":[{"id":"...","description":"..."}]}
+{"status":"conflict","error":"DuplicateReference","action":"ref_import",
+ "message":"Reference already exists", "identifier":"10.5555/example",
+ "existing_keys":["Example1900"],
+ "options":[{"id":"keep_existing","description":"Do not import a duplicate reference"},
+            {"id":"allow_duplicate","description":"Retry with --allow-duplicate"}]}
 ```
 
 Each `error` code has one status and one exit code wherever it is raised; both
@@ -341,10 +344,12 @@ from `capabilities.error_codes`.
 
 ### Commands that create files
 
-The create family writes files rather than editing one existing library, so it
-reports `out`, `outputs`, `written`, and command-specific fields such as
-`inputs`, `entries`, `removed`, and `unrouted` instead of `modified` and
-`plan`. The `status` and exit-code rules are the same, and every create command
+File-producing commands retain the common envelope where applicable.
+`scrub` and `corpus combine` report the input in `file` and the destination
+in `out`; `corpus split` reports destinations as `outputs` objects with `path`.
+Command-specific fields include `inputs`, `entries`, `removed` and `unrouted`.
+Do not assume every file-producing command has an `out` key or omits `modified`
+and `plan`. The `status` and exit-code rules are the same, and every create command
 supports `--dry-run`, `--diff`, and `--json`.
 
 For `corpus split`, inspect every output bucket and `unrouted`; warnings report

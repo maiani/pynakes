@@ -74,9 +74,9 @@ Crossref, OpenAlex, and Semantic Scholar have clients that also serve other
 workflows; their identifiers and record URLs can now be passed to `ref import`
 directly. Crossref remains part of the covered Elsevier path too, where it
 resolves a PII to its DOI. None of the four metadata indexes requires an API
-key: Crossref's and OpenAlex's `mailto=` parameter is polite-pool courtesy
-rather than authentication, and the Semantic Scholar Graph API answers
-unauthenticated at low volume — a key only raises its rate limit.
+key. pynakes does not send Crossref or OpenAlex a `mailto` parameter.
+Semantic Scholar requests are unauthenticated. See
+[Network and privacy](network-and-privacy.md) for transmitted data and headers.
 
 Google Books and the Library of Congress are deliberately out of scope rather
 than pending. Google Books needs an API key for dependable quota, and Open

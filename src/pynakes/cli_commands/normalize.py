@@ -154,10 +154,10 @@ def normalize(
     """Normalize entries: titles, authors, journals, DOIs, identifier case, and ordering.
 
     Each step follows the library's configured settings (its normalization
-    metadata) unless overridden by a flag. ``--only`` runs just the named steps,
-    and ``--key`` / ``--where`` just the selected entries; a selection leaves the
+    metadata) unless overridden by a flag. `--only` runs just the named steps,
+    and `--key` / `--where` just the selected entries; a selection leaves the
     whole file alone, so it neither re-sorts entries nor rearranges metadata.
-    ``normalize --key Newton1687,Euler1748 --only journals`` abbreviates two
+    `normalize --key Newton1687,Euler1748 --only journals` abbreviates two
     journal names and changes nothing else.
     """
     params = RunParams(

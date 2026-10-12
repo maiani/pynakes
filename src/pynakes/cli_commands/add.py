@@ -64,8 +64,8 @@ def add(
     """Add a manually specified reference entry.
 
     Omitting the citation key starts an interactive prompt for the key, type,
-    and required fields. That path needs an interactive terminal: with ``--json``
-    or headless stdin it errors instead, so supply the key (and ``--field``) to
+    and required fields. That path needs an interactive terminal: with `--json`
+    or headless stdin it errors instead, so supply the key (and `--field`) to
     add non-interactively.
     """
     interactive = key is None

@@ -110,7 +110,7 @@ def asset_repair(
     Drops manifest rows for keys the library no longer has and records for
     files that are gone, and records material files the manifest does not
     know (as manual additions). Only the manifest changes: no material file
-    and no byte of the library. ``asset check`` reports the same drift.
+    and no byte of the library. `asset check` reports the same drift.
     """
     file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)

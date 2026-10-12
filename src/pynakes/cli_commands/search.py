@@ -57,29 +57,29 @@ def search(
     """Search entries by free text, phrases, or field-scoped terms.
 
     Each result is tagged with the field(s) that matched, e.g. \\[title] or
-    \\[title, groups]: ``key`` and ``type`` for the citation key and entry
-    type, or the matching stored field name (``title``, ``author``,
-    ``groups``, ``abstract``, ...). With ``--json`` every hit is explained
+    \\[title, groups]: `key` and `type` for the citation key and entry
+    type, or the matching stored field name (`title`, `author`,
+    `groups`, `abstract`, ...). With `--json` every hit is explained
     individually — field, term, exact or fuzzy, score, and the matching excerpt.
     By default, results are ranked by match strength — key > title > author >
     other fields > groups/abstract, then by score — with ties kept in file
-    order; pass ``--no-rank`` for plain file order.
+    order; pass `--no-rank` for plain file order.
 
-    ``--where`` narrows *which* entries are searched with the shared selector
+    `--where` narrows *which* entries are searched with the shared selector
     grammar, so date ranges and "missing field" questions need no special
-    flags: ``--where 'year >= 2020 and abstract missing'``.
+    flags: `--where 'year >= 2020 and abstract missing'`.
 
     An empty query selects by predicate alone —
-    ``pynakes search "" --where 'doi missing'`` answers "which entries have no
+    `pynakes search "" --where 'doi missing'` answers "which entries have no
     DOI" without a text match. The query argument stays required so that a
-    lone path cannot be mistaken for a query; ``""`` is the explicit opt-in.
+    lone path cannot be mistaken for a query; `""` is the explicit opt-in.
     Predicate-only results report no matched fields and are always in file
     order, since relevance ranking needs terms to rank.
 
-    ``--abstract`` adds a one-line abstract excerpt under each hit, so a
-    candidate set can be triaged from the search itself; ``--json`` always
+    `--abstract` adds a one-line abstract excerpt under each hit, so a
+    candidate set can be triaged from the search itself; `--json` always
     carries the full abstract. To read whole entries instead, pass the keys to
-    ``ref show --key``.
+    `ref show --key`.
     """
     file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)

@@ -218,8 +218,9 @@ strings, unknown entry fields survive, and malformed structural input raises
 
 The parser-conformance target is pinned to **TeX Live 2026** (BibTeX **0.99d**,
 BibLaTeX **3.21**, and Biber **2.21** as the BibLaTeX input-validation oracle).
-The versioned corpus and CI validation remain a release gate; pynakes should not
-claim broader standards compatibility than this pinned baseline exercises.
+The versioned corpus runs in CI. External BibTeX/Biber oracle tests are
+optional and skip when the tools are absent; the default CI matrix does not
+install them. This baseline does not establish broader standards compatibility.
 
 ### Surgical edits
 
@@ -336,7 +337,8 @@ interactive choice is possible. Modifying command responses share `status`,
 Only explicit reference import, integrity workflows, and Pinax download
 primitives contact providers. Integrity workflows require an explicit
 `online=True`/`--online` opt-in and support deterministic caching; Pinax
-downloads require the explicit `asset fetch` command or `ref import --fetch`.
+downloads require the explicit `asset fetch` command or
+`ref add` / `ref import --fetch`.
 Plain `.bib` maintenance never fetches materials. Network parsing lives in the
 provider implementations; `importer.py`, `integrity.py`, and `fetch.py`
 translate provider failures into their domain errors. Tests mock or fixture
@@ -379,11 +381,10 @@ arbitrary shell execution, or LLM API calls. An MCP server is similarly a
 downstream transport concern: the CLI already provides a machine-readable, safe
 agent interface.
 
-The next structural extensions are planned in dependency order: optional Pinax
-mode (one `Bibliography` + its `pinax-files-dir` of materials), `Library` (a directory
-of pinakes/bibliographies with cross-file search and identity resolution), and
-`Catalogue` (a derived, rebuildable index over the Library). None of these are
-part of the current implementation — see
+Pinax mode is implemented: one `Bibliography` plus its `pinax-files-dir`
+of materials. The next planned extensions are `Library` (a directory of
+bibliographies with cross-file search and identity resolution) and `Catalogue`
+(a derived, rebuildable index). Those collection APIs are not implemented — see
 [DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md) for the roadmap.
 
 - [API reference](../api/index.md)

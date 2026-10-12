@@ -38,10 +38,10 @@ def edit(
 ) -> None:
     """Patch fields or type on one uniquely identified reference.
 
-    Supplying no change options (``--field`` / ``--clear-field`` / ``--type``)
+    Supplying no change options (`--field` / `--clear-field` / `--type`)
     starts an interactive prompt for the type and required fields, using the
     current values as defaults. That path needs an interactive terminal: with
-    ``--json`` or headless stdin it errors instead.
+    `--json` or headless stdin it errors instead.
     """
     interactive = not field and not clear_field and entry_type is None
     if interactive:

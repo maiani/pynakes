@@ -219,17 +219,17 @@ def init(
 
     With no options it writes a sensible, pynakes-native default profile (the
     BibLaTeX dialect and pynakes' default citation-key pattern, as the native
-    ``dialect``/``key-pattern`` keys in ``pynakes-meta`` — no ``jabref-meta``
-    unless requested). ``--dialect`` / ``--key-pattern`` override individual
-    settings; ``--jabref`` also emits the JabRef projection so the library opens
-    JabRef-tracked, and sets ``format-entry-type-case: preserve`` so ``format``
-    and ``normalize`` leave JabRef's ``@Article`` spelling alone; ``--profile-from`` replaces the defaults with another library's
+    `dialect`/`key-pattern` keys in `pynakes-meta` — no `jabref-meta`
+    unless requested). `--dialect` / `--key-pattern` override individual
+    settings; `--jabref` also emits the JabRef projection so the library opens
+    JabRef-tracked, and sets `format-entry-type-case: preserve` so `format`
+    and `normalize` leave JabRef's `@Article` spelling alone; `--profile-from` replaces the defaults with another library's
     maintenance profile (its conventions, not its group tree or TeX-source
-    list). ``--pinax`` seeds pinax mode and, when the file already exists,
-    converts it in place; combined with ``--profile-from`` on an existing file, it
+    list). `--pinax` seeds pinax mode and, when the file already exists,
+    converts it in place; combined with `--profile-from` on an existing file, it
     merges in the template's missing profile keys instead of replacing
-    anything already set. ``--agent-guide`` writes AGENTS.md (only meaningful
-    alongside ``--pinax``).
+    anything already set. `--agent-guide` writes AGENTS.md (only meaningful
+    alongside `--pinax`).
     """
     params = RunParams(
         dry_run=dry_run,

@@ -311,9 +311,9 @@ def format_bibliography(
 ) -> None:
     """Rewrite layout only; never change bibliographic values or conventions.
 
-    ``--where`` restricts the rewrite to the matching entries. A selection owns
+    `--where` restricts the rewrite to the matching entries. A selection owns
     the layout inside each entry it matches, not the layout of the file, so
-    ``--entry-order``, ``--block-order``, and ``--blank-lines`` are whole-file
+    `--entry-order`, `--block-order`, and `--blank-lines` are whole-file
     policies that cannot be combined with it.
     """
     to_stdout = out == "-"

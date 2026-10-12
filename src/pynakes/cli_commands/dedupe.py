@@ -82,7 +82,7 @@ def dedupe_merge(
 ) -> None:
     """Conservatively merge duplicate works into their first entry.
 
-    Without ``--key`` every duplicate cluster in the file is merged. With it,
+    Without `--key` every duplicate cluster in the file is merged. With it,
     only the clusters containing a named key are, so one pair can be resolved
     after looking at it without accepting every other merge the file invites.
     """

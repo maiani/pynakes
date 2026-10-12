@@ -33,7 +33,7 @@ def compare(
 ) -> None:
     """Compare one reference's fields against another reference (read-only).
 
-    With ``--with OTHER_KEY``, compares two entries already in the library —
+    With `--with OTHER_KEY`, compares two entries already in the library —
     e.g. reviewing a candidate duplicate pair before merging. No network
     access. Without it, compares against a fetched DOI/arXiv remote record:
     prefers the entry's DOI (existing, or inferred from a local URL), falling
@@ -41,7 +41,7 @@ def compare(
 
     Either way, reports only the fields where a non-empty value on the other
     side differs from the local one, for manual review — nothing is written.
-    Apply chosen fields afterward with ``ref edit FILE KEY --field name=value``.
+    Apply chosen fields afterward with `ref edit FILE KEY --field name=value`.
     """
     if with_ is not None and online:
         raise InvalidInputError(

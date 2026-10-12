@@ -44,7 +44,7 @@ BibTeX:
   is requested, and strict mode accepts only findings the library explicitly
   suppresses.
 - **Explicit side effects.** Network access is limited to `ref import`, `asset
-  fetch`, and operations invoked with `--online`.
+  fetch`, `ref add --fetch` / `ref import --fetch`, and operations invoked with `--online`.
 
 ## In JabRef's lineage
 

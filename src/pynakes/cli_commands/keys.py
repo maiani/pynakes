@@ -197,7 +197,7 @@ def keys_generate(
 ) -> None:
     """Derive citation keys from entry metadata and update linked TeX citations.
 
-    Name one key, select several with ``--key`` / ``--where``, or pass ``--all``.
+    Name one key, select several with `--key` / `--where`, or pass `--all`.
     """
     selecting = where is not None or bool(key_selector)
     if sum((all_entries, key is not None, selecting)) != 1:

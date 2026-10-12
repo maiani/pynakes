@@ -294,41 +294,21 @@ away.
 
 #### Stage 6 — Documentation and policy
 
-- **Policy**: the beta promise above, written into
-  [docs/guides/public-api.md](docs/guides/public-api.md); a "Breaking" and
-  "Deprecated" convention in CHANGELOG (a breaking change shipped in patch
-  0.6.2); a stable/experimental marker per command in `capabilities` and in the
-  reference.
-- **Generated reference**: build the command reference from the live Click tree
-  or `capabilities --json`, replacing the hand-maintained parts of
-  [docs/guides/usage.md](docs/guides/usage.md). It then covers what is
-  documented nowhere today: `metadata remove`, `tex list/remove/clear`,
-  `ref remove --keep-files`, `corpus batch --ops-file`, `init --agent-guide`
-  (also missing from CHANGELOG), and many options.
-- **False claims**: `asset check` does not verify checksums; default
-  `normalize` does not abbreviate journals, and the quickstart's table example
-  also needs `--journal-style abbreviated`; architecture.md says Pinax is not
-  implemented; pinax.md's `add --fetch` and "not a per-invocation flag";
-  usage.md's "`--online` is required for every command that reaches the
-  network"; the FAQ's "responses are cached"; "`asset check` repair planned".
-- **Contract docs** in [docs/guides/llm-integration.md](docs/guides/llm-integration.md):
-  the conflict example's `options` shape, the nonexistent `DuplicateDOI` code,
-  the nonexistent `out` field, and everything Stage 4 changes.
-- **Stale status**: README (twice), docs/index.md, public-api.md,
-  installation.md, faq.md (three places), pinax.md, and the `rev: v0.5.0` pin in
-  git-workflows.md.
-- **Network and privacy page**: what each online command sends and to whom
-  (`ref find` sends its free text to Crossref), the User-Agent, the `mailto` the
-  docs promise but the client never sends, and `PYNAKES_APS_API_TOKEN`.
-- **Smaller fixes**: the completion docs pass a shell name Typer ignores; the
-  mkdocs `site_url` is a placeholder and no docs deployment exists; README
-  relative links break on PyPI; the README claims conformance "verified against
-  TeX Live" while those oracle tests skip in CI; fifteen help texts show literal
-  RST double backticks.
+Implemented (2026-10-12): compatibility and CHANGELOG deprecation conventions,
+per-command stability markers, a command reference generated from the live
+Click tree, executable offline documentation walkthroughs, and a network/privacy
+guide. Current engine docs describe the beta target and the actual normalization,
+Pinax, network, cache and JSON behavior. README links work outside the repository;
+shell completion and terminal help no longer carry misleading syntax. The
+placeholder site URL was removed; no hosted documentation deployment is claimed.
+See [CHANGELOG.md](CHANGELOG.md) for the completed changes.
 
-**Gate 6**: `mkdocs build --strict` green; every offline shell example in the
-README, quickstart, and usage guide runs in a CI doc test; the command reference
-is generated; no document reports an alpha version or status.
+**Gate 6** (met locally, 2026-10-12): `mkdocs build --strict` passes;
+every offline shell example in README, quickstart and usage runs in
+`tests/test_doc_examples.py` with network access blocked; the generated command
+reference is checked for drift; current engine documents report no alpha status.
+The CI documentation job runs these tests before building. Validation of this
+unstaged change on the remote matrix awaits a later authorized commit/push.
 
 #### Stage 7 — Release candidate → 0.7.0
 

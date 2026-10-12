@@ -9,8 +9,8 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/maiani/pynakes/ci.yml?branch=main)](https://github.com/maiani/pynakes/actions)
 [![License](https://img.shields.io/github/license/maiani/pynakes)](https://github.com/maiani/pynakes/blob/main/LICENSE)
 
-> [!WARNING]
-> `pynakes` is alpha-quality software. Interfaces and behavior may change between releases.
+> This development checkout targets the v0.7 CLI beta contract. See the
+> [compatibility policy](https://github.com/maiani/pynakes/blob/main/docs/guides/public-api.md).
 
 **pynakes is a reference management engine for BibTeX and BibLaTeX bibliographies and their research materials.**
 
@@ -38,7 +38,7 @@ A `.bib` file is the index card; a **pinax** is the card together with the shelf
   `capabilities`, structured change plans, and `--strict` / pre-commit gates
   allow callers to inspect outcomes without rewriting bibliography text.
 - **Explicit network access.** Network use is limited to `ref import`, `asset
-  fetch`, and operations invoked with `--online`.
+  fetch`, `ref add --fetch` / `ref import --fetch`, and operations invoked with `--online`.
 - **Preservation-first interoperability.** Untouched BibTeX/BibLaTeX source and
   JabRef metadata round-trip unchanged. `pynakes-meta` holds native settings;
   JabRef metadata can be preserved, adopted, and projected explicitly.
@@ -103,24 +103,24 @@ with explicit combine, split, and batch workflows across files. The next planned
 step is `Library` and a rebuildable `Catalogue`: search, compare, reconcile,
 and analyze a collection without moving its authoritative data into a database.
 Graphical clients and agent integrations will use the same engine. These library
-and catalogue APIs are planned, not implemented; see [DEVPLAN.md](DEVPLAN.md).
+and catalogue APIs are planned, not implemented; see [DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
 
 ## Installation
 
-```bash
+```sh
 pip install pynakes
 ```
 
 For development (with test/lint tools):
 
-```bash
+```sh
 git clone https://github.com/maiani/pynakes.git
 cd pynakes
 pip install -e ".[dev]"
 pre-commit install  # enable Ruff and ty checks on commit
 ```
 
-See the [Installation guide](docs/guides/installation.md) for shell completion and troubleshooting.
+See the [Installation guide](https://github.com/maiani/pynakes/blob/main/docs/guides/installation.md) for shell completion and troubleshooting.
 
 ## Quick start
 
@@ -146,56 +146,40 @@ operation modules remain available for applications that need them.
 
 ### Command line
 
+The following offline example runs in an empty directory:
+
 ```bash
-# Create a new library, then inspect and check for issues
 pynakes init mylib.bib
-pynakes inspect mylib.bib
+pynakes ref add mylib.bib Newton1687 --type book --field author="Isaac Newton" --field title="Principia" --field year=1687 --field publisher="Royal Society"
+pynakes inspect mylib.bib --json
 pynakes lint mylib.bib --json
-
-# Import by DOI, repository id, ISBN, or supported URL, or add one manually
-pynakes ref import mylib.bib 10.5555/example
-pynakes ref import mylib.bib arXiv:2301.00001
-pynakes ref import mylib.bib PMID:12345678
-pynakes ref import mylib.bib 978-0-00-000000-2
-pynakes ref import mylib.bib INSPIRE:Author:2024abc
-pynakes ref import mylib.bib https://link.springer.com/article/10.5555/example
-pynakes ref add mylib.bib Manual2026 --field title="Manual Reference" --field year=2026
-pynakes ref add  # interactive
-pynakes ref show mylib.bib Manual2026
-pynakes ref edit mylib.bib Manual2026 --field year=2027 --clear-field note
-pynakes ref edit mylib.bib Manual2026  # interactive
-
-# Preview the normalization pass before committing
+pynakes ref show mylib.bib Newton1687
+pynakes ref edit mylib.bib Newton1687 --field note="Reviewed"
 pynakes normalize mylib.bib --dry-run --diff
-
-# Remove entries by citation key (with pinax material cleanup)
-pynakes ref remove mylib.bib DeprecatedKey2020
-
-# Rename a citation key across the .bib file and .tex sources
-pynakes keys rename mylib.bib OldKey2020 NewKey2020 paper.tex chapters/
-
-# Fetch configured materials for one entry (Pinax mode)
-pynakes asset fetch mylib.bib arXivKey2024
-
-# Search entries
-pynakes search mylib.bib "neural network" --json
-
-# Gate a build: fail if any .bib has errors
-pynakes lint mylib.bib chapters/*.bib --strict
-
-# Write a public copy for arXiv: no private fields, metadata blocks, or comments
-pynakes scrub mylib.bib --out arxiv/refs.bib --diff
-pynakes scrub arxiv/refs.bib --check   # exits 1 if anything private is left
-
-# Shell completion for cite keys (bash/zsh/fish)
-eval "$(pynakes --show-completion bash)"
+pynakes search mylib.bib Principia --json
+pynakes scrub mylib.bib --out public.bib --diff
+pynakes scrub public.bib --check
+pynakes ref remove mylib.bib Newton1687 --keep-files
 ```
+
+Online imports are explicit, and even a dry run contacts the provider:
+
+```sh
+pynakes ref import mylib.bib 10.5555/example --dry-run --diff
+pynakes ref import mylib.bib arXiv:2301.00001 --fetch
+```
+
+These invented identifiers illustrate syntax, rather than promise a resolvable
+record. Interactive `ref add` and `ref edit FILE KEY` require a terminal.
+For shell completion, run `pynakes --install-completion` in the target shell;
+Typer detects the shell and does not take a shell-name argument.
+
 
 When the current directory contains exactly one `.bib` file, its path may be omitted from commands that operate on a single library (for example, `pynakes normalize --dry-run`). 
 
 Commands still require an explicit path when there are multiple `.bib` files.
 
-See the [Quick Start guide](docs/guides/quickstart.md) and [Usage guide](docs/guides/usage.md) for the full command surface.
+See the [Quick Start guide](https://github.com/maiani/pynakes/blob/main/docs/guides/quickstart.md) and [Usage guide](https://github.com/maiani/pynakes/blob/main/docs/guides/usage.md) for the full command surface.
 
 ## Write behavior
 
@@ -219,38 +203,38 @@ users:
 - `pynakes capabilities --json` describes supported operations
 - Exit codes: `0` success, `1` error, `2` conflict
 
-See the [LLM Integration guide](docs/guides/llm-integration.md) for the full JSON envelope and recommended workflows.
+See the [LLM Integration guide](https://github.com/maiani/pynakes/blob/main/docs/guides/llm-integration.md) for the full JSON envelope and recommended workflows.
 
 ## Status
 
-This checkout targets v0.7.0: a beta CLI contract and an alpha VS Code client.
-Published pre-0.7 releases remain alpha; the Python API is intended to stabilize
-at 1.0. From 0.7.0, incompatible CLI, JSON-envelope, and error-code changes
+This checkout targets v0.7.0: a beta CLI contract and an experimental VS Code client.
+The Python API is intended to stabilize at 1.0. From 0.7.0, incompatible CLI, JSON-envelope, and error-code changes
 require a documented deprecation period. Pin versions for reproducible workflows.
 
 CI is configured for Python 3.12–3.15 on Linux, Windows, and macOS, with a 90%
 coverage floor. Current hardening work and remaining release gates are tracked
-in [DEVPLAN.md](DEVPLAN.md).
+in [DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
 
-Parser conformance is verified against the TeX Live 2026 toolchain (BibTeX 0.99d,
-BibLaTeX 3.21, Biber 2.21). The project roadmap is documented in
-[DEVPLAN.md](DEVPLAN.md).
+Parser conformance targets TeX Live 2026 (BibTeX 0.99d, BibLaTeX 3.21,
+Biber 2.21). Optional external-oracle tests skip when those tools are absent;
+the default CI matrix does not install them. The project roadmap is documented in
+[DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
 
 ## Documentation
 
-- [Quick Start](docs/guides/quickstart.md)
-- [Usage Guide](docs/guides/usage.md)
-- [Installation](docs/guides/installation.md)
-- [LLM Integration](docs/guides/llm-integration.md)
-- [Git Workflows: pre-commit & CI](docs/guides/git-workflows.md)
-- [Architecture](docs/guides/architecture.md)
-- [Pinax — the corpus layer](docs/guides/pinax.md)
-- [API Reference](docs/api/reference.md)
+- [Quick Start](https://github.com/maiani/pynakes/blob/main/docs/guides/quickstart.md)
+- [Usage Guide](https://github.com/maiani/pynakes/blob/main/docs/guides/usage.md)
+- [Installation](https://github.com/maiani/pynakes/blob/main/docs/guides/installation.md)
+- [LLM Integration](https://github.com/maiani/pynakes/blob/main/docs/guides/llm-integration.md)
+- [Git Workflows: pre-commit & CI](https://github.com/maiani/pynakes/blob/main/docs/guides/git-workflows.md)
+- [Architecture](https://github.com/maiani/pynakes/blob/main/docs/guides/architecture.md)
+- [Pinax — the corpus layer](https://github.com/maiani/pynakes/blob/main/docs/guides/pinax.md)
+- [API Reference](https://github.com/maiani/pynakes/blob/main/docs/api/reference.md)
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](https://github.com/maiani/pynakes/blob/main/LICENSE).
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions are welcome — see [CONTRIBUTING.md](https://github.com/maiani/pynakes/blob/main/CONTRIBUTING.md).

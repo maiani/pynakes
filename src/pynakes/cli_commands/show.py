@@ -34,11 +34,11 @@ def show(
     """Show one uniquely identified reference, or triage several at once.
 
     With a citation key this prints every stored field of that one reference.
-    With ``--key k1,k2,...`` it prints a compact summary of each requested
+    With `--key k1,k2,...` it prints a compact summary of each requested
     reference instead — title, creator, date, venue, and identifiers, plus the
-    abstract under ``--abstract`` — so a set of candidates can be scanned in
+    abstract under `--abstract` — so a set of candidates can be scanned in
     one call rather than one invocation per key. Both forms refuse to guess
-    when a key is duplicated, and the ``--key`` form reports every unknown key
+    when a key is duplicated, and the `--key` form reports every unknown key
     together.
     """
     if keys:

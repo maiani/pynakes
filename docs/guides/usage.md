@@ -1,6 +1,45 @@
 # Usage Guide
 
-This guide documents the currently implemented `pynakes` command surface.
+This guide explains the engine's workflows and selection semantics. The
+[generated command reference](command-reference.md) lists every live command,
+argument, option, default, choice and stability marker. It is rebuilt from the
+same Click tree as `capabilities --json`; it includes `metadata remove`,
+`tex list/remove/clear`, `ref remove --keep-files`, `corpus batch --ops-file`
+and `init --agent-guide`.
+
+## Offline walkthrough
+
+Run this block in an empty directory. It creates its own library, so no
+private bibliography or network service is needed. The README, quickstart and
+this guide's `bash` blocks are executed in CI. Installation, online and
+terminal-only examples use `sh` and are labeled separately.
+
+```bash
+pynakes init refs.bib --pinax --agent-guide
+pynakes ref add refs.bib Newton1687 --type book --field author="Isaac Newton" --field title="Principia" --field year=1687 --field publisher="Royal Society"
+pynakes ref add refs.bib Euler1748 --type book --field author="Leonhard Euler" --field title="Introductio" --field year=1748 --field publisher="Bousquet"
+pynakes fields set refs.bib note "review" --where 'year < 1800 and type = book'
+pynakes search refs.bib "" --where 'key in [Newton1687, Euler1748]' --json
+pynakes groups add-group refs.bib Classics
+pynakes groups add-entry refs.bib Newton1687 Classics
+pynakes groups list-entries refs.bib Classics --json
+pynakes metadata set refs.bib normalize-journal-style abbreviated
+pynakes metadata remove refs.bib normalize-journal-style
+pynakes tex list refs.bib --json
+pynakes tex add refs.bib paper.tex
+pynakes tex remove refs.bib paper.tex
+pynakes tex clear refs.bib
+pynakes keys check refs.bib --json
+pynakes dedupe check refs.bib --json
+pynakes asset check refs.bib --json
+pynakes format refs.bib --dry-run --diff
+pynakes normalize refs.bib --dry-run --diff
+pynakes capabilities --json
+```
+
+`tex add` records a path; it does not create a manuscript. `tex scan` and
+citation rewrites require actual TeX sources. Online operations and their
+transmitted data are described in [Network and privacy](network-and-privacy.md).
 
 ## Command Conventions
 
@@ -32,14 +71,7 @@ selection that matches nothing writes nothing and warns `no_entries_selected`.
 `predicate_grammar.used_by`.
 
 Predicates combine with `and`, `or`, and `not`; `and` binds tighter than `or`,
-and parentheses group explicitly:
-
-```bash
-pynakes fields set refs.bib note "review" \
-  --where 'year >= 2024 and doi missing and type in [article, inproceedings]'
-
-pynakes search refs.bib widgets --where 'not (group "Reviewed" or keywords contains draft)'
-```
+and parentheses group explicitly, for example `not (group "Reviewed" or keywords contains draft)`.
 
 Field operators:
 
@@ -66,15 +98,7 @@ Besides stored fields, four names are special: `key` (citation key), `type`
 back to a date composed from `year`/`month`/`day`). `group "Name"` tests JabRef
 group membership; the stored field itself is reachable as `groups`.
 
-Pass an empty query to select by predicate alone:
-
-```bash
-pynakes search refs.bib "" --where 'key in [Newton1687, Euler1748]'
-pynakes search refs.bib "" --where 'date >= 1900-06 and date <= 1910'
-pynakes search refs.bib "" --where 'abstract missing'          # "entries missing field X"
-pynakes search refs.bib "" --where 'title ~ "quantum computing"'
-pynakes search refs.bib "" --where 'journal matches "^Phys\. Rev\."'
-```
+Pass an empty query to select by predicate alone: `search FILE "" --where EXPRESSION`.
 
 Use `""`, not a filler query like `.`: a filler is a real search term, so
 `search . --where 'abstract missing'` quietly returns only those matching
@@ -92,12 +116,7 @@ compose with everything else (`used and year >= 2020`).
 ### Selecting by citation key
 
 When you already know the key, `--key` says so without the grammar. It is
-comma-separated and repeatable, and every command that takes `--where` takes it:
-
-```bash
-pynakes fields set refs.bib note "checked" --key Newton1687
-pynakes fields clear refs.bib abstract --key Newton1687,Euler1748 --key Gauss1801
-```
+comma-separated and repeatable, and every command that takes `--where` takes it.
 
 `--key X` is exactly `--where 'key in [X]'`. Passing both *narrows* — they are
 combined with `and`, so `--key Newton1687,Euler1748 --where 'type = article'`
@@ -106,7 +125,8 @@ acts on whichever of the two is an article.
 On [`ref add`](#add) and [`ref import`](#import), which create an entry rather
 than select one, `--key` names the key to assign. Commands that act on exactly
 one existing reference — [`ref show` and `ref edit`](#show-and-edit),
-`ref remove` — take the citation key as a positional argument.
+— take the citation key as a positional argument. `ref remove` accepts
+one or more keys.
 
 `pynakes capabilities --json` reports this grammar under `predicate_grammar`.
 
@@ -118,14 +138,6 @@ citation-key pattern (`[auth][year][veryshorttitle]`) — so the library works w
 `keys generate` and `normalize` out of the box. It refuses to overwrite an
 existing file unless `--force`; pass `--backup` to keep a `.bak` copy.
 
-```bash
-pynakes init refs.bib                          # default profile (biblatex)
-pynakes init refs.bib --dialect bibtex         # choose the dialect
-pynakes init refs.bib --key-pattern '[auth][year]'
-pynakes init refs.bib --profile-from template.bib  # copy another library's profile
-pynakes init refs.bib --dry-run --diff         # preview the seed file
-```
-
 `--profile-from` copies the template's *conventions* — dialect, key patterns,
 `saveActions`, and pynakes normalization/lint settings — but not its own content
 (group tree, linked TeX sources). `--dialect` / `--key-pattern` override individual
@@ -134,14 +146,6 @@ settings on top of the default (or copied) profile.
 ## inspect
 
 Inspect a `.bib` file.
-
-```bash
-pynakes inspect                           # auto-detects one .bib file
-pynakes inspect refs.bib
-pynakes inspect refs.bib --json
-pynakes inspect refs.bib --resolved --json    # + crossref/xdata-inherited fields
-pynakes inspect refs.bib --display --json     # + human-readable title/author view
-```
 
 JSON output includes file encoding, line ending, entries, duplicate keys, and
 structured JabRef library metadata under `jabref_metadata`. Use `lint` for
@@ -158,15 +162,6 @@ for a UI to render — never a value to edit or write back; combine with
 ## lint
 
 Validate entries.
-
-```bash
-pynakes lint                         # auto-detects one .bib file
-pynakes lint refs.bib
-pynakes lint refs.bib --json
-pynakes lint refs.bib chapters/*.bib --strict   # multi-file CI gate
-pynakes lint refs.bib --category correctness    # only structural problems
-pynakes lint refs.bib --ignore missing_doi --ignore formatting   # leave findings out
-```
 
 Checks include duplicate citation keys, dialect-aware missing required fields by
 entry type, malformed DOI fields, missing article DOIs, malformed group
@@ -215,7 +210,7 @@ severity, as every other check fails on any finding. A finding the library
 accepts is suppressed explicitly — `lint-ignore`, `--ignore`, or an `ignore`
 directive on the entry — rather than tolerated by a severity rule. Human output ends
 with the commands that would clear the fixable findings, for example
-`Run `pynakes format` to resolve 3 of them.`
+“Run `pynakes format` to resolve 3 of them.”
 
 Some findings can never be fixed — a venue that assigns no DOIs, a journal with
 no volumes — and would keep a commit hook failing or noisy. `--ignore NAME`
@@ -260,18 +255,9 @@ Manage JabRef-style `groups` fields and the hierarchical group tree.
 
 ### Flat group membership
 
-```bash
-pynakes groups list                       # auto-detects one .bib file
-pynakes groups list refs.bib
-pynakes groups list refs.bib --json
-
-pynakes groups add-entry KEY "GroupName" --dry-run --diff  # auto-detects one .bib file
-pynakes groups add-entry refs.bib KEY "GroupName" --dry-run --diff
-pynakes groups add-entry refs.bib KEY "GroupName"
-
-pynakes groups remove-entry refs.bib KEY "GroupName" --dry-run --diff
-pynakes groups remove-entry refs.bib KEY "GroupName"
-```
+Use `groups add-entry` and `groups remove-entry` for tags on a reference.
+Create the group first with `groups add-group`, or pass `--create` when adding
+a member to a new group. `groups list` reports the membership.
 
 ### Group tree (hierarchical groups)
 
@@ -280,34 +266,12 @@ in the `pynakes-meta` `group-tree` key. Trees with multiple nodes are split
 across continuation lines (one node per line) for readability. The tree is
 bidirectionally compatible with JabRef's `grouping` block and flat `groups:`
 metadata.
-```bash
-pynakes groups tree refs.bib              # display the group tree
-pynakes groups tree refs.bib --json
-
-pynakes groups add-group refs.bib "Machine Learning"                  # root node
-pynakes groups add-group refs.bib "Deep Learning" --parent "Machine Learning"
-pynakes groups add-group refs.bib "NLP" --parent "Machine Learning" --color "ff0000ff"
-
-pynakes groups rename-group refs.bib "NLP" "Natural Language Processing"
-
-pynakes groups move-group refs.bib "Deep Learning" "Machine Learning"
-pynakes groups move-group refs.bib "Deep Learning" ""   # move to root
-
-pynakes groups update-group refs.bib "Deep Learning" --color "00ff00ff" --context including
-
-pynakes groups remove-group refs.bib "NLP"   # removes group + its children
-```
 
 `groups list` reports every known group — the union of flat per-entry tags and
 tree nodes — so a flat-only group is never hidden by the presence of a tree, and
 a member-less tree node still appears. Each group lists its direct members only;
 it does not expand tree descendants. Use `groups list-entries` for
-descendant-inclusive membership, or `--exact` to restrict it to direct members:
-
-```bash
-pynakes groups list-entries refs.bib "Machine Learning"           # includes descendants
-pynakes groups list-entries refs.bib "Machine Learning" --exact   # direct members only
-```
+descendant-inclusive membership, or `--exact` to restrict it to direct members.
 
 A group name that matches neither a tree node nor a flat tag is a `KeyNotFound`
 error rather than an empty result, so a typo is distinguishable from a group
@@ -324,19 +288,6 @@ schema and native format.
 ## keys
 
 Check, generate, rename, and repair citation keys.
-
-```bash
-pynakes keys check refs.bib
-pynakes keys check refs.bib --json
-
-pynakes keys generate refs.bib OldKey2020 --dry-run --diff
-pynakes keys generate refs.bib --all --dry-run --diff
-pynakes keys repair --dry-run --diff              # auto-detects one .bib file
-pynakes keys repair refs.bib --dry-run --diff
-pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/ --dry-run --diff
-
-pynakes keys usage OldKey2020 paper.tex chapters/ --json
-```
 
 Generated keys default to `AuthorYearTitle`. JabRef metadata is honored when
 present:
@@ -390,11 +341,8 @@ someone else's copy of the manuscript.
 ### Linked TeX sources
 
 Record the `.tex` files that cite a library once, and the citation-key commands
-reuse them — no need to pass paths every time:
-
-```bash
-pynakes metadata set refs.bib tex-sources "paper.tex, chapters_src/"
-```
+reuse them — no need to pass paths every time. Use `tex add FILE PATH...`
+or set `tex-sources` metadata.
 
 ```bibtex
 @comment{pynakes-meta: tex-sources:paper.tex, chapters_src/;}
@@ -440,18 +388,8 @@ trailing `;` when present; `value` is the normalized display/semantic form with
 that terminator stripped. The exact source comment remains available as the
 block's raw text in the Python model.
 
-```bash
-pynakes metadata list                     # auto-detects one .bib file
-pynakes metadata list refs.bib
-pynakes metadata list refs.bib --json
-```
-
-Set a metadata value:
-
-```bash
-pynakes metadata set refs.bib databaseType biblatex --dry-run --diff
-pynakes metadata set refs.bib databaseType biblatex
-```
+Set a metadata value with `metadata set FILE KEY VALUE`; remove a block
+with `metadata remove FILE KEY`.
 
 By default `metadata set` **routes the key automatically for maximum JabRef
 compatibility**: keys JabRef understands (library/save/group/file/selector/
@@ -459,13 +397,6 @@ key-pattern, e.g. `databaseType`, `saveOrderConfig`, `saveActions`,
 `groupstree`, `fileDirectory*`, `selector_*`, `keypatterndefault`,
 `keypattern_<entrytype>`) go to `jabref-meta`; anything JabRef cannot represent
 goes to `pynakes-meta`. Force a target with `--namespace jabref|pynakes`.
-
-```bash
-# pynakes-only setting → lands in pynakes-meta automatically
-pynakes metadata set refs.bib normalize-journal-style abbreviated
-# force a key into jabref-meta (requires --allow-unknown if JabRef won't know it)
-pynakes metadata set refs.bib myKey myValue --namespace jabref --allow-unknown
-```
 
 Unknown metadata blocks are preserved byte-for-byte. Writing an unrecognized key
 into `jabref-meta` requires `--allow-unknown` (so JabRef's namespace is not
@@ -478,46 +409,16 @@ Bulk-edit one field operation across all references matching `--where`, while
 preserving entry formatting. Use `ref edit` when patching one reference across
 several fields.
 
-```bash
-pynakes fields set refs.bib journal "Physical Review B" --where 'journal = "Phys. Rev. B"'
-pynakes fields rename refs.bib journal journaltitle --dry-run --diff
-pynakes fields move refs.bib journal journaltitle --dry-run --diff
-pynakes fields append refs.bib keywords "AI" --dry-run --diff
-pynakes fields clear refs.bib abstract --dry-run --diff
-```
+`--where` is the shared [entry selector](#selecting-entries-where).
 
-`--where` is the shared [entry selector](#selecting-entries-where):
-
-```bash
-pynakes fields append refs.bib keywords "transformers" \
-  --where 'title contains "neural network"'
-
-pynakes fields clear refs.bib doi --where 'type = book'
-pynakes fields clear refs.bib note --where 'doi exists'
-pynakes fields clear refs.bib abstract --where 'year < 2000 or type in [book, thesis]'
-```
-
-Title capitalization protection:
-
-```bash
-pynakes fields protect-title refs.bib --dry-run --diff
-pynakes fields protect-title refs.bib --field booktitle --term Proceedings
-```
+`fields protect-title` protects capitalization in title-family fields.
 
 This protects acronyms, uppercase/digit tokens, mixed-case terms such as
 `LaTeX`, and explicit terms.
 
 ## add
 
-Add a manually specified reference entry:
-
-```bash
-pynakes ref add refs.bib Manual2026 --field title="Manual Reference" --field year=2026
-pynakes ref add refs.bib Manual2026 --type book --field author="Ada Lovelace"
-pynakes ref add Manual2026 --field title="Manual Reference"  # auto-detects one .bib file
-pynakes ref add  # interactive; auto-detects one .bib file
-pynakes ref add --file refs.bib  # interactive with an explicit library
-```
+Use `ref add FILE KEY --field name=value...` to add a manual entry.
 
 `--field` is repeatable and uses `name=value` syntax. `--type` defaults to
 `article`. Existing citation keys are rejected unless `--allow-duplicate` is
@@ -532,17 +433,7 @@ mode requires a terminal and errors under `--json` or headless stdin. Use
 
 ## show and edit
 
-Read or transactionally patch one uniquely identified reference:
-
-```bash
-pynakes ref show refs.bib Manual2026
-pynakes ref show refs.bib Manual2026 --resolved --json
-pynakes ref show refs.bib --key Manual2026,Newton1687 --abstract
-pynakes ref edit refs.bib Manual2026 \
-  --field title="Revised title" --field year=2027 \
-  --clear-field note --type book --dry-run --diff
-pynakes ref edit refs.bib Manual2026  # interactive when no change options are supplied
-```
+Read with `ref show FILE KEY`; patch with `ref edit FILE KEY --field name=value`.
 
 `--key` turns `ref show` into a **triage view**: instead of every stored field
 of one reference, it prints a compact summary of each requested reference — the
@@ -588,16 +479,7 @@ moves or drops entries carries it along (see
 | `ignore` | finding types or categories, each optionally `NAME:FIELD` | `lint` leaves this entry's matching findings out of its report and its `--strict` gate |
 
 `ref directive` writes and removes directives on the entries named by `--key`
-or selected by `--where`, changing only the directive lines:
-
-```bash
-pynakes ref directive refs.bib ignore missing_doi --key Newton1687 --reason "no DOI assigned"
-pynakes ref directive refs.bib ignore missing_profile_required_field:volume --key Newton1687
-pynakes ref directive refs.bib ignore missing_doi --where 'doi missing and year < 1950' \
-  --reason "pre-DOI era"
-pynakes ref directive refs.bib ignore missing_doi --key Newton1687 --remove
-pynakes ref directive refs.bib ignore --key Newton1687 --remove   # every ignore on it
-```
+or selected by `--where`, changing only the directive lines.
 
 `--where` is how a library adopts `lint --strict`: waive the findings it has
 accepted, by selection, and every new finding still fails the gate.
@@ -615,10 +497,6 @@ its reason unnoticed. Waived findings count toward the lint summary's
 
 Find the real records matching a reference written out in prose.
 
-```bash
-pynakes ref find "Shannon, A Mathematical Theory of Communication, Bell System Technical Journal, 1948" --online
-```
-
 ```
 3 candidate(s) from crossref:
  *1.   57.6  10.1002/j.1538-7305.1948.tb00917.x
@@ -635,7 +513,8 @@ can be checked: `ref import` either resolves it or does not. A reference written
 out as text carries no such claim, and this is how to ask whether one describes
 anything that exists. Read-only; import a candidate you accept by its DOI.
 
-`--online` is required, as it is for every command that reaches the network.
+`ref find` requires `--online`. `ref import`, `asset fetch`, and
+`ref add` / `ref import --fetch` authorize network access explicitly without it.
 `--limit` caps the candidates (5 by default), and `--cache-file` reuses answers
 across runs.
 
@@ -661,32 +540,10 @@ a verdict would be a quality judgment the data does not support.
 ## import
 
 Import a reference by DOI, repository/preprint identifier, ISBN, or supported
-URL. The type is auto-detected, so the same command handles all of these:
-
-```bash
-pynakes ref import refs.bib 10.5555/example --dry-run --diff
-pynakes ref import refs.bib https://doi.org/10.5555/example
-pynakes ref import refs.bib arXiv:2301.00001
-pynakes ref import refs.bib https://arxiv.org/abs/2301.00001
-pynakes ref import refs.bib PMID:12345678
-pynakes ref import refs.bib https://www.nber.org/papers/w12345
-pynakes ref import refs.bib https://zenodo.org/records/1234567
-```
+URL. The type is auto-detected.
 
 Publisher article URLs and book ISBNs work the same way, so a page URL copied
-from a browser can be imported without first digging out its DOI:
-
-```bash
-pynakes ref import refs.bib https://link.springer.com/article/10.5555/example
-pynakes ref import refs.bib https://onlinelibrary.wiley.com/doi/10.5555/example
-pynakes ref import refs.bib https://journals.plos.org/plosone/article?id=10.5555/example
-pynakes ref import refs.bib https://iopscience.iop.org/article/10.5555/example
-pynakes ref import refs.bib https://scipost.org/SciPostPhys.10.1.001
-pynakes ref import refs.bib https://www.jstor.org/stable/1171664
-pynakes ref import refs.bib https://www.sciencedirect.com/science/article/pii/S0123456789012345
-pynakes ref import refs.bib 978-0-00-000000-2
-pynakes ref import refs.bib ISBN:0123456789
-```
+from a browser can be imported without first digging out its DOI.
 
 SciPost article ids and numeric JSTOR stable ids become their publisher's DOI;
 ScienceDirect URLs carry a Publisher Item Identifier, which is resolved to a DOI
@@ -696,14 +553,7 @@ before any network request.
 
 Discipline-specific databases publish their own BibTeX, which carries detail the
 DOI record omits — eprints and report numbers from INSPIRE, venue and editor
-details from the ACL Anthology:
-
-```bash
-pynakes ref import refs.bib INSPIRE:Author:2024abc
-pynakes ref import refs.bib https://inspirehep.net/literature/451647
-pynakes ref import refs.bib DBLP:journals/cacm/Codd70
-pynakes ref import refs.bib https://aclanthology.org/2023.acl-long.1
-```
+details from the ACL Anthology.
 
 An INSPIRE texkey is the citation key high-energy physics already uses, so
 `--key-source provider` adopts it verbatim. DBLP's own key is not usable as a
@@ -727,12 +577,7 @@ run `normalize` or `format` with `--key` to bring it in line by hand.
 ### Importing several at once
 
 Give several identifiers, or pipe a list, and they resolve in one call and
-commit in one write:
-
-```bash
-pynakes ref import refs.bib 10.5555/one arXiv:2301.00001 10.5555/two --dry-run
-pbpaste | pynakes ref import - refs.bib --diff
-```
+commit in one write. Use `-` as the identifier to read standard input.
 
 Piped input is one identifier per line; blank lines and `#` comments are
 skipped, so a list pasted out of a chat or a notes file needs no cleaning up
@@ -762,15 +607,7 @@ resolve. Re-run that one with `--allow-duplicate` if a second copy was wanted.
 A single identifier keeps its existing behavior exactly: a failure is the
 command's failure, and `--key` applies to the one entry.
 
-Options:
-
-```bash
-pynakes ref import refs.bib 10.5555/example --key ManualKey2026
-pynakes ref import refs.bib 10.5555/example --key-source provider
-pynakes ref import refs.bib 10.5555/example --allow-duplicate
-pynakes ref import refs.bib arXiv:2301.00001 --fetch
-pynakes ref import refs.bib 10.5555/example --fetch --cache-file .pynakes-cache
-```
+All import options are listed in the [generated reference](command-reference.md#ref-import).
 
 Each identifier is fetched through its matching provider. By default
 `ref import` imports metadata only; `--fetch` also downloads configured Pinax
@@ -787,14 +624,6 @@ planned identifier, repository, catalogue, and publisher URL inventory.
 
 Validate JabRef linked files stored in `file` fields.
 
-```bash
-pynakes asset check refs.bib
-pynakes asset check refs.bib --json
-pynakes asset check refs.bib --root ~/papers --json
-pynakes asset repair refs.bib --dry-run --diff   # preview the manifest repair
-pynakes asset repair refs.bib --backup
-```
-
 `asset check` only reports, so it can gate a commit. `asset repair` reconciles
 the Pinax manifest with the material files that exist: it drops records for
 keys the library no longer has and for files that are gone, and records files
@@ -803,13 +632,8 @@ no byte of the library.
 
 `asset check` takes one or more libraries as positional arguments (handy for CI
 gating). `asset fetch` downloads materials for one entry or for a whole library;
-its first positional is a citation key, so the whole-library form names the
-library with `--file`:
-
-```bash
-pynakes asset fetch refs.bib alvarez2019   # one entry
-pynakes asset fetch --file refs.bib        # every entry with missing materials
-```
+its first positional is the library, followed by an optional citation key.
+Omit the key to fetch the whole library.
 
 See the [Pinax guide](pinax.md#fetch-the-first-slice) for what gets downloaded
 and how `pinax-fetch-policy` governs it.
@@ -824,21 +648,14 @@ file = {:/path/to/folder:directory}
 
 Relative paths are resolved against the `.bib` file directory, repeated
 `--root` directories, and JabRef `fileDirectory*` metadata. It reports `ok`,
-`missing`, `wrong_type`, and `unresolved` statuses. This command is read-only;
-repair is planned separately.
+`missing`, `wrong_type`, and `unresolved` statuses. This command is read-only.
+In Pinax mode, `asset repair` reconciles manifest drift. Neither command
+repairs arbitrary JabRef attachment paths or recomputes checksums.
 
 ## format
 
 Rewrite the whole-file layout deterministically without changing bibliographic
-values or conventions:
-
-```bash
-pynakes format refs.bib --dry-run --diff
-pynakes format refs.bib
-pynakes format refs.bib --check
-pynakes format refs.bib --field-order preserve
-pynakes format refs.bib --wrap-values stable --line-width 100
-```
+values or conventions.
 
 `format` runs the lint checks first and refuses source shapes that its semantic
 model cannot rewrite losslessly, currently repeated assignments of one field in
@@ -895,12 +712,7 @@ commands, `format` is an explicit whole-file rewrite.
 `--where` narrows the rewrite to the entries a
 [selector](#selecting-entries-where) matches; every other byte of the file —
 including unmatched entries — stays identical, so the diff covers exactly the
-entries you asked for:
-
-```bash
-pynakes format refs.bib --where 'year >= 2024' --dry-run --diff
-pynakes format refs.bib --where 'key in [Newton1687]' --alignment equals
-```
+entries you asked for.
 
 A selection owns the layout *inside* each entry it matches, not the layout of
 the file, so the whole-file options `--entry-order`, `--block-order`, and
@@ -909,11 +721,6 @@ the file, so the whole-file options `--entry-order`, `--block-order`, and
 ## normalize
 
 Run the daily maintenance pass.
-
-```bash
-pynakes normalize refs.bib --dry-run --diff
-pynakes normalize refs.bib
-```
 
 Default behavior:
 
@@ -932,12 +739,7 @@ names the flag that turns each one on, and `--json` carries the full reason
 under `operations.skipped`.
 
 To run some steps on some entries, name the steps with `--only` and the
-entries with `--key` or `--where`:
-
-```bash
-# abbreviate two journal names, and change nothing else
-pynakes normalize refs.bib --key Newton1687,Euler1748 --only journals --dry-run --diff
-```
+entries with `--key` or `--where`.
 
 The steps are `metadata`, `drop-fields`, `titles`, `authors`, `dois`, `pages`,
 `journals`, `save-actions`, `months`, `identifier-case`, `sort`, and `keys`. A
@@ -947,18 +749,7 @@ the file or rearranges its metadata, since those act on the file as a whole, and
 flag that configures a step `--only` leaves out, such as
 `--only journals --author-style biblatex`.
 
-Useful overrides:
-
-```bash
-pynakes normalize refs.bib --author-style conservative
-pynakes normalize refs.bib --journal-style none
-pynakes normalize refs.bib --journal-style full
-pynakes normalize refs.bib --title-protection off
-pynakes normalize refs.bib --doi-normalization off
-pynakes normalize refs.bib --pages off
-pynakes normalize refs.bib --identifier-case off
-pynakes normalize refs.bib --key-generation on
-```
+See the generated reference for the full set of overrides.
 
 Page ranges are rewritten to BibTeX's `start--end`: a Unicode en-dash
 (`1052–1055`, which is what Crossref hands out) or a single hyphen becomes
@@ -970,11 +761,8 @@ with `--pages off` or `normalize-pages: false`. `lint` reports the same values
 as `nonstandard_page_range`, so a range an import or a paste introduced is
 visible before it reaches a build.
 
-Journal source tables:
-
-```bash
-pynakes normalize refs.bib --journal-style abbreviated --journal-table journals.csv --ltwa-table ltwa.csv
-```
+Journal source tables require `--journal-style abbreviated` (or a stored
+journal style) to request abbreviation.
 
 `journals.csv` accepts `title`, `abbreviation`, and optional `issn` columns.
 LTWA tables accept `Word` and `Abbreviation` columns.
@@ -985,11 +773,7 @@ To check journal-title conformance without modifying the file, set
 
 To always strip a field — `abstract` is the common case — across every entry,
 use `--drop-field` (repeatable) or persist it as `normalize-drop-fields`
-metadata:
-
-```bash
-pynakes normalize refs.bib --drop-field abstract
-```
+metadata.
 
 Off by default, like journal-style conversion: dropping a field is opinionated
 and not reversible, so it only runs for fields named explicitly.
@@ -1050,23 +834,8 @@ doi[clean_up_doi]
 
 Analyze which entries are cited by `.tex` or `.aux` files.
 
-```bash
-pynakes tex scan refs.bib paper.tex paper.aux
-pynakes tex scan refs.bib paper.tex --json
-```
-
-Tag cited entries:
-
-```bash
-pynakes tex scan refs.bib paper.tex --group Cited --dry-run --diff
-pynakes tex scan refs.bib paper.tex --keyword cited
-```
-
-Export only cited entries:
-
-```bash
-pynakes tex scan refs.bib paper.tex --out cited-only.bib
-```
+Use `--group NAME` to tag cited entries, or `--out PATH` to export only
+those entries.
 
 With `--json`, the report's `usages` object locates every citation: each cited
 key maps to its occurrences, one `{path, line, column, text, macro}` per
@@ -1083,11 +852,6 @@ before a `.bib` goes to arXiv, into a submission bundle, or into a public
 repository. The input is read-only; `--out` names the copy (give it the input
 path to scrub in place).
 
-```bash
-pynakes scrub refs.bib --out arxiv/refs.bib
-pynakes scrub refs.bib --out arxiv/refs.bib --diff   # exactly what left
-```
-
 Three kinds of content are removed by default:
 
 | Kind | What goes |
@@ -1099,41 +863,18 @@ Three kinds of content are removed by default:
 Bibliographic content is never removed unasked: `abstract`, `keywords`, and
 `note` stay unless you name them.
 
-What counts as private is the library's call:
-
-```bash
-# Add to the set (globs allowed), or spare something from it
-pynakes scrub refs.bib --out public.bib --drop-field abstract --keep-field file
-
-# Keep a whole kind
-pynakes scrub refs.bib --out public.bib --keep-comments --keep-metadata
-pynakes scrub refs.bib --out public.bib --keep-field '*'   # blocks only
-```
+Use `--drop-field` and `--keep-field` to adjust what counts as private.
 
 A library can record its own policy instead of repeating flags — see
 [`scrub-fields`, `scrub-keep-fields`, `scrub-comments`, and
-`scrub-metadata`](metadata-reference.md#pynakes-meta-keys):
-
-```bash
-pynakes metadata set refs.bib scrub-fields abstract,annote
-pynakes metadata set refs.bib scrub-keep-fields keywords
-```
+`scrub-metadata`](metadata-reference.md#pynakes-meta-keys).
 
 `--check` reports instead of writing and exits `1` when anything private is
-found, which is what a submission or CI check needs:
-
-```bash
-pynakes scrub arxiv/refs.bib --check
-```
+found, which is what a submission or CI check needs.
 
 Everything not removed stays byte-for-byte identical, so the copy is reviewable
 as a diff of its source. To release only the entries a document actually cites,
-chain it after [`tex scan --out`](#tex-scan):
-
-```bash
-pynakes tex scan refs.bib paper.tex --out arxiv/refs.bib
-pynakes scrub arxiv/refs.bib --out arxiv/refs.bib
-```
+chain it after [`tex scan --out`](#tex-scan).
 
 ## combine
 
@@ -1146,17 +887,8 @@ rather than guessing.
 (`corpus combine` unions whole files; merging two records of the *same* work is a
 different operation — see [`dedupe merge`](#dedupe).)
 
-```bash
-pynakes corpus combine a.bib b.bib --out combined.bib
-pynakes corpus combine a.bib b.bib --out combined.bib --dedupe --dry-run --diff
-```
-
 `--where` keeps only the entries a [selector](#selecting-entries-where) matches,
-so a focused subset of several libraries is one command:
-
-```bash
-pynakes corpus combine a.bib b.bib --out recent.bib --where 'year >= 2020 and doi exists'
-```
+so a focused subset of several libraries is one command.
 
 ## split
 
@@ -1168,23 +900,6 @@ Each `--route FILE='predicate'` rule pairs an output file with a selector. The
 predicate is any [`--where`](#selecting-entries-where) expression — including
 `and`/`or`/`not` — plus the bucket predicates `*` (catch-all) and `used` /
 `unused` (against the citations found in `--tex`/`--aux` sources).
-
-```bash
-# Partition by group (first match wins; `*` collects the rest)
-pynakes corpus split refs.bib extra.bib \
-  --route ml.bib='group "Machine Learning"' \
-  --route rest.bib='*'
-
-# Partition into cited vs uncited against a manuscript
-pynakes corpus split refs.bib --tex paper.tex \
-  --route used.bib='used' \
-  --route unused.bib='*' --dry-run --diff
-
-# Bucket predicates compose with field predicates
-pynakes corpus split refs.bib --tex paper.tex \
-  --route recent-cited.bib='used and year >= 2020' \
-  --route rest.bib='*'
-```
 
 Routing is **first match** by default — each entry lands in the first output
 whose predicate matches, so the outputs are a partition. Pass `--copy` to send an
@@ -1198,27 +913,6 @@ Convert between BibTeX and BibLaTeX field/type conventions (in place), or
 export/import the interchange formats CSL-JSON, RIS, MODS, and EndNote tagged
 text. The target is required: pynakes does not infer it from JabRef's
 `databaseType` metadata.
-
-```bash
-# Dialect conversion (edits the .bib in place, with a reviewable diff):
-pynakes convert refs.bib --to biblatex --dry-run --diff
-pynakes convert refs.bib --to bibtex
-
-# Export to an interchange format (stdout, or --out FILE):
-pynakes convert refs.bib --to csl-json --out refs.json
-pynakes convert refs.bib --to ris
-pynakes convert refs.bib --to mods --out refs.xml
-pynakes convert refs.bib --to endnote --out refs.enw
-
-# Import an interchange format to BibTeX:
-pynakes convert records.ris --from ris --out refs.bib
-pynakes convert items.json --from csl-json
-pynakes convert records.xml --from mods
-pynakes convert records.enw --from endnote
-
-# CSV is export-only:
-pynakes convert refs.bib --to csv --out refs.csv
-```
 
 Export/import map the common entry types and fields; unmapped fields are
 dropped rather than guessed.
@@ -1234,33 +928,15 @@ and writes no output file.
 
 Print the machine-readable command/capability description.
 
-```bash
-pynakes capabilities
-pynakes capabilities --json
-```
-
 ## search
 
 Search entries without modifying the library.
-
-```bash
-pynakes search learning                   # auto-detects one .bib file
-pynakes search refs.bib learning
-pynakes search refs.bib 'title:"natural language" type:article' --json
-pynakes search refs.bib widgets --in-field title --where 'year = 2024' --json
-pynakes search refs.bib "" --where 'doi missing'    # predicate only, no text match
-```
 
 Terms are ANDed. Quoted phrases stay together. `field:term` scopes a term to a
 field; plain terms search the key, type, and stored fields.
 
 `--fuzzy` also accepts near-misses — misspellings and inflections — by
-normalized similarity, so a half-remembered title still finds its entry:
-
-```bash
-pynakes search refs.bib 'nueral widgts' --fuzzy
-pynakes search refs.bib widgets --where 'year >= 2020 and abstract missing' --json
-```
+normalized similarity, so a half-remembered title can still find its entry.
 
 Results are ranked by match strength (key > title > author > other fields >
 groups/abstract, then by score) with ties in file order; `--no-rank` restores
@@ -1278,11 +954,7 @@ covering date ranges and missing-field queries without search-specific flags.
 result list can be triaged without a second command; a result with no stored
 abstract says `(no abstract)`. The excerpt is for reading — `--json` always
 carries the full abstract, including when `--in-field` restricts the fields
-searched, and reporting the abstract never widens what the query matches:
-
-```bash
-pynakes search refs.bib 'quantum computing' --fuzzy --abstract --limit 10
-```
+searched, and reporting the abstract never widens what the query matches.
 
 For the promising keys, `ref show --key k1,k2,…` prints the summarized
 entries; a single `ref show <key>` prints one in full.
@@ -1290,12 +962,6 @@ entries; a single `ref show <key>` prints one in full.
 ## dedupe
 
 Detect and conservatively merge duplicate works.
-
-```bash
-pynakes dedupe check refs.bib
-pynakes dedupe merge refs.bib --dry-run --diff
-pynakes dedupe merge refs.bib --key Newton1687b        # just this pair
-```
 
 `check` reports each cluster with the identity that matched it and the keys in
 it. `merge` folds every cluster into its first entry; `--key` narrows it to the
@@ -1320,16 +986,6 @@ once no matter how many entries carry it — and discarded when the command exit
 Pass `--cache-file PATH` to keep them for later runs; see
 [Caching provider responses](#caching-provider-responses).
 
-```bash
-pynakes verify --online --strict --json        # auto-detects one .bib file
-pynakes verify refs.bib --online --strict --json
-pynakes verify refs.bib --online --published --json
-pynakes enrich refs.bib --online --dry-run --diff
-pynakes enrich refs.bib --online --published --dry-run --diff
-pynakes enrich refs.bib --online --key Newton1687 --dry-run --diff
-pynakes enrich refs.bib --online --where 'doi missing and year >= 2020'
-```
-
 `--key` and `--where` limit `enrich` to the selected entries, so a lookup for a
 few references never queries a provider for the rest of the library.
 
@@ -1344,13 +1000,10 @@ order.
 ### Caching provider responses
 
 Nothing is cached to disk unless you ask for it. Every command that can go
-online — `verify`, `enrich`, `ref compare`, `ref import --fetch`, `asset fetch` —
-accepts `--cache-file PATH`, and only that flag creates a cache. Without it, an
-online run leaves the directory holding your `.bib` exactly as it found it.
-
-```bash
-pynakes verify refs.bib --online --cache-file .pynakes-cache
-```
+online — `verify`, `enrich`, `ref compare`, `ref find`, `ref import`,
+`ref add --fetch`, `asset fetch` —
+accepts `--cache-file PATH`, and only that flag creates a cache. Without it, provider responses are not persisted. Modifying online commands
+can still write bibliography updates and downloaded materials.
 
 The cache is one file: newline-delimited JSON, one record per provider response,
 identifiers in plain text so it stays readable and greppable. A single
@@ -1374,7 +1027,7 @@ it when you want a genuinely fresh comparison.
 The following commands/features are not implemented yet:
 
 - `entries`
-- linked-file repair
+- repair of arbitrary JabRef linked-file paths (Pinax manifest repair is implemented)
 
 ## Next Steps
 

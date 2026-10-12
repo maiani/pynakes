@@ -14,7 +14,7 @@ across files; `Library`, `Catalogue` and broader client integrations are planned
 in the [roadmap](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
 
 > **Development status.** This checkout targets v0.7.0, with a beta CLI contract
-> and an alpha VS Code client. Published pre-0.7 releases remain alpha. The
+> and a separately versioned experimental VS Code client. The
 > Python API is intended to stabilize at 1.0; from 0.7.0 the CLI contract requires
 > deprecation before incompatible changes. Pin versions for reproducible use.
 
