@@ -398,3 +398,22 @@ def test_aliased_drift_silent_when_consistent() -> None:
         "@comment{pynakes-meta:\ndialect: biblatex\n}\n"
     )
     assert metadata_pkg.aliased_drift_warnings(lib) == []
+
+
+def test_metadata_value_choices_match_validation() -> None:
+    choices = metadata_pkg.metadata_value_choices()
+    assert choices["dialect"] == ["biblatex", "bibtex"]
+    assert choices["databasetype"] == choices["dialect"]
+    assert choices["format-alignment"] == ["compact", "equals"]
+    assert choices["scrub-comments"] == ["false", "true"]
+    metadata_pkg.validate_metadata_value("scrub-comments", "yes")
+    assert "key-pattern" not in choices
+    assert "pinax-fetch-policy" not in choices  # A list, not a single choice.
+    for key, values in choices.items():
+        for value in values:
+            metadata_pkg.validate_metadata_value(key, value)
+            metadata_pkg.validate_metadata_value(key.upper(), value.upper() + ";")
+        with pytest.raises(ValueError):
+            metadata_pkg.validate_metadata_value(key, "not-a-choice")
+    choices["dialect"].append("unexpected")
+    assert "unexpected" not in metadata_pkg.metadata_value_choices()["dialect"]

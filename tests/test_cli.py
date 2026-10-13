@@ -563,6 +563,7 @@ class TestInspectAndLint:
         assert data["entry_count"] == 5
         assert {e["key"] for e in data["entries"]} >= {"Smith2020", "Jones2021"}
         assert "issues" not in data
+        assert data["metadata_value_choices"]["dialect"] == ["biblatex", "bibtex"]
 
     def test_inspect_json_includes_declarations_and_resolved_fields(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"

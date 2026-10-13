@@ -375,6 +375,20 @@ produce a standard exit-`2` conflict.
 - Let pynakes parse and write BibTeX instead of editing it as plain text.
 - Keep network access explicit and operations focused.
 
+### Metadata value choices
+
+`inspect --json` includes `metadata_value_choices`, a mapping from lower-case
+metadata keys to accepted values for finite, single-valued settings. It applies
+to either metadata namespace and shares the engine's validation registries.
+The standard Boolean metadata values are `true` and `false`, so those are the
+only Boolean choices advertised. Other supported spellings are nonstandard
+compatibility aliases and remain accepted on input.
+Clients can use it for dropdowns, including when adding a new metadata block.
+List-valued settings, numbers, and free-form values are omitted. Existing raw
+values can have different casing or a trailing terminator; reading the choices
+must not silently replace them. Older engines may omit the map, in which case
+clients can retain free-form editing and rely on `metadata set` validation.
+
 ### Shared inspection reports
 
 `inspect refs.bib --display --insights --json` includes an `insights` object

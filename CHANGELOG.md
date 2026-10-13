@@ -134,6 +134,13 @@ form is a `UsageError`, never silently reinterpreted.
 
 ### Added
 
+- Document `true` and `false` as the standard Boolean metadata values across
+  pynakes. Other supported spellings remain nonstandard compatibility aliases;
+  existing metadata is not automatically rewritten.
+
+- `inspect --json` exposes `metadata_value_choices`, sharing the engine validation
+  registries so clients can offer dropdowns for finite, single-valued metadata.
+
 - `asset fetch` reports a `summary` (`requested`, `fetched`,
   `already_present`, `unavailable`, `failed`, `planned`) and one
   `download_failed` warning per failed download; failed items name their

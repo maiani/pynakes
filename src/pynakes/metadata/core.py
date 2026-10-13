@@ -89,6 +89,9 @@ def metadata_list_values(lib: BibFile, name: str) -> tuple[str, ...]:
 def metadata_bool(value: str | None, default: bool) -> bool:
     """Coerce a metadata string to ``bool``.
 
+    Standard Boolean metadata uses ``true`` and ``false``. Other supported
+    spellings are nonstandard compatibility aliases.
+
     Truthy spellings: ``1``, ``true``, ``yes``, ``on``, ``enabled``.
     Falsy spellings: ``0``, ``false``, ``no``, ``off``, ``disabled``.
     Anything else returns ``default``.

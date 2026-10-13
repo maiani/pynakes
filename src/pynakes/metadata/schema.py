@@ -125,12 +125,43 @@ _FORMAT_CHOICES = {
 }
 
 
+_BOOLEAN_KEYS = {
+    "format-trailing-comma",
+    "format-blank-lines",
+    "scrub-comments",
+    "scrub-metadata",
+}
+_BOOLEAN_VALUES = {"true", "false", "yes", "no", "on", "off", "1", "0"}
+
+
+def metadata_value_choices() -> dict[str, list[str]]:
+    """Return finite choices for single-valued metadata keys, keyed case-insensitively.
+
+    Choices share the validator's registries and apply in either namespace.
+    Standard Boolean metadata values are ``true``/``false``; validation also
+    accepts nonstandard compatibility aliases.
+    Lists (such as fetch policies), numbers, and free-form values are omitted.
+    Fresh, sorted lists let clients offer choices without owning the schema.
+    Existing spelling and terminators remain the caller's original value.
+    """
+    choices = {
+        "dialect": _VALID_DIALECTS,
+        "databasetype": _VALID_DIALECTS,
+        "normalize-journal-style": _VALID_JOURNAL_STYLES,
+        "normalize-journal-source": _VALID_JOURNAL_SOURCES,
+        **_FORMAT_CHOICES,
+        **{key: {"true", "false"} for key in _BOOLEAN_KEYS},
+    }
+    return {key: sorted(values) for key, values in sorted(choices.items())}
+
+
 def validate_metadata_value(key: str, value: str) -> None:
     """Validate a metadata value for a known key, raising ``ValueError`` if invalid.
 
     Applies to any metadata key whose value format pynakes understands:
     ``dialect``/``databaseType`` must be ``bibtex`` or ``biblatex``, the ``fetch-*``
-    booleans must be a recognised truthy/falsy spelling,
+    booleans use standard ``true``/``false`` values (supported nonstandard
+    compatibility aliases remain accepted),
     ``normalize-journal-style`` must be ``none``/``abbreviated``/``full``, the
     ``format-*`` choices must come from their enum, and all other known keys
     must have a non-empty value. Unknown-key values (including JabRef-only keys
@@ -181,13 +212,8 @@ def validate_metadata_value(key: str, value: str) -> None:
             )
         return
 
-    if normalized_key in {
-        "format-trailing-comma",
-        "format-blank-lines",
-        "scrub-comments",
-        "scrub-metadata",
-    }:
-        if stripped.lower() not in {"true", "false", "yes", "no", "on", "off", "1", "0"}:
+    if normalized_key in _BOOLEAN_KEYS:
+        if stripped.lower() not in _BOOLEAN_VALUES:
             raise ValueError(f"Invalid Boolean value for {normalized_key}: {stripped!r}")
         return
 

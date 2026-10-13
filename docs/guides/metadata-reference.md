@@ -23,8 +23,13 @@ into its `jabref-meta` counterpart so JabRef never sees a stale value; if the
 two ever disagree, `metadata list` reports the drift (pynakes uses the native
 value).
 
-Boolean values accept `true`/`false`, `on`/`off`, `yes`/`no`,
-`enabled`/`disabled`, or `1`/`0`. List values are comma- or semicolon-separated.
+The standard Boolean metadata values are **`true` and `false`**. Use these
+lower-case spellings in new metadata, examples, and generated settings.
+Other spellings remain accepted where supported for compatibility, but are
+nonstandard aliases, not additional recommended values. Existing metadata is
+not rewritten merely because it uses an alias.
+
+List values are comma- or semicolon-separated.
 
 pynakes writes all `pynakes-meta` keys as a single consolidated comment, one
 `key: value` line per setting — JabRef never reads this namespace, so there is no
