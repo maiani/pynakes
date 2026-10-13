@@ -114,6 +114,9 @@ const uriOf = (fsPath: string) => ({ fsPath, toString: () => `file://${fsPath}` 
 
 Object.assign(require("vscode") as Record<string, unknown>, {
   Uri: { file: uriOf },
+  Position: class {},
+  Range: class {},
+  TextEditorRevealType: { InCenterIfOutsideViewport: 0 },
   FileType: { File: 1, Directory: 2 },
   ViewColumn: { Beside: -2 },
   ConfigurationTarget: { Global: 1 },
@@ -146,7 +149,7 @@ Object.assign(require("vscode") as Record<string, unknown>, {
 });
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { openMaterial } = require("../navigation.js") as typeof import("../navigation.js");
+const { openMaterial, doubleClickEntry } = require("../navigation.js") as typeof import("../navigation.js");
 
 function reset(): void {
   calls.length = 0;
@@ -222,4 +225,61 @@ test("a directory is revealed, and an unreported path is refused", async () => {
   await openMaterial(openable, "/etc/passwd", "editor");
   assert.equal(calls.length, 1);
   assert.equal(calls[0][0], "warning");
+});
+
+const entryDocument = { uri: uriOf("/lib/refs.bib") } as unknown as import("vscode").TextDocument;
+const pdfIndex = (paths: string[]): import("../insights").MaterialIndex => ({
+  byKey: { Newton1687: paths.map((path) => ({
+    path, kind: "pdf", label: path, present: true, origin: "file",
+  })) },
+  pinaxRoot: null, orphanCount: 0, driftCount: 0, brokenCount: 0,
+});
+
+test("double-click opens a local PDF by default using the viewer preference", async () => {
+  reset();
+  settings["pynakes.openMaterialsWith"] = "system";
+  const target = "/lib/Newton1687.PDF";
+  await doubleClickEntry(entryDocument, "Newton1687", pdfIndex(["/lib/source.zip", target, target]), new Set([target]));
+  assert.deepEqual(calls, [["openExternal", target]]);
+});
+
+test("double-click reports missing PDFs, including unknown prototype-like keys", async () => {
+  reset();
+  const index = pdfIndex(["/lib/missing.pdf"]);
+  index.byKey.Newton1687[0].present = false;
+  for (const key of ["Newton1687", "constructor"]) {
+    await doubleClickEntry(entryDocument, key, index, new Set());
+  }
+  assert.equal(calls.length, 2);
+  assert.ok(calls.every((call) => call[0] === "info" && String(call[1]).includes("No local PDF")));
+});
+
+test("double-click offers multiple PDFs and respects cancellation", async () => {
+  reset();
+  settings["pynakes.openMaterialsWith"] = "system";
+  const paths = ["/lib/published.pdf", "/lib/preprint.pdf"];
+  const window = require("vscode").window;
+  window.showQuickPick = async (items: unknown[]) => items[1];
+  await doubleClickEntry(entryDocument, "Newton1687", pdfIndex(paths), new Set(paths));
+  assert.deepEqual(calls, [["openExternal", paths[1]]]);
+  calls.length = 0;
+  window.showQuickPick = async () => undefined;
+  await doubleClickEntry(entryDocument, "Newton1687", pdfIndex(paths), new Set(paths));
+  assert.deepEqual(calls, []);
+});
+
+test("source preference keeps the source jump", async () => {
+  reset();
+  settings["pynakes.doubleClickAction"] = "source";
+  const vscode = require("vscode");
+  vscode.Position = class {};
+  vscode.Range = class {};
+  vscode.TextEditorRevealType = { InCenterIfOutsideViewport: 0 };
+  vscode.window.showTextDocument = async () => {
+    calls.push(["source"]);
+    return { revealRange() {} };
+  };
+  const document = { ...entryDocument, getText: () => "@book{Newton1687,}", positionAt: () => ({}) };
+  await doubleClickEntry(document as unknown as import("vscode").TextDocument, "Newton1687", null, new Set());
+  assert.deepEqual(calls, [["source"]]);
 });

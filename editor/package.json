@@ -127,13 +127,27 @@
             "Open materials with the operating system's default application."
           ],
           "default": "editor",
-          "markdownDescription": "Where a click on a material in the detail pane's **Materials** list opens it. `editor` (the default) opens it inside VS Code, beside the view; this never runs the file. VS Code has no built-in PDF viewer, so without a PDF viewer extension a PDF opens to the binary-file placeholder and a one-time notification offers the system viewer instead. `system` hands it to the operating system's default application. Each material also offers the other choice as a secondary action, and Alt-click (Option-click) takes it. A directory is revealed rather than opened: in the Explorer when it is inside the workspace and `editor` applies, otherwise in the system file manager.",
+          "markdownDescription": "Where materials open, including entry double-clicks configured to open a PDF and clicks in the detail pane's **Materials** list. `editor` (the default) opens it inside VS Code, beside the view; this never runs the file. VS Code has no built-in PDF viewer, so without a PDF viewer extension a PDF opens to the binary-file placeholder and a one-time notification offers the system viewer instead. `system` hands it to the operating system's default application. Each material also offers the other choice as a secondary action, and Alt-click (Option-click) takes it. A directory is revealed rather than opened: in the Explorer when it is inside the workspace and `editor` applies, otherwise in the system file manager.",
           "scope": "window"
         },
         "pynakes.allowOnlineLookups": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Allow the bibliography view to reach the network: \"Compare with remote\" (`ref compare --online`), importing a reference by identifier (`ref import`), and fetching an entry's missing materials (`asset fetch`). On by default; disable to keep the view fully offline — compare still runs and reports that lookups are disabled, and Import and Fetch say so instead of failing at the provider.",
+          "markdownDescription": "Allow the bibliography view to reach the network: \"Compare with remote\" (`ref compare --online`), importing a reference by identifier (`ref import`), and fetching an entry's missing materials (`asset fetch`). On by default; disable to keep the view fully offline \u2014 compare still runs and reports that lookups are disabled, and Import and Fetch say so instead of failing at the provider.",
+          "scope": "window"
+        },
+        "pynakes.doubleClickAction": {
+          "type": "string",
+          "enum": [
+            "openPdf",
+            "source"
+          ],
+          "enumDescriptions": [
+            "Open a local PDF attached to the entry.",
+            "Open the entry declaration in the BibTeX source."
+          ],
+          "default": "openPdf",
+          "markdownDescription": "What double-clicking an entry does. PDF opening uses `#pynakes.openMaterialsWith#`; when several PDFs are available, choose one from a list.",
           "scope": "window"
         }
       }

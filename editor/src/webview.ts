@@ -31,6 +31,7 @@ const SCRIPTS = [
   "detail.js",
   "compare.js",
   "duplicates.js",
+  "libraryPanels.js",
   "panels.js",
   "layout.js",
   "main.js",
@@ -96,10 +97,6 @@ ${styles}
             title="Add a reference from a DOI, arXiv id, or supported URL">Import…</button>
     <button id="add-entry" class="button" type="button"
             title="Add an empty entry to fill in here">New entry</button>
-    <button id="find-duplicates" class="button" type="button"
-            title="Find entries the engine judges to be the same work">Duplicates</button>
-    <button id="fetch-materials" class="button" type="button"
-            title="Download every entry's missing materials, after approving the files it would write">Fetch materials…</button>
   </span>
 </header>
 <div id="banner" class="banner" hidden></div>

@@ -215,11 +215,12 @@
   gap: 2px;
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
+  overflow-x: auto;
 }
 
 .pane-tab-holder {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 0;
 }
@@ -607,3 +608,29 @@
 .chip-remove:hover {
   opacity: 1;
 }
+
+.metadata-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) 3fr;
+  gap: 12px;
+  padding: 5px 0;
+}
+.metadata-row code { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 5em; overflow: auto; }
+.metadata-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.metadata-form label { display: flex; gap: 6px; align-items: center; }
+.metadata-form label:has(textarea) { flex-basis: 100%; align-items: start; }
+.metadata-form textarea { flex: 1; min-width: 0; }
+.metadata-form input:not([type="checkbox"]),
+.metadata-form select,
+.metadata-form textarea {
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  font: inherit;
+  padding: 5px;
+}
+.metadata-form textarea { font-family: var(--vscode-editor-font-family, monospace); }
+
+.metadata-value { flex-basis: 100%; }
+.metadata-value label { align-items: start; }
+.metadata-value select { min-width: 180px; }

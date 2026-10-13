@@ -81,6 +81,8 @@ function openView(): View {
   // webview would load them.
   const dom = new JSDOM(html, { runScripts: "outside-only", pretendToBeVisual: true, virtualConsole });
   const { window } = dom;
+  // jsdom has no layout or scrolling; keyboard selection still runs normally.
+  window.HTMLElement.prototype.scrollIntoView = () => {};
   let state: unknown;
   Object.assign(window, {
     acquireVsCodeApi: () => ({
@@ -141,6 +143,7 @@ class Host {
           payload: {
             rows: read.rows,
             summary: read.summary,
+            metadata: read.metadata,
             groups: read.groups,
             groupsByEntry: read.groupsByEntry,
             lint: read.lint,
@@ -265,6 +268,7 @@ for (const fixture of [
     click(view, "#uncited");
     assertHealthy(view, "filtering and sorting");
 
+    click(view, '.tab[data-pane="duplicates"]');
     view.document.getElementById("find-duplicates")?.click();
     await host.drain();
     assertHealthy(view, "after finding duplicates");
@@ -416,28 +420,29 @@ test("fetching materials is handed to the extension, one fetch at a time", { ski
   assert.ok(typeof request.key === "string" && request.key, "a per-entry fetch names its key");
   assertHealthy(view, "after asking to fetch");
 
-  // While it runs, neither the entry's button nor the toolbar's starts another.
+  // While it runs, neither the entry's button nor the Materials pane's starts another.
   const busy = view.document.querySelector<HTMLButtonElement>("button.material-fetch");
   assert.equal(busy?.textContent, "Fetching…");
   assert.equal(busy?.disabled, true);
-  const toolbar = view.document.getElementById("fetch-materials") as HTMLButtonElement;
-  assert.equal(toolbar.disabled, true);
+  click(view, '.tab[data-pane="materials"]');
+  const toolbar = () => view.document.getElementById("fetch-materials") as HTMLButtonElement;
+  assert.equal(toolbar().disabled, true);
 
   view.post({ type: "fetchState", key: request.key, busy: false });
   view.post({ type: "fetchDone", level: "success", message: "Fetched 1 file." });
   assertHealthy(view, "after the fetch ended");
   assert.equal(view.document.querySelector<HTMLButtonElement>("button.material-fetch")?.disabled, false);
-  assert.equal(toolbar.disabled, false);
+  assert.equal(toolbar().disabled, false);
   assert.match(view.document.getElementById("notice")?.textContent ?? "", /Fetched 1 file/);
 
-  toolbar.click();
+  toolbar().click();
   const all = asked(view, "fetchMaterials")[1];
-  assert.equal(all.key, undefined, "the toolbar fetches for every entry");
+  assert.equal(all.key, undefined, "the Materials pane fetches for every entry");
   assert.equal(view.document.querySelector<HTMLButtonElement>("button.material-fetch")?.disabled, true);
   view.post({ type: "fetchState", key: null, busy: false });
   view.post({ type: "mutationError", label: "Fetch missing materials", message: "Online lookups are disabled." });
   assertHealthy(view, "after a refused fetch");
-  assert.equal(toolbar.disabled, false);
+  assert.equal(toolbar().disabled, false);
 });
 
 test("a material opens where the setting says, or the other way on request", { skip }, async () => {
@@ -451,6 +456,9 @@ test("a material opens where the setting says, or the other way on request", { s
   const { view, host } = await opened("", file);
   click(view, '.tab[data-pane="edit"]');
   view.document.querySelector<HTMLElement>("#rows tr")?.click();
+
+  view.document.querySelector("#rows tr")!.dispatchEvent(new view.window.MouseEvent("dblclick", { bubbles: true }));
+  assert.deepEqual({ ...asked(view, "doubleClickEntry").at(-1) }, { type: "doubleClickEntry", key: "Newton1687" });
 
   const material = () => view.document.querySelector<HTMLButtonElement>(".material .link-button");
   const alternate = () => view.document.querySelector<HTMLButtonElement>(".material .material-alt");
@@ -629,6 +637,7 @@ test("duplicate-cluster keys are buttons that select their entry", { skip }, asy
       "  year = {1843},\n  doi = {10.5555/engine}\n}\n",
   );
   const { view, host } = await opened("refs.bib", file);
+  click(view, '.tab[data-pane="duplicates"]');
   view.document.getElementById("find-duplicates")?.click();
   await host.drain();
 
@@ -680,4 +689,127 @@ test("a key rename holds the key field until its mutation ends, however it ends"
     assert.equal(field()?.value, original, `and showing the key as it is, after ${ending.type}`);
   }
   assertHealthy(view, "after renames that wrote nothing");
+});
+
+
+test("multi-selection supports ranges, toggles, bulk actions and filtering", { skip }, async () => {
+  const file = tempBib(["Newton1687", "Euler1748", "Gauss1801"].map((key) =>
+    `@book{${key}, title={Historical work}, groups={${key === "Newton1687" ? "Mechanics" : "Mathematics"}}}\n`,
+  ).join(""));
+  const { view } = await opened("", file);
+  const row = (key: string) => view.document.querySelector<HTMLElement>(`#rows tr[data-key="${key}"]`)!;
+  const select = (key: string, modifiers: MouseEventInit = {}) => row(key).dispatchEvent(
+    new view.window.MouseEvent("click", { bubbles: true, ...modifiers }),
+  );
+  const selected = () => [...view.document.querySelectorAll<HTMLElement>("#rows tr.selected")].map((row) => row.dataset.key);
+  select("Newton1687");
+  select("Gauss1801", { shiftKey: true });
+  assert.deepEqual(selected(), ["Newton1687", "Euler1748", "Gauss1801"]);
+  select("Euler1748", { ctrlKey: true });
+  assert.deepEqual(selected(), ["Newton1687", "Gauss1801"]);
+  const action = (text: string) => [...view.document.querySelectorAll<HTMLButtonElement>(".detail-section button")].find((button) => button.textContent === text)!.click();
+  action("Add to group…");
+  assert.deepEqual(Array.from(asked(view, "promptGroup").at(-1)!.keys as string[]), selected());
+  action("Remove from group…");
+  assert.equal(asked(view, "promptGroup").at(-1)!.member, false);
+  action("Remove entries…");
+  assert.deepEqual(JSON.parse(JSON.stringify(asked(view, "mutate").at(-1)!.mutation)), {
+    kind: "remove", keys: ["Newton1687", "Gauss1801"], keepFiles: false,
+  });
+  select("Newton1687");
+  press(view, row("Newton1687"), "ArrowDown", { shiftKey: true });
+  assert.deepEqual(selected(), ["Newton1687", "Euler1748"]);
+  press(view, row("Euler1748"), "a", { ctrlKey: true });
+  assert.deepEqual(selected(), ["Newton1687", "Euler1748", "Gauss1801"]);
+  select("Newton1687");
+  const query = view.document.getElementById("query")!;
+  press(view, query, "a", { ctrlKey: true });
+  assert.deepEqual(selected(), ["Newton1687"], "select-all in the search input stays in the input");
+  select("Gauss1801", { metaKey: true });
+  // Filtering must drop hidden keys from the bulk action's selection.
+  groupRow(view, "Mechanics")!.click();
+  assert.deepEqual(selected(), ["Newton1687"]);
+  assert.equal(view.document.querySelector(".detail-section h3")?.textContent, "Groups");
+  assertHealthy(view, "after bulk selection");
+});
+
+test("dragging a selection onto a group requests one bulk membership mutation", { skip }, async () => {
+  const file = tempBib("@book{Newton1687, title={Principia}, groups={Mechanics}}\n@book{Euler1748, title={Analysis}}\n");
+  const { view } = await opened("", file);
+  const rows = [...view.document.querySelectorAll<HTMLElement>("#rows tr")];
+  rows[0].click();
+  rows[1].dispatchEvent(new view.window.MouseEvent("click", { bubbles: true, metaKey: true }));
+  const transfer = { setData() {}, effectAllowed: "", dropEffect: "" };
+  const drag = (target: Element, type: string) => {
+    const event = new view.window.Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "dataTransfer", { value: transfer });
+    target.dispatchEvent(event);
+    return event;
+  };
+  drag(rows[0], "dragstart");
+  const group = groupRow(view, "Mechanics")!;
+  assert.ok(drag(group, "dragover").defaultPrevented);
+  drag(group, "drop");
+  assert.deepEqual(JSON.parse(JSON.stringify(asked(view, "mutate").at(-1)!.mutation)), {
+    kind: "groups", keys: ["Newton1687", "Euler1748"], group: "Mechanics", member: true,
+  });
+  const count = asked(view, "mutate").length;
+  drag(group, "drop");
+  assert.equal(asked(view, "mutate").length, count, "an unrelated drag is ignored");
+  assertHealthy(view, "after drag and drop");
+});
+
+
+test("metadata is editable in its dock and the toolbar contains only entry creation actions", { skip }, async () => {
+  const file = tempBib("@book{Newton1687, title={Principia}}\n@Comment{pynakes-meta:notes:Original;}\n");
+  const { view } = await opened("", file);
+  assert.deepEqual([...view.document.querySelectorAll(".toolbar-actions button")].map((button) => button.id), ["import-entry", "add-entry"]);
+  click(view, '.tab[data-pane="metadata"]');
+  const button = (text: string) => [...view.document.querySelectorAll<HTMLButtonElement>(".pane-content button")].find((button) => button.textContent === text)!;
+  button("pynakes: notes").click();
+  const textarea = view.document.querySelector<HTMLTextAreaElement>(".metadata-form textarea")!;
+  assert.equal(textarea.value, "Original;");
+  textarea.value = "Edited notes";
+  textarea.dispatchEvent(new view.window.Event("input", { bubbles: true }));
+  click(view, '.tab[data-pane="materials"]');
+  assert.ok(view.document.getElementById("fetch-materials"));
+  click(view, '.tab[data-pane="metadata"]');
+  assert.equal(view.document.querySelector<HTMLTextAreaElement>(".metadata-form textarea")!.value, "Edited notes");
+  button("Review change…").click();
+  assert.deepEqual(JSON.parse(JSON.stringify(asked(view, "mutate").at(-1)!.mutation)), {
+    kind: "metadata", edit: { namespace: "pynakes", key: "notes", value: "Edited notes", allowUnknown: false },
+  });
+  button("Remove block…").click();
+  assert.equal((asked(view, "mutate").at(-1)!.mutation as { edit: { value: unknown } }).edit.value, null);
+  button("New metadata").click();
+  assert.equal(view.document.querySelector<HTMLInputElement>(".metadata-form input")!.value, "");
+  button("Cancel").click();
+  assert.equal(view.document.querySelector(".metadata-form"), null);
+  assertHealthy(view, "after editing metadata");
+});
+
+
+test("metadata uses engine choices and preserves existing values until edited", { skip }, async () => {
+  const file = tempBib("@book{Newton1687, title={Principia}}\n@Comment{jabref-meta:databaseType:BIBTEX;}\n");
+  const { view } = await opened("", file);
+  click(view, '.tab[data-pane="metadata"]');
+  const button = (text: string) => [...view.document.querySelectorAll<HTMLButtonElement>(".pane-content button")].find((button) => button.textContent === text)!;
+  button("jabref: databaseType").click();
+  let select = view.document.querySelector<HTMLSelectElement>(".metadata-value select")!;
+  assert.ok(select);
+  assert.equal(select.value, "BIBTEX;");
+  assert.deepEqual([...select.options].map((option) => option.value), ["BIBTEX;", "biblatex", "bibtex"]);
+  select.value = "biblatex";
+  select.dispatchEvent(new view.window.Event("change", { bubbles: true }));
+  button("Review change…").click();
+  assert.equal((asked(view, "mutate").at(-1)!.mutation as { edit: { value: string } }).edit.value, "biblatex");
+  const key = view.document.querySelector<HTMLInputElement>(".metadata-form input")!;
+  key.value = "notes";
+  key.dispatchEvent(new view.window.Event("input", { bubbles: true }));
+  assert.equal(view.document.querySelector<HTMLTextAreaElement>(".metadata-value textarea")!.value, "biblatex");
+  key.value = "format-trailing-comma";
+  key.dispatchEvent(new view.window.Event("input", { bubbles: true }));
+  select = view.document.querySelector<HTMLSelectElement>(".metadata-value select")!;
+  assert.deepEqual([...select.options].map((option) => option.value), ["biblatex", "false", "true"]);
+  assertHealthy(view, "after selecting finite metadata values");
 });

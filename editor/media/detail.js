@@ -353,7 +353,7 @@ window.PV = window.PV || {};
       "it would write are listed for approval first; this reaches the network.";
     fetch.addEventListener("click", () => {
       PV.state.fetchBusy = row.key;
-      // One fetch at a time: the toolbar's whole-library fetch waits too.
+      // One fetch at a time: the Materials pane's whole-library fetch waits too.
       const all = document.getElementById("fetch-materials");
       if (all) {
         all.disabled = true;
@@ -471,6 +471,26 @@ window.PV = window.PV || {};
       return;
     }
     const s = PV.state;
+    if (s.selectedKeys.size > 1) {
+      const keys = [...s.selectedKeys];
+      const section = document.createElement("div");
+      section.className = "detail-section";
+      const heading = document.createElement("h3");
+      heading.textContent = `${keys.length} entries selected`;
+      const names = document.createElement("p");
+      names.textContent = keys.join(", ");
+      const groups = PV.declaredGroupNames();
+      const memberships = [...new Set(keys.flatMap((key) => PV.own(s.groupsByEntry, key) || []))];
+      section.append(heading, names,
+        PV.button("button", "Add to group…", null, () => PV.post({ type: "promptGroup", keys, groups })),
+        PV.button("button", "Remove from group…", null, () => PV.post({ type: "promptGroup", keys, groups: memberships, member: false })),
+        PV.button("button", "Remove entries…", "Review the removal diff", () => PV.post({
+          type: "mutate", mutation: { kind: "remove", keys, keepFiles: false },
+        })),
+      );
+      target.replaceChildren(section);
+      return;
+    }
     const row =
       s.visible.find((candidate) => candidate.key === s.selectedKey) ||
       s.rows.find((candidate) => candidate.key === s.selectedKey);

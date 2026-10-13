@@ -13,7 +13,35 @@ release. Its version says nothing about which engine it runs.
 
 ## [Unreleased] - 0.1.0
 
+### Changed
+
+- Refresh inspection, groups, and lint through one engine invocation, reducing
+  a saved bibliography refresh from six processes to three. Citation and material
+  reads remain parallel and use the saved bibliography's location.
+
 ### Added
+
+- Metadata values with finite choices use engine-supplied dropdowns, including
+  dialect, journal and formatting settings, and Boolean options. Existing values
+  are preserved until explicitly changed; free-form values retain a text area.
+
+- A Metadata dock tab for adding, editing, and removing pynakes/JabRef metadata
+  through engine validation and the existing diff-and-approval flow. Drafts
+  survive switching tabs.
+- A Materials tab for bibliography-wide fetching. The Duplicates tab now owns
+  its scan button; the top bar keeps search/filter controls, Import, and New
+  entry. Clicking a bottom tab also expands a collapsed dock.
+
+- Multi-selection with Ctrl/Cmd-click, Shift-click, Shift+arrow keys, and
+  Ctrl/Cmd+A. The selection can be added to or removed from a group, or deleted,
+  through one combined preview and approval. Hidden rows leave the selection
+  when filtering. Drag entries onto a group to add membership while preserving
+  their other memberships; group changes use the engine's atomic batch operation.
+
+- Configurable entry double-click action: `pynakes.doubleClickAction` defaults to
+  `openPdf`, using the material viewer preference and offering a choice for
+  multiple PDFs. Select `source` to restore the previous source-jump behavior.
+  Entries without a local PDF show a notification.
 
 - `editor/`: a VS Code / Open VSX extension companion. It opens a `.bib` file
   as a sortable, filterable entry table (blank values sort last in either

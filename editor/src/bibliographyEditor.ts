@@ -41,7 +41,10 @@ import {
   reportDuplicates,
   runMutation,
 } from "./mutations";
-import { collectOpenablePaths, openCitation, openMaterial, revealEntry } from "./navigation";
+import type { MaterialIndex } from "./insights";
+import {
+  collectOpenablePaths, doubleClickEntry, openCitation, openMaterial, revealEntry,
+} from "./navigation";
 import { type PynakesCommand, describeCommand } from "./pynakes";
 import { commitStaged, previewStaged, type StagingHost } from "./stagedCommit";
 import {
@@ -71,6 +74,8 @@ interface MirrorContext {
 interface ViewMessage {
   type?: string;
   key?: string;
+  keys?: string[];
+  member?: boolean;
   field?: string;
   value?: string | null;
   /** The value a staged change was made against; null when the field was absent. */
@@ -116,6 +121,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
    * webview is the least trustworthy part of this extension — so a path is
    * opened only when the last read actually reported it.
    */
+  private readonly entryMaterials = new WeakMap<vscode.WebviewPanel, MaterialIndex | null>();
   private readonly openablePaths = new WeakMap<vscode.WebviewPanel, Set<string>>();
 
   /** Every open panel per document, so a staging change reaches each view of it. */
@@ -336,6 +342,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       const settings = viewSettings(document);
       this.findings.publishLint(document, result.read.lint, settings.showFindings);
       this.findings.publishCitations(document, result.read.citations, settings.showFindings);
+      this.entryMaterials.set(panel, result.read.materials);
       this.openablePaths.set(
         panel,
         collectOpenablePaths(result.read.citations, result.read.materials),
@@ -459,6 +466,13 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
           await renameKey(host(), message.key, message.newKey);
         }
         return;
+      case "doubleClickEntry":
+        if (message.key) {
+          await doubleClickEntry(
+            document, message.key, this.entryMaterials.get(panel), this.openablePaths.get(panel),
+          );
+        }
+        return;
       case "reveal":
         if (message.key) {
           await revealEntry(document, message.key);
@@ -506,8 +520,10 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         await promptImport(host());
         return;
       case "promptGroup":
-        if (message.key) {
-          await promptGroup(host(), message.key, message.groups ?? []);
+        if (message.keys?.length || message.key) {
+          await promptGroup(
+            host(), message.keys ?? [message.key!], message.groups ?? [], message.member !== false,
+          );
         }
         return;
       case "groupActions":
@@ -652,6 +668,7 @@ function toPayload(read: LibraryRead): Record<string, unknown> {
   return {
     rows: read.rows,
     summary: read.summary,
+    metadata: read.metadata,
     groups: read.groups,
     groupsByEntry: read.groupsByEntry,
     lint: read.lint,

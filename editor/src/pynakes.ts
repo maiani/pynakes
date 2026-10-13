@@ -73,6 +73,15 @@ export function inspectBib(
   return runJson<InspectEnvelope>(command, ["inspect", filePath, "--display"], cwd);
 }
 
+/** Inspection, group reports, and lint from one engine snapshot. */
+export function inspectLibrary(
+  command: PynakesCommand,
+  filePath: string,
+  cwd?: string,
+): Promise<InspectEnvelope> {
+  return runJson<InspectEnvelope>(command, ["inspect", filePath, "--display", "--insights"], cwd);
+}
+
 /** The declared group hierarchy from the file's metadata. */
 export function groupsTree(
   command: PynakesCommand,
@@ -243,10 +252,22 @@ export async function corpusBatch(
   expectSha256?: string,
   cwd?: string,
 ): Promise<CorpusBatchEnvelope> {
+  return corpusOperations(command, filePath, requests.map(refEditOperation), dryRun, expectSha256, cwd);
+}
+
+/** Submit engine operations together, with one preview and atomic commit. */
+export async function corpusOperations(
+  command: PynakesCommand,
+  filePath: string,
+  operations: Array<RefEditOperation | { op: "groups.add_entry" | "groups.remove_entry"; key: string; group: string; create?: boolean }>,
+  dryRun: boolean,
+  expectSha256?: string,
+  cwd?: string,
+): Promise<CorpusBatchEnvelope> {
   const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "pynakes-batch-"));
   try {
     const opsFile = path.join(dir, "ops.json");
-    await fs.promises.writeFile(opsFile, JSON.stringify(requests.map(refEditOperation)), "utf-8");
+    await fs.promises.writeFile(opsFile, JSON.stringify(operations), "utf-8");
     return await runJson<CorpusBatchEnvelope>(
       command,
       corpusBatchArgs(filePath, opsFile, dryRun, expectSha256),
@@ -695,4 +716,32 @@ export async function engineVersion(
   } catch {
     return undefined;
   }
+}
+
+/** One metadata block, validated and surgically edited by the engine. */
+export interface MetadataEdit {
+  namespace: "pynakes" | "jabref";
+  key: string;
+  /** null removes the block; an empty string remains a set operation. */
+  value: string | null;
+  allowUnknown?: boolean;
+}
+
+export function metadataEditArgs(
+  filePath: string, edit: MetadataEdit, dryRun: boolean, expectSha256?: string,
+): string[] {
+  const flags = ["--namespace", edit.namespace];
+  if (edit.value !== null && edit.allowUnknown) flags.push("--allow-unknown");
+  return invocation(
+    ["metadata", edit.value === null ? "remove" : "set", filePath],
+    modifyingFlags(flags, dryRun, expectSha256),
+    edit.value === null ? [edit.key] : [edit.key, edit.value],
+  );
+}
+
+export function editMetadata(
+  command: PynakesCommand, filePath: string, edit: MetadataEdit,
+  dryRun: boolean, cwd?: string, expectSha256?: string,
+): Promise<MutationEnvelope> {
+  return runJson<MutationEnvelope>(command, metadataEditArgs(filePath, edit, dryRun, expectSha256), cwd);
 }

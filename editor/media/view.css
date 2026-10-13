@@ -628,3 +628,9 @@ body.resizing * {
   margin: 16px 12px;
   color: var(--vscode-descriptionForeground);
 }
+
+.group-row.drop-target {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: -2px;
+  background: var(--vscode-list-dropBackground);
+}

@@ -29,8 +29,6 @@ window.PV = window.PV || {};
     headers: document.querySelectorAll("th[data-col]"),
     importEntry: document.getElementById("import-entry"),
     addEntry: document.getElementById("add-entry"),
-    findDuplicates: document.getElementById("find-duplicates"),
-    fetchMaterials: document.getElementById("fetch-materials"),
     sidebarSplitter: document.getElementById("sidebar-splitter"),
     detailSplitter: document.getElementById("detail-splitter"),
     panelSplitter: document.getElementById("panel-splitter"),
@@ -73,19 +71,6 @@ window.PV = window.PV || {};
   // builds an entry or a group name itself.
   elements.importEntry.addEventListener("click", () => PV.post({ type: "promptImport" }));
   elements.addEntry.addEventListener("click", () => PV.post({ type: "promptAdd" }));
-  elements.fetchMaterials.addEventListener("click", () => {
-    // Every entry's; the extension plans it and asks before anything is fetched.
-    PV.state.fetchBusy = "*";
-    elements.fetchMaterials.disabled = true;
-    PV.renderDocks();
-    PV.post({ type: "fetchMaterials" });
-  });
-  elements.findDuplicates.addEventListener("click", () => {
-    PV.state.duplicates = "loading";
-    PV.showPane("duplicates");
-    PV.post({ type: "findDuplicates" });
-  });
-
   elements.uncited.addEventListener("change", () => {
     PV.state.uncitedOnly = elements.uncited.checked;
     PV.persist();
@@ -129,7 +114,7 @@ window.PV = window.PV || {};
   elements.query.addEventListener("keydown", (event) => {
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      PV.moveSelection(1);
+      PV.moveSelection(1, event);
     } else if (event.key === "Escape" && elements.query.value) {
       event.preventDefault();
       elements.query.value = "";
@@ -159,12 +144,15 @@ window.PV = window.PV || {};
     if (typing || event.defaultPrevented) {
       return;
     }
-    if (event.key === "ArrowDown") {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a" && !control) {
       event.preventDefault();
-      PV.moveSelection(1);
+      PV.selectAll();
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      PV.moveSelection(1, event);
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      PV.moveSelection(-1);
+      PV.moveSelection(-1, event);
     } else if (event.key === "Enter" && !control && PV.state.selectedKey) {
       event.preventDefault();
       PV.post({ type: "reveal", key: PV.state.selectedKey });
@@ -242,6 +230,7 @@ window.PV = window.PV || {};
         s.lint = message.payload.lint || null;
         s.citations = message.payload.citations || null;
         s.materials = message.payload.materials || null;
+        s.metadata = message.payload.metadata || null;
         s.warnings = message.payload.warnings || [];
         s.engine = message.engine;
         s.dirty = message.dirty;
@@ -345,6 +334,7 @@ window.PV = window.PV || {};
         PV.showPane("duplicates");
         break;
       case "mutationDone":
+        if (message.metadataChanged) s.metadataDraft = null;
         notify("success", message.label + ": done.");
         // Any write can invalidate the cluster list — a merge resolves one, a
         // remove can empty one, an import can create one. Clearing it says
@@ -355,6 +345,8 @@ window.PV = window.PV || {};
           PV.persist();
         }
         if (message.renamedKey && s.selectedKey === message.renamedKey.from) {
+          s.selectedKeys.delete(message.renamedKey.from);
+          s.selectedKeys.add(message.renamedKey.to);
           s.selectedKey = message.renamedKey.to;
           PV.persist();
         }
@@ -362,6 +354,7 @@ window.PV = window.PV || {};
           // The reload that follows renders the table; remembering the key here
           // means the new entry is selected as soon as it exists.
           s.selectedKey = message.select;
+          s.selectedKeys = new Set([message.select]);
           PV.persist();
         }
         break;
@@ -369,7 +362,6 @@ window.PV = window.PV || {};
         // The fetch is over, whatever its outcome: its buttons work again.
         if (!message.busy) {
           s.fetchBusy = null;
-          elements.fetchMaterials.disabled = false;
           PV.renderDocks();
         }
         break;
@@ -419,6 +411,8 @@ window.PV = window.PV || {};
       case "parseError":
         s.rows = [];
         s.summary = null;
+        s.metadata = null;
+        s.materials = null;
         s.groups = [];
         s.lint = null;
         showBanner(
@@ -446,6 +440,8 @@ window.PV = window.PV || {};
       case "engineError":
         s.rows = [];
         s.summary = null;
+        s.metadata = null;
+        s.materials = null;
         s.groups = [];
         s.lint = null;
         showBanner(

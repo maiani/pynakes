@@ -16,6 +16,7 @@
  */
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { test } from "node:test";
@@ -27,6 +28,7 @@ import {
   groupsList,
   groupsTree,
   inspectBib,
+  inspectLibrary,
   keysRename,
   lintBib,
   refAdd,
@@ -65,6 +67,14 @@ test("inspect/groups/lint/search return their documented envelope shape", { skip
 
   const lint = await lintBib(command, file);
   assert.equal(lint.status, "success");
+
+  const combined = await inspectLibrary(command, file);
+  assert.equal(combined.status, "success");
+  if (combined.status === "success") {
+    assert.deepEqual(combined.insights, { groups_tree: tree, groups_list: list, lint });
+    const { insights, ...base } = combined;
+    assert.deepEqual(base, inspected);
+  }
 
   const search = await searchBib(command, file, { query: "Smith" });
   if (search.status !== "success") {
@@ -602,4 +612,37 @@ test("a hierarchy edit is applied only to the file its preview read", { skip }, 
 
   assert.equal(!stale.ok && stale.conflict === true && stale.error, "ExternalModification");
   assert.equal(fs.readFileSync(file, "utf-8"), moved);
+});
+
+test("bulk group membership previews and commits atomically", { skip }, async () => {
+  const file = tempBib("@book{Newton1687, title={Principia}}\n@book{Euler1748, title={Analysis}}\n");
+  const mutation: Mutation = { kind: "groups", keys: ["Newton1687", "Euler1748"], group: "Classics", member: true, create: true };
+  const added = await previewThenApply(file, mutation);
+  assert.deepEqual(added.rewrittenKeys.sort(), ["Euler1748", "Newton1687"]);
+  const before = fs.readFileSync(file, "utf-8");
+  const refused = await applyMutation(command, file, { ...mutation, keys: ["Newton1687", "Missing"], member: false }, createHash("sha256").update(before).digest("hex"));
+  assert.equal(refused.ok, false);
+  assert.equal(fs.readFileSync(file, "utf-8"), before, "a failed batch writes nothing");
+  await previewThenApply(file, { ...mutation, member: false });
+  assert.ok(!fs.readFileSync(file, "utf-8").includes("Classics"));
+  await previewThenApply(file, { kind: "remove", keys: mutation.keys, keepFiles: true });
+  assert.ok(!fs.readFileSync(file, "utf-8").includes("@book"));
+});
+
+
+test("metadata edits round-trip through the engine with preview and validation", { skip }, async () => {
+  const file = tempBib("@book{Newton1687, title={Principia}}\n");
+  const edit = { namespace: "pynakes" as const, key: "notes", value: "Library notes" };
+  await previewThenApply(file, { kind: "metadata", edit });
+  let read = await inspectBib(command, file);
+  assert.equal(read.status, "success");
+  if (read.status === "success") assert.equal(read.pynakes_metadata.values.notes, "Library notes");
+  await previewThenApply(file, { kind: "metadata", edit: { ...edit, value: "Revised notes" } });
+  const before = fs.readFileSync(file, "utf-8");
+  const refused = await previewMutation(command, file, { kind: "metadata", edit: { namespace: "jabref", key: "unknown-test-key", value: "value" } });
+  assert.equal(refused.ok, false);
+  assert.equal(fs.readFileSync(file, "utf-8"), before);
+  await previewThenApply(file, { kind: "metadata", edit: { ...edit, value: null } });
+  read = await inspectBib(command, file);
+  if (read.status === "success") assert.equal(read.pynakes_metadata.values.notes, undefined);
 });

@@ -79,7 +79,11 @@ window.PV = window.PV || {};
     selectedGroup: persisted.selectedGroup || null,
     collapsedGroups: new Set(Array.isArray(persisted.collapsed) ? persisted.collapsed : []),
     sidebarCollapsed: Boolean(persisted.sidebarCollapsed),
+    metadata: null,
+    metadataDraft: null,
     selectedKey: persisted.selectedKey || null,
+    selectedKeys: new Set(persisted.selectedKey ? [persisted.selectedKey] : []),
+    selectionAnchor: persisted.selectedKey || null,
     sortColumn: persisted.sortColumn || "index",
     sortDescending: Boolean(persisted.sortDescending),
     // Which pane is active in each dock ("right" / "bottom").
@@ -94,6 +98,8 @@ window.PV = window.PV || {};
       diff: persisted.paneDock?.diff || "bottom",
       compare: persisted.paneDock?.compare || "bottom",
       duplicates: persisted.paneDock?.duplicates || "bottom",
+      metadata: persisted.paneDock?.metadata || "bottom",
+      materials: persisted.paneDock?.materials || "bottom",
     },
     panelCollapsed: Boolean(persisted.panelCollapsed),
     // Column widths in pixels, by column position. Empty means the stylesheet

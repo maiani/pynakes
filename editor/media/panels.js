@@ -19,13 +19,15 @@ window.PV = window.PV || {};
   "use strict";
 
   /** Pane definitions: canonical order and their labels. */
-  const PANE_ORDER = ["edit", "findings", "diff", "compare", "duplicates"];
+  const PANE_ORDER = ["edit", "findings", "diff", "compare", "duplicates", "materials", "metadata"];
   const PANE_LABEL = {
     edit: "Edit",
     findings: "Findings",
     diff: "Staged diff",
     compare: "Compare",
     duplicates: "Duplicates",
+    materials: "Materials",
+    metadata: "Metadata",
   };
 
   const els = {};
@@ -87,6 +89,7 @@ window.PV = window.PV || {};
     button.textContent = count === null ? PANE_LABEL[pane] : PANE_LABEL[pane] + " (" + count + ")";
     button.addEventListener("click", () => {
       PV.state.dock[locationOf(pane)] = pane;
+      if (locationOf(pane) === "bottom") PV.state.panelCollapsed = false;
       PV.persist();
       PV.renderDocks();
     });
@@ -155,6 +158,8 @@ window.PV = window.PV || {};
 
   /** Render one pane's content into `target`. */
   function renderPane(pane, target, options) {
+    if (pane === "metadata") return PV.renderMetadata(target);
+    if (pane === "materials") return PV.renderMaterials(target);
     if (pane === "findings") {
       return renderFindings(target);
     }

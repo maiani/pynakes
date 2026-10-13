@@ -108,6 +108,7 @@ function mutationKeys(mutation: Mutation): string[] {
     case "import":
       return mutation.request.key ? [mutation.request.key] : [];
     case "remove":
+    case "groups":
       return mutation.keys;
     case "group":
       return [mutation.key];
@@ -122,6 +123,8 @@ function mutationKeys(mutation: Mutation): string[] {
       // renamed entry would be orphaned. Entries whose `crossref` follows the
       // rename are named by the preview's plan.
       return [mutation.oldKey];
+    case "metadata":
+      return [];
     case "groupTree":
       // The hierarchy lives in the file's metadata, not in any entry. The
       // entries a rename moves are known only from its preview, and are
@@ -366,23 +369,27 @@ export async function promptImport(host: MutationHost): Promise<void> {
  */
 export async function promptGroup(
   host: MutationHost,
-  key: string,
+  keys: string[],
   candidates: string[],
+  member = true,
 ): Promise<void> {
+  if (!keys.length) return;
+  const key = keys.length === 1 ? keys[0] : `${keys.length} entries`;
+  const title = `${member ? "Add" : "Remove"} ${key} ${member ? "to" : "from"} a group`;
   const NEW_GROUP = "$(add) New group…";
   const picked = candidates.length
-    ? await vscode.window.showQuickPick([...candidates, NEW_GROUP], {
-        title: `Add ${key} to a group`,
+    ? await vscode.window.showQuickPick(member ? [...candidates, NEW_GROUP] : candidates, {
+        title,
         placeHolder: "Group name",
       })
-    : NEW_GROUP;
+    : member ? NEW_GROUP : undefined;
   if (!picked) {
     return;
   }
   let group = picked;
   if (picked === NEW_GROUP) {
     const typed = await vscode.window.showInputBox({
-      title: `Add ${key} to a group`,
+      title,
       prompt: "Group name",
       validateInput: (value) =>
         // `;` separates memberships in the stored field, so a name containing
@@ -396,10 +403,9 @@ export async function promptGroup(
   }
   // Only a name typed under "New group…" may create a group.
   await runMutation(host, {
-    kind: "group",
-    key,
+    ...(keys.length === 1 ? { kind: "group", key: keys[0] } : { kind: "groups", keys }),
     group,
-    member: true,
+    member,
     create: picked === NEW_GROUP,
   });
 }
@@ -523,6 +529,7 @@ export async function runMutation(
     }
     host.post({
       type: "mutationDone",
+      metadataChanged: mutation.kind === "metadata",
       label,
       warnings: applied.warnings,
       // An entry that was just created is almost certainly the one to edit

@@ -19,10 +19,18 @@ window.PV = window.PV || {};
    */
   PV.renderDuplicates = (target) => {
     const duplicates = PV.state.duplicates;
+    const scan = PV.button("button", "Find duplicates", "Scan this bibliography for repeated works", () => {
+      PV.state.duplicates = "loading";
+      PV.renderDocks();
+      PV.post({ type: "findDuplicates" });
+    });
+    scan.id = "find-duplicates";
+    scan.disabled = duplicates === "loading";
+    target.appendChild(scan);
     if (duplicates === null) {
       const hint = document.createElement("p");
       hint.className = "hint";
-      hint.textContent = "Choose Duplicates in the toolbar to look for repeated works.";
+      hint.textContent = "Find repeated works in this bibliography, then review each pair before merging.";
       target.appendChild(hint);
       return;
     }

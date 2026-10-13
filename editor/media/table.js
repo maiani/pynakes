@@ -24,14 +24,27 @@ window.PV = window.PV || {};
     body.addEventListener("click", (event) => {
       const row = event.target.closest("tr");
       if (row?.dataset.key) {
-        PV.select(row.dataset.key);
+        PV.select(row.dataset.key, event);
       }
     });
     body.addEventListener("dblclick", (event) => {
       const row = event.target.closest("tr");
       if (row?.dataset.key) {
-        PV.post({ type: "reveal", key: row.dataset.key });
+        PV.post({ type: "doubleClickEntry", key: row.dataset.key });
       }
+    });
+
+    body.addEventListener("dragstart", (event) => {
+      const row = event.target.closest("tr[data-key]");
+      if (!row || !event.dataTransfer) return;
+      if (!PV.state.selectedKeys.has(row.dataset.key)) PV.select(row.dataset.key);
+      PV.draggedKeys = [...PV.state.selectedKeys];
+      event.dataTransfer.setData("application/x-pynakes-entries", JSON.stringify(PV.draggedKeys));
+      event.dataTransfer.effectAllowed = "copy";
+    });
+    body.addEventListener("dragend", () => {
+      PV.draggedKeys = null;
+      document.querySelectorAll(".drop-target").forEach((row) => row.classList.remove("drop-target"));
     });
 
     installResizers();
@@ -150,28 +163,65 @@ window.PV = window.PV || {};
   }
 
   /** Move the selection by `offset` rows and scroll it into view. */
-  PV.moveSelection = (offset) => {
+  PV.moveSelection = (offset, modifiers = {}) => {
     const rows = PV.state.visible;
     if (rows.length === 0) {
       return;
     }
     const current = rows.findIndex((row) => row.key === PV.state.selectedKey);
     const next = Math.min(rows.length - 1, Math.max(0, current === -1 ? 0 : current + offset));
-    PV.select(rows[next].key);
+    PV.select(rows[next].key, modifiers);
     const element = body.querySelector(`tr[data-key="${CSS.escape(rows[next].key)}"]`);
     if (element) {
       element.scrollIntoView({ block: "nearest" });
     }
   };
 
-  PV.select = (key) => {
-    PV.state.selectedKey = key;
-    PV.persist();
-    for (const row of body.querySelectorAll("tr")) {
-      row.classList.toggle("selected", row.dataset.key === key);
+  PV.select = (key, modifiers = {}) => {
+    const s = PV.state;
+    if (modifiers.shiftKey && s.selectionAnchor) {
+      const keys = s.visible.map((row) => row.key);
+      const anchor = keys.indexOf(s.selectionAnchor);
+      const end = keys.indexOf(key);
+      if (!modifiers.ctrlKey && !modifiers.metaKey) s.selectedKeys.clear();
+      if (anchor >= 0 && end >= 0) {
+        keys.slice(Math.min(anchor, end), Math.max(anchor, end) + 1).forEach((key) => s.selectedKeys.add(key));
+      } else {
+        s.selectedKeys.add(key);
+      }
+    } else if (modifiers.ctrlKey || modifiers.metaKey) {
+      if (s.selectedKeys.has(key)) s.selectedKeys.delete(key);
+      else s.selectedKeys.add(key);
+      s.selectionAnchor = key;
+    } else {
+      s.selectedKeys = new Set([key]);
+      s.selectionAnchor = key;
     }
+    s.selectedKey = s.selectedKeys.has(key) ? key : [...s.selectedKeys].at(-1) || null;
+    PV.persist();
+    refreshSelection();
     PV.renderDetail();
   };
+
+  PV.selectAll = () => {
+    const s = PV.state;
+    s.selectedKeys = new Set(s.visible.map((row) => row.key));
+    s.selectedKey = s.visible[0]?.key || null;
+    s.selectionAnchor = s.selectedKey;
+    PV.persist();
+    refreshSelection();
+    PV.renderDetail();
+  };
+
+  function refreshSelection() {
+    for (const row of body.querySelectorAll("tr[data-key]")) {
+      const selected = PV.state.selectedKeys.has(row.dataset.key);
+      row.classList.toggle("selected", selected);
+      row.setAttribute("aria-selected", String(selected));
+    }
+    counts.textContent = counts.textContent.replace(/ · \d+ selected$/, "");
+    if (PV.state.selectedKeys.size > 1) counts.textContent += ` · ${PV.state.selectedKeys.size} selected`;
+  }
 
   function cell(text, className) {
     const td = document.createElement("td");
@@ -184,13 +234,21 @@ window.PV = window.PV || {};
   PV.renderTable = () => {
     const s = PV.state;
     const rows = PV.computeVisible();
+    const previousSelection = [...s.selectedKeys].join("\0");
+    const previousKey = s.selectedKey;
+    const visibleKeys = new Set(rows.map((row) => row.key));
+    s.selectedKeys = new Set([...s.selectedKeys].filter((key) => visibleKeys.has(key)));
+    if (!s.selectedKeys.size && s.selectedKey && visibleKeys.has(s.selectedKey)) s.selectedKeys.add(s.selectedKey);
+    if (!s.selectedKeys.has(s.selectedKey)) s.selectedKey = [...s.selectedKeys][0] || null;
     const fragment = document.createDocumentFragment();
 
     for (const row of rows) {
       const tr = document.createElement("tr");
       tr.dataset.key = row.key;
       tr.tabIndex = -1;
-      if (row.key === s.selectedKey) {
+      tr.draggable = true;
+      tr.setAttribute("aria-selected", String(s.selectedKeys.has(row.key)));
+      if (s.selectedKeys.has(row.key)) {
         tr.classList.add("selected");
       }
 
@@ -259,6 +317,11 @@ window.PV = window.PV || {};
     }
     body.replaceChildren(fragment);
 
+    if (previousSelection !== [...s.selectedKeys].join("\0") || previousKey !== s.selectedKey) {
+      PV.persist();
+      PV.renderDetail();
+    }
+
     const total = s.rows.length;
     const shown = rows.length;
     if (total === 0) {
@@ -281,6 +344,7 @@ window.PV = window.PV || {};
     if (s.search.busy) {
       parts.push("searching…");
     }
+    if (s.selectedKeys.size > 1) parts.push(`${s.selectedKeys.size} selected`);
     counts.textContent = parts.join(" · ");
 
     for (const header of headers) {

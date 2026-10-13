@@ -203,3 +203,38 @@ export async function revealEntry(document: vscode.TextDocument, key: string): P
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+/** Resolve the current double-click preference against engine-reported materials. */
+export async function doubleClickEntry(
+  document: vscode.TextDocument,
+  key: string,
+  materials: MaterialIndex | null | undefined,
+  openable: Set<string> | undefined,
+): Promise<void> {
+  if (vscode.workspace.getConfiguration("pynakes", document.uri).get("doubleClickAction") === "source") {
+    await revealEntry(document, key);
+    return;
+  }
+  const entries = materials?.byKey;
+  const list = entries && Object.hasOwn(entries, key) ? entries[key] : [];
+  const seen = new Set<string>();
+  const pdfs = (list ?? []).filter((material) => {
+    const target = material.path;
+    if (!material.present || !target || path.extname(target).toLowerCase() !== ".pdf" || seen.has(target)) {
+      return false;
+    }
+    seen.add(target);
+    return true;
+  });
+  if (!pdfs.length) {
+    void vscode.window.showInformationMessage(`No local PDF is available for "${key}".`);
+    return;
+  }
+  const chosen = pdfs.length === 1 ? pdfs[0] : (await vscode.window.showQuickPick(
+    pdfs.map((material) => ({ label: material.label, description: material.path!, material })),
+    { placeHolder: `Open a PDF for ${key}` },
+  ))?.material;
+  if (chosen) {
+    await openMaterial(openable, chosen.path!, undefined, document.uri);
+  }
+}

@@ -19,6 +19,29 @@ window.PV = window.PV || {};
     container.addEventListener("click", onClick);
     container.addEventListener("contextmenu", onContextMenu);
     container.addEventListener("keydown", onKeyDown);
+    container.addEventListener("dragover", (event) => {
+      const row = event.target.closest(".group-row[data-group]");
+      if (!row?.dataset.group || !PV.draggedKeys?.length) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+      container.querySelectorAll(".drop-target").forEach((item) => item.classList.remove("drop-target"));
+      row.classList.add("drop-target");
+    });
+    container.addEventListener("dragleave", (event) => {
+      const row = event.target.closest(".group-row");
+      if (row && !row.contains(event.relatedTarget)) row.classList.remove("drop-target");
+    });
+    container.addEventListener("drop", (event) => {
+      const row = event.target.closest(".group-row[data-group]");
+      if (!row?.dataset.group || !PV.draggedKeys?.length) return;
+      event.preventDefault();
+      row.classList.remove("drop-target");
+      const keys = PV.draggedKeys.filter((key) => PV.state.rows.some((entry) => entry.key === key));
+      PV.draggedKeys = null;
+      if (keys.length) PV.post({ type: "mutate", mutation: {
+        kind: "groups", keys, group: row.dataset.group, member: true,
+      } });
+    });
   };
 
   /**

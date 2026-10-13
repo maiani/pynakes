@@ -36,7 +36,14 @@ export interface MetadataNamespace {
   blocks: unknown[];
 }
 
+export interface InspectInsights {
+  groups_tree: GroupsTreeEnvelope;
+  groups_list: GroupsListEnvelope;
+  lint: LintEnvelope;
+}
+
 export interface InspectSuccess {
+  insights?: InspectInsights;
   status: "success";
   action: string;
   file: string;
@@ -47,6 +54,7 @@ export interface InspectSuccess {
   strings: Record<string, string>;
   preamble: string[];
   comments: string[];
+  metadata_value_choices?: Record<string, string[]>;
   jabref_metadata: MetadataNamespace;
   pynakes_metadata: MetadataNamespace;
   duplicate_keys: Record<string, number>;

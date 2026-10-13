@@ -22,6 +22,7 @@ import type {
   FieldComparison,
   InspectError,
   MutationEnvelope,
+  MetadataNamespace,
   PinaxMaterialMove,
   RefCompareWarning,
   RefEditPlanEntry,
@@ -38,15 +39,15 @@ import {
   type SearchOptions,
   assetCheck,
   corpusBatch,
+  corpusOperations,
+  editMetadata,
+  type MetadataEdit,
   dedupeCheck,
   dedupeMerge,
   groupsEntry,
-  groupsList,
   groupTree,
-  groupsTree,
-  inspectBib,
+  inspectLibrary,
   keysRename,
-  lintBib,
   refAdd,
   refCompare,
   refImport,
@@ -58,6 +59,7 @@ import {
 /** Everything the view needs about a bibliography. */
 export interface LibraryRead {
   rows: EntryRow[];
+  metadata: { pynakes: MetadataNamespace; jabref: MetadataNamespace; valueChoices: Record<string, string[]> };
   summary: Summary;
   groups: GroupNode[];
   /** Group names per citation key, for the detail pane. */
@@ -79,9 +81,9 @@ export type LibraryReadResult =
  * Read a bibliography.
  *
  * `inspect` is authoritative: if it fails, there is no view to show. Every
- * other read is supplementary, so a failure there degrades to a warning and an
- * otherwise working table rather than an error page. They all run concurrently
- * — independent reads of a file nothing is writing.
+ * supplementary report can fail independently and degrade to a warning. Groups
+ * and lint share the inspection snapshot; citation and material checks run
+ * concurrently against the saved bibliography.
  *
  * `neighbourPath` is where the citation and material reads look, and it is
  * deliberately not `filePath`. Those two reads are about the files *around* the
@@ -101,11 +103,8 @@ export async function readLibrary(
   cwd?: string,
   neighbourPath?: string,
 ): Promise<LibraryReadResult> {
-  const [inspected, tree, list, lint, scan, assets] = await Promise.all([
-    inspectBib(command, filePath, cwd),
-    groupsTree(command, filePath, cwd),
-    groupsList(command, filePath, cwd),
-    lintBib(command, filePath, cwd),
+  const [inspected, scan, assets] = await Promise.all([
+    inspectLibrary(command, filePath, cwd),
     neighbourPath ? texScan(command, neighbourPath, cwd) : undefined,
     neighbourPath ? assetCheck(command, neighbourPath, cwd) : undefined,
   ]);
@@ -113,6 +112,12 @@ export async function readLibrary(
   if (inspected.status === "error") {
     return { ok: false, error: inspected };
   }
+
+  if (!inspected.insights) {
+    return { ok: false, error: { status: "error", error: "InvalidResponse",
+      message: "The engine omitted inspect insights. Update pynakes." } };
+  }
+  const { groups_tree: tree, groups_list: list, lint } = inspected.insights;
 
   const warnings: string[] = [];
   const membership = list.status === "success" ? list.groups : {};
@@ -139,6 +144,10 @@ export async function readLibrary(
     ok: true,
     read: {
       rows: toRows(inspected),
+      metadata: {
+        pynakes: inspected.pynakes_metadata, jabref: inspected.jabref_metadata,
+        valueChoices: inspected.metadata_value_choices ?? {},
+      },
       summary: summarize(inspected),
       groups: buildGroupTree(tree.status === "success" ? tree.tree : [], membership),
       groupsByEntry: list.status === "success" ? groupsByEntry(list) : {},
@@ -348,9 +357,11 @@ export async function commitEdits(
  * near-copies that could drift apart in what they check before writing.
  */
 export type Mutation =
+  | { kind: "metadata"; edit: MetadataEdit }
   | { kind: "add"; request: RefAddRequest }
   | { kind: "import"; request: RefImportRequest }
   | { kind: "remove"; keys: string[]; keepFiles: boolean }
+  | { kind: "groups"; keys: string[]; group: string; member: boolean; create?: boolean }
   | { kind: "group"; key: string; group: string; member: boolean; create?: boolean }
   /** `keys` names the cluster(s) to merge; omitted means every cluster. */
   | { kind: "dedupeMerge"; keys?: string[] }
@@ -362,6 +373,8 @@ export type Mutation =
 /** A short label for the diff panel and the confirmation prompt. */
 export function describeMutation(mutation: Mutation): string {
   switch (mutation.kind) {
+    case "metadata":
+      return `${mutation.edit.value === null ? "Remove" : "Set"} ${mutation.edit.namespace} metadata "${mutation.edit.key}"`;
     case "add":
       return `Add ${mutation.request.key}`;
     case "import":
@@ -370,6 +383,10 @@ export function describeMutation(mutation: Mutation): string {
       return mutation.keys.length === 1
         ? `Remove ${mutation.keys[0]}`
         : `Remove ${mutation.keys.length} entries`;
+    case "groups": {
+      const target = mutation.keys.length === 1 ? mutation.keys[0] : `${mutation.keys.length} entries`;
+      return `${mutation.member ? "Add" : "Remove"} ${target} ${mutation.member ? "to" : "from"} "${mutation.group}"`;
+    }
     case "group":
       return mutation.member
         ? `Add ${mutation.key} to "${mutation.group}"`
@@ -415,6 +432,8 @@ function runMutation(
   expectSha256?: string,
 ): Promise<MutationEnvelope> {
   switch (mutation.kind) {
+    case "metadata":
+      return editMetadata(command, filePath, mutation.edit, dryRun, cwd, expectSha256);
     case "add":
       return refAdd(command, filePath, mutation.request, dryRun, cwd, expectSha256);
     case "import":
@@ -429,6 +448,12 @@ function runMutation(
         cwd,
         expectSha256,
       );
+    case "groups":
+      return corpusOperations(command, filePath, mutation.keys.map((key) => ({
+        op: mutation.member ? "groups.add_entry" : "groups.remove_entry",
+        key, group: mutation.group,
+        ...(mutation.member ? { create: mutation.create ?? false } : {}),
+      })), dryRun, expectSha256, cwd);
     case "group":
       return groupsEntry(
         command,
