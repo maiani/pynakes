@@ -50,9 +50,9 @@ def test_offline_shell_examples(document: str, tmp_path: Path, monkeypatch) -> N
             assert result.exit_code == 0, f"{document}: {line}\n{result.output}"
             count += 1
     assert count > 0, f"No offline examples tested in {document}"
-    library = tmp_path / ("mylib.bib" if document == "README.md" else "refs.bib")
+    library = tmp_path / "refs.bib"
     assert library.exists()
-    assert "Newton1687" in library.read_text(encoding="utf-8") or document == "README.md"
+    assert "Newton1687" in library.read_text(encoding="utf-8")
 
 
 def test_generated_command_reference_is_current() -> None:

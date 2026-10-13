@@ -3,7 +3,7 @@
 ## System Requirements
 
 - Python 3.12 or later
-- pip or equivalent package manager
+- pip, uv, or an equivalent package manager
 - (Optional) git for development installation
 
 ## Installation Methods
@@ -15,6 +15,22 @@ Install with pip:
 ```bash
 pip install pynakes
 ```
+
+### With uv
+
+Install the CLI in an isolated tool environment:
+
+```bash
+uv tool install pynakes
+```
+
+To use pynakes as a Python library in a uv-managed project, add it as a dependency:
+
+```bash
+uv add pynakes
+```
+
+See [uv’s tools guide](https://docs.astral.sh/uv/guides/tools/) for tool management.
 
 ### Development Installation
 

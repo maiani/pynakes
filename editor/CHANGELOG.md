@@ -21,6 +21,9 @@ release. Its version says nothing about which engine it runs.
 
 ### Added
 
+- Focused user, configuration, architecture, and development guides under
+  `editor/docs/`; the README now provides a short introduction and setup links.
+
 - Metadata values with finite choices use engine-supplied dropdowns, including
   dialect, journal and formatting settings, and Boolean options. Existing values
   are preserved until explicitly changed; free-form values retain a text area.
