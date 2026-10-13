@@ -11,6 +11,7 @@ from pynakes._identifiers import canonical_doi, normalize_arxiv
 from pynakes._text_utils import _normalize_text
 from pynakes.editing import set_entry_field, set_entry_type
 from pynakes.identity import (
+    WorkEvidence,
     WorkIdentifier,
     WorkIdentifiers,
     compare_work_evidence,
@@ -160,8 +161,8 @@ def find_duplicate_clusters(lib: BibFile) -> list[DuplicateCluster]:
         reasons[keep].add(reason)
 
     evidence = [evidence_from_entry(entry) for entry in entries]
-    for i in range(len(entries)):
-        for j in range(i + 1, len(entries)):
+    for i, candidates in enumerate(_candidate_indices(evidence)):
+        for j in candidates:
             match = compare_work_evidence(evidence[i], evidence[j])
             if match.status == "exact":
                 left_ids = evidence[i].identifiers.by_kind()
@@ -186,6 +187,43 @@ def find_duplicate_clusters(lib: BibFile) -> list[DuplicateCluster]:
         reason = "+".join(sorted(reasons.get(root, {"fuzzy"})))
         clusters.append(DuplicateCluster(identity, reason, cluster_entries))
     return clusters
+
+
+def _candidate_indices(evidence: list[WorkEvidence]) -> Iterable[list[int]]:
+    """Yield potentially matching later indices in the original pair order.
+
+    Exact matches require a shared identifier; probable matches require a
+    shared year and author. Conflicting identifiers rule out either kind.
+    Keep these necessary conditions aligned with compare_work_evidence, which
+    remains the authority on whether each candidate actually matches.
+    """
+    identifiers = [item.identifiers.by_kind() for item in evidence]
+    by_id: dict[tuple[str, str], set[int]] = defaultdict(set)
+    by_kind: dict[str, set[int]] = defaultdict(set)
+    by_author_year: dict[tuple[str, str], set[int]] = defaultdict(set)
+    for i, item in enumerate(evidence):
+        for kind, values in identifiers[i].items():
+            by_kind[kind].add(i)
+            for value in values:
+                by_id[kind, value].add(i)
+        if item.year and len(item.title_fingerprint) >= 12:
+            for author in item.authors:
+                by_author_year[item.year, author].add(i)
+    for i, item in enumerate(evidence):
+        candidates: set[int] = set()
+        shared: dict[str, set[int]] = {}
+        for kind, values in identifiers[i].items():
+            matches: set[int] = set()
+            for value in values:
+                matches.update(by_id[kind, value])
+            shared[kind] = matches
+            candidates.update(matches)
+        if item.year and len(item.title_fingerprint) >= 12:
+            for author in item.authors:
+                candidates.update(by_author_year[item.year, author])
+        for kind, matches in shared.items():
+            candidates.difference_update((candidates & by_kind[kind]) - matches)
+        yield sorted(j for j in candidates if j > i)
 
 
 def clusters_for_keys(

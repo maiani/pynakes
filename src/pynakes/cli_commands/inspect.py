@@ -7,6 +7,7 @@ retaining the stable CLI contract.
 import typer
 
 from pynakes.authors import split_name_list
+from pynakes.cli_commands._inspect_insights import inspect_insights
 from pynakes.cli_common import (
     _emit_json,
     _entries,
@@ -57,6 +58,11 @@ def inspect(
         "--display",
         help="Include each entry's LaTeX/brace-cleaned title fields and split, cleaned author/editor names",
     ),
+    insights: bool = typer.Option(
+        False,
+        "--insights",
+        help="Include group hierarchy, membership, and lint in JSON from the same snapshot",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Inspect a .bib file structure.
@@ -70,7 +76,9 @@ def inspect(
     `author`/`editor` split into individual, cleaned names — a presentation
     projection for a UI, never a value to write back. Cleaning is applied to
     the resolved fields when `--resolved` is also given, otherwise to the
-    entry's own fields.
+    entry's own fields. With `--insights`, JSON also includes independent
+    group hierarchy, membership, and advisory lint envelopes computed from
+    the same parsed snapshot. Supplementary failures do not hide inspection.
     """
     file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
@@ -122,6 +130,8 @@ def inspect(
                 "files_dir": str(store.root),
                 "manifest": str(store.manifest_path),
             }
+        if insights:
+            result["insights"] = inspect_insights(coll, file)
         _emit_json(result)
         return
 

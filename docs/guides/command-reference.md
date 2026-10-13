@@ -632,6 +632,7 @@ Inspect a .bib file structure.
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `--resolved` | boolean | no | false | — | Include each entry's resolved fields (crossref/xdata inheritance applied) |
 | `--display` | boolean | no | false | — | Include each entry's LaTeX/brace-cleaned title fields and split, cleaned author/editor names |
+| `--insights` | boolean | no | false | — | Include group hierarchy, membership, and lint in JSON from the same snapshot |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 

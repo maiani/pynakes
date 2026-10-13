@@ -141,6 +141,8 @@ class _Resolver:
 
 def _split_concatenation(value: str) -> list[str]:
     """Split a BibTeX value on top-level ``#`` operators."""
+    if "#" not in value:
+        return [value]
     return iter_toplevel_splits(value, separators="#")
 
 

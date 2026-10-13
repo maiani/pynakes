@@ -10,7 +10,8 @@ from pynakes.model import (
     BibFile,
     EntryStore,
     MetadataBlock,
-    resolve_field_value,
+    _Resolver,
+    _string_lookup,
     resolve_string_definitions,
 )
 
@@ -149,10 +150,11 @@ def parse_bib(text: str) -> BibFile:
         position = block_end
 
     resolved_strings = resolve_string_definitions(strings)
+    resolver = _Resolver(_string_lookup(resolved_strings))
     for entry in entries.values():
         entry.field_expressions = dict(entry.fields)
         entry.fields = {
-            name: resolve_field_value(value, resolved_strings)
+            name: resolver.expression(value, frozenset()).text
             for name, value in entry.fields.items()
         }
 
@@ -369,6 +371,8 @@ def _split_once_top_level(text: str, separator: str) -> tuple[str, str | None]:
 
 def _strip_tex_comments(text: str) -> str:
     """Remove top-level unescaped TeX comments while retaining line boundaries."""
+    if "%" not in text:
+        return text
     output: list[str] = []
     brace_depth = 0
     in_quotes = False

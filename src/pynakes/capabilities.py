@@ -315,6 +315,7 @@ def get_capabilities() -> dict:
             "parse_bibtex",
             "create_library",
             "inspect_library",
+            "inspect_insights",
             "lint",
             "entry_directives",
             "manage_groups",

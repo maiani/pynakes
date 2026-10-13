@@ -27,7 +27,16 @@ from pynakes.lint import lint as lint_lib
 def _lint_one(
     file: str, categories: set[str] | None = None, ignores: frozenset[str] = frozenset()
 ) -> CheckOutcome:
-    coll = Bibliography.open(file)
+    return _lint_collection(Bibliography.open(file), file, categories, ignores)
+
+
+def _lint_collection(
+    coll: Bibliography,
+    file: str,
+    categories: set[str] | None = None,
+    ignores: frozenset[str] = frozenset(),
+) -> CheckOutcome:
+    """Build the same lint report for an already opened bibliography."""
     lib = coll.lib
     issues = lint_lib(lib, base_dir=Path(file).parent)
     # The command line adds to the library's own `lint-ignore`; it never

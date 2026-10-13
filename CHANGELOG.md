@@ -19,6 +19,15 @@ surface first, this release makes one batch of breaking changes, listed
 together below. The pre-0.7 spellings are **removed, not deprecated**: an old
 form is a `UsageError`, never silently reinterpreted.
 
+### Performance
+
+- Index duplicate candidates by identifier and author/year, excluding conflicting
+  identifiers before comparison while preserving cluster order and match rules.
+- Reuse string resolution within a parse and skip unnecessary comment and
+  concatenation scans, preserving source round trips.
+- Add `inspect --insights --json` for group hierarchy, membership, and advisory
+  lint from the same parsed snapshot, with independent supplementary errors.
+
 ### Release preparation
 
 - Classify pynakes 0.7.0 as Beta; its Python API remains experimental until
