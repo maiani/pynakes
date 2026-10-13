@@ -10,7 +10,7 @@ Use **Breaking changes** for incompatible behavior and migrations, and
 warning and earliest removal release). Additions and fixes use their usual
 sections. Historical releases retain their original headings.
 
-## [0.7.0] - Unreleased
+## [0.7.0] - 2026-10-13
 
 The CLI moves to beta. From 0.7.0, its commands, options, JSON envelope, exit
 codes, and error codes change only through a documented deprecation (see
@@ -31,10 +31,10 @@ form is a `UsageError`, never silently reinterpreted.
 ### Release preparation
 
 - Classify pynakes 0.7.0 as Beta; its Python API remains experimental until
-  1.0. Finish engine readiness first, then the editor 0.1.0 Alpha, and publish
-  both together. Internal RC artifacts are validation builds, not a separate
-  publication milestone.
-- Add the coordinated release checklist and audit the loaded package's error
+  1.0. Release the engine first; editor 0.1.0 Alpha follows independently.
+  Internal RC artifacts are validation builds, not a separate publication
+  milestone.
+- Add the release checklist and audit the loaded package's error
   codes so contract tests work against an installed wheel without `src/`.
 - Replace the stale agent-harness requirement with existing contract/workflow
   tests and separately recorded manual acceptance; the old harness was

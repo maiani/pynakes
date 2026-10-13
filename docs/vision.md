@@ -70,7 +70,7 @@ CI, and agents — with no dependency on any application above it.
 The optional Pinax mode keeps that base intact while letting a bibliography own a
 `pinax-files-dir` of citation-key-addressed materials. No `pinax-files-dir` means no Pinax
 behavior. Cross-file corpus work — a `Library` over many pinakes, a derived
-`Catalogue` index — is planned for v0.8; see
+`Catalogue` index — is planned for the v0.9 discovery release; see
 [DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
 
 The name points past the single file. The *Pinakes* was Callimachus's catalog of

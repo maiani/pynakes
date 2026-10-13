@@ -7,14 +7,15 @@ material provenance, project bibliographies, manuscript citation maintenance,
 and public release copies.
 
 The current foundation is one authoritative `Bibliography` (`.bib`), optional
-Pinax materials, and explicit operations across files. The next planned step
-extends that foundation to `Library`, a rebuildable `Catalogue`, and analysis
-across collections. Applications for capture, reading, graphical interaction,
+Pinax materials, and explicit operations across files. The next releases first
+improve bounded research reads, then extend that foundation to `Library`, a
+rebuildable `Catalogue`, and source-linked evidence. Applications for capture,
+reading, graphical interaction,
 and sync consume the same engine; they share its parser, data model and review
 contract. Planned integrations are tracked here without being advertised as
 implemented features.
 
-This document is the **road to 1.0** and the major releases beyond it.
+This document is the **road to 1.0** and possible extensions beyond it.
 Completed work is recorded in [CHANGELOG.md](CHANGELOG.md) and the git log.
 
 ## Road to 1.0
@@ -23,7 +24,7 @@ Completed work is recorded in [CHANGELOG.md](CHANGELOG.md) and the git log.
 
 v0.7.0 moves the **CLI** to beta: its command syntax, options, JSON envelope,
 exit codes, and error codes become a contract that changes only through a
-documented deprecation. The **VS Code editor** ships alongside it as a
+documented deprecation. The **VS Code editor** follows independently as a
 **0.1.0 alpha** pre-release — usable, with no compatibility promise of its own,
 and a consumer of nothing but the beta envelope. The Python API keeps its
 current status — the intended public surface in
@@ -71,7 +72,7 @@ Decisions that still constrain new work:
   (`% pynakes: verb args -- reason`), never a `pynakes-*` field; a new
   directive adds a word to `ref directive`, not a command.
 - No project-level config (`pynakes.toml`, `[tool.pynakes]`): the `.bib` carries
-  its own settings. Revisit with the v0.8 `Library`.
+  its own settings. Revisit with the v0.9 `Library`.
 - Group-tree commands edit the hierarchy, not entries, unless asked:
   `rename-group --members` moves memberships, and `remove-group` keeps them.
 - The surface contract is enforced by `tests/test_contract.py`, read from the
@@ -85,27 +86,24 @@ Decisions that still constrain new work:
   publisher on test.pypi.org first. The local-only `v0.6.2` tag was never
   released; retire it or leave it unpushed.
 
-#### Release — engine 0.7.0 Beta with editor 0.1.0 Alpha
+#### Release — engine 0.7.0 Beta first
 
-The checklist is [RELEASE.md](RELEASE.md). Remaining:
+The checklist is [RELEASE.md](RELEASE.md). Release the engine first; editor
+0.1.0 Alpha remains a separate publication with its own acceptance and publisher
+setup. Engine release steps:
 
-1. CI green on the release commit, the full matrix and the editor job.
-2. Manual acceptance in VS Code against the ready engine, and manual agent
-   acceptance recorded separately (the former hand-run harness was removed in
-   `0ef2951`; `test_contract.py` and `test_workflows.py` are automated tests,
-   not an agent evaluation).
-3. Choose the editor's distribution channel (VS Code Marketplace, Open VSX, or
-   both) and claim the `pynakes` publisher there.
-4. Rebuild both artifacts from the clean release commit (the editor with
-   `npm run package:prerelease` against the 0.7.0 engine), validate them, date
-   both changelogs, then push the `v0.7.0` tag and publish the editor in the
-   same window.
+1. Record installed-wheel tests, disposable-library checks and manual agent
+   acceptance separately from automated contract/workflow tests.
+2. Date the engine changelog and commit the release changes; require the full
+   CI matrix to pass on that commit.
+3. Build and validate final-version artifacts from the clean release commit,
+   then push `v0.7.0`. Verify the release workflow, PyPI and GitHub release.
 
-Until then, fix regressions only; new features wait for 0.7.1 or v0.8.
+Until then, fix regressions only. New features wait for v0.8; 0.7.x patches
+fix bugs only.
 
-**Done when**: candidate use has shown no data-loss or contract regression; both
-distributions are published in the coordinated release; the engine tag names
-0.7.0.
+**Done when**: candidate use has shown no data-loss or contract regression;
+engine 0.7.0 is published and installable. Editor publication is not this gate.
 
 #### Editor track
 
@@ -140,232 +138,277 @@ rather than worked around in the client.
 
 ---
 
-### v0.8 — Multi-bib setup, Library, Catalogue, and MCP server
+### Release approach from v0.8
 
-- **`Library` (corpus)**: `Library.open(dir)`; `collections()`,
-  `collection(path)`; cross-file `search`/`find_key`/dedup, reusing the
-  work-matching evidence from v0.6. A Library holds many `.bib` files (many
-  pinakes).
-- **Cross-library entry operations** — the motions single-file mode can't
-  express, built on the `Library` + v0.6 work-matching evidence:
-  - **`corpus pick`** — cross-library entry cherry-pick, the missing verb:
-    `corpus pick SRC.bib… --keys K1,K2,… --into DEST.bib [--with-materials]
-    [--strip-groups | --map-group "Src=Dest"] [--dedupe]`. Pull a focused subset
-    out of one or more larger libraries into a target library in a single
-    reviewable command, replacing a harvest→strip→combine→re-group script. This
-    is the operation the "seed a new library from neighbors" workflow is built on
-    and the one entry-level motion with no path today.
-  - **`corpus search`** — one query across N libraries with a `[file]` column
-    ("which of my libraries already has this?"), surfacing `Library.search` at
-    the CLI.
-  - **`corpus dedupe` / `dedupe --against other.bib`** — cross-file
-    duplicate/identity check so entries are vetted against siblings before a
-    transplant.
-  - **`ref import --from sibling.bib KEY`** — pull a single entry from a sibling
-    library by key without first digging out its DOI (a lighter cousin of
-    `corpus pick`).
-- **Mirrored-bibliography rename propagation** — pynakes treats every `.bib` in
-  isolation, but a common layout keeps a superset bibliography (e.g.
-  `bibliography/`) and a working subset copy (e.g. `manuscript/`) that must
-  track it; renaming a key in the superset has no way to propagate to the
-  mirror today. Needs a declared mirror relationship (naming still open —
-  avoid overloading "corpus") and a propagation step for `keys rename` (and any
-  other key-changing operation) once that relationship exists. Moved from v0.7,
-  where it would have added surface during the freeze.
-- **`Catalogue` (index)**: a derived, rebuildable search index (e.g. SQLite FTS)
-  over the Library; strictly derived, never a competing source of truth.
-- **Single-bibliography analysis**: add a public `pynakes.analysis` API
-  namespace and a read-only `analyze` command returning typed and JSON-friendly
-  reports for one `BibFile`/`Bibliography`. Start with deterministic descriptive
-  measures: entries by type and year, author/journal frequencies, identifier
-  and required-field coverage, lint finding counts, group membership, and
-  declared linked-file coverage. The report composes the existing
-  `lint`/`files`/`filestore`/`identity` result objects rather than
-  reimplementing their checks, and is sectioned so the library-wide rollup
-  below aggregates it without redesign. Keep analysis offline and separate from
-  mutation; do not turn heuristic scores into quality judgments. Deferred here
-  from v0.6.
-- **Library-wide analysis**: lift the single-bibliography analysis reports over
-  `Library`, retaining per-file provenance while adding corpus-wide rollups and
-  cross-library coverage/duplication views. Reuse the same typed results rather
-  than creating an unrelated statistics implementation.
-- **More per-entry directives.** `% pynakes: ignore` shipped with the
-  `ref directive` writer (see CHANGELOG); each further verb is a word in the
-  same grammar, not a new command. Candidates, each the per-entry form of a
-  library setting or a recurring false positive: `distinct-from KEY` for a pair
-  `dedupe check` flags but that are different works (the same commit-hook
-  problem #2 raised for lint); `no-fetch` or a per-entry fetch policy for
-  `asset fetch`; `keep-key` against key regeneration; and an opt-out from
-  `enrich` when a provider's record for the work is wrong. `ref show` could list
-  an entry's directives.
-- **Type spelling of new entries** (only if asked for): under
-  `format-entry-type-case: preserve`, `ref add` and `ref import` still write
-  `@book`, so a JabRef library mixes spellings until JabRef next saves it. A
-  JabRef spelling value for the setting, or a `consistency` finding for mixed
-  spellings of one type, would close that.
-- **Further import paths**: candidates not yet in the inventory, ordered by the
-  size of the community whose canonical identifier is not a DOI: NASA ADS
-  (bibcodes; needs a user-supplied API token), RePEc/IDEAS handles, MathSciNet
-  review numbers, institutional-repository URN resolvers such as DiVA, and
-  SciELO; then ISBN coverage beyond Open Library through a catalogue such as
-  WorldCat (Google Books and the Library of Congress are out of scope, per
-  [docs/guides/import-providers.md](docs/guides/import-providers.md)).
-  OpenReview is held back rather than planned: its public API answers a bot
-  challenge to non-browser clients, so importing from it would mean defeating
-  that challenge. Revisit only if a documented, key-based API path appears.
-- **MCP server**: a thin [Model Context Protocol](https://modelcontextprotocol.io)
-  companion on the pinned pynakes API, allowing agents to interrogate a personal
-  corpus conversationally — "find papers by X on topic Y", "which entries are
-  missing PDFs", etc. Query-only layer over the `Library`/`Catalogue`.
-- **Agent surface polish**:
-  - **Plan-and-approve workflow**: extend `corpus batch`, which already
-    previews and commits a sequence of bibliography operations as one, to
-    material and network steps (e.g. "dedupe these → normalize → fetch PDFs"),
-    so a whole multi-step plan is approved once.
-  - **Post-hoc change summary**: the change plan already counts added, removed,
-    renamed, and modified entries; add operation-level counts — "3 keys
-    renamed, 12 fields normalized, 2 entries enriched" — so an agent can report
-    what happened without re-parsing the diff.
-- **`Catalogue`-backed rich query CLI**: `search` gains full-text queries
-  against the index; its existing field-scoped terms carry over.
-- **Editor toward beta**: whatever of the v0.7 alpha feature work remains, plus
-  the library-scoped reads the `Library` makes possible. The extension may
-  *read* library-scoped things; it never owns or curates them.
+Each minor release should deliver a coherent set of related workflows with
+bounded acceptance cases. The versions below express an intended sequence, not calendar promises.
+Do not accumulate unrelated features to fill a release, or make one release
+wait for a companion application. If a slice remains too large, split it again
+and renumber the later milestones. CLI compatibility follows the beta promise.
+Command names and schema sketches below are proposals until implemented.
 
-**Done when**: `Library`, `Catalogue`, single-bibliography and library-wide
-analysis, and the
-cross-library entry operations (`corpus pick`/`search`/`dedupe`) shipped with
-tests and docs; MCP server published as a companion package; agent-plan and
-change-summary features shipped; `pytest && ruff` green; CHANGELOG updated;
-version bumped to 0.8.0.
+Pynakes owns bibliography operations, material identity, evidence locations, and
+reviewable persistence. External agents supply interpretations and proposed
+changes; researchers decide whether those interpretations are scientifically
+sound. Missing evidence stays explicit. No built-in semantic classifier,
+model dependency, or hidden network call is implied by this roadmap.
 
----
+| Release | Cohesive scope | Main dependency |
+| --- | --- | --- |
+| 0.8 | Research context, saved searches and bibliography analysis | Existing reads and checks |
+| 0.9 | Library, Catalogue and cross-file analysis | Bounded reads and identity evidence |
+| 0.10 | Project assembly and mirrored bibliographies | Library and guarded writes |
+| 0.11 | Curation: merges, directives and normalization | Existing editing and identity APIs |
+| 0.12 | Materials and acquisition: linking, extraction, ingestion and providers | Pinax, bounded reads and provider registry |
+| 0.13 | Evidence-linked research annotations | Material locations and hashes |
+| 0.14 | Resumable plans and execution receipts | Batch, acquisition and material operations |
+| 1.0 | Pin the exercised API and end-to-end contracts | Accepted workflows below |
 
-### v0.9 — Performance and scale
+These are seven substantial feature releases before 1.0. Related features share
+one release and acceptance workflow; implementation tasks do not each need a
+version. MCP and editor releases remain independently versioned companions.
 
-Measure and improve the offline paths that become important once v0.8 can work
-across many bibliographies. Performance claims must be backed by reproducible
-results, not estimates. The linear parser path was fixed in v0.7, because a
-single real library already reaches the sizes where it matters.
+#### Checks and evaluation throughout
 
-Starting point, from `scripts/bench_scale.py` on synthetic libraries at the
-close of v0.7 (one machine; measurements, not assertions):
+- Every release has correctness tests, documentation, a changelog, and the
+  applicable checks from `AGENTS.md`: full engine tests with coverage ≥90%,
+  Ruff lint/format, ty, strict docs, and artifact checks for releases. Changed
+  editor code also passes compilation and its tests.
+- Start a small **agent evaluation suite in v0.8**, separate from deterministic
+  contract tests. Use invented or public historical fixtures and record task,
+  engine/model versions, tool calls, outcomes, and evaluation conditions.
+  Begin with ambiguous references, duplicate conflicts, concurrent edits, and
+  bounded reads; add cross-library assembly and evidence-grounded comparisons
+  as their engine support ships. Mock provider responses for reproducible
+  runs; keep explicit live-network exercises separate.
+- Measure task correctness, unsupported claims, preservation of uncertainty,
+  unnecessary calls, response size, and whether edits match the approved plan.
+  Do not treat a passing CLI test as proof that an agent uses it correctly.
+- Performance is a continuing requirement, not a release-sized catch-all.
+  Extend `scripts/bench_scale.py` with representative corpus shapes, Python
+  and platform details, peak memory, and timings for changed workflows.
+  Include dense fuzzy-match cases as well as unrelated references. Establish
+  baselines before regression budgets; avoid brittle timing assertions in
+  correctness tests. Profile bulk source-span edits, index refreshes, and
+  cross-file reconciliation when those paths show material cost.
 
-| Entries | Parse | Lint | `format --check` |
-| ---: | ---: | ---: | ---: |
-| 4,000 | 0.40 s | 1.40 s | 2.31 s |
-| 20,000 | 2.00 s | 6.97 s | 11.56 s |
+### v0.8 — Research context and reusable queries
 
-- **Reproducible benchmark suite**: add generated and fixture-backed corpora at
-  documented sizes; measure parse, unchanged write, lint, search, dedupe,
-  canonical formatting, bulk surgical edits, Library queries, and Catalogue
-  builds. Record the Python version, platform, corpus shape, and peak memory
-  alongside timing results.
-- **Blocked identity and dedupe matching**: use the shared work-matching
-  evidence from v0.6 to build candidate sets by stable identifiers and metadata
-  fingerprints; do not compare every unrelated pair with fuzzy title matching.
-- **Single-pass bulk edits**: apply recorded source spans in source order rather
-  than repeatedly searching and copying the entire bibliography for every
-  changed entry.
-- **Library and Catalogue profiling**: measure index construction, refresh,
-  cross-file search, and identity reconciliation from v0.8; optimize only
-  profiles that show material cost.
-- **Regression budgets**: establish benchmark baselines before choosing
-  thresholds, then gate material regressions in representative offline
-  operations without using brittle wall-clock assertions in the correctness
-  suite.
-- **Evidence-based documentation**: publish only measurements produced by the
-  benchmark suite, with their environment and corpus; document known scaling
-  limits and do not infer an untested maximum library size.
+**Workflow:** select a set of papers, obtain bounded comparison context, and
+save the selection criteria for later use.
 
-**Done when**: the benchmark suite and baseline report are published; common
-offline paths have no known accidental quadratic scans; dedupe avoids exhaustive
-pairwise fuzzy comparison for ordinary nonmatching corpora; benchmarked
-regression budgets are enforced; correctness, round-trip, and duplicate-key
-tests remain green; CHANGELOG updated; version bumped to 0.9.0.
+- Extend multi-entry `ref show` with an optional context projection containing
+  summaries, abstracts, material availability and recorded provenance. Reuse
+  existing records; distinguish missing information from omitted content.
+- Add field selection, deterministic pagination and explicit text/entry limits.
+  Report truncation and how to retrieve full records; cursors must detect a
+  changed snapshot. Reads stay offline and contain source data, not generated
+  scientific judgments or model-dependent token counts.
+- Persist named predicates in `pynakes-meta`, with read/write/remove/run
+  operations. Validate with the existing predicate parser; store queries, not
+  result sets, and use the same bounded-result contract.
+- Add `pynakes.analysis` and an offline `analyze` report for one bibliography:
+  type/year and author/journal frequencies, identifier/field coverage, groups,
+  lint and material findings. Compose existing reports and expose descriptive
+  counts rather than scientific-quality scores.
+- Advertise schemas in `capabilities`, preserve existing reads, and introduce
+  the agent evaluation fixtures and response-size/call-count measurements above.
 
----
+**Done when:** selected context can be paged without omissions under a stable
+snapshot; missing and truncated information are distinct; saved queries reflect
+subsequent edits; analysis counts reconcile with underlying reports, including
+empty and duplicate-key libraries.
 
-### v0.10 — Ingestion and hygiene breadth
+### v0.9 — Library discovery and indexed search
 
-Close the gaps that a cross-check against JabRef and Zotero shows are
-conspicuous in a single-file engine: getting an entry *in* from something that
-is not already an identifier, and the value-level cleanups both tools ship. All
-of it stays single-bibliography work, so it lands before the 1.0 pin rather than
-after it. Network access remains explicit and opt-in per the existing rule.
+**Workflow:** find a paper across existing collections and inspect collection-wide
+coverage efficiently, without importing another copy.
 
-- **`ref from-pdf`** — build an entry from a PDF. Layered cheapest-first: read
-  embedded BibTeX and XMP metadata, then a DOI/arXiv id found in the document
-  text, then fall back to resolving what was found through the existing
-  provider registry. This is the reverse of `ref import` and the most commonly
-  cited gap against both tools. Text extraction needs a PDF dependency, so it
-  ships as an optional extra rather than a core requirement, and a scanned PDF
-  with no extractable identifier must fail honestly instead of guessing.
-- **`ref from-text`** — build an entry from a pasted reference string. Offline
-  and dependency-free, reporting which fields it recognized and which it could
-  not, so a partial parse is visible rather than silently thin. Never emit a
-  confident entry from an ambiguous string; leave the uncertain fields out.
-- **Journal abbreviation coverage** — the current LTWA seed table plus
-  `--ltwa-table` covers the mechanism but not the data. Ship a curated
-  abbreviation database so correct behavior is not conditional on the user
-  finding a CSV, and widen `JOURNAL_STYLES` beyond `abbreviated`/`full`/`none`
-  to the forms competitors expose (e.g. MEDLINE, shortest-unique). Title lists
-  are data, not logic: keep them versioned and inspectable.
-- **Further `normalize` formatters** — the most-used value-level cleanups from
-  JabRef's save actions: HTML entities and markup to LaTeX, Unicode to LaTeX
-  and back, and LaTeX markup tidying. These belong to `normalize` because they
-  change bibliographic *values*; `format` stays layout-only and must not
-  acquire any of them.
-- **`asset link`** — scan a directory and match existing files to entries by
-  citation key, then by a documented name heuristic, and report the matches for
-  approval before writing any link. The batch counterpart to today's
-  per-material workflow, and the answer to "I have 500 PDFs and a `.bib`".
-  Ambiguous matches are reported, never silently resolved.
-- **Richer `dedupe merge` conflict resolution** — JabRef resolves a merge with a
-  visual field-by-field diff, which a headless tool cannot copy directly. The
-  equivalent is better evidence and finer control: per-field provenance in the
-  merge report, an explicit field-level choice rather than whole-entry
-  precedence, and a refusal to auto-merge when the evidence is weak. Build it on
-  the v0.6 work-matching evidence instead of a second similarity implementation.
-- **`saved-search`** — persist a named predicate query in the `pynakes-meta`
-  namespace and re-run it on demand, so a `--where` expression becomes a
-  durable view instead of shell history. A saved search is a stored query, never
-  a stored result set, and never a second source of truth about membership.
+- Introduce `Library` over explicitly selected `.bib` files or a declared root,
+  with collections, key lookup, search and cross-file identity reports. Settle
+  membership/configuration here; keep per-bibliography settings in the `.bib`.
+- Expose `corpus search` and cross-file duplicate checks, retaining file/entry
+  provenance and exact versus probable matching. Repeated keys across files
+  do not establish work identity. Report unreadable members and changing inputs
+  without claiming a globally atomic filesystem snapshot.
+- Add a rebuildable `Catalogue` for bibliographic fields and abstracts, with
+  documented freshness and refresh behavior. Carry bounded reads, field-scoped
+  queries, match explanations and source locations into indexed search; retain
+  direct reads for recovery and comparison. Files remain authoritative.
+- Lift v0.8 analysis into Library rollups. Distinguish entry occurrences from
+  identified works, reconcile per-file counts and expose partial-read failures.
+- Test index refresh, deletion, rename and corruption recovery; measure index
+  build/query/refresh cost and memory before making performance claims.
 
-**Done when**: `ref from-pdf` and `ref from-text` ship with an optional-extra
-boundary for the PDF dependency; the curated abbreviation database and widened
-journal styles are in place; the added `normalize` formatters leave `format`
-layout-only; `asset link` and `saved-search` ship with tests and docs;
-`pytest && ruff` green; CHANGELOG updated; version bumped to 0.10.0.
+**Done when:** source locations and ambiguity survive cross-file discovery;
+rollups reconcile; the index can be rebuilt without losing information; stale
+results have explicit semantics and representative queries show measured benefit.
 
----
+#### MCP and editor integration
 
-### v1.0 — Launch
+Develop a query-only MCP companion against the v0.9 Library/Catalogue contract,
+with bounded results and the same errors and provenance as the CLI. Derive its
+schemas from the engine and test adapter parity; declare an engine compatibility
+range. Add evidence reads after v0.12–v0.13. Companion publication does not gate
+an otherwise complete engine release. The editor may read library-scoped data
+but remains the project-scoped client, with no bibliography logic of its own.
 
-**A reference management engine with a pinned public API and a dependable
-workflow from reference acquisition to project bibliography and release copy.**
-Published as 1.0.0 on PyPI, it preserves authoritative files and interoperates
-with JabRef. `Bibliography` remains the basic working unit; the planned v0.8
-`Library`, `Catalogue` and MCP integration extend its reach across collections.
+### v0.10 — Project assembly and bibliography relationships
 
-The launch must document and exercise the complete workflows, including
-reference curation, material provenance and manuscript citation maintenance,
-through the same Python API and CLI. Release claims follow verified behavior
-and completed gates.
+**Workflow:** seed a project from existing collections and maintain an explicitly
+declared relationship to its master bibliography.
 
-- Stable API, semver promise: the CLI contract, in beta since 0.7.0, and the
-  Python API both fall under the semantic-versioning policy in
-  [docs/guides/public-api.md](docs/guides/public-api.md).
-- All [core architecture invariants](docs/guides/architecture.md#core-invariants)
-  intact; coverage ≥90%; `ruff` clean.
+- Add `corpus pick` with source/entry selection, a destination preview, explicit
+  group preservation/stripping/mapping, and destination identity/key checks.
+  A single-entry `ref import --from` alias can share this implementation.
+- Support explicit material copying with collision, missing-file and rollback
+  rules. Prepare and validate outputs before mutation; never silently overwrite
+  target materials or move originals. Report source-to-destination mappings,
+  operation counts, skips and conflicts, guarded by input/output fingerprints.
+- Declare master/subset relationships separately from Library membership and
+  arbitrary copying. Propagate key renames through declared mirrors with
+  previews covering TeX references and materials. Check all participating files
+  before applying and reuse transaction/recovery mechanisms.
 
-**Done when**: 1.0.0 is on PyPI.
+**Done when:** project assembly leaves sources intact; accepted copies and
+renames preserve declared relationships and references; conflicting mirror
+edits and interruptions cannot leave unreported partial changes. Do not expose
+material copying until its recovery guarantees are tested.
+
+### v0.11 — Curation decisions and bibliographic consistency
+
+**Workflow:** resolve duplicate and metadata problems once, record deliberate
+exceptions, and have later maintenance respect those decisions.
+
+- Add field-level merge choices and provenance using existing identity evidence.
+  Validate choices against source fingerprints; preserve materials and references
+  and keep unresolved conflicts blocking. Extend this contract to annotations
+  when v0.13 introduces them.
+- Add `distinct-from`, `keep-key`, `no-fetch` and enrichment opt-outs to the
+  directive grammar. Expose reasons, specify affected commands and explicit
+  overrides, and handle renamed or missing targets.
+- Ship a versioned journal abbreviation dataset with source/licensing records,
+  justified extra styles and explicit ambiguous-name behavior. Keep data and
+  algorithms independently inspectable; preserve existing defaults.
+- Add individually opt-in HTML entity/markup conversion, Unicode/LaTeX
+  conversion and LaTeX tidying to `normalize`. Document lossy cases and operation
+  order; `format` remains layout-only. Include explicit new-entry type spelling
+  for JabRef-style libraries without silently respelling existing entries.
+
+**Done when:** chosen values are attributable, stale merge choices are refused,
+commands honor exceptions, journal data is distributable and tested, and
+normalization preserves untouched bytes with documented loss where applicable.
+
+### v0.12 — Material acquisition and source-linked extraction
+
+**Workflow:** bring existing papers into a research library, identify their
+references, and retrieve passages tied to the exact material read.
+
+- Add `asset link`: match existing files by key and then explicitly requested
+  filename heuristics. Preview links, keep competing candidates unresolved,
+  and never silently overwrite or relocate materials.
+- Introduce optional PDF/TeX extraction. Keep rebuildable derivatives separate
+  from originals and record source hash, extractor/version, options and usable
+  locations: PDF page indices and available printed labels, or TeX paths and
+  lines/sections. Detect staleness and report scanned or incomplete text honestly;
+  OCR remains a later optional capability.
+- Expose bounded passage retrieval independently of the Catalogue, then extend
+  indexed content search through these derived records. Return source locations
+  for checking quotations, equations and methods. Source text is data, not
+  executable instructions; distinguish excerpts from external interpretations.
+- Add `ref from-pdf`: embedded BibTeX/XMP, then extracted identifiers, then
+  explicitly requested provider resolution. Reuse extraction and retain
+  candidate evidence. Add offline `ref from-text` with recognized fields and
+  unresolved text; existing `ref find` remains the online lookup path.
+- Extend the provider registry as one acquisition workstream: NASA ADS bibcodes,
+  RePEc/IDEAS handles, MathSciNet review numbers, institutional URNs starting
+  with DiVA, SciELO, and additional ISBN coverage (evaluate WorldCat first).
+  Verify supported access, credentials, mapping and recorded fixtures for each.
+  Google Books and Library of Congress remain excluded; reconsider OpenReview
+  only with supported access, without bypassing bot challenges.
+
+**Done when:** accepted links and imports are reviewable and ambiguity remains
+explicit; returned passages identify their material hash and supported location;
+derivatives can be rebuilt without modifying originals. Each shipped provider
+passes offline fixtures and a separate access check. Record an explicit decision
+for every provider candidate; unavailable access defers that adapter, not the
+whole release. No stub or invented metadata counts as supported ingestion.
+
+### v0.13 — Evidence-linked research annotations
+
+**Workflow:** record “uses a Markov approximation” with its supporting passage,
+author, and review status, then find it after the citation key changes.
+
+- Define a versioned, inspectable annotation format outside bibliographic fields.
+  Settle its storage and stable reference/material identity before exposing writes.
+  Annotations are authored records; unlike extracted text, they cannot be
+  discarded and reconstructed from the PDF.
+- Distinguish verbatim excerpts, agent interpretations, and human-authored notes.
+  Record creator, evidence anchors, material version, and explicit review state;
+  human review does not automatically mean a claim is scientifically correct.
+- Provide read, preview, write and validation operations; preserve links through
+  key renames and handle merges, removal, and material replacement explicitly.
+  Mark stale or orphaned evidence rather than silently retargeting it.
+- Let external tools create interpretations. Pynakes validates structure and
+  references, not whether a paper supports a scientific conclusion. Define
+  export/scrub behavior for private annotations before sharing is supported.
+
+**Done when:** annotations remain attributable and retrievable after renames;
+changed sources invalidate anchors visibly; unreviewed interpretations cannot
+be mistaken for verbatim excerpts or human-reviewed records in the envelope.
+
+### v0.14 — Resumable plans and execution receipts
+
+**Workflow:** resume a collection-maintenance job after interruption without
+repeating completed downloads or losing track of what changed.
+
+- Build on `corpus batch` with persisted, versioned plans: operations, inputs,
+  fingerprints, dependencies, permitted network steps, and expected outputs.
+  Keep deterministic bibliography batches atomic within their existing scope.
+- Persist receipts for completed, failed and pending steps, with output hashes
+  and operation-level counts. Resume by checking recorded outputs and current
+  preconditions, not by trusting that a previous process finished a write.
+- Separate network acquisition from applying retrieved results. Record what was
+  actually obtained; changed provider data or a changed source must invalidate
+  affected expectations. An earlier approval covers only its stated plan and
+  conditions, not arbitrary changes discovered during a retry.
+- Document partial completion and recovery for filesystem/network steps; do not
+  describe the whole workflow as atomic. Use existing fetch and material
+  transaction mechanisms rather than a second write implementation.
+
+**Done when:** interruption tests cover before/after writes and downloads;
+retries neither duplicate successful work nor apply stale plans, and receipts
+explain both completed changes and remaining work without parsing diffs.
+
+### v1.0 — Pin the exercised public API
+
+**A reference management engine with a dependable workflow from reference
+acquisition through evidence-linked research to project bibliography and release
+copy.** Freeze the public Python API after the smaller releases have exercised
+its bibliography, Library, material, and evidence boundaries. The CLI keeps its
+existing deprecation promise throughout.
+
+- Exercise complete workflows for acquisition, curation, project assembly,
+  manuscript citation maintenance, evidence retrieval, and public release.
+- Document which records are authoritative and which are rebuildable, the
+  compatibility/migration rules for persisted annotations and plans, and the
+  limits of recovery across network and filesystem operations.
+- Review the outstanding editor interoperability issues before pinning affected
+  engine behavior. Complete the scheduled v0.8–v0.14 workflows before launch.
+  Bimas and MCP publication are independent; provider candidates deferred from
+  v0.12 must have a documented disposition, not an implied implementation claim.
+
+**Done when:** these workflows and API boundaries have recorded acceptance
+results, all applicable checks pass, compatibility and migration policies are
+published, and 1.0.0 is on PyPI. No additional feature bundle belongs in the
+launch release.
 
 ---
 
 ## Beyond 1.0
 
-The data and analysis items stay **in pynakes** as pure bib-file mechanisms.
+The data mechanisms below extend pynakes; they are not a single scheduled
+release or a requirement to ship 2.0.
 The remaining GUI item is a separately distributed companion tracked here
 because it exercises the pinned integration boundary. Clients divide by
 **scope**, not by feature: the project-scoped editor ships as an alpha in v0.7,
@@ -399,15 +442,16 @@ project at all. See
 - **Material metadata writing** — `asset embed-xmp`: write an entry's
   bibliographic metadata into its linked PDF as XMP, making the file
   self-describing for sharing and archival, and the natural companion to
-  reading metadata *out* of a PDF in v0.10. This one modifies a material rather
+  PDF ingestion in v0.12. This one modifies a material rather
   than the `.bib`, so it needs the same preview-and-approve treatment as a
   bibliography edit and must never be implied by another command.
 - **Further material formats** — EPUB metadata extraction alongside PDF, as
   open-access monographs become common. Lower priority than PDF by usage, and
-  it shares the v0.10 extraction pipeline rather than duplicating it.
-- **Content-intelligence layers** — full-text extraction, content search,
-  RAG/embeddings, and rich agent notes/memory, as an opt-in extra never on the
-  bibliography write path.
+  it shares the v0.12 extraction pipeline rather than duplicating it.
+- **Optional semantic retrieval** — RAG/embeddings and richer agent memory
+  built on the source-linked extraction and annotation contracts above. Keep
+  model-specific dependencies optional, results attributable, and semantic
+  judgments outside automatic bibliography mutation.
 - **Library-scoped GUI (Bimas, working name)** — a standalone application for
   exploring a generic library: one that belongs to no particular project and
   outlives any workspace. It is *not* a fallback for the extension proving too
@@ -419,9 +463,9 @@ project at all. See
   boundary must already be pinned — two clients cannot share an unversioned
   contract.
 
-**Done when**: the core 2.0.0 release is on PyPI with its mechanisms documented.
-Bimas is not a 2.0 gate: it begins once the integration boundary is pinned,
-which the project-scoped editor in v0.7 is what first forces.
+Schedule these as separate additive releases after their designs are accepted.
+Use a new major version only when a compatibility change requires one. Bimas
+begins once the integration boundary is pinned; it is not an engine release gate.
 
 ---
 
@@ -460,6 +504,6 @@ rejected on fit, not on merit — several are the reason people choose those too
   human-readable filenames for sharing, belongs to an export or copy operation
   that names files on the way out, leaving the store addressable.
 - **Cite-as-you-write HTTP daemon on a fixed port** (JabRef, port 23119). The
-  need is real, but the MCP server in v0.8 and the editor in v0.7 both address
+  need is real, but the planned MCP companion and the editor in v0.7 both address
   it over boundaries that already exist, without a background service listening
   on a well-known port.
