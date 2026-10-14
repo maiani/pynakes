@@ -111,3 +111,18 @@ class Material(StrEnum):
     SOURCE = "source"
     SUPPLEMENT = "supplement"
     BEST_PDF = "best-pdf"
+
+
+class AnalysisSection(StrEnum):
+    """``analyze --section``: one section of the analysis report."""
+
+    ENTRIES = "entries"
+    TYPES = "types"
+    YEARS = "years"
+    AUTHORS = "authors"
+    VENUES = "venues"
+    IDENTIFIERS = "identifiers"
+    FIELDS = "fields"
+    GROUPS = "groups"
+    LINT = "lint"
+    MATERIALS = "materials"

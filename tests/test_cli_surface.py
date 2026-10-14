@@ -109,8 +109,17 @@ def test_removed_spelling_is_a_usage_error(bib: Path, tmp_path: Path, args: list
     assert not (tmp_path / "out.bib").exists()
 
 
-def test_capabilities_lists_no_deprecated_forms() -> None:
-    assert "deprecations" not in get_capabilities()
+def test_every_listed_deprecation_is_still_accepted() -> None:
+    # A form in its deprecation period must keep working until its removal
+    # release, so each one listed is still an option of its live command.
+    capabilities = get_capabilities()
+    for deprecation in capabilities["deprecations"]:
+        schema = capabilities["command_schemas"][deprecation["command"]]
+        flags = {flag for option in schema["options"] for flag in option["flags"]}
+        assert deprecation["old"] in flags, deprecation
+        assert deprecation["new"] and deprecation["removal"], deprecation
+        major, minor, _patch = (int(part) for part in deprecation["removal"].split("."))
+        assert (major, minor) > (0, 7), deprecation
 
 
 # --- operands that look like options -------------------------------------------

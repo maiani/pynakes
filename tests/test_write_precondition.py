@@ -26,6 +26,7 @@ LIBRARY = (
     "group-tree: Mechanics||2||1||StaticGroup|||0|||\n"
     "  Optics||2||1||StaticGroup|||0|||\n"
     "tex-sources: paper.tex\n"
+    "query-mechanics: group Mechanics\n"
     "}\n"
     "\n"
     "@book{Newton1687,\n"
@@ -90,6 +91,8 @@ WRITES = {
     "metadata set": ["metadata", "set", "{bib}", "key-pattern", "[auth][year]"],
     "metadata remove": ["metadata", "remove", "{bib}", "tex-sources"],
     "metadata adopt-jabref": ["metadata", "adopt-jabref", "{bib}"],
+    "query set": ["query", "set", "{bib}", "early", "year < 1700"],
+    "query remove": ["query", "remove", "{bib}", "mechanics"],
     "tex add": ["tex", "add", "{bib}", "appendix.tex"],
     "tex remove": ["tex", "remove", "{bib}", "paper.tex"],
     "tex clear": ["tex", "clear", "{bib}"],

@@ -38,6 +38,7 @@ def _flags(command: str) -> set[str]:
 
 #: Every command's positional arguments: (name, required, variadic), in order.
 POSITIONALS: dict[str, tuple[tuple[str, bool, bool], ...]] = {
+    "analyze": (("file", False, False),),
     "asset check": (("files", True, True),),
     "asset fetch": (("file", False, False), ("target", False, False)),
     "asset repair": (("file", False, False),),
@@ -84,6 +85,10 @@ POSITIONALS: dict[str, tuple[tuple[str, bool, bool], ...]] = {
     "metadata remove": (("file", False, False), ("key", True, False)),
     "metadata set": (("file", False, False), ("key", True, False), ("value", True, False)),
     "normalize": (("file", False, False),),
+    "query list": (("file", False, False),),
+    "query remove": (("file", False, False), ("name", True, False)),
+    "query run": (("file", False, False), ("name", True, False)),
+    "query set": (("file", False, False), ("name", True, False), ("expression", True, False)),
     "ref add": (("file", False, False), ("key", False, False)),
     "ref compare": (("file", False, False), ("key", True, False)),
     "ref directive": (("file", False, False), ("words", True, True)),
@@ -175,6 +180,7 @@ def test_every_writing_command_previews() -> None:
 #: ``ref find`` and ``ref import`` need the network; offline they return an
 #: error envelope, which is checked like any other.
 SAMPLES: dict[str, tuple[str, list[str]]] = {
+    "analyze": ("read", ["analyze", "{bib}"]),
     "asset check": ("check", ["asset", "check", "{bib}"]),
     "asset fetch": ("modify", ["asset", "fetch", "{bib}", "White2024", "--dry-run"]),
     "asset repair": ("modify", ["asset", "repair", "{pinax}", "--dry-run"]),
@@ -268,6 +274,10 @@ SAMPLES: dict[str, tuple[str, list[str]]] = {
     ),
     "metadata set": ("modify", ["metadata", "set", "{bib}", "dialect", "biblatex", "--dry-run"]),
     "normalize": ("modify", ["normalize", "{bib}", "--dry-run"]),
+    "query list": ("read", ["query", "list", "{groups}"]),
+    "query remove": ("modify", ["query", "remove", "{queries}", "recent", "--dry-run"]),
+    "query run": ("read", ["query", "run", "{queries}", "recent", "--limit", "1"]),
+    "query set": ("modify", ["query", "set", "{bib}", "recent", "year >= 2022", "--dry-run"]),
     "ref add": (
         "modify",
         [
@@ -341,6 +351,12 @@ def _library(tmp_path: Path) -> dict[str, str]:
     )
     (tmp_path / "pinax.files").mkdir()
     paths["pinax"] = str(pinax)
+    queries = tmp_path / "queries.bib"
+    queries.write_text(
+        "@comment{pynakes-meta:\nquery-recent: year >= 1700\n}\n\n"
+        "@misc{Euler1748,\n  title = {Introductio},\n  year = {1748}\n}\n"
+    )
+    paths["queries"] = str(queries)
     ops = tmp_path / "ops.json"
     ops.write_text(json.dumps([{"op": "fields.append", "field": "keywords", "value": "ml"}]))
     paths["ops"] = str(ops)

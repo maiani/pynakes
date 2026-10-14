@@ -12,13 +12,7 @@ from pynakes.cli_checks import CheckOutcome, _run_checks, strict_option
 from pynakes.cli_choices import LintCategory
 from pynakes.cli_common import _emit_error, _safe, _source_sha256
 from pynakes.engine import Bibliography
-from pynakes.lint import (
-    LintIssue,
-    entry_ignore_rules,
-    is_waived,
-    library_lint_ignores,
-    unknown_ignore_names,
-)
+from pynakes.lint import LintIssue, suppress_findings, unknown_ignore_names
 from pynakes.lint import lint as lint_lib
 
 # --- lint ------------------------------------------------------------------
@@ -38,15 +32,10 @@ def _lint_collection(
 ) -> CheckOutcome:
     """Build the same lint report for an already opened bibliography."""
     lib = coll.lib
-    issues = lint_lib(lib, base_dir=Path(file).parent)
     # The command line adds to the library's own `lint-ignore`; it never
     # re-enables what the library ignores. `ignore` directives above an entry
     # waive that entry's findings.
-    ignored = ignores | library_lint_ignores(lib)
-    rules = entry_ignore_rules(lib)
-    kept = [i for i in issues if not (i.is_ignored(ignored) or is_waived(i, rules))]
-    suppressed = len(issues) - len(kept)
-    issues = kept
+    issues, suppressed = suppress_findings(lib, lint_lib(lib, base_dir=Path(file).parent), ignores)
     if categories:
         issues = [issue for issue in issues if issue.category in categories]
     errors = sum(1 for i in issues if i.severity == "error")

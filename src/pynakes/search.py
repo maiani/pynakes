@@ -157,6 +157,7 @@ def search_entries(
     query: str,
     *,
     fields: Iterable[str] | None = None,
+    search_in: Iterable[str] | None = None,
     extra_fields: Iterable[str] | None = None,
     where: Callable[[BibEntry], bool] | None = None,
     case_sensitive: bool = False,
@@ -167,8 +168,11 @@ def search_entries(
     """Return entries whose searchable text matches all query terms.
 
     Free terms search the citation key, entry type, and stored fields. Fielded
-    terms search only their target. ``fields`` restricts stored fields included
-    in free-text search and output; ``key`` and ``type`` remain searchable.
+    terms search only their target. ``search_in`` restricts the stored fields
+    free terms search, and every result still reports all its stored fields;
+    ``key`` and ``type`` remain searchable. ``fields`` is the older form that
+    restricts both the fields searched and the fields reported; pass one or
+    the other.
     ``extra_fields`` names fields reported in every result regardless of that
     restriction, so a caller can display a field — an abstract, say — without
     widening what the query searches.
@@ -204,7 +208,10 @@ def search_entries(
     # query terms: a predicate-only selection is always returned in file order.
     rank = rank and bool(terms)
 
+    if fields is not None and search_in is not None:
+        raise ValueError("Pass fields or search_in, not both")
     field_filter = {name.lower() for name in fields} if fields is not None else None
+    match_filter = {name.lower() for name in search_in} if search_in is not None else field_filter
     always = {name.lower() for name in extra_fields or ()}
     results: list[SearchResult] = []
 
@@ -213,7 +220,7 @@ def search_entries(
             continue
 
         if terms:
-            match = _match_entry(entry, terms, field_filter, case_sensitive, fuzzy)
+            match = _match_entry(entry, terms, match_filter, case_sensitive, fuzzy)
             if match is None:
                 continue
             matched_fields, matches, score = match

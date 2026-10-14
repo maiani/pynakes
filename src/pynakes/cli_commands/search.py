@@ -3,7 +3,19 @@
 import typer
 
 from pynakes import search as search_ops
+from pynakes.bounded import parse_field_selection, project_fields, request_digest
+from pynakes.cli_commands._bounded import (
+    bounds_payload,
+    check_bounds,
+    cursor_option,
+    limit_option,
+    max_chars_option,
+    page_of,
+    parse_select,
+    select_option,
+)
 from pynakes.cli_common import (
+    InvalidInputError,
     _emit_json,
     _entries,
     _resolve_input_bib,
@@ -11,6 +23,7 @@ from pynakes.cli_common import (
     _source_sha256,
     bib_file_argument,
     build_where_filter,
+    deprecation_warning,
     key_option,
     parse_key_selector,
     where_option,
@@ -28,10 +41,18 @@ def search(
             'field:"phrase". Pass "" to select by --where alone'
         ),
     ),
+    search_in: list[str] | None = typer.Option(
+        None,
+        "--in",
+        help="Search only these stored fields: comma-separated, repeatable. "
+        "The citation key and entry type stay searchable",
+    ),
+    select: list[str] | None = select_option(),
     in_field: list[str] | None = typer.Option(
         None,
         "--in-field",
-        help="Restrict stored fields searched and returned; repeat for multiple fields",
+        help="Deprecated, removed in 0.9.0: use --in to choose the fields searched "
+        "and --select to choose the fields returned",
     ),
     where: str | None = where_option(),
     key: list[str] | None = key_option(),
@@ -46,7 +67,9 @@ def search(
         "--abstract",
         help="Print an excerpt of each result's abstract beneath the hit",
     ),
-    limit: int | None = typer.Option(None, "--limit", help="Maximum number of matches"),
+    limit: int | None = limit_option("Maximum number of matches per page"),
+    cursor: str | None = cursor_option(),
+    max_chars: int | None = max_chars_option(),
     no_rank: bool = typer.Option(
         False,
         "--no-rank",
@@ -65,6 +88,12 @@ def search(
     other fields > groups/abstract, then by score — with ties kept in file
     order; pass `--no-rank` for plain file order.
 
+    Two options shape a search without changing the query: `--in` chooses
+    which stored fields the terms are looked for in, and `--select` chooses
+    which fields each result returns. They are independent: `--in title
+    --select title,abstract` matches titles only and still returns the
+    abstracts.
+
     `--where` narrows *which* entries are searched with the shared selector
     grammar, so date ranges and "missing field" questions need no special
     flags: `--where 'year >= 2020 and abstract missing'`.
@@ -80,7 +109,33 @@ def search(
     candidate set can be triaged from the search itself; `--json` always
     carries the full abstract. To read whole entries instead, pass the keys to
     `ref show --key`.
+
+    Results page like every bounded read: `--limit` caps a page,
+    `page.next_cursor` resumes the same search with `--cursor` (refused once
+    the library changes), and `--max-chars` cuts long field values, listing
+    each cut under the result's `truncated`.
     """
+    check_bounds(limit, max_chars)
+    warnings: list[dict] = []
+    if in_field:
+        if search_in or select:
+            raise InvalidInputError(
+                "--in-field is deprecated and cannot be combined with --in or --select; "
+                "use --in and --select"
+            )
+        warnings.append(
+            deprecation_warning(
+                "--in-field", "--in and --select", removal="0.9.0", json_output=json_output
+            )
+        )
+    try:
+        scope = parse_field_selection(search_in)
+    except ValueError as exc:
+        raise InvalidInputError(f"--in: {exc}") from None
+    selection = parse_select(select)
+    if selection is not None and abstract and "abstract" not in selection:
+        # --abstract shows each abstract; with a selection it has to be selected.
+        selection = (*selection, "abstract")
     file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
     lib = coll.lib
@@ -90,12 +145,30 @@ def search(
         lib,
         query,
         fields=in_field,
+        search_in=scope,
         extra_fields=("abstract",) if abstract else None,
         where=where_filter,
         case_sensitive=case_sensitive,
         fuzzy=fuzzy,
-        limit=limit,
         rank=ranked,
+    )
+    results, page = page_of(
+        coll,
+        results,
+        limit=limit,
+        cursor=cursor,
+        request=request_digest(
+            command="search",
+            query=query,
+            where=where,
+            keys=parse_key_selector(key),
+            in_fields=list(scope or in_field or []),
+            case_sensitive=case_sensitive,
+            fuzzy=fuzzy,
+            ranked=ranked,
+        ),
+        json_output=json_output,
+        action="search",
     )
 
     if json_output:
@@ -105,19 +178,23 @@ def search(
                 "action": "search",
                 "file": file,
                 "source_sha256": _source_sha256(coll),
-                "warnings": [],
+                "warnings": warnings,
                 "query": query,
                 "where": where,
                 "keys": parse_key_selector(key),
                 "where_parsed": where_filter.to_dict() if where_filter is not None else None,
-                "in_fields": in_field or [],
+                "in_fields": list(scope or in_field or []),
                 "case_sensitive": case_sensitive,
                 "fuzzy": fuzzy,
                 "abstract": abstract,
                 "limit": limit,
                 "ranked": ranked,
+                "bounds": bounds_payload(
+                    select=selection, include=(), max_chars=max_chars, limit=limit
+                ),
                 "count": len(results),
-                "matches": [result.to_dict() for result in results],
+                "page": page.to_dict(),
+                "matches": [_bounded_match(result, selection, max_chars) for result in results],
             }
         )
         return
@@ -134,6 +211,25 @@ def search(
         if abstract:
             excerpt = abstract_excerpt(result.fields.get("abstract"))
             typer.echo(f"      {excerpt or '(no abstract)'}")
+    if not page.complete:
+        typer.echo(
+            f"Showing {page.offset + 1}-{page.offset + page.returned} of {page.total}; "
+            f"continue with --cursor {page.next_cursor}"
+        )
+
+
+def _bounded_match(
+    result: search_ops.SearchResult, select: tuple[str, ...] | None, max_chars: int | None
+) -> dict[str, object]:
+    """Serialize one match with the selected fields, cut to ``max_chars``."""
+    described = result.to_dict()
+    projection = project_fields(result.fields, select, max_chars)
+    described["fields"] = projection.fields
+    if select is not None:
+        described["missing_fields"] = projection.missing
+        described["omitted_fields"] = projection.omitted
+    described["truncated"] = {name: cut.to_dict() for name, cut in projection.truncated.items()}
+    return described
 
 
 def register(app: typer.Typer) -> None:

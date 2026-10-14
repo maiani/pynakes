@@ -26,6 +26,22 @@ Reference management engine for BibTeX, BibLaTeX, and their materials
 | `--install-completion` | boolean | no | null | — | Install completion for the current shell. |
 | `--show-completion` | boolean | no | null | — | Show completion for the current shell, to copy it or customize the installation. |
 
+## analyze
+
+**Stability: stable**
+
+Describe a bibliography: what it holds and how complete its records are.
+
+`pynakes analyze [FILE] [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `--section` | list[choice] | no | — | entries, types, years, authors, venues, identifiers, fields, groups, lint, materials | Report only these sections (repeatable; default: all) |
+| `--top` | integer | no | 10 | — | Length of the author and venue frequency lists |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+
 ## asset check
 
 **Stability: stable**
@@ -852,6 +868,81 @@ Normalize entries: titles, authors, journals, DOIs, identifier case, and orderin
 | `--ignore-missing-tex` | boolean | no | false | — | Regenerate keys despite missing linked TeX sources; those sources are not rewritten |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 
+## query list
+
+**Stability: stable**
+
+List the library's saved queries, and whether each still parses.
+
+`pynakes query list [FILE] [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+
+## query remove
+
+**Stability: stable**
+
+Remove a saved query from the library.
+
+`pynakes query remove [FILE] NAME [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `NAME` | string | yes | — | — | Name of the saved query to remove |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
+| `--dry-run` | boolean | no | false | — | Show changes without writing |
+| `--diff` | boolean | no | false | — | Show a unified diff |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+
+## query run
+
+**Stability: stable**
+
+Run a saved query against the library as it is now.
+
+`pynakes query run [FILE] NAME [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `NAME` | string | yes | — | — | Name of the saved query to run |
+| `--resolved` | boolean | no | false | — | Include fields inherited through crossref/xdata |
+| `--abstract` | boolean | no | false | — | Include each abstract in the summary |
+| `--select` | list[string] | no | null | — | Return only these fields under 'fields': comma-separated, repeatable. A selected field the entry lacks is null and listed in missing_fields |
+| `--include` | list[string] | no | null | — | Also report what the library records outside the entry's fields: materials (Pinax files and file links), provenance (manifest records and directives). Comma-separated, repeatable |
+| `--max-chars` | integer | no | null | — | Cut every returned text value to at most this many characters; each cut is listed under 'truncated' |
+| `--limit` | integer | no | null | — | Return at most this many entries per page |
+| `--cursor` | string | no | null | — | Resume a paged read: pass page.next_cursor from the previous page. Refused when the library changed since |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+
+## query set
+
+**Stability: stable**
+
+Save a named selector query in the library, or replace one.
+
+`pynakes query set [FILE] NAME EXPRESSION [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `NAME` | string | yes | — | — | Query name: letters, digits, '_', '.', '-' |
+| `EXPRESSION` | string | yes | — | — | Selector expression (the --where grammar) |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
+| `--dry-run` | boolean | no | false | — | Show changes without writing |
+| `--diff` | boolean | no | false | — | Show a unified diff |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+
 ## ref add
 
 **Stability: stable**
@@ -1012,6 +1103,11 @@ Show one uniquely identified reference, or triage several at once.
 | `--key` | list[string] | no | null | — | Summarize several references at once: comma-separated keys, repeatable |
 | `--resolved` | boolean | no | false | — | Include fields inherited through crossref/xdata |
 | `--abstract` | boolean | no | false | — | Include each abstract in the --key summary |
+| `--select` | list[string] | no | null | — | Return only these fields under 'fields': comma-separated, repeatable. A selected field the entry lacks is null and listed in missing_fields |
+| `--include` | list[string] | no | null | — | Also report what the library records outside the entry's fields: materials (Pinax files and file links), provenance (manifest records and directives). Comma-separated, repeatable |
+| `--max-chars` | integer | no | null | — | Cut every returned text value to at most this many characters; each cut is listed under 'truncated' |
+| `--limit` | integer | no | null | — | With --key, return at most this many entries per page |
+| `--cursor` | string | no | null | — | Resume a paged read: pass page.next_cursor from the previous page. Refused when the library changed since |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 
@@ -1051,13 +1147,17 @@ Search entries by free text, phrases, or field-scoped terms.
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `QUERY` | string | yes | — | — | Search query: words/phrases, optionally scoped as field:term or field:"phrase". Pass "" to select by --where alone |
-| `--in-field` | list[string] | no | null | — | Restrict stored fields searched and returned; repeat for multiple fields |
+| `--in` | list[string] | no | null | — | Search only these stored fields: comma-separated, repeatable. The citation key and entry type stay searchable |
+| `--select` | list[string] | no | null | — | Return only these fields under 'fields': comma-separated, repeatable. A selected field the entry lacks is null and listed in missing_fields |
+| `--in-field` | list[string] | no | null | — | Deprecated, removed in 0.9.0: use --in to choose the fields searched and --select to choose the fields returned |
 | `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing. See `pynakes capabilities` for the full grammar. |
 | `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
 | `--case-sensitive` | boolean | no | false | — | Match case sensitively |
 | `--fuzzy` | boolean | no | false | — | Also match near-misses (misspellings, inflections) by similarity |
 | `--abstract` | boolean | no | false | — | Print an excerpt of each result's abstract beneath the hit |
-| `--limit` | integer | no | null | — | Maximum number of matches |
+| `--limit` | integer | no | null | — | Maximum number of matches per page |
+| `--cursor` | string | no | null | — | Resume a paged read: pass page.next_cursor from the previous page. Refused when the library changed since |
+| `--max-chars` | integer | no | null | — | Cut every returned text value to at most this many characters; each cut is listed under 'truncated' |
 | `--no-rank` | boolean | no | false | — | Keep raw file order instead of ranking by match strength |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |

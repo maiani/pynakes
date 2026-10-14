@@ -6,7 +6,10 @@ the tool rather than guessing. Update this when commands are added or removed.
 
 from pynakes import __all__ as PUBLIC_API_EXPORTS
 from pynakes import __version__ as VERSION
+from pynakes.analysis import SECTIONS as ANALYSIS_SECTIONS
 from pynakes.cli_errors import catalogue_description
+from pynakes.entry_reader import INCLUDE_PARTS
+from pynakes.metadata.schema import SAVED_QUERY_PREFIX
 from pynakes.query import FUZZY_THRESHOLD, WHERE_GRAMMAR
 
 # Stable type vocabulary for command-schema introspection. The on-disk click
@@ -50,6 +53,9 @@ _SEARCH_QUERY_GRAMMAR = {
     "terms": "Whitespace-separated terms are ANDed.",
     "phrases": "Quoted phrases stay together.",
     "field_prefix": "field:term scopes a term to one field; key: and type: are special fields.",
+    "search_in": "--in FIELDS scopes every unprefixed term to those stored fields "
+    "(key and type stay searchable). It does not change what a match returns; "
+    "--select does that.",
     "examples": [
         "learning",
         '"natural language"',
@@ -87,13 +93,107 @@ _SEARCH_QUERY_GRAMMAR = {
 }
 
 
+# Old forms that still work, warn with {"type": "deprecated", ...}, and go away
+# in the named release. Empty once nothing is being retired.
+_DEPRECATIONS = [
+    {
+        "command": "search",
+        "old": "--in-field",
+        "new": "--in and --select",
+        "removal": "0.9.0",
+        "note": "--in-field restricted both the fields searched and the fields "
+        "returned; --in chooses the first and --select the second.",
+    },
+]
+
+# The bounded-read contract shared by every multi-entry read.
+_BOUNDED_READS = {
+    "commands": ["ref show (--key)", "query run", "search"],
+    "options": {
+        "--limit N": "at most N entries per page; --limit 0 reports only page.total",
+        "--cursor TOKEN": "resume with page.next_cursor from the previous page",
+        "--max-chars N": "cut every returned text value to N characters",
+        "--select FIELDS": "return only these stored fields (abstract included): "
+        "under 'fields' in place of 'summary' on ref show and query run, as each "
+        "match's 'fields' on search",
+        "--include PARTS": "ref show and query run: add what the library records "
+        "outside the entry's fields, each part under its own key",
+    },
+    "page": {
+        "keys": ["offset", "limit", "returned", "total", "complete", "next_cursor"],
+        "order": "Deterministic for a snapshot: requested key order for ref show --key, "
+        "file order for query run, ranked or file order for search.",
+        "snapshot": "A cursor carries a digest of the library it was issued for and of "
+        "the selection. Against a changed library it is refused with the StaleCursor "
+        "conflict (exit 2); against another selection, with InvalidInput.",
+    },
+    "missing_vs_omitted": {
+        "missing": "The library has no value: a selected field is null and listed in "
+        "missing_fields; an included part with nothing recorded is listed in missing.",
+        "omitted": "A value exists but was left out: stored fields outside --select are "
+        "listed in omitted_fields; values cut by --max-chars are listed in truncated "
+        "with their full and returned lengths.",
+        "unread": "Entries beyond this page: page.complete is false and "
+        "page.next_cursor reads them.",
+    },
+    "include": {
+        "parts": list(INCLUDE_PARTS),
+        "materials": "Pinax materials present for the key (pinax.configured is false "
+        "without pinax-files-dir) and BibLaTeX file links with their status.",
+        "provenance": "The Pinax manifest record for each material (source, dates, "
+        "access, checksum) and the per-entry directives with their reasons.",
+    },
+    "retrieve_full": "When a page truncated any value, retrieve_full names the keys "
+    "to re-read without --max-chars.",
+    "limits_count": "characters of stored text; never model-dependent tokens",
+    "offline": True,
+}
+
+_SAVED_QUERIES = {
+    "storage": f"One pynakes-meta line per query: {SAVED_QUERY_PREFIX}NAME: EXPRESSION",
+    "grammar": "The shared --where predicate grammar (see predicate_grammar).",
+    "name": "Letters, digits, '_', '.', '-', starting with a letter or digit; "
+    "compared case-insensitively.",
+    "commands": ["query list", "query set", "query remove", "query run"],
+    "results": "The library stores the query, never its result: query run evaluates "
+    "it against the entries as they are now, in file order, under the bounded-read "
+    "contract.",
+    "citations": "used/unused resolve against the library's tex-sources when the "
+    "query runs (NoSources when none are linked).",
+    "validation": "query set and metadata set validate the expression; lint reports "
+    "a stored query that no longer parses (invalid_metadata_value).",
+}
+
+_ANALYSIS = {
+    "command": "analyze",
+    "module": "pynakes.analysis",
+    "sections": list(ANALYSIS_SECTIONS),
+    "descriptive_only": True,
+    "reconciles": {
+        "lint": "Equals lint's summary for the library (after lint-ignore and ignore directives).",
+        "entries": "total counts physical entries, duplicate citation keys included; "
+        "each per-entry section counts every entry once.",
+    },
+    "frequency_lists": "authors.top and venues.top are capped by --top, most "
+    "frequent first, ties alphabetical; distinct always counts every value.",
+    "offline": True,
+}
+
 # Single source of truth for how commands are grouped by nature, shared by the
 # CLI ``--help`` panels (``cli.py`` reads this for ``rich_help_panel``) and the
 # ``command_groups`` field of the capability description. Ordered: panels render
 # in this order, and the commands within each panel in this order. Every
 # top-level command/group must appear in exactly one panel — guarded by tests.
 COMMAND_GROUPS: dict[str, list[str]] = {
-    "Inspect & validate": ["inspect", "search", "lint", "verify", "capabilities"],
+    "Inspect & validate": [
+        "inspect",
+        "search",
+        "query",
+        "analyze",
+        "lint",
+        "verify",
+        "capabilities",
+    ],
     "Edit references": [
         "ref",
         "format",
@@ -235,6 +335,7 @@ def _selector_surfaces(schemas: dict[str, dict]) -> list[str]:
     )
     return [
         *(f"{name} (--where, --key)" for name in selecting),
+        "query set / query run (saved expressions)",
         "corpus split (--route)",
         "batch (fields.* where)",
     ]
@@ -354,6 +455,10 @@ def get_capabilities() -> dict:
             "normalize_pages",
             "import_reference",
             "search_library",
+            "bounded_reads",
+            "include_materials_and_provenance",
+            "saved_queries",
+            "analyze_library",
             "detect_used_citations",
             "remove_entries",
             "combine_libraries",
@@ -403,6 +508,9 @@ def get_capabilities() -> dict:
             "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "
             "formats (export/import CSL-JSON, RIS, MODS, EndNote, and export CSV)",
             "search": "Search entries by free text, phrases, or field-scoped terms",
+            "query": "Save, list, remove, and run named selector queries (list, set, remove, run)",
+            "analyze": "Describe a bibliography with offline counts: types, years, "
+            "authors, venues, identifier and field coverage, groups, lint, materials",
             "scrub": "Write a public copy with private content removed — private "
             "entry fields, metadata blocks, and free comments (--check gates instead "
             "of writing)",
@@ -419,6 +527,10 @@ def get_capabilities() -> dict:
         "error_codes": catalogue_description(),
         "predicate_grammar": {"used_by": _selector_surfaces(schemas), **_PREDICATE_GRAMMAR},
         "search_query_grammar": _SEARCH_QUERY_GRAMMAR,
+        "bounded_reads": _BOUNDED_READS,
+        "deprecations": _DEPRECATIONS,
+        "saved_queries": _SAVED_QUERIES,
+        "analysis": _ANALYSIS,
         "formatting": {
             "lint_gate": (
                 "Formatting runs lint and refuses findings that make a canonical "

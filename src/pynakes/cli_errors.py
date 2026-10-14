@@ -52,6 +52,7 @@ class ErrorCode(StrEnum):
     DUPLICATE_MERGE_KEY = "DuplicateMergeKey"
     DEDUPE_CONFLICT = "DedupeConflict"
     DUPLICATE_REFERENCE = "DuplicateReference"
+    STALE_CURSOR = "StaleCursor"
 
 
 @dataclass(frozen=True)
@@ -149,6 +150,11 @@ CATALOGUE: dict[ErrorCode, ErrorSpec] = {
     _E.DEDUPE_CONFLICT: ErrorSpec(2, "dedupe merge: a cluster has irreconcilable field values."),
     _E.DUPLICATE_REFERENCE: ErrorSpec(
         2, "ref import: the work is already in the library (includes 'existing_keys')."
+    ),
+    _E.STALE_CURSOR: ErrorSpec(
+        2,
+        "A --cursor was issued for an earlier state of the library; restart the read "
+        "without --cursor (includes 'source_sha256').",
     ),
 }
 

@@ -12,6 +12,7 @@ from pynakes import __version__
 from pynakes.capabilities import COMMAND_GROUPS
 from pynakes.cli_commands import (
     add,
+    analyze,
     asset_check,
     batch,
     capabilities,
@@ -33,6 +34,7 @@ from pynakes.cli_commands import (
     lint,
     metadata,
     normalize,
+    query,
     remove,
     scrub,
     search,
@@ -62,6 +64,7 @@ tex_app = typer.Typer(
 )
 asset_app = typer.Typer(help="Fetch and validate Pinax materials", cls=AutoBibGroup)
 corpus_app = typer.Typer(help="Operate across multiple .bib files", cls=AutoBibGroup)
+query_app = typer.Typer(help="Save and run named selector queries", cls=AutoBibGroup)
 
 
 def _version_callback(value: bool) -> None:
@@ -99,6 +102,7 @@ format.register(app)
 convert.register(app)
 capabilities.register(app)
 search.register(app)
+analyze.register(app)
 scrub.register(app)
 
 # ref: per-entry lifecycle
@@ -119,6 +123,9 @@ tex_scan.register(tex_app)
 fetch.register(asset_app)
 asset_check.register(asset_app)
 
+# query: named selector queries saved in pynakes-meta
+query.register(query_app)
+
 # corpus: operations across multiple .bib files
 setops.register(corpus_app)
 batch.register(corpus_app)
@@ -131,6 +138,7 @@ app.add_typer(dedupe_app, name="dedupe")
 app.add_typer(metadata_app, name="metadata")
 app.add_typer(tex_app, name="tex")
 app.add_typer(asset_app, name="asset")
+app.add_typer(query_app, name="query")
 app.add_typer(corpus_app, name="corpus")
 
 # --- Group top-level --help by nature ---------------------------------------

@@ -100,6 +100,7 @@ __all__ = [
     "lint",
     "profile_required_fields",
     "resolve_lint_profile",
+    "suppress_findings",
     "unknown_ignore_names",
 ]
 
@@ -184,6 +185,21 @@ _CONSISTENCY_DECORATION_FIELDS = frozenset(
 _CONSISTENCY_ALTERNATIVES: dict[str, frozenset[str]] = {
     "pages": frozenset({"articleno", "artnum", "eid", "numpages", "doi"}),
 }
+
+
+def suppress_findings(
+    lib: BibFile, issues: list[LintIssue], ignores: frozenset[str] = frozenset()
+) -> tuple[list[LintIssue], int]:
+    """Drop the findings the library waives, returning ``(kept, suppressed_count)``.
+
+    A finding is suppressed by the library's ``lint-ignore``, by the caller's
+    ``ignores`` (added to it, never replacing it), or by an ``ignore``
+    directive above its entry. This is the report ``lint`` prints.
+    """
+    ignored = ignores | library_lint_ignores(lib)
+    rules = entry_ignore_rules(lib)
+    kept = [issue for issue in issues if not (issue.is_ignored(ignored) or is_waived(issue, rules))]
+    return kept, len(issues) - len(kept)
 
 
 def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:

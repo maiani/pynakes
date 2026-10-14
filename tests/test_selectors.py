@@ -37,6 +37,8 @@ NOT_ENTRY_SELECTABLE = {
     "metadata adopt-jabref": "edits file metadata, not entries",
     "metadata remove": "edits file metadata, not entries",
     "metadata set": "edits file metadata, not entries",
+    "query remove": "edits a saved query, not entries",
+    "query set": "edits a saved query, not entries",
     "ref add": "creates one entry",
     "ref edit": "names one entry positionally",
     "ref import": "--key names the key to assign to the new entry",

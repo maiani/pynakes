@@ -2,6 +2,22 @@
 
 import typer
 
+from pynakes.bounded import request_digest
+from pynakes.cli_commands._bounded import (
+    bounds_payload,
+    check_bounds,
+    cursor_option,
+    emit_page,
+    entry_records,
+    include_option,
+    included_lines,
+    limit_option,
+    max_chars_option,
+    page_of,
+    parse_includes,
+    parse_select,
+    select_option,
+)
 from pynakes.cli_commands._reference import parse_key_list, unique_entries, unique_entry
 from pynakes.cli_common import (
     InvalidInputError,
@@ -14,7 +30,6 @@ from pynakes.cli_common import (
     key_option,
 )
 from pynakes.engine import Bibliography
-from pynakes.triage import entry_summary
 
 
 def show(
@@ -29,6 +44,11 @@ def show(
     abstract: bool = typer.Option(
         False, "--abstract", help="Include each abstract in the --key summary"
     ),
+    select: list[str] | None = select_option(),
+    include: list[str] | None = include_option(),
+    max_chars: int | None = max_chars_option(),
+    limit: int | None = limit_option("With --key, return at most this many entries per page"),
+    cursor: str | None = cursor_option(),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Show one uniquely identified reference, or triage several at once.
@@ -40,6 +60,15 @@ def show(
     one call rather than one invocation per key. Both forms refuse to guess
     when a key is duplicated, and the `--key` form reports every unknown key
     together.
+
+    Bounded reads: `--select` returns only the named fields (the abstract
+    among them); `--include materials,provenance` adds the materials
+    available for each entry and the provenance the library recorded;
+    `--max-chars` cuts long values and lists every cut under `truncated`. With `--key`, `--limit` pages the selection and
+    `page.next_cursor` resumes it — a cursor is refused once the library
+    changes, so pages never silently skip or repeat entries. Information
+    the library lacks is reported as missing (`null`, `missing`,
+    `missing_fields`), never as an omission.
     """
     if keys:
         if key is not None:
@@ -51,6 +80,11 @@ def show(
             "--abstract applies to the --key summary; showing a single key already "
             "prints every field, abstract included"
         )
+    if not keys and (limit is not None or cursor is not None):
+        raise InvalidInputError("--limit and --cursor page a --key selection")
+    check_bounds(limit, max_chars)
+    selection = parse_select(select)
+    parts = parse_includes(include)
 
     file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
@@ -62,11 +96,29 @@ def show(
             parse_key_list(keys),
             resolved=resolved,
             include_abstract=abstract,
+            select=selection,
+            include=parts,
+            max_chars=max_chars,
+            limit=limit,
+            cursor=cursor,
             json_output=json_output,
         )
         return
 
     entry = unique_entry(coll, key, json_output, action="ref_show")
+    if selection is not None or parts or max_chars is not None:
+        _show_bounded_entry(
+            coll,
+            file,
+            entry,
+            resolved=resolved,
+            select=selection,
+            include=parts,
+            max_chars=max_chars,
+            json_output=json_output,
+        )
+        return
+
     fields = coll.lib.resolved_fields(entry) if resolved else entry.fields
     if json_output:
         _emit_json(
@@ -88,27 +140,33 @@ def show(
         typer.echo(f"  {name} = {value}")
 
 
-def _show_summaries(
+def _show_bounded_entry(
     coll: Bibliography,
     file: str,
-    keys: list[str],
+    entry,
     *,
     resolved: bool,
-    include_abstract: bool,
+    select: tuple[str, ...] | None,
+    include: tuple[str, ...],
+    max_chars: int | None,
     json_output: bool,
 ) -> None:
-    """Print one triage summary per requested key, in the order requested."""
-    summaries = []
-    for entry in unique_entries(coll, keys, json_output, action="ref_show"):
-        fields = coll.lib.resolved_fields(entry) if resolved else entry.fields
-        summaries.append(
-            {
-                "key": entry.key,
-                "entry_type": entry.type,
-                "summary": entry_summary(entry, fields, include_abstract=include_abstract),
-            }
-        )
-
+    """Show one entry's fields under a projection, text limit, or inclusion."""
+    (record,), warnings = entry_records(
+        coll,
+        [entry],
+        resolved=resolved,
+        include_abstract=False,
+        # Every stored field, unless a selection narrows it: the single-key
+        # form shows the whole record by default.
+        select=select if select is not None else tuple(name.lower() for name in entry.fields),
+        include=include,
+        max_chars=max_chars,
+    )
+    if select is None:
+        # Nothing was selected away, so nothing was omitted or missing.
+        record.pop("missing_fields", None)
+        record.pop("omitted_fields", None)
     if json_output:
         _emit_json(
             {
@@ -116,25 +174,77 @@ def _show_summaries(
                 "action": "ref_show",
                 "file": file,
                 "source_sha256": _source_sha256(coll),
-                "warnings": [],
-                "keys": keys,
-                "count": len(summaries),
-                "entries": summaries,
+                "warnings": warnings,
+                **record,
                 "resolved": resolved,
-                "abstract": include_abstract,
+                "bounds": bounds_payload(
+                    select=select, include=include, max_chars=max_chars, limit=None
+                ),
             }
         )
         return
+    truncated = record.get("truncated")
+    truncated = truncated if isinstance(truncated, dict) else {}
+    typer.echo(f"@{entry.type}{{{entry.key}}}")
+    for name, value in (record.get("fields") or {}).items():
+        cut = "…" if f"fields.{name}" in truncated else ""
+        typer.echo(f"  {name} = {'(none)' if value is None else value}{cut}")
+    for name, value in included_lines(record):
+        typer.echo(f"  {name}: {value}")
 
-    typer.echo(f"{file}: {len(summaries)} {_entries(len(summaries))}.")
-    # One label column across every entry keeps the values aligned down the
-    # whole listing, which is what makes it scannable.
-    width = max((len(name) for item in summaries for name in item["summary"]), default=0)
-    for item in summaries:
-        typer.echo("")
-        typer.echo(f"@{item['entry_type']}{{{item['key']}}}")
-        for name, value in item["summary"].items():
-            typer.echo(f"  {name.ljust(width)}  {'(none)' if value is None else value}")
+
+def _show_summaries(
+    coll: Bibliography,
+    file: str,
+    keys: list[str],
+    *,
+    resolved: bool,
+    include_abstract: bool,
+    select: tuple[str, ...] | None,
+    include: tuple[str, ...],
+    max_chars: int | None,
+    limit: int | None,
+    cursor: str | None,
+    json_output: bool,
+) -> None:
+    """Print one triage summary per requested key, in the order requested."""
+    entries = unique_entries(coll, keys, json_output, action="ref_show")
+    page, page_info = page_of(
+        coll,
+        entries,
+        limit=limit,
+        cursor=cursor,
+        request=request_digest(command="ref show", keys=keys),
+        json_output=json_output,
+        action="ref_show",
+    )
+    records, warnings = entry_records(
+        coll,
+        page,
+        resolved=resolved,
+        include_abstract=include_abstract,
+        select=select,
+        include=include,
+        max_chars=max_chars,
+    )
+    payload: dict[str, object] = {
+        "status": "success",
+        "action": "ref_show",
+        "file": file,
+        "source_sha256": _source_sha256(coll),
+        "warnings": warnings,
+        "keys": keys,
+        "resolved": resolved,
+        "abstract": include_abstract,
+        "bounds": bounds_payload(select=select, include=include, max_chars=max_chars, limit=limit),
+    }
+    emit_page(
+        payload,
+        records,
+        page_info,
+        heading=f"{file}: {len(records)} {_entries(len(records))}.",
+        json_output=json_output,
+    )
 
 
 def register(app: typer.Typer) -> None:

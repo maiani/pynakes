@@ -183,6 +183,20 @@ def _with_warnings(human: list[str], warnings: list | None) -> list[str]:
     return lines
 
 
+def deprecation_warning(old: str, new: str, *, removal: str, json_output: bool) -> dict:
+    """Return the structured warning for a deprecated form, echoing it outside ``--json``.
+
+    The beta contract: an old form keeps working for one minor release and says
+    so with ``{"type": "deprecated", "old": ..., "new": ...}``, plus the release
+    that removes it. Outside ``--json`` the notice goes to stderr, so stdout
+    stays the command's own output.
+    """
+    message = f"{old} is deprecated and will be removed in {removal}; use {new}"
+    if not json_output:
+        typer.echo(f"warning: {message}", err=True)
+    return {"type": "deprecated", "old": old, "new": new, "removal": removal, "message": message}
+
+
 def _entries(count: int) -> str:
     return "entry" if count == 1 else "entries"
 

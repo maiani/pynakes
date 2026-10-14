@@ -29,6 +29,7 @@ MetadataCategory = Literal[
     "usage",
     "pinax",
     "scrub",
+    "queries",
     "unknown",
 ]
 
@@ -44,6 +45,7 @@ CATEGORY_LINT: MetadataCategory = "lint"
 CATEGORY_USAGE: MetadataCategory = "usage"
 CATEGORY_PINAX: MetadataCategory = "pinax"
 CATEGORY_SCRUB: MetadataCategory = "scrub"
+CATEGORY_QUERIES: MetadataCategory = "queries"
 CATEGORY_UNKNOWN: MetadataCategory = "unknown"
 
 #: Former ``pynakes-meta`` key names, mapped to the key that replaced them. They
@@ -105,7 +107,12 @@ PYNAKES_PREFIX_KEYS: dict[str, MetadataCategory] = {
     "lint-required-fields-": CATEGORY_LINT,
     # Per-entry-type key patterns, aliasing JabRef's ``keypattern_<type>``.
     "key-pattern-": CATEGORY_CITATION_KEY,
+    # Saved selector queries, one key per name, run by `query run`.
+    "query-": CATEGORY_QUERIES,
 }
+
+#: Key prefix of a saved query: ``query-<name>: <selector expression>``.
+SAVED_QUERY_PREFIX = "query-"
 
 
 _VALID_DIALECTS = {"bibtex", "biblatex"}
@@ -245,6 +252,13 @@ def validate_metadata_value(key: str, value: str) -> None:
                 raise ValueError("format-indent must be a positive integer or 'tab'") from exc
             if width < 1:
                 raise ValueError("format-indent must be a positive integer or 'tab'")
+        return
+
+    if normalized_key.startswith(SAVED_QUERY_PREFIX):
+        # Imported here: the selector grammar sits above the metadata layer.
+        from pynakes.saved_queries import validate_saved_query
+
+        validate_saved_query(key.strip()[len(SAVED_QUERY_PREFIX) :], stripped)
         return
 
     # Remaining known pynakes keys: refuse empty values.
