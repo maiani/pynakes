@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "tasks": [
+    {
+      "id": "ambiguous-reference",
+      "category": "ambiguous_references",
+      "fixture": "historical.bib",
+      "prompt": "Which entry in this library is Euler's 'Introductio in analysin infinitorum'? Answer with its citation key.",
+      "expected": {
+        "answer_keys": ["Euler1748a", "Euler1748b"],
+        "must_report_ambiguity": true,
+        "library": "unchanged"
+      },
+      "notes": "Two volumes share the title. A correct answer names both keys and says the request is ambiguous rather than picking one.",
+      "reference": [
+        {
+          "argv": ["search", "{lib}", "Introductio", "--json"],
+          "checks": [{"path": "count", "equals": 2}]
+        },
+        {
+          "argv": ["ref", "show", "{lib}", "--key", "Euler1748a,Euler1748b", "--select", "title,volume", "--json"],
+          "checks": [
+            {"path": "entries.0.fields.volume", "equals": "1"},
+            {"path": "entries.1.fields.volume", "equals": "2"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "duplicate-conflict",
+      "category": "duplicate_conflicts",
+      "fixture": "historical.bib",
+      "prompt": "Add the note 'first edition' to Hooke1665.",
+      "expected": {
+        "answer_keys": ["Hooke1665"],
+        "must_report_ambiguity": true,
+        "library": "unchanged"
+      },
+      "notes": "Hooke1665 identifies two entries. The edit is refused with a DuplicateCitationKey conflict; a correct agent surfaces it and asks which entry is meant instead of editing either.",
+      "reference": [
+        {
+          "argv": ["ref", "edit", "{lib}", "Hooke1665", "--field", "note=first edition", "--dry-run", "--json"],
+          "expect_exit": 2,
+          "checks": [{"path": "error", "equals": "DuplicateCitationKey"}]
+        },
+        {
+          "argv": ["keys", "check", "{lib}", "--json"],
+          "checks": [{"path": "status", "equals": "success"}]
+        }
+      ]
+    },
+    {
+      "id": "concurrent-edit",
+      "category": "concurrent_edits",
+      "fixture": "historical.bib",
+      "prompt": "Preview adding the note 'first edition' to Newton1687, then apply exactly what you previewed.",
+      "expected": {
+        "answer_keys": ["Newton1687"],
+        "must_report_ambiguity": false,
+        "library": "external_change_only"
+      },
+      "notes": "Between the preview and the apply the file changes on disk. Applying with --expect-sha256 is refused with ExternalModification; a correct agent reports that and re-previews rather than writing over the change.",
+      "reference": [
+        {
+          "argv": ["ref", "edit", "{lib}", "Newton1687", "--field", "note=first edition", "--dry-run", "--json"],
+          "checks": [{"path": "dry_run", "equals": true}]
+        },
+        {"mutate": {"append": "\n% edited in another tool\n"}},
+        {
+          "argv": ["ref", "edit", "{lib}", "Newton1687", "--field", "note=first edition", "--expect-sha256", "{step0.source_sha256}", "--json"],
+          "expect_exit": 2,
+          "checks": [{"path": "error", "equals": "ExternalModification"}]
+        }
+      ]
+    },
+    {
+      "id": "bounded-context",
+      "category": "bounded_reads",
+      "fixture": "optics.bib",
+      "prompt": "Summarize the abstracts of every entry in the group Optics. Read at most 5 entries per call and at most 300 characters of any value.",
+      "expected": {
+        "answer_keys": [
+          "Ashby1950", "Gisler1952", "Elling1954", "Castell1956", "Ashby1958", "Gisler1960",
+          "Elling1962", "Castell1964", "Ashby1966", "Gisler1968", "Elling1970", "Castell1972"
+        ],
+        "must_report_ambiguity": false,
+        "library": "unchanged"
+      },
+      "notes": "The library saves the selection as the query 'optics'. A correct agent pages until page.complete, reads every key exactly once, and says the abstracts it summarized were truncated.",
+      "reference": [
+        {
+          "argv": ["query", "run", "{lib}", "optics", "--select", "title,abstract", "--max-chars", "300", "--limit", "5", "--json"],
+          "paginate": true,
+          "checks": [{"path": "page.total", "equals": 12}]
+        }
+      ]
+    }
+  ]
+}

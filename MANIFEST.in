@@ -10,6 +10,7 @@ prune .vscode
 prune docs
 prune editor
 prune scripts
+prune evals
 
 # Ship the complete test environment with the source distribution so downstream
 # packagers can validate the archive without checking out the repository.
