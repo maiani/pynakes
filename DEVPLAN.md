@@ -197,22 +197,20 @@ version. MCP and editor releases remain independently versioned companions.
 **Workflow:** select a set of papers, obtain bounded comparison context, and
 save the selection criteria for later use.
 
-- Extend multi-entry `ref show` with an optional context projection containing
-  summaries, abstracts, material availability and recorded provenance. Reuse
-  existing records; distinguish missing information from omitted content.
-- Add field selection, deterministic pagination and explicit text/entry limits.
-  Report truncation and how to retrieve full records; cursors must detect a
-  changed snapshot. Reads stay offline and contain source data, not generated
-  scientific judgments or model-dependent token counts.
-- Persist named predicates in `pynakes-meta`, with read/write/remove/run
-  operations. Validate with the existing predicate parser; store queries, not
-  result sets, and use the same bounded-result contract.
-- Add `pynakes.analysis` and an offline `analyze` report for one bibliography:
-  type/year and author/journal frequencies, identifier/field coverage, groups,
-  lint and material findings. Compose existing reports and expose descriptive
-  counts rather than scientific-quality scores.
-- Advertise schemas in `capabilities`, preserve existing reads, and introduce
-  the agent evaluation fixtures and response-size/call-count measurements above.
+The engine work is implemented and recorded under *Unreleased* in
+[CHANGELOG.md](CHANGELOG.md): the bounded-read contract (`--select`,
+`--include materials,provenance`, `--max-chars`, `--limit`, snapshot-bound
+`--cursor`)
+shared by `ref show --key`, `query run`, and `search`, saved queries
+(`query list/set/remove/run`), `analyze`, their `capabilities` schemas, and the
+agent evaluation suite in `evals/agent`. Its tests cover the gate below.
+
+Remaining before release:
+
+- Record at least one agent run per evaluation task with
+  `scripts/agent_eval.py`, keeping the transcript, the scores, and the
+  `measure` baseline together with the engine and model versions.
+- Release per [RELEASE.md](RELEASE.md).
 
 **Done when:** selected context can be paged without omissions under a stable
 snapshot; missing and truncated information are distinct; saved queries reflect

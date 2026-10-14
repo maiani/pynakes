@@ -40,6 +40,10 @@ src/pynakes/
   authors.py journals.py normalize.py
   importer.py         resolve + import references by DOI / arXiv id or supported URL
   lookup.py           resolve a written-out reference to records that exist
+  bounded.py          bounded-read contract: projection, char limits, snapshot cursors
+  entry_reader.py    per-entry records: summary, fields, research context
+  saved_queries.py    named --where expressions stored as query-<name> metadata
+  analysis.py         offline descriptive report for one bibliography (`analyze`)
   integrity.py        verify / enrich / published (opt-in --online lookups)
   _integrity_*.py     integrity report types and the published-check half
   entry_types.py      container/eprint field naming per entry type + dialect
@@ -57,6 +61,7 @@ src/pynakes/
   cli_errors.py       the error-code catalogue (status + exit code per code)
   cli_choices.py cli_checks.py cli_completion.py   option choices, gates, completion
 tests/                pytest suite, conformance fixtures, and CLI workflow tests
+evals/agent/          agent evaluation tasks and fixtures (run by scripts/agent_eval.py)
 editor/               VS Code extension companion (TypeScript, own toolchain)
 ```
 
@@ -146,7 +151,8 @@ tests pass:
 
 - Python ≥ 3.12, type hints throughout. Ruff line length 100 (E501 ignored).
 - CLI: top-level transforms/checks plus Typer resource families (`ref`,
-  `groups`, `keys`, `fields`, `dedupe`, `metadata`, `tex`, `asset`, `corpus`).
+  `groups`, `keys`, `fields`, `dedupe`, `metadata`, `tex`, `asset`, `query`,
+  `corpus`).
   Command callbacks live in `cli_commands/`; operation modules stay independently
   unit-testable. Keep `capabilities` synchronized with the live command surface.
 - Try to limit file length preferably to ~500 lines, with a maximum limit of 800.

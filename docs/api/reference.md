@@ -77,6 +77,16 @@ with usage examples, see the [API overview](index.md).
 
 ::: pynakes.batch
 
+## Research reads and analysis
+
+::: pynakes.bounded
+
+::: pynakes.entry_reader
+
+::: pynakes.saved_queries
+
+::: pynakes.analysis
+
 ## Introspection
 
 ::: pynakes.capabilities

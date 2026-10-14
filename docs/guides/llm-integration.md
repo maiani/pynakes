@@ -143,7 +143,8 @@ the all-or-nothing guarantee rather than an exception to it.
 
 - Use `ref show <key>` to read one uniquely keyed reference, and
   `ref show --key k1,k2,… [--abstract]` to triage a candidate set in one call
-  instead of one invocation per key.
+  instead of one invocation per key. Use the
+  [bounded-read options](#bounded-reads) to compare the set within a budget.
 - Use `ref edit <key>` for a multi-field patch to one reference.
 - Use `ref directive ignore <finding> --key <key> --reason "..."` to accept a lint
   finding a human has judged unfixable for one entry (a venue with no DOIs),
@@ -203,6 +204,66 @@ the candidates, then summarize the survivors with one
 `entry_type` and a `summary` of title, creator, date, venue, and identifiers,
 with `abstract: null` where none is stored. Read a chosen entry in full with a
 single-key `ref show <key> --json`.
+
+### Bounded reads
+
+Comparing a set of papers needs their abstracts, what can be read for each, and
+where it came from, within a response budget. Two options decide what each
+entry reports:
+
+- `--select f1,f2` returns exactly those stored fields — `abstract` is one —
+  under `fields`, in place of the triage `summary` (on `search`, as each
+  match's `fields`; `search --in` separately chooses the fields searched).
+- `--include materials,provenance` adds what the library records outside the
+  entry's fields, each part under its own key. `materials`: the Pinax materials
+  present for the key (`pinax.configured` is `false` without
+  `pinax-files-dir`) and the BibLaTeX `file` links with their status.
+  `provenance`: the Pinax manifest record of each material (source, dates,
+  access) and the directives above the entry with their reasons.
+
+For example, `ref show --key k1,k2,… --select title,abstract --include
+materials --json`. Everything comes from existing records, offline; nothing in
+a record is a judgment about the work.
+
+Keep the response bounded with the same options on `ref show --key`,
+`query run`, and `search`:
+
+- `--limit N` returns at most `N` entries; `page.total` counts the whole
+  selection and `--limit 0` reports only that count.
+- `--cursor` resumes with `page.next_cursor` until `page.complete` is `true`.
+  The cursor is bound to the library snapshot: if the file changes between
+  pages, the next page is refused with the `StaleCursor` conflict (exit 2), so
+  pages never silently skip or repeat entries. Restart from the first page.
+- `--max-chars N` cuts every text value to `N` characters (characters of the
+  stored text, never tokens) and lists each cut under the entry's `truncated`
+  with its full and returned lengths. `retrieve_full` names the keys to
+  re-read in full.
+
+Keep missing and omitted apart when you report on a selection. *Missing* means
+the library has nothing: a selected field is `null` and listed in
+`missing_fields`, and an included part with nothing recorded is listed in
+`missing`. *Omitted* means a value exists but was left out: `omitted_fields`
+names stored fields outside `--select`, and `truncated` names cut values. Say
+that a summary was based on truncated text rather than presenting it as
+complete.
+
+### Saved queries and analysis
+
+A selection worth repeating can be saved in the library:
+`query set refs.bib to-read 'abstract exists and not group "Read"'` stores a
+`query-to-read` line in `pynakes-meta`, validated with the `--where` grammar.
+`query run refs.bib to-read --json` evaluates it against the entries as they
+are now, so it reflects every later edit, and returns pages under the
+bounded-read options above. `query list` reports whether each stored query
+still parses; `lint` reports one that does not.
+
+`analyze refs.bib --json` describes a library with offline counts in named
+`sections`: entries and duplicate keys, types, years, the most frequent
+authors and venues (`--top`), identifier and field coverage, groups, `lint`
+findings, and linked-file and Pinax materials. The `lint` section is exactly
+`lint`'s summary, and every per-entry section counts each entry once. Use
+`--section` to read only what you need. The counts describe the records; do
+not present them as a measure of scientific quality.
 
 ### Agent-assisted classification
 

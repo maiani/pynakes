@@ -290,6 +290,10 @@ against every process crash, operating-system failure, or storage failure.
 | integrity.py | Opt-in provider-backed verification and conservative enrichment; re-exports the preprint publication check. |
 | _integrity_common.py, _integrity_published.py | Integrity report types and shared field accessors; the preprint detection/promotion half of the integrity surface. |
 | entry_types.py | Which field holds a container title or eprint provenance, given the entry type and dialect. |
+| bounded.py | The bounded-read contract: field projection, character limits, and pagination whose cursors are bound to a library snapshot and a selection. |
+| entry_reader.py | Per-entry records for bounded reads: triage summary or field projection, plus the included materials and recorded provenance. |
+| saved_queries.py | Named `--where` expressions stored as `query-<name>` in `pynakes-meta`, validated with the shared parser and evaluated on demand. |
+| analysis.py | Offline descriptive report of one bibliography, composed from the entry store, groups, lint, linked files, and Pinax. |
 | diff.py | Unified diff generation. |
 | cli.py, cli_common.py, cli_commands/ | Thin Typer application assembly, shared JSON/error/check plumbing, and one command module per command family. |
 | capabilities.py | Machine-readable declaration of the implemented CLI surface. |

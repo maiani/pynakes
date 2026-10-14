@@ -10,6 +10,80 @@ Use **Breaking changes** for incompatible behavior and migrations, and
 warning and earliest removal release). Additions and fixes use their usual
 sections. Historical releases retain their original headings.
 
+## [Unreleased]
+
+Research context and reusable queries: select a set of papers, read bounded
+comparison context for it, and save the selection for later.
+
+### Added
+
+- **Materials and provenance in reads.** `ref show --key … --include
+  materials,provenance` (and `query run --include`) adds the materials
+  available for each entry (Pinax materials for the key and `file` links with
+  their resolution status) and its recorded provenance (the Pinax manifest
+  record of each material and the directives above the entry). Parts the
+  library lacks are listed under `missing`; nothing is inferred.
+- **Bounded reads.** `ref show --key`, `query run`, and `search` share one
+  contract: `--limit` pages a deterministic selection (`--limit 0` only
+  counts), `page.next_cursor` resumes it with `--cursor`, and `--max-chars`
+  cuts text values, listing each cut under `truncated` with its full length
+  and naming the keys to re-read under `retrieve_full`. `ref show` and
+  `query run` take `--select` to return only the named fields, with
+  `missing_fields` and `omitted_fields` keeping absent and left-out values
+  apart. A single-key `ref show` accepts `--select`, `--max-chars`, and
+  `--include` too; without them its output is unchanged. Limits count
+  characters of the stored text, never tokens.
+- **Snapshot-bound cursors.** A cursor carries digests of the library and the
+  selection it was issued for. Resuming against a changed library is refused
+  with the new `StaleCursor` conflict (exit 2); resuming another selection is
+  `InvalidInput`.
+- **Saved queries.** `query list`, `query set`, `query remove`, and
+  `query run` keep named `--where` expressions as `query-<name>` lines in
+  `pynakes-meta` (new metadata category `queries`). Expressions are validated
+  with the shared selector parser by `query set`, `metadata set`, and `lint`;
+  `query run` evaluates the query against the current entries, resolving
+  `used`/`unused` through the linked `tex-sources`.
+- **`analyze`** and `pynakes.analysis`: offline descriptive counts for one
+  bibliography in named sections — entries and duplicate keys, types, years,
+  most frequent authors and venues (`--top`), identifier and field coverage,
+  groups, `lint` findings, and linked-file and Pinax materials. `--section`
+  selects sections. The `lint` section equals `lint`'s summary; duplicate-key
+  and empty libraries are counted as they are.
+- `capabilities` describes the bounded-read contract (`bounded_reads`), saved
+  queries (`saved_queries`), and the analysis sections (`analysis`).
+- An agent evaluation suite in `evals/agent`: invented and historical fixtures,
+  tasks for ambiguous references, duplicate conflicts, concurrent edits, and
+  bounded reads, and `scripts/agent_eval.py` to measure the reference
+  solutions' call counts and response sizes and to score recorded agent runs.
+  It is repository tooling, not shipped in the sdist.
+- Python API: `search_entries(search_in=...)` scopes matching without
+  restricting the reported fields; `fields=` keeps its old meaning.
+- Python API: `pynakes.bounded`, `pynakes.entry_reader`,
+  `pynakes.saved_queries`, `pynakes.analysis`, and `pynakes.lint.suppress_findings`
+  (the waiver step `lint` applies).
+
+- `search --in FIELDS` looks for the terms only in those stored fields, and
+  `search --select FIELDS` returns only those fields per match, with
+  `missing_fields` and `omitted_fields`. Each does one job; they combine
+  freely. `search` reports the bounds it applied under `bounds`.
+- Deprecation warnings: a deprecated form still works, adds
+  `{"type": "deprecated", "old", "new", "removal", "message"}` to `warnings`
+  (stderr outside `--json`), and is listed in `capabilities` under
+  `deprecations`.
+
+### Deprecated
+
+- `search --in-field` restricted both the fields searched and the fields
+  returned. Replace `--in-field F` with `--in F --select F`. It still works
+  and warns in 0.8, cannot be combined with `--in` or `--select`, and is
+  removed in 0.9.0.
+
+### Changed
+
+- `search` reports a `page` object and computes every match before applying
+  `--limit`, so `page.total` counts them all; `--no-rank` no longer stops the
+  scan early.
+
 ## [0.7.0] - 2026-10-13
 
 The CLI moves to beta. From 0.7.0, its commands, options, JSON envelope, exit

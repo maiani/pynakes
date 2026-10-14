@@ -38,7 +38,8 @@ covered by a backward-compatibility guarantee.
 | Whole-file formatting | `pynakes.canonical` |
 | Work-matching evidence | `pynakes.identity` |
 | Analysis and maintenance | `pynakes.dedupe`, `pynakes.files`, `pynakes.integrity`, `pynakes.lint`, `pynakes.metadata`, `pynakes.scrub`, `pynakes.usage` |
-| Selection and search | `pynakes.query`, `pynakes.search` |
+| Selection and search | `pynakes.query`, `pynakes.search`, `pynakes.saved_queries` |
+| Research reads and analysis | `pynakes.bounded`, `pynakes.entry_reader`, `pynakes.analysis` |
 | Set operations (projections) | `pynakes.setops` |
 | Composition | `pynakes.batch` |
 | Introspection | `pynakes.capabilities` and `pynakes.__version__` |
@@ -100,7 +101,10 @@ Starting with 1.0.0:
 
 From 0.7.0, removing or renaming a CLI command, option, envelope key, action,
 exit-code meaning or error code requires one minor release in which the old
-form still works and emits a structured deprecation warning. At 1.0.0, these
+form still works and emits a structured deprecation warning: an entry in the
+envelope's `warnings` with `type: deprecated`, `old`, `new`, and the `removal`
+release (on stderr outside `--json`). `capabilities` lists every form currently
+in its deprecation period under `deprecations`. At 1.0.0, these
 surfaces and the Python API follow the semantic-versioning policy above. Include
 `pynakes.__version__` or `capabilities.VERSION` in diagnostics.
 

@@ -38,6 +38,9 @@ and JabRef interoperability keeps existing libraries usable across tools.
 - **References and materials together.** Pinax tracks PDFs, source bundles, and
   provenance. Materials can follow entries through citation-key changes and
   bibliography combine/split operations.
+- **Research reads.** Compare a set of papers through bounded, paged reads of
+  their abstracts, materials, and recorded provenance; save selections as named
+  queries; and describe a library's coverage with `analyze`.
 - **Automation.** Structured JSON, change plans, exit codes, and machine-readable
   capabilities support scripts, CI, and agent workflows. Network access is
   explicit.

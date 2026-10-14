@@ -466,6 +466,16 @@ from "not requested". The keys may be comma-separated, the option repeated, or
 both; repeats collapse and the requested order is preserved. Every unknown key
 is reported together in one exit-1 `KeyNotFound` error.
 
+For comparing a set, `--select` returns exactly the named stored fields
+(`--select title,abstract`) in place of the summary, and `--include` adds what
+the library records outside the fields: `materials` (Pinax materials for the
+key and `file` links with their status) and `provenance` (the Pinax manifest
+record of each material and the directives above the entry). What the library
+lacks is listed under `missing_fields` or `missing`, never hidden.
+`--max-chars` cuts long values and lists each cut under `truncated`, and
+`--limit` pages the selection, printing a `--cursor` that resumes it. A cursor is refused once the library changes, so
+the pages of one read always come from one snapshot.
+
 `ref edit` applies all requested field and type changes in one commit. It does
 not rename the citation key: use `keys rename` for that coordinated operation,
 which can also update linked TeX sources and Pinax materials. `ref show` and
@@ -982,14 +992,59 @@ Which entries are searched is a separate question from what matches: `--where`
 answers it with the shared [selector grammar](#selecting-entries-where),
 covering date ranges and missing-field queries without search-specific flags.
 
+Two more options shape a search independently. `--in title,abstract` looks for
+the terms only in those stored fields (the citation key and entry type stay
+searchable); `--select title,year` returns only those fields for each match,
+listing absent ones under `missing_fields`. `--in title --select abstract`
+matches titles and returns abstracts. `--in-field` is deprecated and will be
+removed in 0.9.0: it did both at once, so replace `--in-field title` with
+`--in title --select title`.
+
 `--abstract` prints a one-line abstract excerpt under each hit, so a
 result list can be triaged without a second command; a result with no stored
 abstract says `(no abstract)`. The excerpt is for reading — `--json` always
-carries the full abstract, including when `--in-field` restricts the fields
-searched, and reporting the abstract never widens what the query matches.
+carries the full abstract, including under `--in` or `--select`, and
+reporting the abstract never widens what the query matches.
 
 For the promising keys, `ref show --key k1,k2,…` prints the summarized
 entries; a single `ref show <key>` prints one in full.
+
+`--limit` caps a page of results and `--cursor` resumes the same search at the
+next page; `--max-chars` cuts long field values in `--json` output.
+
+## query
+
+Save a selection the library keeps reusing, and run it later against the
+entries as they are then:
+
+```bash
+pynakes query set refs.bib to-read 'abstract exists and not group "Read"'
+pynakes query run refs.bib to-read --select title,abstract --limit 10
+pynakes query list refs.bib
+pynakes query remove refs.bib to-read
+```
+
+A saved query is one `query-<name>` line in `pynakes-meta` holding a
+[`--where`](#selecting-entries-where) expression; the library stores the query,
+never its result. `query run` returns the matching entries in file order with
+the same options as `ref show --key`. `used`/`unused` resolve against the
+library's [linked TeX sources](#linked-tex-sources).
+
+## analyze
+
+Describe what a library holds and how complete its records are:
+
+```bash
+pynakes analyze refs.bib
+pynakes analyze refs.bib --section identifiers --section lint --json
+```
+
+The report counts entries and duplicate keys, entry types, years, the most
+frequent authors and venues (`--top`, default 10), identifier and field
+coverage, groups, `lint` findings, and linked-file and Pinax materials. It is
+offline and descriptive: each section composes an existing report, so the
+`lint` section matches `lint` and every count can be traced to the entries
+behind it.
 
 ## dedupe
 
