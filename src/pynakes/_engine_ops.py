@@ -391,7 +391,7 @@ class BibliographyOperations:
         identifier: str,
         *,
         key: str | None = None,
-        key_source: str = "generated",
+        key_source: str | None = None,
         allow_duplicate: bool = False,
     ) -> tuple[str, BibEntry]:
         """Import one reference from a supported identifier or URL into memory.
@@ -399,7 +399,9 @@ class BibliographyOperations:
         The identifier type is auto-detected and provider metadata is normalized
         for the library's BibTeX/BibLaTeX dialect. The entry then follows the
         library's declared ``normalize-*`` and ``format-*`` settings, so it
-        needs no clean-up pass of its own. Returns ``(kind, entry)``.
+        needs no clean-up pass of its own. ``key_source`` ``None`` reads the
+        library's ``import-key-source`` setting (default ``generated``).
+        Returns ``(kind, entry)``.
         """
         # Imported here: the importer pulls in the HTTP stack, which only a
         # network-backed command should pay for at startup.
@@ -410,7 +412,7 @@ class BibliographyOperations:
             identifier,
             dialect=metadata_ops.library_dialect(self.lib),
             key=key,
-            key_source=key_source,
+            key_source=importer_ops.library_key_source(self.lib, key_source),
             allow_duplicate=allow_duplicate,
         )
         apply_library_style(self.lib, entry)

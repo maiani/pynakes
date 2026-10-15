@@ -617,3 +617,15 @@ def test_arxiv_id_and_its_doi_import_to_the_same_shape() -> None:
     assert by_id.type == by_doi.type
     for name in ("eprint", "archivePrefix", "primaryClass"):
         assert by_id.fields[name] == by_doi.fields[name], name
+
+
+def test_key_source_follows_the_library_setting_unless_given() -> None:
+    from pynakes.bibtex_parser import parse_bib
+    from pynakes.importer import library_key_source
+
+    plain = parse_bib("")
+    provider = parse_bib("@comment{pynakes-meta:\nimport-key-source: provider\n}\n")
+
+    assert library_key_source(plain) == "generated"
+    assert library_key_source(provider) == "provider"
+    assert library_key_source(provider, "generated") == "generated"

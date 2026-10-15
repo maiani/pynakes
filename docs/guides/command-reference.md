@@ -1045,7 +1045,7 @@ Import one or more references from supported identifiers or URLs.
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `IDENTIFIERS` | list[string] | yes | — | — | One or more DOIs, repository identifiers, or supported reference URLs. Use "-" to read them from stdin, one per line |
 | `--key` | string | no | null | — | Citation key to use (only with a single identifier) |
-| `--key-source` | choice | no | "generated" | generated, provider | Citation key source when --key is absent |
+| `--key-source` | choice | no | null | generated, provider | Citation key source when --key is absent: generated or provider; default: the library's import-key-source setting, else generated |
 | `--allow-duplicate` | boolean | no | false | — | Import even if the reference already exists |
 | `--fetch` | boolean | no | false | — | After importing, fetch configured Pinax materials for the new entry |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |

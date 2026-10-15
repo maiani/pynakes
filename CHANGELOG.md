@@ -110,6 +110,8 @@ comparison context for it, and save the selection for later.
   `normalize-months` / `normalize-invisible-characters` settings) turn those
   steps on or off, like every other step; before, only `--only` could leave
   them out.
+- The `import-key-source` setting chooses `ref import`'s key source
+  (`generated` or `provider`); `--key-source` overrides it per run.
 - The `pinax-fetch-access` and `pinax-discover-arxiv` settings choose
   `asset fetch`'s access mode and arXiv-id discovery for the library;
   `--access` and `--discover/--no-discover` override them per run, and

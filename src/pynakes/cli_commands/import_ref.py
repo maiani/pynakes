@@ -58,10 +58,11 @@ def import_reference(
     key: str | None = typer.Option(
         None, "--key", help="Citation key to use (only with a single identifier)"
     ),
-    key_source: KeySource = typer.Option(
-        KeySource.GENERATED,
+    key_source: KeySource | None = typer.Option(
+        None,
         "--key-source",
-        help="Citation key source when --key is absent",
+        help="Citation key source when --key is absent: generated or provider; default: "
+        "the library's import-key-source setting, else generated",
     ),
     allow_duplicate: bool = typer.Option(
         False, "--allow-duplicate", help="Import even if the reference already exists"
@@ -118,8 +119,11 @@ def import_reference(
     coll = Bibliography.open(file)
     # Before any provider is asked: a stale precondition should cost no lookup.
     _check_expected_sha256(file, coll, params)
+    source = importer_ops.library_key_source(
+        coll.lib, None if key_source is None else key_source.value
+    )
     if len(positional) > 1:
-        _import_several(coll, file, positional, params, key_source, allow_duplicate, cache_file)
+        _import_several(coll, file, positional, params, source, allow_duplicate, cache_file)
         return
 
     identifier = positional[0]
@@ -128,7 +132,7 @@ def import_reference(
         kind, entry = coll.import_reference(
             identifier,
             key=key,
-            key_source=key_source,
+            key_source=source,
             allow_duplicate=allow_duplicate,
         )
     except importer_ops.UnsupportedIdentifierError as exc:
@@ -202,7 +206,7 @@ def import_reference(
         "identifier": label,
         "doi": entry.fields.get("doi"),
         "key": entry.key,
-        "key_source": "user" if key else key_source,
+        "key_source": "user" if key else source,
         "entry_type": entry.type,
     }
     if fetch_report is not None:

@@ -32,7 +32,7 @@ from pynakes.identity import (
     find_exact_matches,
 )
 from pynakes.keys import UnsupportedCitationKeyPatternError, generate_key, unique_key
-from pynakes.metadata import library_dialect
+from pynakes.metadata import library_dialect, metadata_value
 from pynakes.model import BibEntry, BibFile
 from pynakes.providers._http import DEFAULT_TIMEOUT, ProviderFetchError
 from pynakes.providers.metadata import (
@@ -67,6 +67,18 @@ from pynakes.providers.url_resolvers import (
 )
 
 KEY_SOURCES = {"generated", "provider"}
+
+
+def library_key_source(lib: BibFile, key_source: str | None = None) -> str:
+    """Return the key source an import uses: ``key_source``, else the library's.
+
+    The library's ``import-key-source`` setting chooses between a generated
+    key (the default) and the provider's own; an explicit argument wins.
+    """
+    if key_source is not None:
+        return key_source
+    return (metadata_value(lib, "import-key-source") or "generated").strip().lower()
+
 
 # Identifier types ``resolve_identifier`` can return.
 DOI = "doi"

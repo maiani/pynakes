@@ -57,6 +57,7 @@ to find the operation module that owns a key.
 | `dialect` | library | `bibtex` or `biblatex`; aliases JabRef's `databaseType` (read native-first) | engine, `lint`, importer | `databaseType` |
 | `sort-order` | save | Sort criteria, same token grammar as `--sort-by` (e.g. `year:desc,author`); aliases JabRef's `saveOrderConfig` (read native-first) | `normalize` | `saveOrderConfig` |
 | `key-pattern` | citation-key | Default citation-key pattern (e.g. `[auth][year][veryshorttitle]`); aliases JabRef's `keypatterndefault` (read native-first) | `keys`, `lint` | `keypatterndefault` |
+| `import-key-source` | citation-key | `generated` (default) or `provider`: where `ref import` takes a new entry's key from; `--key-source` overrides it | `ref import` | — |
 | `key-pattern-<entrytype>` | citation-key | Per-entry-type key pattern; aliases JabRef's `keypattern_<entrytype>` (read native-first) | `keys`, `lint` | `keypattern_<entrytype>` |
 | `normalize-protect-titles` | normalization | Boolean; default `true` for `normalize`; `lint` checks it when stored | `normalize`, `lint` | — |
 | `normalize-title-fields` | normalization | List; default `title,booktitle,maintitle,subtitle` | `normalize`, `lint` | — |

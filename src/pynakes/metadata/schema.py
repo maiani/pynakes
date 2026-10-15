@@ -67,6 +67,8 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     "sort-order": CATEGORY_SAVE,
     # Native default citation-key pattern, aliasing JabRef's ``keypatterndefault``.
     "key-pattern": CATEGORY_CITATION_KEY,
+    # Where `ref import` takes a new entry's key from: generated or provider.
+    "import-key-source": CATEGORY_CITATION_KEY,
     "normalize-protected-terms": CATEGORY_NORMALIZATION,
     "normalize-drop-fields": CATEGORY_NORMALIZATION,
     "normalize-journal-source": CATEGORY_NORMALIZATION,
@@ -140,6 +142,7 @@ _FORMAT_CHOICES = {
 #: flag of the same meaning accepts.
 _SETTING_CHOICES: dict[str, set[str]] = {
     "pinax-fetch-access": {"open", "institutional"},
+    "import-key-source": {"generated", "provider"},
 }
 
 _BOOLEAN_KEYS = {
