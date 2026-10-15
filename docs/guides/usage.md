@@ -71,8 +71,8 @@ Accepted by [`ref show`](#show-and-edit), [`fields`](#fields), [`search`](#searc
 [`corpus split`](#split) (`--route` rules), and the `fields.*` operations of
 `corpus batch`. A `--key` that names no entry is a `KeyNotFound` error, and a
 selection that matches nothing writes nothing and warns `no_entries_selected`.
-`pynakes capabilities` lists every command that takes the selector under
-`predicate_grammar.used_by`.
+`pynakes capabilities --json --section predicate_grammar` lists every command
+that takes the selector under `predicate_grammar.used_by`.
 
 Predicates combine with `and`, `or`, and `not`; `and` binds tighter than `or`,
 and parentheses group explicitly, for example `not (group "Reviewed" or keywords contains draft)`.
@@ -134,7 +134,7 @@ one existing reference — [`ref show` and `ref edit`](#show-and-edit),
 — take the citation key as a positional argument. `ref remove` accepts
 one or more keys.
 
-`pynakes capabilities --json` reports this grammar under `predicate_grammar`.
+`pynakes capabilities --json --section predicate_grammar` reports this grammar.
 
 ## init
 

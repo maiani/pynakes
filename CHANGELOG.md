@@ -172,6 +172,12 @@ it per run in either direction.
 
 ### Changed
 
+- `capabilities --json` returns a compact index (about 6 KB, from 214 KB):
+  exit codes and conventions, a one-line summary of every command under
+  `command_index`, and the detailed sections by name and size. `--command
+  PATH` returns one command's schema and `--section NAME` one section (both
+  repeatable); `--all` returns the whole description as before. The Python
+  `get_capabilities()` is unchanged.
 - `--json` envelopes are compact — one line, no indentation — so an agent or
   script pays for content, not padding (about a sixth fewer bytes per
   envelope, a third on `capabilities`). `--pretty` restores the indented

@@ -167,13 +167,19 @@ class TestErrorCatalogAndGrammar:
 
 class TestCapabilitiesCommand:
     def test_json_output_is_valid(self) -> None:
-        result = runner.invoke(app, ["capabilities", "--json"])
+        result = runner.invoke(app, ["capabilities", "--json", "--all"])
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         assert data.pop("status") == "success"
         assert data.pop("action") == "capabilities"
         assert data.pop("warnings") == []
         assert data == get_capabilities()
+
+    def test_section_choices_are_every_detailed_section(self) -> None:
+        from pynakes.cli_commands.capabilities import _INDEX_KEYS, CapabilitySection
+
+        detailed = set(get_capabilities()) - set(_INDEX_KEYS) - {"command_schemas"}
+        assert {section.value for section in CapabilitySection} == detailed
 
     def test_human_output_lists_commands(self) -> None:
         result = runner.invoke(app, ["capabilities"])

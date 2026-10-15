@@ -39,10 +39,21 @@ pynakes capabilities --json
 ```
 
 Treat this output, rather than a copied command list, as the source of truth.
-It includes:
+It is a compact index (about 6 KB): exit codes and conventions, a one-line
+summary of every command under `command_index`, and the names and sizes of the
+detailed sections under `sections`. Ask for details only when you need them:
 
-- `command_groups` and `command_schemas`: the live commands, arguments,
-  options, types, defaults, help text and per-command `stability` markers.
+```bash
+pynakes capabilities --json --command "ref show"          # one command's options
+pynakes capabilities --json --section predicate_grammar   # one section
+```
+
+`--command` and `--section` repeat; `--all` returns the whole description
+(about 150 KB), which is rarely worth reading. The sections include:
+
+- `command_groups` and `command_schemas` (per command, through `--command`):
+  the live commands, arguments, options, types, defaults, help text and
+  per-command `stability` markers.
 - `error_codes`: the error and conflict codes on which a caller can branch.
 - `predicate_grammar`: the one selector grammar every entry-addressable
   command accepts, including boolean composition and its operator table. Its

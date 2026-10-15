@@ -73,7 +73,7 @@ test("the material choices are the engine's own --material values", { skip }, ()
   // Read the choices from the machine-readable command schema, not --help: help
   // is rendered for a terminal, and its wrapping and colour vary by environment.
   const capabilities = JSON.parse(
-    execFileSync(command.executable, [...command.leadingArgs, "capabilities", "--json"]).toString(),
+    execFileSync(command.executable, [...command.leadingArgs, "capabilities", "--json", "--command", "asset fetch"]).toString(),
   ) as {
     command_schemas: Record<string, { options: { flags: string[]; choices?: string[] }[] }>;
   };

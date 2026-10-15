@@ -4074,8 +4074,25 @@ class TestErrorHandling:
 
 
 class TestCapabilities:
+    def test_capabilities_index_is_small_and_points_to_the_details(self) -> None:
+        index = runner.invoke(app, ["capabilities", "--json"])
+        data = json.loads(index.output)
+        assert len(index.output) < 10_000
+        assert "command_schemas" not in data and data["command_index"]["ref show"]
+        assert "predicate_grammar" in data["sections"]
+        one = json.loads(
+            runner.invoke(app, ["capabilities", "--json", "--command", "ref show"]).output
+        )
+        assert list(one["command_schemas"]) == ["ref show"]
+        grammar = json.loads(
+            runner.invoke(app, ["capabilities", "--json", "--section", "predicate_grammar"]).output
+        )
+        assert set(grammar) - {"status", "action", "warnings"} == {"predicate_grammar"}
+        unknown = runner.invoke(app, ["capabilities", "--json", "--section", "nope"])
+        assert unknown.exit_code == 1 and json.loads(unknown.output)["error"] == "UsageError"
+
     def test_capabilities_json(self) -> None:
-        result = runner.invoke(app, ["capabilities", "--json"])
+        result = runner.invoke(app, ["capabilities", "--json", "--all"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["tool"] == "pynakes"
