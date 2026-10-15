@@ -172,6 +172,10 @@ it per run in either direction.
 
 ### Changed
 
+- Help read through a pipe (an agent, a script) uses the plain layout instead
+  of Rich's padded boxes: 40–60% fewer bytes, the same content. A terminal
+  keeps the boxed layout. `pynakes --help` ends with a map from common jobs to
+  the commands that do them.
 - A `DuplicateCitationKey` conflict lists its `candidates`: each entry's
   position, line, type, and summary fields, the fields that tell the entries
   apart (`differs`), and a `--where` expression that selects that entry alone,

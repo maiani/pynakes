@@ -47,8 +47,25 @@ from pynakes.cli_completion import _citekey_completer as _complete_fn
 from pynakes.cli_discovery import AutoBibGroup
 from pynakes.cli_surface import FILE_OPTION, FILE_OPTION_HELP, LIBRARY_ARGUMENT
 
+#: Which command does which job, so one help read is enough to start. ``\b``
+#: keeps Click from rewrapping the lines in the plain (piped) layout.
+_JOBS = """\b
+Common jobs (add --json for machine-readable output):
+  find a reference          search FILE "terms" | ref show FILE --where EXPR
+  read entries              ref show FILE KEY | ref show FILE --key K1,K2
+  change one entry          ref edit FILE KEY --field name=value
+  change many entries       fields set|append|clear FILE ... --where EXPR
+  add by DOI/arXiv/URL      ref import FILE ID
+  check a library           lint FILE | verify FILE | dedupe check FILE
+  clean up conventions      normalize FILE | layout: format FILE
+  cited in a manuscript     tex scan FILE | --where used
+  PDFs and sources          asset fetch FILE | asset check FILE
+Preview any change with --dry-run --diff; apply it with --expect-sha256.
+Details: pynakes COMMAND --help, or capabilities --json --command 'ref show'."""
+
 app = typer.Typer(
     help="Reference management engine for BibTeX, BibLaTeX, and their materials",
+    epilog=_JOBS,
     cls=AutoBibGroup,
     rich_markup_mode="rich",
 )

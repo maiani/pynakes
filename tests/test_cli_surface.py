@@ -193,3 +193,16 @@ def test_json_is_compact_unless_pretty_is_asked_for(tmp_path) -> None:
     assert pretty.count("\n") > 1 and json.loads(pretty) == json.loads(compact)
     # The choice belongs to one invocation and never leaks into the next.
     assert after == compact
+
+
+def test_help_is_plain_through_a_pipe_and_maps_jobs_to_commands() -> None:
+    from typer.testing import CliRunner
+
+    from pynakes.cli import app
+
+    output = CliRunner().invoke(app, ["--help"]).output
+
+    # No terminal: no padded Rich boxes, and the job map is there in one read.
+    assert "╭" not in output and "│" not in output
+    assert "Common jobs" in output and "ref show FILE --where EXPR" in output
+    assert "[cyan]" not in output
