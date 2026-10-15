@@ -155,6 +155,13 @@ tests pass:
   `corpus`).
   Command callbacks live in `cli_commands/`; operation modules stay independently
   unit-testable. Keep `capabilities` synchronized with the live command surface.
+- Every behaviour-shaping option has three forms: a CLI flag / Python API
+  parameter, a `pynakes-meta` setting, and that setting editable through
+  `metadata set` (schema, validation, `capabilities`). The flag overrides the
+  setting in both directions (`--x/--no-x`, or an explicit value). Add all
+  three in the same change; a value one form cannot express is a bug.
+  Exceptions — run mechanics, network enablement, search terms — are listed in
+  [docs/vision.md](docs/vision.md#reviewable-automation).
 - Try to limit file length preferably to ~500 lines, with a maximum limit of 800.
 - Add tests and a `CHANGELOG.md` entry with each behavioral change. Changes to
   the extension go in `editor/CHANGELOG.md` instead: it is versioned on its own.

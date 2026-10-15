@@ -45,6 +45,18 @@ BibTeX:
   suppresses.
 - **Explicit side effects.** Network access is limited to `ref import`, `asset
   fetch`, `ref add --fetch` / `ref import --fetch`, and operations invoked with `--online`.
+- **Every setting three ways.** Each behaviour a command can be configured
+  into is selectable per run (CLI flag or Python API parameter), storable in
+  the library as a metadata setting, and that setting is itself editable
+  through the CLI and API (`metadata set`), never only by hand. A library's
+  profile therefore reproduces its behaviour from the file alone, and any run
+  can override it in either direction. Three things are deliberately not
+  settings: how one run is carried out (`--json`, `--dry-run`, `--diff`,
+  paging, the `--where`/`--key` selection, output paths, one-off views such as
+  `analyze --section` or `convert --to`); whether the network is used
+  (`--online`, `--fetch` stay explicit — a setting may choose *which* lookup a
+  network command makes, never *whether* one is made); and the terms of a
+  single search (`--in`, `--fuzzy`, `--case-sensitive`).
 
 ## In JabRef's lineage
 
