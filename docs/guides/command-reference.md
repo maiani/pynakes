@@ -861,6 +861,8 @@ Normalize entries: titles, authors, journals, DOIs, identifier case, and orderin
 | `--ltwa-table` | string | no | null | — | CSV/TSV LTWA word abbreviation table |
 | `--doi-normalization` | choice | no | "metadata" | metadata, on, off | Strip DOI URL prefixes and labels down to the bare DOI |
 | `--pages` | choice | no | "metadata" | metadata, on, off | Rewrite page ranges to start--end |
+| `--months` | choice | no | "metadata" | metadata, on, off | Rewrite bare month names to BibTeX month macros (month = june -> jun) |
+| `--invisible-characters` | choice | no | "metadata" | metadata, on, off | Remove characters that render as nothing (zero-width spaces, stray BOMs) |
 | `--key-generation` | choice | no | "metadata" | metadata, on, off | Regenerate citation keys from the library's key pattern |
 | `--identifier-case` | choice | no | "metadata" | metadata, on, off | Lowercase entry types and field names |
 | `--metadata-formatting` | choice | no | "metadata" | metadata, on, off | Consolidate metadata layout: pynakes-meta top, jabref-meta bottom |

@@ -87,6 +87,8 @@ class NormalizeOptions:
     ltwa_table: str | None = None
     normalize_dois: bool | None = None
     normalize_pages: bool | None = None
+    normalize_months: bool | None = None
+    remove_invisible: bool | None = None
     normalize_keys: bool | None = None
     identifier_case: bool | None = None
     format_metadata: bool | None = None
@@ -166,6 +168,8 @@ SKIPPABLE_STEPS: dict[str, tuple[str, str]] = {
     "journals": ("--journal-style abbreviated|full", "normalize-journal-style"),
     "dois": ("--doi-normalization on", "normalize-dois"),
     "pages": ("--pages on", "normalize-pages"),
+    "months": ("--months on", "normalize-months"),
+    "invisible_characters": ("--invisible-characters on", "normalize-invisible-characters"),
     "identifier_case": ("--identifier-case on", "normalize-identifier-case"),
     "keys": ("--key-generation on", "normalize-keys"),
 }
@@ -414,8 +418,12 @@ def normalize_library(
 
     # Characters that render as nothing (a stray byte-order mark, a zero-width
     # space) have no place in a field; lint names each one (invisible_character).
-    if runs("invisible_characters"):
+    if not runs("invisible_characters"):
+        pass
+    elif _resolve_bool(lib, opts.remove_invisible, "invisible-characters", True):
         result.invisible_characters = remove_invisible(selection)
+    else:
+        _record_skip(result, "invisible_characters", "invisible-character removal is off")
 
     titles_run = runs("titles")
     if titles_run:
@@ -513,8 +521,12 @@ def normalize_library(
 
     # This syntax-specific pass repairs bare full month names and canonicalizes
     # predefined macro spelling without changing literals or custom strings.
-    if runs("months"):
+    if not runs("months"):
+        pass
+    elif _resolve_bool(lib, opts.normalize_months, "months", True):
         result.months = normalize_month_macros(selection)
+    else:
+        _record_skip(result, "months", "month normalization is off")
 
     if not runs("identifier_case"):
         pass

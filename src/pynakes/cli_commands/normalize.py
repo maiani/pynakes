@@ -107,6 +107,18 @@ def normalize(
         case_sensitive=False,
         help="Rewrite page ranges to start--end",
     ),
+    months: Switch = typer.Option(
+        Switch.METADATA,
+        "--months",
+        case_sensitive=False,
+        help="Rewrite bare month names to BibTeX month macros (month = june -> jun)",
+    ),
+    invisible_characters: Switch = typer.Option(
+        Switch.METADATA,
+        "--invisible-characters",
+        case_sensitive=False,
+        help="Remove characters that render as nothing (zero-width spaces, stray BOMs)",
+    ),
     key_normalization: Switch = typer.Option(
         Switch.METADATA,
         "--key-generation",
@@ -193,6 +205,8 @@ def normalize(
             "--ltwa-table": ltwa_table is not None,
             "--doi-normalization": doi_normalization != "metadata",
             "--pages": page_normalization != "metadata",
+            "--months": months != "metadata",
+            "--invisible-characters": invisible_characters != "metadata",
             "--key-generation": key_normalization != "metadata",
             "--identifier-case": identifier_case != "metadata",
             "--metadata-formatting": metadata_formatting != "metadata",
@@ -220,6 +234,8 @@ def normalize(
             sort_by,
         )
         options.only = steps
+        options.normalize_months = _optional_bool(months)
+        options.remove_invisible = _optional_bool(invisible_characters)
         coll = Bibliography.open(file)
         selected = select_keys(
             coll, where, key, json_output, "normalize", warnings=selection_warnings
@@ -315,6 +331,8 @@ _FLAG_STEPS = {
     "--ltwa-table": "journals",
     "--doi-normalization": "dois",
     "--pages": "pages",
+    "--months": "months",
+    "--invisible-characters": "invisible_characters",
     "--key-generation": "keys",
     "--identifier-case": "identifier_case",
     "--metadata-formatting": "metadata",

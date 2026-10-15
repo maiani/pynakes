@@ -106,6 +106,10 @@ comparison context for it, and save the selection for later.
   `checked: false`, `rate_limited`, and `retryable`, and `lookups` names the
   entries not checked and the arguments that retry them; a throttle is no
   longer indistinguishable from "no match".
+- `normalize --months` and `--invisible-characters` (and the
+  `normalize-months` / `normalize-invisible-characters` settings) turn those
+  steps on or off, like every other step; before, only `--only` could leave
+  them out.
 - `verify --key` / `--where` check only the selected entries of one library,
   as `enrich` already did; `--published` follows the same selection.
 - `lint --only TYPES` reports only the named finding types, the counterpart of

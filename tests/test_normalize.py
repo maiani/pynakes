@@ -1,5 +1,10 @@
 """Tests for high-level normalization."""
 
+import json
+from pathlib import Path
+
+import pytest
+
 from pynakes.authors import normalize_authors, normalize_name_list
 from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
@@ -107,6 +112,8 @@ def test_every_skippable_step_can_be_named_and_turned_back_on() -> None:
         author_style="none",
         normalize_dois=False,
         normalize_pages=False,
+        normalize_months=False,
+        remove_invisible=False,
         identifier_case=False,
         normalize_keys=False,
     )
@@ -596,3 +603,32 @@ def test_sorting_keeps_entries_sharing_a_key_in_order() -> None:
         "Between",
         "Second",
     ]
+
+
+@pytest.mark.parametrize(
+    ("setting", "flag", "step"),
+    [
+        ("normalize-months", "--months", "months"),
+        ("normalize-invisible-characters", "--invisible-characters", "invisible_characters"),
+    ],
+)
+def test_months_and_invisible_steps_have_a_setting_and_a_flag(
+    tmp_path: Path, setting: str, flag: str, step: str
+) -> None:
+    from typer.testing import CliRunner
+
+    from pynakes.cli import app
+
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@book{A, title = {T​}, month = june}\n", encoding="utf-8")
+    runner = CliRunner()
+
+    def operations(*extra: str) -> dict:
+        result = runner.invoke(app, ["normalize", str(bib), "--dry-run", "--json", *extra])
+        return json.loads(result.output)["operations"]
+
+    assert operations()[step] == 1
+    runner.invoke(app, ["metadata", "set", str(bib), setting, "false"])
+    assert operations()[step] == 0 and step in operations()["skipped"]
+    # The flag overrides the setting in either direction.
+    assert operations(flag, "on")[step] == 1

@@ -67,7 +67,13 @@ to find the operation module that owns a key.
 | `normalize-journal-source` | normalization | `jabref` (bundled JabRef lists, default) or `none` (rule-based only) | `normalize`, `lint` | — |
 | `normalize-journal-table` | normalization | CSV/TSV path with exact journal mappings, layered on top of `normalize-journal-source` | `normalize`, `lint` | — |
 | `normalize-ltwa-table` | normalization | CSV/TSV path with LTWA word mappings | `normalize`, `lint` | — |
+| `normalize-protect-titles` | normalization | Boolean (default: `true`); `--title-protection` | `normalize` | — |
+| `normalize-title-fields` | normalization | List of title-like fields to protect; `--title-field` | `normalize` | — |
 | `normalize-dois` | normalization | Boolean | `normalize` | — |
+| `normalize-pages` | normalization | Boolean (default: `true`); `--pages` | `normalize` | — |
+| `normalize-months` | normalization | Boolean (default: `true`); `--months` | `normalize` | — |
+| `normalize-invisible-characters` | normalization | Boolean (default: `true`); `--invisible-characters` | `normalize` | — |
+| `normalize-keys` | normalization | Boolean (default: `false`); `--key-generation` | `normalize` | — |
 | `normalize-identifier-case` | normalization | Boolean | `normalize` | — |
 | `normalize-format-metadata` | normalization | Boolean | `normalize` | — |
 | `format-indent` | formatting | Positive space count or `tab` (default: `2`) | `format` | — |

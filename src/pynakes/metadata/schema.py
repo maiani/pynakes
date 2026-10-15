@@ -137,6 +137,8 @@ _BOOLEAN_KEYS = {
     "format-blank-lines",
     "scrub-comments",
     "scrub-metadata",
+    "normalize-months",
+    "normalize-invisible-characters",
 }
 _BOOLEAN_VALUES = {"true", "false", "yes", "no", "on", "off", "1", "0"}
 
