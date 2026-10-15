@@ -13,12 +13,13 @@ predicate language is the shared selector grammar in :mod:`pynakes.query`, whose
 "Name"`` predicates exist for exactly this purpose.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
 from pynakes._entry_comments import carry_from
 from pynakes.model import BibEntry, BibFile
 from pynakes.query import parse_query
+from pynakes.saved_queries import saved_query_expressions
 
 Predicate = Callable[[BibEntry], bool]
 
@@ -114,16 +115,21 @@ def strip_metadata_blocks(lib: BibFile) -> BibFile:
 # --- predicates ------------------------------------------------------------
 
 
-def compile_predicate(expr: str, cited_keys: set[str] | None = None) -> Predicate:
+def compile_predicate(
+    expr: str,
+    cited_keys: set[str] | None = None,
+    saved: Mapping[str, str] | None = None,
+) -> Predicate:
     """Compile one bucket predicate into a callable over entries.
 
     This is the shared ``--where`` grammar (:func:`pynakes.query.parse_query`)
     with the bucket-only predicates ``*``, ``used`` / ``unused``, and
     ``group "Name"`` available, so a bucket accepts anything ``--where``
     accepts — including boolean composition, e.g.
-    ``used and year >= 2020 and not group "Reviewed"``.
+    ``used and year >= 2020 and not group "Reviewed"``. ``saved`` resolves
+    ``query "name"`` (see :func:`pynakes.saved_queries.saved_query_expressions`).
     """
-    return parse_query(expr.strip(), cited_keys=cited_keys)
+    return parse_query(expr.strip(), cited_keys=cited_keys, saved=saved)
 
 
 # --- partition -------------------------------------------------------------
@@ -168,7 +174,10 @@ def partition_library(
     if not rules:
         raise ValueError("split requires at least one --to rule")
 
-    compiled = [(rule.label, compile_predicate(rule.predicate, cited_keys)) for rule in rules]
+    saved = saved_query_expressions(lib)
+    compiled = [
+        (rule.label, compile_predicate(rule.predicate, cited_keys, saved)) for rule in rules
+    ]
     collected: dict[str, list[BibEntry]] = {rule.label: [] for rule in rules}
     unrouted = 0
 

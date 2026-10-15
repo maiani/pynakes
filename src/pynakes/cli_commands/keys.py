@@ -211,7 +211,10 @@ def keys_generate(
     params = _params(dry_run, diff, json_output, backup, expect_sha256)
     coll = Bibliography.open(file)
     duplicated: list[str] = []
-    selected = select_keys(coll, where, key_selector, json_output, "keys_generate")
+    selection_warnings: list[dict] = []
+    selected = select_keys(
+        coll, where, key_selector, json_output, "keys_generate", warnings=selection_warnings
+    )
     if selected is not None:
         renames, duplicated = coll.generate_selected_keys(selected)
     elif key is None:
@@ -265,7 +268,7 @@ def keys_generate(
         params,
         human,
         diff_text=diff_text,
-        warnings=source_warnings,
+        warnings=[*selection_warnings, *source_warnings],
         **({"key": key} if key is not None else {}),
         source_occurrences=total_source_occurrences,
         sources=source_changes,

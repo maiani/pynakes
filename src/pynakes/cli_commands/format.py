@@ -30,14 +30,14 @@ from pynakes.cli_common import (
     _source_sha256,
     _verb,
     bib_file_argument,
-    build_where_filter,
+    bind_where_filter,
     is_auxiliary_bib_file,
     key_option,
     parse_key_selector,
     where_option,
 )
 from pynakes.engine import Bibliography
-from pynakes.model import BibFile, QueryFilter
+from pynakes.model import BibFile
 
 
 class AlignmentChoice(str, Enum):
@@ -172,7 +172,6 @@ def _run_recursive(
     check: bool,
     where: str | None = None,
     keys: list[str] | None = None,
-    selector: QueryFilter = None,
 ) -> None:
     results: list[dict[str, object]] = []
     failures = 0
@@ -182,7 +181,7 @@ def _run_recursive(
         try:
             coll = Bibliography.open(path)
             layout = _layout(coll.lib, overrides)
-            coll.format(layout, selector)
+            coll.format(layout, bind_where_filter(coll, where, keys=keys))
             plan = coll.change_plan()
             if check:
                 payload = _check_payload(str(path), coll, where, keys)
@@ -328,8 +327,10 @@ def format_bibliography(
     if recursive and expect_sha256 is not None:
         _emit_error(json_output, "InvalidInput", "--expect-sha256 names one file's digest")
     selected_keys = parse_key_selector(key)
-    selector = build_where_filter(where, keys=key)
-    if selector is not None:
+    if key and not selected_keys:
+        _emit_error(json_output, "InvalidInput", "--key needs at least one citation key")
+    selecting = where is not None or bool(selected_keys)
+    if selecting:
         whole_file = {
             "--entry-order": entry_order,
             "--block-order": block_order,
@@ -376,14 +377,13 @@ def format_bibliography(
             check=check,
             where=where,
             keys=selected_keys,
-            selector=selector,
         )
         return
 
     if file == "-":
         coll = Bibliography.from_text(sys.stdin.read())
         try:
-            coll.format(_layout(coll.lib, overrides), selector)
+            coll.format(_layout(coll.lib, overrides), bind_where_filter(coll, where, keys=key))
         except FormatLintError as exc:
             _emit_error(
                 json_output,
@@ -401,6 +401,8 @@ def format_bibliography(
     coll = Bibliography.open(resolved)
     _check_expected_sha256(resolved, coll, params)
     source_text = coll.preview()
+    warnings: list[dict] = []
+    selector = bind_where_filter(coll, where, keys=key, warnings=warnings)
     try:
         selected = coll.format(_layout(coll.lib, overrides), selector)
     except FormatLintError as exc:
@@ -433,7 +435,7 @@ def format_bibliography(
         coll,
         params,
         [human],
-        warnings=[],
+        warnings=warnings,
         check=False,
         where=where,
         keys=selected_keys,

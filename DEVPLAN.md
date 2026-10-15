@@ -202,8 +202,8 @@ The engine work is implemented and recorded under *Unreleased* in
 [CHANGELOG.md](CHANGELOG.md): the bounded-read contract (`--select`,
 `--include materials,provenance`, `--max-chars`, `--limit`, snapshot-bound
 `--cursor`)
-shared by `ref show --key`, `query run`, and `search`, saved queries
-(`query list/set/remove/run`), `analyze`, their `capabilities` schemas, and the
+shared by `ref show --key`, `ref show --where`, and `search`, saved queries
+(`query list/set/remove`, run anywhere as `--where 'query "NAME"'`), `analyze`, their `capabilities` schemas, and the
 agent evaluation suite in `evals/agent`. Its tests cover the gate below.
 
 Remaining before release:

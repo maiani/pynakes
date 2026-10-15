@@ -29,8 +29,8 @@ from pynakes.cli_common import (
     _safe,
     _source_sha256,
     _verb,
-    build_where_filter,
     key_option,
+    library_where_filter,
     parse_key_selector,
     where_option,
 )
@@ -138,7 +138,6 @@ def combine(
     one command rather than a combine-then-prune script.
     """
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
-    selector = build_where_filter(where, keys=key)
     _refuse_existing_output(json_output, out, force)
     named_inputs, digests = _load_inputs(inputs)
     pinax_sources = _entry_sources(named_inputs)
@@ -162,6 +161,16 @@ def combine(
         )
         return
 
+    # The combined library carries the first input's metadata, so its saved
+    # queries and linked TeX sources (relative to that input) are the ones used.
+    selection_warnings: list[dict] = []
+    selector = library_where_filter(
+        merged.lib,
+        where,
+        keys=key,
+        base_dir=Path(inputs[0]).resolve().parent,
+        warnings=selection_warnings,
+    )
     if selector is not None:
         kept = [entry for entry in merged.lib.entries.values() if selector(entry)]
         merged.lib = merged.lib.derive(kept)
@@ -182,7 +191,7 @@ def combine(
         except FileNotFoundError:
             pass
 
-    warnings: list[dict[str, object]] = []
+    warnings: list[dict[str, object]] = [*selection_warnings]
     if merged.duplicate_keys:
         warnings.append(_duplicate_keys_warning(merged.duplicate_keys))
     output_files_dir = metadata_value(merged.lib, FILES_DIR_KEY)

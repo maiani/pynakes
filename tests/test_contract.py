@@ -87,7 +87,6 @@ POSITIONALS: dict[str, tuple[tuple[str, bool, bool], ...]] = {
     "normalize": (("file", False, False),),
     "query list": (("file", False, False),),
     "query remove": (("file", False, False), ("name", True, False)),
-    "query run": (("file", False, False), ("name", True, False)),
     "query set": (("file", False, False), ("name", True, False), ("expression", True, False)),
     "ref add": (("file", False, False), ("key", False, False)),
     "ref compare": (("file", False, False), ("key", True, False)),
@@ -276,7 +275,6 @@ SAMPLES: dict[str, tuple[str, list[str]]] = {
     "normalize": ("modify", ["normalize", "{bib}", "--dry-run"]),
     "query list": ("read", ["query", "list", "{groups}"]),
     "query remove": ("modify", ["query", "remove", "{queries}", "recent", "--dry-run"]),
-    "query run": ("read", ["query", "run", "{queries}", "recent", "--limit", "1"]),
     "query set": ("modify", ["query", "set", "{bib}", "recent", "year >= 2022", "--dry-run"]),
     "ref add": (
         "modify",

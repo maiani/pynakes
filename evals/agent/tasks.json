@@ -89,7 +89,7 @@
       "notes": "The library saves the selection as the query 'optics'. A correct agent pages until page.complete, reads every key exactly once, and says the abstracts it summarized were truncated.",
       "reference": [
         {
-          "argv": ["query", "run", "{lib}", "optics", "--select", "title,abstract", "--max-chars", "300", "--limit", "5", "--json"],
+          "argv": ["ref", "show", "{lib}", "--where", "query \"optics\"", "--select", "title,abstract", "--max-chars", "300", "--limit", "5", "--json"],
           "paginate": true,
           "checks": [{"path": "page.total", "equals": 12}]
         }

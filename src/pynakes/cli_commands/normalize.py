@@ -200,6 +200,7 @@ def normalize(
         },
     )
 
+    selection_warnings: list[dict] = []
     try:
         options = _build_normalize_options(
             title_protection,
@@ -220,7 +221,9 @@ def normalize(
         )
         options.only = steps
         coll = Bibliography.open(file)
-        selected = select_keys(coll, where, key, json_output, "normalize")
+        selected = select_keys(
+            coll, where, key, json_output, "normalize", warnings=selection_warnings
+        )
         report = coll.normalize(options, force_key_renames=ignore_missing_tex, keys=selected)
     except MissingTexSourcesError as exc:
         _emit_error(
@@ -279,7 +282,7 @@ def normalize(
     if asked:
         names = ", ".join(step.replace("_", "-") for step in asked)
         human.append(f"  left out as asked: {names}.")
-    warnings = list(report.warnings)
+    warnings = [*selection_warnings, *report.warnings]
     if selected == []:
         warnings.append(
             {"type": "no_entries_selected", "message": "No entry matched the selection"}

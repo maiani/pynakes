@@ -107,7 +107,7 @@ PYNAKES_PREFIX_KEYS: dict[str, MetadataCategory] = {
     "lint-required-fields-": CATEGORY_LINT,
     # Per-entry-type key patterns, aliasing JabRef's ``keypattern_<type>``.
     "key-pattern-": CATEGORY_CITATION_KEY,
-    # Saved selector queries, one key per name, run by `query run`.
+    # Saved selector queries, one key per name, run as the `query "name"` predicate.
     "query-": CATEGORY_QUERIES,
 }
 

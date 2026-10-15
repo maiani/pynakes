@@ -59,6 +59,11 @@ def _json(*args: str) -> tuple[int, dict]:
     return result.exit_code, json.loads(result.output)
 
 
+def _run(bib: Path, name: str, *extra: str) -> tuple[int, dict]:
+    """Run a saved query the way every caller does: as a --where predicate."""
+    return _json("ref", "show", str(bib), "--where", f'query "{name}"', *extra)
+
+
 def _keys(payload: dict) -> list[str]:
     return [entry["key"] for entry in payload["entries"]]
 
@@ -132,8 +137,9 @@ def test_lint_reports_a_stored_query_that_no_longer_parses(tmp_path: Path) -> No
     assert [issue.type for issue in issues if issue.field == "query-bad"] == [
         "invalid_metadata_value"
     ]
-    code, payload = _json("query", "run", str(bib), "bad")
-    assert code == 1 and "no longer parses" in payload["message"]
+    code, payload = _run(bib, "bad")
+    assert code == 1 and payload["error"] == "InvalidInput"
+    assert "saved query 'bad'" in payload["message"]
 
 
 # --- list / run / remove ---------------------------------------------------------
@@ -157,10 +163,11 @@ def test_run_returns_matches_in_file_order(tmp_path: Path) -> None:
     bib = _library(tmp_path)
     _json("query", "set", str(bib), "early", "year < 1700")
 
-    code, payload = _json("query", "run", str(bib), "EARLY")
+    code, payload = _run(bib, "EARLY")
 
     assert code == 0
-    assert payload["name"] == "early" and payload["expression"] == "year < 1700"
+    assert payload["where"] == 'query "EARLY"'
+
     assert _keys(payload) == ["Newton1687", "Hooke1665"]
     assert payload["page"]["total"] == 2
 
@@ -168,10 +175,10 @@ def test_run_returns_matches_in_file_order(tmp_path: Path) -> None:
 def test_a_saved_query_reflects_later_edits(tmp_path: Path) -> None:
     bib = _library(tmp_path)
     _json("query", "set", str(bib), "noted", "note exists")
-    _code, before = _json("query", "run", str(bib), "noted")
+    _code, before = _run(bib, "noted")
 
     runner.invoke(app, ["ref", "edit", str(bib), "Euler1748", "--field", "note=two volumes"])
-    _code, after = _json("query", "run", str(bib), "noted")
+    _code, after = _run(bib, "noted")
 
     assert _keys(before) == []
     assert _keys(after) == ["Euler1748"]
@@ -181,22 +188,10 @@ def test_run_pages_with_inclusions_and_projection(tmp_path: Path) -> None:
     bib = _library(tmp_path)
     _json("query", "set", str(bib), "all", "*")
 
-    _code, first = _json(
-        "query",
-        "run",
-        str(bib),
-        "all",
-        "--limit",
-        "2",
-        "--select",
-        "year",
-        "--include",
-        "materials",
+    _code, first = _run(bib, "all", "--limit", "2", "--select", "year", "--include", "materials")
+    _code, rest = _run(
+        bib, "all", "--limit", "2", "--select", "year", "--cursor", first["page"]["next_cursor"]
     )
-    _code, rest = _json(
-        "query", "run", str(bib), "all", "--limit", "2", "--select", "year",
-        "--cursor", first["page"]["next_cursor"],
-    )  # fmt: skip
 
     assert _keys(first) + _keys(rest) == ["Newton1687", "Euler1748", "Hooke1665"]
     assert first["entries"][0]["fields"] == {"year": "1687"}
@@ -206,10 +201,10 @@ def test_run_pages_with_inclusions_and_projection(tmp_path: Path) -> None:
 def test_editing_the_query_invalidates_its_cursor(tmp_path: Path) -> None:
     bib = _library(tmp_path)
     _json("query", "set", str(bib), "all", "*")
-    _code, first = _json("query", "run", str(bib), "all", "--limit", "1")
+    _code, first = _run(bib, "all", "--limit", "1")
     _json("query", "set", str(bib), "all", "year > 1600")
 
-    code, payload = _json("query", "run", str(bib), "all", "--cursor", first["page"]["next_cursor"])
+    code, payload = _run(bib, "all", "--cursor", first["page"]["next_cursor"])
 
     # The library changed, so the snapshot check fires before the request check.
     assert code == 2 and payload["error"] == "StaleCursor"
@@ -219,7 +214,7 @@ def test_used_resolves_against_linked_tex_sources(tmp_path: Path) -> None:
     bib = _library(tmp_path)
     _json("query", "set", str(bib), "cited", "used")
 
-    code, payload = _json("query", "run", str(bib), "cited")
+    code, payload = _run(bib, "cited")
 
     assert code == 0 and _keys(payload) == ["Hooke1665"]
 
@@ -228,19 +223,19 @@ def test_used_without_tex_sources_is_no_sources(tmp_path: Path) -> None:
     bib = _library(tmp_path)
     bib.write_text(LIBRARY.replace("tex-sources: paper.tex", "query-cited: unused"))
 
-    code, payload = _json("query", "run", str(bib), "cited")
+    code, payload = _run(bib, "cited")
 
     assert code == 1 and payload["error"] == "NoSources"
 
 
-def test_unknown_query_names_the_available_ones(tmp_path: Path) -> None:
+def test_unknown_query_is_invalid_input(tmp_path: Path) -> None:
     bib = _library(tmp_path)
     _json("query", "set", str(bib), "early", "year < 1700")
 
-    code, payload = _json("query", "run", str(bib), "late")
+    code, payload = _run(bib, "late")
 
-    assert code == 1 and payload["error"] == "KeyNotFound"
-    assert payload["available"] == ["early"]
+    assert code == 1 and payload["error"] == "InvalidInput"
+    assert "no saved query named 'late'" in payload["message"]
 
 
 def test_remove_restores_the_original_bytes(tmp_path: Path) -> None:
@@ -259,12 +254,111 @@ def test_human_output(tmp_path: Path) -> None:
     runner.invoke(app, ["query", "set", str(bib), "early", "year < 1700"])
 
     listed = runner.invoke(app, ["query", "list", str(bib)]).output
-    ran = runner.invoke(app, ["query", "run", str(bib), "early"]).output
+    ran = runner.invoke(app, ["ref", "show", str(bib), "--where", 'query "early"']).output
     again = runner.invoke(app, ["query", "set", str(bib), "early", "year < 1700"]).output
 
     assert "early: year < 1700" in listed
-    assert "query 'early' matches 2 entries" in ran and "@book{Hooke1665}" in ran
+    assert "--where matches 2 entries" in ran and "Hooke1665" in ran
     assert "already saved" in again
+
+
+# --- saved queries inside --where ------------------------------------------------
+
+
+def test_a_saved_query_composes_with_the_rest_of_an_expression(tmp_path: Path) -> None:
+    bib = _library(tmp_path)
+    _json("query", "set", str(bib), "early", "year < 1700")
+
+    code, payload = _json("ref", "show", str(bib), "--where", 'query "early" and not used')
+
+    assert code == 0 and _keys(payload) == ["Newton1687"]
+
+
+def test_a_saved_query_narrows_with_key(tmp_path: Path) -> None:
+    bib = _library(tmp_path)
+    _json("query", "set", str(bib), "early", "year < 1700")
+
+    code, payload = _run(bib, "early", "--key", "Hooke1665,Euler1748")
+
+    assert code == 0 and _keys(payload) == ["Hooke1665"]
+
+
+def test_a_saved_query_runs_in_a_modifying_command(tmp_path: Path) -> None:
+    bib = _library(tmp_path)
+    _json("query", "set", str(bib), "early", "year < 1700")
+
+    code, payload = _json(
+        "fields", "set", str(bib), "note", "early", "--where", 'query "early"', "--dry-run"
+    )
+
+    assert code == 0 and payload["modified_entries"] == 2
+
+
+def test_a_saved_query_may_refer_to_another(tmp_path: Path) -> None:
+    bib = _library(tmp_path)
+    _json("query", "set", str(bib), "early", "year < 1700")
+    code, saved = _json("query", "set", str(bib), "early-cited", 'query "early" and used')
+
+    assert code == 0 and saved["uses_citations"] is True
+    _code, payload = _run(bib, "early-cited")
+    assert _keys(payload) == ["Hooke1665"]
+
+
+def test_a_circular_saved_query_is_refused(tmp_path: Path) -> None:
+    bib = _library(tmp_path)
+    _json("query", "set", str(bib), "a", "year < 1700")
+    _json("query", "set", str(bib), "b", 'query "a"')
+
+    code, payload = _json("query", "set", str(bib), "a", 'query "b"')
+
+    assert code == 1 and "refers to itself" in payload["message"]
+
+
+def test_a_reference_to_a_missing_query_is_refused_on_save(tmp_path: Path) -> None:
+    bib = _library(tmp_path)
+
+    code, payload = _json("query", "set", str(bib), "a", 'query "nowhere"')
+
+    assert code == 1 and "no saved query named 'nowhere'" in payload["message"]
+
+
+def test_list_reports_a_dangling_reference_as_invalid(tmp_path: Path) -> None:
+    bib = _library(tmp_path)
+    bib.write_text(LIBRARY.replace("tex-sources", 'query-a: query "gone"\ntex-sources'))
+
+    _code, payload = _json("query", "list", str(bib))
+
+    (described,) = payload["queries"]
+    assert described["valid"] is False and "gone" in described["error"]
+
+
+def test_used_resolves_in_any_where(tmp_path: Path) -> None:
+    bib = _library(tmp_path)
+
+    code, payload = _json(
+        "fields", "set", str(bib), "note", "cited", "--where", "used", "--dry-run"
+    )
+
+    assert code == 0 and payload["modified_entries"] == 1
+
+
+def test_a_missing_linked_source_is_a_warning(tmp_path: Path) -> None:
+    bib = _library(tmp_path)
+    bib.write_text(LIBRARY.replace("tex-sources: paper.tex", "tex-sources: paper.tex, gone.tex"))
+
+    code, payload = _json("ref", "show", str(bib), "--where", "used")
+
+    assert code == 0 and _keys(payload) == ["Hooke1665"]
+    assert any("gone.tex" in json.dumps(warning) for warning in payload["warnings"])
+
+
+def test_a_field_named_query_is_still_comparable(tmp_path: Path) -> None:
+    bib = _library(tmp_path)
+    bib.write_text(LIBRARY.replace("  year = {1748}", "  year = {1748},\n  query = {open}"))
+
+    code, payload = _json("ref", "show", str(bib), "--where", "query = open")
+
+    assert code == 0 and _keys(payload) == ["Euler1748"]
 
 
 # --- Python API ------------------------------------------------------------------

@@ -19,8 +19,9 @@ from pynakes.dedupe import DedupeConflictError
 from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography, ExternalModificationError
 from pynakes.io import SaveResult, save_text
-from pynakes.model import QueryFilter
+from pynakes.model import BibFile, QueryFilter
 from pynakes.query import And, InSet, parse_query
+from pynakes.saved_queries import NoCitationSourcesError, compile_selector
 
 _F = TypeVar("_F", bound=Callable)
 
@@ -209,7 +210,8 @@ WHERE_HELP = (
     "Select entries with the shared --where grammar: predicates joined by "
     "and/or/not, e.g. 'year >= 2025 and type in \\[article, inproceedings]'. "
     "Operators: contains, =, !=, >, >=, <, <=, in \\[..], matches, ~ (fuzzy), "
-    "exists, missing. See `pynakes capabilities` for the full grammar."
+    "exists, missing; 'used'/'unused' test the linked TeX sources and "
+    "'query NAME' runs a saved query. See `pynakes capabilities` for the full grammar."
 )
 
 
@@ -273,20 +275,68 @@ def build_where_filter(
     return membership if parsed is None else And((parsed, membership))
 
 
+def bind_where_filter(
+    coll: Bibliography,
+    where: str | None,
+    *,
+    keys: list[str] | None = None,
+    warnings: list[dict] | None = None,
+) -> QueryFilter:
+    """Compile ``--where`` / ``--key`` against the opened library.
+
+    Unlike :func:`build_where_filter`, this resolves what only the library
+    knows: ``query "name"`` against its saved queries, and ``used``/``unused``
+    against its linked TeX sources (scanned only when the expression tests
+    citations). Linked sources missing on disk are appended to ``warnings``
+    for the command's envelope.
+    """
+    base_dir = coll.path.parent if coll.path is not None else None
+    return library_where_filter(coll.lib, where, keys=keys, base_dir=base_dir, warnings=warnings)
+
+
+def library_where_filter(
+    lib: BibFile,
+    where: str | None,
+    *,
+    keys: list[str] | None = None,
+    base_dir: Path | None = None,
+    warnings: list[dict] | None = None,
+) -> QueryFilter:
+    """:func:`bind_where_filter` for a library that is not an opened file.
+
+    ``base_dir`` is where the library's relative ``tex-sources`` resolve from.
+    """
+    selected = parse_key_selector(keys)
+    if keys and not selected:
+        raise ValueError("--key needs at least one citation key")
+    parsed = None
+    if where is not None:
+        parsed, found = compile_selector(lib, where, base_dir=base_dir)
+        if warnings is not None:
+            warnings.extend(found)
+    if not selected:
+        return parsed
+    membership = InSet(field="key", values=tuple(selected))
+    return membership if parsed is None else And((parsed, membership))
+
+
 def select_keys(
     coll: Bibliography,
     where: str | None,
     keys: list[str] | None,
     json_output: bool,
     action: str,
+    *,
+    warnings: list[dict] | None = None,
 ) -> list[str] | None:
     """Resolve ``--where`` / ``--key`` to the selected citation keys, in file order.
 
     ``None`` when neither is given: the command acts on every entry. A ``--key``
     that names no entry is a ``KeyNotFound`` error rather than a quietly smaller
-    selection, so a mistyped key is never read as "nothing to do".
+    selection, so a mistyped key is never read as "nothing to do". The
+    expression is bound to the library (:func:`bind_where_filter`).
     """
-    selector = build_where_filter(where, keys=keys)
+    selector = bind_where_filter(coll, where, keys=keys, warnings=warnings)
     if selector is None:
         return None
     missing = [name for name in parse_key_selector(keys) if name not in coll.lib.entries]
@@ -493,6 +543,8 @@ def _safe(fn: _F) -> _F:
             )
         except InvalidInputError as exc:
             _emit_error(json_output, "InvalidInput", str(exc))
+        except NoCitationSourcesError as exc:
+            _emit_error(json_output, "NoSources", str(exc))
         except ValueError as exc:
             # By convention, operation modules raise ValueError to signal
             # invalid user-supplied data (bad field name, malformed key, etc.).

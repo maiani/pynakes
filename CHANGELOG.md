@@ -18,17 +18,17 @@ comparison context for it, and save the selection for later.
 ### Added
 
 - **Materials and provenance in reads.** `ref show --key … --include
-  materials,provenance` (and `query run --include`) adds the materials
+  materials,provenance` (and `ref show --where … --include`) adds the materials
   available for each entry (Pinax materials for the key and `file` links with
   their resolution status) and its recorded provenance (the Pinax manifest
   record of each material and the directives above the entry). Parts the
   library lacks are listed under `missing`; nothing is inferred.
-- **Bounded reads.** `ref show --key`, `query run`, and `search` share one
+- **Bounded reads.** `ref show --key`, `ref show --where`, and `search` share one
   contract: `--limit` pages a deterministic selection (`--limit 0` only
   counts), `page.next_cursor` resumes it with `--cursor`, and `--max-chars`
   cuts text values, listing each cut under `truncated` with its full length
-  and naming the keys to re-read under `retrieve_full`. `ref show` and
-  `query run` take `--select` to return only the named fields, with
+  and naming the keys to re-read under `retrieve_full`. `ref show` takes
+  `--select` to return only the named fields, with
   `missing_fields` and `omitted_fields` keeping absent and left-out values
   apart. A single-key `ref show` accepts `--select`, `--max-chars`, and
   `--include` too; without them its output is unchanged. Limits count
@@ -37,12 +37,21 @@ comparison context for it, and save the selection for later.
   selection it was issued for. Resuming against a changed library is refused
   with the new `StaleCursor` conflict (exit 2); resuming another selection is
   `InvalidInput`.
-- **Saved queries.** `query list`, `query set`, `query remove`, and
-  `query run` keep named `--where` expressions as `query-<name>` lines in
-  `pynakes-meta` (new metadata category `queries`). Expressions are validated
-  with the shared selector parser by `query set`, `metadata set`, and `lint`;
-  `query run` evaluates the query against the current entries, resolving
-  `used`/`unused` through the linked `tex-sources`.
+- **Saved queries.** `query list`, `query set`, and `query remove` keep named
+  `--where` expressions as `query-<name>` lines in `pynakes-meta` (new
+  metadata category `queries`). Expressions are validated with the shared
+  selector parser by `query set`, `metadata set`, and `lint`. A saved query
+  is the `--where` predicate `query "name"`, so every command that selects
+  entries runs it against the current entries and can narrow it further; a
+  saved expression may refer to other saved queries, and a missing or
+  circular reference is refused.
+- **`ref show --where`** summarizes every entry a selector matches, in file
+  order, under the bounded-read options; with `--key` the two narrow each
+  other.
+- `used`/`unused` work in every `--where`, resolved against the library's
+  linked `tex-sources` (previously only `corpus split --route` with
+  `--tex`/`--aux`). An expression that tests citations in a library with no
+  linked sources is a `NoSources` error.
 - **`analyze`** and `pynakes.analysis`: offline descriptive counts for one
   bibliography in named sections — entries and duplicate keys, types, years,
   most frequent authors and venues (`--top`), identifier and field coverage,

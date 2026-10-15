@@ -10,7 +10,7 @@ able to tell three situations apart:
 * **not yet read** — the selection continues on a later page.
 
 This module holds the primitives shared by every bounded read (``ref show
---key``, ``search``, ``query run``): :func:`project_fields` selects and
+--key``, ``ref show --where``, ``search``): :func:`project_fields` selects and
 truncates field values and reports what it left out, and :func:`paginate`
 slices a deterministic sequence into pages whose cursors carry a digest of the
 snapshot they were issued for. Resuming a cursor against a changed library is

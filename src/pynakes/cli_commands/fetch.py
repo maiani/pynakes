@@ -253,7 +253,10 @@ def fetch(
         FetchPolicy(**{flag: flag in chosen for flag in MATERIALS.values()}) if chosen else None
     )
     _check_expected_sha256(file, coll, params)
-    selected = select_keys(coll, where, key, json_output, "asset_fetch")
+    selection_warnings: list[dict] = []
+    selected = select_keys(
+        coll, where, key, json_output, "asset_fetch", warnings=selection_warnings
+    )
 
     progress: _RichFetchProgress | _JsonLinesProgress | None = None
     if progress_stream is ProgressStream.JSONL:
@@ -299,7 +302,7 @@ def fetch(
         coll,
         params,
         human,
-        warnings=report["warnings"],
+        warnings=[*selection_warnings, *report["warnings"]],
         files_dir=files_dir,
         access=report["access"],
         fetch_policy=report["fetch_policy"],

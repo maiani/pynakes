@@ -236,7 +236,8 @@ def enrich(
     coll = Bibliography.open(file)
     # Before any provider is asked: a stale precondition should cost no lookup.
     _check_expected_sha256(file, coll, params)
-    selected = select_keys(coll, where, key, json_output, "enrich")
+    selection_warnings: list[dict] = []
+    selected = select_keys(coll, where, key, json_output, "enrich", warnings=selection_warnings)
     fields = (
         sorted({name.strip() for item in only_field for name in item.split(",") if name.strip()})
         if only_field
@@ -261,7 +262,7 @@ def enrich(
             fields=fields,
         )
     updates = list(report.updates)
-    warnings = list(report.warnings)
+    warnings = [*selection_warnings, *report.warnings]
     if selected == []:
         warnings.append(
             {"type": "no_entries_selected", "message": "No entry matched the selection"}

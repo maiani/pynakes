@@ -22,7 +22,7 @@ from pynakes.cli_common import (
     _safe,
     _source_sha256,
     bib_file_argument,
-    build_where_filter,
+    bind_where_filter,
     deprecation_warning,
     key_option,
     parse_key_selector,
@@ -139,7 +139,7 @@ def search(
     file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
     lib = coll.lib
-    where_filter = build_where_filter(where, keys=key)
+    where_filter = bind_where_filter(coll, where, keys=key, warnings=warnings)
     ranked = not no_rank and bool(query.strip())
     results = search_ops.search_entries(
         lib,

@@ -108,21 +108,21 @@ _DEPRECATIONS = [
 
 # The bounded-read contract shared by every multi-entry read.
 _BOUNDED_READS = {
-    "commands": ["ref show (--key)", "query run", "search"],
+    "commands": ["ref show (--key, --where)", "search"],
     "options": {
         "--limit N": "at most N entries per page; --limit 0 reports only page.total",
         "--cursor TOKEN": "resume with page.next_cursor from the previous page",
         "--max-chars N": "cut every returned text value to N characters",
         "--select FIELDS": "return only these stored fields (abstract included): "
-        "under 'fields' in place of 'summary' on ref show and query run, as each "
+        "under 'fields' in place of 'summary' on ref show, as each "
         "match's 'fields' on search",
-        "--include PARTS": "ref show and query run: add what the library records "
+        "--include PARTS": "ref show: add what the library records "
         "outside the entry's fields, each part under its own key",
     },
     "page": {
         "keys": ["offset", "limit", "returned", "total", "complete", "next_cursor"],
         "order": "Deterministic for a snapshot: requested key order for ref show --key, "
-        "file order for query run, ranked or file order for search.",
+        "file order for ref show --where, ranked or file order for search.",
         "snapshot": "A cursor carries a digest of the library it was issued for and of "
         "the selection. Against a changed library it is refused with the StaleCursor "
         "conflict (exit 2); against another selection, with InvalidInput.",
@@ -186,12 +186,16 @@ _SAVED_QUERIES = {
     "grammar": "The shared --where predicate grammar (see predicate_grammar).",
     "name": "Letters, digits, '_', '.', '-', starting with a letter or digit; "
     "compared case-insensitively.",
-    "commands": ["query list", "query set", "query remove", "query run"],
-    "results": "The library stores the query, never its result: query run evaluates "
-    "it against the entries as they are now, in file order, under the bounded-read "
-    "contract.",
-    "citations": "used/unused resolve against the library's tex-sources when the "
-    "query runs (NoSources when none are linked).",
+    "commands": ["query list", "query set", "query remove"],
+    "running": 'A saved query is the --where predicate query "NAME", so every '
+    "command that selects entries runs it and can narrow it further: "
+    "ref show --where 'query \"NAME\"' reads its matches under the bounded-read "
+    "contract. A saved expression may refer to other saved queries; a missing or "
+    "circular reference is an InvalidInput error.",
+    "results": "The library stores the query, never its result: it is evaluated "
+    "against the entries as they are now, in file order.",
+    "citations": "used/unused resolve against the library's tex-sources wherever "
+    "--where is evaluated (NoSources when none are linked).",
     "validation": "query set and metadata set validate the expression; lint reports "
     "a stored query that no longer parses (invalid_metadata_value).",
 }
@@ -367,7 +371,7 @@ def _selector_surfaces(schemas: dict[str, dict]) -> list[str]:
     )
     return [
         *(f"{name} (--where, --key)" for name in selecting),
-        "query set / query run (saved expressions)",
+        "query set (saved expressions, run as --where 'query \"NAME\"')",
         "corpus split (--route)",
         "batch (fields.* where)",
     ]

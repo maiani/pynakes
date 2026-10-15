@@ -4,6 +4,8 @@ This module keeps command callbacks separate from application assembly while
 retaining the stable CLI contract.
 """
 
+from collections.abc import Callable
+
 import typer
 
 from pynakes.cli_common import (
@@ -16,12 +18,13 @@ from pynakes.cli_common import (
     _safe,
     _verb,
     bib_file_argument,
-    build_where_filter,
+    bind_where_filter,
     key_option,
     parse_key_selector,
     where_option,
 )
 from pynakes.engine import Bibliography
+from pynakes.model import QueryFilter
 
 # --- fields ----------------------------------------------------------------
 
@@ -29,28 +32,31 @@ from pynakes.engine import Bibliography
 def _run_field_op(
     file: str,
     action: str,
-    op: object,
+    op: Callable[[Bibliography, QueryFilter], int],
     params: RunParams,
     details: dict,
     verb: str,
     *,
+    where: str | None,
+    key: list[str] | None,
     list_values: str | None = None,
 ) -> None:
-    """Run one field operation and report it.
+    """Run one field operation on the ``--where``/``--key`` selection and report it.
 
     ``list_values`` names a field whose new value is listed per changed entry,
     for an operation whose result cannot be predicted from the command line
     alone (title protection decides token by token).
     """
     coll = Bibliography.open(file)
-    count = op(coll)
+    warnings: list[dict] = []
+    count = op(coll, bind_where_filter(coll, where, keys=key, warnings=warnings))
     human = [f"{verb} ({count} {_entries(count)} changed)."]
     if list_values is not None:
         for change in coll.change_plan()["entries"]:
             value = change.get("fields", {}).get(list_values)
             if change["change"] == "modified" and value is not None:
                 human.append(f"  {change['key']}: {value['new']}")
-    _finish_mod(file, action, coll, params, human, **details)
+    _finish_mod(file, action, coll, params, human, warnings=warnings, **details)
 
 
 def fields_rename(
@@ -74,14 +80,15 @@ def fields_rename(
         backup=backup,
         expect_sha256=expect_sha256,
     )
-    flt = build_where_filter(where, keys=key)
     _run_field_op(
         file,
         "fields_rename",
-        lambda coll: coll.rename_field(old, new, flt),
+        lambda coll, flt: coll.rename_field(old, new, flt),
         params,
         {"old": old, "new": new, "where": where, "keys": parse_key_selector(key)},
         f"{_verb('rename', params)} field {old!r} to {new!r}",
+        where=where,
+        key=key,
     )
 
 
@@ -106,14 +113,15 @@ def fields_set(
         backup=backup,
         expect_sha256=expect_sha256,
     )
-    flt = build_where_filter(where, keys=key)
     _run_field_op(
         file,
         "fields_set",
-        lambda coll: coll.set_field(field, value, flt),
+        lambda coll, flt: coll.set_field(field, value, flt),
         params,
         {"field": field, "value": value, "where": where, "keys": parse_key_selector(key)},
         f"{_verb('set', params, 'Set')} field {field!r}",
+        where=where,
+        key=key,
     )
 
 
@@ -138,14 +146,15 @@ def fields_move(
         backup=backup,
         expect_sha256=expect_sha256,
     )
-    flt = build_where_filter(where, keys=key)
     _run_field_op(
         file,
         "fields_move",
-        lambda coll: coll.move_field(old, new, flt),
+        lambda coll, flt: coll.move_field(old, new, flt),
         params,
         {"old": old, "new": new, "where": where, "keys": parse_key_selector(key)},
         f"{_verb('move', params)} field {old!r} to {new!r}",
+        where=where,
+        key=key,
     )
 
 
@@ -170,14 +179,15 @@ def fields_append(
         backup=backup,
         expect_sha256=expect_sha256,
     )
-    flt = build_where_filter(where, keys=key)
     _run_field_op(
         file,
         "fields_append",
-        lambda coll: coll.append_field(field, value, flt),
+        lambda coll, flt: coll.append_field(field, value, flt),
         params,
         {"field": field, "value": value, "where": where, "keys": parse_key_selector(key)},
         f"{_verb('append', params, 'Appended')} {value!r} to field {field!r}",
+        where=where,
+        key=key,
     )
 
 
@@ -201,14 +211,15 @@ def fields_clear(
         backup=backup,
         expect_sha256=expect_sha256,
     )
-    flt = build_where_filter(where, keys=key)
     _run_field_op(
         file,
         "fields_clear",
-        lambda coll: coll.clear_field(field, flt),
+        lambda coll, flt: coll.clear_field(field, flt),
         params,
         {"field": field, "where": where, "keys": parse_key_selector(key)},
         f"{_verb('clear', params, 'Cleared')} field {field!r}",
+        where=where,
+        key=key,
     )
 
 
@@ -235,15 +246,16 @@ def fields_protect_title(
         backup=backup,
         expect_sha256=expect_sha256,
     )
-    flt = build_where_filter(where, keys=key)
     terms = term or []
     _run_field_op(
         file,
         "fields_protect_title",
-        lambda coll: coll.protect_title(title_field, flt, terms),
+        lambda coll, flt: coll.protect_title(title_field, flt, terms),
         params,
         {"field": title_field, "terms": terms, "where": where, "keys": parse_key_selector(key)},
         f"{_verb('protect', params, 'Protected')} capitalization in field {title_field!r}",
+        where=where,
+        key=key,
         list_values=title_field,
     )
 

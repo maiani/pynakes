@@ -1,7 +1,7 @@
 """Per-entry records for bounded, comparison-oriented reads.
 
 :class:`EntryReader` turns entries of one :class:`~pynakes.engine.Bibliography`
-into the JSON-friendly records that ``ref show --key`` and ``query run`` return.
+into the JSON-friendly records that ``ref show --key`` and ``ref show --where`` return.
 A record carries either the triage summary (:func:`pynakes.triage.entry_summary`)
 or, on request, a projection of exactly the stored fields asked for — the
 abstract among them. On request it also *includes* what the library records

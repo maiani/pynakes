@@ -65,7 +65,7 @@ Every command that addresses a *set* of entries takes the same selector: the
 `--where` grammar. A selector written for one command is valid for the others,
 so there are no command-specific filter flags to learn.
 
-Accepted by [`fields`](#fields), [`search`](#search), [`format`](#format),
+Accepted by [`ref show`](#show-and-edit), [`fields`](#fields), [`search`](#search), [`format`](#format),
 [`normalize`](#normalize), [`enrich`](#verify-enrich), `keys generate`,
 `asset fetch`, `ref directive`, [`corpus combine`](#combine),
 [`corpus split`](#split) (`--route` rules), and the `fields.*` operations of
@@ -101,21 +101,23 @@ Besides stored fields, four names are special: `key` (citation key), `type`
 (entry type), `year` (falls back to the year inside `date`), and `date` (falls
 back to a date composed from `year`/`month`/`day`). `group "Name"` tests JabRef
 group membership; the stored field itself is reachable as `groups`.
+`used` / `unused` test whether a citation key appears in the library's
+[linked TeX sources](#linked-tex-sources), and `query "name"` runs one of the
+library's [saved queries](#query), so `--where 'query "to-read" and unused'`
+composes both.
 
-Pass an empty query to select by predicate alone: `search FILE "" --where EXPRESSION`.
-
-Use `""`, not a filler query like `.`: a filler is a real search term, so
-`search . --where 'abstract missing'` quietly returns only those matching
-entries whose text happens to contain a period. An empty query searches nothing
-and lets the predicate decide, which is the whole set. The query argument stays
-required, so a lone path can never be mistaken for a query.
+To read a selection, use `ref show FILE --where EXPRESSION`: it returns a
+summary per matching entry in file order, under the bounded-read options.
+`search` is for text: `search FILE "" --where EXPRESSION` also selects by
+predicate alone, but use `""`, not a filler query like `.`, which is a real
+search term.
 
 Quote values containing spaces or punctuation; bare tokens may not contain
 whitespace, brackets, commas, or comparison characters. A comparison against a
 field an entry does not have is false, except `!=` and `missing`, which are
-true. `corpus split --route` additionally accepts the bucket predicates `*`
-(catch-all), and `used` / `unused` against `--tex`/`--aux` sources, which
-compose with everything else (`used and year >= 2020`).
+true. `corpus split --route` additionally accepts the bucket predicate `*`
+(catch-all), and resolves `used` / `unused` against its `--tex`/`--aux`
+sources, which compose with everything else (`used and year >= 2020`).
 
 ### Selecting by citation key
 
@@ -465,6 +467,12 @@ store none report `(none)` (JSON `null`), so "no abstract" is distinguishable
 from "not requested". The keys may be comma-separated, the option repeated, or
 both; repeats collapse and the requested order is preserved. Every unknown key
 is reported together in one exit-1 `KeyNotFound` error.
+
+`--where EXPRESSION` gives the same view for every entry a
+[selector](#selecting-entries-where) matches, in file order:
+`ref show refs.bib --where 'year < 1800 and abstract missing'`, or
+`--where 'query "to-read"'` for a saved query. With `--key` as well, the two
+narrow each other.
 
 For comparing a set, `--select` returns exactly the named stored fields
 (`--select title,abstract`) in place of the summary, and `--include` adds what
@@ -1028,16 +1036,18 @@ entries as they are then:
 
 ```bash
 pynakes query set refs.bib to-read 'abstract exists and not group "Read"'
-pynakes query run refs.bib to-read --select title,abstract --limit 10
+pynakes ref show refs.bib --where 'query "to-read"' --select title,abstract --limit 10
+pynakes fields append refs.bib keywords queued --where 'query "to-read" and year < 1900'
 pynakes query list refs.bib
 pynakes query remove refs.bib to-read
 ```
 
 A saved query is one `query-<name>` line in `pynakes-meta` holding a
 [`--where`](#selecting-entries-where) expression; the library stores the query,
-never its result. `query run` returns the matching entries in file order with
-the same options as `ref show --key`. `used`/`unused` resolve against the
-library's [linked TeX sources](#linked-tex-sources).
+never its result. `query "name"` is a predicate of the `--where` grammar, so
+every command that selects entries runs it, and a saved expression may itself
+refer to other saved queries. `ref show --where` returns the matches in file
+order with the same options as `ref show --key`.
 
 ## analyze
 

@@ -90,7 +90,7 @@ to find the operation module that owns a key.
 | `scrub-comments` | scrub | Boolean; default `true` — whether `scrub` removes free comment blocks | `scrub` | — |
 | `scrub-metadata` | scrub | Boolean; default `true` — whether `scrub` removes `jabref-meta`/`pynakes-meta` blocks | `scrub` | — |
 | `pinax-files-dir` | pinax | Path to the Pinax materials directory, relative to the `.bib` file | `fetch`, `files`, engine | — |
-| `query-<name>` | queries | One `--where` selector expression on one line; a saved query run by `query run <name>`. `query set` and `lint` validate it | `query` | — |
+| `query-<name>` | queries | One `--where` selector expression on one line; a saved query, run wherever `--where` is accepted as `query "<name>"`. `query set` and `lint` validate it | `query` | — |
 | `pinax-fetch-policy` | pinax | Comma-separated list of: `preprint`, `published`, `source`, `supplement`, `bestpdf` (default `bestpdf`) | `fetch` | — |
 
 `lint-required-fields` values are additive to pynakes' built-in requirements,

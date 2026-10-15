@@ -226,7 +226,7 @@ materials --json`. Everything comes from existing records, offline; nothing in
 a record is a judgment about the work.
 
 Keep the response bounded with the same options on `ref show --key`,
-`query run`, and `search`:
+`ref show --where`, and `search`:
 
 - `--limit N` returns at most `N` entries; `page.total` counts the whole
   selection and `--limit 0` reports only that count.
@@ -252,10 +252,12 @@ complete.
 A selection worth repeating can be saved in the library:
 `query set refs.bib to-read 'abstract exists and not group "Read"'` stores a
 `query-to-read` line in `pynakes-meta`, validated with the `--where` grammar.
-`query run refs.bib to-read --json` evaluates it against the entries as they
-are now, so it reflects every later edit, and returns pages under the
-bounded-read options above. `query list` reports whether each stored query
-still parses; `lint` reports one that does not.
+A saved query is a `--where` predicate: `ref show refs.bib --where 'query
+"to-read"' --json` evaluates it against the entries as they are now, so it
+reflects every later edit, and returns pages under the bounded-read options
+above. Every command that takes `--where` runs it the same way and can narrow
+it (`--where 'query "to-read" and year >= 1900'`). `query list` reports
+whether each stored query still parses; `lint` reports one that does not.
 
 `analyze refs.bib --json` describes a library with offline counts in named
 `sections`: entries and duplicate keys, types, years, the most frequent

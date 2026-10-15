@@ -76,7 +76,11 @@ def directive(
         expect_sha256=expect_sha256,
     )
     coll = Bibliography.open(file)
-    selected = select_keys(coll, where, key, json_output, "ref_directive") or []
+    selection_warnings: list[dict] = []
+    selected = (
+        select_keys(coll, where, key, json_output, "ref_directive", warnings=selection_warnings)
+        or []
+    )
     for name in selected:
         unique_entry(coll, name, json_output, action="ref_directive")
     if remove:
@@ -89,7 +93,7 @@ def directive(
     else:
         verb_done = "Removed" if remove else "Added"
     human = [f"{verb_done} {text!r} on {len(changed)} of {len(selected)} selected entries."]
-    warnings: list[dict[str, str]] = []
+    warnings: list[dict] = [*selection_warnings]
     if not selected:
         warnings.append({"type": "no_entries_selected", "message": "No entry matched --where"})
     elif remove and not changed:

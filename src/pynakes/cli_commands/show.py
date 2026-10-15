@@ -27,7 +27,9 @@ from pynakes.cli_common import (
     _safe,
     _source_sha256,
     bib_file_argument,
+    bind_where_filter,
     key_option,
+    where_option,
 )
 from pynakes.engine import Bibliography
 
@@ -38,6 +40,10 @@ def show(
     keys: list[str] | None = key_option(
         "Summarize several references at once: comma-separated keys, repeatable"
     ),
+    where: str | None = where_option(
+        "Summarize every reference this selector matches, in file order (the shared "
+        "--where grammar, saved queries and used/unused included); narrowed by --key"
+    ),
     resolved: bool = typer.Option(
         False, "--resolved", help="Include fields inherited through crossref/xdata"
     ),
@@ -47,7 +53,9 @@ def show(
     select: list[str] | None = select_option(),
     include: list[str] | None = include_option(),
     max_chars: int | None = max_chars_option(),
-    limit: int | None = limit_option("With --key, return at most this many entries per page"),
+    limit: int | None = limit_option(
+        "With --key or --where, return at most this many entries per page"
+    ),
     cursor: str | None = cursor_option(),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
@@ -59,35 +67,56 @@ def show(
     abstract under `--abstract` — so a set of candidates can be scanned in
     one call rather than one invocation per key. Both forms refuse to guess
     when a key is duplicated, and the `--key` form reports every unknown key
-    together.
+    together. `--where EXPR` summarizes every entry the selector matches, in
+    file order — `--where 'query "to-read"'` runs a saved query, and
+    `used`/`unused` test the library's linked TeX sources.
 
     Bounded reads: `--select` returns only the named fields (the abstract
     among them); `--include materials,provenance` adds the materials
     available for each entry and the provenance the library recorded;
-    `--max-chars` cuts long values and lists every cut under `truncated`. With `--key`, `--limit` pages the selection and
+    `--max-chars` cuts long values and lists every cut under `truncated`.
+    With `--key` or `--where`, `--limit` pages the selection and
     `page.next_cursor` resumes it — a cursor is refused once the library
     changes, so pages never silently skip or repeat entries. Information
     the library lacks is reported as missing (`null`, `missing`,
     `missing_fields`), never as an omission.
     """
-    if keys:
+    selecting = bool(keys) or where is not None
+    if selecting:
         if key is not None:
-            raise InvalidInputError("Pass a citation key or --key, not both")
+            raise InvalidInputError("Pass a citation key or --key/--where, not both")
     elif key is None:
-        raise InvalidInputError("Provide a citation key or --key")
-    if abstract and not keys:
+        raise InvalidInputError("Provide a citation key, --key, or --where")
+    if abstract and not selecting:
         raise InvalidInputError(
-            "--abstract applies to the --key summary; showing a single key already "
-            "prints every field, abstract included"
+            "--abstract applies to the --key/--where summary; showing a single key "
+            "already prints every field, abstract included"
         )
-    if not keys and (limit is not None or cursor is not None):
-        raise InvalidInputError("--limit and --cursor page a --key selection")
+    if not selecting and (limit is not None or cursor is not None):
+        raise InvalidInputError("--limit and --cursor page a --key or --where selection")
     check_bounds(limit, max_chars)
     selection = parse_select(select)
     parts = parse_includes(include)
 
     file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
+
+    if where is not None:
+        _show_selection(
+            coll,
+            file,
+            where,
+            parse_key_list(keys) if keys else [],
+            resolved=resolved,
+            include_abstract=abstract,
+            select=selection,
+            include=parts,
+            max_chars=max_chars,
+            limit=limit,
+            cursor=cursor,
+            json_output=json_output,
+        )
+        return
 
     if keys:
         _show_summaries(
@@ -243,6 +272,67 @@ def _show_summaries(
         records,
         page_info,
         heading=f"{file}: {len(records)} {_entries(len(records))}.",
+        json_output=json_output,
+    )
+
+
+def _show_selection(
+    coll: Bibliography,
+    file: str,
+    where: str,
+    keys: list[str],
+    *,
+    resolved: bool,
+    include_abstract: bool,
+    select: tuple[str, ...] | None,
+    include: tuple[str, ...],
+    max_chars: int | None,
+    limit: int | None,
+    cursor: str | None,
+    json_output: bool,
+) -> None:
+    """Print one triage summary per entry the ``--where`` selector matches."""
+    if keys:
+        # A mistyped --key is an error, never a quietly smaller selection.
+        unique_entries(coll, keys, json_output, action="ref_show")
+    warnings: list[dict] = []
+    selector = bind_where_filter(coll, where, keys=keys or None, warnings=warnings)
+    matches = [entry for entry in coll.lib.entries.values() if selector is None or selector(entry)]
+    page, page_info = page_of(
+        coll,
+        matches,
+        limit=limit,
+        cursor=cursor,
+        request=request_digest(command="ref show", where=where, keys=keys),
+        json_output=json_output,
+        action="ref_show",
+    )
+    records, reader_warnings = entry_records(
+        coll,
+        page,
+        resolved=resolved,
+        include_abstract=include_abstract,
+        select=select,
+        include=include,
+        max_chars=max_chars,
+    )
+    payload: dict[str, object] = {
+        "status": "success",
+        "action": "ref_show",
+        "file": file,
+        "source_sha256": _source_sha256(coll),
+        "warnings": [*warnings, *reader_warnings],
+        "where": where,
+        "keys": keys,
+        "resolved": resolved,
+        "abstract": include_abstract,
+        "bounds": bounds_payload(select=select, include=include, max_chars=max_chars, limit=limit),
+    }
+    emit_page(
+        payload,
+        records,
+        page_info,
+        heading=f"{file}: --where matches {page_info.total} {_entries(page_info.total)}.",
         json_output=json_output,
     )
 

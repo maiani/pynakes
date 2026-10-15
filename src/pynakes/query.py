@@ -12,7 +12,7 @@ Grammar::
     or         := and { "or" and }
     and        := unary { "and" unary }
     unary      := "not" unary | "(" expression ")" | predicate
-    predicate  := "*" | "used" | "unused" | "group" VALUE
+    predicate  := "*" | "used" | "unused" | "group" VALUE | "query" VALUE
                 | FIELD ("exists" | "missing")
                 | FIELD ["not"] "in" "[" VALUE { "," VALUE } "]"
                 | FIELD OP VALUE
@@ -30,14 +30,16 @@ except ``!=`` and ``missing``, which are true.
 The special fields are ``key`` (citation key), ``type`` (entry type), ``year``
 (falls back to the year inside ``date``), and ``date`` (falls back to a date
 composed from ``year``/``month``/``day``). ``group "Name"`` tests JabRef group
-membership; the stored field is reachable as ``groups``.
+membership; the stored field is reachable as ``groups``. ``query "name"``
+runs a query saved in the library (see :mod:`pynakes.saved_queries`), so a
+saved selection composes with the rest of an expression.
 """
 
 from __future__ import annotations
 
 import operator
 import re
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
@@ -57,6 +59,7 @@ __all__ = [
     "Node",
     "Not",
     "Or",
+    "SavedQueryRef",
     "Used",
     "field_value",
     "fuzzy_score",
@@ -248,6 +251,22 @@ class Group(Node):
     def to_dict(self) -> dict[str, object]:
         """Describe the group predicate."""
         return {"predicate": "group", "name": self.name}
+
+
+@dataclass(frozen=True)
+class SavedQueryRef(Node):
+    """The ``query "name"`` predicate: a saved query, compiled in place."""
+
+    name: str
+    expression: Node
+
+    def matches(self, entry: BibEntry) -> bool:
+        """Return whether the saved query selects the entry."""
+        return self.expression.matches(entry)
+
+    def to_dict(self) -> dict[str, object]:
+        """Describe the reference and the saved expression it runs."""
+        return {"predicate": "query", "name": self.name, "expression": self.expression.to_dict()}
 
 
 @dataclass(frozen=True)
@@ -458,11 +477,21 @@ def _tokenize(expr: str) -> list[_Token]:
 class _Parser:
     """Recursive-descent parser for one selector expression."""
 
-    def __init__(self, expr: str, tokens: list[_Token], cited_keys: Iterable[str] | None) -> None:
+    def __init__(
+        self,
+        expr: str,
+        tokens: list[_Token],
+        cited_keys: Iterable[str] | None,
+        saved: Mapping[str, str] | None,
+        resolving: tuple[str, ...] = (),
+    ) -> None:
         self.expr = expr
         self.tokens = tokens
         self.position = 0
         self.cited_keys = None if cited_keys is None else frozenset(cited_keys)
+        self.saved = saved
+        #: Saved queries being expanded around this parse, to refuse a cycle.
+        self.resolving = resolving
 
     # --- token helpers ---
 
@@ -549,12 +578,35 @@ class _Parser:
         if lowered in ("used", "unused") and not self._operator_follows():
             if self.cited_keys is None:
                 raise ValueError(
-                    f"predicate {lowered!r} needs cited keys; pass --tex/--aux sources"
+                    f"predicate {lowered!r} needs cited keys: link TeX sources with `pynakes tex add`"
                 )
             return Used(self.cited_keys, negate=lowered == "unused")
         if lowered == "group":
             return self._group()
+        if lowered == "query" and not self._operator_follows():
+            return self._saved_query()
         return self._field_predicate(lowered)
+
+    def _saved_query(self) -> Node:
+        name = self._value("a saved query name")
+        if self.saved is None:
+            raise ValueError(f"predicate 'query' needs a library to look up {name!r} in")
+        folded = name.casefold()
+        expression = self.saved.get(folded)
+        if expression is None:
+            raise ValueError(f"no saved query named {name!r}")
+        if folded in self.resolving:
+            chain = " -> ".join([*self.resolving, folded])
+            raise ValueError(f"saved query {name!r} refers to itself ({chain})")
+        tokens = _tokenize(expression)
+        if not tokens:
+            raise ValueError(f"saved query {name!r} is empty")
+        parser = _Parser(expression, tokens, self.cited_keys, self.saved, (*self.resolving, folded))
+        try:
+            node = parser.parse()
+        except ValueError as exc:
+            raise ValueError(f"saved query {name!r}: {exc}") from exc
+        return SavedQueryRef(name, node)
 
     def _group(self) -> Node:
         token = self._peek()
@@ -598,7 +650,12 @@ class _Parser:
         return InSet(field, tuple(values), negate=negate)
 
 
-def parse_query(expr: str, *, cited_keys: Iterable[str] | None = None) -> Node:
+def parse_query(
+    expr: str,
+    *,
+    cited_keys: Iterable[str] | None = None,
+    saved: Mapping[str, str] | None = None,
+) -> Node:
     """Compile a ``--where`` expression into a callable predicate.
 
     Examples::
@@ -611,7 +668,9 @@ def parse_query(expr: str, *, cited_keys: Iterable[str] | None = None) -> Node:
 
     ``cited_keys`` supplies the key set the ``used`` / ``unused`` predicates
     test against; without it those predicates raise, since a bare cited-key
-    question has no answer.
+    question has no answer. ``saved`` maps case-folded saved-query names to
+    their expressions for the ``query "name"`` predicate, which raises without
+    it; a saved query that refers back to itself is refused.
 
     Raises:
         ValueError: if the expression cannot be parsed.
@@ -620,7 +679,7 @@ def parse_query(expr: str, *, cited_keys: Iterable[str] | None = None) -> Node:
         tokens = _tokenize(expr)
         if not tokens:
             raise ValueError("expression is empty")
-        return _Parser(expr, tokens, cited_keys).parse()
+        return _Parser(expr, tokens, cited_keys, saved).parse()
     except ValueError as exc:
         # Every failure names the whole expression: a caller sees the selector it
         # sent back, not just the fragment that stopped the parser.
@@ -655,9 +714,13 @@ WHERE_GRAMMAR: dict[str, object] = {
     },
     "bucket_predicates": {
         "*": "matches every entry (catch-all / rest bucket)",
-        "used": "citation key appears in the --tex/--aux sources",
-        "unused": "citation key does not appear in the sources",
+        "used": (
+            "citation key appears in the library's linked TeX sources (tex-sources), "
+            "or in the --tex/--aux sources of corpus split"
+        ),
+        "unused": "citation key does not appear in those sources",
         'group "Name"': "entry belongs to the named group",
+        'query "name"': "the library's saved query of that name selects the entry",
     },
     "values": (
         "Quote values containing spaces or punctuation with single or double "
@@ -680,6 +743,7 @@ WHERE_GRAMMAR: dict[str, object] = {
         'journal matches "^Phys\\. Rev\\."',
         "date >= 1900-06",
         "used",
+        'query "to-read" and year >= 2000',
         "*",
     ],
 }

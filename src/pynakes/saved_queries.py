@@ -14,20 +14,23 @@ when they are saved and again by ``lint``, so a query that no longer parses is
 reported rather than silently selecting nothing.
 
 The ``used`` / ``unused`` predicates resolve against the library's linked TeX
-sources (``tex-sources``) when the query runs.
+sources (``tex-sources``) when the query runs, and ``query "name"`` runs
+another saved query in place. :func:`compile_selector` is the one place a
+``--where`` expression is bound to a library, so every command that selects
+entries understands both.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
 from pynakes._text_utils import check_balanced_braces, strip_meta_terminator
 from pynakes.metadata.schema import SAVED_QUERY_PREFIX
 from pynakes.model import BibEntry, BibFile
-from pynakes.query import And, Node, Not, Or, Used, parse_query
+from pynakes.query import And, Node, Not, Or, SavedQueryRef, Used, parse_query
 from pynakes.usage import (
     collect_cited_keys,
     resolve_existing_tex_sources,
@@ -38,10 +41,12 @@ __all__ = [
     "SAVED_QUERY_PREFIX",
     "NoCitationSourcesError",
     "SavedQuery",
+    "compile_selector",
     "metadata_key",
     "query_uses_citations",
     "saved_queries",
     "saved_query",
+    "saved_query_expressions",
     "select_entries",
     "validate_query_name",
     "validate_saved_query",
@@ -61,11 +66,16 @@ class SavedQuery:
     name: str
     expression: str
 
-    def to_dict(self) -> dict[str, object]:
-        """Describe the query, including whether its expression still parses."""
+    def to_dict(self, saved: Mapping[str, str] | None = None) -> dict[str, object]:
+        """Describe the query, including whether its expression still parses.
+
+        ``saved`` (see :func:`saved_query_expressions`) resolves references to
+        other saved queries, so a missing or circular one makes the query
+        invalid; without it, references are only checked for syntax.
+        """
         described: dict[str, object] = {"name": self.name, "expression": self.expression}
         try:
-            node = parse_query(self.expression, cited_keys=())
+            node = parse_query(self.expression, cited_keys=(), saved=saved or _ANY_QUERY)
         except ValueError as exc:
             described.update(valid=False, error=str(exc), parsed=None, uses_citations=False)
         else:
@@ -99,12 +109,32 @@ def validate_query_name(name: str) -> str:
     return stripped
 
 
-def validate_saved_query(name: str, expression: str) -> Node:
+class _AnyQuery(Mapping[str, str]):
+    """Stands in for a library's saved queries when only syntax is checked."""
+
+    def __getitem__(self, name: str) -> str:
+        return "*"
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(())
+
+    def __len__(self) -> int:
+        return 0
+
+
+_ANY_QUERY = _AnyQuery()
+
+
+def validate_saved_query(
+    name: str, expression: str, saved: Mapping[str, str] | None = None
+) -> Node:
     """Check a query before it is stored, returning its parsed expression.
 
     The expression must be one line (it is one metadata line), must keep
     ``{``/``}`` balanced (it lives inside an ``@comment``), and must parse
-    under the shared selector grammar.
+    under the shared selector grammar. With ``saved``, every ``query "name"``
+    it refers to must exist there and must not lead back to ``name``; without
+    it, references are checked only for syntax.
 
     Raises:
         ValueError: naming what is wrong with the name or the expression.
@@ -116,7 +146,12 @@ def validate_saved_query(name: str, expression: str) -> Node:
     if "\n" in text or "\r" in text:
         raise ValueError(f"Saved query {name!r} must be a single line")
     check_balanced_braces(f"saved query {name!r}", text)
-    return parse_query(text, cited_keys=())
+    if saved is None:
+        return parse_query(text, cited_keys=(), saved=_ANY_QUERY)
+    # Resolve as if already stored, so a cycle through this name is caught.
+    candidate = {**saved, name.strip().casefold(): text}
+    ref = parse_query(f"query {_quoted(name.strip())}", cited_keys=(), saved=candidate)
+    return ref.expression if isinstance(ref, SavedQueryRef) else ref
 
 
 def saved_queries(lib: BibFile) -> list[SavedQuery]:
@@ -147,10 +182,22 @@ def saved_query(lib: BibFile, name: str) -> SavedQuery | None:
     return None
 
 
+def saved_query_expressions(lib: BibFile) -> dict[str, str]:
+    """Map each saved query's case-folded name to its expression."""
+    return {query.name.casefold(): query.expression for query in saved_queries(lib)}
+
+
+def _quoted(name: str) -> str:
+    # Names are restricted to [A-Za-z0-9_.-], which a double quote never breaks.
+    return f'"{name}"'
+
+
 def query_uses_citations(node: Node) -> bool:
     """Return whether ``node`` tests ``used`` or ``unused`` anywhere."""
     if isinstance(node, Used):
         return True
+    if isinstance(node, SavedQueryRef):
+        return query_uses_citations(node.expression)
     if isinstance(node, Not):
         return query_uses_citations(node.child)
     if isinstance(node, And | Or):
@@ -177,13 +224,38 @@ def select_entries(
         ValueError: if the expression does not parse.
         NoCitationSourcesError: if it tests citations and no sources are known.
     """
-    node = parse_query(expression, cited_keys=())
+    node, warnings = compile_selector(lib, expression, base_dir=base_dir, cited_keys=cited_keys)
+    return [entry for entry in lib.entries.values() if node(entry)], warnings
+
+
+def compile_selector(
+    lib: BibFile,
+    expression: str,
+    *,
+    base_dir: str | Path | None = None,
+    cited_keys: Iterable[str] | None = None,
+) -> tuple[Node, list[dict]]:
+    """Compile a ``--where`` expression against ``lib``, with its warnings.
+
+    ``query "name"`` resolves against the library's saved queries.
+    ``used``/``unused`` resolve against ``cited_keys`` when given, else
+    against the library's linked ``tex-sources`` (relative to ``base_dir``) —
+    scanned only when the expression actually tests citations. The warnings
+    name linked sources missing on disk, in the shape the CLI envelope reports.
+
+    Raises:
+        ValueError: if the expression does not parse, or names a saved query
+            that does not exist or refers back to itself.
+        NoCitationSourcesError: if it tests citations and no sources are known.
+    """
+    saved = saved_query_expressions(lib)
+    node = parse_query(expression, cited_keys=(), saved=saved)
     warnings: list[dict] = []
     if query_uses_citations(node):
         if cited_keys is None:
             cited_keys, warnings = _linked_cited_keys(lib, base_dir)
-        node = parse_query(expression, cited_keys=cited_keys)
-    return [entry for entry in lib.entries.values() if node(entry)], warnings
+        node = parse_query(expression, cited_keys=cited_keys, saved=saved)
+    return node, warnings
 
 
 def _linked_cited_keys(lib: BibFile, base_dir: str | Path | None) -> tuple[set[str], list[dict]]:

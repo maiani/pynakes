@@ -1,6 +1,6 @@
 """Shared options and output for bounded multi-entry reads.
 
-``ref show --key`` and ``query run`` return the same page of entry records (see
+``ref show --key`` and ``ref show --where`` return the same page of entry records (see
 :mod:`pynakes.entry_reader`) under the same options, so a caller that learned
 to page one can page the other. This module owns those options, the cursor
 error handling, and the envelope keys they share.
