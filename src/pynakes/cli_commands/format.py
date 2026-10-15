@@ -51,12 +51,6 @@ class FieldOrderChoice(str, Enum):
     alphabetical = "alphabetical"
 
 
-class EntryOrderChoice(str, Enum):
-    preserve = "preserve"
-    key = "key"
-    profile = "profile"
-
-
 class BlockOrderChoice(str, Enum):
     preserve = "preserve"
     canonical = "canonical"
@@ -80,7 +74,7 @@ class FormatOverrides:
     trailing_comma: bool | None
     blank_line_entries: bool | None
     field_order: FieldOrderChoice | None
-    entry_order: EntryOrderChoice | None
+    entry_order: str | None
     block_order: BlockOrderChoice | None
     wrap_values: WrapValuesChoice | None
     line_width: int | None
@@ -101,7 +95,7 @@ def _layout(
         trailing_comma=overrides.trailing_comma,
         blank_line_entries=overrides.blank_line_entries,
         field_order=overrides.field_order.value if overrides.field_order is not None else None,
-        entry_order=overrides.entry_order.value if overrides.entry_order is not None else None,
+        entry_order=overrides.entry_order,
         block_order=overrides.block_order.value if overrides.block_order is not None else None,
         wrap_values=overrides.wrap_values.value if overrides.wrap_values is not None else None,
         line_width=overrides.line_width,
@@ -267,8 +261,12 @@ def format_bibliography(
     field_order: FieldOrderChoice | None = typer.Option(
         None, "--field-order", help="Field ordering policy"
     ),
-    entry_order: EntryOrderChoice | None = typer.Option(
-        None, "--entry-order", help="Entry ordering policy"
+    entry_order: str | None = typer.Option(
+        None,
+        "--entry-order",
+        help="Entry order: preserve, key, profile (the library's sort-order, else "
+        "JabRef's saveOrderConfig), or a sort spec such as 'author,year:desc' "
+        "(citationkey/key and entrytype/type name the key and the type)",
     ),
     block_order: BlockOrderChoice | None = typer.Option(
         None, "--block-order", help="Top-level block ordering policy"
@@ -309,6 +307,10 @@ def format_bibliography(
     expect_sha256: str | None = _EXPECT_SHA256_OPTION,
 ) -> None:
     """Rewrite layout only; never change bibliographic values or conventions.
+
+    `--entry-order` sorts the entries: by key, by the library's configured
+    order (`profile`), or by an explicit spec such as `author,year:desc`.
+    Crossref parents always follow their children.
 
     `--where` restricts the rewrite to the matching entries. A selection owns
     the layout inside each entry it matches, not the layout of the file, so

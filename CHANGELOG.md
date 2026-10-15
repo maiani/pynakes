@@ -106,6 +106,8 @@ comparison context for it, and save the selection for later.
   `checked: false`, `rate_limited`, and `retryable`, and `lookups` names the
   entries not checked and the arguments that retry them; a throttle is no
   longer indistinguishable from "no match".
+- `format --entry-order` accepts an explicit sort spec, such as
+  `author,year:desc`, besides `preserve`, `key`, and `profile`.
 - `lint --severity` reports only findings at least that severe, and
   `lint --summary` reports every count without listing each finding
   (`issues_omitted`). The summary gains `by_type`.
@@ -139,6 +141,13 @@ comparison context for it, and save the selection for later.
   title, a zero-width space).
 
 ### Deprecated
+
+- Sorting entries in `normalize` (`--sort-by`, the `sort` step, and sorting by
+  the library's `sort-order` / `saveOrderConfig`) is deprecated and removed in
+  0.9.0: entry order is layout, which `format` owns. Use
+  `format --entry-order profile`, or an explicit spec. `normalize` reports a
+  `deprecated` warning whenever it sorts. Unlike `normalize`, `format` also
+  rewrites each entry's layout.
 
 - `search --in-field` restricted both the fields searched and the fields
   returned. Replace `--in-field F` with `--in F --select F`. It still works

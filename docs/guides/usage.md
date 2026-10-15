@@ -746,8 +746,12 @@ readability convention chosen to make entries predictable and easy to scan:
    fields, avoiding an arbitrary alphabetical reshuffle.
 
 `--field-order` accepts `preferred`, `preserve`, or `alphabetical`.
-`--entry-order` accepts `preserve`, `key`, or `profile` (the library's `sort-order` /
-`saveOrderConfig`). `--block-order preserve` keeps comments, strings, preambles,
+`--entry-order` accepts `preserve`, `key`, `profile` (the library's `sort-order` /
+`saveOrderConfig`), or an explicit sort spec in the same grammar, such as
+`--entry-order author,year:desc` (`citationkey`/`key` and `entrytype`/`type`
+name the key and the type; crossref parents always follow their children).
+`format` owns entry order: `normalize --sort-by` and `normalize`'s sorting by
+`sort-order` are deprecated and removed in 0.9.0. `--block-order preserve` keeps comments, strings, preambles,
 and raw source in place as barriers while sorting entry runs (a comment attached
 directly above an entry is not a barrier; it moves with its entry); the default
 `canonical` policy retains pynakes' metadata/JabRef placement convention.
@@ -793,7 +797,8 @@ To run some steps on some entries, name the steps with `--only` and the
 entries with `--key` or `--where`.
 
 The steps are `metadata`, `drop-fields`, `titles`, `authors`, `dois`, `pages`,
-`journals`, `save-actions`, `months`, `identifier-case`, `sort`, and `keys`. A
+`journals`, `save-actions`, `months`, `identifier-case`, `sort` (deprecated:
+use `format --entry-order`), and `keys`. A
 step left out reports why under `operations.skipped`. A selection never re-sorts
 the file or rearranges its metadata, since those act on the file as a whole, and
 `--sort-by` or `--metadata-formatting` given with a selection is refused. So is a

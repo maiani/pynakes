@@ -97,6 +97,17 @@ _SEARCH_QUERY_GRAMMAR = {
 # in the named release. Empty once nothing is being retired.
 _DEPRECATIONS = [
     {
+        "command": "normalize",
+        "old": "--sort-by",
+        "new": "format --entry-order SPEC (or profile)",
+        "removal": "0.9.0",
+        "note": "Sorting by the library's sort-order or saveOrderConfig leaves normalize "
+        "too, with the same warning. Entry order is layout, which format owns. "
+        "format --entry-order takes "
+        "preserve, key, profile (sort-order, else JabRef's saveOrderConfig), or a sort "
+        "spec such as author,year:desc. format also rewrites each entry's layout.",
+    },
+    {
         "command": "search",
         "old": "--in-field",
         "new": "--in and --select",
@@ -543,7 +554,7 @@ def get_capabilities() -> dict:
             "metadata": "Inspect and update top-level library metadata "
             "(list, set, remove, adopt-jabref)",
             "normalize": "Normalize entries (titles, authors, journals, DOIs, "
-            "identifier case, ordering) per the library's configured settings",
+            "identifier case, keys) per the library's configured settings",
             "format": "Lint, then rewrite bibliography layout with portable profile settings "
             "and explicit policy overrides",
             "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "

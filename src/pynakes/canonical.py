@@ -29,7 +29,12 @@ from pynakes._entry_comments import (
 from pynakes.bibtex_parser import parse_bib, parse_raw_string_definition
 from pynakes.bibtex_writer import _quote_field_value, render_entry
 from pynakes.editing import raw_field_names
-from pynakes.metadata import library_sort_order, metadata_bool, metadata_value
+from pynakes.metadata import (
+    library_sort_order,
+    metadata_bool,
+    metadata_value,
+    parse_sort_order_value,
+)
 from pynakes.model import BibEntry, BibFile
 
 __all__ = [
@@ -51,13 +56,17 @@ __all__ = [
     "format_selected_entries",
     "layout_from_metadata",
     "resolve_entry_type_case",
+    "entry_order_criteria",
+    "validate_entry_order",
     "validate_format_input",
     "write_bib_canonical",
 ]
 
 Alignment = Literal["compact", "equals"]
 FieldOrder = Literal["preferred", "preserve", "alphabetical"]
-EntryOrder = Literal["preserve", "key", "profile"]
+#: ``preserve``, ``key``, ``profile``, or an explicit sort spec such as
+#: ``author,year:desc`` (the ``sort-order`` metadata grammar).
+EntryOrder = str
 BlockOrder = Literal["preserve", "canonical"]
 EntryTypeCase = Literal["lower", "preserve"]
 WrapValues = Literal["off", "stable", "canonical"]
@@ -98,7 +107,7 @@ class CanonicalLayout:
             raise ValueError("format indent must be a non-empty string")
         _validate_choice("alignment", self.alignment, ALIGNMENTS)
         _validate_choice("field order", self.field_order, FIELD_ORDERS)
-        _validate_choice("entry order", self.entry_order, ENTRY_ORDERS)
+        validate_entry_order(self.entry_order)
         _validate_choice("block order", self.block_order, BLOCK_ORDERS)
         _validate_choice("wrap-values mode", self.wrap_values, WRAP_VALUE_MODES)
         _validate_choice("entry-type case", self.entry_type_case, ENTRY_TYPE_CASES)
@@ -145,6 +154,43 @@ def validate_format_input(lib: BibFile) -> list:
     if errors:
         raise FormatLintError(errors)
     return issues
+
+
+def validate_entry_order(value: str) -> None:
+    """Accept a named entry order or a ``field[:asc|desc],...`` sort spec.
+
+    Raises:
+        ValueError: naming the accepted forms.
+    """
+    if value in ENTRY_ORDERS:
+        return
+    criteria = parse_sort_order_value(value)
+    directions = {"", "asc", "ascending", "desc", "descending"}
+    tokens = [token.strip() for token in value.split(",")]
+    if (
+        not criteria
+        or any(not token.partition(":")[0].strip() for token in tokens)
+        or any(token.partition(":")[2].strip().lower() not in directions for token in tokens)
+    ):
+        raise ValueError(
+            f"Invalid entry order {value!r}: expected one of {', '.join(ENTRY_ORDERS)}, "
+            "or a sort spec such as 'author,year:desc'"
+        )
+
+
+def entry_order_criteria(lib: BibFile, entry_order: str) -> list[tuple[str, bool]]:
+    """Return the ``(field, descending)`` sort criteria an entry order means.
+
+    ``profile`` reads the library's ``sort-order`` (else JabRef's
+    ``saveOrderConfig``); an empty list keeps the current order.
+    """
+    if entry_order == "preserve":
+        return []
+    if entry_order == "key":
+        return [("key", False)]
+    if entry_order == "profile":
+        return list(library_sort_order(lib) or [])
+    return parse_sort_order_value(entry_order) or []
 
 
 def _metadata_choice(lib: BibFile, key: str, default: str, choices: tuple[str, ...]) -> str:
@@ -447,11 +493,7 @@ def _ordered_entries(
     entries: list[BibEntry] | None = None,
 ) -> list[BibEntry]:
     selected = list(lib.entries.values()) if entries is None else list(entries)
-    if layout.entry_order == "preserve":
-        return selected
-    criteria = (
-        [("key", False)] if layout.entry_order == "key" else list(library_sort_order(lib) or [])
-    )
+    criteria = entry_order_criteria(lib, layout.entry_order)
     if not criteria:
         return selected
 

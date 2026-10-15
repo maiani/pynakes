@@ -55,7 +55,7 @@ to find the operation module that owns a key.
 | Key | Category | Values | Used by | Jabref equivalent |
 | --- | --- | --- | --- | --- |
 | `dialect` | library | `bibtex` or `biblatex`; aliases JabRef's `databaseType` (read native-first) | engine, `lint`, importer | `databaseType` |
-| `sort-order` | save | Sort criteria, same token grammar as `--sort-by` (e.g. `year:desc,author`); aliases JabRef's `saveOrderConfig` (read native-first) | `normalize` | `saveOrderConfig` |
+| `sort-order` | save | Sort criteria, same token grammar as `format --entry-order` specs (e.g. `year:desc,author`); aliases JabRef's `saveOrderConfig` (read native-first) | `format --entry-order profile` (and, deprecated, `normalize`) | `saveOrderConfig` |
 | `key-pattern` | citation-key | Default citation-key pattern (e.g. `[auth][year][veryshorttitle]`); aliases JabRef's `keypatterndefault` (read native-first) | `keys`, `lint` | `keypatterndefault` |
 | `key-pattern-<entrytype>` | citation-key | Per-entry-type key pattern; aliases JabRef's `keypattern_<entrytype>` (read native-first) | `keys`, `lint` | `keypattern_<entrytype>` |
 | `normalize-protect-titles` | normalization | Boolean; default `true` for `normalize`; `lint` checks it when stored | `normalize`, `lint` | — |
@@ -129,7 +129,7 @@ equivalent). A pynakes-native library needs none of them.
 | `keypatterndefault` | `key-pattern` | Citation-key generation and `lint` key-pattern conformance |
 | `keypattern_<entrytype>` | `key-pattern-<entrytype>` | Per-entry-type key generation and `lint` conformance; overrides the default |
 | `databaseType` | `dialect` | engine, `lint`, importer |
-| `saveOrderConfig` | `sort-order` (only its `specified` form) | `normalize` |
+| `saveOrderConfig` | `sort-order` (only its `specified` form) | `format --entry-order profile` (and, deprecated, `normalize`) |
 | `grouping` / `groupsTree` / `groups:N ...` (flat) | `group-tree` | `groups tree`/`add-group`/etc — see [Grouping](#grouping) |
 | `saveActions` | *(no native equivalent)* | `normalize` author, DOI, and field-formatter defaults |
 

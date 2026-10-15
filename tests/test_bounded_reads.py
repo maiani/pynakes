@@ -398,5 +398,5 @@ def test_in_field_cannot_be_mixed_with_its_replacements(fixtures_dir: Path) -> N
 def test_capabilities_list_the_deprecation() -> None:
     from pynakes.capabilities import get_capabilities
 
-    (deprecation,) = get_capabilities()["deprecations"]
-    assert (deprecation["command"], deprecation["old"]) == ("search", "--in-field")
+    listed = {(item["command"], item["old"]) for item in get_capabilities()["deprecations"]}
+    assert ("search", "--in-field") in listed
