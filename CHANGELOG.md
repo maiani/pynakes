@@ -144,6 +144,9 @@ comparison context for it, and save the selection for later.
 
 ### Fixed
 
+- Sorting entries (`normalize --sort-by`, `format --entry-order`) could swap
+  two entries sharing a citation key, changing which one BibTeX reads. Entries
+  sharing a key now keep their relative order.
 - A PDF served by arXiv was stored as the published PDF when a DOI route led
   to it; it is now stored as the preprint, and publisher copies are tried
   first. An arXiv DOI (`10.48550/arXiv.*`) is read as the arXiv id it encodes

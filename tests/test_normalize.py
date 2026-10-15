@@ -576,3 +576,23 @@ def test_jabref_style_dots_each_initial_of_a_spaced_given_name() -> None:
         normalize_name_list("Newton, I and Euler, L P and Gauss, C. F.")
         == "Newton, I. and Euler, L. P. and Gauss, C. F."
     )
+
+
+def test_sorting_keeps_entries_sharing_a_key_in_order() -> None:
+    from pynakes.bibtex_parser import parse_bib
+    from pynakes.normalize import sort_entries
+
+    lib = parse_bib(
+        "@book{Euler, title = {First}, year = {1700}}\n\n"
+        "@book{Gauss, title = {Between}, year = {1750}}\n\n"
+        "@book{Euler, title = {Second}, year = {1800}}\n"
+    )
+
+    sort_entries(lib, [("year", True)])
+
+    # BibTeX reads the first Euler, so it must stay first; the others still sort.
+    assert [entry.fields["title"] for entry in lib.entries.values()] == [
+        "First",
+        "Between",
+        "Second",
+    ]

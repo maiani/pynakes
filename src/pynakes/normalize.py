@@ -588,15 +588,34 @@ def sort_entries(lib: BibFile, criteria: list[tuple[str, bool]]) -> int:
     primary sort. Implemented as successive stable sorts from the least- to the
     most-significant criterion, so per-criterion ascending/descending is honored
     independently. After sorting, crossref parents are placed after all of their
-    children (a BibTeX 0.99 processing requirement). Returns the number of entries.
+    children (a BibTeX 0.99 processing requirement). Entries sharing a citation
+    key keep their relative order: BibTeX uses the first, so reordering them
+    would change which record a citation reaches. Returns the number of entries.
     """
+    before = list(lib.entries.values())
     for field_name, descending in reversed(criteria):
         lib.entries.reorder(
             lambda entry, f=field_name: _entry_sort_key(entry, f),
             reverse=descending,
         )
+    lib.entries.set_order(_keep_duplicate_order(before, list(lib.entries.values())))
     _sink_crossref_parents(lib)
     return len(lib.entries)
+
+
+def _keep_duplicate_order(before: list[BibEntry], after: list[BibEntry]) -> list[BibEntry]:
+    """Return ``after`` with each duplicated key's entries back in ``before`` order.
+
+    The duplicates keep the positions the sort gave them; only which of them
+    sits in each position is restored, so the one BibTeX reads stays first.
+    """
+    by_key: dict[str, list[BibEntry]] = {}
+    for entry in before:
+        by_key.setdefault(entry.key, []).append(entry)
+    queues = {key: iter(group) for key, group in by_key.items() if len(group) > 1}
+    if not queues:
+        return after
+    return [next(queues[entry.key]) if entry.key in queues else entry for entry in after]
 
 
 def _sink_crossref_parents(lib: BibFile) -> None:
