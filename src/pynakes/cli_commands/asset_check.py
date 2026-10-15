@@ -24,10 +24,25 @@ from pynakes.filestore import FileStore, FileStoreScan
 
 
 def _files_check_one(file: str, root: list[str] | None) -> CheckOutcome:
-    coll = Bibliography.open(file)
+    return asset_check_collection(Bibliography.open(file), file, root)
+
+
+def asset_check_collection(
+    coll: Bibliography,
+    file: str,
+    root: list[str] | None = None,
+    location: str | Path | None = None,
+) -> CheckOutcome:
+    """Build the `asset check` report for an already opened bibliography.
+
+    ``location`` is where the library lives (default ``file``): relative
+    ``file`` links and ``pinax-files-dir`` resolve from it, so a copy of the
+    library reports the materials of the original.
+    """
     lib = coll.lib
-    report = files_ops.check_linked_files(lib, file, root)
-    store = FileStore.from_metadata(lib, file)
+    where = location if location is not None else file
+    report = files_ops.check_linked_files(lib, where, root)
+    store = FileStore.from_metadata(lib, where)
     pinax = store.scan_entries(lib.entries.values()) if store is not None else None
     misclassified = (
         misclassified_published(store, lib.entries.values()) if store is not None else []

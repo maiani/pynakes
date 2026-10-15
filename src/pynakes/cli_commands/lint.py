@@ -43,10 +43,13 @@ def _lint_collection(
     min_severity: str = "info",
     summary_only: bool = False,
     types: frozenset[str] = frozenset(),
+    location: str | Path | None = None,
 ) -> CheckOutcome:
     """Build the same lint report for an already opened bibliography.
 
-    ``min_severity`` and ``types`` narrow the report as ``categories`` does. ``summary_only``
+    ``min_severity`` and ``types`` narrow the report as ``categories`` does.
+    ``location`` is where the library lives (default ``file``), for the checks
+    that resolve paths relative to it. ``summary_only``
     leaves the per-finding list out and says so (``issues_omitted``); every
     count, ``by_type`` included, still covers each finding reported.
     """
@@ -54,7 +57,8 @@ def _lint_collection(
     # The command line adds to the library's own `lint-ignore`; it never
     # re-enables what the library ignores. `ignore` directives above an entry
     # waive that entry's findings.
-    issues, suppressed = suppress_findings(lib, lint_lib(lib, base_dir=Path(file).parent), ignores)
+    base_dir = Path(location if location is not None else file).parent
+    issues, suppressed = suppress_findings(lib, lint_lib(lib, base_dir=base_dir), ignores)
     if categories:
         issues = [issue for issue in issues if issue.category in categories]
     if types:

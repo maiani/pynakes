@@ -116,6 +116,11 @@ comparison context for it, and save the selection for later.
 - `corpus split --route` rules resolve `used`/`unused` against the linked
   `tex-sources` when no `--tex`/`--aux` is given.
 - A read no longer re-parses the library to report an empty change plan.
+- `inspect --insights` also returns the `tex scan` and `asset check`
+  envelopes from the same snapshot, so a client draws a library from one
+  process and one parse. `inspect --origin PATH` names where the library is
+  saved when FILE is a copy (an editor's unsaved buffer): `tex-sources`,
+  `pinax-files-dir`, and relative `file` links resolve from there.
 - `lint` scans each entry's source once rather than once per check and field,
   and parses each author list once for key-pattern checks: about a fifth
   faster on a 3,000-entry library.

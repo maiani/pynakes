@@ -44,6 +44,42 @@ from pynakes.usage import (
 
 # --- tex scan --------------------------------------------------------------
 
+_NO_SOURCES = "No sources given and no 'tex-sources' metadata to fall back to"
+
+
+def linked_scan_result(coll: Bibliography, file: str, location: str | Path) -> dict:
+    """Return the `tex scan --json` envelope for the library's linked sources.
+
+    The read-only scan `inspect --insights` reports beside the rest of the
+    snapshot. ``location`` is where the library lives, so its relative
+    ``tex-sources`` resolve from there even when ``file`` is a copy. A library
+    with no linked sources on disk is the ``NoSources`` error envelope.
+    """
+    linked = tex_sources_from_metadata(coll.lib, Path(location).parent)
+    existing, warnings = resolve_existing_tex_sources(linked)
+    if not existing:
+        return {"status": "error", "error": "NoSources", "message": _NO_SOURCES}
+    occurrences, include_all, scanned = collect_citation_occurrences(existing)
+    report = analyze_usage(
+        coll.lib, set(occurrences), include_all=include_all, sources=scanned, usages=occurrences
+    )
+    return {
+        "status": "success",
+        "action": "tex_scan",
+        "file": file,
+        "dry_run": False,
+        "modified": False,
+        "modified_entries": 0,
+        "warnings": warnings,
+        "plan": coll.change_plan(),
+        "source_sha256": _source_sha256(coll),
+        "out": None,
+        "written": False,
+        "report": report.to_dict(),
+        "tagged": None,
+        "exported": None,
+    }
+
 
 def scan(
     file: str | None = bib_file_argument(),
@@ -123,11 +159,7 @@ def scan(
         resolved_sources, missing = resolve_existing_tex_sources(resolved_sources)
         warnings.extend(missing)
     if not resolved_sources:
-        _emit_error(
-            json_output,
-            "NoSources",
-            "No sources given and no 'tex-sources' metadata to fall back to",
-        )
+        _emit_error(json_output, "NoSources", _NO_SOURCES)
         return
     occurrences, include_all, scanned = collect_citation_occurrences(resolved_sources)
     if out:

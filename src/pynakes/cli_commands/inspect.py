@@ -62,7 +62,14 @@ def inspect(
     insights: bool = typer.Option(
         False,
         "--insights",
-        help="Include group hierarchy, membership, and lint in JSON from the same snapshot",
+        help="Include group hierarchy, membership, lint, linked-TeX citations, and material "
+        "state in JSON, all from the same snapshot",
+    ),
+    origin: str | None = typer.Option(
+        None,
+        "--origin",
+        help="Where the library is saved, when FILE is a copy of it (an editor's unsaved "
+        "buffer): tex-sources, pinax-files-dir, and relative file links resolve from there",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
@@ -78,14 +85,19 @@ def inspect(
     projection for a UI, never a value to write back. Cleaning is applied to
     the resolved fields when `--resolved` is also given, otherwise to the
     entry's own fields. With `--insights`, JSON also includes independent
-    group hierarchy, membership, and advisory lint envelopes computed from
-    the same parsed snapshot. Supplementary failures do not hide inspection.
+    group hierarchy, membership, lint, `tex scan`, and `asset check`
+    envelopes computed from the same parsed snapshot, so a client draws a
+    library from one process and one parse. Supplementary failures do not
+    hide inspection. `--origin` names where the library really lives when
+    FILE is a copy, so its relative paths resolve as they would for the
+    original.
     """
     file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
     lib = coll.lib
     duplicates = lib.entries.duplicate_keys()
-    store = FileStore.from_metadata(lib, file)
+    location = origin if origin is not None else file
+    store = FileStore.from_metadata(lib, location)
 
     if json_output:
         entries = []
@@ -133,7 +145,7 @@ def inspect(
                 "manifest": str(store.manifest_path),
             }
         if insights:
-            result["insights"] = inspect_insights(coll, file)
+            result["insights"] = inspect_insights(coll, file, location)
         _emit_json(result)
         return
 

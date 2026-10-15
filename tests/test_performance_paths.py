@@ -84,13 +84,19 @@ def test_shared_resolver_preserves_independent_expansions():
 
 def test_insights_match_individual_reads_and_open_once(tmp_path, monkeypatch):
     path = tmp_path / "library.bib"
-    path.write_text("@book{Newton1687,title={Principia},year={1687},groups={Classics}}")
+    path.write_text(
+        "@comment{pynakes-meta:\ntex-sources: paper.tex\n}\n\n"
+        "@book{Newton1687,title={Principia},year={1687},groups={Classics}}"
+    )
+    (tmp_path / "paper.tex").write_text("\\cite{Newton1687}\n")
     runner = CliRunner()
     expected = {}
     for name, command in (
         ("groups_tree", ["groups", "tree"]),
         ("groups_list", ["groups", "list"]),
         ("lint", ["lint"]),
+        ("tex_scan", ["tex", "scan"]),
+        ("asset_check", ["asset", "check"]),
     ):
         result = runner.invoke(app, [*command, str(path), "--json"])
         assert result.exit_code == 0, result.output
@@ -115,7 +121,7 @@ def test_insights_failure_keeps_inspection(tmp_path, monkeypatch):
     path = tmp_path / "library.bib"
     path.write_text("@book{Newton1687,title={Principia}}")
 
-    def fail(*args):
+    def fail(*args, **kwargs):
         raise ValueError("Invalid supplementary data")
 
     monkeypatch.setattr(_inspect_insights, "_lint_collection", fail)
@@ -125,3 +131,31 @@ def test_insights_failure_keeps_inspection(tmp_path, monkeypatch):
     assert data["entries"][0]["key"] == "Newton1687"
     assert data["insights"]["lint"]["error"] == "InvalidInput"
     assert data["insights"]["groups_tree"]["status"] == "success"
+
+
+def test_origin_resolves_a_copy_against_the_original(tmp_path):
+    library = tmp_path / "project" / "library.bib"
+    library.parent.mkdir()
+    library.write_text(
+        "@comment{pynakes-meta:\ntex-sources: paper.tex\n}\n\n"
+        "@book{Newton1687,title={Principia}}\n\n@book{Euler1748,title={Introductio}}\n"
+    )
+    (library.parent / "paper.tex").write_text("\\cite{Euler1748}\n")
+    # An editor's unsaved buffer, mirrored somewhere else with an entry added.
+    mirror = tmp_path / "mirror" / "buffer.bib"
+    mirror.parent.mkdir()
+    mirror.write_text(library.read_text() + "\n@book{Gauss1801,title={Disquisitiones}}\n")
+    runner = CliRunner()
+
+    alone = json.loads(runner.invoke(app, ["inspect", str(mirror), "--insights", "--json"]).output)
+    located = json.loads(
+        runner.invoke(
+            app, ["inspect", str(mirror), "--insights", "--origin", str(library), "--json"]
+        ).output
+    )
+
+    assert alone["insights"]["tex_scan"]["error"] == "NoSources"
+    report = located["insights"]["tex_scan"]["report"]
+    assert report["used"] == ["Euler1748"]
+    # The buffer's own entries are scanned, the unsaved one included.
+    assert sorted(report["unused"]) == ["Gauss1801", "Newton1687"]
