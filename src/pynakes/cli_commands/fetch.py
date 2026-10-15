@@ -3,6 +3,8 @@
 Downloads arXiv materials (PDF and source) into the configured Pinax directory.
 """
 
+import json
+import sys
 from enum import Enum
 
 import typer
@@ -19,7 +21,7 @@ from rich.progress import (
 from rich.text import Text
 
 from pynakes.cli_checks import strict_option
-from pynakes.cli_choices import Material
+from pynakes.cli_choices import Material, ProgressStream
 from pynakes.cli_commands._fetch_report import fetch_report_lines
 from pynakes.cli_commands._rich_progress import RichProgressBase
 from pynakes.cli_common import (
@@ -139,6 +141,28 @@ class _RichFetchProgress(RichProgressBase):
                 self._progress.remove_task(task_id)
 
 
+class _JsonLinesProgress:
+    """Write each fetch event as one JSON object per line on stderr (``--progress jsonl``).
+
+    Byte-level ``artifact_progress`` events are left out: the stream says which
+    entry and material the run is on, what each one came to, and when it waits
+    to retry, not how many bytes each chunk held. Every line is flushed, so a
+    reader sees it as soon as it is written, and stdout keeps the final envelope.
+    """
+
+    def __enter__(self) -> "_JsonLinesProgress":
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        return None
+
+    def __call__(self, event: FetchProgressEvent) -> None:
+        if event.kind == "artifact_progress":
+            return
+        sys.stderr.write(json.dumps(event.to_dict(), ensure_ascii=False) + "\n")
+        sys.stderr.flush()
+
+
 #: The fetch-policy flag each ``--material`` sets.
 MATERIALS = {
     Material.PREPRINT: "preprint",
@@ -173,6 +197,19 @@ def fetch(
         "--access",
         help="Publisher access context: open or institutional (uses existing network access)",
     ),
+    discover: bool = typer.Option(
+        False,
+        "--discover",
+        help="When a preprint is needed and the entry has a DOI but no arXiv id, look one up "
+        "(OpenAlex, then Semantic Scholar), check it against arXiv's record, and use and "
+        "record a confirmed id (eprint, only when the entry has none)",
+    ),
+    progress_stream: ProgressStream = typer.Option(
+        ProgressStream.AUTO,
+        "--progress",
+        help="Progress while the run lasts: auto (a bar on a terminal, nothing with --json), "
+        "jsonl (one JSON event per line on stderr, also with --json), or none",
+    ),
     where: str | None = where_option(),
     key: list[str] | None = key_option(),
     strict: bool = strict_option(
@@ -185,8 +222,9 @@ def fetch(
 
     With no citation key every entry with configured missing materials is
     fetched; `--key` / `--where` fetch for the selected entries only. The
-    result is reported in full either way; `--strict` then exits 1 when the
-    run was incomplete.
+    result is reported in full either way; `coverage` says which requested
+    PDFs are still missing and why, and `--strict` then exits 1 when the run
+    was incomplete. Rerunning fetches only what is still missing.
     """
     params = RunParams(
         dry_run=dry_run,
@@ -217,7 +255,12 @@ def fetch(
     _check_expected_sha256(file, coll, params)
     selected = select_keys(coll, where, key, json_output, "asset_fetch")
 
-    if params.json_output:
+    progress: _RichFetchProgress | _JsonLinesProgress | None = None
+    if progress_stream is ProgressStream.JSONL:
+        progress = _JsonLinesProgress()
+    elif progress_stream is ProgressStream.AUTO and not params.json_output:
+        progress = _RichFetchProgress()
+    if progress is None:
         report = coll.fetch_materials(
             target=target,
             keys=selected,
@@ -225,9 +268,10 @@ def fetch(
             dry_run=params.dry_run,
             cache_file=cache_file,
             access=access.value,
+            discover=discover,
         )
     else:
-        with _RichFetchProgress() as progress:
+        with progress:
             report = coll.fetch_materials(
                 target=target,
                 keys=selected,
@@ -236,6 +280,7 @@ def fetch(
                 cache_file=cache_file,
                 progress=progress,
                 access=access.value,
+                discover=discover,
             )
 
     human = fetch_report_lines(report)
@@ -260,9 +305,12 @@ def fetch(
         fetch_policy=report["fetch_policy"],
         strict=strict,
         summary=summary,
+        coverage=report["coverage"],
+        complete=report["coverage"]["complete"] and not summary["failed"],
         fetched=report["fetched"],
         skipped=report["skipped"],
         failed=report["failed"],
+        discovered=report["discovered"],
     )
     if strict and incomplete:
         raise typer.Exit(code=1)

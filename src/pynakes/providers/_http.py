@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import email.utils
 import json
+import threading
 import time
 from collections.abc import Callable, Mapping
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
 from urllib.request import Request as _UrllibRequest
 
 import httpx
@@ -42,6 +45,45 @@ RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 MAX_ATTEMPTS = 3
 BACKOFF_SECONDS = (1.0, 4.0)
 MAX_RETRY_AFTER = 30.0
+
+# The least time between two requests to one provider's API host, in seconds,
+# whatever the caller's concurrency: each provider's published guidance for
+# unauthenticated clients, rounded to stay under it. A throttle the provider
+# still answers with goes through the retry above; pacing makes it rare.
+PROVIDER_MIN_INTERVAL: dict[str, float] = {
+    "api.crossref.org": 0.25,
+    "api.openalex.org": 0.12,
+    "api.semanticscholar.org": 1.1,
+    "export.arxiv.org": 3.0,
+}
+
+#: Told about each wait before a retry: ``(message, delay_seconds, next_attempt)``.
+#: A caller that reports progress sets it for the duration of its run.
+RETRY_LISTENER: ContextVar[Callable[[str, float, int], None] | None] = ContextVar(
+    "pynakes_retry_listener", default=None
+)
+
+_pace_lock = threading.Lock()
+_next_slot: dict[str, float] = {}
+
+
+def pace(url: str, *, sleep: Callable[[float], None] = time.sleep) -> None:
+    """Wait until *url*'s provider host may be asked again (see :data:`PROVIDER_MIN_INTERVAL`).
+
+    Slots are reserved under a lock and waited for outside it, so concurrent
+    workers queue for one host without blocking requests to another.
+    """
+    host = (urlsplit(url).hostname or "").lower()
+    interval = PROVIDER_MIN_INTERVAL.get(host)
+    if interval is None:
+        return
+    with _pace_lock:
+        now = time.monotonic()
+        slot = max(now, _next_slot.get(host, now))
+        _next_slot[host] = slot + interval
+    if slot > now:
+        sleep(slot - now)
+
 
 # Bytes requested per read from an injected opener's response.
 READ_CHUNK = 64 * 1024
@@ -123,6 +165,9 @@ def _with_retry(
             delay = _retry_delay(attempt, exc.retry_after)
             if time.monotonic() + delay >= deadline:
                 raise _give_up(exc, error_class, "Network deadline exceeded") from exc
+            listener = RETRY_LISTENER.get()
+            if listener is not None:
+                listener(str(exc), delay, attempt + 2)
             sleep(delay)
     assert last is not None
     raise _give_up(last, error_class, str(last))
@@ -142,7 +187,14 @@ def _give_up(last: _Transient, error_class: type[Exception], message: str) -> Ex
 
 
 class ProviderFetchError(Exception):
-    """Raised when an external provider response cannot be fetched or parsed."""
+    """Raised when an external provider response cannot be fetched or parsed.
+
+    ``status`` is the HTTP status that failed the request, when there was one,
+    and ``retry_after`` the delay the provider asked for, in seconds.
+    """
+
+    status: int | None = None
+    retry_after: float | None = None
 
 
 class ProviderRateLimitedError(ProviderFetchError):
@@ -213,6 +265,7 @@ def fetch_bytes(
     if opener is None:
 
         def attempt() -> bytes:
+            pace(url)
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise error_class("Network deadline exceeded")
@@ -482,6 +535,10 @@ def fetch_json(
     return data if isinstance(data, dict) else None
 
 
+class _NotFound(Exception):
+    """Internal signal: the provider has no record (HTTP 404), which is an answer."""
+
+
 def _fetch_text(
     url: str,
     *,
@@ -490,9 +547,70 @@ def _fetch_text(
     opener: Callable[..., object] | None,
     timeout: float,
     headers: Mapping[str, str] | None,
+    sleep: Callable[[float], None] | None = None,
 ) -> str | None:
+    """Fetch one metadata lookup, retrying throttles and server errors like ``fetch_bytes``.
+
+    A provider still answering HTTP 429 after every retry raises
+    :class:`ProviderRateLimitedError`, so a caller can report the record as not
+    checked rather than as absent. ``None`` means the provider has no record.
+    """
     deadline = time.monotonic() + DEFAULT_DEADLINE
+
+    def attempt() -> bytes:
+        try:
+            text = _fetch_text_once(
+                url,
+                provider=provider,
+                identifier=identifier,
+                opener=opener,
+                timeout=timeout,
+                headers=headers,
+                deadline=deadline,
+            )
+        except ProviderFetchError as exc:
+            if exc.status in RETRY_STATUSES:
+                raise _Transient(str(exc), exc.retry_after, status=exc.status) from exc
+            raise
+        if text is None:
+            raise _NotFound
+        return text.encode("utf-8")
+
+    try:
+        data = _with_retry(
+            attempt, error_class=ProviderFetchError, sleep=sleep or _sleep, deadline=deadline
+        )
+    except _NotFound:
+        return None
+    return data.decode("utf-8")
+
+
+# The wait between metadata retries; a module attribute so tests can replace it.
+_sleep = time.sleep
+
+
+def _status_error(
+    provider: str, identifier: str, status: int, retry_after: str | None
+) -> ProviderFetchError:
+    """Return the error for one HTTP status answer, carrying the status and any Retry-After."""
+    error = ProviderFetchError(f"{provider} lookup failed for {identifier!r}: HTTP {status}")
+    error.status = status
+    error.retry_after = _parse_retry_after(retry_after)
+    return error
+
+
+def _fetch_text_once(
+    url: str,
+    *,
+    provider: str,
+    identifier: str,
+    opener: Callable[..., object] | None,
+    timeout: float,
+    headers: Mapping[str, str] | None,
+    deadline: float,
+) -> str | None:
     if opener is None:
+        pace(url)
         return _fetch_text_httpx(
             url,
             provider=provider,
@@ -517,8 +635,8 @@ def _fetch_text(
     except HTTPError as exc:
         if exc.code == 404:
             return None
-        raise ProviderFetchError(
-            f"{provider} lookup failed for {identifier!r}: HTTP {exc.code}"
+        raise _status_error(
+            provider, identifier, exc.code, (exc.headers or {}).get("Retry-After")
         ) from exc
     except URLError as exc:
         reason = getattr(exc, "reason", exc)
@@ -565,8 +683,11 @@ def _fetch_text_httpx(
                     chunks.append(chunk)
                 return b"".join(chunks).decode("utf-8", errors="replace")
     except httpx.HTTPStatusError as exc:
-        raise ProviderFetchError(
-            f"{provider} lookup failed for {identifier!r}: HTTP {exc.response.status_code}"
+        raise _status_error(
+            provider,
+            identifier,
+            exc.response.status_code,
+            exc.response.headers.get("Retry-After"),
         ) from exc
     except (httpx.HTTPError, OSError, ValueError) as exc:
         if time.monotonic() >= deadline:

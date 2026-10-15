@@ -16,12 +16,14 @@ from pynakes._engine_fetch import build_fetch_queue, run_fetch_loop
 from pynakes._engine_helpers import metadata_fetch_policy
 from pynakes.fetch_progress import WOULD_FETCH, FetchProgress
 from pynakes.filestore import FILES_DIR_KEY
-from pynakes.metadata import FetchPolicy
+from pynakes.metadata import FetchPolicy, library_dialect
 
 if TYPE_CHECKING:
     from pynakes import metadata as metadata_ops
+    from pynakes._fetch_discovery import ArxivDiscovery
     from pynakes.filestore import FileStore
-    from pynakes.model import BibFile
+    from pynakes.model import BibEntry, BibFile
+    from pynakes.providers.repositories.arxiv import ArxivRecord
 
 
 def _anything_landed(fetched: list[dict], skipped: list[dict], dry_run: bool) -> bool:
@@ -106,6 +108,9 @@ class BibliographyMaterials:
         progress: FetchProgress | None = None,
         access: str = "open",
         keys: Collection[str] | None = None,
+        discover: bool = False,
+        arxiv_lookup: Callable[[str], str | None] | None = None,
+        arxiv_record_fetcher: Callable[[str], "ArxivRecord"] | None = None,
     ) -> dict:
         """Download selected arXiv, published, and supplementary materials for entries.
 
@@ -125,6 +130,11 @@ class BibliographyMaterials:
             progress: Optional callback receiving fetch progress events.
             access: Published-material access mode: ``open`` or ``institutional``.
             keys: Citation keys to fetch for, in place of ``target``; ``None`` for all.
+            discover: Look up a missing arXiv id by DOI when a preprint is needed,
+                check it against arXiv's record, and write a confirmed one to
+                the entry (``eprint`` and its archive field, only when empty).
+            arxiv_lookup: Injectable DOI-to-arXiv-id lookup for testing.
+            arxiv_record_fetcher: Injectable arXiv record fetcher for testing.
 
         Returns:
             A dict with ``fetched``, ``skipped``, ``failed`` lists, plus
@@ -134,7 +144,11 @@ class BibliographyMaterials:
             and dry-run ``planned``, and ``failed``), and ``warnings``: one
             ``download_failed`` object per failed download. A skipped or failed
             item for which a download was tried lists the requests in
-            ``attempts``.
+            ``attempts``. ``coverage`` says whether the PDFs the policy asks
+            for are now present: ``entries``, ``with_pdf``, ``without_pdf``,
+            ``missing`` (each entry still lacking one, with the reason this
+            run recorded) and ``complete``. ``discovered`` lists each arXiv-id
+            lookup ``discover`` made and its outcome.
         """
         if access not in {"open", "institutional"}:
             raise ValueError(f"Unknown fetch access mode: {access!r}")
@@ -170,6 +184,10 @@ class BibliographyMaterials:
             cache_file=cache_file,
             progress=progress,
             access=access,
+            discover=self._arxiv_discoverer(cache_file, arxiv_lookup, arxiv_record_fetcher)
+            if discover
+            else None,
+            dialect=library_dialect(self.lib),
         )
         if bootstrapped and not _anything_landed(run.fetched, run.skipped, dry_run):
             # The store was only ever needed to hold what this run fetched;
@@ -191,5 +209,31 @@ class BibliographyMaterials:
             "skipped": run.skipped,
             "failed": run.failed,
             "summary": run.summary(),
+            "coverage": run.coverage(entry_queue, store, resolved),
+            "discovered": run.discovered,
             "warnings": run.warnings,
         }
+
+    @staticmethod
+    def _arxiv_discoverer(
+        cache_file: str | Path | None,
+        lookup: Callable[[str], str | None] | None,
+        record_fetcher: Callable[[str], "ArxivRecord"] | None,
+    ) -> Callable[["BibEntry", str], "ArxivDiscovery"]:
+        """Bind the arXiv-id lookup and its check to this run's providers."""
+        from pynakes._fetch_discovery import discover_arxiv_id
+        from pynakes.providers.identity import resolve_arxiv_id_for_doi
+        from pynakes.providers.repositories import arxiv as arxiv_provider
+
+        def default_lookup(doi: str) -> str | None:
+            return resolve_arxiv_id_for_doi(doi, cache_file=cache_file)
+
+        def discover(entry: "BibEntry", doi: str) -> "ArxivDiscovery":
+            return discover_arxiv_id(
+                entry,
+                doi,
+                lookup=lookup or default_lookup,
+                record_fetcher=record_fetcher or arxiv_provider.fetch_record,
+            )
+
+        return discover

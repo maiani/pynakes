@@ -80,6 +80,14 @@ class LintCategory(StrEnum):
     PROFILE = "profile"
 
 
+class LintSeverity(StrEnum):
+    """``lint --severity``: the least severe finding to report."""
+
+    ERROR = "error"
+    WARNING = "warning"
+    INFO = "info"
+
+
 class GroupContext(StrEnum):
     """How a group's membership relates to its parent's (JabRef's hierarchical context)."""
 
@@ -111,6 +119,14 @@ class Material(StrEnum):
     SOURCE = "source"
     SUPPLEMENT = "supplement"
     BEST_PDF = "best-pdf"
+
+
+class ProgressStream(StrEnum):
+    """``asset fetch --progress``: how progress is reported while the run lasts."""
+
+    AUTO = "auto"
+    JSONL = "jsonl"
+    NONE = "none"
 
 
 class AnalysisSection(StrEnum):

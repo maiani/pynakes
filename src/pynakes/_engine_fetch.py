@@ -10,13 +10,23 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from pynakes._fetch_published import ARXIV_DOI_REASON
+from pynakes._identifiers import arxiv_id_from_doi, is_arxiv_doi, normalize_doi
 from pynakes.fetch_progress import WOULD_FETCH, FetchProgress, FetchProgressEvent
 from pynakes.metadata import FetchPolicy
 from pynakes.model import BibEntry, BibFile
 
 if TYPE_CHECKING:
+    from pynakes._fetch_discovery import ArxivDiscovery
     from pynakes.fetch import FetchAccess
     from pynakes.filestore import FileStore, MaterialPresence
+
+#: Looks up and checks one entry's arXiv id by its DOI (``asset fetch --discover``).
+DiscoverArxiv = Callable[[BibEntry, str], "ArxivDiscovery"]
+
+# Materials that are not a PDF of the work: a reason given for one of these
+# does not explain why an entry has no PDF.
+_NOT_THE_PDF = frozenset({"preprint_source", "supplement_pdf"})
 
 #: Where a skip names a missing arXiv id for an entry that has a DOI: the
 #: engine's existing DOI-to-arXiv backfill. Nothing attaches one automatically.
@@ -38,6 +48,7 @@ class FetchLoopResult:
     skipped: list[dict] = field(default_factory=list)
     failed: list[dict] = field(default_factory=list)
     warnings: list[dict] = field(default_factory=list)
+    discovered: list[dict] = field(default_factory=list)
     already_present: int = 0
     unavailable: int = 0
     planned: int = 0
@@ -53,6 +64,68 @@ class FetchLoopResult:
         self.failed.append(item)
         self.warnings.append(download_warning(item))
         return item
+
+    def coverage(
+        self, queue: list[BibEntry], store: "FileStore", policy: FetchPolicy
+    ) -> dict[str, object]:
+        """Say whether the requested PDFs are now in the store, entry by entry.
+
+        This answers the collection question that ``summary`` does not: an
+        operation can succeed while some entries still lack the PDF the policy
+        asks for. ``missing`` names each such entry, the material it lacks, and
+        the reason this run recorded for it. Source bundles and supplements are
+        not counted here; ``skipped`` and ``failed`` report them.
+        """
+        reasons = self._pdf_reasons()
+        with_pdf = 0
+        missing: list[dict[str, object]] = []
+        for entry in queue:
+            if not entry.key.strip():
+                missing.append({"key": entry.key, "materials": ["pdf"], "reason": "empty key"})
+                continue
+            presence = store.presence_for(entry.key)
+            has_pdf = presence.published_pdf or presence.preprint_pdf
+            with_pdf += bool(has_pdf)
+            lacking: list[str] = []
+            if policy.bestpdf and not has_pdf:
+                lacking.append("pdf")
+            if policy.published and not presence.published_pdf:
+                lacking.append("published_pdf")
+            if policy.preprint and not presence.preprint_pdf:
+                lacking.append("preprint_pdf")
+            if lacking:
+                missing.append(
+                    {
+                        "key": entry.key,
+                        "materials": lacking,
+                        "reason": reasons.get(entry.key, "not attempted"),
+                    }
+                )
+        return {
+            "entries": len(queue),
+            "with_pdf": with_pdf,
+            "without_pdf": len(queue) - with_pdf,
+            "missing": missing,
+            "complete": not missing,
+        }
+
+    def _pdf_reasons(self) -> dict[str, str]:
+        """The reason recorded for each key's PDF: a failure before a skip, discovery last."""
+        reasons: dict[str, str] = {}
+        for item in self.failed:
+            if item.get("artifact") not in _NOT_THE_PDF:
+                reasons.setdefault(item["key"], str(item["error"]))
+        for item in self.skipped:
+            if item.get("artifact") not in _NOT_THE_PDF:
+                reasons.setdefault(item["key"], str(item["reason"]))
+        for item in self.discovered:
+            if item["status"] != "linked":
+                lookup = f"arXiv id lookup: {item['status']}"
+                if item.get("message"):
+                    lookup = f"{lookup} ({item['message']})"
+                key = str(item["key"])
+                reasons[key] = f"{reasons[key]}; {lookup}" if key in reasons else lookup
+        return reasons
 
     def summary(self) -> dict[str, int]:
         """Return the envelope's ``summary`` counts."""
@@ -150,6 +223,8 @@ def run_fetch_loop(
     cache_file: str | Path | None = None,
     progress: FetchProgress | None = None,
     access: str = "open",
+    discover: DiscoverArxiv | None = None,
+    dialect: str = "bibtex",
 ) -> FetchLoopResult:
     """Iterate *entry_queue* and download materials into *store*.
 
@@ -160,8 +235,77 @@ def run_fetch_loop(
     ``policy.bestpdf`` means "try published PDF first, fall back to preprint
     PDF when no open-access copy is available".
 
+    A DOI under arXiv's own prefix (``10.48550/arXiv.*``) is read as the arXiv
+    id it encodes, never as a published version. With *discover*, an entry
+    that needs a preprint but has no arXiv id has one looked up by its DOI —
+    only once a published PDF could not be had, for ``best-pdf`` — and a
+    confirmed id is used and written to the entry (see
+    :mod:`pynakes._fetch_discovery`). Each lookup is reported in ``discovered``.
+
     Returns a :class:`FetchLoopResult`.
     """
+    from pynakes.providers._http import RETRY_LISTENER
+
+    run = FetchLoopResult(entries=len(entry_queue))
+    current = {"key": ""}
+
+    def heard_retry(message: str, delay: float, attempt: int) -> None:
+        _emit_fetch_progress(
+            progress,
+            FetchProgressEvent(
+                kind="retry", key=current["key"], message=message, retry_in=delay, attempt=attempt
+            ),
+        )
+
+    token = RETRY_LISTENER.set(heard_retry if progress is not None else None)
+    try:
+        _fetch_entries(
+            run,
+            entry_queue,
+            store,
+            policy,
+            dry_run,
+            current,
+            pdf_fetcher=pdf_fetcher,
+            source_fetcher=source_fetcher,
+            published_url_fetcher=published_url_fetcher,
+            institutional_url_fetcher=institutional_url_fetcher,
+            published_pdf_fetcher=published_pdf_fetcher,
+            supplement_url_fetcher=supplement_url_fetcher,
+            supplement_pdf_fetcher=supplement_pdf_fetcher,
+            cache_file=cache_file,
+            progress=progress,
+            access=access,
+            discover=discover,
+            dialect=dialect,
+        )
+    finally:
+        RETRY_LISTENER.reset(token)
+    return run
+
+
+def _fetch_entries(
+    run: FetchLoopResult,
+    entry_queue: list[BibEntry],
+    store: "FileStore",
+    policy: FetchPolicy,
+    dry_run: bool,
+    current: dict[str, str],
+    *,
+    pdf_fetcher: Callable[[str], bytes] | None,
+    source_fetcher: Callable[[str], bytes] | None,
+    published_url_fetcher: Callable[[str], str | None] | None,
+    institutional_url_fetcher: Callable[[str], str | None] | None,
+    published_pdf_fetcher: Callable[[str], bytes] | None,
+    supplement_url_fetcher: Callable[[str], tuple[str, ...]] | None,
+    supplement_pdf_fetcher: Callable[[str], bytes] | None,
+    cache_file: str | Path | None,
+    progress: FetchProgress | None,
+    access: str,
+    discover: DiscoverArxiv | None,
+    dialect: str,
+) -> None:
+    """The per-entry body of :func:`run_fetch_loop`, recording into *run*."""
     from pynakes.fetch import (
         ArxivFetchError,
         PublishedPdfFetchError,
@@ -172,7 +316,6 @@ def run_fetch_loop(
     )
     from pynakes.identity import entry_arxiv_id
 
-    run = FetchLoopResult(entries=len(entry_queue))
     fetched, skipped = run.fetched, run.skipped
     # ``Bibliography.fetch_materials`` has already rejected any other value.
     fetch_access = cast("FetchAccess", access)
@@ -194,13 +337,31 @@ def run_fetch_loop(
             continue
 
         key = entry.key
+        current["key"] = key
         _emit_fetch_progress(
             progress,
             FetchProgressEvent(kind="entry", key=key, entry_index=index, entry_total=entry_total),
         )
         arxiv_id = entry_arxiv_id(entry)
         doi = entry.fields.get("doi", "").strip()
+        arxiv_doi = is_arxiv_doi(doi)
+        if arxiv_doi:
+            # arXiv's own DOI names the preprint: it is an arXiv id, not a
+            # route to a published version.
+            arxiv_id = arxiv_id or arxiv_id_from_doi(normalize_doi(doi))
+            doi = ""
         presence = store.presence_for(key)
+        if (
+            discover is not None
+            and not dry_run
+            and arxiv_id is None
+            and doi
+            and (
+                (policy.preprint and not presence.preprint_pdf)
+                or (policy.source and not presence.preprint_source)
+            )
+        ):
+            arxiv_id = _discover(run, discover, entry, doi, dialect)
 
         can_fetch_preprint = bool(arxiv_id) and policy.preprint and not presence.preprint_pdf
         can_fetch_source = bool(arxiv_id) and policy.source and not presence.preprint_source
@@ -252,6 +413,8 @@ def run_fetch_loop(
             else:
                 reason = "materials already present"
                 kind = "already_present"
+            if arxiv_doi and missing_doi:
+                reason = f"{reason.replace('no DOI', 'no published DOI')}; {ARXIV_DOI_REASON}"
             run.skip({"key": key, "reason": reason}, kind)
             _emit_fetch_progress(
                 progress,
@@ -355,8 +518,27 @@ def run_fetch_loop(
                 )
             except PublishedPdfFetchError as exc:
                 pub_error = exc
+            landed_pdf = pub_result is not None and pub_result.pdf_path is not None
+            if (
+                not landed_pdf
+                and policy.bestpdf
+                and arxiv_id is None
+                and discover is not None
+                and not presence.preprint_pdf
+            ):
+                arxiv_id = _discover(run, discover, entry, doi, dialect)
             if pub_result is not None and pub_result.pdf_path is not None:
                 fetched.append(pub_result.to_dict())
+                if pub_result.artifact == "preprint_pdf" and not policy.bestpdf:
+                    # The copy found is the preprint: the published PDF is still missing.
+                    run.skip(
+                        {
+                            "key": key,
+                            "artifact": "published_pdf",
+                            "reason": pub_result.reason or "no published version found",
+                        },
+                        "unavailable",
+                    )
             elif policy.bestpdf and not presence.preprint_pdf and arxiv_id is not None:
                 # best-pdf: no published PDF, whether unavailable or failed, so
                 # the preprint is the best PDF there is.
@@ -447,7 +629,20 @@ def run_fetch_loop(
                 run.fail(key, exc, "supplement_pdf")
                 _emit_fail(progress, key, index, entry_total, exc)
 
-    return run
+
+def _discover(
+    run: FetchLoopResult, discover: DiscoverArxiv, entry: BibEntry, doi: str, dialect: str
+) -> str | None:
+    """Look up *entry*'s arXiv id, write a confirmed one, and return it (``None`` otherwise)."""
+    from dataclasses import replace
+
+    from pynakes._fetch_discovery import link_arxiv_id
+
+    found = discover(entry, doi)
+    if found.status == "linked" and found.arxiv_id is not None:
+        found = replace(found, written=link_arxiv_id(entry, found.arxiv_id, dialect))
+    run.discovered.append(found.to_dict())
+    return found.arxiv_id if found.status == "linked" else None
 
 
 def _planned_artifacts(

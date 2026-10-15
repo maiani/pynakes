@@ -149,6 +149,38 @@ _BOUNDED_READS = {
     "offline": True,
 }
 
+# Collecting PDFs for a bibliography, end to end, with what each step reports.
+_MATERIAL_COLLECTION = {
+    "fetch": "asset fetch --material best-pdf [--access institutional] [--discover] "
+    "[--progress jsonl] --json",
+    "completeness": "summary counts operations; coverage answers the collection question: "
+    "entries, with_pdf, without_pdf, missing (key, materials, reason) and complete. "
+    "The envelope's complete is false while a requested PDF is missing or a download failed.",
+    "progress": "--progress jsonl writes one JSON event per line on stderr (entry, "
+    "artifact_start, artifact_done, artifact_skip, skip, fail, retry with retry_in and "
+    "attempt); stdout keeps the final envelope, also with --json.",
+    "attempts": "Every request is recorded: stage resolve (DOI landing page, open-access "
+    "index; lookup and error name it) or download, with url, final_url, status, "
+    "content_type, outcome and retryable. Credentials are never recorded.",
+    "classification": "A PDF served by a preprint repository (arXiv) is stored as "
+    "preprint_pdf, never published_pdf; an arXiv DOI (10.48550/arXiv.*) is read as the "
+    "arXiv id it encodes. asset check reports misclassified files with their evidence "
+    "(source_host, arxiv_doi, pdf_arxiv_stamp); asset repair --reclassify moves them.",
+    "discovery": "--discover looks up a missing arXiv id by DOI when a preprint is needed "
+    "and checks it against arXiv's record: linked (used; eprint written only when absent), "
+    "ambiguous (reported, not used), not_found, or not_checked (with retryable).",
+    "resume": "Each material is recorded in the Pinax manifest as it lands; rerunning the "
+    "same command fetches only what is still missing.",
+    "reviewed_enrichment": "enrich --online --dry-run, then the same command with "
+    "--only-field NAMES --expect-sha256 <source_sha256> applies only the reviewed fields. "
+    "lookups.not_checked names entries whose lookup failed (never read as no match), "
+    "lookups.retry the arguments that rerun the retryable ones.",
+    "transfer": "corpus combine project.bib scratch.bib --out project.bib --force keeps the "
+    "project's pinax-files-dir and copies the scratch materials; --dry-run lists them "
+    "under pinax_materials.",
+    "compact_reads": "lint --summary / --severity; ref show --key K --select FIELDS "
+    "(abstracts only when selected); asset check coverage.",
+}
 _SAVED_QUERIES = {
     "storage": f"One pynakes-meta line per query: {SAVED_QUERY_PREFIX}NAME: EXPRESSION",
     "grammar": "The shared --where predicate grammar (see predicate_grammar).",
@@ -457,6 +489,11 @@ def get_capabilities() -> dict:
             "search_library",
             "bounded_reads",
             "include_materials_and_provenance",
+            "material_collection_coverage",
+            "fetch_progress_stream",
+            "discover_arxiv_ids",
+            "reclassify_materials",
+            "enrich_selected_fields",
             "saved_queries",
             "analyze_library",
             "detect_used_citations",
@@ -528,6 +565,7 @@ def get_capabilities() -> dict:
         "predicate_grammar": {"used_by": _selector_surfaces(schemas), **_PREDICATE_GRAMMAR},
         "search_query_grammar": _SEARCH_QUERY_GRAMMAR,
         "bounded_reads": _BOUNDED_READS,
+        "material_collection": _MATERIAL_COLLECTION,
         "deprecations": _DEPRECATIONS,
         "saved_queries": _SAVED_QUERIES,
         "analysis": _ANALYSIS,

@@ -76,6 +76,8 @@ Download Pinax materials, optionally using existing institutional network access
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--cache-file` | string | no | null | — | Keep provider responses in a reusable cache file at this path (safe to delete or .gitignore). Omit it and nothing is written to disk: responses are reused for this run only |
 | `--access` | choice | no | "open" | open, institutional | Publisher access context: open or institutional (uses existing network access) |
+| `--discover` | boolean | no | false | — | When a preprint is needed and the entry has a DOI but no arXiv id, look one up (OpenAlex, then Semantic Scholar), check it against arXiv's record, and use and record a confirmed id (eprint, only when the entry has none) |
+| `--progress` | choice | no | "auto" | auto, jsonl, none | Progress while the run lasts: auto (a bar on a terminal, nothing with --json), jsonl (one JSON event per line on stderr, also with --json), or none |
 | `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing. See `pynakes capabilities` for the full grammar. |
 | `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
 | `--strict` | boolean | no | false | — | Exit 1 when a requested material failed to download or was unavailable (materials already present pass) (for CI and pre-commit gating) |
@@ -94,6 +96,7 @@ Reconcile the Pinax manifest with the material files that exist.
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `--backup` | boolean | no | false | — | Also write manifest.json.bak (or the next free .bak.N) before reconciling |
+| `--reclassify` | boolean | no | false | — | Also move each published PDF that `asset check` reports as misclassified (a preprint, on recorded evidence) to the preprint path, with its manifest record |
 | `--dry-run` | boolean | no | false | — | Report the repairs without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff of the manifest |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
@@ -243,6 +246,7 @@ Conservatively fill missing metadata (modifies the file).
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `--online` | boolean | no | false | — | Fetch DOI provider metadata; otherwise only local DOI URLs are used |
 | `--published` | boolean | no | false | — | Also promote preprints to their published version, writing the published DOI/journal when one is available (requires --online) |
+| `--only-field` | list[string] | no | null | — | Apply only updates to these fields (repeatable or comma-separated; 'type' for an entry-type change), e.g. --only-field eprint,archiveprefix after reviewing a --dry-run |
 | `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing. See `pynakes capabilities` for the full grammar. |
 | `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
 | `--cache-file` | string | no | null | — | Keep provider responses in a reusable cache file at this path (safe to delete or .gitignore). Omit it and nothing is written to disk: responses are reused for this run only |
@@ -755,6 +759,8 @@ Validate entries and report issues (accepts multiple files for CI gating).
 | `--strict` | boolean | no | false | — | Exit 1 when any finding is left after lint-ignore, --ignore, and ignore directives (for CI and pre-commit gating) |
 | `--category` | list[choice] | no | — | correctness, content, formatting, consistency, profile | Report only these categories (repeatable) |
 | `--ignore` | list[string] | no | — | — | Leave out a finding type (missing_doi) or a whole category (consistency); repeatable, and added to the library's lint-ignore setting |
+| `--severity` | choice | no | "info" | error, warning, info | Report only findings at least this severe: error, warning, or info (all) |
+| `--summary` | boolean | no | false | — | Report counts (by severity, category and type) without listing each finding; the omitted count is reported as issues_omitted |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 
 ## metadata adopt-jabref

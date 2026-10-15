@@ -20,6 +20,9 @@ from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 #: HTTP error status, or a failure before any status (DNS, TLS, timeout, policy).
 ATTEMPT_OUTCOMES = ("pdf", "not_pdf", "http_error", "network_error")
 
+#: The step an attempt belongs to: finding a PDF link, or downloading the PDF.
+ATTEMPT_STAGES = ("resolve", "download")
+
 # APS article DOIs read ``10.1103/<JournalPrefix>.<volume>.<article>``. The
 # canonical PDF lives under the journal's short code on journals.aps.org; the
 # legacy ``link.aps.org`` redirector and plain-HTTP links to it are refused or
@@ -49,7 +52,45 @@ APS_JOURNAL_CODES: dict[str, str] = {
     "physicsphysiquefizika": "ppf",
 }
 
-_APS_DOI = re.compile(r"^10\.1103/([A-Za-z]+)\.", re.IGNORECASE)
+# DOI identity is case-insensitive, but the journals.aps.org PDF path is not:
+# ``/prb/pdf/10.1103/physrevb.1.1`` is a 404 where ``.../PhysRevB.1.1`` serves
+# the article. The canonical spelling of each journal prefix, by its lowercase.
+APS_CANONICAL_PREFIXES: dict[str, str] = {
+    name.lower(): name
+    for name in (
+        "PhysRev",
+        "PhysRevLett",
+        "PhysRevX",
+        "PhysRevA",
+        "PhysRevB",
+        "PhysRevC",
+        "PhysRevD",
+        "PhysRevE",
+        "PhysRevResearch",
+        "PhysRevApplied",
+        "PhysRevMaterials",
+        "PhysRevFluids",
+        "PhysRevAccelBeams",
+        "PhysRevSTAB",
+        "PhysRevPhysEducRes",
+        "PhysRevSTPER",
+        "PhysRevSeriesI",
+        "RevModPhys",
+        "PRXQuantum",
+        "PRXEnergy",
+        "PRXLife",
+        "PhysicsPhysiqueFizika",
+    )
+}
+
+_APS_DOI = re.compile(r"^10\.1103/([A-Za-z]+)(\..+)$", re.IGNORECASE)
+
+# Hosts that serve preprints, never a version of record: a PDF fetched from one
+# of these is a preprint whatever identifier led to it.
+PREPRINT_HOSTS = ("arxiv.org",)
+
+# Statuses for which trying the same request later can succeed.
+_RETRYABLE_STATUSES = frozenset({408, 425, 429, 500, 502, 503, 504})
 
 # Query parameter names that carry secrets in publisher and CDN links.
 _SECRET_PARAM = re.compile(
@@ -88,13 +129,39 @@ def aps_pdf_url(doi: str) -> str | None:
     ``None`` when *doi* is not an APS article DOI whose journal prefix is
     known — including APS's newer opaque DOIs, which name no journal.
     """
+    canonical = canonical_aps_doi(doi)
+    if canonical is None:
+        return None
+    match = _APS_DOI.match(canonical)
+    assert match is not None
+    code = APS_JOURNAL_CODES[match.group(1).lower()]
+    return f"https://journals.aps.org/{code}/pdf/{quote(canonical, safe='/')}"
+
+
+def canonical_aps_doi(doi: str) -> str | None:
+    """Return an APS article DOI with its journal prefix in APS's own spelling.
+
+    ``10.1103/physrevb.1.1`` becomes ``10.1103/PhysRevB.1.1``. ``None`` when
+    *doi* is not an APS DOI whose journal prefix is known.
+    """
     match = _APS_DOI.match(doi.strip())
     if match is None:
         return None
-    code = APS_JOURNAL_CODES.get(match.group(1).lower())
-    if code is None:
+    prefix = APS_CANONICAL_PREFIXES.get(match.group(1).lower())
+    if prefix is None or match.group(1).lower() not in APS_JOURNAL_CODES:
         return None
-    return f"https://journals.aps.org/{code}/pdf/{quote(doi.strip(), safe='/')}"
+    return f"10.1103/{prefix}{match.group(2)}"
+
+
+def is_preprint_host(url: str | None) -> bool:
+    """Return whether *url* is served by a preprint repository (see :data:`PREPRINT_HOSTS`)."""
+    if not url:
+        return False
+    try:
+        host = (urlsplit(url).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return False
+    return any(host == known or host.endswith(f".{known}") for known in PREPRINT_HOSTS)
 
 
 def _is_aps_host(url: str) -> bool:
@@ -142,12 +209,17 @@ def redact_url(url: str | None) -> str | None:
     return urlunsplit((parts.scheme, netloc, parts.path, urlencode(kept), ""))
 
 
-def attempt_record(url: str, info: dict | None, outcome: str) -> dict:
+def attempt_record(url: str, info: dict | None, outcome: str, *, stage: str = "download") -> dict:
     """Return the redacted record of one request: what was asked for, and what came back.
 
     *info* is what the transport observed (``final_url``, ``status``,
     ``content_type``); any of them is ``None`` when the request never got that
-    far, or when an injected fetcher reported none.
+    far, or when an injected fetcher reported none. *stage* is one of
+    :data:`ATTEMPT_STAGES`: ``resolve`` for a request that looked for a PDF
+    link (a DOI landing page, an open-access index), ``download`` for one that
+    asked for the PDF itself. ``retryable`` says whether the same request may
+    succeed later (a throttle, a server error, a network failure) as opposed to
+    an answer that will not change by waiting (401, 403, 404, not a PDF).
     """
     info = info or {}
     content_type = info.get("content_type")
@@ -162,7 +234,17 @@ def attempt_record(url: str, info: dict | None, outcome: str) -> dict:
         "status": status if isinstance(status, int) else None,
         "content_type": content_type,
         "outcome": outcome,
+        "stage": stage,
+        "retryable": _retryable(outcome, status if isinstance(status, int) else None),
     }
+
+
+def _retryable(outcome: str, status: int | None) -> bool:
+    if outcome == "network_error":
+        return True
+    if outcome == "http_error":
+        return status in _RETRYABLE_STATUSES
+    return False
 
 
 def status_from_message(message: str) -> int | None:
@@ -184,3 +266,36 @@ def describe_attempts(attempts: Iterable[dict]) -> str:
             detail.append(str(attempt.get("outcome") or "no response").replace("_", " "))
         parts.append(f"{host} ({', '.join(detail)})")
     return "; ".join(parts)
+
+
+def describe_content(data: bytes) -> str:
+    """Return a short description of ``data`` for error messages."""
+    if not data:
+        return "empty response"
+    if data.startswith(b"<") or data.startswith(b"<!") or data.startswith(b"<?"):
+        return f"HTML ({len(data)} bytes)"
+    return f"{len(data)} bytes"
+
+
+def non_pdf_reason(data: bytes, access: str = "institutional") -> str:
+    description = describe_content(data)
+    if data.lstrip().lower().startswith((b"<html", b"<!doctype html")):
+        if access == "open":
+            return f"publisher URL served an HTML page ({len(data)} bytes), not a PDF"
+        return f"authentication required or publisher returned HTML ({len(data)} bytes)"
+    return f"publisher URL returned {description}, not a PDF"
+
+
+def access_error_reason(exc: Exception) -> str | None:
+    message = str(exc)
+    if "HTTP 401" in message:
+        return "authentication required for publisher PDF"
+    if "HTTP 403" in message:
+        return "institutional access was not accepted by the publisher"
+    return None
+
+
+def error_outcome(exc: Exception, info: dict) -> str:
+    """Classify a failed request: an HTTP error status, or no usable response at all."""
+    status = info.get("status") or status_from_message(str(exc))
+    return "http_error" if isinstance(status, int) and status >= 400 else "network_error"

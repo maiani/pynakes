@@ -11,9 +11,10 @@ Group-tree and key operations live in :mod:`pynakes._engine_groups` and
 
 from __future__ import annotations
 
-from collections.abc import Collection, Iterable
+import copy
+from collections.abc import Callable, Collection, Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 from pynakes import convert as convert_ops
 from pynakes import dedupe as dedupe_ops
@@ -28,13 +29,15 @@ from pynakes import scrub as scrub_ops
 from pynakes._entry_comments import attached_comment_indices
 from pynakes._library_style import apply_library_style
 from pynakes.canonical import CanonicalLayout, format_selected_entries, validate_format_input
-from pynakes.editing import set_entry_type
+from pynakes.editing import set_entry_field, set_entry_type
 from pynakes.filestore import FILES_DIR_KEY, FileStore, resolve_files_dir
 from pynakes.lint import LintIssue
 from pynakes.lint import lint as lint_lib
 from pynakes.model import BibEntry, BibFile, QueryFilter
 from pynakes.progress import EntryProgress
 from pynakes.usage import tex_sources_from_metadata, validate_tex_sources
+
+_R = TypeVar("_R", integrity_ops.EnrichReport, integrity_ops.PublishedReport)
 
 
 class BibliographyOperations:
@@ -575,17 +578,25 @@ class BibliographyOperations:
         progress: EntryProgress | None = None,
         concurrency: int = 1,
         keys: Collection[str] | None = None,
+        fields: Collection[str] | None = None,
     ) -> integrity_ops.EnrichReport:
-        """Conservatively fill missing metadata in memory, for ``keys`` or every entry."""
-        report = integrity_ops.enrich_library(
-            self.lib,
-            online=online,
-            cache_file=cache_file,
-            progress=progress,
-            concurrency=concurrency,
-            keys=keys,
+        """Conservatively fill missing metadata in memory, for ``keys`` or every entry.
+
+        ``fields`` applies only the updates to those fields (``type`` names an
+        entry-type change); ``None`` applies them all. The report lists only
+        what was applied.
+        """
+        return self._enrich_selected_fields(
+            lambda lib: integrity_ops.enrich_library(
+                lib,
+                online=online,
+                cache_file=cache_file,
+                progress=progress,
+                concurrency=concurrency,
+                keys=keys,
+            ),
+            fields,
         )
-        return report
 
     def apply_published(
         self,
@@ -595,15 +606,45 @@ class BibliographyOperations:
         progress: EntryProgress | None = None,
         concurrency: int = 1,
         keys: Collection[str] | None = None,
+        fields: Collection[str] | None = None,
     ) -> integrity_ops.PublishedReport:
-        """Apply published-version metadata updates in memory, for ``keys`` or every entry."""
-        report = integrity_ops.check_published(
-            self.lib,
-            online=online,
-            apply=True,
-            cache_file=cache_file,
-            progress=progress,
-            concurrency=concurrency,
-            keys=keys,
+        """Apply published-version metadata updates in memory, for ``keys`` or every entry.
+
+        ``fields`` restricts the updates applied, as for :meth:`enrich`.
+        """
+        return self._enrich_selected_fields(
+            lambda lib: integrity_ops.check_published(
+                lib,
+                online=online,
+                apply=True,
+                cache_file=cache_file,
+                progress=progress,
+                concurrency=concurrency,
+                keys=keys,
+            ),
+            fields,
         )
+
+    def _enrich_selected_fields(
+        self, run: Callable[[BibFile], _R], fields: Collection[str] | None
+    ) -> _R:
+        """Run an enrichment, keeping only the updates to *fields* (all when ``None``).
+
+        With a selection the enrichment runs on a copy of the library; each
+        entry's changes to the selected fields are then made on the real entry,
+        by position (duplicate keys stay distinct), through the surgical
+        editing helpers. Nothing else changes.
+        """
+        if fields is None:
+            return run(self.lib)
+        wanted = {name.strip().lower() for name in fields}
+        scratch = copy.deepcopy(self.lib)
+        report = run(scratch)
+        for entry, enriched in zip(self.lib.entries.values(), scratch.entries.values()):
+            if "type" in wanted and enriched.type.lower() != entry.type.lower():
+                set_entry_type(entry, enriched.type)
+            for name, value in enriched.fields.items():
+                if name.lower() in wanted and entry.fields.get(name) != value:
+                    set_entry_field(entry, name, value)
+        report.updates = [u for u in report.updates if u.field.lower() in wanted]
         return report

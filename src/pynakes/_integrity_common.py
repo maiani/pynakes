@@ -11,10 +11,11 @@ comparison that has to be case-insensitive, a container title that belongs in
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from pynakes._identifiers import doi_from_text, normalize_doi
 from pynakes.entry_types import (
@@ -104,7 +105,7 @@ class EnrichReport:
     """Result of conservative metadata enrichment."""
 
     updates: list[FieldUpdate] = field(default_factory=list)
-    warnings: list[dict[str, str]] = field(default_factory=list)
+    warnings: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def changed_entries(self) -> int:
@@ -159,7 +160,7 @@ class PublishedReport:
 
     candidates: list[PublishedCandidate] = field(default_factory=list)
     updates: list[FieldUpdate] = field(default_factory=list)
-    warnings: list[dict[str, str]] = field(default_factory=list)
+    warnings: list[dict[str, Any]] = field(default_factory=list)
     # Keys whose *preprint* record gained published metadata (a DOI, a journal,
     # an @article type) — the direction "promotion" describes.
     promoted_keys: list[str] = field(default_factory=list)
@@ -242,7 +243,7 @@ class EntryComparisonReport:
     source: str | None = None
     identifier: str | None = None
     fields: list[FieldComparison] = field(default_factory=list)
-    warnings: list[dict[str, str]] = field(default_factory=list)
+    warnings: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, object]:
         """Serialize the comparison report to a JSON-friendly dict."""
@@ -384,3 +385,31 @@ def _journal(entry: BibEntry) -> str:
 def _has_retraction_flag(entry: BibEntry) -> bool:
     haystack = " ".join(entry.fields.get(field, "") for field in ("title", "note", "annote"))
     return "retract" in haystack.lower()
+
+
+def lookup_warning(kind: str, key: str, message: str, exc: BaseException) -> dict[str, Any]:
+    """Return the warning for one provider lookup that failed, saying it was not checked.
+
+    A failed lookup is not an answer: ``checked`` is ``False``, so it cannot be
+    read as "no match". ``rate_limited`` marks a provider that kept answering
+    HTTP 429 through every retry, and ``retryable`` says whether running the
+    lookup again later can succeed (a throttle, a server or network failure)
+    rather than meet the same refusal.
+    """
+    from pynakes.providers._http import ProviderRateLimitedError
+
+    chain: list[BaseException] = []
+    current: BaseException | None = exc
+    while current is not None and current not in chain:
+        chain.append(current)
+        current = current.__cause__
+    rate_limited = any(isinstance(error, ProviderRateLimitedError) for error in chain)
+    refused = re.search(r"\bHTTP 4(?!29)\d\d\b", message) is not None
+    return {
+        "type": kind,
+        "key": key,
+        "message": message,
+        "checked": False,
+        "rate_limited": rate_limited,
+        "retryable": rate_limited or not refused,
+    }

@@ -31,6 +31,7 @@ from pynakes._integrity_common import (
     _field_value,
     _journal,
     _map_concurrently,
+    lookup_warning,
 )
 from pynakes.editing import set_entry_field, set_entry_type
 from pynakes.identity import evidence_from_entry
@@ -74,7 +75,7 @@ def _finish_doi_to_arxiv_backfill(
 ) -> None:
     if isinstance(result, ProviderFetchError):
         report.warnings.append(
-            {"type": "doi_to_arxiv_lookup_failed", "key": entry.key, "message": str(result)}
+            lookup_warning("doi_to_arxiv_lookup_failed", entry.key, str(result), result)
         )
         return
 
@@ -127,7 +128,7 @@ def _finish_arxiv_check(
 ) -> None:
     if isinstance(result, MetadataFetchError):
         report.warnings.append(
-            {"type": "preprint_lookup_failed", "key": entry.key, "message": str(result)}
+            lookup_warning("preprint_lookup_failed", entry.key, str(result), result)
         )
         return
 

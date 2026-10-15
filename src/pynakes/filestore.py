@@ -381,6 +381,23 @@ class FileStore(PinaxManifest):
         _copy_manifest_row(source, self, key)
         return copied
 
+    def plan_material_copy(self, source: "FileStore", key: str) -> list[dict[str, str]]:
+        """Return what :meth:`copy_materials_from` would copy for ``key``, writing nothing.
+
+        Same shape as its result, so a dry run can name every file a combine
+        would bring over. Materials already in place (source and target are
+        the same location) are left out, as the copy leaves them.
+        """
+        planned: list[dict[str, str]] = []
+        source_paths = source.paths_for(key)
+        target_paths = self.paths_for(key)
+        for kind in ARTIFACT_KINDS:
+            src = getattr(source_paths, kind)
+            dst = getattr(target_paths, kind)
+            if src.exists() and src.resolve() != dst.resolve():
+                planned.append({"key": key, "kind": kind, "path": str(dst)})
+        return planned
+
     def plan_material_merge(self, old: str, new: str) -> list[dict[str, str]]:
         """Return planned in-place material moves from ``old`` onto ``new``.
 
@@ -489,6 +506,52 @@ class FileStore(PinaxManifest):
                 src.replace(dst)
                 transaction.moved.append((src, dst))
             self._rename_manifest_row(old, new)
+        except Exception:
+            transaction.rollback()
+            raise
+        return transaction
+
+    def reclassify_material(
+        self, key: str, old_kind: str, new_kind: str, *, evidence: list | None = None
+    ) -> PinaxRenameTransaction:
+        """Move one of *key*'s materials to another kind's path, with its manifest record.
+
+        For a file stored under the wrong label — a preprint saved as the
+        published PDF. The target must not exist; nothing is overwritten. The
+        manifest record moves with the file and notes ``reclassified_from`` and
+        the *evidence* for the change.
+        """
+        key = _validate_key(key)
+        for kind in (old_kind, new_kind):
+            if kind not in ARTIFACT_KINDS:
+                raise ValueError(f"Unknown Pinax artifact kind: {kind}")
+        src = getattr(self.paths_for(key), old_kind)
+        dst = getattr(self.paths_for(key), new_kind)
+        if not src.exists():
+            raise ValueError(f"No {old_kind} material for {key!r}: {src}")
+        if dst.exists():
+            raise ValueError(f"Cannot reclassify Pinax material {src}: target exists: {dst}")
+        existed = self.manifest_path.exists()
+        transaction = PinaxRenameTransaction(
+            store=self,
+            moved=[],
+            original_manifest=self.read_manifest() if existed else None,
+            manifest_existed=existed,
+        )
+        try:
+            src.replace(dst)
+            transaction.moved.append((src, dst))
+            if existed:
+                manifest = self.read_manifest()
+                files = manifest["files"]
+                row = files.get(key) if isinstance(files, dict) else None
+                if isinstance(row, dict) and isinstance(row.get(old_kind), dict):
+                    record = dict(row.pop(old_kind))
+                    record["reclassified_from"] = old_kind
+                    if evidence:
+                        record["reclassification_evidence"] = list(evidence)
+                    row[new_kind] = record
+                    self.write_manifest(manifest)
         except Exception:
             transaction.rollback()
             raise

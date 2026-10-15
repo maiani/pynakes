@@ -81,7 +81,10 @@ def _store(tmp_path: Path) -> FileStore:
             "10.1103/PhysRevLett.12.345",
             "https://journals.aps.org/prl/pdf/10.1103/PhysRevLett.12.345",
         ),
-        ("10.1103/physrevx.3.21", "https://journals.aps.org/prx/pdf/10.1103/physrevx.3.21"),
+        # A lowercased DOI is the same DOI, but APS serves the PDF only under the
+        # journal's own spelling of the prefix.
+        ("10.1103/physrevx.3.21", "https://journals.aps.org/prx/pdf/10.1103/PhysRevX.3.21"),
+        ("10.1103/PHYSREVB.46.1", "https://journals.aps.org/prb/pdf/10.1103/PhysRevB.46.1"),
         ("10.1103/RevModPhys.1.1", "https://journals.aps.org/rmp/pdf/10.1103/RevModPhys.1.1"),
         (
             "10.1103/PRXQuantum.2.10",
@@ -143,6 +146,8 @@ def test_attempt_record_keeps_only_safe_fields() -> None:
         "status": 200,
         "content_type": "text/html",
         "outcome": "not_pdf",
+        "stage": "download",
+        "retryable": False,
     }
     assert describe_attempts([record]) == "cdn.example (HTTP 200, text/html)"
     assert describe_attempts([attempt_record("https://a.example/x", None, "network_error")]) == (
@@ -283,6 +288,8 @@ def test_a_page_that_is_not_a_pdf_is_a_skip_with_redacted_attempts(
         "status": 404,
         "content_type": None,
         "outcome": "http_error",
+        "stage": "download",
+        "retryable": False,
     }
     assert attempts[1] == {
         "url": "http://publisher.example/pdf?id=7",
@@ -290,6 +297,8 @@ def test_a_page_that_is_not_a_pdf_is_a_skip_with_redacted_attempts(
         "status": 200,
         "content_type": "text/html",
         "outcome": "not_pdf",
+        "stage": "download",
+        "retryable": False,
     }
     assert "s3cr3t" not in json.dumps(attempts) + str(caught.value)
 
@@ -315,6 +324,8 @@ def test_only_non_pdf_answers_are_a_skip_with_attempts(tmp_path: Path, monkeypat
             "status": 200,
             "content_type": "text/html",
             "outcome": "not_pdf",
+            "stage": "download",
+            "retryable": False,
         }
     ]
 

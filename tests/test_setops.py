@@ -618,3 +618,44 @@ def test_merge_dedupe_detects_conflict_on_equivalent_but_not_identical_entries()
         "entries with same key, same fields, but different raw formatting "
         "should raise a formatting conflict rather than silently dropping one"
     )
+
+
+def test_cli_combine_into_a_library_previews_and_transfers_its_materials(tmp_path: Path) -> None:
+    # Moving reviewed references from a scratch library into a project one:
+    # the project keeps its own pinax-files-dir, the scratch materials follow
+    # their entries, and a dry run names them before anything is copied.
+    project = tmp_path / "project.bib"
+    project.write_text(
+        "@article{Euler1748,\n  title = {Introductio},\n}\n\n"
+        "@comment{pynakes-meta:\npinax-files-dir: pdfs\n}\n",
+        encoding="utf-8",
+    )
+    scratch = tmp_path / "scratch.bib"
+    scratch.write_text(
+        "@article{Gauss1801,\n  title = {Disquisitiones},\n}\n\n"
+        "@comment{pynakes-meta:\npinax-files-dir: scratch.files\n}\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "pdfs").mkdir()
+    (tmp_path / "pdfs" / "Euler1748.published.pdf").write_bytes(b"%PDF one")
+    (tmp_path / "scratch.files").mkdir()
+    (tmp_path / "scratch.files" / "Gauss1801.preprint.pdf").write_bytes(b"%PDF two")
+    args = ["corpus", "combine", str(project), str(scratch), "--out", str(project), "--force"]
+    expected = [
+        {
+            "key": "Gauss1801",
+            "kind": "preprint_pdf",
+            "path": str(tmp_path / "pdfs" / "Gauss1801.preprint.pdf"),
+        }
+    ]
+
+    preview = json.loads(runner.invoke(app, [*args, "--dry-run", "--json"]).output)
+    assert preview["pinax_materials"] == expected
+    assert not (tmp_path / "pdfs" / "Gauss1801.preprint.pdf").exists()
+
+    result = json.loads(runner.invoke(app, [*args, "--json"]).output)
+
+    assert result["pinax_materials"] == expected
+    assert (tmp_path / "pdfs" / "Gauss1801.preprint.pdf").read_bytes() == b"%PDF two"
+    assert (tmp_path / "pdfs" / "Euler1748.published.pdf").read_bytes() == b"%PDF one"
+    assert "pinax-files-dir: pdfs" in project.read_text(encoding="utf-8")

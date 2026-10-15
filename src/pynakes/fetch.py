@@ -16,11 +16,16 @@ from typing import Literal
 
 from pynakes._fetch_attempts import (
     DiagnosedFetchError,
+    access_error_reason,
     attempt_record,
     candidate_urls,
+    error_outcome,
+    is_preprint_host,
+    non_pdf_reason,
     redact_url,
     status_from_message,
 )
+from pynakes._fetch_published import ARXIV_DOI_REASON, resolve_candidates
 from pynakes._fetch_source import (
     MAX_SOURCE_BYTES,
     MAX_SOURCE_MEMBERS,
@@ -28,8 +33,13 @@ from pynakes._fetch_source import (
     ArxivSourceUnavailableError,
     extract_arxiv_source,
 )
-from pynakes._identifiers import normalize_arxiv, normalize_doi
-from pynakes.fetch_progress import FetchArtifact, FetchProgress, FetchProgressEvent
+from pynakes._identifiers import is_arxiv_doi, normalize_arxiv, normalize_doi
+from pynakes.fetch_progress import (
+    FetchArtifact,
+    FetchProgress,
+    byte_progress,
+    emit_progress,
+)
 from pynakes.filestore import FileStore
 from pynakes.providers import publisher
 from pynakes.providers._http import ProviderFetchError, fetch_bytes
@@ -109,6 +119,8 @@ class PublishedDownloadResult:
     access: FetchAccess | None = None
     reason: str | None = None
     attempts: tuple[dict, ...] = field(default_factory=tuple)
+    artifact: FetchArtifact = "published_pdf"
+    source: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         """Serialize the result to a JSON-friendly dict.
@@ -116,15 +128,23 @@ class PublishedDownloadResult:
         Includes ``arxiv_id`` and ``source_path`` (always ``None``) so the
         CLI loop can iterate both :class:`ArxivDownloadResult` and
         :class:`PublishedDownloadResult` items uniformly. ``attempts`` is
-        listed only for a result that fetched nothing.
+        listed only for a result that fetched nothing. ``artifact`` says what
+        the stored file is: ``preprint_pdf`` when the only copy found was
+        served by a preprint repository, with ``classified_by`` and the
+        ``source`` URL as the evidence.
         """
         result: dict[str, object] = {
             "key": self.key,
             "doi": self.doi,
             "arxiv_id": None,
+            "artifact": self.artifact,
             "pdf_path": str(self.pdf_path) if self.pdf_path is not None else None,
             "source_path": None,
         }
+        if self.pdf_path is not None and self.source is not None:
+            result["source"] = redact_url(self.source)
+        if self.artifact == "preprint_pdf":
+            result["classified_by"] = "source_host"
         if self.access is not None:
             result["access"] = self.access
         if self.reason is not None:
@@ -183,13 +203,13 @@ def fetch_arxiv_pdf(
         return arxiv.fetch_pdf(
             identifier,
             timeout=timeout,
-            progress=_byte_progress(progress, key, "preprint_pdf"),
+            progress=byte_progress(progress, key, "preprint_pdf"),
             response_info=info,
         )
     except ValueError as exc:
         raise ArxivFetchError(str(exc), artifact="preprint_pdf") from exc
     except ProviderFetchError as exc:
-        attempt = attempt_record(arxiv.pdf_url(identifier), info, _error_outcome(exc, info))
+        attempt = attempt_record(arxiv.pdf_url(identifier), info, error_outcome(exc, info))
         raise ArxivFetchError(str(exc), attempts=[attempt], artifact="preprint_pdf") from exc
 
 
@@ -209,13 +229,13 @@ def fetch_arxiv_source(
         return arxiv.fetch_source(
             identifier,
             timeout=timeout,
-            progress=_byte_progress(progress, key, "preprint_source"),
+            progress=byte_progress(progress, key, "preprint_source"),
             response_info=info,
         )
     except ValueError as exc:
         raise ArxivFetchError(str(exc), artifact="preprint_source") from exc
     except ProviderFetchError as exc:
-        attempt = attempt_record(arxiv.source_url(identifier), info, _error_outcome(exc, info))
+        attempt = attempt_record(arxiv.source_url(identifier), info, error_outcome(exc, info))
         raise ArxivFetchError(str(exc), attempts=[attempt], artifact="preprint_source") from exc
 
 
@@ -248,7 +268,7 @@ def download_arxiv_materials(
     source_unavailable = False
 
     if pdf:
-        _emit_progress(progress, "artifact_start", key, "preprint_pdf")
+        emit_progress(progress, "artifact_start", key, "preprint_pdf")
         try:
             if pdf_fetcher is None:
                 pdf_bytes = fetch_arxiv_pdf(arxiv_id, progress=progress, key=key)
@@ -265,7 +285,7 @@ def download_arxiv_materials(
             fetched_date=fetched_date,
             refetchable=True,
         )
-        _emit_progress(progress, "artifact_done", key, "preprint_pdf", total_bytes=len(pdf_bytes))
+        emit_progress(progress, "artifact_done", key, "preprint_pdf", total_bytes=len(pdf_bytes))
 
     if source:
         try:
@@ -300,7 +320,7 @@ def _download_arxiv_source(
     """Fetch and install one arXiv source bundle: its path, and whether arXiv had none."""
     source_path: Path | None = None
     source_unavailable = False
-    _emit_progress(progress, "artifact_start", key, "preprint_source")
+    emit_progress(progress, "artifact_start", key, "preprint_source")
     try:
         if source_fetcher is None:
             source_bytes = fetch_arxiv_source(arxiv_id, progress=progress, key=key)
@@ -323,7 +343,7 @@ def _download_arxiv_source(
         # PDF-only deposit: nothing to extract. Not a corrupt-archive failure,
         # so don't discard a PDF fetched above — report it as unavailable.
         source_unavailable = True
-        _emit_progress(
+        emit_progress(
             progress,
             "artifact_done",
             key,
@@ -339,7 +359,7 @@ def _download_arxiv_source(
             fetched_date=fetched_date,
             refetchable=True,
         )
-        _emit_progress(
+        emit_progress(
             progress, "artifact_done", key, "preprint_source", total_bytes=len(source_bytes)
         )
     return source_path, source_unavailable
@@ -426,22 +446,13 @@ def fetch_published_pdf(
             error_class=PublishedPdfFetchError,
             label=shown,
             opener=urlopen,
-            progress=_byte_progress(progress, key, "published_pdf"),
+            progress=byte_progress(progress, key, "published_pdf"),
             response_info=response_info,
         )
     except PublishedPdfFetchError as exc:
         raise PublishedPdfFetchError(
             f"Failed to download published PDF from {shown}: {exc}"
         ) from exc
-
-
-def _describe_content(data: bytes) -> str:
-    """Return a short description of ``data`` for error messages."""
-    if not data:
-        return "empty response"
-    if data.startswith(b"<") or data.startswith(b"<!") or data.startswith(b"<?"):
-        return f"HTML ({len(data)} bytes)"
-    return f"{len(data)} bytes"
 
 
 def download_published_material(
@@ -464,20 +475,32 @@ def download_published_material(
     (or ``None`` when no OA copy exists). ``pdf_fetcher`` receives the resolved
     URL and returns bytes. Both are injectable for testing.
 
+    Under ``institutional`` access the DOI landing page is asked for its PDF
+    link as well, and a publisher route derived from the DOI (an APS article's
+    canonical PDF URL, in the journal's own spelling) is tried even when the
+    landing page refuses the request.
+
     Each resolved URL is tried in the order
     :func:`pynakes._fetch_attempts.candidate_urls` gives — an APS article's
     canonical ``journals.aps.org`` PDF URL first, an ``https://`` form before a
     plain ``http://`` one — until one serves a PDF. Each request is a single
     GET whose bytes are kept only when they start with ``%PDF``.
 
+    A DOI under arXiv's own prefix is not looked up: it names the preprint.
+    A PDF served by a preprint repository (arXiv) is tried only after every
+    publisher URL and, when it is the copy obtained, is stored as the preprint
+    PDF — the result's ``artifact`` is then ``preprint_pdf`` — unless a
+    preprint PDF is already present, in which case nothing is written.
+
     ``url_validator``, when given, is asked first about each open-access URL and
     a ``False`` skips it without a download.
 
     Returns a ``PublishedDownloadResult`` with ``pdf_path`` set when the
     download succeeded; otherwise its ``reason`` says why and its
-    ``attempts`` records every request made. Raises
-    :class:`PublishedPdfFetchError`, with the same ``attempts``, when a request
-    failed with an error that is not an access refusal.
+    ``attempts`` records every request made, the lookups that looked for a PDF
+    link (``stage: resolve``) included. Raises :class:`PublishedPdfFetchError`,
+    with the same ``attempts``, when a request failed with an error that is
+    not an access refusal.
     """
     try:
         normalized = normalize_doi(doi)
@@ -485,47 +508,44 @@ def download_published_material(
         raise PublishedPdfFetchError(str(exc), artifact="published_pdf") from exc
     if access not in {"open", "institutional"}:
         raise ValueError(f"Unknown fetch access mode: {access!r}")
+    if is_arxiv_doi(normalized):
+        return PublishedDownloadResult(key=key, doi=normalized, reason=ARXIV_DOI_REASON)
     resolver = url_resolver or (
         lambda d: (
             openalex_oa_pdf_url(d, cache_file=cache_file)
             or crossref_oa_pdf_url(d, cache_file=cache_file)
         )
     )
-    candidates: list[tuple[str, FetchAccess]] = []
-    resolution_error: PublishedPdfFetchError | None = None
-    try:
-        pdf_url = resolver(normalized)
-    except PublishedPdfFetchError as exc:
-        if access == "open":
-            raise
-        resolution_error = exc
-        pdf_url = None
-    if pdf_url is not None:
-        candidates.append((pdf_url, "open"))
-    if access == "institutional":
-        entitled_resolver = institutional_url_resolver
-        if entitled_resolver is None and url_resolver is None:
-            entitled_resolver = institutional_pdf_url
-        if entitled_resolver is not None:
-            entitled_url = entitled_resolver(normalized)
-            if entitled_url is not None:
-                candidates.append((entitled_url, "institutional"))
-    if not candidates:
-        if resolution_error is not None:
-            raise resolution_error
-        reason = (
+    entitled_resolver = institutional_url_resolver
+    if entitled_resolver is None and url_resolver is None:
+        entitled_resolver = institutional_pdf_url
+    found = resolve_candidates(
+        normalized,
+        access,
+        open_resolver=resolver,
+        entitled_resolver=entitled_resolver,
+        error_class=PublishedPdfFetchError,
+    )
+    attempts: list[dict] = list(found.attempts)
+    if not found.urls:
+        if found.errors:
+            raise PublishedPdfFetchError(
+                str(found.errors[0]), attempts=attempts, artifact="published_pdf"
+            )
+        reason = found.refusal or (
             "no publisher PDF link found"
             if access == "institutional"
             else "no open-access copy found"
         )
-        return PublishedDownloadResult(key=key, doi=normalized, reason=reason)
+        return PublishedDownloadResult(
+            key=key, doi=normalized, reason=reason, attempts=tuple(attempts)
+        )
 
-    _emit_progress(progress, "artifact_start", key, "published_pdf")
-    attempts: list[dict] = []
-    errors: list[PublishedPdfFetchError] = []
+    emit_progress(progress, "artifact_start", key, "published_pdf")
+    errors: list[Exception] = list(found.errors)
     tried: set[str] = set()
-    last_reason = "publisher URL did not serve PDF content"
-    for candidate_url, candidate_access in candidates:
+    last_reason = found.refusal or "publisher URL did not serve PDF content"
+    for candidate_url, candidate_access in found.urls:
         for url in candidate_urls(candidate_url, normalized):
             if url in tried:
                 continue
@@ -538,8 +558,8 @@ def download_published_material(
             except PublishedPdfFetchError as exc:
                 if info.get("status") is None:
                     info["status"] = status_from_message(str(exc))
-                attempts.append(attempt_record(url, info, _error_outcome(exc, info)))
-                access_reason = _access_error_reason(exc)
+                attempts.append(attempt_record(url, info, error_outcome(exc, info)))
+                access_reason = access_error_reason(exc)
                 if candidate_access == "institutional" and access_reason is not None:
                     last_reason = access_reason
                 else:
@@ -548,8 +568,13 @@ def download_published_material(
             if data is None or not data.startswith(b"%PDF"):
                 attempts.append(attempt_record(url, info, "not_pdf"))
                 if data is not None:
-                    last_reason = _non_pdf_reason(data, candidate_access)
+                    last_reason = non_pdf_reason(data, candidate_access)
                 continue
+            served_by = info.get("final_url") or url
+            if is_preprint_host(served_by):
+                return _store_repository_copy(
+                    store, key, normalized, data, served_by, fetched_date, progress, attempts
+                )
             pdf_path = store.write_published_pdf(key, data)
             store.record_artifact(
                 key,
@@ -559,21 +584,54 @@ def download_published_material(
                 refetchable=True,
                 access=candidate_access,
             )
-            _emit_progress(progress, "artifact_done", key, "published_pdf", total_bytes=len(data))
+            emit_progress(progress, "artifact_done", key, "published_pdf", total_bytes=len(data))
             return PublishedDownloadResult(
                 key=key,
                 doi=normalized,
                 pdf_path=pdf_path,
                 access=candidate_access if candidate_access == "institutional" else None,
+                source=url,
             )
     if errors:
         message = str(errors[0])
         if len(attempts) > 1:
             message = f"{message} ({len(attempts)} URLs tried)"
         raise PublishedPdfFetchError(message, attempts=attempts, artifact="published_pdf")
-    _emit_progress(progress, "artifact_skip", key, "published_pdf", message=last_reason)
+    emit_progress(progress, "artifact_skip", key, "published_pdf", message=last_reason)
     return PublishedDownloadResult(
         key=key, doi=normalized, reason=last_reason, attempts=tuple(attempts)
+    )
+
+
+def _store_repository_copy(
+    store: FileStore,
+    key: str,
+    doi: str,
+    data: bytes,
+    url: str,
+    fetched_date: str | None,
+    progress: FetchProgress | None,
+    attempts: list[dict],
+) -> PublishedDownloadResult:
+    """Keep a PDF a preprint repository served as the preprint it is, never as published."""
+    reason = "no published version found; the only copy found is a preprint"
+    if store.presence_for(key).preprint_pdf:
+        reason = f"{reason}, and the preprint PDF is already present"
+        attempts.append(attempt_record(url, {"final_url": url}, "pdf"))
+        emit_progress(progress, "artifact_skip", key, "published_pdf", message=reason)
+        return PublishedDownloadResult(key=key, doi=doi, reason=reason, attempts=tuple(attempts))
+    pdf_path = store.write_preprint_pdf(key, data)
+    store.record_artifact(
+        key, "preprint_pdf", source=url, fetched_date=fetched_date, refetchable=True
+    )
+    emit_progress(progress, "artifact_done", key, "published_pdf", total_bytes=len(data))
+    return PublishedDownloadResult(
+        key=key,
+        doi=doi,
+        pdf_path=pdf_path,
+        reason=reason,
+        artifact="preprint_pdf",
+        source=url,
     )
 
 
@@ -635,7 +693,7 @@ def download_supplement_material(
     url = urls[0]
     shown = redact_url(url) or url
     info: dict = {}
-    _emit_progress(progress, "artifact_start", key, "supplement_pdf")
+    emit_progress(progress, "artifact_start", key, "supplement_pdf")
     try:
         if pdf_fetcher is not None:
             data = pdf_fetcher(url)
@@ -645,16 +703,16 @@ def download_supplement_material(
                 timeout=30.0,
                 error_class=SupplementPdfFetchError,
                 label=shown,
-                progress=_byte_progress(progress, key, "supplement_pdf"),
+                progress=byte_progress(progress, key, "supplement_pdf"),
                 response_info=info,
             )
     except SupplementPdfFetchError as exc:
         if info.get("status") is None:
             info["status"] = status_from_message(str(exc))
-        attempts = (attempt_record(url, info, _error_outcome(exc, info)),)
-        access_reason = _access_error_reason(exc)
+        attempts = (attempt_record(url, info, error_outcome(exc, info)),)
+        access_reason = access_error_reason(exc)
         if access == "institutional" and access_reason is not None:
-            _emit_progress(progress, "artifact_skip", key, "supplement_pdf", message=access_reason)
+            emit_progress(progress, "artifact_skip", key, "supplement_pdf", message=access_reason)
             return SupplementDownloadResult(
                 key=key, doi=normalized, reason=access_reason, attempts=attempts
             )
@@ -664,8 +722,8 @@ def download_supplement_material(
             artifact="supplement_pdf",
         ) from exc
     if not data.startswith(b"%PDF"):
-        reason = _non_pdf_reason(data, access)
-        _emit_progress(progress, "artifact_skip", key, "supplement_pdf", message=reason)
+        reason = non_pdf_reason(data, access)
+        emit_progress(progress, "artifact_skip", key, "supplement_pdf", message=reason)
         return SupplementDownloadResult(
             key=key,
             doi=normalized,
@@ -682,32 +740,8 @@ def download_supplement_material(
         refetchable=True,
         access=access,
     )
-    _emit_progress(progress, "artifact_done", key, "supplement_pdf", total_bytes=len(data))
+    emit_progress(progress, "artifact_done", key, "supplement_pdf", total_bytes=len(data))
     return SupplementDownloadResult(key=key, doi=normalized, pdf_path=pdf_path, access=access)
-
-
-def _non_pdf_reason(data: bytes, access: FetchAccess = "institutional") -> str:
-    description = _describe_content(data)
-    if data.lstrip().lower().startswith((b"<html", b"<!doctype html")):
-        if access == "open":
-            return f"publisher URL served an HTML page ({len(data)} bytes), not a PDF"
-        return f"authentication required or publisher returned HTML ({len(data)} bytes)"
-    return f"publisher URL returned {description}, not a PDF"
-
-
-def _access_error_reason(exc: Exception) -> str | None:
-    message = str(exc)
-    if "HTTP 401" in message:
-        return "authentication required for publisher PDF"
-    if "HTTP 403" in message:
-        return "institutional access was not accepted by the publisher"
-    return None
-
-
-def _error_outcome(exc: Exception, info: dict) -> str:
-    """Classify a failed request: an HTTP error status, or no usable response at all."""
-    status = info.get("status") or status_from_message(str(exc))
-    return "http_error" if isinstance(status, int) and status >= 400 else "network_error"
 
 
 def _diagnose(exc: DiagnosedFetchError, artifact: str, url: str) -> None:
@@ -716,7 +750,7 @@ def _diagnose(exc: DiagnosedFetchError, artifact: str, url: str) -> None:
         exc.artifact = artifact
     if not exc.attempts:
         exc.attempts = (
-            attempt_record(url, {"status": status_from_message(str(exc))}, _error_outcome(exc, {})),
+            attempt_record(url, {"status": status_from_message(str(exc))}, error_outcome(exc, {})),
         )
 
 
@@ -725,47 +759,3 @@ def _normalize_or_raise(identifier: str) -> str:
     if normalized is None:
         raise ArxivFetchError(f"Malformed arXiv identifier: {identifier!r}")
     return normalized
-
-
-def _byte_progress(
-    progress: FetchProgress | None,
-    key: str,
-    artifact: FetchArtifact,
-) -> Callable[[int, int | None], None] | None:
-    if progress is None:
-        return None
-
-    def callback(advance: int, total: int | None) -> None:
-        progress(
-            FetchProgressEvent(
-                kind="artifact_progress",
-                key=key,
-                artifact=artifact,
-                advance=advance,
-                total_bytes=total,
-            )
-        )
-
-    return callback
-
-
-def _emit_progress(
-    progress: FetchProgress | None,
-    kind: str,
-    key: str,
-    artifact: FetchArtifact,
-    *,
-    total_bytes: int | None = None,
-    message: str = "",
-) -> None:
-    if progress is None:
-        return
-    progress(
-        FetchProgressEvent(
-            kind=kind,  # type: ignore[arg-type]
-            key=key,
-            artifact=artifact,
-            total_bytes=total_bytes,
-            message=message,
-        )
-    )

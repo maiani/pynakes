@@ -187,6 +187,14 @@ def enrich(
         help="Also promote preprints to their published version, writing the "
         "published DOI/journal when one is available (requires --online)",
     ),
+    only_field: list[str] | None = typer.Option(
+        None,
+        "--only-field",
+        metavar="NAME",
+        help="Apply only updates to these fields (repeatable or comma-separated; "
+        "'type' for an entry-type change), e.g. --only-field eprint,archiveprefix "
+        "after reviewing a --dry-run",
+    ),
     where: str | None = where_option(),
     key: list[str] | None = key_option(),
     cache_file: str | None = _CACHE_FILE_OPTION,
@@ -204,6 +212,9 @@ def enrich(
     DOI/journal), folding in the former `published --apply` operation.
     `--key` and `--where` limit it to the selected entries, so a lookup
     for a handful of references never reaches the rest of the library.
+    `--only-field` applies a reviewed subset: preview with `--dry-run`, then
+    apply only those fields with `--expect-sha256` set to the previewed
+    `source_sha256`, so nothing changed in between.
     """
     if published and not online:
         # Offline, the preprint pass has nothing to check against and would
@@ -226,6 +237,11 @@ def enrich(
     # Before any provider is asked: a stale precondition should cost no lookup.
     _check_expected_sha256(file, coll, params)
     selected = select_keys(coll, where, key, json_output, "enrich")
+    fields = (
+        sorted({name.strip() for item in only_field for name in item.split(",") if name.strip()})
+        if only_field
+        else None
+    )
     if online and not json_output:
         with _RichIntegrityProgress("Enriching") as progress:
             report = coll.enrich(
@@ -234,10 +250,15 @@ def enrich(
                 progress=progress,
                 concurrency=concurrency,
                 keys=selected,
+                fields=fields,
             )
     else:
         report = coll.enrich(
-            online=online, cache_file=cache_file, concurrency=concurrency, keys=selected
+            online=online,
+            cache_file=cache_file,
+            concurrency=concurrency,
+            keys=selected,
+            fields=fields,
         )
     updates = list(report.updates)
     warnings = list(report.warnings)
@@ -256,10 +277,15 @@ def enrich(
                     progress=progress,
                     concurrency=concurrency,
                     keys=selected,
+                    fields=fields,
                 )
         else:
             preprints = coll.apply_published(
-                online=online, cache_file=cache_file, concurrency=concurrency, keys=selected
+                online=online,
+                cache_file=cache_file,
+                concurrency=concurrency,
+                keys=selected,
+                fields=fields,
             )
         updates += preprints.updates
         warnings += preprints.warnings
@@ -268,6 +294,7 @@ def enrich(
             "published": preprints.published,
             "promoted": preprints.promoted,
             "linked": preprints.linked,
+            "not_found": sum(1 for c in preprints.candidates if c.status == "not_found"),
             "updates": [update.to_dict() for update in preprints.updates],
         }
         # Two opposite directions of travel, counted apart. Reporting the
@@ -282,6 +309,12 @@ def enrich(
                 f"  added arXiv preprint provenance to {preprints.linked} published "
                 f"{_entries(preprints.linked)}"
             )
+    lookups = _lookup_coverage(warnings, concurrency, cache_file)
+    if lookups["not_checked"]:
+        detail.append(
+            f"  not checked: {len(lookups['not_checked'])} "
+            f"{_entries(len(lookups['not_checked']))} ({lookups['retry']})"
+        )
     # Counted over every update this command applied, preprint work included, so
     # the dry-run summary matches both the diff below it and the JSON envelope.
     changed_entries = len({update.key for update in updates})
@@ -303,8 +336,37 @@ def enrich(
         where=where,
         keys=parse_key_selector(key),
         selected=None if selected is None else len(selected),
+        lookups=lookups,
+        only_fields=fields,
         **extra,
     )
+
+
+def _lookup_coverage(
+    warnings: list[dict], concurrency: int, cache_file: str | None
+) -> dict[str, object]:
+    """Name the entries whose provider lookups failed, so "not checked" is never read as "no match".
+
+    ``retry`` is the command-line suffix that reruns just the retryable ones,
+    at a lower concurrency when a provider throttled the run; ``None`` when
+    there is nothing to retry.
+    """
+    failed = [w for w in warnings if w.get("checked") is False]
+    not_checked = sorted({str(w["key"]) for w in failed})
+    rate_limited = sorted({str(w["key"]) for w in failed if w.get("rate_limited")})
+    retryable = sorted({str(w["key"]) for w in failed if w.get("retryable")})
+    retry = None
+    if retryable:
+        lower = max(1, concurrency // 4) if rate_limited else concurrency
+        retry = f"--key {','.join(retryable)} --concurrency {lower}"
+        if cache_file:
+            retry = f"{retry} --cache-file {cache_file}"
+    return {
+        "not_checked": not_checked,
+        "rate_limited": rate_limited,
+        "retryable": retryable,
+        "retry": retry,
+    }
 
 
 def register(app: typer.Typer) -> None:

@@ -77,6 +77,7 @@ class TestLintStrict:
             "info",
             "suppressed",
             "by_category",
+            "by_type",
         }
         assert "files" not in data  # not the aggregate shape
 

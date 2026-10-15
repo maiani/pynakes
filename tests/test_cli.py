@@ -1653,8 +1653,10 @@ class TestImportCommand:
                 "key": key,
                 "doi": "10.5555/provider",
                 "arxiv_id": None,
+                "artifact": "published_pdf",
                 "pdf_path": str(tmp_path / "refs.files" / f"{key}.published.pdf"),
                 "source_path": None,
+                "source": "https://example.com/provider.pdf",
             }
         ]
         assert (tmp_path / "refs.files" / f"{key}.published.pdf").read_bytes() == b"%PDF published"

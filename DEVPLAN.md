@@ -127,8 +127,9 @@ being edited, not library-scoped exploration (see
   - *Opening materials with the system handler:* a `file`-field path is handed
     to the OS; on Windows an executable named by an untrusted `.bib` could run.
     Decide on an allow-list or a confirmation.
-  - *Fetch progress:* the engine reports no per-file progress in `--json`
-    mode, and the view does not offer `--access institutional`.
+  - *Fetch progress:* the engine now streams per-entry progress with
+    `asset fetch --progress jsonl` (also under `--json`); the view does not yet
+    consume it or offer `--access institutional`.
   - `keys generate` and `keys repair` move Pinax materials but do not report
     `pinax_materials` as `keys rename` does.
 

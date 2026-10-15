@@ -265,6 +265,64 @@ findings, and linked-file and Pinax materials. The `lint` section is exactly
 `--section` to read only what you need. The counts describe the records; do
 not present them as a measure of scientific quality.
 
+### Collecting materials
+
+One command collects the best available PDF for a library and says whether the
+collection is complete:
+
+```bash
+pynakes asset fetch refs.bib --material best-pdf --access institutional \
+  --discover --progress jsonl --json > fetch.json
+```
+
+- **Completeness.** `summary` counts what the run did; `coverage` answers the
+  research question: `entries`, `with_pdf`, `without_pdf`, and `missing`, one
+  item per entry still lacking a requested PDF with the `reason` this run
+  recorded. `complete` is `false` while anything is missing or failed, even
+  though `status` is `"success"` and the exit code is `0` without `--strict`.
+- **Progress.** `--progress jsonl` writes one JSON event per line on stderr
+  while stdout keeps the final envelope: `entry` (with `entry_index` and
+  `entry_total`), `artifact_start`, `artifact_done`, `artifact_skip`, `skip`,
+  `fail`, and `retry` (with `retry_in` seconds and the `attempt` that follows).
+  Read the stream instead of polling the files directory.
+- **Attempts.** Every skipped or failed item lists its requests, including the
+  lookups made before any PDF link existed: `stage` is `resolve` (a DOI landing
+  page or open-access index, named by `lookup`, with its `error`) or
+  `download`, and `retryable` says whether running again later can succeed.
+- **Preprints stay preprints.** A PDF served by arXiv is stored as
+  `preprint_pdf` (`artifact`, `classified_by: "source_host"`, `source`), and an
+  arXiv DOI (`10.48550/arXiv.*`) is read as the arXiv id it encodes, never as a
+  published version. `asset check` reports files stored as published that the
+  evidence says are preprints (`misclassified`, with `source_host`,
+  `arxiv_doi`, or `pdf_arxiv_stamp` evidence); `asset repair --reclassify`
+  moves them, with their manifest records.
+- **Missing arXiv ids.** `--discover` looks one up by DOI when a preprint is
+  needed, then checks it against arXiv's record (the DOI arXiv records, or a
+  matching title). `discovered` reports each lookup: `linked` (used, and written
+  as `eprint` only when the entry has none), `ambiguous` (reported, not used),
+  `not_found`, or `not_checked` (with `retryable`).
+- **Resuming.** Each material is recorded as it lands, so an interrupted run
+  is resumed by running the same command: present materials are skipped.
+
+To apply part of an enrichment after reviewing it, preview with
+`enrich refs.bib --online --dry-run --json`, then run the same command with
+`--only-field eprint,archiveprefix --expect-sha256 <source_sha256>`. A failed
+provider lookup is reported with `checked: false` and listed under
+`lookups.not_checked`; it is never a "no match". `lookups.retry` gives the
+arguments that rerun only the retryable ones, at a lower concurrency when a
+provider throttled the run.
+
+To move reviewed references from a scratch library into a project library with
+their materials, run
+`corpus combine project.bib scratch.bib --out project.bib --force --dry-run --json`:
+the project keeps its `pinax-files-dir`, and `pinax_materials` names every file
+that would be copied. Run it again without `--dry-run` to apply.
+
+For compact reads, `lint --summary` keeps every count (`by_category`,
+`by_type`) without listing each finding, and `lint --severity warning` leaves
+out informational ones. `ref show --key K --select title,doi` returns only the
+fields named, so abstracts stay out unless selected.
+
 ### Agent-assisted classification
 
 pynakes deliberately has no built-in semantic classifier. To classify an

@@ -60,6 +60,8 @@ def _instant_http_retries(request: pytest.FixtureRequest, monkeypatch: pytest.Mo
     from pynakes.providers import _http
 
     monkeypatch.setattr(_http, "_retry_delay", lambda attempt, retry_after: 0.0)
+    # Provider pacing spaces real requests to one API host; mocked ones need none.
+    monkeypatch.setattr(_http, "PROVIDER_MIN_INTERVAL", {})
 
 
 @pytest.fixture(autouse=True)

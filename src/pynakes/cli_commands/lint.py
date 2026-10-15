@@ -9,7 +9,7 @@ from pathlib import Path
 import typer
 
 from pynakes.cli_checks import CheckOutcome, _run_checks, strict_option
-from pynakes.cli_choices import LintCategory
+from pynakes.cli_choices import LintCategory, LintSeverity
 from pynakes.cli_common import _emit_error, _safe, _source_sha256
 from pynakes.engine import Bibliography
 from pynakes.lint import LintIssue, suppress_findings, unknown_ignore_names
@@ -18,10 +18,20 @@ from pynakes.lint import lint as lint_lib
 # --- lint ------------------------------------------------------------------
 
 
+#: Severities from most to least severe; ``--severity`` keeps a prefix of this.
+_SEVERITY_ORDER = ("error", "warning", "info")
+
+
 def _lint_one(
-    file: str, categories: set[str] | None = None, ignores: frozenset[str] = frozenset()
+    file: str,
+    categories: set[str] | None = None,
+    ignores: frozenset[str] = frozenset(),
+    min_severity: str = "info",
+    summary_only: bool = False,
 ) -> CheckOutcome:
-    return _lint_collection(Bibliography.open(file), file, categories, ignores)
+    return _lint_collection(
+        Bibliography.open(file), file, categories, ignores, min_severity, summary_only
+    )
 
 
 def _lint_collection(
@@ -29,8 +39,15 @@ def _lint_collection(
     file: str,
     categories: set[str] | None = None,
     ignores: frozenset[str] = frozenset(),
+    min_severity: str = "info",
+    summary_only: bool = False,
 ) -> CheckOutcome:
-    """Build the same lint report for an already opened bibliography."""
+    """Build the same lint report for an already opened bibliography.
+
+    ``min_severity`` narrows the report as ``categories`` does. ``summary_only``
+    leaves the per-finding list out and says so (``issues_omitted``); every
+    count, ``by_type`` included, still covers each finding reported.
+    """
     lib = coll.lib
     # The command line adds to the library's own `lint-ignore`; it never
     # re-enables what the library ignores. `ignore` directives above an entry
@@ -38,6 +55,8 @@ def _lint_collection(
     issues, suppressed = suppress_findings(lib, lint_lib(lib, base_dir=Path(file).parent), ignores)
     if categories:
         issues = [issue for issue in issues if issue.category in categories]
+    kept = set(_SEVERITY_ORDER[: _SEVERITY_ORDER.index(min_severity) + 1])
+    issues = [issue for issue in issues if issue.severity in kept]
     errors = sum(1 for i in issues if i.severity == "error")
     warnings = sum(1 for i in issues if i.severity == "warning")
     infos = sum(1 for i in issues if i.severity == "info")
@@ -58,13 +77,19 @@ def _lint_collection(
             "info": infos,
             "suppressed": suppressed,
             "by_category": by_category,
+            "by_type": {
+                issue_type: sum(1 for i in issues if i.type == issue_type)
+                for issue_type in sorted({i.type for i in issues})
+            },
         },
-        "issues": [i.to_dict() for i in issues],
+        "issues": [] if summary_only else [i.to_dict() for i in issues],
     }
+    if summary_only:
+        result["issues_omitted"] = len(issues)
     if not issues:
         human = [f"{file}: no issues found."]
     else:
-        human = [f"  {_format_issue(issue)}" for issue in issues]
+        human = [] if summary_only else [f"  {_format_issue(issue)}" for issue in issues]
         human.append(
             f"{len(issues)} issue(s): {errors} error(s), {warnings} warning(s), {infos} info."
         )
@@ -133,9 +158,25 @@ def lint(
         help="Leave out a finding type (missing_doi) or a whole category (consistency); "
         "repeatable, and added to the library's lint-ignore setting",
     ),
+    severity: LintSeverity = typer.Option(
+        LintSeverity.INFO,
+        "--severity",
+        help="Report only findings at least this severe: error, warning, or info (all)",
+    ),
+    summary: bool = typer.Option(
+        False,
+        "--summary",
+        help="Report counts (by severity, category and type) without listing each finding; "
+        "the omitted count is reported as issues_omitted",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Validate entries and report issues (accepts multiple files for CI gating)."""
+    """Validate entries and report issues (accepts multiple files for CI gating).
+
+    `--category` and `--severity` narrow what is reported, and `--strict`
+    fails on what remains; `--summary` keeps every count but leaves out the
+    per-finding list.
+    """
     categories = {item.value for item in category}
     unknown = unknown_ignore_names(ignore)
     if unknown:
@@ -148,7 +189,7 @@ def lint(
     _run_checks(
         files,
         "lint",
-        lambda file: _lint_one(file, categories, ignores),
+        lambda file: _lint_one(file, categories, ignores, severity.value, summary),
         json_output,
         strict,
     )

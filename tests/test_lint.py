@@ -1,6 +1,7 @@
 """Tests for linting / validation checks."""
 
 import ast
+import json
 from pathlib import Path
 
 import pytest
@@ -1194,3 +1195,32 @@ def test_former_metadata_key_names_its_replacement_and_checks_its_value() -> Non
     assert "former name of 'pinax-fetch-policy'" in issues[0].message
     assert "metadata set FILE pinax-fetch-policy" in issues[0].message
     assert "prepring" in issues[1].message
+
+
+def test_lint_severity_and_summary_keep_the_report_small_without_hiding_counts(
+    tmp_path: Path,
+) -> None:
+    from typer.testing import CliRunner
+
+    from pynakes.cli import app
+
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@article{Euler1748,\n  title = {Introductio},\n  doi = {not a doi},\n}\n\n"
+        "@article{Gauss1801,\n  title = {Disquisitiones},\n}\n",
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+
+    full = json.loads(runner.invoke(app, ["lint", str(bib), "--json"]).output)
+    narrowed = json.loads(
+        runner.invoke(app, ["lint", str(bib), "--severity", "error", "--json"]).output
+    )
+    summary = json.loads(runner.invoke(app, ["lint", str(bib), "--summary", "--json"]).output)
+
+    assert {issue["severity"] for issue in narrowed["issues"]} <= {"error"}
+    assert narrowed["summary"]["warnings"] == narrowed["summary"]["info"] == 0
+    assert summary["issues"] == []
+    assert summary["issues_omitted"] == full["summary"]["issues"] > 0
+    assert summary["summary"] == full["summary"]
+    assert sum(full["summary"]["by_type"].values()) == full["summary"]["issues"]

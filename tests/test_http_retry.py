@@ -264,3 +264,91 @@ def test_a_server_error_that_outlasts_every_retry_is_not_rate_limiting() -> None
     with pytest.raises(ProviderFetchError) as caught:
         fetch_bytes("https://example.test", opener=opener, sleep=lambda _: None)
     assert not isinstance(caught.value, _http.ProviderRateLimitedError)
+
+
+# --- metadata lookups (fetch_json) -------------------------------------------
+
+
+def _lookup(opener, monkeypatch) -> tuple[dict | None, list[float]]:
+    slept: list[float] = []
+    monkeypatch.setattr(_http, "_sleep", slept.append)
+    data = _http.fetch_json(
+        "https://example.test/works/1",
+        namespace="test",
+        identifier="10.5555/one",
+        provider="Example",
+        opener=opener,
+    )
+    return data, slept
+
+
+def test_a_throttled_metadata_lookup_is_retried(monkeypatch) -> None:
+    # A JSON lookup used to fail on the first 429, so a busy provider turned a
+    # bulk enrichment into a list of "unresolved" entries nobody had checked.
+    opener = _opener_raising(_http_error(429, {"Retry-After": "2"}), then=b'{"ok": 1}')
+
+    data, slept = _lookup(opener, monkeypatch)
+
+    assert data == {"ok": 1}
+    assert slept == [2.0]
+
+
+def test_a_lookup_throttled_through_every_retry_is_reported_as_rate_limited(monkeypatch) -> None:
+    opener = _opener_raising(*[_http_error(429)] * _http.MAX_ATTEMPTS)
+
+    with pytest.raises(_http.ProviderRateLimitedError, match="HTTP 429"):
+        _lookup(opener, monkeypatch)
+    assert len(opener.calls) == _http.MAX_ATTEMPTS
+
+
+def test_a_missing_record_is_an_answer_and_is_not_retried(monkeypatch) -> None:
+    opener = _opener_raising(_http_error(404))
+
+    data, slept = _lookup(opener, monkeypatch)
+
+    assert data is None
+    assert slept == []
+    assert len(opener.calls) == 1
+
+
+def test_a_refusal_is_not_retried(monkeypatch) -> None:
+    opener = _opener_raising(_http_error(403))
+
+    with pytest.raises(ProviderFetchError, match="HTTP 403") as caught:
+        _lookup(opener, monkeypatch)
+    assert not isinstance(caught.value, _http.ProviderRateLimitedError)
+    assert len(opener.calls) == 1
+
+
+def test_the_retry_listener_hears_each_wait() -> None:
+    heard: list[tuple[str, float, int]] = []
+    token = _http.RETRY_LISTENER.set(
+        lambda message, delay, attempt: heard.append((message, delay, attempt))
+    )
+    try:
+        fetch_bytes(
+            "https://example.test",
+            opener=_opener_raising(_http_error(503)),
+            sleep=lambda delay: None,
+            timeout=5.0,
+        )
+    finally:
+        _http.RETRY_LISTENER.reset(token)
+
+    assert [(delay, attempt) for _, delay, attempt in heard] == [(1.0, 2)]
+    assert "HTTP 503" in heard[0][0]
+
+
+def test_pacing_spaces_requests_to_one_provider_host(monkeypatch) -> None:
+    clock = [100.0]
+    monkeypatch.setattr(_http.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(_http, "PROVIDER_MIN_INTERVAL", {"api.example.test": 0.5})
+    monkeypatch.setattr(_http, "_next_slot", {})
+    waits: list[float] = []
+
+    for _ in range(3):
+        _http.pace("https://api.example.test/works/1", sleep=waits.append)
+    _http.pace("https://other.example.test/", sleep=waits.append)
+
+    # Three back-to-back requests reserve consecutive slots; another host waits for none.
+    assert waits == [0.5, 1.0]

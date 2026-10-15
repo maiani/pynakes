@@ -28,10 +28,34 @@ def fetch_report_lines(
             lines.append(f"{skipped_prefix} {item['key']} ({item['reason']}){_tried(item)}.")
     for item in report["failed"]:
         lines.append(f"{failed_prefix} {item['key']} ({item['error']}){_tried(item)}.")
+    for item in report.get("discovered", ()):
+        lines.append(_discovered_line(item))
     summary = report.get("summary")
     if summary and (report["skipped"] or report["failed"]):
         lines.append(_summary_line(summary))
+    coverage = report.get("coverage")
+    if coverage and coverage["missing"]:
+        lines.append(_coverage_line(coverage))
     return lines
+
+
+def _discovered_line(item: dict) -> str:
+    if item["status"] == "linked":
+        written = f"; recorded {', '.join(item['written'])}" if item.get("written") else ""
+        return (
+            f"Found arXiv:{item['arxiv_id']} for {item['key']} "
+            f"(confirmed by {str(item.get('verified_by', '')).replace('_', ' ')}{written})."
+        )
+    detail = f": {item['message']}" if item.get("message") else ""
+    return f"arXiv id lookup for {item['key']}: {item['status'].replace('_', ' ')}{detail}."
+
+
+def _coverage_line(coverage: dict) -> str:
+    missing = "; ".join(f"{item['key']} ({item['reason']})" for item in coverage["missing"])
+    return (
+        f"Coverage: {coverage['with_pdf']} of {coverage['entries']} entries have a PDF; "
+        f"{len(coverage['missing'])} still missing what was requested: {missing}."
+    )
 
 
 def _tried(item: dict) -> str:

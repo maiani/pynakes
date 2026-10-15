@@ -21,6 +21,7 @@ from __future__ import annotations
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from pynakes._identifiers import normalize_doi
 from pynakes._integrity_common import (
@@ -43,6 +44,7 @@ from pynakes._integrity_common import (
     _has_retraction_flag,
     _map_concurrently,
     _remote_container,
+    lookup_warning,
 )
 from pynakes._integrity_published import (
     _fetch_arxiv_fields,
@@ -206,7 +208,7 @@ class _EnrichFetchResult:
     """Result of one entry's remote-metadata fetch, for the sequential apply pass."""
 
     remote: BibEntry | None = None
-    warnings: list[dict[str, str]] = field(default_factory=list)
+    warnings: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _enrich_fetch_job(
@@ -219,18 +221,18 @@ def _enrich_fetch_job(
             result.remote = aps_provider.fetch_entry(normalized, journal, cache_file=cache_file)
         except ProviderFetchError as exc:
             result.warnings.append(
-                {
-                    "type": "preferred_provider_unresolved",
-                    "key": key,
-                    "message": f"Could not fetch APS Harvest metadata for DOI "
-                    f"{normalized!r}: {exc}",
-                }
+                lookup_warning(
+                    "preferred_provider_unresolved",
+                    key,
+                    f"Could not fetch APS Harvest metadata for DOI {normalized!r}: {exc}",
+                    exc,
+                )
             )
     if result.remote is None:
         try:
             result.remote = fetch_doi_entry(normalized, cache_file=cache_file)
         except MetadataFetchError as exc:
-            result.warnings.append({"type": "doi_unresolved", "key": key, "message": str(exc)})
+            result.warnings.append(lookup_warning("doi_unresolved", key, str(exc), exc))
     if result.remote is not None and crossref_provider.lacks_article_locator(result.remote.fields):
         try:
             work = crossref_provider.fetch_work_by_doi(normalized, cache_file=cache_file)
@@ -240,11 +242,12 @@ def _enrich_fetch_job(
                     result.remote.fields.setdefault(field_name, value)
         except ProviderFetchError as exc:
             result.warnings.append(
-                {
-                    "type": "crossref_supplement_unresolved",
-                    "key": key,
-                    "message": f"Could not supplement DOI {normalized!r} from Crossref: {exc}",
-                }
+                lookup_warning(
+                    "crossref_supplement_unresolved",
+                    key,
+                    f"Could not supplement DOI {normalized!r} from Crossref: {exc}",
+                    exc,
+                )
             )
     return result
 

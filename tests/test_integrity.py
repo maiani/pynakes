@@ -1080,3 +1080,74 @@ def test_verify_reports_rate_limiting_as_a_warning_not_an_entry_error(monkeypatc
     (issue,) = report.issues
     assert (issue.type, issue.severity) == ("rate_limited", "warning")
     assert "--concurrency" in issue.message
+
+
+def test_enrich_reports_throttled_lookups_as_not_checked(monkeypatch, tmp_path: Path) -> None:
+    # "No match" and "not checked because the provider throttled us" used to
+    # look alike; a bulk run left the second kind for the caller to find.
+    from pynakes.providers._http import ProviderRateLimitedError
+
+    def throttled(d: str) -> str:
+        if d.endswith("busy"):
+            raise ProviderRateLimitedError("DOI lookup failed: HTTP 429 (rate limited: HTTP 429)")
+        raise ProviderFetchError("DOI lookup failed: HTTP 403")
+
+    monkeypatch.setattr(doi, "fetch_bibtex", throttled)
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@article{Busy,\n  title = {T},\n  doi = {10.5555/busy}\n}\n\n"
+        "@article{Refused,\n  title = {U},\n  doi = {10.5555/refused}\n}\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app, ["enrich", str(bib), "--online", "--concurrency", "8", "--dry-run", "--json"]
+    )
+
+    data = json.loads(result.output)
+    by_key = {w["key"]: w for w in data["warnings"]}
+    assert by_key["Busy"]["checked"] is False
+    assert by_key["Busy"]["rate_limited"] is True
+    assert by_key["Busy"]["retryable"] is True
+    assert by_key["Refused"]["rate_limited"] is False
+    assert by_key["Refused"]["retryable"] is False
+    assert data["lookups"] == {
+        "not_checked": ["Busy", "Refused"],
+        "rate_limited": ["Busy"],
+        "retryable": ["Busy"],
+        "retry": "--key Busy --concurrency 2",
+    }
+
+
+def test_enrich_only_field_applies_a_reviewed_subset(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
+    bib = tmp_path / "refs.bib"
+    source = "@article{A,\n  title = {A Correct Title},\n  doi = {10.5555/example}\n}\n"
+    bib.write_text(source, encoding="utf-8")
+
+    preview = json.loads(
+        runner.invoke(app, ["enrich", str(bib), "--online", "--dry-run", "--json"]).output
+    )
+    assert {"journal", "year"} <= {update["field"] for update in preview["updates"]}
+
+    result = runner.invoke(
+        app,
+        [
+            "enrich",
+            str(bib),
+            "--online",
+            "--only-field",
+            "year",
+            "--expect-sha256",
+            preview["source_sha256"],
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert [update["field"] for update in data["updates"]] == ["year"]
+    assert data["only_fields"] == ["year"]
+    written = bib.read_text(encoding="utf-8")
+    assert "year = {2024}" in written
+    assert "journal" not in written

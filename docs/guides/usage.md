@@ -663,6 +663,15 @@ the Pinax manifest with the material files that exist: it drops records for
 keys the library no longer has and for files that are gone, and records files
 the manifest does not know. It changes only the manifest — no material file and
 no byte of the library.
+With `--reclassify` it also moves each published PDF that `asset check` reports
+as `misclassified` — a preprint, on recorded evidence — to the preprint path,
+with its manifest record; a file whose preprint path is taken is reported as a
+conflict and left alone.
+
+`asset check` keeps two questions apart under `coverage`: `linked_files`
+counts `file`-field links (the top-level `checked`/`ok`/`missing`), and
+`materials` counts the entries that have a PDF in Pinax and names those that
+do not.
 
 `asset check` takes one or more libraries as positional arguments (handy for CI
 gating). `asset fetch` downloads materials for one entry or for a whole library;

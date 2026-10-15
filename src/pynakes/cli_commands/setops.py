@@ -94,11 +94,14 @@ def _copy_pinax_materials(
         raise ValueError(f"Pinax output requires unique citation keys: {keys}")
     target = _ensure_pinax_output(lib, out, preserve_files_dir=preserve_files_dir)
     copied: list[dict[str, str]] = []
-    if dry_run:
-        return copied
     for entry in lib.entries.values():
         source = sources.get(id(entry))
-        if source is not None:
+        if source is None:
+            continue
+        if dry_run:
+            # Name what would be copied: no diff of the .bib shows material files.
+            copied.extend(target.plan_material_copy(source, entry.key))
+        else:
             copied.extend(target.copy_materials_from(source, entry.key))
     return copied
 

@@ -71,13 +71,61 @@ comparison context for it, and save the selection for later.
   (stderr outside `--json`), and is listed in `capabilities` under
   `deprecations`.
 
+- **Collection coverage.** `asset fetch` reports `coverage` — the entries
+  still missing a requested PDF, each with the reason the run recorded — and a
+  top-level `complete`, so a partial run is visible without reading nested
+  items. `asset check` reports `coverage`, keeping `file`-field links
+  (`linked_files`) apart from Pinax material coverage (`materials`).
+- **Fetch progress stream.** `asset fetch --progress jsonl` writes one JSON
+  event per line on stderr, also with `--json`: the entry being worked on,
+  each material's outcome, and `retry` events with the wait and the attempt
+  that follows. `--progress none` silences the terminal bar.
+- **arXiv-id discovery.** `asset fetch --discover` looks up a missing arXiv id
+  by DOI when a preprint is needed and checks it against arXiv's record before
+  using it. A confirmed id is written as `eprint` only when the entry has
+  none; an unconfirmed one is reported as `ambiguous` and not used. Each
+  lookup is listed under `discovered`.
+- **Repairing misclassified PDFs.** `asset check` reports published PDFs that
+  are really preprints under `misclassified`, with the evidence (a recorded
+  arXiv source, an arXiv DOI, or arXiv's stamp in the PDF), and
+  `asset repair --reclassify` moves them to the preprint path with their
+  manifest records.
+- **Reviewed enrichment.** `enrich --only-field NAMES` applies only updates to
+  the named fields, so a reviewed `--dry-run` can be applied in part under
+  `--expect-sha256`.
+- **Lookup coverage.** A failed provider lookup in `enrich` is reported with
+  `checked: false`, `rate_limited`, and `retryable`, and `lookups` names the
+  entries not checked and the arguments that retry them; a throttle is no
+  longer indistinguishable from "no match".
+- `lint --severity` reports only findings at least that severe, and
+  `lint --summary` reports every count without listing each finding
+  (`issues_omitted`). The summary gains `by_type`.
 - `lint` reports invisible characters in field values (`invisible_character`:
   the code point, its name, and its offset), and `normalize` removes them
   (step `invisible-characters`). Zero-width joiners and directional marks are
   kept.
+- `corpus combine --dry-run` lists the Pinax materials it would copy under
+  `pinax_materials`.
+- Every fetch attempt records its `stage` (`resolve` or `download`) and
+  whether it is `retryable`; a fetched item records its `artifact` and
+  `source`.
 
 ### Fixed
 
+- A PDF served by arXiv was stored as the published PDF when a DOI route led
+  to it; it is now stored as the preprint, and publisher copies are tried
+  first. An arXiv DOI (`10.48550/arXiv.*`) is read as the arXiv id it encodes
+  rather than looked up as a published version.
+- A failed DOI landing-page or open-access lookup was reported with no
+  attempts; the request, its status, and its error are now recorded.
+- APS PDF routes are built with the journal prefix in APS's own spelling
+  (`PhysRevB`, not `physrevb`): the publisher serves the PDF only under that
+  path, so a lowercased DOI produced a 404. Under institutional access the
+  canonical APS route is tried even when the DOI landing page refuses.
+- OpenAlex, Crossref, and Semantic Scholar lookups were not retried: a single
+  HTTP 429 failed the lookup. They are now retried with `Retry-After` and
+  backoff like downloads, and requests to each provider's API host are paced
+  to its published rate for unauthenticated clients.
 - Imported records drop invisible characters (a byte-order mark inside a
   title, a zero-width space).
 
