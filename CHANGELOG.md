@@ -12,73 +12,82 @@ sections. Historical releases retain their original headings.
 
 ## [Unreleased]
 
-Research context and reusable queries: select a set of papers, read bounded
-comparison context for it, and save the selection for later.
+Research context and reusable selections: select a set of papers, read bounded
+comparison context for it, and save the selection for later. Collecting
+materials for a library now reports what is still missing and why. Every
+behaviour-shaping option is available three ways — a flag, a library setting,
+and that setting editable through `metadata set` — and the CLI loses several
+commands and options that duplicated each other.
 
 ### Added
 
-- **Materials and provenance in reads.** `ref show --key … --include
-  materials,provenance` (and `ref show --where … --include`) adds the materials
-  available for each entry (Pinax materials for the key and `file` links with
-  their resolution status) and its recorded provenance (the Pinax manifest
-  record of each material and the directives above the entry). Parts the
-  library lacks are listed under `missing`; nothing is inferred.
+#### Selecting and reading entries
+
 - **Bounded reads.** `ref show --key`, `ref show --where`, and `search` share one
   contract: `--limit` pages a deterministic selection (`--limit 0` only
   counts), `page.next_cursor` resumes it with `--cursor`, and `--max-chars`
   cuts text values, listing each cut under `truncated` with its full length
-  and naming the keys to re-read under `retrieve_full`. `ref show` takes
-  `--select` to return only the named fields, with
-  `missing_fields` and `omitted_fields` keeping absent and left-out values
-  apart. A single-key `ref show` accepts `--select`, `--max-chars`, and
-  `--include` too; without them its output is unchanged. Limits count
-  characters of the stored text, never tokens.
+  and naming the keys to re-read under `retrieve_full`. `--select` returns only
+  the named fields, with `missing_fields` and `omitted_fields` keeping absent
+  and left-out values apart. A single-key `ref show` accepts `--select`,
+  `--max-chars`, and `--include` too; without them its output is unchanged.
+  Limits count characters of the stored text, never tokens.
 - **Snapshot-bound cursors.** A cursor carries digests of the library and the
   selection it was issued for. Resuming against a changed library is refused
   with the new `StaleCursor` conflict (exit 2); resuming another selection is
   `InvalidInput`.
-- **Saved queries.** `query list`, `query set`, and `query remove` keep named
-  `--where` expressions as `query-<name>` lines in `pynakes-meta` (new
-  metadata category `queries`). Expressions are validated with the shared
-  selector parser by `query set`, `metadata set`, and `lint`. A saved query
-  is the `--where` predicate `query "name"`, so every command that selects
-  entries runs it against the current entries and can narrow it further; a
-  saved expression may refer to other saved queries, and a missing or
-  circular reference is refused.
+- **Materials and provenance in reads.** `ref show … --include
+  materials,provenance` adds the materials available for each entry (Pinax
+  materials for the key and `file` links with their resolution status) and
+  its recorded provenance (the Pinax manifest record of each material and the
+  directives above the entry). Parts the library lacks are listed under
+  `missing`; nothing is inferred.
 - **`ref show --where`** summarizes every entry a selector matches, in file
   order, under the bounded-read options; with `--key` the two narrow each
   other.
-- `used`/`unused` work in every `--where`, resolved against the library's
-  linked `tex-sources` (previously only `corpus split --route` with
-  `--tex`/`--aux`). An expression that tests citations in a library with no
-  linked sources is a `NoSources` error.
+- **Saved queries.** `query list`, `query set`, and `query remove` keep named
+  `--where` expressions as `query-<name>` lines in `pynakes-meta` (new
+  metadata category `queries`), validated by `query set`, `metadata set`, and
+  `lint`. A saved query is the `--where` predicate `query "name"`, so every
+  command that selects entries runs it against the current entries and can
+  narrow it further; a saved expression may refer to other saved queries, and
+  a missing or circular reference is refused.
+- **`used`/`unused` in every `--where`**, resolved against the library's linked
+  `tex-sources` (previously only `corpus split --route` with `--tex`/`--aux`,
+  which now also falls back to `tex-sources`). An expression that tests
+  citations in a library with no linked sources is a `NoSources` error;
+  linked sources missing on disk are warnings.
+- `search --in FIELDS` looks for the terms only in those stored fields, and
+  `search --select FIELDS` returns only those fields per match. Each does one
+  job; they combine freely. `search` reports the bounds it applied under
+  `bounds`.
+- `verify --key` / `--where` check only the selected entries of one library,
+  as `enrich` already did; `--published` follows the same selection.
+- `scrub --where` / `--key` keep only the selected entries in the public copy,
+  selected before scrubbing: `scrub refs.bib --where used --out public.bib`
+  releases just the cited entries.
+
+#### Describing and checking a library
+
 - **`analyze`** and `pynakes.analysis`: offline descriptive counts for one
   bibliography in named sections — entries and duplicate keys, types, years,
   most frequent authors and venues (`--top`), identifier and field coverage,
   groups, `lint` findings, and linked-file and Pinax materials. `--section`
   selects sections. The `lint` section equals `lint`'s summary; duplicate-key
   and empty libraries are counted as they are.
-- `capabilities` describes the bounded-read contract (`bounded_reads`), saved
-  queries (`saved_queries`), and the analysis sections (`analysis`).
-- An agent evaluation suite in `evals/agent`: invented and historical fixtures,
-  tasks for ambiguous references, duplicate conflicts, concurrent edits, and
-  bounded reads, and `scripts/agent_eval.py` to measure the reference
-  solutions' call counts and response sizes and to score recorded agent runs.
-  It is repository tooling, not shipped in the sdist.
-- Python API: `search_entries(search_in=...)` scopes matching without
-  restricting the reported fields; `fields=` keeps its old meaning.
-- Python API: `pynakes.bounded`, `pynakes.entry_reader`,
-  `pynakes.saved_queries`, `pynakes.analysis`, and `pynakes.lint.suppress_findings`
-  (the waiver step `lint` applies).
+- **Narrower lint reports.** `lint --only TYPES` reports only the named
+  finding types (the counterpart of `--ignore`), `--severity` only findings at
+  least that severe, and `--summary` every count without listing each finding
+  (`issues_omitted`). The summary gains `by_type`, and each `duplicate_key`
+  finding lists the position of every entry sharing the key under `instances`.
+  `lint --include-ignored` also reports what the library's `lint-ignore` and
+  ignore directives waive.
+- **Invisible characters.** `lint` reports them in field values
+  (`invisible_character`: the code point, its name, and its offset), and
+  `normalize` removes them (step `invisible-characters`). Zero-width joiners
+  and directional marks are kept.
 
-- `search --in FIELDS` looks for the terms only in those stored fields, and
-  `search --select FIELDS` returns only those fields per match, with
-  `missing_fields` and `omitted_fields`. Each does one job; they combine
-  freely. `search` reports the bounds it applied under `bounds`.
-- Deprecation warnings: a deprecated form still works, adds
-  `{"type": "deprecated", "old", "new", "removal", "message"}` to `warnings`
-  (stderr outside `--json`), and is listed in `capabilities` under
-  `deprecations`.
+#### Collecting materials
 
 - **Collection coverage.** `asset fetch` reports `coverage` — the entries
   still missing a requested PDF, each with the reason the run recorded — and a
@@ -99,6 +108,10 @@ comparison context for it, and save the selection for later.
   arXiv source, an arXiv DOI, or arXiv's stamp in the PDF), and
   `asset repair --reclassify` moves them to the preprint path with their
   manifest records.
+- Every fetch attempt records its `stage` (`resolve` or `download`) and
+  whether it is `retryable`; a fetched item records its `artifact` and
+  `source`. `corpus combine --dry-run` lists the Pinax materials it would copy
+  under `pinax_materials`.
 - **Reviewed enrichment.** `enrich --only-field NAMES` applies only updates to
   the named fields, so a reviewed `--dry-run` can be applied in part under
   `--expect-sha256`.
@@ -106,58 +119,90 @@ comparison context for it, and save the selection for later.
   `checked: false`, `rate_limited`, and `retryable`, and `lookups` names the
   entries not checked and the arguments that retry them; a throttle is no
   longer indistinguishable from "no match".
-- `normalize --months` and `--invisible-characters` (and the
-  `normalize-months` / `normalize-invisible-characters` settings) turn those
-  steps on or off, like every other step; before, only `--only` could leave
-  them out.
-- The `verify-published` and `enrich-published` settings turn on the
-  published-version pass of `verify` and `enrich`; `--published/--no-published`
-  overrides them. A setting never enables the network: offline, `enrich`
-  skips the pass with a `published_skipped_offline` warning. New metadata
-  category `integrity`.
-- The `lint-severity` setting sets the least severe finding `lint` reports;
-  `--severity` overrides it. `lint --include-ignored` also reports what the
-  library's `lint-ignore` and ignore directives waive, so a run can override
-  them too.
-- The `import-key-source` setting chooses `ref import`'s key source
-  (`generated` or `provider`); `--key-source` overrides it per run.
-- The `pinax-fetch-access` and `pinax-discover-arxiv` settings choose
-  `asset fetch`'s access mode and arXiv-id discovery for the library;
-  `--access` and `--discover/--no-discover` override them per run, and
-  `Bibliography.fetch_materials(access=None, discover=None)` reads them.
-- `verify --key` / `--where` check only the selected entries of one library,
-  as `enrich` already did; `--published` follows the same selection.
-- `lint --only TYPES` reports only the named finding types, the counterpart of
-  `--ignore`.
-- `scrub --where` / `--key` keep only the selected entries in the copy, so
-  `scrub refs.bib --where used --out public.bib` releases just the cited
-  entries.
-- `corpus split --route` rules resolve `used`/`unused` against the linked
-  `tex-sources` when no `--tex`/`--aux` is given.
-- A read no longer re-parses the library to report an empty change plan.
+
+#### Library settings
+
+Each setting is validated by `metadata set`, and the matching flag overrides
+it per run in either direction.
+
+- `normalize-months` and `normalize-invisible-characters`, with the new
+  `normalize --months` and `--invisible-characters`: those steps switch on and
+  off like every other step; before, only `--only` could leave them out.
+- `lint-severity`: the least severe finding `lint` (and `inspect --insights`)
+  reports; `--severity` overrides it.
+- `pinax-fetch-access` and `pinax-discover-arxiv`: `asset fetch`'s access mode
+  and arXiv-id discovery; `--access` and `--discover/--no-discover` override
+  them.
+- `import-key-source`: whether `ref import` generates a key or takes the
+  provider's; `--key-source` overrides it.
+- `verify-published` and `enrich-published` (new metadata category
+  `integrity`): the published-version pass of `verify` and `enrich`;
+  `--published/--no-published` overrides them. A setting never enables the
+  network: offline, `enrich` skips the pass with a
+  `published_skipped_offline` warning.
+
+#### Clients, API, and tooling
+
 - `inspect --insights` also returns the `tex scan` and `asset check`
   envelopes from the same snapshot, so a client draws a library from one
   process and one parse. `inspect --origin PATH` names where the library is
   saved when FILE is a copy (an editor's unsaved buffer): `tex-sources`,
   `pinax-files-dir`, and relative `file` links resolve from there.
-- `lint` scans each entry's source once rather than once per check and field,
-  and parses each author list once for key-pattern checks: about a fifth
-  faster on a 3,000-entry library.
+- `capabilities` describes the bounded-read contract (`bounded_reads`), saved
+  queries (`saved_queries`), the analysis sections (`analysis`), material
+  collection (`material_collection`), and deprecated forms (`deprecations`).
+- Deprecation warnings: a deprecated form still works, adds
+  `{"type": "deprecated", "old", "new", "removal", "message"}` to `warnings`
+  (stderr outside `--json`), and is listed in `capabilities`.
+- Python API: `pynakes.bounded`, `pynakes.entry_reader`,
+  `pynakes.saved_queries`, `pynakes.analysis`, `pynakes.lint.suppress_findings`
+  (the waiver step `lint` applies), `Bibliography.remove_entries()` for
+  specific physical entries, and `search_entries(search_in=...)`, which scopes
+  matching without restricting the reported fields (`fields=` keeps its
+  meaning). Settings resolve in the
+  API as on the CLI — explicit argument, then library setting, then default:
+  `fetch_materials(access=None, discover=None)`,
+  `import_reference(key_source=None)`, `library_lint_severity()`, and
+  `library_published()`.
+- An agent evaluation suite in `evals/agent`: invented and historical fixtures,
+  tasks for ambiguous references, duplicate conflicts, concurrent edits, and
+  bounded reads, and `scripts/agent_eval.py` to measure the reference
+  solutions' call counts and response sizes and to score recorded agent runs.
+  It is repository tooling, not shipped in the sdist.
+
+### Changed
+
+- `search` reports a `page` object and computes every match before applying
+  `--limit`, so `page.total` counts them all; `--no-rank` no longer stops the
+  scan early.
+
+### Performance
+
 - Commands start faster: the HTTP client, the reference importer, the
   progress bars, and the installed-version lookup load only when a command
   uses them, so an offline command no longer imports `httpx`.
-- `lint --severity` reports only findings at least that severe, and
-  `lint --summary` reports every count without listing each finding
-  (`issues_omitted`). The summary gains `by_type`.
-- `lint` reports invisible characters in field values (`invisible_character`:
-  the code point, its name, and its offset), and `normalize` removes them
-  (step `invisible-characters`). Zero-width joiners and directional marks are
-  kept.
-- `corpus combine --dry-run` lists the Pinax materials it would copy under
-  `pinax_materials`.
-- Every fetch attempt records its `stage` (`resolve` or `download`) and
-  whether it is `retryable`; a fetched item records its `artifact` and
-  `source`.
+- `lint` scans each entry's source once rather than once per check and field,
+  and parses each author list once for key-pattern checks: about a fifth
+  faster on a 3,000-entry library.
+- A read no longer re-parses the library to report an empty change plan.
+
+### Deprecated
+
+Each still works and warns in 0.8, and is removed in 0.9.0.
+
+- `keys check`: use `lint --only duplicate_key` (with `--strict` to gate).
+- `tex scan --out`, `--group`, and `--keyword`: `tex scan` only reports.
+  Select the cited entries with `--where used` in the command that acts on
+  them — `corpus combine FILE --where used --out OUT`, `scrub FILE --where used
+  --out OUT`, or `fields append FILE keywords WORD --where used`.
+- `format --entry-order` and the `format-entry-order` setting: entry order is
+  not only layout (BibTeX reads the first of several entries sharing a key,
+  and an unsorted style with `\nocite{*}` lists entries in file order), so
+  sorting belongs to `normalize --sort-by` and the `sort-order` setting, which
+  move entries byte for byte. `format` warns whenever it reorders.
+- `search --in-field` restricted both the fields searched and the fields
+  returned. Replace `--in-field F` with `--in F --select F`; it cannot be
+  combined with `--in` or `--select`.
 
 ### Fixed
 
@@ -180,37 +225,6 @@ comparison context for it, and save the selection for later.
   to its published rate for unauthenticated clients.
 - Imported records drop invisible characters (a byte-order mark inside a
   title, a zero-width space).
-
-### Deprecated
-
-- `keys check` is deprecated and removed in 0.9.0: use
-  `lint --only duplicate_key` (with `--strict` to gate). Each `duplicate_key`
-  finding now lists the position of every entry sharing the key under
-  `instances`.
-
-- `tex scan --out`, `--group`, and `--keyword` are deprecated and removed in
-  0.9.0: `tex scan` only reports. Select the cited entries with `--where used`
-  in the command that acts on them — `corpus combine FILE --where used --out
-  OUT`, `scrub FILE --where used --out OUT`, or `fields append FILE keywords
-  WORD --where used`.
-
-- `format --entry-order` and the `format-entry-order` setting are
-  deprecated and removed in 0.9.0: entry order is not only layout (BibTeX
-  reads the first of several entries sharing a key, and an unsorted style with
-  `\nocite{*}` lists entries in file order), so sorting belongs to
-  `normalize --sort-by` and the `sort-order` setting, which move entries byte
-  for byte. `format` reports a `deprecated` warning whenever it reorders.
-
-- `search --in-field` restricted both the fields searched and the fields
-  returned. Replace `--in-field F` with `--in F --select F`. It still works
-  and warns in 0.8, cannot be combined with `--in` or `--select`, and is
-  removed in 0.9.0.
-
-### Changed
-
-- `search` reports a `page` object and computes every match before applying
-  `--limit`, so `page.total` counts them all; `--no-rank` no longer stops the
-  scan early.
 
 ## [0.7.0] - 2026-10-13
 
