@@ -78,6 +78,7 @@ def test_normalize_library_runs_standard_pass() -> None:
         "title_fields": {"title": 1},
         "title_markup": 0,
         "dropped_fields": 0,
+        "invisible_characters": 0,
         "authors": 1,
         "journals": 0,
         "dois": 1,

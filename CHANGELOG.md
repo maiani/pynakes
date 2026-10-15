@@ -71,6 +71,16 @@ comparison context for it, and save the selection for later.
   (stderr outside `--json`), and is listed in `capabilities` under
   `deprecations`.
 
+- `lint` reports invisible characters in field values (`invisible_character`:
+  the code point, its name, and its offset), and `normalize` removes them
+  (step `invisible-characters`). Zero-width joiners and directional marks are
+  kept.
+
+### Fixed
+
+- Imported records drop invisible characters (a byte-order mark inside a
+  title, a zero-width space).
+
 ### Deprecated
 
 - `search --in-field` restricted both the fields searched and the fields

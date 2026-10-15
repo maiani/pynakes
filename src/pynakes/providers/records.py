@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from pynakes._invisible import strip_invisible
 from pynakes._markup import TITLE_LIKE_FIELDS, markup_to_latex
 from pynakes._text_utils import check_balanced_braces
 from pynakes.formatters._pages import normalize_page_numbers
@@ -44,12 +45,14 @@ class ReferenceMetadata:
     provider_key: str | None = None
 
     def __post_init__(self) -> None:
-        """Normalize field and identifier names, and repair provider page ranges."""
+        """Normalize field and identifier names, drop invisible characters, repair page ranges."""
         self.provider = self.provider.strip()
         self.entry_type = self.entry_type.strip().lower()
-        self.fields = {name.strip(): value for name, value in self.fields.items()}
+        # Providers occasionally deposit characters that render as nothing (a
+        # byte-order mark inside a title); they never belong in a field.
+        self.fields = {name.strip(): strip_invisible(value) for name, value in self.fields.items()}
         self.field_expressions = {
-            name.strip(): value for name, value in self.field_expressions.items()
+            name.strip(): strip_invisible(value) for name, value in self.field_expressions.items()
         }
         self.identifiers = {name.strip().lower(): value for name, value in self.identifiers.items()}
         for name, value in self.fields.items():

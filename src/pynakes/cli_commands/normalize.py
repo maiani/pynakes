@@ -247,6 +247,7 @@ def normalize(
     counts = [
         ("titles", sum(report.title_fields.values()), "titles"),
         ("title_markup", report.title_markup, "title_markup"),
+        ("invisible_characters", report.invisible_characters, "invisible_characters"),
         ("authors", report.authors, "authors"),
         ("journals", report.journals, "journals"),
         ("dois", report.dois, "dois"),

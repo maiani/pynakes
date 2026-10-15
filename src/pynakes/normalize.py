@@ -8,6 +8,7 @@ from pynakes import fields as field_ops
 from pynakes import journals as journal_ops
 from pynakes._calendar import MONTH_ABBR_TO_NAME, MONTH_NUM_TO_ABBR, month_name_to_int
 from pynakes._identifiers import normalize_doi
+from pynakes._invisible import remove_invisible
 from pynakes._markup import TITLE_LIKE_FIELDS
 from pynakes._normalize_steps import (
     NOT_IN_ONLY,
@@ -109,6 +110,8 @@ class NormalizeResult:
     #: Entries whose title-like fields had provider markup converted to LaTeX.
     title_markup: int = 0
     dropped_fields: int = 0
+    #: Entries whose field values had invisible characters removed.
+    invisible_characters: int = 0
     authors: int = 0
     journals: int = 0
     dois: int = 0
@@ -138,6 +141,7 @@ class NormalizeResult:
             "title_fields": dict(self.title_fields),
             "title_markup": self.title_markup,
             "dropped_fields": self.dropped_fields,
+            "invisible_characters": self.invisible_characters,
             "authors": self.authors,
             "journals": self.journals,
             "dois": self.dois,
@@ -407,6 +411,11 @@ def normalize_library(
     if runs("drop_fields"):
         for drop_field in _resolve_drop_fields(lib, opts.drop_fields):
             result.dropped_fields += field_ops.clear_field(selection, drop_field)
+
+    # Characters that render as nothing (a stray byte-order mark, a zero-width
+    # space) have no place in a field; lint names each one (invisible_character).
+    if runs("invisible_characters"):
+        result.invisible_characters = remove_invisible(selection)
 
     titles_run = runs("titles")
     if titles_run:

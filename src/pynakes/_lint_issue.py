@@ -44,6 +44,7 @@ ISSUE_CATEGORIES: dict[str, LintCategory] = {
     "nonstandard_page_range": "content",
     "title_capitalization_unprotected": "content",
     "title_markup": "content",
+    "invisible_character": "content",
     "unknown_journal": "content",
     "unsupported_citation_key_pattern": "content",
     "noncanonical_entry_type_case": "formatting",

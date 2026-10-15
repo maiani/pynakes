@@ -857,7 +857,7 @@ Normalize entries: titles, authors, journals, DOIs, identifier case, and orderin
 | `--identifier-case` | choice | no | "metadata" | metadata, on, off | Lowercase entry types and field names |
 | `--metadata-formatting` | choice | no | "metadata" | metadata, on, off | Consolidate metadata layout: pynakes-meta top, jabref-meta bottom |
 | `--sort-by` | list[string] | no | null | — | Sort entries by a BibTeX field name; repeat for secondary keys (e.g. --sort-by author --sort-by year:desc). Use "citationkey" (or "key") for the citation key and append ":desc" for descending. "original" keeps the current order. Omit to follow the file's configured sort order. |
-| `--only` | list[string] | no | null | — | Run only these steps, comma-separated and repeatable: metadata, drop-fields, titles, authors, dois, pages, journals, save-actions, months, identifier-case, sort, keys |
+| `--only` | list[string] | no | null | — | Run only these steps, comma-separated and repeatable: metadata, drop-fields, invisible-characters, titles, authors, dois, pages, journals, save-actions, months, identifier-case, sort, keys |
 | `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing. See `pynakes capabilities` for the full grammar. |
 | `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
 | `--dry-run` | boolean | no | false | — | Show changes without writing |

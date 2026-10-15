@@ -34,6 +34,7 @@ from pynakes._lint_directives import (
     entry_ignore_rules,
     is_waived,
 )
+from pynakes._lint_invisible import lint_invisible
 from pynakes._lint_issue import (
     CATEGORY_FIXERS,
     IGNORABLE_NAMES,
@@ -770,5 +771,6 @@ def _lint_entry(
     issues += _lint_doi(entry, fields)
     issues += _lint_pages(entry, fields)
     issues += _lint_title_markup(entry, fields)
+    issues += lint_invisible(entry)
     issues += _lint_groups(entry)
     return issues

@@ -22,6 +22,7 @@ WHOLE_FILE = "acts on the whole file, so it does not run on a selection of entri
 STEPS: tuple[str, ...] = (
     "metadata",
     "drop_fields",
+    "invisible_characters",
     "titles",
     "authors",
     "dois",
