@@ -14,7 +14,6 @@ import sys
 
 import typer
 
-from pynakes import importer as importer_ops
 from pynakes.cli_choices import KeySource
 from pynakes.cli_commands._fetch_report import fetch_report_lines
 from pynakes.cli_common import (
@@ -88,6 +87,9 @@ def import_reference(
     abandon the rest. A single identifier keeps its existing behavior: a failure
     is the command's failure.
     """
+    # The importer pulls in provider and HTTP code; load it only to import.
+    from pynakes import importer as importer_ops
+
     params = RunParams(
         dry_run=dry_run,
         diff=diff,
@@ -238,6 +240,9 @@ def _import_several(
     decide: the other identifiers still have to be resolved, and re-running with
     ``--allow-duplicate`` is the answer if a second copy really was wanted.
     """
+    # The importer pulls in provider and HTTP code; load it only to import.
+    from pynakes import importer as importer_ops
+
     results: list[dict[str, object]] = []
     warnings: list[dict[str, object]] = []
     imported = 0

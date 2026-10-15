@@ -8,7 +8,6 @@ import typer
 import typer.main
 from typer.core import TyperOption
 
-from pynakes import __version__
 from pynakes.capabilities import COMMAND_GROUPS
 from pynakes.cli_commands import (
     add,
@@ -64,13 +63,15 @@ tex_app = typer.Typer(
 )
 asset_app = typer.Typer(help="Fetch and validate Pinax materials", cls=AutoBibGroup)
 corpus_app = typer.Typer(help="Operate across multiple .bib files", cls=AutoBibGroup)
-query_app = typer.Typer(help="Save and run named selector queries", cls=AutoBibGroup)
+query_app = typer.Typer(help="Save, list, and remove named selector queries", cls=AutoBibGroup)
 
 
 def _version_callback(value: bool) -> None:
     """Print the installed package version and exit before command parsing."""
     if value:
-        typer.echo(__version__)
+        import pynakes
+
+        typer.echo(pynakes.__version__)
         raise typer.Exit()
 
 

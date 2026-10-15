@@ -20,7 +20,6 @@ from pynakes import convert as convert_ops
 from pynakes import dedupe as dedupe_ops
 from pynakes import fields as field_ops
 from pynakes import files as file_ops
-from pynakes import importer as importer_ops
 from pynakes import integrity as integrity_ops
 from pynakes import journals as journal_ops
 from pynakes import metadata as metadata_ops
@@ -402,6 +401,10 @@ class BibliographyOperations:
         library's declared ``normalize-*`` and ``format-*`` settings, so it
         needs no clean-up pass of its own. Returns ``(kind, entry)``.
         """
+        # Imported here: the importer pulls in the HTTP stack, which only a
+        # network-backed command should pay for at startup.
+        from pynakes import importer as importer_ops
+
         kind, entry = importer_ops.prepare_imported_reference(
             self.lib,
             identifier,

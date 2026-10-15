@@ -17,7 +17,6 @@ from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.cli import app
 from pynakes.interchange import IMPORT_FORMATS, import_library
-from pynakes.providers import _http
 
 runner = CliRunner()
 MODS_NS = "http://www.loc.gov/mods/v3"
@@ -204,7 +203,7 @@ def provider(monkeypatch, handler):
     transport = httpx.MockTransport(handler)
     original = httpx.Client
     monkeypatch.setattr(
-        _http.httpx, "Client", lambda **kwargs: original(**{**kwargs, "transport": transport})
+        httpx, "Client", lambda **kwargs: original(**{**kwargs, "transport": transport})
     )
 
 

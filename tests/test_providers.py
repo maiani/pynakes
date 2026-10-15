@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 from pynakes.provider_cache import open_cache
-from pynakes.providers import _network, identity, publisher
+from pynakes.providers import _network, _transport, identity, publisher
 from pynakes.providers._http import ProviderFetchError
 from pynakes.providers.metadata import openalex, semantic_scholar
 from pynakes.providers.records import ReferenceMetadata
@@ -365,7 +365,7 @@ def test_discover_publisher_artifacts_uses_the_guarded_client(
 
     assert len(built) == 1
     assert built[0]["trust_env"] is False
-    assert isinstance(built[0]["transport"], _network.PublicTransport)
+    assert isinstance(built[0]["transport"], _transport.PublicTransport)
     assert built[0]["event_hooks"]["request"]
 
 

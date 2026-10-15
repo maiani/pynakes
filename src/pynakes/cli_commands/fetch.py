@@ -5,25 +5,14 @@ Downloads arXiv materials (PDF and source) into the configured Pinax directory.
 
 import json
 import sys
+from collections.abc import Callable
 from enum import Enum
 
 import typer
-from rich.progress import (
-    BarColumn,
-    DownloadColumn,
-    SpinnerColumn,
-    Task,
-    TaskID,
-    TextColumn,
-    TimeElapsedColumn,
-    TransferSpeedColumn,
-)
-from rich.text import Text
 
 from pynakes.cli_checks import strict_option
 from pynakes.cli_choices import Material, ProgressStream
 from pynakes.cli_commands._fetch_report import fetch_report_lines
-from pynakes.cli_commands._rich_progress import RichProgressBase
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     _CACHE_FILE_OPTION,
@@ -40,15 +29,8 @@ from pynakes.cli_common import (
     where_option,
 )
 from pynakes.engine import Bibliography
-from pynakes.fetch_progress import FetchArtifact, FetchProgressEvent
+from pynakes.fetch_progress import FetchProgressEvent
 from pynakes.metadata import FetchPolicy
-
-_ARTIFACT_LABELS: dict[FetchArtifact, str] = {
-    "preprint_pdf": "preprint PDF",
-    "preprint_source": "preprint source",
-    "published_pdf": "published PDF",
-    "supplement_pdf": "supplement PDF",
-}
 
 
 class FetchAccess(str, Enum):
@@ -56,89 +38,6 @@ class FetchAccess(str, Enum):
 
     OPEN = "open"
     INSTITUTIONAL = "institutional"
-
-
-class _DownloadOrCountColumn(DownloadColumn):
-    """Bytes for a download task; ``done/total`` for the entry-queue task."""
-
-    def render(self, task: Task) -> Text:
-        if task.fields.get("entries"):
-            return Text(f"{int(task.completed)}/{int(task.total or 0)} entries")
-        return super().render(task)
-
-
-class _SpeedColumn(TransferSpeedColumn):
-    """Transfer speed for a download task; nothing for the entry-queue task."""
-
-    def render(self, task: Task) -> Text:
-        return Text("") if task.fields.get("entries") else super().render(task)
-
-
-class _RichFetchProgress(RichProgressBase):
-    """Render Pinax fetch progress to stderr for human CLI runs.
-
-    One task tracks the entry queue, so a long run whose entries are mostly
-    skipped (materials already present) still shows it is moving; each
-    download gets its own byte-level task beneath it.
-    """
-
-    def __init__(self) -> None:
-        super().__init__(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            _DownloadOrCountColumn(),
-            _SpeedColumn(),
-            TimeElapsedColumn(),
-        )
-        self._tasks: dict[tuple[str, FetchArtifact], object] = {}
-        self._entries: TaskID | None = None
-
-    def _track_entry(self, event: FetchProgressEvent) -> None:
-        if not event.entry_total or not event.entry_index:
-            return
-        if self._entries is None:
-            self._entries = self._progress.add_task(
-                "Fetching", total=event.entry_total, entries=True
-            )
-        done = event.entry_index - (1 if event.kind == "entry" else 0)
-        self._progress.update(self._entries, completed=done, description=f"Fetching: {event.key}")
-
-    def __call__(self, event: FetchProgressEvent) -> None:
-        self._track_entry(event)
-        if event.kind == "fail" and event.artifact is None:
-            self._remove_key_tasks(event.key)
-            return
-        if event.artifact is None:
-            return
-        ident = (event.key, event.artifact)
-        if event.kind == "artifact_start":
-            label = _ARTIFACT_LABELS[event.artifact]
-            self._tasks[ident] = self._progress.add_task(
-                f"{event.key}: {label}", total=event.total_bytes
-            )
-        elif event.kind == "artifact_progress":
-            task_id = self._tasks.get(ident)
-            if task_id is None:
-                return
-            update: dict[str, object] = {"advance": event.advance}
-            if event.total_bytes is not None:
-                update["total"] = event.total_bytes
-            self._progress.update(task_id, **update)
-        elif event.kind in {"artifact_done", "artifact_skip", "fail"}:
-            task_id = self._tasks.pop(ident, None)
-            if task_id is not None:
-                if event.total_bytes is not None:
-                    self._progress.update(
-                        task_id, total=event.total_bytes, completed=event.total_bytes
-                    )
-                self._progress.remove_task(task_id)
-
-    def _remove_key_tasks(self, key: str) -> None:
-        for ident, task_id in list(self._tasks.items()):
-            if ident[0] == key:
-                self._tasks.pop(ident, None)
-                self._progress.remove_task(task_id)
 
 
 class _JsonLinesProgress:
@@ -258,11 +157,13 @@ def fetch(
         coll, where, key, json_output, "asset_fetch", warnings=selection_warnings
     )
 
-    progress: _RichFetchProgress | _JsonLinesProgress | None = None
+    progress: Callable[[FetchProgressEvent], None] | None = None
     if progress_stream is ProgressStream.JSONL:
         progress = _JsonLinesProgress()
     elif progress_stream is ProgressStream.AUTO and not params.json_output:
-        progress = _RichFetchProgress()
+        from pynakes.cli_commands._rich_progress import RichFetchProgress
+
+        progress = RichFetchProgress()
     if progress is None:
         report = coll.fetch_materials(
             target=target,

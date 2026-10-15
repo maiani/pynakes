@@ -116,6 +116,9 @@ comparison context for it, and save the selection for later.
 - `corpus split --route` rules resolve `used`/`unused` against the linked
   `tex-sources` when no `--tex`/`--aux` is given.
 - A read no longer re-parses the library to report an empty change plan.
+- Commands start faster: the HTTP client, the reference importer, the
+  progress bars, and the installed-version lookup load only when a command
+  uses them, so an offline command no longer imports `httpx`.
 - `format --entry-order` accepts an explicit sort spec, such as
   `author,year:desc`, besides `preserve`, `key`, and `profile`.
 - `lint --severity` reports only findings at least that severe, and

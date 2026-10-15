@@ -4,7 +4,8 @@ import json
 
 from typer.testing import CliRunner
 
-from pynakes.capabilities import VERSION, get_capabilities
+import pynakes
+from pynakes.capabilities import get_capabilities
 from pynakes.cli import app
 
 runner = CliRunner()
@@ -14,7 +15,7 @@ class TestGetCapabilities:
     def test_top_level_structure(self) -> None:
         caps = get_capabilities()
         assert caps["tool"] == "pynakes"
-        assert caps["version"] == VERSION
+        assert caps["version"] == pynakes.__version__
         assert caps["network_access_is_explicit"] is True
         assert caps["supports_dry_run"] is True
         assert caps["supports_json_output"] is True

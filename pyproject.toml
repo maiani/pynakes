@@ -159,11 +159,6 @@ include = ["src/pynakes/cli_commands/dedupe.py"]
 invalid-argument-type = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/pynakes/cli_commands/fetch.py"]
-[tool.ty.overrides.rules]
-invalid-argument-type = "ignore"
-
-[[tool.ty.overrides]]
 include = ["src/pynakes/cli_commands/fields.py"]
 [tool.ty.overrides.rules]
 call-non-callable = "ignore"

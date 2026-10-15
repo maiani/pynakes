@@ -9,24 +9,26 @@ import time
 from collections.abc import Callable, Mapping
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import Request as _UrllibRequest
 
-import httpx
-
-from pynakes import __version__
+import pynakes
 from pynakes.provider_cache import open_cache
-from pynakes.providers._network import (
-    DEFAULT_DEADLINE,
-    MAX_METADATA_BYTES,
-    PublicTransport,
-    request_guard,
-    validate_url,
-)
+from pynakes.providers._network import DEFAULT_DEADLINE, MAX_METADATA_BYTES, validate_url
 
-USER_AGENT = f"pynakes/{__version__} (+https://github.com/maiani/pynakes)"
+if TYPE_CHECKING:
+    import httpx
+
+# httpx and the transport that enforces the network policy are imported by the
+# two functions that make requests: every offline command imports this module
+# (for its error types) and should not pay for an HTTP client it never uses.
+
+
+def user_agent() -> str:
+    """Return the User-Agent every provider request sends."""
+    return f"pynakes/{pynakes.__version__} (+https://github.com/maiani/pynakes)"
+
 
 DownloadProgress = Callable[[int, int | None], None]
 
@@ -257,7 +259,7 @@ def fetch_bytes(
     max_bytes = MAX_DOWNLOAD_BYTES if max_bytes is None else max_bytes
     validate_url(url, error_class, resolve=False)
     deadline = time.monotonic() + deadline_seconds
-    headers: dict[str, str] = {"User-Agent": USER_AGENT}
+    headers: dict[str, str] = {"User-Agent": user_agent()}
     if accept is not None:
         headers["Accept"] = accept
     display = label or url
@@ -315,6 +317,8 @@ def _fetch_bytes_urllib(
     deadline: float,
     info: dict | None = None,
 ) -> bytes:
+    from urllib.request import Request as _UrllibRequest  # loaded only to fetch
+
     request = _UrllibRequest(url, headers=headers)
     try:
         with opener(request, timeout=timeout) as response:  # type: ignore[arg-type]
@@ -407,6 +411,10 @@ def _fetch_bytes_httpx(
     deadline: float,
     info: dict | None = None,
 ) -> bytes:
+    import httpx
+
+    from pynakes.providers._transport import PublicTransport, request_guard
+
     try:
         with httpx.Client(
             transport=PublicTransport(deadline=deadline),
@@ -619,8 +627,10 @@ def _fetch_text_once(
             headers=headers,
             deadline=deadline,
         )
-    request_headers = {"User-Agent": USER_AGENT}
+    request_headers = {"User-Agent": user_agent()}
     request_headers.update(headers or {})
+    from urllib.request import Request as _UrllibRequest  # loaded only to fetch
+
     request = _UrllibRequest(url, headers=request_headers)
     try:
         with opener(request, timeout=timeout) as response:  # type: ignore[arg-type]
@@ -654,7 +664,11 @@ def _fetch_text_httpx(
     headers: Mapping[str, str] | None,
     deadline: float,
 ) -> str | None:
-    request_headers = {"User-Agent": USER_AGENT}
+    import httpx
+
+    from pynakes.providers._transport import PublicTransport, request_guard
+
+    request_headers = {"User-Agent": user_agent()}
     request_headers.update(headers or {})
     try:
         with httpx.Client(

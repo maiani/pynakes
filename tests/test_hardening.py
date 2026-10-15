@@ -14,7 +14,7 @@ from pynakes.engine import Bibliography
 from pynakes.filestore import FileStore
 from pynakes.interchange import import_library
 from pynakes.keys import rename_key
-from pynakes.providers import _http, _network
+from pynakes.providers import _http, _network, _transport
 from pynakes.providers.records import ReferenceMetadata
 from pynakes.providers.repositories import arxiv
 from pynakes.scrub import ScrubOptions
@@ -181,7 +181,7 @@ def mock_http(monkeypatch, handler):
     transport = httpx.MockTransport(handler)
     original = httpx.Client
     monkeypatch.setattr(
-        _http.httpx, "Client", lambda **kwargs: original(**{**kwargs, "transport": transport})
+        httpx, "Client", lambda **kwargs: original(**{**kwargs, "transport": transport})
     )
 
 
@@ -265,7 +265,7 @@ def test_public_transport_pins_dns_and_keeps_host_and_tls_name(monkeypatch):
         return httpx.Response(200, content=b"ok")
 
     monkeypatch.setattr(httpx.HTTPTransport, "handle_request", send)
-    with _network.PublicTransport() as transport:
+    with _transport.PublicTransport() as transport:
         original = httpx.Request("GET", "https://example.test/paper")
         transport.handle_request(original)
     request = sent[0]
@@ -277,7 +277,7 @@ def test_public_transport_pins_dns_and_keeps_host_and_tls_name(monkeypatch):
 
 def test_public_transport_refuses_dns_rebinding(monkeypatch):
     monkeypatch.setattr(_network, "_getaddrinfo", lambda host, port: ["127.0.0.1"])
-    with _network.PublicTransport() as transport:
+    with _transport.PublicTransport() as transport:
         with pytest.raises(ValueError, match="non-public"):
             transport.handle_request(httpx.Request("GET", "https://example.test"))
 

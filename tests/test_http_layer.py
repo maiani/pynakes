@@ -13,7 +13,7 @@ import httpx
 import pytest
 
 from pynakes.provider_cache import open_cache
-from pynakes.providers import _http, _network
+from pynakes.providers import _http, _network, _transport
 from pynakes.providers._http import ProviderFetchError, fetch_bytes, fetch_json
 
 # conftest zeroes retry delays; the retry-boundary tests need the real backoff.
@@ -24,7 +24,7 @@ def mock_http(monkeypatch, handler):
     transport = httpx.MockTransport(handler)
     original = httpx.Client
     monkeypatch.setattr(
-        _http.httpx, "Client", lambda **kwargs: original(**{**kwargs, "transport": transport})
+        httpx, "Client", lambda **kwargs: original(**{**kwargs, "transport": transport})
     )
 
 
@@ -83,8 +83,8 @@ def test_an_expired_deadline_skips_resolution(monkeypatch):
 
 
 def test_the_deadline_wrapper_is_installed_on_the_transport():
-    transport = _network.PublicTransport(deadline=time.monotonic() + 5)
-    assert isinstance(transport._pool._network_backend, _network._DeadlineBackend)
+    transport = _transport.PublicTransport(deadline=time.monotonic() + 5)
+    assert isinstance(transport._pool._network_backend, _transport._DeadlineBackend)
 
 
 class _RecordingStream(httpcore.NetworkStream):
@@ -98,10 +98,10 @@ class _RecordingStream(httpcore.NetworkStream):
 
 def test_each_socket_read_gets_only_the_time_left():
     inner = _RecordingStream()
-    stream = _network._DeadlineStream(inner, time.monotonic() + 1)
+    stream = _transport._DeadlineStream(inner, time.monotonic() + 1)
     stream.read(10, timeout=30)
     assert 0 < inner.timeouts[0] <= 1
-    expired = _network._DeadlineStream(inner, time.monotonic() - 1)
+    expired = _transport._DeadlineStream(inner, time.monotonic() - 1)
     with pytest.raises(_network.DeadlineExceeded):
         expired.read(10, timeout=30)
     assert len(inner.timeouts) == 1

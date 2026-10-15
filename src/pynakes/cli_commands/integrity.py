@@ -5,16 +5,8 @@ retaining the stable CLI contract.
 """
 
 import typer
-from rich.progress import (
-    BarColumn,
-    MofNCompleteColumn,
-    SpinnerColumn,
-    TextColumn,
-    TimeElapsedColumn,
-)
 
 from pynakes.cli_checks import CheckOutcome, _run_checks, strict_option
-from pynakes.cli_commands._rich_progress import RichProgressBase
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     _CACHE_FILE_OPTION,
@@ -36,35 +28,15 @@ from pynakes.cli_common import (
     where_option,
 )
 from pynakes.engine import Bibliography
-from pynakes.progress import EntryProgressEvent
 
 # --- integrity / enrichment -------------------------------------------------
 
 
-class _RichIntegrityProgress(RichProgressBase):
-    """Render an online verify/enrich pass's entry-by-entry progress to stderr.
+def _integrity_bar(description: str):
+    """Return the stderr progress bar for an online pass, loading Rich only now."""
+    from pynakes.cli_commands._rich_progress import RichIntegrityProgress
 
-    Mirrors ``asset fetch``'s ``_RichFetchProgress``, scaled down to one task
-    (there is no per-artifact byte count to track here): a spinner, a bar over
-    the whole entry queue, and the current key in the description.
-    """
-
-    def __init__(self, description: str) -> None:
-        super().__init__(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            MofNCompleteColumn(),
-            TimeElapsedColumn(),
-        )
-        self._description = description
-        self._task_id: object = None
-
-    def __call__(self, event: EntryProgressEvent) -> None:
-        description = f"{self._description}: {event.key}"
-        if self._task_id is None:
-            self._task_id = self._progress.add_task(description, total=event.entry_total)
-        self._progress.update(self._task_id, completed=event.entry_index, description=description)
+    return RichIntegrityProgress(description)
 
 
 def _verify_one(
@@ -81,7 +53,7 @@ def _verify_one(
     selection_warnings: list[dict] = []
     selected = select_keys(coll, where, key, json_output, "verify", warnings=selection_warnings)
     if online and not json_output:
-        with _RichIntegrityProgress("Verifying") as progress:
+        with _integrity_bar("Verifying") as progress:
             report = coll.verify(
                 online=online,
                 cache_file=cache_file,
@@ -122,7 +94,7 @@ def _verify_one(
         # Read-only preprint check, folded in from the former `published` command.
         # Informational only: it never affects the --strict gate.
         if online and not json_output:
-            with _RichIntegrityProgress("Checking preprints") as progress:
+            with _integrity_bar("Checking preprints") as progress:
                 preprints = coll.published_check(
                     online=online,
                     cache_file=cache_file,
@@ -266,7 +238,7 @@ def enrich(
         else None
     )
     if online and not json_output:
-        with _RichIntegrityProgress("Enriching") as progress:
+        with _integrity_bar("Enriching") as progress:
             report = coll.enrich(
                 online=online,
                 cache_file=cache_file,
@@ -293,7 +265,7 @@ def enrich(
     detail: list[str] = []
     if published:
         if online and not json_output:
-            with _RichIntegrityProgress("Checking preprints") as progress:
+            with _integrity_bar("Checking preprints") as progress:
                 preprints = coll.apply_published(
                     online=online,
                     cache_file=cache_file,

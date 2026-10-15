@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 from pynakes import integrity, provider_cache
 from pynakes.bibtex_parser import parse_bib
 from pynakes.cli import app
-from pynakes.cli_commands.integrity import _RichIntegrityProgress
+from pynakes.cli_commands._rich_progress import RichIntegrityProgress
 from pynakes.identity import entry_arxiv_id
 from pynakes.integrity import (
     _map_concurrently,
@@ -771,7 +771,7 @@ def test_rich_integrity_progress_tracks_entries() -> None:
         def update(self, task_id: object, **kwargs: object) -> None:
             self.updated.append((task_id, kwargs))
 
-    progress = _RichIntegrityProgress("Verifying")
+    progress = RichIntegrityProgress("Verifying")
     fake = FakeProgress()
     progress._progress = fake  # type: ignore[assignment]
 
@@ -790,7 +790,7 @@ def test_rich_integrity_progress_tracks_entries() -> None:
 def test_verify_online_shows_progress_bar_not_json(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
     seen: list[EntryProgressEvent] = []
-    monkeypatch.setattr(_RichIntegrityProgress, "__call__", lambda self, event: seen.append(event))
+    monkeypatch.setattr(RichIntegrityProgress, "__call__", lambda self, event: seen.append(event))
     bib = tmp_path / "refs.bib"
     bib.write_text("@article{A, doi = {10.5555/example}}\n")
 
@@ -804,7 +804,7 @@ def test_verify_online_json_skips_progress_bar(monkeypatch, tmp_path: Path) -> N
     monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
     constructed = []
     monkeypatch.setattr(
-        _RichIntegrityProgress,
+        RichIntegrityProgress,
         "__init__",
         lambda self, description: constructed.append(description),
     )

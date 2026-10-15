@@ -58,7 +58,7 @@ def _mock_http(monkeypatch: pytest.MonkeyPatch, handler) -> list[str]:
             kwargs["transport"] = transport
             super().__init__(*args, **kwargs)
 
-    monkeypatch.setattr("pynakes.providers._http.httpx.Client", MockClient)
+    monkeypatch.setattr("httpx.Client", MockClient)
     return requested
 
 

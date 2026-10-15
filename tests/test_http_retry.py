@@ -166,7 +166,7 @@ def _mock_httpx_client(monkeypatch, handler) -> None:
             kwargs["transport"] = transport
             super().__init__(*args, **kwargs)
 
-    monkeypatch.setattr("pynakes.providers._http.httpx.Client", MockClient)
+    monkeypatch.setattr("httpx.Client", MockClient)
 
 
 def test_httpx_transport_retries_a_throttle(monkeypatch) -> None:

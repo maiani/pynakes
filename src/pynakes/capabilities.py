@@ -4,8 +4,8 @@ Kept in sync with the actually-implemented CLI commands so agents can introspect
 the tool rather than guessing. Update this when commands are added or removed.
 """
 
+import pynakes
 from pynakes import __all__ as PUBLIC_API_EXPORTS
-from pynakes import __version__ as VERSION
 from pynakes.analysis import SECTIONS as ANALYSIS_SECTIONS
 from pynakes.cli_errors import catalogue_description
 from pynakes.entry_reader import INCLUDE_PARTS
@@ -418,7 +418,7 @@ def get_capabilities() -> dict:
     schemas = command_schemas()
     return {
         "tool": "pynakes",
-        "version": VERSION,
+        "version": pynakes.__version__,
         "description": (
             "Reference management engine for BibTeX and BibLaTeX bibliographies and "
             "their research materials: curation, citation tracking, and optional "

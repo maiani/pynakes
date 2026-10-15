@@ -58,7 +58,7 @@ def _mock_httpx_client(monkeypatch: pytest.MonkeyPatch, handler) -> None:
             kwargs["transport"] = transport
             super().__init__(*args, **kwargs)
 
-    monkeypatch.setattr("pynakes.providers._http.httpx.Client", MockClient)
+    monkeypatch.setattr("httpx.Client", MockClient)
 
 
 PROVIDER_BIBTEX = """@article{provider-key,

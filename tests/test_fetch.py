@@ -11,7 +11,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from pynakes.cli_commands.fetch import _RichFetchProgress
+from pynakes.cli_commands._rich_progress import RichFetchProgress
 from pynakes.fetch import (
     ArxivFetchError,
     ArxivSourceUnavailableError,
@@ -37,7 +37,7 @@ def _mock_httpx_client(monkeypatch: pytest.MonkeyPatch, handler) -> None:
             kwargs["transport"] = transport
             super().__init__(*args, **kwargs)
 
-    monkeypatch.setattr("pynakes.providers._http.httpx.Client", MockClient)
+    monkeypatch.setattr("httpx.Client", MockClient)
 
 
 def test_rich_fetch_progress_tracks_artifact_lifecycle() -> None:
@@ -63,7 +63,7 @@ def test_rich_fetch_progress_tracks_artifact_lifecycle() -> None:
         def remove_task(self, task_id: object) -> None:
             self.removed.append(task_id)
 
-    progress = _RichFetchProgress()
+    progress = RichFetchProgress()
     fake = FakeProgress()
     progress._progress = fake  # type: ignore[assignment]
 
@@ -790,10 +790,10 @@ def test_truncated_single_file_source_is_an_arxiv_error(tmp_path: Path) -> None:
 
 def test_fetch_progress_tracks_the_entry_queue() -> None:
     # A long run of skipped entries used to show nothing until the end.
-    from pynakes.cli_commands.fetch import _RichFetchProgress
+    from pynakes.cli_commands._rich_progress import RichFetchProgress
     from pynakes.fetch_progress import FetchProgressEvent
 
-    progress = _RichFetchProgress()
+    progress = RichFetchProgress()
     progress(FetchProgressEvent(kind="entry", key="Euler1748", entry_index=1, entry_total=3))
     progress(FetchProgressEvent(kind="skip", key="Gauss1801", entry_index=2, entry_total=3))
 
