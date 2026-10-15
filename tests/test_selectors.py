@@ -43,11 +43,10 @@ NOT_ENTRY_SELECTABLE = {
     "ref edit": "names one entry positionally",
     "ref import": "--key names the key to assign to the new entry",
     "ref remove": "names its entries positionally",
-    "scrub": "produces a public copy of the whole library",
     "tex add": "edits the TeX source list, not entries",
     "tex clear": "edits the TeX source list, not entries",
     "tex remove": "edits the TeX source list, not entries",
-    "tex scan": "tags entries from what the TeX sources cite",
+    "tex scan": "reports on the whole library against its TeX sources",
 }
 
 LIBRARY = (

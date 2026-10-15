@@ -106,6 +106,12 @@ comparison context for it, and save the selection for later.
   `checked: false`, `rate_limited`, and `retryable`, and `lookups` names the
   entries not checked and the arguments that retry them; a throttle is no
   longer indistinguishable from "no match".
+- `scrub --where` / `--key` keep only the selected entries in the copy, so
+  `scrub refs.bib --where used --out public.bib` releases just the cited
+  entries.
+- `corpus split --route` rules resolve `used`/`unused` against the linked
+  `tex-sources` when no `--tex`/`--aux` is given.
+- A read no longer re-parses the library to report an empty change plan.
 - `format --entry-order` accepts an explicit sort spec, such as
   `author,year:desc`, besides `preserve`, `key`, and `profile`.
 - `lint --severity` reports only findings at least that severe, and
@@ -141,6 +147,12 @@ comparison context for it, and save the selection for later.
   title, a zero-width space).
 
 ### Deprecated
+
+- `tex scan --out`, `--group`, and `--keyword` are deprecated and removed in
+  0.9.0: `tex scan` only reports. Select the cited entries with `--where used`
+  in the command that acts on them — `corpus combine FILE --where used --out
+  OUT`, `scrub FILE --where used --out OUT`, or `fields append FILE keywords
+  WORD --where used`.
 
 - Sorting entries in `normalize` (`--sort-by`, the `sort` step, and sorting by
   the library's `sort-order` / `saveOrderConfig`) is deprecated and removed in

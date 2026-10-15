@@ -42,6 +42,7 @@ __all__ = [
     "NoCitationSourcesError",
     "SavedQuery",
     "compile_selector",
+    "linked_cited_keys",
     "metadata_key",
     "query_uses_citations",
     "saved_queries",
@@ -253,12 +254,20 @@ def compile_selector(
     warnings: list[dict] = []
     if query_uses_citations(node):
         if cited_keys is None:
-            cited_keys, warnings = _linked_cited_keys(lib, base_dir)
+            cited_keys, warnings = linked_cited_keys(lib, base_dir)
         node = parse_query(expression, cited_keys=cited_keys, saved=saved)
     return node, warnings
 
 
-def _linked_cited_keys(lib: BibFile, base_dir: str | Path | None) -> tuple[set[str], list[dict]]:
+def linked_cited_keys(lib: BibFile, base_dir: str | Path | None) -> tuple[set[str], list[dict]]:
+    """Return the keys the library's linked TeX sources cite, with warnings.
+
+    ``\\nocite{*}`` counts every entry as cited. The warnings name linked
+    sources missing on disk.
+
+    Raises:
+        NoCitationSourcesError: if the library links no TeX sources.
+    """
     sources = tex_sources_from_metadata(lib, base_dir or ".")
     if not sources:
         raise NoCitationSourcesError(

@@ -31,6 +31,7 @@ from pynakes._engine_helpers import (
     apply_span_edits,
     block_removal_span,
     compute_change_plan,
+    empty_change_plan,
     fingerprint,
     insert_metadata_comment,
     iter_changed_entries,
@@ -214,6 +215,10 @@ class Bibliography(
         :meth:`commit` (a commit refreshes the pristine baseline). Duplicate
         citation keys are compared best-effort.
         """
+        if self.preview() == self._pristine_text:
+            # Nothing staged renders differently, so there is nothing to compare:
+            # skip re-parsing the pristine text, which dominates a read's cost.
+            return empty_change_plan()
         return compute_change_plan(self._pristine_text, self.lib)
 
     @property

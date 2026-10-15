@@ -220,6 +220,15 @@ def iter_changed_entries(
 # ---------------------------------------------------------------------------
 
 
+def empty_change_plan() -> dict:
+    """Return the change plan of a bibliography with nothing staged."""
+    return {
+        "summary": {"added": 0, "removed": 0, "renamed": 0, "modified": 0, "metadata_changed": 0},
+        "entries": [],
+        "metadata": [],
+    }
+
+
 def compute_change_plan(pristine_text: str, lib: BibFile) -> dict:
     """Compute the structured change-plan dict for :meth:`~pynakes.engine.Bibliography.change_plan`.
 

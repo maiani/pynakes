@@ -1,4 +1,9 @@
-"""`tex scan`: report which entries the TeX sources cite, and subset or tag them."""
+"""`tex scan`: report which entries the TeX sources cite.
+
+Its write options (`--out`, `--group`, `--keyword`) are deprecated: the
+`used` predicate now works in every `--where`, so exporting or tagging the
+cited entries is the job of the commands that export and tag.
+"""
 
 from pathlib import Path
 
@@ -23,6 +28,7 @@ from pynakes.cli_common import (
     _source_sha256,
     _verb,
     bib_file_argument,
+    deprecation_warning,
 )
 from pynakes.engine import Bibliography
 from pynakes.io import save_text
@@ -47,12 +53,20 @@ def scan(
         "(defaults to the library's 'tex-sources' metadata)",
     ),
     out: str | None = typer.Option(
-        None, "--out", help="Write a subset .bib containing only the used entries"
+        None,
+        "--out",
+        help="Deprecated (removed in 0.9.0): use corpus combine FILE --where used --out OUT",
     ),
     force: bool = _FORCE_OPTION,
-    group: str | None = typer.Option(None, "--group", help="Tag used entries into this group"),
+    group: str | None = typer.Option(
+        None,
+        "--group",
+        help="Deprecated (removed in 0.9.0): use fields append FILE groups NAME --where used",
+    ),
     keyword: str | None = typer.Option(
-        None, "--keyword", help="Tag used entries with this keyword"
+        None,
+        "--keyword",
+        help="Deprecated (removed in 0.9.0): use fields append FILE keywords WORD --where used",
     ),
     backup: bool = _BACKUP_OPTION,
     expect_sha256: str | None = _EXPECT_SHA256_OPTION,
@@ -60,7 +74,15 @@ def scan(
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff of changes"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Report which entries are used in LaTeX sources; optionally tag or export them."""
+    """Report which entries are used in LaTeX sources, and which citations are missing.
+
+    The report reads the given sources, else the library's linked
+    `tex-sources`. To act on the cited entries, select them with
+    `--where used` wherever entries are selected: `corpus combine FILE
+    --where used --out cited.bib` exports them, and `fields append FILE
+    keywords cited --where used` tags them. `--out`, `--group`, and
+    `--keyword` still do this here until 0.9.0, with a `deprecated` warning.
+    """
     params = RunParams(
         dry_run=dry_run,
         diff=diff,
@@ -78,8 +100,28 @@ def scan(
         list(sources) if sources else tex_sources_from_metadata(coll.lib, Path(file).parent)
     )
     warnings: list[dict] = []
+    if out:
+        warnings.append(
+            deprecation_warning(
+                "tex scan --out",
+                "corpus combine FILE --where used --out OUT",
+                removal="0.9.0",
+                json_output=json_output,
+            )
+        )
+    for flag, value, tag_name in (("--group", group, "groups"), ("--keyword", keyword, "keywords")):
+        if value:
+            warnings.append(
+                deprecation_warning(
+                    f"tex scan {flag}",
+                    f"fields append FILE {tag_name} VALUE --where used",
+                    removal="0.9.0",
+                    json_output=json_output,
+                )
+            )
     if not sources:
-        resolved_sources, warnings = resolve_existing_tex_sources(resolved_sources)
+        resolved_sources, missing = resolve_existing_tex_sources(resolved_sources)
+        warnings.extend(missing)
     if not resolved_sources:
         _emit_error(
             json_output,
@@ -129,8 +171,10 @@ def scan(
     human = [
         f"Scanned {len(scanned)} source file(s); {report.cited_count} cited key(s).",
     ]
+    # Deprecation notices already went to stderr; the rest belong in the report.
     for w in warnings:
-        human.append(f"  {w['message']}")
+        if w.get("type") != "deprecated":
+            human.append(f"  {w['message']}")
     if report.include_all:
         human.append(r"\nocite{*} found — all entries counted as used.")
     human.append(f"Used:    {len(report.used)}")

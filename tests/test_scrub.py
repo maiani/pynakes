@@ -463,3 +463,58 @@ def test_repeated_scrub_stages_removals_against_original_positions(tmp_path: Pat
     assert "private" not in coll.preview()
     coll.commit(backup=False)
     assert Bibliography.open(path).scrub().clean
+
+
+# --- selecting what to release ------------------------------------------------
+
+
+_CITING_LIBRARY = (
+    "@comment{pynakes-meta:\ntex-sources: paper.tex\n}\n\n"
+    "% read twice\n"
+    "@book{Newton1687,\n  title = {Principia},\n  owner = {me}\n}\n\n"
+    "@book{Euler1748,\n  title = {Introductio},\n  owner = {me}\n}\n"
+)
+
+
+def test_where_used_releases_only_the_cited_entries(tmp_path: Path) -> None:
+    bib = _bib(tmp_path, "refs.bib", _CITING_LIBRARY)
+    (tmp_path / "paper.tex").write_text("\\cite{Euler1748}\n", encoding="utf-8")
+    out = tmp_path / "public.bib"
+
+    result = runner.invoke(app, ["scrub", str(bib), "--where", "used", "--out", str(out), "--json"])
+
+    payload = json.loads(result.output)
+    assert result.exit_code == 0, result.output
+    assert (payload["selected"], payload["left_out"]) == (1, 1)
+    written = out.read_text(encoding="utf-8")
+    # Selected before scrubbing: tex-sources is gone from the copy, yet used worked.
+    assert "Euler1748" in written and "Newton1687" not in written
+    assert "tex-sources" not in written and "owner" not in written
+    # The comment attached to the left-out entry leaves with it.
+    assert "read twice" not in written
+
+
+def test_key_narrows_the_release_and_check_reads_only_the_selection(tmp_path: Path) -> None:
+    bib = _bib(
+        tmp_path,
+        "refs.bib",
+        _CITING_LIBRARY.replace("  owner = {me}\n}\n\n@book{Euler", "}\n\n@book{Euler"),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "scrub",
+            str(bib),
+            "--key",
+            "Newton1687",
+            "--keep-metadata",
+            "--keep-comments",
+            "--check",
+            "--json",
+        ],
+    )
+
+    payload = json.loads(result.output)
+    assert result.exit_code == 0, result.output
+    assert payload["clean"] is True

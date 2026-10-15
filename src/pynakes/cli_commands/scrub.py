@@ -24,6 +24,10 @@ from pynakes.cli_common import (
     _source_sha256,
     _verb,
     bib_file_argument,
+    bind_where_filter,
+    key_option,
+    parse_key_selector,
+    where_option,
 )
 from pynakes.engine import Bibliography
 
@@ -79,6 +83,13 @@ def scrub(
         "--check",
         help="Write nothing; exit 1 if any private content is found",
     ),
+    where: str | None = where_option(
+        "Keep only the entries this selector matches (the shared --where grammar): "
+        "--where used releases just the entries the linked TeX sources cite"
+    ),
+    key: list[str] | None = key_option(
+        "Keep only these citation keys: comma-separated, repeatable. Narrows --where"
+    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would change without writing"),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff of what was removed"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
@@ -97,8 +108,10 @@ def scrub(
     `scrub-metadata` metadata.
 
     Everything not removed stays byte-for-byte identical, so `--diff` shows
-    exactly what left the library. To release only the entries a document
-    actually cites, run `tex scan --out` first and scrub its output.
+    exactly what left the library. `--where` / `--key` keep only the
+    selected entries, chosen before anything is scrubbed: `scrub refs.bib
+    --where used --out public.bib` releases just the entries the linked TeX
+    sources cite.
     """
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
 
@@ -129,7 +142,17 @@ def scrub(
 
     coll = Bibliography.open(resolved)
     source_text = coll.preview()
+    selection_warnings: list[dict] = []
+    # Select before scrubbing: the selector may read metadata scrubbing removes
+    # (used/unused read tex-sources; query "name" reads saved queries).
+    selector = bind_where_filter(coll, where, keys=key, warnings=selection_warnings)
+    dropped = 0
+    if selector is not None:
+        dropped = coll.remove_entries(
+            [entry for entry in coll.lib.entries.values() if not selector(entry)]
+        )
     report = coll.scrub(options)
+    report.warnings[:0] = selection_warnings
 
     if check:
         _check_result(resolved, coll, report, params)
@@ -140,7 +163,12 @@ def scrub(
         f"{_verb('scrub', params, 'Scrubbed')} {resolved} → {out}.",
         *_summary_lines(report),
     ]
-    if report.clean:
+    if selector is not None:
+        human.append(
+            f"  kept {len(coll.lib.entries)} selected {_entries(len(coll.lib.entries))}; "
+            f"left out {dropped}."
+        )
+    elif report.clean:
         human.append("  nothing private found; the copy is identical to the source.")
     _finish_create(
         params,
@@ -157,6 +185,10 @@ def scrub(
         check=False,
         source_sha256=_source_sha256(coll),
         removed=report.to_dict(),
+        where=where,
+        keys=parse_key_selector(key),
+        selected=None if selector is None else len(coll.lib.entries),
+        left_out=dropped,
     )
 
 

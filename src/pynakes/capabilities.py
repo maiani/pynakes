@@ -96,6 +96,22 @@ _SEARCH_QUERY_GRAMMAR = {
 # Old forms that still work, warn with {"type": "deprecated", ...}, and go away
 # in the named release. Empty once nothing is being retired.
 _DEPRECATIONS = [
+    *(
+        {
+            "command": "tex scan",
+            "old": flag,
+            "new": replacement,
+            "removal": "0.9.0",
+            "note": "used works in every --where, so the commands that export and tag "
+            "select the cited entries themselves; tex scan only reports. For a public "
+            "copy of the cited entries, scrub FILE --where used --out OUT.",
+        }
+        for flag, replacement in (
+            ("--out", "corpus combine FILE --where used --out OUT"),
+            ("--group", "fields append FILE groups NAME --where used"),
+            ("--keyword", "fields append FILE keywords WORD --where used"),
+        )
+    ),
     {
         "command": "normalize",
         "old": "--sort-by",

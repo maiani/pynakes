@@ -188,7 +188,7 @@ Combine inputs, then route entries into several outputs by predicate.
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
 | `INPUTS` | list[string] | yes | — | — | One or more .bib files (merged in memory) |
-| `--route` | list[string] | yes | null | — | Output rule FILE='predicate' (repeatable). Predicate: any --where expression (including and/or/not), or one of * / used / unused / group "Name". |
+| `--route` | list[string] | yes | null | — | Output rule FILE='predicate' (repeatable). Predicate: any --where expression (including and/or/not), or one of * / used / unused / group "Name". used/unused read --tex/--aux, else the linked tex-sources. |
 | `--force` | boolean | no | false | — | Overwrite the output file if it already exists |
 | `--copy` | boolean | no | false | — | Send an entry to every matching bucket (default: first match only) |
 | `--minimal` | boolean | no | false | — | Drop jabref-meta/pynakes-meta blocks and skip Pinax materials in outputs, for standalone single-entry or few-entry snippets |
@@ -1114,6 +1114,8 @@ Write a copy of a library with its private content removed.
 | `--keep-comments` | boolean | no | false | — | Keep free @comment blocks and % comment lines |
 | `--keep-metadata` | boolean | no | false | — | Keep jabref-meta and pynakes-meta blocks |
 | `--check` | boolean | no | false | — | Write nothing; exit 1 if any private content is found |
+| `--where` | string | no | null | — | Keep only the entries this selector matches (the shared --where grammar): --where used releases just the entries the linked TeX sources cite |
+| `--key` | list[string] | no | null | — | Keep only these citation keys: comma-separated, repeatable. Narrows --where |
 | `--dry-run` | boolean | no | false | — | Show what would change without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff of what was removed |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
@@ -1221,7 +1223,7 @@ Unlink one or more TeX source files or directories from this library.
 
 **Stability: stable**
 
-Report which entries are used in LaTeX sources; optionally tag or export them.
+Report which entries are used in LaTeX sources, and which citations are missing.
 
 `pynakes tex scan [FILE] [SOURCES...] [OPTIONS]`
 
@@ -1229,10 +1231,10 @@ Report which entries are used in LaTeX sources; optionally tag or export them.
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `SOURCES` | list[string] | no | — | — | One or more .tex/.aux files or directories to scan (defaults to the library's 'tex-sources' metadata) |
-| `--out` | string | no | null | — | Write a subset .bib containing only the used entries |
+| `--out` | string | no | null | — | Deprecated (removed in 0.9.0): use corpus combine FILE --where used --out OUT |
 | `--force` | boolean | no | false | — | Overwrite the output file if it already exists |
-| `--group` | string | no | null | — | Tag used entries into this group |
-| `--keyword` | string | no | null | — | Tag used entries with this keyword |
+| `--group` | string | no | null | — | Deprecated (removed in 0.9.0): use fields append FILE groups NAME --where used |
+| `--keyword` | string | no | null | — | Deprecated (removed in 0.9.0): use fields append FILE keywords WORD --where used |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
 | `--dry-run` | boolean | no | false | — | Show what would change without writing |

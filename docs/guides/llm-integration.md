@@ -179,8 +179,8 @@ the all-or-nothing guarantee rather than an exception to it.
 - Use `scrub` before a library leaves the author's machine — an arXiv upload, a
   submission bundle, a public repository. It writes a copy (`--out`) without
   private entry fields, metadata blocks, or free comments, and leaves the source
-  untouched; `--check` reports and exits `1` instead of writing. Chain it after
-  `tex scan --out` to release only the cited entries. Do not approximate it with
+  untouched; `--check` reports and exits `1` instead of writing. Add
+  `--where used` to release only the cited entries. Do not approximate it with
   `fields clear`: that reaches the fields but not the group tree, the metadata
   blocks, or the comments.
 - Use `keys rename` when a key change must also update TeX citations; use

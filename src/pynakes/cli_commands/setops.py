@@ -40,6 +40,12 @@ from pynakes.filestore import FILES_DIR_KEY, FileStore
 from pynakes.io import _decode_bytes, save_text
 from pynakes.metadata import metadata_value, set_metadata
 from pynakes.model import BibFile
+from pynakes.query import parse_query
+from pynakes.saved_queries import (
+    linked_cited_keys,
+    query_uses_citations,
+    saved_query_expressions,
+)
 from pynakes.setops import PartitionRule, merge_libraries, partition_library, strip_metadata_blocks
 from pynakes.usage import collect_cited_keys
 
@@ -252,6 +258,11 @@ def _duplicate_keys_warning(keys: list[str]) -> dict[str, object]:
 # --- split -----------------------------------------------------------------
 
 
+def _tests_citations(lib: BibFile, predicate: str) -> bool:
+    node = parse_query(predicate, cited_keys=(), saved=saved_query_expressions(lib))
+    return query_uses_citations(node)
+
+
 def _parse_rules(specs: list[str]) -> list[PartitionRule]:
     rules: list[PartitionRule] = []
     seen: set[str] = set()
@@ -275,7 +286,7 @@ def split(
         "--route",
         help="Output rule FILE='predicate' (repeatable). Predicate: any --where "
         "expression (including and/or/not), or one of * / used / unused / "
-        'group "Name".',
+        'group "Name". used/unused read --tex/--aux, else the linked tex-sources.',
     ),
     force: bool = _FORCE_OPTION,
     copy: bool = typer.Option(
@@ -339,9 +350,16 @@ def split(
 
     sources = [*(tex or []), *(aux or [])]
     cited_keys: set[str] | None = None
+    source_warnings: list[dict] = []
     if sources:
         cited, include_all, _scanned = collect_cited_keys(sources)
         cited_keys = set(merged.lib.entries.keys()) if include_all else cited
+    elif any(_tests_citations(merged.lib, rule.predicate) for rule in rules):
+        # As everywhere --where is evaluated, used/unused fall back to the
+        # linked tex-sources (of the first input, whose metadata the merge keeps).
+        cited_keys, source_warnings = linked_cited_keys(
+            merged.lib, Path(inputs[0]).resolve().parent
+        )
 
     for rule in rules:
         _refuse_input_as_output(params.json_output, rule.label, [*inputs, *sources])
@@ -390,7 +408,7 @@ def split(
             }
         )
 
-    warnings: list[dict[str, object]] = []
+    warnings: list[dict[str, object]] = [*source_warnings]
     if merged.duplicate_keys:
         warnings.append(_duplicate_keys_warning(merged.duplicate_keys))
     if result.unrouted:

@@ -551,7 +551,16 @@ class BibliographyOperations:
 
         Returns the number of entries removed.
         """
-        entries = self.lib.entries.get_all(key)
+        return self.remove_entries(self.lib.entries.get_all(key))
+
+    def remove_entries(self, entries: Iterable[BibEntry]) -> int:
+        """Remove these physical entries from memory, with their attached comments.
+
+        Unlike :meth:`remove_entry`, this removes exactly the entries given, so
+        one of several entries sharing a citation key can go while the others
+        stay. Returns the number of entries removed.
+        """
+        entries = list(entries)
         self._remove_attached_comments(entries)
         for entry in entries:
             self.lib.entries.remove(entry)

@@ -896,10 +896,22 @@ doi[clean_up_doi]
 
 ## tex scan
 
-Analyze which entries are cited by `.tex` or `.aux` files.
+Analyze which entries are cited by `.tex` or `.aux` files: the given ones,
+else the library's [linked TeX sources](#linked-tex-sources). The report
+lists the used and unused entries and the cited keys the library lacks.
 
-Use `--group NAME` to tag cited entries, or `--out PATH` to export only
-those entries.
+To act on the cited entries, select them with `--where used` in the command
+that does the work:
+
+```bash
+pynakes tex add refs.bib paper.tex                             # link the manuscript once
+pynakes corpus combine refs.bib --where used --out cited.bib   # a working subset
+pynakes scrub refs.bib --where used --out public.bib           # a public copy
+pynakes fields append refs.bib keywords cited --where used     # tag them
+```
+
+`tex scan --out`, `--group`, and `--keyword` still export and tag until 0.9.0,
+with a `deprecated` warning.
 
 With `--json`, the report's `usages` object locates every citation: each cited
 key maps to its occurrences, one `{path, line, column, text, macro}` per
@@ -938,7 +950,8 @@ found, which is what a submission or CI check needs.
 
 Everything not removed stays byte-for-byte identical, so the copy is reviewable
 as a diff of its source. To release only the entries a document actually cites,
-chain it after [`tex scan --out`](#tex-scan).
+select them: `scrub refs.bib --where used --out public.bib`. Selection happens
+before scrubbing, so `used` still reads the `tex-sources` the copy loses.
 
 ## combine
 
