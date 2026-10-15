@@ -12,7 +12,13 @@ from pynakes.cli_checks import CheckOutcome, _run_checks, strict_option
 from pynakes.cli_choices import LintCategory, LintSeverity
 from pynakes.cli_common import _emit_error, _safe, _source_sha256
 from pynakes.engine import Bibliography
-from pynakes.lint import LintIssue, suppress_findings, unknown_ignore_names, unknown_issue_types
+from pynakes.lint import (
+    LintIssue,
+    library_lint_severity,
+    suppress_findings,
+    unknown_ignore_names,
+    unknown_issue_types,
+)
 from pynakes.lint import lint as lint_lib
 
 # --- lint ------------------------------------------------------------------
@@ -26,12 +32,20 @@ def _lint_one(
     file: str,
     categories: set[str] | None = None,
     ignores: frozenset[str] = frozenset(),
-    min_severity: str = "info",
+    min_severity: str | None = None,
     summary_only: bool = False,
     types: frozenset[str] = frozenset(),
+    include_ignored: bool = False,
 ) -> CheckOutcome:
     return _lint_collection(
-        Bibliography.open(file), file, categories, ignores, min_severity, summary_only, types
+        Bibliography.open(file),
+        file,
+        categories,
+        ignores,
+        min_severity,
+        summary_only,
+        types,
+        include_ignored=include_ignored,
     )
 
 
@@ -40,14 +54,18 @@ def _lint_collection(
     file: str,
     categories: set[str] | None = None,
     ignores: frozenset[str] = frozenset(),
-    min_severity: str = "info",
+    min_severity: str | None = None,
     summary_only: bool = False,
     types: frozenset[str] = frozenset(),
     location: str | Path | None = None,
+    include_ignored: bool = False,
 ) -> CheckOutcome:
     """Build the same lint report for an already opened bibliography.
 
-    ``min_severity`` and ``types`` narrow the report as ``categories`` does.
+    ``min_severity`` and ``types`` narrow the report as ``categories`` does;
+    ``min_severity`` ``None`` reads the library's ``lint-severity`` setting.
+    ``include_ignored`` reports what ``lint-ignore`` and ignore directives
+    would suppress, for a run that needs to see the library's waivers.
     ``location`` is where the library lives (default ``file``), for the checks
     that resolve paths relative to it. ``summary_only``
     leaves the per-finding list out and says so (``issues_omitted``); every
@@ -58,7 +76,12 @@ def _lint_collection(
     # re-enables what the library ignores. `ignore` directives above an entry
     # waive that entry's findings.
     base_dir = Path(location if location is not None else file).parent
-    issues, suppressed = suppress_findings(lib, lint_lib(lib, base_dir=base_dir), ignores)
+    found = lint_lib(lib, base_dir=base_dir)
+    if include_ignored:
+        issues, suppressed = [i for i in found if not i.is_ignored(ignores)], 0
+    else:
+        issues, suppressed = suppress_findings(lib, found, ignores)
+    min_severity = library_lint_severity(lib, min_severity)
     if categories:
         issues = [issue for issue in issues if issue.category in categories]
     if types:
@@ -173,10 +196,17 @@ def lint(
         help="Report only these finding types (duplicate_key, missing_doi, ...): "
         "comma-separated, repeatable",
     ),
-    severity: LintSeverity = typer.Option(
-        LintSeverity.INFO,
+    severity: LintSeverity | None = typer.Option(
+        None,
         "--severity",
-        help="Report only findings at least this severe: error, warning, or info (all)",
+        help="Report only findings at least this severe: error, warning, or info (all); "
+        "default: the library's lint-severity setting, else info",
+    ),
+    include_ignored: bool = typer.Option(
+        False,
+        "--include-ignored",
+        help="Also report the findings the library's lint-ignore setting and ignore "
+        "directives waive (they then count for --strict)",
     ),
     summary: bool = typer.Option(
         False,
@@ -213,7 +243,15 @@ def lint(
     _run_checks(
         files,
         "lint",
-        lambda file: _lint_one(file, categories, ignores, severity.value, summary, types),
+        lambda file: _lint_one(
+            file,
+            categories,
+            ignores,
+            None if severity is None else severity.value,
+            summary,
+            types,
+            include_ignored,
+        ),
         json_output,
         strict,
     )

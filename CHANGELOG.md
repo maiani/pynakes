@@ -110,6 +110,10 @@ comparison context for it, and save the selection for later.
   `normalize-months` / `normalize-invisible-characters` settings) turn those
   steps on or off, like every other step; before, only `--only` could leave
   them out.
+- The `lint-severity` setting sets the least severe finding `lint` reports;
+  `--severity` overrides it. `lint --include-ignored` also reports what the
+  library's `lint-ignore` and ignore directives waive, so a run can override
+  them too.
 - The `import-key-source` setting chooses `ref import`'s key source
   (`generated` or `provider`); `--key-source` overrides it per run.
 - The `pinax-fetch-access` and `pinax-discover-arxiv` settings choose

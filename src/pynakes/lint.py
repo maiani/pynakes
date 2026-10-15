@@ -76,6 +76,7 @@ from pynakes.keys import (
 from pynakes.metadata import (
     library_dialect,
     metadata_category,
+    metadata_value,
     validate_metadata_value,
 )
 from pynakes.metadata.schema import RENAMED_METADATA_KEYS
@@ -103,6 +104,7 @@ __all__ = [
     "profile_required_fields",
     "resolve_lint_profile",
     "suppress_findings",
+    "library_lint_severity",
     "unknown_ignore_names",
     "unknown_issue_types",
 ]
@@ -188,6 +190,18 @@ _CONSISTENCY_DECORATION_FIELDS = frozenset(
 _CONSISTENCY_ALTERNATIVES: dict[str, frozenset[str]] = {
     "pages": frozenset({"articleno", "artnum", "eid", "numpages", "doi"}),
 }
+
+
+def library_lint_severity(lib: BibFile, severity: str | None = None) -> str:
+    """Return the least severe finding ``lint`` reports: ``severity``, else the library's.
+
+    The library's ``lint-severity`` setting (``error``, ``warning``, or
+    ``info``, the default) is the threshold; an explicit argument wins.
+    """
+    if severity is not None:
+        return severity
+    value = (metadata_value(lib, "lint-severity") or "info").strip().lower()
+    return value if value in SEVERITIES else "info"
 
 
 def suppress_findings(

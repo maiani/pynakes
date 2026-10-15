@@ -1264,3 +1264,30 @@ def test_keys_check_still_works_and_says_it_is_deprecated(tmp_path: Path) -> Non
     assert payload["has_duplicates"] is True
     (warning,) = payload["warnings"]
     assert warning["type"] == "deprecated" and warning["new"] == "lint --only duplicate_key"
+
+
+def test_lint_severity_setting_and_both_overrides(tmp_path: Path) -> None:
+    from typer.testing import CliRunner
+
+    from pynakes.cli import app
+
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@comment{pynakes-meta:\nlint-severity: error\nlint-ignore: missing_doi\n}\n\n"
+        "@article{Euler1748, title = {I}, doi = {not a doi}}\n\n"
+        "@article{Euler1748, title = {II}}\n",
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+
+    def types(*extra: str) -> set[str]:
+        result = runner.invoke(app, ["lint", str(bib), "--json", *extra])
+        return set(json.loads(result.output)["summary"]["by_type"])
+
+    by_setting = types()
+    widened = types("--severity", "info")
+    unwaived = types("--severity", "info", "--include-ignored")
+
+    assert "malformed_doi" not in by_setting and "duplicate_key" in by_setting
+    assert "malformed_doi" in widened and "missing_doi" not in widened
+    assert "missing_doi" in unwaived

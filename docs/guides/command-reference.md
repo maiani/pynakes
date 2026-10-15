@@ -761,7 +761,8 @@ Validate entries and report issues (accepts multiple files for CI gating).
 | `--category` | list[choice] | no | — | correctness, content, formatting, consistency, profile | Report only these categories (repeatable) |
 | `--ignore` | list[string] | no | — | — | Leave out a finding type (missing_doi) or a whole category (consistency); repeatable, and added to the library's lint-ignore setting |
 | `--only` | list[string] | no | — | — | Report only these finding types (duplicate_key, missing_doi, ...): comma-separated, repeatable |
-| `--severity` | choice | no | "info" | error, warning, info | Report only findings at least this severe: error, warning, or info (all) |
+| `--severity` | choice | no | null | error, warning, info | Report only findings at least this severe: error, warning, or info (all); default: the library's lint-severity setting, else info |
+| `--include-ignored` | boolean | no | false | — | Also report the findings the library's lint-ignore setting and ignore directives waive (they then count for --strict) |
 | `--summary` | boolean | no | false | — | Report counts (by severity, category and type) without listing each finding; the omitted count is reported as issues_omitted |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 

@@ -98,6 +98,8 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     "lint-required-fields": CATEGORY_LINT,
     # Finding types and categories the `lint` command leaves out of its report.
     "lint-ignore": CATEGORY_LINT,
+    # The least severe finding `lint` reports by default.
+    "lint-severity": CATEGORY_LINT,
     # Native group tree (hierarchy of StaticGroup nodes).
     "group-tree": CATEGORY_GROUPS,
     # What `scrub` removes when preparing a public copy of this library.
@@ -143,6 +145,7 @@ _FORMAT_CHOICES = {
 _SETTING_CHOICES: dict[str, set[str]] = {
     "pinax-fetch-access": {"open", "institutional"},
     "import-key-source": {"generated", "provider"},
+    "lint-severity": {"error", "warning", "info"},
 }
 
 _BOOLEAN_KEYS = {
