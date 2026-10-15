@@ -1,0 +1,117 @@
+{
+  "task": "duplicate-conflict",
+  "engine_version": "0.7.0.dev42+gc5cbe1f8b (v0.8 branch, commit 0529460)",
+  "agent": {
+    "model": "claude-opus-5-5",
+    "client": "Claude Code general-purpose subagent",
+    "settings": "default; Bash only; task prompt plus library path and CLI path"
+  },
+  "conditions": "fresh fixture copy, offline, no prior context, no repository access",
+  "calls": [
+    {
+      "argv": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 3206
+    },
+    {
+      "argv": [
+        "ref",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 690
+    },
+    {
+      "argv": [
+        "ref",
+        "edit",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 1859
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "historical.bib",
+        "Hooke1665",
+        "--json"
+      ],
+      "exit_code": 2,
+      "response_bytes": 1037
+    },
+    {
+      "argv": [
+        "fields",
+        "set",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 2110
+    },
+    {
+      "argv": [
+        "fields",
+        "set",
+        "historical.bib",
+        "--where",
+        "key = \"Hooke1665\" and year = \"1665\"",
+        "--field",
+        "note=first edition",
+        "--dry-run",
+        "--diff",
+        "--json"
+      ],
+      "exit_code": 1,
+      "response_bytes": 111
+    },
+    {
+      "argv": [
+        "fields",
+        "set",
+        "historical.bib",
+        "note",
+        "first edition",
+        "--where",
+        "key = \"Hooke1665\" and year = \"1665\"",
+        "--dry-run",
+        "--diff",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 929
+    },
+    {
+      "argv": [
+        "fields",
+        "set",
+        "historical.bib",
+        "note",
+        "first edition",
+        "--where",
+        "key = \"Hooke1665\" and year = \"1665\"",
+        "--expect-sha256",
+        "a1d26bf5babb1d77c4a60ba2be0c171e894ff40e86e998bcc3b087a673474bcd",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 665
+    }
+  ],
+  "answer": {
+    "keys": [
+      "Hooke1665"
+    ],
+    "reported_ambiguity": true,
+    "text": "Added note = {first edition} to the 1665 Micrographia entry (one of two sharing Hooke1665), previewed first; offers to move it or run keys repair."
+  },
+  "library_sha256_after": "3d740d8bc8371c8d644aa75878eca4ceba0fc4682330969c7e64ab05a2f91c15",
+  "review": {
+    "unsupported_claims": 0,
+    "notes": "Same judgment as run 1: inferred the 1665 entry and wrote the note via the conflict candidate where expression, then reported it. Fewer calls (the conflict carried the candidates), but it still acted instead of asking.",
+    "reviewer": "Claude (orchestrating session); owner review pending"
+  }
+}

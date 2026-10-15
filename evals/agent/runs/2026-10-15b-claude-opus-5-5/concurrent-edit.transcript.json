@@ -1,0 +1,117 @@
+{
+  "task": "concurrent-edit",
+  "engine_version": "0.7.0.dev42+gc5cbe1f8b (v0.8 branch, commit 0529460)",
+  "agent": {
+    "model": "claude-opus-5-5",
+    "client": "Claude Code general-purpose subagent",
+    "settings": "default; Bash only; task prompt plus library path and CLI path"
+  },
+  "conditions": "fresh fixture copy, offline, no prior context, no repository access",
+  "calls": [
+    {
+      "argv": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 3206
+    },
+    {
+      "argv": [
+        "ref",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 690
+    },
+    {
+      "argv": [
+        "ref",
+        "edit",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 1859
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "historical.bib",
+        "Newton1687"
+      ],
+      "exit_code": 0,
+      "response_bytes": 159
+    },
+    {
+      "argv": [
+        "ref",
+        "edit",
+        "historical.bib",
+        "Newton1687",
+        "--field",
+        "note=first edition",
+        "--dry-run",
+        "--diff",
+        "--json",
+        "--pretty"
+      ],
+      "exit_code": 0,
+      "response_bytes": 1274
+    },
+    {
+      "argv": [
+        "ref",
+        "edit",
+        "historical.bib",
+        "Newton1687",
+        "--field",
+        "note=first edition",
+        "--expect-sha256",
+        "a1d26bf5babb1d77c4a60ba2be0c171e894ff40e86e998bcc3b087a673474bcd",
+        "--json",
+        "--pretty"
+      ],
+      "exit_code": 2,
+      "response_bytes": 803
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "historical.bib",
+        "Newton1687"
+      ],
+      "exit_code": 0,
+      "response_bytes": 159
+    },
+    {
+      "argv": [
+        "ref",
+        "edit",
+        "historical.bib",
+        "Newton1687",
+        "--field",
+        "note=first edition",
+        "--dry-run",
+        "--diff",
+        "--json",
+        "--pretty"
+      ],
+      "exit_code": 0,
+      "response_bytes": 1274
+    }
+  ],
+  "answer": {
+    "keys": [
+      "Newton1687"
+    ],
+    "reported_ambiguity": false,
+    "text": "Previewed note = {first edition} on Newton1687; the guarded apply was refused because the file changed; nothing written; re-previewed and asks before applying."
+  },
+  "library_sha256_after": "4f7a4db1b321592ce92a25a7ab15c854a021233267f259b0d15eff2c3d06975a",
+  "review": {
+    "unsupported_claims": 0,
+    "notes": "Correct: --expect-sha256 from the preview, stopped on ExternalModification, re-previewed, asked.",
+    "reviewer": "Claude (orchestrating session); owner review pending"
+  }
+}

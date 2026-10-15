@@ -208,13 +208,13 @@ agent evaluation suite in `evals/agent`. Its tests cover the gate below.
 
 Remaining before release:
 
-- Agent runs: one per task is recorded in
-  [`evals/agent/runs/2026-10-15-claude-opus-5-5`](evals/agent/runs/2026-10-15-claude-opus-5-5/README.md);
-  the owner still has to review its `unsupported_claims` counts. All four
-  runs were correct, but at 5–10 calls beyond the reference and 6–40× its
-  response bytes: cut discovery cost (`capabilities` is 214 KB, help pages
-  5–7 KB each) and return what the next step needs (a duplicate-key conflict
-  should list the entries it cannot choose between), then record a second run.
+- Agent runs: two per task are recorded in `evals/agent/runs/` — the first,
+  then a second after compact envelopes, a 6 KB `capabilities` index,
+  duplicate-key candidates, and plain piped help, which cut response bytes by
+  88% (525 KB → 62 KB) and calls from 39 to 31. The owner still has to review
+  the `unsupported_claims` counts. Open: `duplicate-conflict` writes to the
+  entry it infers instead of asking, help remains the largest fixed cost, and
+  agents opt into `--pretty` unprompted.
 - Release per [RELEASE.md](RELEASE.md).
 
 **Done when:** selected context can be paged without omissions under a stable

@@ -1,0 +1,164 @@
+{
+  "task": "bounded-context",
+  "engine_version": "0.7.0.dev42+gc5cbe1f8b (v0.8 branch, commit 0529460)",
+  "agent": {
+    "model": "claude-opus-5-5",
+    "client": "Claude Code general-purpose subagent",
+    "settings": "default; Bash only; task prompt plus library path and CLI path"
+  },
+  "conditions": "fresh fixture copy, offline, no prior context, no repository access",
+  "calls": [
+    {
+      "argv": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 3206
+    },
+    {
+      "argv": [
+        "capabilities",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 6448
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 3194
+    },
+    {
+      "argv": [
+        "capabilities",
+        "--json",
+        "--command",
+        "ref show"
+      ],
+      "exit_code": 0,
+      "response_bytes": 2755
+    },
+    {
+      "argv": [
+        "groups",
+        "tree",
+        "optics.bib"
+      ],
+      "exit_code": 0,
+      "response_bytes": 157
+    },
+    {
+      "argv": [
+        "capabilities",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 6448
+    },
+    {
+      "argv": [
+        "groups",
+        "list",
+        "optics.bib"
+      ],
+      "exit_code": 0,
+      "response_bytes": 303
+    },
+    {
+      "argv": [
+        "groups",
+        "list-entries",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 706
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "optics.bib",
+        "--key",
+        "Ashby1950,Ashby1958,Ashby1966,Castell1956,Castell1964,Castell1972,Elling1954,Elling1962,Elling1970,Gisler1952,Gisler1960,Gisler1968",
+        "--select",
+        "title,abstract",
+        "--max-chars",
+        "300",
+        "--limit",
+        "5",
+        "--json",
+        "--pretty"
+      ],
+      "exit_code": 0,
+      "response_bytes": 4891
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "optics.bib",
+        "--key",
+        "Ashby1950,Ashby1958,Ashby1966,Castell1956,Castell1964,Castell1972,Elling1954,Elling1962,Elling1970,Gisler1952,Gisler1960,Gisler1968",
+        "--select",
+        "title,abstract",
+        "--max-chars",
+        "300",
+        "--limit",
+        "5",
+        "--json",
+        "--cursor",
+        "c1.eyJvIjo1LCJyIjoiYjcyNTk2MDNjZjQyYmZjZSIsInMiOiIyODQwYmE5N2JiYjUxNGQwIn0"
+      ],
+      "exit_code": 0,
+      "response_bytes": 3744
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "optics.bib",
+        "--key",
+        "Ashby1950,Ashby1958,Ashby1966,Castell1956,Castell1964,Castell1972,Elling1954,Elling1962,Elling1970,Gisler1952,Gisler1960,Gisler1968",
+        "--select",
+        "title,abstract",
+        "--max-chars",
+        "300",
+        "--limit",
+        "5",
+        "--json",
+        "--cursor",
+        "c1.eyJvIjoxMCwiciI6ImI3MjU5NjAzY2Y0MmJmY2UiLCJzIjoiMjg0MGJhOTdiYmI1MTRkMCJ9"
+      ],
+      "exit_code": 0,
+      "response_bytes": 1981
+    }
+  ],
+  "answer": {
+    "keys": [
+      "Ashby1950",
+      "Gisler1952",
+      "Elling1954",
+      "Castell1956",
+      "Ashby1958",
+      "Gisler1960",
+      "Elling1962",
+      "Castell1964",
+      "Ashby1966",
+      "Gisler1968",
+      "Elling1970",
+      "Castell1972"
+    ],
+    "reported_ambiguity": false,
+    "text": "12 Optics entries in four series (lens, crystal, fibre, mirror); every abstract is the same template sentence; read 5 per call at 300 characters, about 40% of each 774-789 character abstract, and says so."
+  },
+  "library_sha256_after": "2840ba97bbb514d0d0633a7a347d0d86e3fc4fcfdabab5c102d93a280bb98bb9",
+  "review": {
+    "unsupported_claims": 0,
+    "notes": "Paged to completion, each key once, truncation reported with full lengths.",
+    "reviewer": "Claude (orchestrating session); owner review pending"
+  }
+}
