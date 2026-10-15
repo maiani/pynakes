@@ -61,7 +61,7 @@ from pynakes._lint_required import required_field_rules
 from pynakes._markup import TITLE_LIKE_FIELDS, markup_to_latex
 from pynakes.bibtex_parser import parse_raw_string_definition
 from pynakes.canonical import EntryTypeCase, resolve_entry_type_case
-from pynakes.editing import raw_field_names, raw_field_value
+from pynakes.editing import raw_field_names, raw_field_values
 from pynakes.formatters import normalize_page_numbers
 from pynakes.identity import identity_class
 from pynakes.journals import (
@@ -556,8 +556,9 @@ def _lint_undefined_string_references(entry: BibEntry, lib: BibFile) -> list[Lin
         # source expressions would create false positives.
         return []
     issues: list[LintIssue] = []
+    raw_values = raw_field_values(entry.raw_content)
     for field in entry.fields:
-        value = raw_field_value(entry.raw_content, field)
+        value = raw_values.get(field.lower())
         if value is None:
             continue
         for reference in undefined_string_references(value, lib.strings):

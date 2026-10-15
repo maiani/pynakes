@@ -11,6 +11,7 @@ modifiers outside that vocabulary raise
 Generation is deterministic — the same entry always yields the same key.
 """
 
+import functools
 import re
 from collections.abc import Callable, Collection
 
@@ -113,9 +114,16 @@ def rewrite_key_references(lib: BibFile, renames: list[tuple[str, str]]) -> int:
     return changed
 
 
+@functools.lru_cache(maxsize=4096)
+def _last_names_of(raw: str) -> tuple[str, ...]:
+    # Pure in the name list's text, and key generation asks for the same
+    # entry's names several times (exemption, pattern markers, fallback key).
+    return tuple(name for name in (_last_name(p) for p in _split_name_list(raw)) if name)
+
+
 def _last_names_for(entry: BibEntry, field: str, fallback: str | None = None) -> list[str]:
     raw = entry.fields.get(field) or (entry.fields.get(fallback, "") if fallback else "") or ""
-    return [name for name in (_last_name(p) for p in _split_name_list(raw)) if name]
+    return list(_last_names_of(raw))
 
 
 def _author_last_names(entry: BibEntry) -> list[str]:

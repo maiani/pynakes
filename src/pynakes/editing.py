@@ -15,6 +15,7 @@ The two layers:
   when something actually changed.
 """
 
+import functools
 import re
 from collections.abc import Callable, Iterable
 
@@ -116,17 +117,21 @@ def _skip_comment(raw: str, i: int) -> int:
     return i
 
 
-def _raw_field_name_spans(raw: str) -> list[tuple[int, int]]:
+@functools.lru_cache(maxsize=8192)
+def _raw_field_name_spans(raw: str) -> tuple[tuple[int, int], ...]:
     """Return spans of field names in an entry's top-level assignments.
 
     A regex alone would also find ``name =`` text inside a braced or quoted
     value, or in a commented-out line. This small scanner stays at the entry
     body's top level and skips field-level ``%`` comments exactly as the
     parser does, so it is safe to use for field edits and lint findings.
+
+    The result depends only on ``raw``, and several lint checks ask for the
+    same entry's spans, so it is cached on the text; an edit produces new text.
     """
     header = re.match(r"@[A-Za-z][A-Za-z0-9_:-]*\s*[{(]\s*[^,]*,", raw, re.IGNORECASE | re.DOTALL)
     if not header:
-        return []
+        return ()
 
     spans: list[tuple[int, int]] = []
     depth = 0
@@ -168,7 +173,7 @@ def _raw_field_name_spans(raw: str) -> list[tuple[int, int]]:
                 i = match.end()
                 continue
         i += 1
-    return spans
+    return tuple(spans)
 
 
 def raw_field_names(raw: str) -> list[str]:
@@ -188,6 +193,26 @@ def raw_field_value(raw: str, field_name: str) -> str | None:
         return None
     _, value_start, value_end = found
     return raw[value_start:value_end].strip()
+
+
+def raw_field_values(raw: str) -> dict[str, str]:
+    """Return every field's unmodified source value, keyed by lowercased name.
+
+    The whole-entry counterpart of :func:`raw_field_value`: one scan of
+    ``raw`` instead of one per field. A repeated field keeps its first
+    assignment, the one BibTeX reads.
+    """
+    values: dict[str, str] = {}
+    for name_start, name_end in _raw_field_name_spans(raw):
+        name = raw[name_start:name_end].lower()
+        if name in values:
+            continue
+        assignment = _ASSIGNMENT_RE.match(raw, name_end)
+        if assignment is None:
+            continue
+        value_start = assignment.end()
+        values[name] = raw[value_start : _scan_value_end(raw, value_start)].strip()
+    return values
 
 
 def _normalize_raw_field_names(raw: str) -> tuple[str, int]:

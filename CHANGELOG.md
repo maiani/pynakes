@@ -116,6 +116,9 @@ comparison context for it, and save the selection for later.
 - `corpus split --route` rules resolve `used`/`unused` against the linked
   `tex-sources` when no `--tex`/`--aux` is given.
 - A read no longer re-parses the library to report an empty change plan.
+- `lint` scans each entry's source once rather than once per check and field,
+  and parses each author list once for key-pattern checks: about a fifth
+  faster on a 3,000-entry library.
 - Commands start faster: the HTTP client, the reference importer, the
   progress bars, and the installed-version lookup load only when a command
   uses them, so an offline command no longer imports `httpx`.
