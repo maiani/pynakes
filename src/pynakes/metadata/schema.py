@@ -26,6 +26,7 @@ MetadataCategory = Literal[
     "normalization",
     "formatting",
     "lint",
+    "integrity",
     "usage",
     "pinax",
     "scrub",
@@ -42,6 +43,7 @@ CATEGORY_CITATION_KEY: MetadataCategory = "citation-key"
 CATEGORY_NORMALIZATION: MetadataCategory = "normalization"
 CATEGORY_FORMATTING: MetadataCategory = "formatting"
 CATEGORY_LINT: MetadataCategory = "lint"
+CATEGORY_INTEGRITY: MetadataCategory = "integrity"
 CATEGORY_USAGE: MetadataCategory = "usage"
 CATEGORY_PINAX: MetadataCategory = "pinax"
 CATEGORY_SCRUB: MetadataCategory = "scrub"
@@ -98,6 +100,10 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     "lint-required-fields": CATEGORY_LINT,
     # Finding types and categories the `lint` command leaves out of its report.
     "lint-ignore": CATEGORY_LINT,
+    # Whether verify / enrich also handle published versions of preprints
+    # (the lookups still need --online).
+    "verify-published": CATEGORY_INTEGRITY,
+    "enrich-published": CATEGORY_INTEGRITY,
     # The least severe finding `lint` reports by default.
     "lint-severity": CATEGORY_LINT,
     # Native group tree (hierarchy of StaticGroup nodes).
@@ -150,6 +156,8 @@ _SETTING_CHOICES: dict[str, set[str]] = {
 
 _BOOLEAN_KEYS = {
     "pinax-discover-arxiv",
+    "verify-published",
+    "enrich-published",
     "format-trailing-comma",
     "format-blank-lines",
     "scrub-comments",

@@ -28,6 +28,7 @@ from pynakes.cli_common import (
     where_option,
 )
 from pynakes.engine import Bibliography
+from pynakes.integrity import library_published
 
 # --- integrity / enrichment -------------------------------------------------
 
@@ -43,13 +44,14 @@ def _verify_one(
     file: str,
     online: bool,
     cache_file: str | None,
-    published: bool,
+    published: bool | None,
     json_output: bool,
     concurrency: int,
     where: str | None = None,
     key: list[str] | None = None,
 ) -> CheckOutcome:
     coll = Bibliography.open(file)
+    published = library_published(coll.lib, "verify", published)
     selection_warnings: list[dict] = []
     selected = select_keys(coll, where, key, json_output, "verify", warnings=selection_warnings)
     if online and not json_output:
@@ -133,10 +135,11 @@ def verify(
     online: bool = typer.Option(
         False, "--online", help="Fetch DOI provider metadata; otherwise only local checks run"
     ),
-    published: bool = typer.Option(
-        False,
-        "--published",
+    published: bool | None = typer.Option(
+        None,
+        "--published/--no-published",
         help="Also report preprints that now have a published version available "
+        "(default: the library's verify-published setting, else off) "
         "(read-only; informational, does not affect --strict)",
     ),
     where: str | None = where_option(),
@@ -175,11 +178,12 @@ def enrich(
         "--online",
         help="Fetch DOI provider metadata; otherwise only local DOI URLs are used",
     ),
-    published: bool = typer.Option(
-        False,
-        "--published",
+    published: bool | None = typer.Option(
+        None,
+        "--published/--no-published",
         help="Also promote preprints to their published version, writing the "
-        "published DOI/journal when one is available (requires --online)",
+        "published DOI/journal when one is available (requires --online); default: "
+        "the library's enrich-published setting, else off",
     ),
     only_field: list[str] | None = typer.Option(
         None,
@@ -210,7 +214,7 @@ def enrich(
     apply only those fields with `--expect-sha256` set to the previewed
     `source_sha256`, so nothing changed in between.
     """
-    if published and not online:
+    if published is True and not online:
         # Offline, the preprint pass has nothing to check against and would
         # report "Enriched 0 entries" as if it had looked and found nothing.
         _emit_error(
@@ -232,6 +236,20 @@ def enrich(
     _check_expected_sha256(file, coll, params)
     selection_warnings: list[dict] = []
     selected = select_keys(coll, where, key, json_output, "enrich", warnings=selection_warnings)
+    from_setting = published is None
+    published = library_published(coll.lib, "enrich", published)
+    if published and not online:
+        # The library asks for the preprint pass, but a setting never enables
+        # the network: skip it and say so rather than refusing the run.
+        published = False
+        if from_setting:
+            selection_warnings.append(
+                {
+                    "type": "published_skipped_offline",
+                    "message": "enrich-published is set, but promoting preprints needs "
+                    "--online; skipped",
+                }
+            )
     fields = (
         sorted({name.strip() for item in only_field for name in item.split(",") if name.strip()})
         if only_field

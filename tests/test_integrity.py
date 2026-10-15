@@ -1151,3 +1151,24 @@ def test_enrich_only_field_applies_a_reviewed_subset(monkeypatch, tmp_path: Path
     written = bib.read_text(encoding="utf-8")
     assert "year = {2024}" in written
     assert "journal" not in written
+
+
+def test_published_settings_choose_the_pass_and_never_enable_the_network(
+    tmp_path: Path,
+) -> None:
+    from pynakes.bibtex_parser import parse_bib
+    from pynakes.integrity import library_published
+
+    lib = parse_bib("@comment{pynakes-meta:\nverify-published: true\n}\n")
+    assert library_published(lib, "verify") is True
+    assert library_published(lib, "enrich") is False
+    assert library_published(lib, "verify", False) is False
+
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@comment{pynakes-meta:\nenrich-published: true\n}\n\n@article{A, title={T}}\n")
+    result = runner.invoke(app, ["enrich", str(bib), "--dry-run", "--json"])
+    payload = json.loads(result.output)
+    assert result.exit_code == 0, result.output
+    assert any(w["type"] == "published_skipped_offline" for w in payload["warnings"])
+    explicit = runner.invoke(app, ["enrich", str(bib), "--published", "--dry-run", "--json"])
+    assert json.loads(explicit.output)["error"] == "OnlineLookupRequired"

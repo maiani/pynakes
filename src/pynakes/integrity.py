@@ -58,7 +58,7 @@ from pynakes.editing import set_entry_field
 from pynakes.entry_types import container_title
 from pynakes.identity import entry_arxiv_id
 from pynakes.journals import _journal_titles_equivalent
-from pynakes.metadata import library_dialect
+from pynakes.metadata import library_dialect, metadata_bool, metadata_value
 from pynakes.model import BibEntry, BibFile
 from pynakes.progress import EntryProgress, EntryProgressEvent
 from pynakes.provider_cache import open_cache
@@ -73,6 +73,7 @@ __all__ = [
     "EntryComparisonReport",
     "FieldComparison",
     "FieldUpdate",
+    "library_published",
     "IntegrityIssue",
     "MetadataFetchError",
     "PublishedCandidate",
@@ -94,6 +95,18 @@ def _verify_fetch_job(args: tuple[str, str | Path | None]) -> BibEntry | Metadat
         return fetch_doi_entry(normalized, cache_file=cache_file)
     except MetadataFetchError as exc:
         return exc
+
+
+def library_published(lib: BibFile, command: str, published: bool | None = None) -> bool:
+    """Return whether ``verify``/``enrich`` also handle published versions.
+
+    ``published`` wins; ``None`` reads the library's ``verify-published`` or
+    ``enrich-published`` setting (default off). The setting never enables the
+    network: the lookups still run only when the command is ``--online``.
+    """
+    if published is not None:
+        return published
+    return metadata_bool(metadata_value(lib, f"{command}-published"), False)
 
 
 def verify_library(

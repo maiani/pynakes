@@ -110,6 +110,11 @@ comparison context for it, and save the selection for later.
   `normalize-months` / `normalize-invisible-characters` settings) turn those
   steps on or off, like every other step; before, only `--only` could leave
   them out.
+- The `verify-published` and `enrich-published` settings turn on the
+  published-version pass of `verify` and `enrich`; `--published/--no-published`
+  overrides them. A setting never enables the network: offline, `enrich`
+  skips the pass with a `published_skipped_offline` warning. New metadata
+  category `integrity`.
 - The `lint-severity` setting sets the least severe finding `lint` reports;
   `--severity` overrides it. `lint --include-ignored` also reports what the
   library's `lint-ignore` and ignore directives waive, so a run can override
