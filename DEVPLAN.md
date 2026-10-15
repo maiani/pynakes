@@ -212,9 +212,10 @@ Remaining before release:
   then a second after compact envelopes, a 6 KB `capabilities` index,
   duplicate-key candidates, and plain piped help, which cut response bytes by
   88% (525 KB → 62 KB) and calls from 39 to 31. The owner still has to review
-  the `unsupported_claims` counts. Open: `duplicate-conflict` writes to the
-  entry it infers instead of asking, help remains the largest fixed cost, and
-  agents opt into `--pretty` unprompted.
+  the `unsupported_claims` counts. What the second run still shows is agent
+  behaviour, not engine waste: the `duplicate-conflict` agent wrote to the
+  entry it inferred although the conflict listed both and offered `ask_which`,
+  and agents opted into `--pretty` or re-read `capabilities` unprompted.
 - Release per [RELEASE.md](RELEASE.md).
 
 **Done when:** selected context can be paged without omissions under a stable
