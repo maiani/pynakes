@@ -127,8 +127,6 @@ comparison context for it, and save the selection for later.
 - Commands start faster: the HTTP client, the reference importer, the
   progress bars, and the installed-version lookup load only when a command
   uses them, so an offline command no longer imports `httpx`.
-- `format --entry-order` accepts an explicit sort spec, such as
-  `author,year:desc`, besides `preserve`, `key`, and `profile`.
 - `lint --severity` reports only findings at least that severe, and
   `lint --summary` reports every count without listing each finding
   (`issues_omitted`). The summary gains `by_type`.
@@ -177,12 +175,12 @@ comparison context for it, and save the selection for later.
   OUT`, `scrub FILE --where used --out OUT`, or `fields append FILE keywords
   WORD --where used`.
 
-- Sorting entries in `normalize` (`--sort-by`, the `sort` step, and sorting by
-  the library's `sort-order` / `saveOrderConfig`) is deprecated and removed in
-  0.9.0: entry order is layout, which `format` owns. Use
-  `format --entry-order profile`, or an explicit spec. `normalize` reports a
-  `deprecated` warning whenever it sorts. Unlike `normalize`, `format` also
-  rewrites each entry's layout.
+- `format --entry-order` and the `format-entry-order` setting are
+  deprecated and removed in 0.9.0: entry order is not only layout (BibTeX
+  reads the first of several entries sharing a key, and an unsorted style with
+  `\nocite{*}` lists entries in file order), so sorting belongs to
+  `normalize --sort-by` and the `sort-order` setting, which move entries byte
+  for byte. `format` reports a `deprecated` warning whenever it reorders.
 
 - `search --in-field` restricted both the fields searched and the fields
   returned. Replace `--in-field F` with `--in F --select F`. It still works

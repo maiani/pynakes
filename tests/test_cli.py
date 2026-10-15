@@ -3568,8 +3568,6 @@ class TestNormalizeCommand:
         assert result.exit_code == 0, result.output
         text = bib.read_text()
         assert text.index("Alpha2020") < text.index("Zebra1980")
-        # Sorting moved to format: the old spelling still works, and says so.
-        assert "normalize --sort-by is deprecated" in result.output
 
     def test_normalize_sort_by_year(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -3686,7 +3684,6 @@ class TestNormalizeCommand:
         assert result.exit_code == 0, result.output
         text = bib.read_text()
         assert text.index("Alpha2020") < text.index("Zebra1980")
-        assert "format --entry-order profile" in result.output
 
     def test_normalize_save_order_original_is_not_sorted(self, tmp_path: Path) -> None:
         # saveOrderConfig type "original" means keep current order — no reorder.

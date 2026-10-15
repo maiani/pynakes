@@ -122,15 +122,14 @@ _DEPRECATIONS = [
         )
     ),
     {
-        "command": "normalize",
-        "old": "--sort-by",
-        "new": "format --entry-order SPEC (or profile)",
+        "command": "format",
+        "old": "--entry-order",
+        "new": "normalize --sort-by SPEC (setting: sort-order)",
         "removal": "0.9.0",
-        "note": "Sorting by the library's sort-order or saveOrderConfig leaves normalize "
-        "too, with the same warning. Entry order is layout, which format owns. "
-        "format --entry-order takes "
-        "preserve, key, profile (sort-order, else JabRef's saveOrderConfig), or a sort "
-        "spec such as author,year:desc. format also rewrites each entry's layout.",
+        "note": "Entry order is not layout: BibTeX reads the first of several entries "
+        "sharing a key, and an unsorted style with \\nocite{*} lists entries in file "
+        "order. normalize sorts by moving entries byte for byte; format keeps the "
+        "order it is given. format-entry-order metadata is deprecated with it.",
     },
     {
         "command": "search",
@@ -579,7 +578,7 @@ def get_capabilities() -> dict:
             "metadata": "Inspect and update top-level library metadata "
             "(list, set, remove, adopt-jabref)",
             "normalize": "Normalize entries (titles, authors, journals, DOIs, "
-            "identifier case, keys) per the library's configured settings",
+            "identifier case, ordering) per the library's configured settings",
             "format": "Lint, then rewrite bibliography layout with portable profile settings "
             "and explicit policy overrides",
             "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "

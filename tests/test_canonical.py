@@ -707,27 +707,31 @@ def test_format_selected_entries_wrapping_is_idempotent() -> None:
     assert "and\n" in once  # the value really was wrapped
 
 
-def test_entry_order_accepts_an_explicit_sort_spec(tmp_path: Path) -> None:
+def test_format_reordering_is_deprecated_in_favour_of_normalize(tmp_path: Path) -> None:
+    import json
+
     from typer.testing import CliRunner
 
     from pynakes.cli import app
 
     bib = tmp_path / "refs.bib"
-    bib.write_text(
-        "@book{Newton1687,\n  author = {Newton},\n  year = {1687}\n}\n\n"
-        "@book{Euler1748,\n  author = {Euler},\n  year = {1748}\n}\n\n"
-        "@book{Euler1736,\n  author = {Euler},\n  year = {1736}\n}\n",
-        encoding="utf-8",
+    bib.write_text("@book{Newton1687, title = {P}}\n\n@book{Euler1748, title = {I}}\n")
+    runner = CliRunner()
+
+    formatted = json.loads(
+        runner.invoke(
+            app, ["format", str(bib), "--entry-order", "key", "--dry-run", "--json"]
+        ).output
     )
+    sorted_ = json.loads(
+        runner.invoke(
+            app,
+            ["normalize", str(bib), "--only", "sort", "--sort-by", "key", "--dry-run", "--json"],
+        ).output
+    )
+    preserved = json.loads(runner.invoke(app, ["format", str(bib), "--dry-run", "--json"]).output)
 
-    result = CliRunner().invoke(app, ["format", str(bib), "--entry-order", "author,year:desc"])
-
-    assert result.exit_code == 0, result.output
-    text = bib.read_text(encoding="utf-8")
-    assert text.index("Euler1748") < text.index("Euler1736") < text.index("Newton1687")
-
-
-@pytest.mark.parametrize("spec", ["year:sideways", ",year", ""])
-def test_entry_order_refuses_a_malformed_spec(spec: str) -> None:
-    with pytest.raises(ValueError, match="Invalid entry order"):
-        CanonicalLayout(entry_order=spec)
+    (warning,) = formatted["warnings"]
+    assert warning["type"] == "deprecated" and "normalize --sort-by" in warning["new"]
+    assert not [w for w in sorted_["warnings"] if w.get("type") == "deprecated"]
+    assert preserved["warnings"] == []

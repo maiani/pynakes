@@ -405,7 +405,7 @@ Rewrite layout only; never change bibliographic values or conventions.
 | `--trailing-comma, --no-trailing-comma` | boolean | no | null | — | Comma after the last field |
 | `--blank-lines, --no-blank-lines` | boolean | no | null | — | Blank line between entries |
 | `--field-order` | choice | no | null | preferred, preserve, alphabetical | Field ordering policy |
-| `--entry-order` | string | no | null | — | Entry order: preserve, key, profile (the library's sort-order, else JabRef's saveOrderConfig), or a sort spec such as 'author,year:desc' (citationkey/key and entrytype/type name the key and the type) |
+| `--entry-order` | choice | no | null | preserve, key, profile | Deprecated (removed in 0.9.0): use normalize --sort-by. Entry ordering policy |
 | `--block-order` | choice | no | null | preserve, canonical | Top-level block ordering policy |
 | `--wrap-values` | choice | no | null | off, stable, canonical | Safe field-value wrapping policy |
 | `--line-width` | integer | no | null | — | Maximum line width for wrapped values |
@@ -843,7 +843,7 @@ Set one top-level metadata block (jabref-meta or pynakes-meta).
 
 **Stability: stable**
 
-Normalize entries: titles, authors, journals, DOIs, identifier case, and keys.
+Normalize entries: titles, authors, journals, DOIs, identifier case, and ordering.
 
 `pynakes normalize [FILE] [OPTIONS]`
 
@@ -864,7 +864,7 @@ Normalize entries: titles, authors, journals, DOIs, identifier case, and keys.
 | `--key-generation` | choice | no | "metadata" | metadata, on, off | Regenerate citation keys from the library's key pattern |
 | `--identifier-case` | choice | no | "metadata" | metadata, on, off | Lowercase entry types and field names |
 | `--metadata-formatting` | choice | no | "metadata" | metadata, on, off | Consolidate metadata layout: pynakes-meta top, jabref-meta bottom |
-| `--sort-by` | list[string] | no | null | — | Deprecated (removed in 0.9.0): use format --entry-order. Sort entries by a BibTeX field name; repeat for secondary keys (e.g. --sort-by author --sort-by year:desc). Use "citationkey" (or "key") for the citation key and append ":desc" for descending. "original" keeps the current order. Omit to follow the file's configured sort order. |
+| `--sort-by` | list[string] | no | null | — | Sort entries by a BibTeX field name; repeat for secondary keys (e.g. --sort-by author --sort-by year:desc). Use "citationkey" (or "key") for the citation key and append ":desc" for descending. "original" keeps the current order. Omit to follow the file's configured sort order. |
 | `--only` | list[string] | no | null | — | Run only these steps, comma-separated and repeatable: metadata, drop-fields, invisible-characters, titles, authors, dois, pages, journals, save-actions, months, identifier-case, sort, keys |
 | `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing; 'used'/'unused' test the linked TeX sources and 'query NAME' runs a saved query. See `pynakes capabilities` for the full grammar. |
 | `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |

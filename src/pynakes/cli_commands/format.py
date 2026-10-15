@@ -31,6 +31,7 @@ from pynakes.cli_common import (
     _verb,
     bib_file_argument,
     bind_where_filter,
+    deprecation_warning,
     is_auxiliary_bib_file,
     key_option,
     parse_key_selector,
@@ -49,6 +50,12 @@ class FieldOrderChoice(str, Enum):
     preferred = "preferred"
     preserve = "preserve"
     alphabetical = "alphabetical"
+
+
+class EntryOrderChoice(str, Enum):
+    preserve = "preserve"
+    key = "key"
+    profile = "profile"
 
 
 class BlockOrderChoice(str, Enum):
@@ -74,7 +81,7 @@ class FormatOverrides:
     trailing_comma: bool | None
     blank_line_entries: bool | None
     field_order: FieldOrderChoice | None
-    entry_order: str | None
+    entry_order: EntryOrderChoice | None
     block_order: BlockOrderChoice | None
     wrap_values: WrapValuesChoice | None
     line_width: int | None
@@ -95,7 +102,7 @@ def _layout(
         trailing_comma=overrides.trailing_comma,
         blank_line_entries=overrides.blank_line_entries,
         field_order=overrides.field_order.value if overrides.field_order is not None else None,
-        entry_order=overrides.entry_order,
+        entry_order=overrides.entry_order.value if overrides.entry_order is not None else None,
         block_order=overrides.block_order.value if overrides.block_order is not None else None,
         wrap_values=overrides.wrap_values.value if overrides.wrap_values is not None else None,
         line_width=overrides.line_width,
@@ -117,6 +124,20 @@ def _recursive_files(target: Path) -> list[Path]:
         ),
         key=lambda path: str(path).casefold(),
     )
+
+
+def _order_warnings(layout: CanonicalLayout, json_output: bool) -> list[dict]:
+    """Warn that format reorders entries, which moves to normalize in 0.9.0."""
+    if layout.entry_order == "preserve":
+        return []
+    return [
+        deprecation_warning(
+            "format --entry-order (and the format-entry-order setting)",
+            "normalize --sort-by SPEC (setting: sort-order)",
+            removal="0.9.0",
+            json_output=json_output,
+        )
+    ]
 
 
 def _check_payload(
@@ -177,8 +198,10 @@ def _run_recursive(
             layout = _layout(coll.lib, overrides)
             coll.format(layout, bind_where_filter(coll, where, keys=keys))
             plan = coll.change_plan()
+            order_warnings = _order_warnings(layout, params.json_output)
             if check:
                 payload = _check_payload(str(path), coll, where, keys)
+                payload["warnings"] = order_warnings
                 dirty += int(bool(payload["modified"]))
             else:
                 diff_text, modified, changed = _preview_or_commit(coll, params)
@@ -192,7 +215,7 @@ def _run_recursive(
                     "dry_run": params.dry_run,
                     "modified": modified,
                     "modified_entries": changed,
-                    "warnings": [],
+                    "warnings": order_warnings,
                     "where": where,
                     "keys": list(keys or []),
                     "plan": plan,
@@ -261,12 +284,10 @@ def format_bibliography(
     field_order: FieldOrderChoice | None = typer.Option(
         None, "--field-order", help="Field ordering policy"
     ),
-    entry_order: str | None = typer.Option(
+    entry_order: EntryOrderChoice | None = typer.Option(
         None,
         "--entry-order",
-        help="Entry order: preserve, key, profile (the library's sort-order, else "
-        "JabRef's saveOrderConfig), or a sort spec such as 'author,year:desc' "
-        "(citationkey/key and entrytype/type name the key and the type)",
+        help="Deprecated (removed in 0.9.0): use normalize --sort-by. Entry ordering policy",
     ),
     block_order: BlockOrderChoice | None = typer.Option(
         None, "--block-order", help="Top-level block ordering policy"
@@ -307,10 +328,6 @@ def format_bibliography(
     expect_sha256: str | None = _EXPECT_SHA256_OPTION,
 ) -> None:
     """Rewrite layout only; never change bibliographic values or conventions.
-
-    `--entry-order` sorts the entries: by key, by the library's configured
-    order (`profile`), or by an explicit spec such as `author,year:desc`.
-    Crossref parents always follow their children.
 
     `--where` restricts the rewrite to the matching entries. A selection owns
     the layout inside each entry it matches, not the layout of the file, so
@@ -405,8 +422,10 @@ def format_bibliography(
     source_text = coll.preview()
     warnings: list[dict] = []
     selector = bind_where_filter(coll, where, keys=key, warnings=warnings)
+    layout = _layout(coll.lib, overrides)
+    warnings.extend(_order_warnings(layout, json_output))
     try:
-        selected = coll.format(_layout(coll.lib, overrides), selector)
+        selected = coll.format(layout, selector)
     except FormatLintError as exc:
         _emit_error(
             json_output,
@@ -422,6 +441,7 @@ def format_bibliography(
         return
     if check:
         payload = _check_payload(resolved, coll, where, selected_keys)
+        payload["warnings"] = warnings
         _emit(json_output, payload, [f"{resolved}: {payload['message'].lower()}"])
         if payload["modified"]:
             raise typer.Exit(code=1)

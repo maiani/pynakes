@@ -19,7 +19,6 @@ from pynakes.cli_common import (
     _safe,
     _verb,
     bib_file_argument,
-    deprecation_warning,
     key_option,
     parse_key_selector,
     select_keys,
@@ -129,8 +128,7 @@ def normalize(
     sort_by: list[str] | None = typer.Option(
         None,
         "--sort-by",
-        help="Deprecated (removed in 0.9.0): use format --entry-order. Sort entries by "
-        "a BibTeX field name; repeat for secondary keys "
+        help="Sort entries by a BibTeX field name; repeat for secondary keys "
         '(e.g. --sort-by author --sort-by year:desc). Use "citationkey" (or "key") '
         'for the citation key and append ":desc" for descending. "original" keeps '
         "the current order. Omit to follow the file's configured sort order.",
@@ -153,7 +151,7 @@ def normalize(
         help="Regenerate keys despite missing linked TeX sources; those sources are not rewritten",
     ),
 ) -> None:
-    """Normalize entries: titles, authors, journals, DOIs, identifier case, and keys.
+    """Normalize entries: titles, authors, journals, DOIs, identifier case, and ordering.
 
     Each step follows the library's configured settings (its normalization
     metadata) unless overridden by a flag. `--only` runs just the named steps,
@@ -161,10 +159,6 @@ def normalize(
     whole file alone, so it neither re-sorts entries nor rearranges metadata.
     `normalize --key Newton1687,Euler1748 --only journals` abbreviates two
     journal names and changes nothing else.
-
-    Sorting entries (`--sort-by`, or the library's `sort-order`) is
-    deprecated here and removed in 0.9.0: entry order is layout, so use
-    `format --entry-order`.
     """
     params = RunParams(
         dry_run=dry_run,
@@ -289,26 +283,6 @@ def normalize(
         names = ", ".join(step.replace("_", "-") for step in asked)
         human.append(f"  left out as asked: {names}.")
     warnings = [*selection_warnings, *report.warnings]
-    # Entry order is layout, which `format` owns; normalize keeps sorting until
-    # 0.9.0 and says so whenever it is asked to, or does so from the profile.
-    if sort_by:
-        warnings.append(
-            deprecation_warning(
-                "normalize --sort-by",
-                "format --entry-order SPEC",
-                removal="0.9.0",
-                json_output=json_output,
-            )
-        )
-    elif report.sort_criteria:
-        warnings.append(
-            deprecation_warning(
-                "normalize sorting entries by the library's sort order",
-                "format --entry-order profile",
-                removal="0.9.0",
-                json_output=json_output,
-            )
-        )
     if selected == []:
         warnings.append(
             {"type": "no_entries_selected", "message": "No entry matched the selection"}
