@@ -172,6 +172,12 @@ it per run in either direction.
 
 ### Changed
 
+- A `DuplicateCitationKey` conflict lists its `candidates`: each entry's
+  position, line, type, and summary fields, the fields that tell the entries
+  apart (`differs`), and a `--where` expression that selects that entry alone,
+  checked against the library before it is offered. The options now begin
+  with `ask_which`; `inspect_all` is gone, since the conflict already shows
+  every instance.
 - `capabilities --json` returns a compact index (about 6 KB, from 214 KB):
   exit codes and conventions, a one-line summary of every command under
   `command_index`, and the detailed sections by name and size. `--command

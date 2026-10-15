@@ -473,6 +473,13 @@ Conflicts exit `2` and include resolutions:
 Each `error` code has one status and one exit code wherever it is raised; both
 come from a single catalogue, which `capabilities.error_codes` publishes.
 
+A conflict carries what the decision needs, so resolving it costs no further
+read. A `DuplicateCitationKey` conflict lists `candidates`: each entry's
+position, type, and summary fields, the fields that tell the entries apart
+(`differs`), and a `where` expression that selects that entry alone. Ask the
+user which entry is meant (`ask_which`) unless the request already says; then
+act on it with a `--where` command such as `fields set`.
+
 A conflict means nothing was written. A refused `--expect-sha256` is an
 `ExternalModification` conflict that also carries `expected_sha256` (what you
 passed) and `source_sha256` (what the file holds now); re-read the file and

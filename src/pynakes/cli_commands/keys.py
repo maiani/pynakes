@@ -11,6 +11,7 @@ import typer
 from pynakes import _tex_rewrite
 from pynakes import keys as keys_ops
 from pynakes.cli_checks import CheckOutcome, _run_checks, strict_option
+from pynakes.cli_commands._duplicates import duplicate_candidates
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     _EXPECT_SHA256_OPTION,
@@ -389,6 +390,7 @@ def keys_rename(
             f"Cannot rename duplicated key {old!r}; repair duplicates first",
             key=old,
             count=len(matches),
+            candidates=duplicate_candidates(coll.lib, old),
             options=[
                 {
                     "id": "repair_duplicates",

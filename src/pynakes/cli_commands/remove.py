@@ -7,6 +7,7 @@ opts out). A key shared by several entries is refused as ambiguous.
 
 import typer
 
+from pynakes.cli_commands._duplicates import duplicate_candidates
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     _EXPECT_SHA256_OPTION,
@@ -59,6 +60,7 @@ def remove(
             f"Citation key {listed} identifies more than one reference; "
             "repair the duplicates, then remove the one you mean",
             keys=duplicated,
+            candidates={key: duplicate_candidates(coll.lib, key) for key in duplicated},
             options=[
                 {
                     "id": "repair_duplicates",

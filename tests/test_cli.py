@@ -2100,9 +2100,11 @@ class TestReferenceCrud:
         assert data["error"] == "DuplicateCitationKey"
         assert data["keys"] == ["Smith2020"]
         assert [option["id"] for option in data["options"]] == [
+            "ask_which",
+            "select_one",
             "repair_duplicates",
-            "inspect_all",
         ]
+        assert len(data["candidates"]["Smith2020"]) == 2
 
     def test_show_keys_resolves_inherited_fields(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"

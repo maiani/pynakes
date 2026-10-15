@@ -4,6 +4,7 @@ import re
 
 import typer
 
+from pynakes.cli_commands._duplicates import DUPLICATE_KEY_OPTIONS, duplicate_candidates
 from pynakes.cli_common import InvalidInputError, _emit_conflict, _emit_error
 from pynakes.engine import Bibliography
 from pynakes.fields import check_field_value
@@ -16,16 +17,6 @@ _FIELD_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_:-]*$")
 #: Offered whenever a requested citation key identifies more than one entry.
 #: The commands that address entries by key refuse to guess which physical
 #: entry was meant, so both options are ways for the caller to disambiguate.
-_DUPLICATE_KEY_OPTIONS = [
-    {
-        "id": "repair_duplicates",
-        "description": "Run keys repair, then retry with the resulting unique key",
-    },
-    {
-        "id": "inspect_all",
-        "description": "Inspect the library to review every duplicate instance",
-    },
-]
 
 _FIELD_LABELS = {
     "booktitle": "Book title",
@@ -131,7 +122,8 @@ def unique_entry(coll: Bibliography, key: str, json_output: bool, *, action: str
             f"Citation key {key!r} identifies {len(matches)} references",
             action=action,
             key=key,
-            options=_DUPLICATE_KEY_OPTIONS,
+            candidates=duplicate_candidates(coll.lib, key),
+            options=DUPLICATE_KEY_OPTIONS,
         )
     return matches[0]
 
@@ -194,7 +186,8 @@ def unique_entries(
             message,
             action=action,
             keys=duplicated,
-            options=_DUPLICATE_KEY_OPTIONS,
+            candidates={key: duplicate_candidates(coll.lib, key) for key in duplicated},
+            options=DUPLICATE_KEY_OPTIONS,
         )
 
     return [matches[key][0] for key in keys]
