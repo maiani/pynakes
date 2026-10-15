@@ -1256,6 +1256,8 @@ Verify entries against authoritative metadata (read-only).
 | `FILES` | list[string] | yes | — | — | One or more .bib files |
 | `--online` | boolean | no | false | — | Fetch DOI provider metadata; otherwise only local checks run |
 | `--published` | boolean | no | false | — | Also report preprints that now have a published version available (read-only; informational, does not affect --strict) |
+| `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing; 'used'/'unused' test the linked TeX sources and 'query NAME' runs a saved query. See `pynakes capabilities` for the full grammar. |
+| `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
 | `--cache-file` | string | no | null | — | Keep provider responses in a reusable cache file at this path (safe to delete or .gitignore). Omit it and nothing is written to disk: responses are reused for this run only |
 | `--concurrency, -j` | integer | no | 8 | — | Number of provider lookups to run at once during an --online pass (result ordering and applied updates are unaffected) |
 | `--strict` | boolean | no | false | — | Exit 1 when verification finds warnings or errors (for CI and pre-commit gating) |

@@ -66,7 +66,7 @@ Every command that addresses a *set* of entries takes the same selector: the
 so there are no command-specific filter flags to learn.
 
 Accepted by [`ref show`](#show-and-edit), [`fields`](#fields), [`search`](#search), [`format`](#format),
-[`normalize`](#normalize), [`enrich`](#verify-enrich), `keys generate`,
+[`normalize`](#normalize), [`verify` and `enrich`](#verify-enrich), `keys generate`,
 `asset fetch`, `ref directive`, [`corpus combine`](#combine),
 [`corpus split`](#split) (`--route` rules), and the `fields.*` operations of
 `corpus batch`. A `--key` that names no entry is a `KeyNotFound` error, and a
@@ -1110,8 +1110,9 @@ once no matter how many entries carry it — and discarded when the command exit
 Pass `--cache-file PATH` to keep them for later runs; see
 [Caching provider responses](#caching-provider-responses).
 
-`--key` and `--where` limit `enrich` to the selected entries, so a lookup for a
-few references never queries a provider for the rest of the library.
+`--key` and `--where` limit `verify` and `enrich` to the selected entries of
+one library, so a lookup for a few references never queries a provider for the
+rest of it.
 
 `verify --strict` exits with code `1` when warnings or errors are reported.
 

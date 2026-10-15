@@ -74,21 +74,32 @@ def _verify_one(
     published: bool,
     json_output: bool,
     concurrency: int,
+    where: str | None = None,
+    key: list[str] | None = None,
 ) -> CheckOutcome:
     coll = Bibliography.open(file)
+    selection_warnings: list[dict] = []
+    selected = select_keys(coll, where, key, json_output, "verify", warnings=selection_warnings)
     if online and not json_output:
         with _RichIntegrityProgress("Verifying") as progress:
             report = coll.verify(
-                online=online, cache_file=cache_file, progress=progress, concurrency=concurrency
+                online=online,
+                cache_file=cache_file,
+                progress=progress,
+                concurrency=concurrency,
+                keys=selected,
             )
     else:
-        report = coll.verify(online=online, cache_file=cache_file, concurrency=concurrency)
+        report = coll.verify(
+            online=online, cache_file=cache_file, concurrency=concurrency, keys=selected
+        )
     result = {
         "status": "success",
         "action": "verify",
         "file": file,
         "source_sha256": _source_sha256(coll),
-        "warnings": [],
+        "warnings": selection_warnings,
+        "selected": None if selected is None else len(selected),
         "online": online,
         "summary": {
             "checked": report.checked,
@@ -117,10 +128,11 @@ def _verify_one(
                     cache_file=cache_file,
                     progress=progress,
                     concurrency=concurrency,
+                    keys=selected,
                 )
         else:
             preprints = coll.published_check(
-                online=online, cache_file=cache_file, concurrency=concurrency
+                online=online, cache_file=cache_file, concurrency=concurrency, keys=selected
             )
         result["preprints"] = {
             "checked": preprints.checked,
@@ -155,6 +167,8 @@ def verify(
         help="Also report preprints that now have a published version available "
         "(read-only; informational, does not affect --strict)",
     ),
+    where: str | None = where_option(),
+    key: list[str] | None = key_option(),
     cache_file: str | None = _CACHE_FILE_OPTION,
     concurrency: int = _CONCURRENCY_OPTION,
     strict: bool = strict_option("verification finds warnings or errors"),
@@ -164,11 +178,19 @@ def verify(
 
     Checks DOI-backed entries against provider metadata; with `--published` it
     also reports preprints that now have a published version available.
+    `--key` and `--where` verify only the selected entries of one library, so
+    checking a handful of references never looks up the rest.
     """
+    if (where is not None or key) and len(files) > 1:
+        _emit_error(
+            json_output, "InvalidInput", "--key and --where select the entries of one library"
+        )
     _run_checks(
         files,
         "verify",
-        lambda f: _verify_one(f, online, cache_file, published, json_output, concurrency),
+        lambda f: _verify_one(
+            f, online, cache_file, published, json_output, concurrency, where, key
+        ),
         json_output,
         strict,
     )

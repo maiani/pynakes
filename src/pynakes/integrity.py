@@ -103,6 +103,7 @@ def verify_library(
     cache_file: str | Path | None = None,
     progress: EntryProgress | None = None,
     concurrency: int = 1,
+    keys: Collection[str] | None = None,
 ) -> VerifyReport:
     """Verify DOI-backed entries against provider metadata.
 
@@ -110,9 +111,10 @@ def verify_library(
     only syntax-checked and reported as unchecked. ``concurrency`` bounds how
     many DOI lookups run at once; report ordering and progress events always
     follow the library's own entry order regardless of fetch completion order.
+    ``keys`` limits the run to those citation keys; ``None`` means every entry.
     """
     report = VerifyReport()
-    entries = list(lib.entries.values())
+    entries = [entry for entry in lib.entries.values() if keys is None or entry.key in keys]
     entry_total = len(entries)
 
     # kind in {"no_doi", "malformed", "offline", "fetch"}; data carries the

@@ -111,14 +111,19 @@ class BibliographyOperations:
         cache_file: str | Path | None = None,
         progress: EntryProgress | None = None,
         concurrency: int = 1,
+        keys: Collection[str] | None = None,
     ) -> integrity_ops.VerifyReport:
-        """Verify entries against authoritative metadata without modifying."""
+        """Verify entries against authoritative metadata without modifying.
+
+        ``keys`` limits the run to those citation keys; ``None`` means every entry.
+        """
         return integrity_ops.verify_library(
             self.lib,
             online=online,
             cache_file=cache_file,
             progress=progress,
             concurrency=concurrency,
+            keys=keys,
         )
 
     def published_check(
@@ -128,14 +133,19 @@ class BibliographyOperations:
         cache_file: str | Path | None = None,
         progress: EntryProgress | None = None,
         concurrency: int = 1,
+        keys: Collection[str] | None = None,
     ) -> integrity_ops.PublishedReport:
-        """Check preprint entries for published metadata without modifying."""
+        """Check preprint entries for published metadata without modifying.
+
+        ``keys`` limits the run to those citation keys; ``None`` means every entry.
+        """
         return integrity_ops.check_published(
             self.lib,
             online=online,
             cache_file=cache_file,
             progress=progress,
             concurrency=concurrency,
+            keys=keys,
         )
 
     def compare_entry_with_remote(

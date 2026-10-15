@@ -103,6 +103,23 @@ def test_enrich_acts_on_the_selected_entries_only(tmp_path: Path) -> None:
     assert {update["key"] for update in by_year["updates"]} == {"Planck1900"}
 
 
+def test_verify_checks_the_selected_entries_only(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@article{Planck1900,\n  doi = {not a doi}\n}\n\n"
+        "@article{Einstein1905,\n  doi = {also not a doi}\n}\n",
+        encoding="utf-8",
+    )
+    everything = _run("verify", str(bib))
+    one = _run("verify", str(bib), "--key", "Planck1900")
+
+    assert {issue["key"] for issue in everything["issues"]} == {"Planck1900", "Einstein1905"}
+    assert one["exit"] == 0 and one["selected"] == 1
+    assert {issue["key"] for issue in one["issues"]} == {"Planck1900"}
+    two_files = _run("verify", str(bib), str(bib), "--where", "year < 1901")
+    assert two_files["exit"] == 1 and "one library" in two_files["message"]
+
+
 def test_an_unknown_key_is_an_error_and_an_empty_selection_a_warning(tmp_path: Path) -> None:
     bib = _library(tmp_path)
     missing = _run("enrich", str(bib), "--key", "Newton1687", "--dry-run")
