@@ -98,6 +98,8 @@ to find the operation module that owns a key.
 | `pinax-files-dir` | pinax | Path to the Pinax materials directory, relative to the `.bib` file | `fetch`, `files`, engine | — |
 | `query-<name>` | queries | One `--where` selector expression on one line; a saved query, run wherever `--where` is accepted as `query "<name>"`. `query set` and `lint` validate it | `query` | — |
 | `pinax-fetch-policy` | pinax | Comma-separated list of: `preprint`, `published`, `source`, `supplement`, `bestpdf` (default `bestpdf`) | `fetch` | — |
+| `pinax-fetch-access` | pinax | `open` (default) or `institutional`; `asset fetch --access` overrides it | `asset fetch` | — |
+| `pinax-discover-arxiv` | pinax | Boolean (default: `false`): look up a missing arXiv id by DOI when a preprint is needed; `asset fetch --discover/--no-discover` overrides it | `asset fetch` | — |
 
 `lint-required-fields` values are additive to pynakes' built-in requirements,
 which follow the library's `dialect` (`bibtex` or `biblatex`, aliasing JabRef's

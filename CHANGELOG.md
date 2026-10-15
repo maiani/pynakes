@@ -110,6 +110,10 @@ comparison context for it, and save the selection for later.
   `normalize-months` / `normalize-invisible-characters` settings) turn those
   steps on or off, like every other step; before, only `--only` could leave
   them out.
+- The `pinax-fetch-access` and `pinax-discover-arxiv` settings choose
+  `asset fetch`'s access mode and arXiv-id discovery for the library;
+  `--access` and `--discover/--no-discover` override them per run, and
+  `Bibliography.fetch_materials(access=None, discover=None)` reads them.
 - `verify --key` / `--where` check only the selected entries of one library,
   as `enrich` already did; `--published` follows the same selection.
 - `lint --only TYPES` reports only the named finding types, the counterpart of

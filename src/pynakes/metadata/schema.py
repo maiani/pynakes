@@ -84,6 +84,10 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     "format-entry-type-case": CATEGORY_FORMATTING,
     "pinax-files-dir": CATEGORY_PINAX,
     "pinax-fetch-policy": CATEGORY_PINAX,
+    # How `asset fetch` reaches publisher copies, and whether it looks up
+    # missing arXiv ids; both only shape a run the user already started.
+    "pinax-fetch-access": CATEGORY_PINAX,
+    "pinax-discover-arxiv": CATEGORY_PINAX,
     # Linked LaTeX sources that cite this library; consulted by the citation-key
     # commands so .tex edits stay consistent without re-specifying the files.
     "tex-sources": CATEGORY_USAGE,
@@ -132,7 +136,14 @@ _FORMAT_CHOICES = {
 }
 
 
+#: Choice-valued settings outside the ``format-*`` family: the value a command's
+#: flag of the same meaning accepts.
+_SETTING_CHOICES: dict[str, set[str]] = {
+    "pinax-fetch-access": {"open", "institutional"},
+}
+
 _BOOLEAN_KEYS = {
+    "pinax-discover-arxiv",
     "format-trailing-comma",
     "format-blank-lines",
     "scrub-comments",
@@ -159,6 +170,7 @@ def metadata_value_choices() -> dict[str, list[str]]:
         "normalize-journal-style": _VALID_JOURNAL_STYLES,
         "normalize-journal-source": _VALID_JOURNAL_SOURCES,
         **_FORMAT_CHOICES,
+        **_SETTING_CHOICES,
         **{key: {"true", "false"} for key in _BOOLEAN_KEYS},
     }
     return {key: sorted(values) for key, values in sorted(choices.items())}
@@ -212,8 +224,8 @@ def validate_metadata_value(key: str, value: str) -> None:
             )
         return
 
-    if normalized_key in _FORMAT_CHOICES:
-        choices = _FORMAT_CHOICES[normalized_key]
+    if normalized_key in _FORMAT_CHOICES or normalized_key in _SETTING_CHOICES:
+        choices = _FORMAT_CHOICES.get(normalized_key) or _SETTING_CHOICES[normalized_key]
         if stripped.lower() not in choices:
             raise ValueError(
                 f"Invalid {normalized_key} {stripped!r}; expected one of: "

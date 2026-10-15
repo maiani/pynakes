@@ -16,7 +16,7 @@ from pynakes._engine_fetch import build_fetch_queue, run_fetch_loop
 from pynakes._engine_helpers import metadata_fetch_policy
 from pynakes.fetch_progress import WOULD_FETCH, FetchProgress
 from pynakes.filestore import FILES_DIR_KEY
-from pynakes.metadata import FetchPolicy, library_dialect
+from pynakes.metadata import FetchPolicy, library_dialect, metadata_bool, metadata_value
 
 if TYPE_CHECKING:
     from pynakes import metadata as metadata_ops
@@ -106,9 +106,9 @@ class BibliographyMaterials:
         supplement_pdf_fetcher: Callable[[str], bytes] | None = None,
         cache_file: str | Path | None = None,
         progress: FetchProgress | None = None,
-        access: str = "open",
+        access: str | None = None,
         keys: Collection[str] | None = None,
-        discover: bool = False,
+        discover: bool | None = None,
         arxiv_lookup: Callable[[str], str | None] | None = None,
         arxiv_record_fetcher: Callable[[str], "ArxivRecord"] | None = None,
     ) -> dict:
@@ -128,11 +128,13 @@ class BibliographyMaterials:
             supplement_pdf_fetcher: Injectable supplement PDF bytes fetcher.
             cache_file: Optional path to a provider-response cache file.
             progress: Optional callback receiving fetch progress events.
-            access: Published-material access mode: ``open`` or ``institutional``.
+            access: Published-material access mode: ``open`` or ``institutional``;
+                ``None`` reads the library's ``pinax-fetch-access`` (default ``open``).
             keys: Citation keys to fetch for, in place of ``target``; ``None`` for all.
             discover: Look up a missing arXiv id by DOI when a preprint is needed,
                 check it against arXiv's record, and write a confirmed one to
                 the entry (``eprint`` and its archive field, only when empty).
+                ``None`` reads the library's ``pinax-discover-arxiv`` (default off).
             arxiv_lookup: Injectable DOI-to-arXiv-id lookup for testing.
             arxiv_record_fetcher: Injectable arXiv record fetcher for testing.
 
@@ -150,6 +152,10 @@ class BibliographyMaterials:
             run recorded) and ``complete``. ``discovered`` lists each arXiv-id
             lookup ``discover`` made and its outcome.
         """
+        if access is None:
+            access = (metadata_value(self.lib, "pinax-fetch-access") or "open").strip().lower()
+        if discover is None:
+            discover = metadata_bool(metadata_value(self.lib, "pinax-discover-arxiv"), False)
         if access not in {"open", "institutional"}:
             raise ValueError(f"Unknown fetch access mode: {access!r}")
         store = self.files

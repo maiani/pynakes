@@ -358,3 +358,31 @@ def test_json_lines_progress_writes_one_event_per_line(capsys) -> None:
         {"event": "entry", "key": "A", "entry_index": 1, "entry_total": 2},
         {"event": "artifact_done", "key": "A", "artifact": "preprint_pdf"},
     ]
+
+
+def test_access_and_discovery_follow_the_library_settings(tmp_path: Path) -> None:
+    from pynakes.engine import Bibliography
+
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@comment{pynakes-meta:\npinax-files-dir: refs.files\n"
+        "pinax-fetch-access: institutional\npinax-discover-arxiv: true\n}\n\n"
+        "@article{Newton1687, title = {Principia}}\n",
+        encoding="utf-8",
+    )
+    coll = Bibliography.open(bib)
+
+    from_settings = coll.fetch_materials(dry_run=True)
+    overridden = coll.fetch_materials(dry_run=True, access="open", discover=False)
+
+    assert from_settings["access"] == "institutional"
+    assert overridden["access"] == "open"
+
+
+def test_fetch_settings_are_validated_by_metadata_set(tmp_path: Path) -> None:
+    from pynakes.metadata.schema import validate_metadata_value
+
+    validate_metadata_value("pinax-fetch-access", "institutional")
+    validate_metadata_value("pinax-discover-arxiv", "true")
+    with pytest.raises(ValueError, match="pinax-fetch-access"):
+        validate_metadata_value("pinax-fetch-access", "sometimes")

@@ -91,17 +91,19 @@ def fetch(
     ),
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     cache_file: str | None = _CACHE_FILE_OPTION,
-    access: FetchAccess = typer.Option(
-        FetchAccess.OPEN,
+    access: FetchAccess | None = typer.Option(
+        None,
         "--access",
-        help="Publisher access context: open or institutional (uses existing network access)",
+        help="Publisher access context: open or institutional (uses existing network access); "
+        "default: the library's pinax-fetch-access setting, else open",
     ),
-    discover: bool = typer.Option(
-        False,
-        "--discover",
+    discover: bool | None = typer.Option(
+        None,
+        "--discover/--no-discover",
         help="When a preprint is needed and the entry has a DOI but no arXiv id, look one up "
         "(OpenAlex, then Semantic Scholar), check it against arXiv's record, and use and "
-        "record a confirmed id (eprint, only when the entry has none)",
+        "record a confirmed id (eprint, only when the entry has none); default: the "
+        "library's pinax-discover-arxiv setting, else off",
     ),
     progress_stream: ProgressStream = typer.Option(
         ProgressStream.AUTO,
@@ -171,7 +173,7 @@ def fetch(
             policy=policy,
             dry_run=params.dry_run,
             cache_file=cache_file,
-            access=access.value,
+            access=None if access is None else access.value,
             discover=discover,
         )
     else:
@@ -183,7 +185,7 @@ def fetch(
                 dry_run=params.dry_run,
                 cache_file=cache_file,
                 progress=progress,
-                access=access.value,
+                access=None if access is None else access.value,
                 discover=discover,
             )
 
