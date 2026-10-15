@@ -10,7 +10,7 @@ import typer
 from click.shell_completion import CompletionItem
 from typer.core import TyperGroup
 
-from pynakes.cli_common import _emit_error
+from pynakes.cli_common import _emit_error, set_pretty_json
 from pynakes.cli_surface import place_library
 
 # Context-meta key recording whether the caller asked for JSON output, so the
@@ -278,6 +278,13 @@ class AutoBibGroup(TyperGroup):
             return []
 
     def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        if ctx.parent is None:
+            # Output style is decided once per invocation, from the whole line,
+            # before any command can emit: `--pretty` may follow any option.
+            pretty = "--pretty" in args
+            set_pretty_json(pretty)
+            if pretty:
+                args = [arg for arg in args if arg != "--pretty"]
         # ``ctx.meta`` is shared across the context tree, so recording the JSON
         # request once makes it visible to ``invoke`` at every nesting level.
         if "--json" in args:

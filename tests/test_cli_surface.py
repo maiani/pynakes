@@ -172,3 +172,24 @@ def test_double_dash_with_an_autodetected_library(bib: Path, monkeypatch) -> Non
 def test_double_dash_passes_a_dash_led_search_query(bib: Path) -> None:
     found = _envelope(["search", str(bib), "--json", "--", "-nothing-matches"])
     assert found["status"] == "success", found
+
+
+def test_json_is_compact_unless_pretty_is_asked_for(tmp_path) -> None:
+    from typer.testing import CliRunner
+
+    from pynakes.cli import app
+
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@book{Newton1687, title = {Principia}}\n", encoding="utf-8")
+    runner = CliRunner()
+
+    compact = runner.invoke(app, ["ref", "show", str(bib), "Newton1687", "--json"]).output
+    pretty = runner.invoke(
+        app, ["ref", "show", str(bib), "Newton1687", "--json", "--pretty"]
+    ).output
+    after = runner.invoke(app, ["ref", "show", str(bib), "Newton1687", "--json"]).output
+
+    assert compact.count("\n") == 1 and ": " not in compact.split('"fields"')[0]
+    assert pretty.count("\n") > 1 and json.loads(pretty) == json.loads(compact)
+    # The choice belongs to one invocation and never leaks into the next.
+    assert after == compact

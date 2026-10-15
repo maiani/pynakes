@@ -220,6 +220,24 @@ def _file_option() -> TyperOption:
     return option
 
 
+def _pretty_option() -> TyperOption:
+    """Return the ``--pretty`` option every ``--json`` command carries.
+
+    JSON envelopes are compact by default — their readers are programs and
+    agents — and ``--pretty`` indents them for a person. Like ``--file``, the
+    flag is read from the whole command line before parsing (see
+    :meth:`pynakes.cli_discovery.AutoBibGroup.parse_args`); it exists here so
+    help, completion, and ``capabilities`` show it.
+    """
+    return TyperOption(
+        param_decls=["pretty_json", "--pretty"],
+        is_flag=True,
+        default=False,
+        expose_value=False,
+        help="Indent --json output for reading (default: compact, one line)",
+    )
+
+
 def _wire_command(command, path=()) -> None:
     for name, sub in command.commands.items():
         full = (*path, name)
@@ -231,6 +249,8 @@ def _wire_command(command, path=()) -> None:
         arguments = [param for param in sub.params if param.param_type_name == "argument"]
         if arguments and arguments[0].name == LIBRARY_ARGUMENT:
             sub.params.append(_file_option())
+        if any(param.name == "json_output" for param in sub.params):
+            sub.params.append(_pretty_option())
         for param in sub.params:
             if param.name == target:
                 param.shell_complete = _complete_fn

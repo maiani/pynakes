@@ -172,6 +172,10 @@ it per run in either direction.
 
 ### Changed
 
+- `--json` envelopes are compact — one line, no indentation — so an agent or
+  script pays for content, not padding (about a sixth fewer bytes per
+  envelope, a third on `capabilities`). `--pretty` restores the indented
+  form. The content of every envelope is unchanged.
 - `search` reports a `page` object and computes every match before applying
   `--limit`, so `page.total` counts them all; `--no-rank` no longer stops the
   scan early.

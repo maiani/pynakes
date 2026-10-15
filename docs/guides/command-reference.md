@@ -41,6 +41,7 @@ Describe a bibliography: what it holds and how complete its records are.
 | `--top` | integer | no | 10 | — | Length of the author and venue frequency lists |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## asset check
 
@@ -56,6 +57,7 @@ Validate linked-file references (accepts multiple files for CI gating).
 | `--root` | list[string] | no | null | — | Additional directory to resolve relative linked-file paths; can be repeated |
 | `--strict` | boolean | no | false | — | Exit 1 when a linked file is missing, unresolved, or the wrong type (for CI and pre-commit gating) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## asset fetch
 
@@ -83,6 +85,7 @@ Download Pinax materials, optionally using existing institutional network access
 | `--strict` | boolean | no | false | — | Exit 1 when a requested material failed to download or was unavailable (materials already present pass) (for CI and pre-commit gating) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## asset repair
 
@@ -101,6 +104,7 @@ Reconcile the Pinax manifest with the material files that exist.
 | `--diff` | boolean | no | false | — | Show a unified diff of the manifest |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## capabilities
 
@@ -113,6 +117,7 @@ Show tool capabilities.
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## convert
 
@@ -135,6 +140,7 @@ Convert a library between BibTeX/BibLaTeX dialects and interchange formats.
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## corpus batch
 
@@ -155,6 +161,7 @@ Apply a sequence of operations atomically (one preview, one commit).
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## corpus combine
 
@@ -176,6 +183,7 @@ Combine several .bib files into one (optionally deduping by citation key).
 | `--diff` | boolean | no | false | — | Show a unified diff of the output |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## corpus split
 
@@ -199,6 +207,7 @@ Combine inputs, then route entries into several outputs by predicate.
 | `--diff` | boolean | no | false | — | Show a unified diff of each output |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## dedupe check
 
@@ -213,6 +222,7 @@ Report duplicate works by DOI/arXiv/other IDs and fuzzy title matches.
 | `FILES` | list[string] | yes | — | — | One or more .bib files |
 | `--strict` | boolean | no | false | — | Exit 1 when duplicate works are found (for CI and pre-commit gating) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## dedupe merge
 
@@ -232,6 +242,7 @@ Conservatively merge duplicate works into their first entry.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## enrich
 
@@ -257,6 +268,7 @@ Conservatively fill missing metadata (modifies the file).
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## fields append
 
@@ -279,6 +291,7 @@ Append a value to a delimited field on matching references.
 | `--diff` | boolean | no | false | — |  |
 | `--json` | boolean | no | false | — |  |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## fields clear
 
@@ -300,6 +313,7 @@ Remove a field from matching references.
 | `--diff` | boolean | no | false | — |  |
 | `--json` | boolean | no | false | — |  |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## fields move
 
@@ -322,6 +336,7 @@ Move a field on matching references, without replacing the target.
 | `--diff` | boolean | no | false | — |  |
 | `--json` | boolean | no | false | — |  |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## fields protect-title
 
@@ -344,6 +359,7 @@ Brace-protect capitalization-sensitive tokens in title-like fields.
 | `--diff` | boolean | no | false | — |  |
 | `--json` | boolean | no | false | — |  |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## fields rename
 
@@ -366,6 +382,7 @@ Rename a field across matching references.
 | `--diff` | boolean | no | false | — |  |
 | `--json` | boolean | no | false | — |  |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## fields set
 
@@ -388,6 +405,7 @@ Set or replace a field on matching references.
 | `--diff` | boolean | no | false | — |  |
 | `--json` | boolean | no | false | — |  |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## format
 
@@ -422,6 +440,7 @@ Rewrite layout only; never change bibliographic values or conventions.
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups add-entry
 
@@ -443,6 +462,7 @@ Add an entry to a group.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups add-group
 
@@ -465,6 +485,7 @@ Add a group node to the hierarchy tree.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups list
 
@@ -479,6 +500,7 @@ List all groups and their members.
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups list-entries
 
@@ -495,6 +517,7 @@ List entries belonging to a group (with descendant propagation by default).
 | `--exact` | boolean | no | false | — | Exact group match only (default: include descendants) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups move-group
 
@@ -515,6 +538,7 @@ Move a group node to a new parent (empty string for root-level).
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups remove-entry
 
@@ -535,6 +559,7 @@ Remove an entry from a group.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups remove-group
 
@@ -554,6 +579,7 @@ Remove a group node and all its descendants from the hierarchy.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups rename-group
 
@@ -575,6 +601,7 @@ Rename a group node, updating parent references in child groups.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups tree
 
@@ -589,6 +616,7 @@ Show the group hierarchy tree.
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups update-group
 
@@ -613,6 +641,7 @@ Update properties of a group node in the hierarchy.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## init
 
@@ -638,6 +667,7 @@ Create or initialize a .bib library.
 | `--diff` | boolean | no | false | — | Show a unified diff of the new file |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## inspect
 
@@ -656,6 +686,7 @@ Inspect a .bib file structure.
 | `--origin` | string | no | null | — | Where the library is saved, when FILE is a copy of it (an editor's unsaved buffer): tex-sources, pinax-files-dir, and relative file links resolve from there |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## keys check
 
@@ -670,6 +701,7 @@ Report duplicate citation keys (deprecated: use `lint --only duplicate_key`).
 | `FILES` | list[string] | yes | — | — | One or more .bib files |
 | `--strict` | boolean | no | false | — | Exit 1 when duplicate citation keys are found (for CI and pre-commit gating) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## keys generate
 
@@ -692,6 +724,7 @@ Derive citation keys from entry metadata and update linked TeX citations.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## keys rename
 
@@ -713,6 +746,7 @@ Rename one citation key to an explicit value and update TeX citations.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## keys repair
 
@@ -731,6 +765,7 @@ Rename duplicate citation keys so every key is unique.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## keys usage
 
@@ -745,6 +780,7 @@ Scan TeX sources directly for \cite-family citations of one key.
 | `KEY` | string | yes | — | — | Citation key to search for |
 | `SOURCES` | list[string] | yes | — | — | One or more .tex files or directories to scan |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## lint
 
@@ -765,6 +801,7 @@ Validate entries and report issues (accepts multiple files for CI gating).
 | `--include-ignored` | boolean | no | false | — | Also report the findings the library's lint-ignore setting and ignore directives waive (they then count for --strict) |
 | `--summary` | boolean | no | false | — | Report counts (by severity, category and type) without listing each finding; the omitted count is reported as issues_omitted |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## metadata adopt-jabref
 
@@ -783,6 +820,7 @@ Start maintaining a JabRef metadata projection for this library.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## metadata list
 
@@ -797,6 +835,7 @@ List top-level metadata blocks (both jabref-meta and pynakes-meta).
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## metadata remove
 
@@ -817,6 +856,7 @@ Remove one metadata block (jabref-meta or pynakes-meta).
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## metadata set
 
@@ -839,6 +879,7 @@ Set one top-level metadata block (jabref-meta or pynakes-meta).
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## normalize
 
@@ -878,6 +919,7 @@ Normalize entries: titles, authors, journals, DOIs, identifier case, and orderin
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
 | `--ignore-missing-tex` | boolean | no | false | — | Regenerate keys despite missing linked TeX sources; those sources are not rewritten |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## query list
 
@@ -892,6 +934,7 @@ List the library's saved queries, and whether each still parses.
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## query remove
 
@@ -911,6 +954,7 @@ Remove a saved query from the library.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## query set
 
@@ -931,6 +975,7 @@ Save a named selector query in the library, or replace one.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## ref add
 
@@ -953,6 +998,7 @@ Add a manually specified reference entry.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## ref compare
 
@@ -971,6 +1017,7 @@ Compare one reference's fields against another reference (read-only).
 | `--cache-file` | string | no | null | — | Keep provider responses in a reusable cache file at this path (safe to delete or .gitignore). Omit it and nothing is written to disk: responses are reused for this run only |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## ref directive
 
@@ -994,6 +1041,7 @@ Add or remove a per-entry directive: a `% pynakes:` line above each entry.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## ref edit
 
@@ -1016,6 +1064,7 @@ Patch fields or type on one uniquely identified reference.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## ref find
 
@@ -1032,6 +1081,7 @@ Find the real records matching a reference written out in prose.
 | `--online` | boolean | no | false | — | Required: this command exists to query a bibliographic index |
 | `--cache-file` | string | no | null | — | Keep provider responses in a reusable cache file at this path (safe to delete or .gitignore). Omit it and nothing is written to disk: responses are reused for this run only |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## ref import
 
@@ -1056,6 +1106,7 @@ Import one or more references from supported identifiers or URLs.
 | `--cache-file` | string | no | null | — | Keep provider responses in a reusable cache file at this path (safe to delete or .gitignore). Omit it and nothing is written to disk: responses are reused for this run only |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## ref remove
 
@@ -1076,6 +1127,7 @@ Remove entries by citation key.
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## ref show
 
@@ -1100,6 +1152,7 @@ Show one uniquely identified reference, or triage several at once.
 | `--cursor` | string | no | null | — | Resume a paged read: pass page.next_cursor from the previous page. Refused when the library changed since |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## scrub
 
@@ -1126,6 +1179,7 @@ Write a copy of a library with its private content removed.
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## search
 
@@ -1153,6 +1207,7 @@ Search entries by free text, phrases, or field-scoped terms.
 | `--no-rank` | boolean | no | false | — | Keep raw file order instead of ranking by match strength |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## tex add
 
@@ -1172,6 +1227,7 @@ Link one or more TeX source files or directories to this library.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## tex clear
 
@@ -1190,6 +1246,7 @@ Unlink all TeX source files from this library.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## tex list
 
@@ -1204,6 +1261,7 @@ List the TeX source files linked to this library.
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## tex remove
 
@@ -1223,6 +1281,7 @@ Unlink one or more TeX source files or directories from this library.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## tex scan
 
@@ -1246,6 +1305,7 @@ Report which entries are used in LaTeX sources, and which citations are missing.
 | `--diff` | boolean | no | false | — | Show a unified diff of changes |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## verify
 
@@ -1266,3 +1326,4 @@ Verify entries against authoritative metadata (read-only).
 | `--concurrency, -j` | integer | no | 8 | — | Number of provider lookups to run at once during an --online pass (result ordering and applied updates are unaffected) |
 | `--strict` | boolean | no | false | — | Exit 1 when verification finds warnings or errors (for CI and pre-commit gating) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |

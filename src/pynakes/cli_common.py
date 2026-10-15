@@ -6,6 +6,7 @@ import os
 import re
 import sys
 from collections.abc import Callable, Iterable
+from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NoReturn, TypeVar
@@ -130,14 +131,29 @@ def _warning_object(warning: object) -> dict:
     return {"type": "warning", "message": str(warning)}
 
 
+#: Whether ``--json`` output is indented for reading (``--pretty``). Set by the
+#: option's callback on every invocation, so it never leaks between commands.
+_PRETTY_JSON: ContextVar[bool] = ContextVar("pynakes_pretty_json", default=False)
+
+
+def set_pretty_json(pretty: bool) -> None:
+    """Choose indented (``True``) or compact (``False``) JSON envelopes."""
+    _PRETTY_JSON.set(pretty)
+
+
 def _emit_json(payload: dict) -> None:
     """Write one JSON envelope to stdout, in the format every command shares.
 
     ``warnings`` is always a list of objects carrying ``type`` and ``message``.
+    The envelope is compact — one line, no padding — because its usual reader
+    is a program or an agent paying per token; ``--pretty`` indents it.
     """
     if "warnings" in payload:
         payload["warnings"] = [_warning_object(w) for w in payload["warnings"] or []]
-    typer.echo(json.dumps(payload, indent=2))
+    if _PRETTY_JSON.get():
+        typer.echo(json.dumps(payload, indent=2))
+    else:
+        typer.echo(json.dumps(payload, separators=(",", ":")))
 
 
 def _emit(

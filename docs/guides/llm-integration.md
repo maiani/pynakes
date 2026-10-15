@@ -20,6 +20,7 @@ contract. For command-by-command tutorials, see the [usage guide](usage.md).
 - **Reviewable edits.** Modifying commands support `--dry-run` and `--diff`,
   including `asset repair`, whose diff is of the Pinax manifest it reconciles.
 - **Structured output.** Use `--json`; do not parse human-readable output.
+  Envelopes are compact, one line; `--pretty` indents them for a person.
 - **Explicit conflicts.** A blocked operation exits `2` and returns resolution
   options instead of choosing one.
 - **Validated replacement.** Commits prepare a temporary file, re-parse it, and
