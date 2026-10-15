@@ -1,0 +1,18 @@
+{
+  "task": "concurrent-edit",
+  "engine_version": "0.7.0.dev42+gc5cbe1f8b (v0.8 branch, commit 2f6caf4)",
+  "agent": {
+    "model": "claude-opus-5-5",
+    "client": "Claude Code general-purpose subagent",
+    "settings": "default; Bash only; task prompt plus library path and CLI path"
+  },
+  "conditions": "fresh fixture copy, offline, no prior context, no repository access",
+  "correct": true,
+  "uncertainty_preserved": true,
+  "unsupported_claims": 0,
+  "call_count": 7,
+  "unnecessary_calls": 5,
+  "response_bytes": 16642,
+  "response_size_ratio": 11.383,
+  "edits_match_plan": true
+}

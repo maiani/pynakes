@@ -208,9 +208,13 @@ agent evaluation suite in `evals/agent`. Its tests cover the gate below.
 
 Remaining before release:
 
-- Record at least one agent run per evaluation task with
-  `scripts/agent_eval.py`, keeping the transcript, the scores, and the
-  `measure` baseline together with the engine and model versions.
+- Agent runs: one per task is recorded in
+  [`evals/agent/runs/2026-10-15-claude-opus-5-5`](evals/agent/runs/2026-10-15-claude-opus-5-5/README.md);
+  the owner still has to review its `unsupported_claims` counts. All four
+  runs were correct, but at 5–10 calls beyond the reference and 6–40× its
+  response bytes: cut discovery cost (`capabilities` is 214 KB, help pages
+  5–7 KB each) and return what the next step needs (a duplicate-key conflict
+  should list the entries it cannot choose between), then record a second run.
 - Release per [RELEASE.md](RELEASE.md).
 
 **Done when:** selected context can be paged without omissions under a stable

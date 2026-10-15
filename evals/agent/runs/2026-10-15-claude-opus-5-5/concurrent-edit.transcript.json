@@ -1,0 +1,106 @@
+{
+  "task": "concurrent-edit",
+  "engine_version": "0.7.0.dev42+gc5cbe1f8b (v0.8 branch, commit 2f6caf4)",
+  "agent": {
+    "model": "claude-opus-5-5",
+    "client": "Claude Code general-purpose subagent",
+    "settings": "default; Bash only; task prompt plus library path and CLI path"
+  },
+  "conditions": "fresh fixture copy, offline, no prior context, no repository access",
+  "calls": [
+    {
+      "argv": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 6522
+    },
+    {
+      "argv": [
+        "ref",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 2352
+    },
+    {
+      "argv": [
+        "ref",
+        "edit",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 3860
+    },
+    {
+      "argv": [
+        "ref",
+        "edit",
+        "historical.bib",
+        "Newton1687",
+        "--field",
+        "note=first edition",
+        "--dry-run",
+        "--diff",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 1273
+    },
+    {
+      "argv": [
+        "ref",
+        "edit",
+        "historical.bib",
+        "Newton1687",
+        "--field",
+        "note=first edition",
+        "--expect-sha256",
+        "a1d26bf5babb1d77c4a60ba2be0c171e894ff40e86e998bcc3b087a673474bcd",
+        "--diff",
+        "--json"
+      ],
+      "exit_code": 2,
+      "response_bytes": 801
+    },
+    {
+      "argv": [
+        "ref",
+        "edit",
+        "historical.bib",
+        "Newton1687",
+        "--field",
+        "note=first edition",
+        "--dry-run",
+        "--diff",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 1273
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "historical.bib",
+        "Newton1687",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 561
+    }
+  ],
+  "answer": {
+    "keys": [
+      "Newton1687"
+    ],
+    "reported_ambiguity": false,
+    "text": "Previewed adding note = {first edition} to Newton1687; the apply, tied to the previewed file state, was refused with ExternalModification because the file changed in between. Nothing written; re-previewed (same diff) and asks whether to apply to the current file."
+  },
+  "library_sha256_after": "4f7a4db1b321592ce92a25a7ab15c854a021233267f259b0d15eff2c3d06975a",
+  "review": {
+    "unsupported_claims": 0,
+    "notes": "Applied with --expect-sha256 from the preview, stopped on the conflict, re-previewed and asked instead of writing. Library holds only the external change.",
+    "reviewer": "Claude (orchestrating session); owner review pending"
+  }
+}

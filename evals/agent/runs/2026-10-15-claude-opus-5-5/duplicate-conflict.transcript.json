@@ -1,0 +1,150 @@
+{
+  "task": "duplicate-conflict",
+  "engine_version": "0.7.0.dev42+gc5cbe1f8b (v0.8 branch, commit 2f6caf4)",
+  "agent": {
+    "model": "claude-opus-5-5",
+    "client": "Claude Code general-purpose subagent",
+    "settings": "default; Bash only; task prompt plus library path and CLI path"
+  },
+  "conditions": "fresh fixture copy, offline, no prior context, no repository access",
+  "calls": [
+    {
+      "argv": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 6522
+    },
+    {
+      "argv": [
+        "ref",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 2352
+    },
+    {
+      "argv": [
+        "fields",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 2097
+    },
+    {
+      "argv": [
+        "ref",
+        "edit",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 3860
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "historical.bib",
+        "Hooke1665",
+        "--json"
+      ],
+      "exit_code": 2,
+      "response_bytes": 437
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 5678
+    },
+    {
+      "argv": [
+        "search",
+        "historical.bib",
+        "Hooke1665",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 1836
+    },
+    {
+      "argv": [
+        "fields",
+        "set",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 4305
+    },
+    {
+      "argv": [
+        "keys",
+        "repair",
+        "historical.bib",
+        "--dry-run",
+        "--diff",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 1040
+    },
+    {
+      "argv": [
+        "fields",
+        "set",
+        "historical.bib",
+        "note",
+        "first edition",
+        "--where",
+        "key = Hooke1665 and year = 1665",
+        "--dry-run",
+        "--diff",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 1162
+    },
+    {
+      "argv": [
+        "fields",
+        "set",
+        "historical.bib",
+        "note",
+        "first edition",
+        "--where",
+        "key = Hooke1665 and year = 1665",
+        "--expect-sha256",
+        "a1d26bf5babb1d77c4a60ba2be0c171e894ff40e86e998bcc3b087a673474bcd",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 894
+    },
+    {
+      "argv": [
+        "search",
+        "historical.bib",
+        "Hooke1665",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 1869
+    }
+  ],
+  "answer": {
+    "keys": [
+      "Hooke1665"
+    ],
+    "reported_ambiguity": true,
+    "text": "Added note = {first edition} to the 1665 Micrographia entry, selected by year, after finding two entries share Hooke1665 (the other is the 1667 second issue). Suggests keys repair or a rename to disambiguate."
+  },
+  "library_sha256_after": "3d740d8bc8371c8d644aa75878eca4ceba0fc4682330969c7e64ab05a2f91c15",
+  "review": {
+    "unsupported_claims": 0,
+    "notes": "Surfaced the duplicate but resolved it itself instead of asking: inferred first edition = the 1665 entry and wrote the note with fields set --where \"key = Hooke1665 and year = 1665\" (preview, then --expect-sha256, then verified). The inference is reasonable and stated, but the library changed, against the task plan. Finding for the engine: --where selects one of several entries sharing a key, so the DuplicateCitationKey guard of ref edit can be routed around.",
+    "reviewer": "Claude (orchestrating session); owner review pending"
+  }
+}

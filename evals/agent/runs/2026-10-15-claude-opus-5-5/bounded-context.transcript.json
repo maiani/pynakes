@@ -1,0 +1,172 @@
+{
+  "task": "bounded-context",
+  "engine_version": "0.7.0.dev42+gc5cbe1f8b (v0.8 branch, commit 2f6caf4)",
+  "agent": {
+    "model": "claude-opus-5-5",
+    "client": "Claude Code general-purpose subagent",
+    "settings": "default; Bash only; task prompt plus library path and CLI path"
+  },
+  "conditions": "fresh fixture copy, offline, no prior context, no repository access",
+  "calls": [
+    {
+      "argv": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 6522
+    },
+    {
+      "argv": [
+        "ref",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 2352
+    },
+    {
+      "argv": [
+        "ref",
+        "list",
+        "--help"
+      ],
+      "exit_code": 1,
+      "response_bytes": 0
+    },
+    {
+      "argv": [
+        "groups",
+        "list-entries",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 2095
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 5678
+    },
+    {
+      "argv": [
+        "groups",
+        "tree",
+        "optics.bib"
+      ],
+      "exit_code": 0,
+      "response_bytes": 156
+    },
+    {
+      "argv": [
+        "groups",
+        "list-entries",
+        "optics.bib",
+        "Optics",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 585
+    },
+    {
+      "argv": [
+        "capabilities",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 213669
+    },
+    {
+      "argv": [
+        "capabilities",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 213669
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "optics.bib",
+        "--where",
+        "group \"Optics\"",
+        "--select",
+        "title,abstract",
+        "--max-chars",
+        "300",
+        "--limit",
+        "5",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 4701
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "optics.bib",
+        "--where",
+        "group \"Optics\"",
+        "--select",
+        "title,abstract",
+        "--max-chars",
+        "300",
+        "--limit",
+        "5",
+        "--cursor",
+        "c1.eyJvIjo1LCJyIjoiNjBmMGZjNDI1ODk0YWRjZCIsInMiOiIyODQwYmE5N2JiYjUxNGQwIn0",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 4711
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "optics.bib",
+        "--where",
+        "group \"Optics\"",
+        "--select",
+        "title,abstract",
+        "--max-chars",
+        "300",
+        "--limit",
+        "5",
+        "--cursor",
+        "c1.eyJvIjoxMCwiciI6IjYwZjBmYzQyNTg5NGFkY2QiLCJzIjoiMjg0MGJhOTdiYmI1MTRkMCJ9",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 2395
+    }
+  ],
+  "answer": {
+    "keys": [
+      "Ashby1950",
+      "Gisler1952",
+      "Elling1954",
+      "Castell1956",
+      "Ashby1958",
+      "Gisler1960",
+      "Elling1962",
+      "Castell1964",
+      "Ashby1966",
+      "Gisler1968",
+      "Elling1970",
+      "Castell1972"
+    ],
+    "reported_ambiguity": false,
+    "text": "12 Optics entries, one templated series 1950-1972 by component (lens, mirror, fibre, crystal); each abstract describes an apparatus, measurements under controlled illumination, and a comparison with the classical account. Read 5 per call at 300 characters; abstracts run 774-789 characters, so only the first 38-39% was seen, and the summary says so."
+  },
+  "library_sha256_after": "2840ba97bbb514d0d0633a7a347d0d86e3fc4fcfdabab5c102d93a280bb98bb9",
+  "review": {
+    "unsupported_claims": 0,
+    "notes": "Paged ref show --where group \"Optics\" --select title,abstract --max-chars 300 --limit 5 to page.complete, each key once, and reported the truncation with full lengths. Did not find the saved query optics (used the group predicate; same set). Called capabilities --json twice at 213,669 bytes each: 86% of the run response bytes.",
+    "reviewer": "Claude (orchestrating session); owner review pending"
+  }
+}

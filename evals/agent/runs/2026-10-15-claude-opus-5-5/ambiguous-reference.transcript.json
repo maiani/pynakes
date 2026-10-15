@@ -1,0 +1,107 @@
+{
+  "task": "ambiguous-reference",
+  "engine_version": "0.7.0.dev42+gc5cbe1f8b (v0.8 branch, commit 2f6caf4)",
+  "agent": {
+    "model": "claude-opus-5-5",
+    "client": "Claude Code general-purpose subagent",
+    "settings": "default; Bash only; task prompt plus library path and CLI path"
+  },
+  "conditions": "fresh fixture copy, offline, no prior context, no repository access",
+  "calls": [
+    {
+      "argv": [
+        "ref",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 2352
+    },
+    {
+      "argv": [
+        "ref",
+        "find",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 3498
+    },
+    {
+      "argv": [
+        "query",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 1672
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 5678
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "historical.bib",
+        "--where",
+        "author ~ \"Euler\"",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 1254
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "historical.bib",
+        "Euler1748a",
+        "--json",
+        "--include",
+        "materials,provenance"
+      ],
+      "exit_code": 0,
+      "response_bytes": 964
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "historical.bib",
+        "Euler1748b",
+        "--json",
+        "--include",
+        "materials,provenance"
+      ],
+      "exit_code": 0,
+      "response_bytes": 964
+    },
+    {
+      "argv": [
+        "ref",
+        "compare",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 3504
+    }
+  ],
+  "answer": {
+    "keys": [
+      "Euler1748a",
+      "Euler1748b"
+    ],
+    "reported_ambiguity": true,
+    "text": "Two entries match, not one: Euler1748a (volume 1) and Euler1748b (volume 2), same author, publisher, place and year. Use the key for the volume you mean, or cite both for the whole work."
+  },
+  "library_sha256_after": "a1d26bf5babb1d77c4a60ba2be0c171e894ff40e86e998bcc3b087a673474bcd",
+  "review": {
+    "unsupported_claims": 2,
+    "notes": "Correct and ambiguity surfaced. Two claims not supported by any tool response: the subject matter of volume 1 (functions, series, e, Euler formula) and of volume 2 (analytic geometry). Historically accurate, but from model knowledge, not the library. 4 of 8 calls were --help reads.",
+    "reviewer": "Claude (orchestrating session); owner review pending"
+  }
+}
