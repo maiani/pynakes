@@ -116,7 +116,8 @@ def test_every_listed_deprecation_is_still_accepted() -> None:
     for deprecation in capabilities["deprecations"]:
         schema = capabilities["command_schemas"][deprecation["command"]]
         flags = {flag for option in schema["options"] for flag in option["flags"]}
-        assert deprecation["old"] in flags, deprecation
+        # A whole command in its deprecation period names itself as the old form.
+        assert deprecation["old"] in flags | {deprecation["command"]}, deprecation
         assert deprecation["new"] and deprecation["removal"], deprecation
         major, minor, _patch = (int(part) for part in deprecation["removal"].split("."))
         assert (major, minor) > (0, 7), deprecation

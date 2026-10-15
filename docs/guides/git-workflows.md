@@ -13,7 +13,7 @@ build. Pass `--strict` to turn a finding into a non-zero exit code:
 | Command | `--strict` fails when… |
 | --- | --- |
 | `pynakes lint --strict` | any finding not suppressed by `lint-ignore`, `--ignore`, or an `ignore` directive |
-| `pynakes keys check --strict` | any citation key is duplicated |
+| `pynakes lint --only duplicate_key --strict` | any citation key is duplicated |
 | `pynakes asset check --strict` | any linked file is missing or the wrong type |
 | `pynakes dedupe check --strict` | duplicate works (same DOI/arXiv/title) are present |
 | `pynakes verify --strict` | any **error or warning** vs. authoritative metadata |
@@ -31,7 +31,7 @@ remain advisory. See [Metadata Reference](metadata-reference.md).
 
 ## Multiple files
 
-The gate checks — `lint`, `verify`, `keys check`, `asset check`,
+The gate checks — `lint`, `verify`, `asset check`,
 `dedupe check` — accept one or more `.bib` files:
 
 ```bash

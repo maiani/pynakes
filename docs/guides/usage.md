@@ -29,7 +29,7 @@ pynakes tex list refs.bib --json
 pynakes tex add refs.bib paper.tex
 pynakes tex remove refs.bib paper.tex
 pynakes tex clear refs.bib
-pynakes keys check refs.bib --json
+pynakes lint refs.bib --only duplicate_key --json
 pynakes dedupe check refs.bib --json
 pynakes asset check refs.bib --json
 pynakes format refs.bib --dry-run --diff
@@ -243,7 +243,7 @@ rewrites them to the standard macro (`month = jun`) and canonicalizes macro
 casing (`month = Jan` → `month = jan`), while preserving literals such as
 `month = {June}` and declared custom strings.
 
-`lint` (along with `keys check`, `asset check`, `dedupe check`, and `verify`)
+`lint` (along with `asset check`, `dedupe check`, and `verify`)
 accepts multiple files, or auto-detects a single `.bib` in the current directory
 when no file is given. Auto-detection ignores the `<jobname>Notes.bib` file
 REVTeX generates, recognized by that name and the `@CONTROL{REVTEX4...}` entry it

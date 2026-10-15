@@ -660,7 +660,7 @@ Inspect a .bib file structure.
 
 **Stability: stable**
 
-Report duplicate citation keys in one or more .bib files.
+Report duplicate citation keys (deprecated: use `lint --only duplicate_key`).
 
 `pynakes keys check FILES... [OPTIONS]`
 
@@ -759,6 +759,7 @@ Validate entries and report issues (accepts multiple files for CI gating).
 | `--strict` | boolean | no | false | — | Exit 1 when any finding is left after lint-ignore, --ignore, and ignore directives (for CI and pre-commit gating) |
 | `--category` | list[choice] | no | — | correctness, content, formatting, consistency, profile | Report only these categories (repeatable) |
 | `--ignore` | list[string] | no | — | — | Leave out a finding type (missing_doi) or a whole category (consistency); repeatable, and added to the library's lint-ignore setting |
+| `--only` | list[string] | no | — | — | Report only these finding types (duplicate_key, missing_doi, ...): comma-separated, repeatable |
 | `--severity` | choice | no | "info" | error, warning, info | Report only findings at least this severe: error, warning, or info (all) |
 | `--summary` | boolean | no | false | — | Report counts (by severity, category and type) without listing each finding; the omitted count is reported as issues_omitted |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |

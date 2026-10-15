@@ -120,7 +120,7 @@ pynakes fields protect-title refs.bib \
 ## Example 7: Repair Citation Keys
 
 ```bash
-pynakes keys check refs.bib --json
+pynakes lint refs.bib --only duplicate_key --json
 pynakes keys repair --dry-run --diff
 pynakes keys repair refs.bib --dry-run --diff
 pynakes keys repair refs.bib

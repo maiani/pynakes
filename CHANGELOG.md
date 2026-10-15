@@ -106,6 +106,8 @@ comparison context for it, and save the selection for later.
   `checked: false`, `rate_limited`, and `retryable`, and `lookups` names the
   entries not checked and the arguments that retry them; a throttle is no
   longer indistinguishable from "no match".
+- `lint --only TYPES` reports only the named finding types, the counterpart of
+  `--ignore`.
 - `scrub --where` / `--key` keep only the selected entries in the copy, so
   `scrub refs.bib --where used --out public.bib` releases just the cited
   entries.
@@ -147,6 +149,11 @@ comparison context for it, and save the selection for later.
   title, a zero-width space).
 
 ### Deprecated
+
+- `keys check` is deprecated and removed in 0.9.0: use
+  `lint --only duplicate_key` (with `--strict` to gate). Each `duplicate_key`
+  finding now lists the position of every entry sharing the key under
+  `instances`.
 
 - `tex scan --out`, `--group`, and `--keyword` are deprecated and removed in
   0.9.0: `tex scan` only reports. Select the cited entries with `--where used`

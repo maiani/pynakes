@@ -79,6 +79,11 @@ NON_ENTRY_ISSUE_TYPES = frozenset(
 IGNORABLE_NAMES: frozenset[str] = frozenset(ISSUE_CATEGORIES) | frozenset(CATEGORY_FIXERS)
 
 
+def unknown_issue_types(names: tuple[str, ...] | list[str]) -> list[str]:
+    """Return the entries of ``names`` that are not finding types."""
+    return [name for name in names if name not in ISSUE_CATEGORIES]
+
+
 def unknown_ignore_names(names: tuple[str, ...] | list[str]) -> list[str]:
     """Return the entries of ``names`` that are neither a finding type nor a category."""
     return [name for name in names if name not in IGNORABLE_NAMES]
@@ -106,6 +111,9 @@ class LintIssue:
     #: library was parsed from text and the check could locate it; ``None``
     #: otherwise (file-level findings, in-memory libraries).
     line: int | None = None
+    #: For ``duplicate_key``: the zero-based positions, among the library's
+    #: entries, of every entry sharing the key. ``None`` for other findings.
+    instances: list[int] | None = None
 
     @property
     def category(self) -> LintCategory:
@@ -123,7 +131,7 @@ class LintIssue:
 
     def to_dict(self) -> dict[str, object]:
         """Serialize the finding to a JSON-friendly dict for CLI output."""
-        return {
+        described: dict[str, object] = {
             "type": self.type,
             "severity": self.severity,
             "category": self.category,
@@ -133,3 +141,6 @@ class LintIssue:
             "field": self.field,
             "line": self.line,
         }
+        if self.instances is not None:
+            described["instances"] = list(self.instances)
+        return described

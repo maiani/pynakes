@@ -99,7 +99,6 @@ commands and their semantics.
 
    ```bash
    pynakes lint refs.bib --json
-   pynakes keys check refs.bib --json
    pynakes dedupe check refs.bib --json
    pynakes tex scan refs.bib paper.tex --json
    pynakes asset check refs.bib --json
@@ -372,7 +371,7 @@ keys a caller can rely on; each command adds its own fields alongside them.
 | modify | edits one library in place (`normalize`, `ref edit`, `fields set`, `tex add`, …) | `status`, `action`, `file`, `dry_run`, `modified`, `modified_entries`, `warnings`, `source_sha256` |
 | create | writes new files (`init`, `scrub`, `corpus combine`, `corpus split`) | `status`, `action`, `dry_run`, `warnings`, plus `out`/`written` or `outputs` |
 | read | reports without writing (`ref show`, `search`, `inspect`, `tex list`, …) | `status`, `action`, `warnings`, `source_sha256` |
-| check | gates a library (`lint`, `verify`, `keys check`, `dedupe check`, `asset check`) | `status`, `action`, `file`, `warnings`, `source_sha256`, `strict` |
+| check | gates a library (`lint`, `verify`, `dedupe check`, `asset check`) | `status`, `action`, `file`, `warnings`, `source_sha256`, `strict` |
 | error | any failure or conflict | `status`, `error`, `message` |
 
 Shared rules:

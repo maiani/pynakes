@@ -1224,3 +1224,43 @@ def test_lint_severity_and_summary_keep_the_report_small_without_hiding_counts(
     assert summary["issues_omitted"] == full["summary"]["issues"] > 0
     assert summary["summary"] == full["summary"]
     assert sum(full["summary"]["by_type"].values()) == full["summary"]["issues"]
+
+
+def test_lint_only_reports_the_named_types_and_gates_on_them(tmp_path: Path) -> None:
+    from typer.testing import CliRunner
+
+    from pynakes.cli import app
+
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "@book{Euler1748,\n  title = {Introductio}\n}\n\n"
+        "@book{Euler1748,\n  title = {Introductio, volume two}\n}\n\n"
+        "@article{Gauss1801,\n  doi = {not a doi}\n}\n",
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["lint", str(bib), "--only", "duplicate_key", "--strict", "--json"])
+
+    payload = json.loads(result.output)
+    assert result.exit_code == 1
+    assert [issue["type"] for issue in payload["issues"]] == ["duplicate_key"]
+    assert payload["issues"][0]["instances"] == [0, 1]
+    unknown = runner.invoke(app, ["lint", str(bib), "--only", "duplicate_keys", "--json"])
+    assert unknown.exit_code == 1 and "duplicate_keys" in json.loads(unknown.output)["message"]
+
+
+def test_keys_check_still_works_and_says_it_is_deprecated(tmp_path: Path) -> None:
+    from typer.testing import CliRunner
+
+    from pynakes.cli import app
+
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@book{Euler1748,\n  title = {I}\n}\n\n@book{Euler1748,\n  title = {II}\n}\n")
+
+    result = CliRunner().invoke(app, ["keys", "check", str(bib), "--json"])
+
+    payload = json.loads(result.output)
+    assert payload["has_duplicates"] is True
+    (warning,) = payload["warnings"]
+    assert warning["type"] == "deprecated" and warning["new"] == "lint --only duplicate_key"

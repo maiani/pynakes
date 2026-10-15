@@ -12,7 +12,7 @@ from pynakes.cli_checks import CheckOutcome, _run_checks, strict_option
 from pynakes.cli_choices import LintCategory, LintSeverity
 from pynakes.cli_common import _emit_error, _safe, _source_sha256
 from pynakes.engine import Bibliography
-from pynakes.lint import LintIssue, suppress_findings, unknown_ignore_names
+from pynakes.lint import LintIssue, suppress_findings, unknown_ignore_names, unknown_issue_types
 from pynakes.lint import lint as lint_lib
 
 # --- lint ------------------------------------------------------------------
@@ -28,9 +28,10 @@ def _lint_one(
     ignores: frozenset[str] = frozenset(),
     min_severity: str = "info",
     summary_only: bool = False,
+    types: frozenset[str] = frozenset(),
 ) -> CheckOutcome:
     return _lint_collection(
-        Bibliography.open(file), file, categories, ignores, min_severity, summary_only
+        Bibliography.open(file), file, categories, ignores, min_severity, summary_only, types
     )
 
 
@@ -41,10 +42,11 @@ def _lint_collection(
     ignores: frozenset[str] = frozenset(),
     min_severity: str = "info",
     summary_only: bool = False,
+    types: frozenset[str] = frozenset(),
 ) -> CheckOutcome:
     """Build the same lint report for an already opened bibliography.
 
-    ``min_severity`` narrows the report as ``categories`` does. ``summary_only``
+    ``min_severity`` and ``types`` narrow the report as ``categories`` does. ``summary_only``
     leaves the per-finding list out and says so (``issues_omitted``); every
     count, ``by_type`` included, still covers each finding reported.
     """
@@ -55,6 +57,8 @@ def _lint_collection(
     issues, suppressed = suppress_findings(lib, lint_lib(lib, base_dir=Path(file).parent), ignores)
     if categories:
         issues = [issue for issue in issues if issue.category in categories]
+    if types:
+        issues = [issue for issue in issues if issue.type in types]
     kept = set(_SEVERITY_ORDER[: _SEVERITY_ORDER.index(min_severity) + 1])
     issues = [issue for issue in issues if issue.severity in kept]
     errors = sum(1 for i in issues if i.severity == "error")
@@ -158,6 +162,13 @@ def lint(
         help="Leave out a finding type (missing_doi) or a whole category (consistency); "
         "repeatable, and added to the library's lint-ignore setting",
     ),
+    only: list[str] = typer.Option(
+        [],
+        "--only",
+        metavar="TYPE",
+        help="Report only these finding types (duplicate_key, missing_doi, ...): "
+        "comma-separated, repeatable",
+    ),
     severity: LintSeverity = typer.Option(
         LintSeverity.INFO,
         "--severity",
@@ -173,8 +184,9 @@ def lint(
 ) -> None:
     """Validate entries and report issues (accepts multiple files for CI gating).
 
-    `--category` and `--severity` narrow what is reported, and `--strict`
-    fails on what remains; `--summary` keeps every count but leaves out the
+    `--category`, `--only`, and `--severity` narrow what is reported, and
+    `--strict` fails on what remains — `lint --only duplicate_key --strict`
+    gates on duplicate citation keys alone; `--summary` keeps every count but leaves out the
     per-finding list.
     """
     categories = {item.value for item in category}
@@ -186,10 +198,18 @@ def lint(
             f"--ignore names no finding type or category: {', '.join(unknown)}",
         )
     ignores = frozenset(ignore)
+    types = frozenset(name.strip() for value in only for name in value.split(",") if name.strip())
+    unknown_types = unknown_issue_types(sorted(types))
+    if unknown_types:
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            f"--only names no finding type: {', '.join(unknown_types)}",
+        )
     _run_checks(
         files,
         "lint",
-        lambda file: _lint_one(file, categories, ignores, severity.value, summary),
+        lambda file: _lint_one(file, categories, ignores, severity.value, summary, types),
         json_output,
         strict,
     )

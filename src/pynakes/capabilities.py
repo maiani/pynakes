@@ -96,6 +96,15 @@ _SEARCH_QUERY_GRAMMAR = {
 # Old forms that still work, warn with {"type": "deprecated", ...}, and go away
 # in the named release. Empty once nothing is being retired.
 _DEPRECATIONS = [
+    {
+        "command": "keys check",
+        "old": "keys check",
+        "new": "lint --only duplicate_key",
+        "removal": "0.9.0",
+        "note": "lint reports the same duplicate_key findings, with every entry's position "
+        "under instances, and gates them with --strict. Unlike keys check, lint honours "
+        "the library's lint-ignore setting.",
+    },
     *(
         {
             "command": "tex scan",
@@ -556,8 +565,8 @@ def get_capabilities() -> dict:
             "groups": "Manage entry groups and group hierarchy "
             "(list, list-entries, add-entry, remove-entry, tree, add-group, "
             "remove-group, rename-group, move-group, update-group)",
-            "keys": "Generate, check, rename, repair citation keys, and look up "
-            "raw-TeX-source citations of one key (usage)",
+            "keys": "Generate, rename, repair citation keys, and look up "
+            "raw-TeX-source citations of one key (usage); check is deprecated",
             "fields": "Bulk-edit fields across matching references "
             "(set, rename, move, append, clear, protect-title)",
             "dedupe": "Detect and conservatively merge duplicate works",

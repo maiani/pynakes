@@ -46,6 +46,7 @@ from pynakes._lint_issue import (
     LintSeverity,
     issue_category,
     unknown_ignore_names,
+    unknown_issue_types,
 )
 from pynakes._lint_profile import (
     PROFILE_ISSUE_TYPES,
@@ -103,6 +104,7 @@ __all__ = [
     "resolve_lint_profile",
     "suppress_findings",
     "unknown_ignore_names",
+    "unknown_issue_types",
 ]
 
 # Entry types for which a missing DOI is worth a (low-severity) warning. This is
@@ -261,6 +263,7 @@ def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
                 f"Citation key {key!r} appears {len(indices)} times (entry {line_refs})",
                 key=key,
                 line=lib.entries.values()[indices[0]].start_line,
+                instances=list(indices),
             )
         )
 

@@ -26,6 +26,7 @@ from pynakes.cli_common import (
     _source_sha256,
     _verb,
     bib_file_argument,
+    deprecation_warning,
     key_option,
     select_keys,
     where_option,
@@ -55,7 +56,7 @@ def _params(
     )
 
 
-def _keys_check_one(file: str) -> CheckOutcome:
+def _keys_check_one(file: str, deprecated: dict | None = None) -> CheckOutcome:
     coll = Bibliography.open(file)
     duplicates = coll.lib.entries.duplicate_keys()
     instances = coll.lib.entries.duplicate_key_instances()
@@ -74,7 +75,7 @@ def _keys_check_one(file: str) -> CheckOutcome:
         "action": "keys_check",
         "file": file,
         "source_sha256": _source_sha256(coll),
-        "warnings": [],
+        "warnings": [] if deprecated is None else [deprecated],
         "has_duplicates": bool(duplicates),
         "duplicate_keys": duplicates,
         "duplicate_key_instances": instances,
@@ -101,8 +102,19 @@ def keys_check(
     strict: bool = strict_option("duplicate citation keys are found"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Report duplicate citation keys in one or more .bib files."""
-    _run_checks(files, "keys_check", _keys_check_one, json_output, strict)
+    """Report duplicate citation keys (deprecated: use `lint --only duplicate_key`).
+
+    `lint --only duplicate_key` reports the same findings, with the position
+    of every entry sharing a key under `instances`, and gates with
+    `--strict`. This command remains until 0.9.0 and reports a `deprecated`
+    warning.
+    """
+    deprecated = deprecation_warning(
+        "keys check", "lint --only duplicate_key", removal="0.9.0", json_output=json_output
+    )
+    _run_checks(
+        files, "keys_check", lambda file: _keys_check_one(file, deprecated), json_output, strict
+    )
 
 
 def _rename_payload(renames: list[tuple[str, str]]) -> dict:

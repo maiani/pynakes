@@ -44,7 +44,7 @@
           "checks": [{"path": "error", "equals": "DuplicateCitationKey"}]
         },
         {
-          "argv": ["keys", "check", "{lib}", "--json"],
+          "argv": ["lint", "{lib}", "--only", "duplicate_key", "--json"],
           "checks": [{"path": "status", "equals": "success"}]
         }
       ]
