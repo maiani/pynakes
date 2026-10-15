@@ -73,13 +73,26 @@ export function inspectBib(
   return runJson<InspectEnvelope>(command, ["inspect", filePath, "--display"], cwd);
 }
 
-/** Inspection, group reports, and lint from one engine snapshot. */
+/**
+ * Everything the view draws, from one engine process and one parse: inspection,
+ * group reports, lint, linked-TeX citations, and material state.
+ *
+ * `origin` is where the library is saved when `filePath` is a mirror of an
+ * unsaved buffer: the engine resolves `tex-sources`, `pinax-files-dir`, and
+ * relative `file` links from there, so the mirror sees the original's
+ * neighbours.
+ */
 export function inspectLibrary(
   command: PynakesCommand,
   filePath: string,
   cwd?: string,
+  origin?: string,
 ): Promise<InspectEnvelope> {
-  return runJson<InspectEnvelope>(command, ["inspect", filePath, "--display", "--insights"], cwd);
+  const args = ["inspect", filePath, "--display", "--insights"];
+  if (origin !== undefined) {
+    args.push("--origin", origin);
+  }
+  return runJson<InspectEnvelope>(command, args, cwd);
 }
 
 /** The declared group hierarchy from the file's metadata. */

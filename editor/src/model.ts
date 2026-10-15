@@ -40,6 +40,10 @@ export interface InspectInsights {
   groups_tree: GroupsTreeEnvelope;
   groups_list: GroupsListEnvelope;
   lint: LintEnvelope;
+  /** The `tex scan` envelope for the linked sources; absent from engines before 0.8. */
+  tex_scan?: TexScanEnvelope;
+  /** The `asset check` envelope; absent from engines before 0.8. */
+  asset_check?: AssetCheckEnvelope;
 }
 
 export interface InspectSuccess {

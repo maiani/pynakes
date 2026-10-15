@@ -147,7 +147,7 @@ question. An entry's **Cited at** list opens the `.tex` file at that `\cite`,
 and citations naming a key no entry declares are published as diagnostics *on
 the source file that makes them*, so an undefined citation appears where it was
 typed. Nothing is guessed locally: every occurrence's file, line, and column
-comes from `tex scan --json`.
+comes from the engine's `tex scan` report.
 
 ## Add, remove, group, merge
 

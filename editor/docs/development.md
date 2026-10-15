@@ -95,11 +95,13 @@ Python child does the work. On Linux and macOS the engine runs as the leader of
 its own process group and the whole group is signalled; on Windows `taskkill
 /T /F` stops the tree.
 
-Bibliography refreshes use `inspect --display --insights --json` to share one
-engine snapshot for entries, groups, and lint. This requires an engine supporting
-`--insights` (included in the bundled engine). Citation and material checks run
-separately against the saved bibliography, including when the editor has unsaved
-changes.
+Bibliography refreshes use one `inspect --display --insights --json` call: one
+process and one parse for entries, groups, lint, citations (`tex_scan`), and
+material state (`asset_check`). A buffer with unsaved changes is read through a
+mirror, so the call passes `--origin` with the document's saved path and the
+engine resolves `tex-sources`, `pinax-files-dir`, and relative `file` links from
+there. This requires an engine supporting both (included in the bundled
+engine).
 
 Writes run sequentially because each rewrites the file atomically. A staged
 commit is one `corpus batch` write, however many entries it covers.

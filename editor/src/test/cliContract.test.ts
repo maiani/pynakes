@@ -22,6 +22,7 @@ import * as path from "node:path";
 import { test } from "node:test";
 import {
   type RefEditRequest,
+  assetCheck,
   dedupeCheck,
   dedupeMerge,
   groupsEntry,
@@ -35,6 +36,7 @@ import {
   refCompare,
   refRemove,
   searchBib,
+  texScan,
 } from "../pynakes.js";
 import {
   type Mutation,
@@ -68,10 +70,19 @@ test("inspect/groups/lint/search return their documented envelope shape", { skip
   const lint = await lintBib(command, file);
   assert.equal(lint.status, "success");
 
+  const scan = await texScan(command, file);
+  const assets = await assetCheck(command, file);
   const combined = await inspectLibrary(command, file);
   assert.equal(combined.status, "success");
   if (combined.status === "success") {
-    assert.deepEqual(combined.insights, { groups_tree: tree, groups_list: list, lint });
+    // One process returns exactly what the separate commands would.
+    assert.deepEqual(combined.insights, {
+      groups_tree: tree,
+      groups_list: list,
+      lint,
+      tex_scan: scan,
+      asset_check: assets,
+    });
     const { insights, ...base } = combined;
     assert.deepEqual(base, inspected);
   }

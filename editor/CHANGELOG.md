@@ -15,9 +15,11 @@ release. Its version says nothing about which engine it runs.
 
 ### Changed
 
-- Refresh inspection, groups, and lint through one engine invocation, reducing
-  a saved bibliography refresh from six processes to three. Citation and material
-  reads remain parallel and use the saved bibliography's location.
+- Refresh the whole view — inspection, groups, lint, citations, and material
+  state — through one engine invocation that parses the bibliography once,
+  reducing a refresh from six processes to one. An unsaved buffer's citations
+  and materials now reflect its unsaved edits: the engine resolves its
+  neighbours from the saved location (`inspect --origin`).
 
 ### Added
 

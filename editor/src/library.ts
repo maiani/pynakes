@@ -37,7 +37,6 @@ import {
   type RefEditRequest,
   type RefImportRequest,
   type SearchOptions,
-  assetCheck,
   corpusBatch,
   corpusOperations,
   editMetadata,
@@ -53,7 +52,6 @@ import {
   refImport,
   refRemove,
   searchBib,
-  texScan,
 } from "./pynakes";
 
 /** Everything the view needs about a bibliography. */
@@ -80,22 +78,22 @@ export type LibraryReadResult =
 /**
  * Read a bibliography.
  *
- * `inspect` is authoritative: if it fails, there is no view to show. Every
- * supplementary report can fail independently and degrade to a warning. Groups
- * and lint share the inspection snapshot; citation and material checks run
- * concurrently against the saved bibliography.
+ * One engine process does the whole read: `inspect --insights` returns the
+ * inspection and every supplementary report — groups, lint, citations, and
+ * materials — from one parse. `inspect` is authoritative: if it fails, there
+ * is no view to show. Every supplementary report can fail independently and
+ * degrade to a warning.
  *
- * `neighbourPath` is where the citation and material reads look, and it is
- * deliberately not `filePath`. Those two reads are about the files *around* the
- * bibliography — the `.tex` sources that cite it, the PDFs it points to — and
- * every path leading to them (`tex-sources`, `pinax-files-dir`, a relative
- * `file` field) is resolved by the engine relative to the `.bib`'s own
+ * `neighbourPath` is where the library really lives, and it is deliberately
+ * not `filePath`. The citation and material reports are about the files
+ * *around* the bibliography — the `.tex` sources that cite it, the PDFs it
+ * points to — and every path leading to them (`tex-sources`,
+ * `pinax-files-dir`, a relative `file` field) resolves from the `.bib`'s own
  * directory. A buffer with unsaved changes is read through a mirror in a
- * temporary directory, where all of those would resolve to nothing and the view
- * would claim a library has no sources and no materials. So the caller passes
- * the document's real path on disk, and omits it when the document has none
- * (never saved, or not a local file) — the cost being that unsaved edits to a
- * `file` field or to `tex-sources` are not reflected until the file is saved.
+ * temporary directory, so the engine is told the real path (`--origin`) and
+ * resolves from there, unsaved edits included. A document with no path on disk
+ * (never saved, or not a local file) has no neighbours, so those two reports
+ * are left out rather than resolved against the mirror.
  */
 export async function readLibrary(
   command: PynakesCommand,
@@ -103,11 +101,7 @@ export async function readLibrary(
   cwd?: string,
   neighbourPath?: string,
 ): Promise<LibraryReadResult> {
-  const [inspected, scan, assets] = await Promise.all([
-    inspectLibrary(command, filePath, cwd),
-    neighbourPath ? texScan(command, neighbourPath, cwd) : undefined,
-    neighbourPath ? assetCheck(command, neighbourPath, cwd) : undefined,
-  ]);
+  const inspected = await inspectLibrary(command, filePath, cwd, neighbourPath);
 
   if (inspected.status === "error") {
     return { ok: false, error: inspected };
@@ -118,6 +112,8 @@ export async function readLibrary(
       message: "The engine omitted inspect insights. Update pynakes." } };
   }
   const { groups_tree: tree, groups_list: list, lint } = inspected.insights;
+  const scan = neighbourPath ? inspected.insights.tex_scan : undefined;
+  const assets = neighbourPath ? inspected.insights.asset_check : undefined;
 
   const warnings: string[] = [];
   const membership = list.status === "success" ? list.groups : {};
