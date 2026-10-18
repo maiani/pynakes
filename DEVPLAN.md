@@ -206,6 +206,37 @@ shared by `ref show --key`, `ref show --where`, and `search`, saved queries
 (`query list/set/remove`, run anywhere as `--where 'query "NAME"'`), `analyze`, their `capabilities` schemas, and the
 agent evaluation suite in `evals/agent`. Its tests cover the gate below.
 
+#### Co-author analysis (added to the v0.8 slice)
+
+`coauthors` and the `analyze` `coauthors` section are implemented under
+*Unreleased*. The decisions that constrain later work:
+
+- **A sibling command, plus a bounded section.** The network (pair lists, ego
+  views, documents) is too large and option-heavy for an `analyze` section, so
+  `coauthors` is its own read command in "Inspect & validate"; `analyze`
+  carries only its counts and `--top`-capped lists. Both run
+  `pynakes.coauthors.coauthor_network`, which takes entries rather than a
+  file, so a Library rollup can feed it the entries of many files.
+- **One reading of an author list.** `_analysis_people.py` is shared with the
+  `authors` section: normalized `Last, First`, compared brace-, space- and
+  case-insensitively, `others` recorded and never a person. The network's
+  author count equals `authors.distinct` by construction.
+- **Variants are evidence.** Look-alike names are reported as candidate pairs
+  with reasons and evidence against, never merged; a `--focus` view of several
+  names is a view, not an identity claim. Resolving that two names are one
+  person is a record correction (or a future directive, v0.11), not an
+  analysis option.
+- **Identity evidence.** ORCID iDs come only from `author+an:orcid`. BibLaTeX's
+  extended name format (`family=..., given=...`) is not parsed yet; when it
+  is, it belongs in `authors.py` so normalization and the network share it.
+- **No new selectors or settings beyond need.** Time slices reuse `--where`;
+  `--focus`, `--to` and `--out` are views and output, not settings. The one
+  behaviour-shaping option, the author-list limit, has all three forms
+  (`--max-authors`, `coauthors-max-authors`, `metadata set`).
+- **Deferred:** editors as co-authors (an explicit `--role` choice if wanted),
+  per-year pair counts beyond first/last year, and weighted (fractional)
+  counting.
+
 Remaining before release:
 
 - Agent runs: two per task are recorded in `evals/agent/runs/` — the first,
@@ -241,6 +272,9 @@ coverage efficiently, without importing another copy.
   direct reads for recovery and comparison. Files remain authoritative.
 - Lift v0.8 analysis into Library rollups. Distinguish entry occurrences from
   identified works, reconcile per-file counts and expose partial-read failures.
+  The co-author network takes multiple files here: one work listed in two
+  files must link its authors once, so the rollup feeds `coauthor_network`
+  identified works (with their file/key provenance in `keys`), not raw entries.
 - Test index refresh, deletion, rename and corruption recovery; measure index
   build/query/refresh cost and memory before making performance claims.
 

@@ -31,6 +31,7 @@ MetadataCategory = Literal[
     "pinax",
     "scrub",
     "queries",
+    "analysis",
     "unknown",
 ]
 
@@ -48,6 +49,7 @@ CATEGORY_USAGE: MetadataCategory = "usage"
 CATEGORY_PINAX: MetadataCategory = "pinax"
 CATEGORY_SCRUB: MetadataCategory = "scrub"
 CATEGORY_QUERIES: MetadataCategory = "queries"
+CATEGORY_ANALYSIS: MetadataCategory = "analysis"
 CATEGORY_UNKNOWN: MetadataCategory = "unknown"
 
 #: Former ``pynakes-meta`` key names, mapped to the key that replaced them. They
@@ -113,6 +115,9 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     "scrub-keep-fields": CATEGORY_SCRUB,
     "scrub-comments": CATEGORY_SCRUB,
     "scrub-metadata": CATEGORY_SCRUB,
+    # Entries listing more authors than this are not linked into the co-author
+    # network (`coauthors`, `analyze`'s coauthors section); 0 links every entry.
+    "coauthors-max-authors": CATEGORY_ANALYSIS,
 }
 
 PYNAKES_PREFIX_KEYS: dict[str, MetadataCategory] = {
@@ -270,6 +275,15 @@ def validate_metadata_value(key: str, value: str) -> None:
             raise ValueError("format-line-width must be an integer") from exc
         if width < 20:
             raise ValueError("format-line-width must be at least 20")
+        return
+
+    if normalized_key == "coauthors-max-authors":
+        try:
+            limit = int(stripped)
+        except ValueError as exc:
+            raise ValueError("coauthors-max-authors must be a non-negative integer") from exc
+        if limit < 0:
+            raise ValueError("coauthors-max-authors must be a non-negative integer")
         return
 
     if normalized_key == "format-indent":

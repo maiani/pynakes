@@ -40,7 +40,8 @@ and JabRef interoperability keeps existing libraries usable across tools.
   bibliography combine/split operations.
 - **Research reads.** Compare a set of papers through bounded, paged reads of
   their abstracts, materials, and recorded provenance; save selections as named
-  queries; and describe a library's coverage with `analyze`.
+  queries; describe a library's coverage with `analyze`; and map its co-author
+  network with `coauthors`.
 - **Automation.** Structured JSON, change plans, exit codes, and machine-readable
   capabilities support scripts, CI, and agent workflows. Network access is
   explicit.

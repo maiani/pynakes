@@ -44,6 +44,8 @@ src/pynakes/
   entry_reader.py    per-entry records: summary, fields, research context
   saved_queries.py    named --where expressions stored as query-<name> metadata
   analysis.py         offline descriptive report for one bibliography (`analyze`)
+  coauthors.py        co-author network, ego views, name-variant candidates (`coauthors`)
+  _coauthor_*.py      its variant detection and GraphML/Markdown rendering
   integrity.py        verify / enrich / published (opt-in --online lookups)
   _integrity_*.py     integrity report types and the published-check half
   entry_types.py      container/eprint field naming per entry type + dialect

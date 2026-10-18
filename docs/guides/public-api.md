@@ -39,7 +39,7 @@ covered by a backward-compatibility guarantee.
 | Work-matching evidence | `pynakes.identity` |
 | Analysis and maintenance | `pynakes.dedupe`, `pynakes.files`, `pynakes.integrity`, `pynakes.lint`, `pynakes.metadata`, `pynakes.scrub`, `pynakes.usage` |
 | Selection and search | `pynakes.query`, `pynakes.search`, `pynakes.saved_queries` |
-| Research reads and analysis | `pynakes.bounded`, `pynakes.entry_reader`, `pynakes.analysis` |
+| Research reads and analysis | `pynakes.bounded`, `pynakes.entry_reader`, `pynakes.analysis`, `pynakes.coauthors` |
 | Set operations (projections) | `pynakes.setops` |
 | Composition | `pynakes.batch` |
 | Introspection | `pynakes.capabilities` and `pynakes.__version__` |

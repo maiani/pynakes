@@ -278,6 +278,16 @@ findings, and linked-file and Pinax materials. The `lint` section is exactly
 `--section` to read only what you need. The counts describe the records; do
 not present them as a measure of scientific quality.
 
+`coauthors refs.bib --json` returns the co-author network under `network`
+(schema `pynakes.coauthors/1`): `authors`, `pairs`, `components`, and
+`variants`. Start with `analyze --section coauthors` for the bounded summary,
+then narrow with `--focus NAME` or `--where` before reading the whole network
+of a large library. Names under `variants` may be one person; report them as
+candidates and never add their counts together yourself. A `focus_variants`
+warning means entries under another spelling of the focus are outside the
+view: pass that spelling as a second `--focus` if the user confirms it is the
+same person. An unknown `--focus` name is `InvalidInput` with `candidates`.
+
 ### Collecting materials
 
 One command collects the best available PDF for a library and says whether the

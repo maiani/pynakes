@@ -37,8 +37,9 @@ Describe a bibliography: what it holds and how complete its records are.
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
-| `--section` | list[choice] | no | — | entries, types, years, authors, venues, identifiers, fields, groups, lint, materials | Report only these sections (repeatable; default: all) |
-| `--top` | integer | no | 10 | — | Length of the author and venue frequency lists |
+| `--section` | list[choice] | no | — | entries, types, years, authors, coauthors, venues, identifiers, fields, groups, lint, materials | Report only these sections (repeatable; default: all) |
+| `--top` | integer | no | 10 | — | Length of the author and venue frequency lists and of the co-author top pairs and collaborators |
+| `--max-authors` | integer | no | null | — | Link only entries listing at most this many authors; 0 links every entry (default: the library's coauthors-max-authors setting, else 100) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
@@ -120,6 +121,31 @@ Show what pynakes can do: a compact index, or the details asked for.
 | `--section` | list[choice] | no | null | analysis, batch_operations, bounded_reads, capabilities, command_groups, commands, deprecations, error_codes, formatting, material_collection, predicate_grammar, python_api, saved_queries, search_query_grammar, work_matching, write_precondition | Return this section of the description, e.g. predicate_grammar (repeatable) |
 | `--all` | boolean | no | false | — | Return the whole description (large: every command's schema) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## coauthors
+
+**Stability: stable**
+
+Map who has written with whom: co-author pairs, components, and name variants.
+
+`pynakes coauthors [FILE] [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `--focus` | list[string] | no | — | — | Show one person's co-authors and the pairs among them (repeatable: several names form one view, e.g. two spellings of the same person). Written like an author field: 'Isaac Newton' finds 'Newton, Isaac' |
+| `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing; 'used'/'unused' test the linked TeX sources and 'query NAME' runs a saved query. See `pynakes capabilities` for the full grammar. |
+| `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
+| `--max-authors` | integer | no | null | — | Link only entries listing at most this many authors; 0 links every entry (default: the library's coauthors-max-authors setting, else 100) |
+| `--to` | choice | no | null | json, graphml, markdown | Render the network as a document: json (the documented schema), graphml, or markdown |
+| `--out` | string | no | null | — | Write the --to document here instead of stdout (- for stdout) |
+| `--force` | boolean | no | false | — | Overwrite the output file if it already exists |
+| `--dry-run` | boolean | no | false | — | Report what --out would write without writing it |
+| `--diff` | boolean | no | false | — | Show a unified diff of the --out file |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## convert

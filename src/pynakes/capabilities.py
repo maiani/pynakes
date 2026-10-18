@@ -8,6 +8,7 @@ import pynakes
 from pynakes import __all__ as PUBLIC_API_EXPORTS
 from pynakes.analysis import SECTIONS as ANALYSIS_SECTIONS
 from pynakes.cli_errors import catalogue_description
+from pynakes.coauthors import SCHEMA as COAUTHOR_SCHEMA
 from pynakes.entry_reader import INCLUDE_PARTS
 from pynakes.metadata.schema import SAVED_QUERY_PREFIX
 from pynakes.query import FUZZY_THRESHOLD, WHERE_GRAMMAR
@@ -235,6 +236,50 @@ _SAVED_QUERIES = {
     "a stored query that no longer parses (invalid_metadata_value).",
 }
 
+_COAUTHORS = {
+    "command": "coauthors",
+    "module": "pynakes.coauthors",
+    "schema": COAUTHOR_SCHEMA,
+    "descriptive_only": True,
+    "offline": True,
+    "people": "The author field of each selected entry, compared as the analyze authors "
+    "section compares them (normalized Last, First; brace-, space- and case-insensitive), "
+    "so summary.authors equals that section's distinct for the same entries. Editors are "
+    "not included.",
+    "others": "'others'/'et al.' truncates a list: only the listed authors are linked, and "
+    "entries.with_others counts such entries.",
+    "selection": "--where/--key select the entries (time slices: --where 'year >= 2020'); "
+    "selection.entries counts them.",
+    "focus": "--focus NAME (repeatable) keeps the focus names, everyone sharing an entry "
+    "with one of them, and the pairs among all of these; components then leave the focus "
+    "names out. An unlisted focus name is InvalidInput with similar names as candidates; "
+    "a focus_variants warning names possible other spellings of a focus name.",
+    "variants": "Pairs of distinct names that may be one person, with reasons (spelling, "
+    "initials, extra_given_names, given_missing, family_split, same_orcid) and "
+    "evidence_against (co_listed, different_orcid). Never merged: they stay separate "
+    "authors.",
+    "identity_evidence": "ORCID iDs from the BibLaTeX named annotation author+an:orcid "
+    '(1="0000-..."); unreadable items are an invalid_orcid_annotation warning.',
+    "documents": {
+        "json": "The network document: schema, source, summary, entries, focus, authors, "
+        "pairs, components, variants.",
+        "graphml": "Undirected; nodes n0.. in author order (label, entries, collaborators, "
+        "component, years, orcids; focus and with_focus in a focus view); edge weight is "
+        "the number of shared entries, keys their citation keys.",
+        "markdown": "A summary table, then one table per list.",
+    },
+    "envelope": "--json without --to returns the document under network; with --to it "
+    "returns content (or out and written with --out).",
+    "analyze_section": "analyze --section coauthors is the bounded summary: the summary "
+    "counts plus top_pairs and top_collaborators capped by --top.",
+    "reconciles": {
+        "components": "Every entry with authors belongs to exactly one component, so "
+        "component entries sum to entries.with_authors (without --focus).",
+        "entries": "single_author + coauthored = with_authors; with_authors + "
+        "without_authors = total.",
+    },
+}
+
 _ANALYSIS = {
     "command": "analyze",
     "module": "pynakes.analysis",
@@ -244,11 +289,16 @@ _ANALYSIS = {
         "lint": "Equals lint's summary for the library (after lint-ignore and ignore directives).",
         "entries": "total counts physical entries, duplicate citation keys included; "
         "each per-entry section counts every entry once.",
+        "coauthors": "coauthors.authors equals authors.distinct; single_author_entries + "
+        "coauthored_entries equals authors.entries_with_authors.",
     },
-    "frequency_lists": "authors.top and venues.top are capped by --top, most "
-    "frequent first, ties alphabetical; distinct always counts every value.",
+    "frequency_lists": "authors.top, venues.top, coauthors.top_pairs and "
+    "coauthors.top_collaborators are capped by --top, most frequent first, ties "
+    "alphabetical; the counts beside them always cover every value.",
     "offline": True,
+    "coauthors": _COAUTHORS,
 }
+
 
 # Single source of truth for how commands are grouped by nature, shared by the
 # CLI ``--help`` panels (``cli.py`` reads this for ``rich_help_panel``) and the
@@ -261,6 +311,7 @@ COMMAND_GROUPS: dict[str, list[str]] = {
         "search",
         "query",
         "analyze",
+        "coauthors",
         "lint",
         "verify",
         "capabilities",
@@ -535,6 +586,7 @@ def get_capabilities() -> dict:
             "enrich_selected_fields",
             "saved_queries",
             "analyze_library",
+            "coauthor_network",
             "detect_used_citations",
             "remove_entries",
             "combine_libraries",
@@ -586,7 +638,11 @@ def get_capabilities() -> dict:
             "search": "Search entries by free text, phrases, or field-scoped terms",
             "query": "Save, list, remove, and run named selector queries (list, set, remove, run)",
             "analyze": "Describe a bibliography with offline counts: types, years, "
-            "authors, venues, identifier and field coverage, groups, lint, materials",
+            "authors, co-authors, venues, identifier and field coverage, groups, lint, "
+            "materials",
+            "coauthors": "Map the co-authorship network of the selected entries: pairs, "
+            "components, name-variant candidates, an ego view (--focus), and JSON, "
+            "GraphML or Markdown documents (--to)",
             "scrub": "Write a public copy with private content removed — private "
             "entry fields, metadata blocks, and free comments (--check gates instead "
             "of writing)",

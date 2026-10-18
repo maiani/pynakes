@@ -136,9 +136,18 @@ class AnalysisSection(StrEnum):
     TYPES = "types"
     YEARS = "years"
     AUTHORS = "authors"
+    COAUTHORS = "coauthors"
     VENUES = "venues"
     IDENTIFIERS = "identifiers"
     FIELDS = "fields"
     GROUPS = "groups"
     LINT = "lint"
     MATERIALS = "materials"
+
+
+class CoauthorFormat(StrEnum):
+    """``coauthors --to``: the document the co-author network is rendered as."""
+
+    JSON = "json"
+    GRAPHML = "graphml"
+    MARKDOWN = "markdown"

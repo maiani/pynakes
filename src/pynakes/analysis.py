@@ -10,6 +10,11 @@
     How many entries have each type and each year (``undated`` for none).
 ``authors`` / ``venues``
     How many entries each creator and venue appears in, most frequent first.
+``coauthors``
+    The co-authorship network in brief: authors, co-listed pairs, connected
+    components and name-variant candidates, with the most frequent pairs and
+    the most connected authors (:func:`pynakes.coauthors.coauthor_network`
+    reports the whole network).
 ``identifiers`` / ``fields``
     How many entries carry each identifier, and each field name.
 ``groups``
@@ -28,7 +33,10 @@ Frequency lists group spellings that differ only in case, braces, or spacing,
 and report the first spelling seen; authors are compared in normalized
 ``Last, First`` form (:func:`pynakes.authors.normalize_name_list`), so
 ``John Smith`` and ``Smith, John`` count as one person, but ``Smith, J.`` does
-not — telling those apart is a curation decision, not a count. Ties are broken
+not — telling those apart is a curation decision, not a count. The
+``coauthors`` section compares people the same way, so its ``authors`` equals
+the ``authors`` section's ``distinct``, and lists such look-alike names as
+``variant_candidates`` instead of merging them. Ties are broken
 alphabetically, so the report is deterministic.
 
 The report's ``sections`` mapping is the stable unit of composition: a later
@@ -37,15 +45,15 @@ multi-file rollup sums per-file sections rather than re-deriving them.
 
 from __future__ import annotations
 
-import re
 from collections import Counter
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pynakes._text_utils import entry_year, fold_field_names
-from pynakes.authors import normalize_name_list, split_name_list
+from pynakes._analysis_people import entry_people, fold, year_of
+from pynakes._text_utils import fold_field_names
+from pynakes.coauthors import coauthor_network, library_max_authors
 from pynakes.files import check_linked_files, parse_file_field
 from pynakes.filestore import FileStore
 from pynakes.group_tree import library_group_tree
@@ -64,6 +72,7 @@ SECTIONS = (
     "types",
     "years",
     "authors",
+    "coauthors",
     "venues",
     "identifiers",
     "fields",
@@ -78,7 +87,6 @@ IDENTIFIER_FIELDS = ("doi", "eprint", "isbn", "issn", "url")
 #: Venue fields, in preference order: an entry's venue is the first one present.
 _VENUE_FIELDS = ("journaltitle", "journal", "booktitle")
 
-_YEAR_RE = re.compile(r"\d{4}")
 _PINAX_KINDS = ("published_pdf", "preprint_pdf", "preprint_source", "supplement_pdf", "erratum_pdf")
 
 
@@ -101,13 +109,17 @@ def analyze(
     *,
     sections: Iterable[str] | None = None,
     top: int = 10,
+    max_authors: int | None = None,
 ) -> AnalysisReport:
     """Return the :class:`AnalysisReport` of ``coll``.
 
     ``sections`` limits the report to the named :data:`SECTIONS` (all of them
     by default), skipping the work the others need — ``lint`` and
     ``materials`` are the expensive ones. ``top`` caps the author and venue
-    frequency lists; their ``distinct`` counts always cover every value.
+    frequency lists and the ``coauthors`` section's top pairs and
+    collaborators; the counts beside them always cover every value.
+    ``max_authors`` is the ``coauthors`` section's limit on linked author
+    lists; ``None`` reads the library's ``coauthors-max-authors`` setting.
 
     Raises:
         ValueError: for an unknown section name or a negative ``top``.
@@ -120,6 +132,8 @@ def analyze(
         )
     if top < 0:
         raise ValueError("top must not be negative")
+    if max_authors is not None and max_authors < 0:
+        raise ValueError("max_authors must not be negative")
 
     entries = list(coll.lib.entries.values())
     report = AnalysisReport(file=str(coll.path) if coll.path is not None else None, top=top)
@@ -128,6 +142,10 @@ def analyze(
         "types": lambda: _types_section(entries),
         "years": lambda: _years_section(entries),
         "authors": lambda: _authors_section(entries, top),
+        "coauthors": lambda: coauthor_network(
+            entries,
+            max_authors=library_max_authors(coll.lib) if max_authors is None else max_authors,
+        ).summary_section(top),
         "venues": lambda: _venues_section(entries, top),
         "identifiers": lambda: _identifiers_section(entries),
         "fields": lambda: _fields_section(entries),
@@ -142,11 +160,6 @@ def analyze(
 
 
 # --- helpers -----------------------------------------------------------------------
-
-
-def _fold(value: str) -> str:
-    """Return the grouping key of a display value: brace-free, spaced, case-folded."""
-    return " ".join(value.replace("{", "").replace("}", "").split()).casefold()
 
 
 def _ranked(counts: Counter[str], names: dict[str, str]) -> list[tuple[str, int]]:
@@ -192,11 +205,11 @@ def _years_section(entries: list[BibEntry]) -> dict[str, object]:
     counts: Counter[str] = Counter()
     undated = 0
     for entry in entries:
-        match = _YEAR_RE.search(entry_year(entry) or "")
-        if match is None:
+        year = year_of(entry)
+        if year is None:
             undated += 1
         else:
-            counts[match.group(0)] += 1
+            counts[year] += 1
     years = sorted(counts)
     return {
         "dated": sum(counts.values()),
@@ -213,21 +226,13 @@ def _authors_section(entries: list[BibEntry], top: int) -> dict[str, object]:
     with_authors = 0
     truncated_lists = 0
     for entry in entries:
-        value = fold_field_names(entry.fields).get("author") or ""
-        people: set[str] = set()
-        for person in split_name_list(value):
-            name = normalize_name_list(person, "jabref").strip()
-            if not name:
-                continue
-            if name == "others":
-                truncated_lists += 1
-                continue
-            key = _fold(name)
+        listed = entry_people(entry)
+        truncated_lists += listed.others
+        for key, name, _spelling in listed.people:
             names.setdefault(key, name)
-            people.add(key)
-        if people:
+        if listed.people:
             with_authors += 1
-        counts.update(people)
+        counts.update(listed.keys)
     ranked = _ranked(counts, names)
     return {
         "distinct": len(counts),
@@ -247,7 +252,7 @@ def _venues_section(entries: list[BibEntry], top: int) -> dict[str, object]:
         for name in _VENUE_FIELDS:
             value = (folded.get(name) or "").strip()
             if value:
-                key = _fold(value)
+                key = fold(value)
                 names.setdefault(key, " ".join(value.split()))
                 fields_used.setdefault(key, name)
                 counts[key] += 1

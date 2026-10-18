@@ -14,6 +14,11 @@ from pynakes.cli_common import (
 )
 from pynakes.engine import Bibliography
 
+_MAX_AUTHORS_HELP = (
+    "Link only entries listing at most this many authors; 0 links every entry "
+    "(default: the library's coauthors-max-authors setting, else 100)"
+)
+
 
 def analyze(
     file: str | None = bib_file_argument(),
@@ -22,25 +27,34 @@ def analyze(
         "--section",
         help="Report only these sections (repeatable; default: all)",
     ),
-    top: int = typer.Option(10, "--top", help="Length of the author and venue frequency lists"),
+    top: int = typer.Option(
+        10,
+        "--top",
+        help="Length of the author and venue frequency lists and of the co-author "
+        "top pairs and collaborators",
+    ),
+    max_authors: int | None = typer.Option(None, "--max-authors", help=_MAX_AUTHORS_HELP),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Describe a bibliography: what it holds and how complete its records are.
 
     Offline, descriptive counts grouped into sections: entries and duplicate
-    keys, entry types, years, the most frequent authors and venues,
-    identifier and field coverage, groups, `lint` findings, and linked-file
-    and Pinax materials. Each section composes an existing report — the
-    `lint` section is exactly `lint`'s summary — so the numbers reconcile with
-    the commands that produced them. Counts describe the records; they never
-    score the works.
+    keys, entry types, years, the most frequent authors and venues, the
+    co-authorship network in brief, identifier and field coverage, groups,
+    `lint` findings, and linked-file and Pinax materials. Each section
+    composes an existing report — the `lint` section is exactly `lint`'s
+    summary — so the numbers reconcile with the commands that produced them.
+    `coauthors` reports the whole co-author network. Counts describe the
+    records; they never score the works.
     """
     if top < 0:
         raise InvalidInputError("--top must not be negative")
+    if max_authors is not None and max_authors < 0:
+        raise InvalidInputError("--max-authors must not be negative")
     file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
     sections = [item.value for item in section] or None
-    report = analyze_bibliography(coll, sections=sections, top=top)
+    report = analyze_bibliography(coll, sections=sections, top=top, max_authors=max_authors)
 
     if json_output:
         _emit_json(
@@ -79,6 +93,14 @@ def _describe(name: str, data: dict) -> str:
         )
     if name == "authors":
         return f"{data['distinct']} distinct; " + _pairs(data["top"], "name")
+    if name == "coauthors":
+        text = (
+            f"{data['authors']} authors, {data['pairs']} pairs, {data['components']} components "
+            f"(largest {data['largest_component']})"
+        )
+        if data["variant_candidates"]:
+            text += f", {data['variant_candidates']} name-variant candidates"
+        return text
     if name == "venues":
         return f"{data['distinct']} distinct; " + _pairs(data["top"], "venue")
     if name == "identifiers":

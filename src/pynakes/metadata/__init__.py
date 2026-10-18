@@ -77,6 +77,7 @@ from pynakes.metadata.jabref import (
     set_metadata,
 )
 from pynakes.metadata.schema import (
+    CATEGORY_ANALYSIS,
     CATEGORY_CITATION_KEY,
     CATEGORY_FILES,
     CATEGORY_FORMATTING,
@@ -123,6 +124,7 @@ def parse_metadata_comment(
 
 
 __all__ = [
+    "CATEGORY_ANALYSIS",
     "CATEGORY_CITATION_KEY",
     "CATEGORY_FILES",
     "CATEGORY_FORMATTING",

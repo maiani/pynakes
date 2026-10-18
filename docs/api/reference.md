@@ -87,6 +87,8 @@ with usage examples, see the [API overview](index.md).
 
 ::: pynakes.analysis
 
+::: pynakes.coauthors
+
 ## Introspection
 
 ::: pynakes.capabilities

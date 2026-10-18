@@ -99,6 +99,7 @@ to find the operation module that owns a key.
 | `scrub-keep-fields` | scrub | List of field names/globs `scrub` keeps despite that set (`*` keeps every field) | `scrub` | — |
 | `scrub-comments` | scrub | Boolean; default `true` — whether `scrub` removes free comment blocks | `scrub` | — |
 | `scrub-metadata` | scrub | Boolean; default `true` — whether `scrub` removes `jabref-meta`/`pynakes-meta` blocks | `scrub` | — |
+| `coauthors-max-authors` | analysis | Non-negative integer (default: `100`; `0` for no limit): entries listing more authors count their authors but are not linked into the co-author network; `--max-authors` overrides it | `coauthors`, `analyze` | — |
 | `pinax-files-dir` | pinax | Path to the Pinax materials directory, relative to the `.bib` file | `fetch`, `files`, engine | — |
 | `query-<name>` | queries | One `--where` selector expression on one line; a saved query, run wherever `--where` is accepted as `query "<name>"`. `query set` and `lint` validate it | `query` | — |
 | `pinax-fetch-policy` | pinax | Comma-separated list of: `preprint`, `published`, `source`, `supplement`, `bestpdf` (default `bestpdf`) | `fetch` | — |

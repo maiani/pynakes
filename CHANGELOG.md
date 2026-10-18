@@ -75,6 +75,23 @@ commands and options that duplicated each other.
   groups, `lint` findings, and linked-file and Pinax materials. `--section`
   selects sections. The `lint` section equals `lint`'s summary; duplicate-key
   and empty libraries are counted as they are.
+- **`coauthors`** and `pynakes.coauthors`: the offline co-author network of a
+  library or of the entries `--where`/`--key` select (`--where 'year >= 2020'`
+  for a time slice) — authors, co-listed pairs with shared-entry counts, years
+  and citation keys, and connected components. People are compared as
+  `analyze`'s `authors` section compares them, so the counts reconcile.
+  `--focus NAME` (repeatable) gives the ego view: one person's co-authors and
+  the pairs among them. Names that may be one person (`Smith, J.` and
+  `Smith, John`, TeX-accented and Unicode spellings, divided family names, a
+  shared ORCID from `author+an:orcid`) are listed as candidates with their
+  reasons and the evidence against, never merged. `--to json|graphml|markdown`
+  renders a document (`--out`, `--force`, `--dry-run`, `--diff`); the JSON
+  document has the versioned schema `pynakes.coauthors/1`. Entries listing more
+  than `--max-authors` people (new setting `coauthors-max-authors`, category
+  `analysis`, default 100, `0` for no limit) count their authors but are not
+  linked.
+- `analyze` has a `coauthors` section: the network's counts with its top pairs
+  and most connected authors, capped by `--top`, and takes `--max-authors`.
 - **Narrower lint reports.** `lint --only TYPES` reports only the named
   finding types (the counterpart of `--ignore`), `--severity` only findings at
   least that severe, and `--summary` every count without listing each finding

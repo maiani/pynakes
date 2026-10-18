@@ -15,6 +15,7 @@ from pynakes.cli_commands import (
     asset_check,
     batch,
     capabilities,
+    coauthors,
     compare,
     convert,
     dedupe,
@@ -121,6 +122,7 @@ convert.register(app)
 capabilities.register(app)
 search.register(app)
 analyze.register(app)
+coauthors.register(app)
 scrub.register(app)
 
 # ref: per-entry lifecycle

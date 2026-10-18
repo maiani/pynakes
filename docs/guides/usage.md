@@ -1080,7 +1080,58 @@ frequent authors and venues (`--top`, default 10), identifier and field
 coverage, groups, `lint` findings, and linked-file and Pinax materials. It is
 offline and descriptive: each section composes an existing report, so the
 `lint` section matches `lint` and every count can be traced to the entries
-behind it.
+behind it. The `coauthors` section summarizes the co-author network below;
+`--max-authors` sets its author-list limit.
+
+## coauthors
+
+Map who has written with whom in a library, or in a slice of it:
+
+```bash
+pynakes coauthors refs.bib
+pynakes coauthors refs.bib --where 'year >= 1700' --json
+pynakes coauthors refs.bib --focus 'Isaac Newton' --to markdown --out newton.md
+pynakes coauthors refs.bib --to graphml --out network.graphml
+```
+
+The report lists every **author** (entries, distinct collaborators, years,
+and the spellings that normalized to them), every **pair** of people listed
+together on at least one entry (shared entries, first and last year, citation
+keys), and the **components**: groups linked by chains of shared entries.
+People are compared exactly as `analyze`'s `authors` section compares them —
+`Max Born` and `Born, Max` are one person — so the two reconcile. Only the
+`author` field is read.
+
+- **Name variants are evidence, not merges.** `Born, M.` and `Born, Max` stay
+  two authors. Pairs that may be one person are listed under `variants`, with
+  reasons (`spelling` for TeX accents, diacritics or case; `initials`;
+  `extra_given_names`; `given_missing`; `family_split`; `same_orcid`) and the
+  evidence against (`co_listed` when both appear on one entry,
+  `different_orcid`). Correct the records if they are one person.
+- **ORCID iDs** are read from the BibLaTeX named annotation
+  `author+an:orcid = {1="0000-0002-1825-0097"; 3="..."}`, numbered by
+  position in the author list.
+- **Ego view.** `--focus NAME` keeps that person, everyone who shares an entry
+  with them, and the pairs among all of these — who among your co-authors has
+  worked together. Repeat it to treat several names as one view, such as two
+  spellings of yourself; a `focus_variants` warning names spellings you left
+  out. Components in this view leave the focus names out. A name no entry
+  lists is refused with the similar names as `candidates`.
+- **Time slices** use the shared [`--where`](#selecting-entries-where)
+  selector: `--where 'year >= 2020'`.
+- **`others`** (or `et al.`) truncates a list; only the listed authors are
+  linked, and `entries.with_others` counts such entries.
+- **Large author lists.** An entry listing more than `--max-authors` people
+  (default 100; `0` for no limit; stored as `coauthors-max-authors`) counts its
+  authors but adds no pairs and joins no components; it is listed under
+  `unlinked_keys` with a `large_author_lists` warning.
+- **Documents.** `--to json` writes the network document (schema
+  `pynakes.coauthors/1`, with a `source` record of the file, its digest and the
+  selection), `--to graphml` an undirected graph for Gephi, Cytoscape or
+  networkx (edge `weight` is the number of shared entries), and
+  `--to markdown` a report with one table per list. Without `--out` the
+  document goes to stdout; `--out` refuses an existing file without `--force`
+  and previews with `--dry-run`/`--diff`.
 
 ## dedupe
 

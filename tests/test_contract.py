@@ -43,6 +43,7 @@ POSITIONALS: dict[str, tuple[tuple[str, bool, bool], ...]] = {
     "asset fetch": (("file", False, False), ("target", False, False)),
     "asset repair": (("file", False, False),),
     "capabilities": (),
+    "coauthors": (("file", False, False),),
     "convert": (("file", False, False),),
     "corpus batch": (("file", False, False),),
     "corpus combine": (("inputs", True, True),),
@@ -184,6 +185,7 @@ SAMPLES: dict[str, tuple[str, list[str]]] = {
     "asset fetch": ("modify", ["asset", "fetch", "{bib}", "White2024", "--dry-run"]),
     "asset repair": ("modify", ["asset", "repair", "{pinax}", "--dry-run"]),
     "capabilities": ("read", ["capabilities"]),
+    "coauthors": ("read", ["coauthors", "{bib}"]),
     "convert": ("modify", ["convert", "{bib}", "--to", "biblatex", "--dry-run"]),
     "corpus batch": ("modify", ["corpus", "batch", "{bib}", "--ops-file", "{ops}", "--dry-run"]),
     "corpus combine": (

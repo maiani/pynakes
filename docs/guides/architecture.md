@@ -294,6 +294,7 @@ against every process crash, operating-system failure, or storage failure.
 | entry_reader.py | Per-entry records for bounded reads: triage summary or field projection, plus the included materials and recorded provenance. |
 | saved_queries.py | Named `--where` expressions stored as `query-<name>` in `pynakes-meta`, validated with the shared parser and evaluated on demand. |
 | analysis.py | Offline descriptive report of one bibliography, composed from the entry store, groups, lint, linked files, and Pinax. |
+| coauthors.py | Offline co-author network of selected entries: pairs, components, ego views, and name-variant candidates (`_coauthor_variants.py`), rendered as JSON, GraphML or Markdown (`_coauthor_render.py`); shares its reading of author lists with `analysis.py` (`_analysis_people.py`). |
 | diff.py | Unified diff generation. |
 | cli.py, cli_common.py, cli_commands/ | Thin Typer application assembly, shared JSON/error/check plumbing, and one command module per command family. |
 | capabilities.py | Machine-readable declaration of the implemented CLI surface. |
