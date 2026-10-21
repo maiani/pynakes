@@ -14,6 +14,8 @@ Set these options in VS Code’s Settings UI (search for **Pynakes**) or in `set
 | `pynakes.openMaterialsWith` | `"editor"` | Open materials in `editor` or with the `system` application. |
 | `pynakes.allowOnlineLookups` | `true` | Allow remote comparisons, imports, and material fetching. |
 | `pynakes.doubleClickAction` | `"openPdf"` | Open a PDF (`openPdf`) or jump to the declaration (`source`). |
+| `pynakes.citationCommand` | `"cite"` | Macro for a new citation inserted into a TeX file (`citep`, `autocite`, …); it must be one the engine counts. |
+| `pynakes.citationCompletion` | `true` | Complete keys inside `\cite{…}` in TeX files from the open bibliographies; turn off if another extension already does. |
 
 ## Which engine runs
 

@@ -13,15 +13,48 @@ release. Its version says nothing about which engine it runs.
 
 ## [Unreleased] - 0.1.0
 
+### Fixed
+
+- Keep the metadata key text field hidden unless **Custom key…** is selected;
+  form layout styles no longer override its hidden state.
+
 ### Changed
 
 - Refresh the whole view — inspection, groups, lint, citations, and material
   state — through one engine invocation that parses the bibliography once,
-  reducing a refresh from six processes to one. An unsaved buffer's citations
+  reducing those reads from six processes to one. A separate `ref schema` read
+  supplies field panels; source digests must agree before the view renders. An unsaved buffer's citations
   and materials now reflect its unsaved edits: the engine resolves its
   neighbours from the saved location (`inspect --origin`).
 
 ### Added
+
+- New metadata offers a namespace-specific key dropdown supplied by the engine,
+  with a custom-key option for named settings and extensions. Missing engine
+  catalogues explain how to reload or select the bundled engine.
+
+
+- Type-aware Required, Optional and Other field sections from `ref schema`.
+  New entry asks for the type and fields first, then offers library-pattern key
+  generation or a manual key; the resulting entry is previewed before writing.
+- Generate keys for a selection with a reviewed diff covering linked TeX
+  citations and reported Pinax moves.
+- Copy selected entries as native BibTeX, or export to a new document in
+  BibTeX, CSL-JSON, RIS, MODS, EndNote or CSV. Native exports include dependencies
+  and library metadata. Pending selected edits must be applied or discarded.
+
+- Cite entries in a manuscript. **Cite** in the detail pane (or for a
+  multi-selection) inserts the keys at the cursor of the TeX editor last used,
+  joining the `\cite{…}` the cursor stands in without repeating a key, or
+  writing a new one with `pynakes.citationCommand`. **Pynakes: Insert
+  Citation** does the same from a TeX editor through a searchable list, and
+  keys complete as they are typed inside a citation
+  (`pynakes.citationCompletion`). Entries come from the open bibliographies
+  that link the file through `tex-sources`, or every open one when none does.
+  The client recognizes a citation by the engine's published
+  `citation_grammar`, the rule `tex scan` applies, so what it completes or
+  inserts is what the view counts as cited. Citing into a source the library
+  does not link offers to link it, through `tex add`'s preview and approval.
 
 - Focused user, configuration, architecture, and development guides under
   `editor/docs/`; the README now provides a short introduction and setup links.

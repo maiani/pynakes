@@ -28,7 +28,10 @@
     "latex"
   ],
   "main": "./out/extension.js",
-  "activationEvents": [],
+  "activationEvents": [
+    "onLanguage:latex",
+    "onLanguage:tex"
+  ],
   "contributes": {
     "customEditors": [
       {
@@ -52,6 +55,11 @@
         "command": "pynakes.refreshBibliography",
         "title": "Refresh Bibliography View",
         "category": "Pynakes"
+      },
+      {
+        "command": "pynakes.insertCitation",
+        "title": "Insert Citation",
+        "category": "Pynakes"
       }
     ],
     "menus": {
@@ -67,6 +75,19 @@
           "command": "pynakes.openBibliography",
           "when": "resourceExtname == .bib",
           "group": "1_open@20"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "pynakes.insertCitation",
+          "when": "editorLangId =~ /^(latex|tex|plaintex|context|latex-expl3|doctex)$/ || resourceExtname =~ /^\\.(tex|ltx)$/i",
+          "group": "1_modification@90"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "pynakes.insertCitation",
+          "when": "editorLangId =~ /^(latex|tex|plaintex|context|latex-expl3|doctex)$/ || resourceExtname =~ /^\\.(tex|ltx)$/i"
         }
       ]
     },
@@ -149,6 +170,18 @@
           "default": "openPdf",
           "markdownDescription": "What double-clicking an entry does. PDF opening uses `#pynakes.openMaterialsWith#`; when several PDFs are available, choose one from a list.",
           "scope": "window"
+        },
+        "pynakes.citationCommand": {
+          "type": "string",
+          "default": "cite",
+          "markdownDescription": "The macro a new citation is written with when entries are cited from the view or with **Insert Citation**, without its backslash: `cite`, `citep`, `autocite`, `parencite`, and so on. It must be one the engine counts as a citation. Keys cited inside an existing citation join it, whatever its macro.",
+          "scope": "resource"
+        },
+        "pynakes.citationCompletion": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Complete citation keys inside a `\\cite{…}` in TeX files, from the bibliographies open in the Pynakes view: those that link the file through `tex-sources`, or every open one when none does. Turn off when another extension already completes them.",
+          "scope": "resource"
         }
       }
     }

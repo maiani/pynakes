@@ -47,6 +47,7 @@ export interface InspectInsights {
 }
 
 export interface InspectSuccess {
+  source_sha256?: string;
   insights?: InspectInsights;
   status: "success";
   action: string;
@@ -58,6 +59,7 @@ export interface InspectSuccess {
   strings: Record<string, string>;
   preamble: string[];
   comments: string[];
+  metadata_key_choices?: Record<string, string[]>;
   metadata_value_choices?: Record<string, string[]>;
   jabref_metadata: MetadataNamespace;
   pynakes_metadata: MetadataNamespace;

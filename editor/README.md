@@ -7,7 +7,8 @@ pynakes reference management engine.
 change. See the [changelog](CHANGELOG.md) for changes.
 
 Browse and search entries, organize groups, edit fields and metadata, review
-duplicates, follow manuscript citations, and open or fetch linked materials.
+duplicates, cite entries in a manuscript and follow its citations, and open or
+fetch linked materials.
 Changes go through the engine’s validation and diff review before writing.
 
 ## Get started

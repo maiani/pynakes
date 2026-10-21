@@ -169,6 +169,31 @@ a change would remove, modify or re-key — including every cluster a whole-file
 fills it in — and the change is refused, with nothing written, if any of them
 has pending edits.
 
+## Cite in a manuscript
+
+**Cite** in an entry's detail pane, or in the bar for a multi-selection,
+inserts the keys at the cursor of the TeX editor you used last, showing it
+beside the view if it is hidden. Inside an existing `\cite{…}` the keys join
+that list, after the key at the cursor and without repeating one already
+there; elsewhere a new `\cite{…}` goes in, written with
+`pynakes.citationCommand` (`citep`, `autocite`, …). It is an ordinary edit of
+the TeX buffer: undo it there, and save when you choose.
+
+From a TeX editor, **Pynakes: Insert Citation** (command palette or the editor's
+context menu) does the same with a searchable list of the open bibliographies'
+entries. Typing inside a `\cite{…}` also completes keys, with author, year and
+title to choose by; set `pynakes.citationCompletion` to `false` if another
+extension already completes them.
+
+Entries come from the bibliographies open in this view: those whose
+`tex-sources` include the file, or every open one when none does. What counts
+as a citation is the engine's own rule, the one `tex scan` uses, so a key
+completed or inserted here is one the view will show as cited. When the
+manuscript is not among the library's linked sources, the view offers to link
+it — a `tex add` through the usual preview and approval — since its citations
+would otherwise not count. Declined, the offer is not repeated for that file
+until VS Code restarts.
+
 ## Rename a citation key
 
 Editing the key at the top of the detail pane is
@@ -268,3 +293,28 @@ follows it. Removing a node leaves entries' memberships as they were, and the
 dialog says so — an entry still filed under a removed group shows it as a group
 the hierarchy does not declare, which that group's **⋯** offers to declare
 again.
+
+
+## Creating and exporting entries
+
+**New entry** loads the engine's entry types and required alternatives, asks for
+known fields and optional additions, then offers a manual citation key or a
+blank value for generation from the library's pattern. Review the complete diff
+before applying. Unknown required values may be left blank; engine lint reports
+them. The Edit pane groups fields into Required, Optional and Other, retaining
+custom fields. A required alternative needs one populated field, not all of them.
+
+**Generate keys…** works on one entry or a selection. Its preview includes linked
+TeX changes and its approval lists material moves. **Copy BibTeX** includes
+referenced entries and library metadata; use the engine's scrub workflow for a
+public copy. **Export…** opens the selected format in a new unsaved document;
+review and save it with VS Code. Exports read the current buffer, but not unapplied
+staged field edits. Apply or discard selected staged changes first.
+
+These actions require the companion engine additions for `citation_grammar` and
+`ref add --no-interactive`, in addition to the v0.8 schema and export contracts.
+Use the rebuilt bundled engine when an older installed engine lacks them.
+
+When adding metadata, choose a known key from the namespace-specific dropdown,
+or choose **Custom key…** for a named setting such as `query-reading`. Finite
+setting values also use a dropdown. All changes still go through diff review.

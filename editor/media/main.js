@@ -227,6 +227,7 @@ window.PV = window.PV || {};
         s.summary = message.payload.summary;
         s.groups = message.payload.groups || [];
         s.groupsByEntry = message.payload.groupsByEntry || {};
+        s.entrySchemas = message.payload.entrySchemas || [];
         s.lint = message.payload.lint || null;
         s.citations = message.payload.citations || null;
         s.materials = message.payload.materials || null;

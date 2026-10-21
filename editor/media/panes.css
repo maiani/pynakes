@@ -618,6 +618,7 @@
 .metadata-row code { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 5em; overflow: auto; }
 .metadata-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .metadata-form label { display: flex; gap: 6px; align-items: center; }
+.metadata-form label[hidden] { display: none; }
 .metadata-form label:has(textarea) { flex-basis: 100%; align-items: start; }
 .metadata-form textarea { flex: 1; min-width: 0; }
 .metadata-form input:not([type="checkbox"]),

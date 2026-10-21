@@ -61,10 +61,45 @@ window.PV = window.PV || {};
       namespace.appendChild(option);
     }
     namespace.value = draft.namespace;
-    namespace.addEventListener("change", () => { draft.namespace = namespace.value; });
+    namespace.addEventListener("change", () => {
+      draft.namespace = namespace.value;
+      renderKeys();
+    });
+    const keyChoice = labeled(form, "Known key", document.createElement("select"));
+    keyChoice.className = "metadata-key-choice";
+    const catalogueHint = document.createElement("p");
+    catalogueHint.className = "hint metadata-catalogue-hint";
+    form.appendChild(catalogueHint);
     const key = labeled(form, "Key", document.createElement("input"));
     key.value = draft.key;
     key.required = true;
+    function renderKeys() {
+      const choices = PV.own(s.metadata.keyChoices, draft.namespace) || [];
+      catalogueHint.hidden = choices.length > 0;
+      catalogueHint.textContent = choices.length ? "" :
+        "The active engine has not supplied a metadata key catalogue. Reload the VS Code window after updating the extension. If this persists, select the bundled engine in Pynakes settings and clear any executable override. Custom keys remain available.";
+      keyChoice.replaceChildren();
+      for (const name of ["", ...choices, "__custom__"]) {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name === "__custom__" ? "Custom key…" : name || "Choose a key…";
+        keyChoice.appendChild(option);
+      }
+      // Preserve original spelling and custom keys when editing existing blocks.
+      keyChoice.value = choices.includes(draft.key) ? draft.key : draft.key ? "__custom__" : "";
+      key.parentElement.hidden = keyChoice.value !== "__custom__";
+      key.required = keyChoice.value === "__custom__";
+    }
+    keyChoice.addEventListener("change", () => {
+      const custom = keyChoice.value === "__custom__";
+      key.parentElement.hidden = !custom;
+      key.required = custom;
+      draft.key = custom ? "" : keyChoice.value;
+      key.value = draft.key;
+      renderValue();
+      if (custom) key.focus();
+    });
+    renderKeys();
     const valueHost = document.createElement("div");
     valueHost.className = "metadata-value";
     form.appendChild(valueHost);
@@ -103,7 +138,11 @@ window.PV = window.PV || {};
     labeled(form, "Allow an unrecognized JabRef key", unknown);
     unknown.addEventListener("change", () => { draft.allowUnknown = unknown.checked; });
     const submit = (remove) => {
-      if (!draft.key.trim()) { key.reportValidity(); return; }
+      if (!draft.key.trim()) {
+        if (key.required) key.reportValidity();
+        else { keyChoice.required = true; keyChoice.reportValidity(); }
+        return;
+      }
       PV.post({ type: "mutate", mutation: { kind: "metadata", edit: {
         namespace: draft.namespace, key: draft.key, value: remove ? null : draft.value,
         allowUnknown: draft.allowUnknown,

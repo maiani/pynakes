@@ -23,6 +23,7 @@ import { test } from "node:test";
 import {
   type RefEditRequest,
   assetCheck,
+  citationGrammar,
   dedupeCheck,
   dedupeMerge,
   groupsEntry,
@@ -33,6 +34,8 @@ import {
   keysRename,
   lintBib,
   refAdd,
+  refSchema,
+  exportSelection,
   refCompare,
   refRemove,
   searchBib,
@@ -45,6 +48,7 @@ import {
   previewEdits,
   previewMutation,
 } from "../library.js";
+import { findCitationContext } from "../citeContext.js";
 import { command, engineSkipReason, previewThenApply, tempBib } from "./engine.js";
 
 const skip = engineSkipReason();
@@ -656,4 +660,81 @@ test("metadata edits round-trip through the engine with preview and validation",
   await previewThenApply(file, { kind: "metadata", edit: { ...edit, value: null } });
   read = await inspectBib(command, file);
   if (read.status === "success") assert.equal(read.pynakes_metadata.values.notes, undefined);
+});
+
+test("the citation grammar composes into what tex scan counts", { skip }, async () => {
+  const envelope = await citationGrammar(command);
+  if (envelope.status !== "success") {
+    assert.fail(`capabilities failed: ${JSON.stringify(envelope)}`);
+  }
+  const grammar = envelope.citation_grammar;
+  const file = tempBib(
+    "@book{Newton1687,\n  title = {Principia}\n}\n@book{Euler1748,\n  title = {Introductio}\n}\n" +
+      "@comment{pynakes-meta: tex-sources:paper.tex;\n}\n",
+  );
+  const text = String.raw`See \parencite*[see][3]{Newton1687} and \Textcite{Euler1748}, not \ref{fig}.`;
+  fs.writeFileSync(path.join(path.dirname(file), "paper.tex"), text, "utf-8");
+  const scan = await texScan(command, file);
+  if (scan.status !== "success") {
+    assert.fail(`tex scan failed: ${JSON.stringify(scan)}`);
+  }
+  assert.deepEqual(scan.report.used.sort(), ["Euler1748", "Newton1687"]);
+  // Every key list the scan counts is one the client finds the cursor in.
+  for (const key of ["Newton1687", "Euler1748"]) {
+    const found = findCitationContext(text, text.indexOf(key) + key.length, grammar);
+    assert.deepEqual(found?.keys, [key]);
+  }
+  assert.equal(findCitationContext(text, text.indexOf("fig") + 1, grammar), null);
+});
+
+test("linking a TeX source records it relative to the library", { skip }, async () => {
+  const file = tempBib("@book{Newton1687,\n  title = {Principia}\n}\n");
+  const dir = path.dirname(file);
+  fs.mkdirSync(path.join(dir, "paper"));
+  const tex = path.join(dir, "paper", "main.tex");
+  fs.writeFileSync(tex, "See \\cite{Newton1687}.\n", "utf-8");
+
+  await previewThenApply(file, { kind: "linkTexSource", source: "paper/main.tex" });
+  assert.match(fs.readFileSync(file, "utf-8"), /tex-sources: ?paper\/main\.tex/);
+  const scan = await texScan(command, file);
+  if (scan.status !== "success") {
+    assert.fail(`tex scan failed: ${JSON.stringify(scan)}`);
+  }
+  assert.deepEqual(scan.report.used, ["Newton1687"]);
+  assert.equal(scan.report.sources.length, 1);
+  assert.equal(fs.realpathSync(scan.report.sources[0]), fs.realpathSync(tex));
+});
+
+
+test("generated new entries preview their key and honor library patterns", { skip }, async () => {
+  const file = tempBib('@comment{pynakes-meta: key-pattern:[auth][year];}\n');
+  const request = {entryType: "book", fields: {author: "Newton, Isaac", title: "Principia", year: "1687"}};
+  const first = await previewThenApply(file, {kind: "add", request});
+  assert.equal(first.key, "newton1687");
+  const second = await previewThenApply(file, {kind: "add", request});
+  assert.equal(second.key, "newton1687a");
+});
+
+test("field schemas and selection exports use the engine's contracts", { skip }, async () => {
+  const file = tempBib('@book{Parent, title={Collected Works}, year={1900}}\n@incollection{Child, title={Chapter}, crossref={Parent}}\n');
+  const schema = await refSchema(command, file);
+  assert.equal(schema.status, "success");
+  if (schema.status !== "success") return;
+  assert.ok(schema.entry_schemas.find(item => item.entry_type === "article")?.required.some(group => group.includes("title")));
+  const bib = await exportSelection(command, file, ["Child"], "bib");
+  assert.equal(bib.status, "success");
+  if (bib.status !== "success") return;
+  assert.match(bib.content, /@book\{Parent/);
+  assert.match(bib.content, /@incollection\{Child/);
+  const json = await exportSelection(command, file, ["Child"], "csl-json");
+  assert.equal(json.status, "success");
+  if (json.status === "success") assert.equal(JSON.parse(json.content).length, 1);
+});
+
+test("key regeneration changes only the selected entries", { skip }, async () => {
+  const file = tempBib('@misc{Old, author={Newton, Isaac}, year={1687}, title={Principia}}\n@misc{Keep, title={Other}}\n');
+  await previewThenApply(file, {kind: "generateKeys", keys: ["Old"]});
+  const text = fs.readFileSync(file, "utf-8");
+  assert.match(text, /Newton1687Principia/);
+  assert.match(text, /@misc\{Keep,/);
 });

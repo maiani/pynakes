@@ -146,6 +146,7 @@ class Host {
             metadata: read.metadata,
             groups: read.groups,
             groupsByEntry: read.groupsByEntry,
+            entrySchemas: read.entrySchemas,
             lint: read.lint,
             citations: read.citations,
             materials: read.materials,
@@ -708,6 +709,8 @@ test("multi-selection supports ranges, toggles, bulk actions and filtering", { s
   select("Euler1748", { ctrlKey: true });
   assert.deepEqual(selected(), ["Newton1687", "Gauss1801"]);
   const action = (text: string) => [...view.document.querySelectorAll<HTMLButtonElement>(".detail-section button")].find((button) => button.textContent === text)!.click();
+  action("Cite");
+  assert.deepEqual(Array.from(asked(view, "cite").at(-1)!.keys as string[]), selected());
   action("Add to group…");
   assert.deepEqual(Array.from(asked(view, "promptGroup").at(-1)!.keys as string[]), selected());
   action("Remove from group…");
@@ -717,6 +720,9 @@ test("multi-selection supports ranges, toggles, bulk actions and filtering", { s
     kind: "remove", keys: ["Newton1687", "Gauss1801"], keepFiles: false,
   });
   select("Newton1687");
+  [...view.document.querySelectorAll<HTMLButtonElement>(".detail-actions button")]
+    .find((button) => button.textContent === "Cite")!.click();
+  assert.deepEqual(Array.from(asked(view, "cite").at(-1)!.keys as string[]), ["Newton1687"]);
   press(view, row("Newton1687"), "ArrowDown", { shiftKey: true });
   assert.deepEqual(selected(), ["Newton1687", "Euler1748"]);
   press(view, row("Euler1748"), "a", { ctrlKey: true });
@@ -812,4 +818,83 @@ test("metadata uses engine choices and preserves existing values until edited", 
   select = view.document.querySelector<HTMLSelectElement>(".metadata-value select")!;
   assert.deepEqual([...select.options].map((option) => option.value), ["biblatex", "false", "true"]);
   assertHealthy(view, "after selecting finite metadata values");
+});
+
+
+test("entry fields use engine schema sections and offer selection actions", { skip }, async () => {
+  const {view, host} = await opened("simple.bib");
+  click(view, '.tab[data-pane="edit"]');
+  const headings = [...view.document.querySelectorAll("h3")].map(node => node.textContent);
+  assert.ok(headings.includes("Required"));
+  assert.ok(headings.includes("Optional"));
+  const buttons = [...view.document.querySelectorAll("button")];
+  for (const label of ["Generate keys…", "Copy BibTeX", "Export…"]) {
+    assert.ok(buttons.some(button => button.textContent === label), label);
+  }
+  const copy = buttons.find(button => button.textContent === "Copy BibTeX")!;
+  copy.click();
+  assert.ok(view.outbox.some(message => message.type === "copyBib" && Array.isArray(message.keys)));
+  const empty = [...view.document.querySelectorAll<HTMLInputElement>(".field-value")].find(input => !input.value);
+  assert.ok(empty);
+  empty.dispatchEvent(new view.window.Event("blur"));
+  assert.ok(!view.outbox.some(message => message.type === "stageField"), "focusing an absent optional field must not create it");
+  await host.drain();
+  assertHealthy(view, "schema sections");
+});
+
+
+test("new metadata offers namespace keys and custom names from the engine catalogue", { skip }, async () => {
+  const { view } = await opened("simple.bib");
+  const style = view.document.createElement("style");
+  style.textContent = fs.readFileSync(path.join(editorRoot, "media/panes.css"), "utf-8");
+  view.document.head.appendChild(style);
+  click(view, '.tab[data-pane="metadata"]');
+  const button = (text: string) => [...view.document.querySelectorAll<HTMLButtonElement>(".pane-content button")].find((button) => button.textContent === text)!;
+  button("New metadata").click();
+  const choice = view.document.querySelector<HTMLSelectElement>(".metadata-key-choice")!;
+  const keyLabel = view.document.querySelector<HTMLInputElement>(".metadata-form input")!.parentElement!;
+  assert.equal(view.window.getComputedStyle(keyLabel).display, "none");
+  assert.equal(choice.value, "");
+  assert.ok([...choice.options].some(option => option.value === "dialect"));
+  choice.value = "dialect";
+  choice.dispatchEvent(new view.window.Event("change", { bubbles: true }));
+  assert.equal(view.window.getComputedStyle(keyLabel).display, "none");
+  const value = view.document.querySelector<HTMLSelectElement>(".metadata-value select")!;
+  assert.equal(value.value, "");
+  value.value = "biblatex";
+  value.dispatchEvent(new view.window.Event("change", { bubbles: true }));
+  button("Review change…").click();
+  assert.deepEqual(JSON.parse(JSON.stringify(asked(view, "mutate").at(-1)!.mutation)), {
+    kind: "metadata", edit: { namespace: "pynakes", key: "dialect", value: "biblatex", allowUnknown: false },
+  });
+  choice.value = "__custom__";
+  choice.dispatchEvent(new view.window.Event("change", { bubbles: true }));
+  const key = view.document.querySelector<HTMLInputElement>(".metadata-form input")!;
+  assert.equal(key.parentElement!.hidden, false);
+  assert.equal(view.window.getComputedStyle(keyLabel).display, "flex");
+  key.value = "query-reading";
+  key.dispatchEvent(new view.window.Event("input", { bubbles: true }));
+  const namespace = view.document.querySelector<HTMLSelectElement>(".metadata-form select")!;
+  namespace.value = "jabref";
+  namespace.dispatchEvent(new view.window.Event("change", { bubbles: true }));
+  assert.ok([...choice.options].some(option => option.value === "databasetype"));
+  assert.ok(![...choice.options].some(option => option.value === "dialect"));
+  assert.equal(key.value, "query-reading");
+  choice.value = "databasetype";
+  choice.dispatchEvent(new view.window.Event("change", { bubbles: true }));
+  assert.equal(view.window.getComputedStyle(keyLabel).display, "none");
+  assertHealthy(view, "after choosing metadata keys");
+});
+
+test("missing metadata catalogue gives recovery instructions", { skip }, async () => {
+  const { view } = await opened("simple.bib");
+  view.window.eval("PV.state.metadata.keyChoices = {};");
+  click(view, '.tab[data-pane="metadata"]');
+  const add = [...view.document.querySelectorAll<HTMLButtonElement>(".pane-content button")].find(button => button.textContent === "New metadata")!;
+  add.click();
+  const hint = view.document.querySelector<HTMLElement>(".metadata-catalogue-hint")!;
+  assert.equal(hint.hidden, false);
+  assert.match(hint.textContent!, /Reload the VS Code window/);
+  assert.match(hint.textContent!, /bundled engine/);
+  assertHealthy(view, "after missing catalogue explanation");
 });

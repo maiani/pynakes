@@ -25,7 +25,7 @@ import {
   type Mutation,
   type MutationOutcome,
 } from "./library";
-import type { GroupTreeEdit, PynakesCommand } from "./pynakes";
+import { refSchema, type GroupTreeEdit, type PynakesCommand } from "./pynakes";
 
 /** What a mutation needs from the view it runs in. */
 export interface MutationHost {
@@ -48,31 +48,6 @@ export interface MutationHost {
     reportFailure?: (failure: Record<string, unknown>) => Record<string, unknown>,
   ): Promise<void>;
 }
-
-/**
- * Entry types offered when adding an entry by hand.
- *
- * A convenience list, not a schema: the engine accepts any type, and `lint`
- * judges whether the entry satisfies it. These are simply the ones worth one
- * keystroke, ordered by how often a working bibliography needs them.
- */
-const ENTRY_TYPES = [
-  "article",
-  "book",
-  "inproceedings",
-  "incollection",
-  "inbook",
-  "phdthesis",
-  "mastersthesis",
-  "techreport",
-  "misc",
-  "online",
-  "unpublished",
-  "proceedings",
-  "manual",
-  "dataset",
-  "software",
-];
 
 /** Why the engine did not apply a call: its message, and whether it was a conflict. */
 interface Refusal {
@@ -104,11 +79,12 @@ export async function reportRefusal(
 function mutationKeys(mutation: Mutation): string[] {
   switch (mutation.kind) {
     case "add":
-      return [mutation.request.key];
+      return mutation.request.key ? [mutation.request.key] : [];
     case "import":
       return mutation.request.key ? [mutation.request.key] : [];
     case "remove":
     case "groups":
+    case "generateKeys":
       return mutation.keys;
     case "group":
       return [mutation.key];
@@ -124,6 +100,7 @@ function mutationKeys(mutation: Mutation): string[] {
       // rename are named by the preview's plan.
       return [mutation.oldKey];
     case "metadata":
+    case "linkTexSource":
       return [];
     case "groupTree":
       // The hierarchy lives in the file's metadata, not in any entry. The
@@ -160,11 +137,17 @@ function approvalDetail(mutation: Mutation, preview: PreviewedMutation): string 
       );
       lines.push(...materialMoveDetail(preview, "into the surviving entry's"));
       break;
+    case "generateKeys":
+      lines.push(...renameKeyDetail("Selected entries", preview));
+      break;
     case "renameKey":
       lines.push(...renameKeyDetail(mutation.oldKey, preview));
       break;
     case "groupTree":
       lines.push(...groupTreeDetail(mutation.edit, preview));
+      break;
+    case "linkTexSource":
+      lines.push("Citations in this source then count toward which entries are cited.");
       break;
     default:
       break;
@@ -299,32 +282,45 @@ function approvalTitle(label: string, mutation: Mutation, preview: PreviewedMuta
  * input state the extension would have to mirror.
  */
 export async function promptAdd(host: MutationHost): Promise<void> {
-  const key = await vscode.window.showInputBox({
-    title: "New entry",
-    prompt: "Citation key for the new entry",
-    placeHolder: "Newton1687",
-    validateInput: (value) =>
-      // Only the shape the format itself forbids: a key with whitespace, a
-      // comma or a brace cannot be written back. Whether it is *taken* is the
-      // engine's judgement, and it refuses with a conflict.
-      /[\s,{}()="#%'\\~]/.test(value)
-        ? "A citation key cannot contain whitespace, braces, quotes, or a comma."
-        : undefined,
+  let request: import("./pynakes").RefAddRequest | undefined;
+  await host.withMirror(async ({ command, source, cwd }) => {
+    const response = await refSchema(command, source, cwd);
+    if (response.status !== "success") throw new Error(response.message);
+    const choice = await vscode.window.showQuickPick(
+      [...response.entry_schemas.map(schema => schema.entry_type), "Custom type…"],
+      { title: "New entry", placeHolder: "Entry type" },
+    );
+    if (!choice) return;
+    const entryType = choice === "Custom type…"
+      ? await vscode.window.showInputBox({ title: "Custom entry type" }) : choice;
+    if (!entryType?.trim()) return;
+    const schema = response.entry_schemas.find(schema => schema.entry_type === entryType);
+    const fields: Record<string, string> = {};
+    for (const alternatives of [...(schema?.required ?? []), ...(schema?.profile_required ?? []).map(f => [f])]) {
+      if (alternatives.some(field => fields[field])) continue;
+      const field = alternatives.length === 1 ? alternatives[0] : await vscode.window.showQuickPick(alternatives,
+        { title: "Required alternative", placeHolder: "Choose a field to supply" });
+      if (!field) return;
+      const value = await vscode.window.showInputBox({ title: `New ${entryType} — ${field}`,
+        prompt: "Leave blank if unknown; the engine will report missing requirements" });
+      if (value === undefined) return;
+      if (value.trim()) fields[field] = value;
+    }
+    // Optional fields matter for key patterns even when the type has no requirements.
+    const optional = await vscode.window.showQuickPick(schema?.optional ?? [],
+      { title: "Additional fields", canPickMany: true, placeHolder: "Select fields to fill, or accept none" });
+    if (optional === undefined) return;
+    for (const field of optional) {
+      const value = await vscode.window.showInputBox({ title: `New ${entryType} — ${field}` });
+      if (value === undefined) return;
+      if (value.trim()) fields[field] = value;
+    }
+    const key = await vscode.window.showInputBox({ title: "Citation key",
+      prompt: "Leave blank to generate from these fields using the library's key pattern" });
+    if (key === undefined) return;
+    request = { entryType: entryType.trim(), fields, ...(key.trim() ? { key: key.trim() } : {}) };
   });
-  if (!key?.trim()) {
-    return;
-  }
-  const entryType = await vscode.window.showQuickPick(ENTRY_TYPES, {
-    title: `New entry — ${key.trim()}`,
-    placeHolder: "Entry type",
-  });
-  if (!entryType) {
-    return;
-  }
-  await runMutation(host, {
-    kind: "add",
-    request: { key: key.trim(), entryType, fields: {} },
-  });
+  if (request) await runMutation(host, { kind: "add", request });
 }
 
 /**

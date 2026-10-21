@@ -23,6 +23,8 @@ window.PV = window.PV || {};
 
   const STAGE_DEBOUNCE_MS = 300;
 
+  const CITE_TITLE = "Insert at the cursor of the TeX editor last used, joining a \\cite{…} it is in";
+
   const timers = new Map();
 
   /** True while the user is typing in this pane, so a re-render would interrupt. */
@@ -39,6 +41,7 @@ window.PV = window.PV || {};
   }
 
   function stage(key, field, value, base) {
+    if (base === null && value === "" && !PV.stagedField(key, field)) return;
     PV.post({ type: "stageField", key, field, value, base });
   }
 
@@ -245,6 +248,9 @@ window.PV = window.PV || {};
     const copy = PV.button("button", "Copy key", null, () =>
       PV.post({ type: "copyKey", key: row.key }),
     );
+    const cite = PV.button("button", "Cite", CITE_TITLE, () =>
+      PV.post({ type: "cite", keys: [row.key] }),
+    );
     const removeTitle = "Remove this entry, after reviewing the diff";
     const remove = PV.button("button", "Remove", removeTitle, () =>
       PV.post({
@@ -254,7 +260,7 @@ window.PV = window.PV || {};
         mutation: { kind: "remove", keys: [row.key], keepFiles: false },
       }),
     );
-    actions.append(reveal, copy, remove);
+    actions.append(reveal, cite, copy, ...selectionActions([row.key]), remove);
     if (PV.entryStaged(row.key)) {
       const discard = PV.button("button", "Discard entry changes", null, () =>
         PV.post({ type: "discardEntry", key: row.key }),
@@ -465,6 +471,46 @@ window.PV = window.PV || {};
     return fragment;
   }
 
+  function selectionActions(keys) {
+    return [
+      PV.button("button", "Generate keys…", "Review generated keys and linked changes", () =>
+        PV.post({ type: "mutate", mutation: { kind: "generateKeys", keys } })),
+      PV.button("button", "Copy BibTeX", "Includes referenced entries and library metadata", () =>
+        PV.post({ type: "copyBib", keys })),
+      PV.button("button", "Export…", "Open the selection in a new document to save", () =>
+        PV.post({ type: "exportSelection", keys })),
+    ];
+  }
+
+  function schemaFields(row, fields, compareFields) {
+    const type = PV.stagedEntry(row.key)?.entryType?.value ?? row.type;
+    const schema = PV.state.entrySchemas.find(item => item.entry_type === type.toLowerCase());
+    if (!schema) {
+      for (const field of orderedFields(row)) fields.appendChild(fieldEditor(row, field, compareFields.includes(field)));
+      return;
+    }
+    const described = new Set();
+    function section(label, names, hint) {
+      const unique = [...new Set(names)].filter(name => !described.has(name.toLowerCase()));
+      if (!unique.length) return;
+      const heading = document.createElement("h3");
+      heading.textContent = label;
+      fields.appendChild(heading);
+      if (hint) {
+        const note = document.createElement("p"); note.className = "hint"; note.textContent = hint;
+        fields.appendChild(note);
+      }
+      for (const name of unique) {
+        described.add(name.toLowerCase());
+        fields.appendChild(fieldEditor(row, name, compareFields.includes(name)));
+      }
+    }
+    section("Required", [...schema.required.flat(), ...schema.profile_required],
+      schema.required.filter(group => group.length > 1).map(group => "One of: " + group.join(" / ")).join("; "));
+    section("Optional", schema.optional);
+    section("Other", orderedFields(row).filter(name => !described.has(name.toLowerCase())));
+  }
+
   PV.renderEditBody = (target, options) => {
     // Re-rendering while a field is focused would move the caret or drop it.
     if (options?.preserveFocus && hasFocus(target)) {
@@ -481,7 +527,8 @@ window.PV = window.PV || {};
       names.textContent = keys.join(", ");
       const groups = PV.declaredGroupNames();
       const memberships = [...new Set(keys.flatMap((key) => PV.own(s.groupsByEntry, key) || []))];
-      section.append(heading, names,
+      section.append(heading, names, ...selectionActions(keys),
+        PV.button("button", "Cite", CITE_TITLE, () => PV.post({ type: "cite", keys })),
         PV.button("button", "Add to group…", null, () => PV.post({ type: "promptGroup", keys, groups })),
         PV.button("button", "Remove from group…", null, () => PV.post({ type: "promptGroup", keys, groups: memberships, member: false })),
         PV.button("button", "Remove entries…", "Review the removal diff", () => PV.post({
@@ -505,9 +552,7 @@ window.PV = window.PV || {};
     const compareFields = compareTargetFields(row);
     const fields = document.createElement("div");
     fields.className = "fields";
-    for (const field of orderedFields(row)) {
-      fields.appendChild(fieldEditor(row, field, compareFields.includes(field)));
-    }
+    schemaFields(row, fields, compareFields);
 
     target.replaceChildren(header(row), fields, addFieldRow(row), membership(row));
   };

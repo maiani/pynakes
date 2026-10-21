@@ -65,6 +65,8 @@ src/
   materialFetch.ts       fetching materials: plan, approve, cancellable run
   fetchPlan.ts           the asset fetch envelope, and what the dialogs say about it
   navigation.ts          opens sources, citations, and materials
+  citing.ts              cites entries in TeX editors: insert, complete, offer to link
+  citeContext.ts         citation key lists in TeX text, by the engine's citation grammar
   materialOpener.ts      where a material opens: in VS Code or with the system
   diagnostics.ts         findings and undefined citations as native diagnostics
   statusBar.ts           the engine/file status bar item
@@ -119,3 +121,9 @@ are validation artifacts. The extension keeps its own
 The VSIX is not published: the `pynakes` publisher namespace must be verified
 before publication on the Marketplace or Open VSX. The alpha has no UI/settings
 compatibility promise; its engine consumes the beta JSON envelope.
+
+
+The field editor also reads `ref schema`; its digest must match `inspect` before
+rendering. New entries use `ref add --no-interactive` rather than creating and
+renaming a placeholder. Rebuild the bundled engine after changes to these
+contracts; testing against a different installed engine is not equivalent.

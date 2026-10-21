@@ -1,3 +1,4 @@
+import { promptExport } from "./selectionExport";
 /**
  * The bibliography view, registered as a custom editor for `.bib` files.
  *
@@ -12,12 +13,15 @@
  * messages. What a message *does* lives beside it — `stagedCommit.ts` and
  * `keyRename.ts` for writes from the detail pane, `mutations.ts` and
  * `groupHierarchy.ts` for entry- and group-level changes, `materialFetch.ts` for
- * downloading materials, `navigation.ts` for leaving the view, `diagnostics.ts`
+ * downloading materials, `citing.ts` for citing entries in a manuscript,
+ * `navigation.ts` for leaving the view, `diagnostics.ts`
  * and `statusBar.ts` for what is published outside it, and `documentAccess.ts`
  * for the questions every engine call asks about the document.
  */
 
+import * as path from "node:path";
 import * as vscode from "vscode";
+import { CitationService, relativeSource } from "./citing";
 import { FindingsPublisher } from "./diagnostics";
 import {
   describeFailure,
@@ -114,6 +118,11 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
 
   private readonly findings = new FindingsPublisher();
 
+  private readonly citing = new CitationService();
+
+  /** Sources the user declined to link, per library, so the offer is made once. */
+  private readonly declinedLinks = new Set<string>();
+
   /**
    * Paths the engine reported for the file currently shown in each panel.
    *
@@ -167,7 +176,9 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         refresh();
       }
     });
-    return vscode.Disposable.from(registration, refreshCommand, statusBar, provider.findings);
+    return vscode.Disposable.from(
+      registration, refreshCommand, statusBar, provider.findings, provider.citing,
+    );
   }
 
   public async resolveCustomTextEditor(
@@ -245,6 +256,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       siblings.delete(panel);
       if (siblings.size === 0) {
         this.panelsByDocument.delete(documentId);
+        this.citing.forget(document);
       }
       this.statusBar.forget(panel);
       if (pending) {
@@ -342,6 +354,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       const settings = viewSettings(document);
       this.findings.publishLint(document, result.read.lint, settings.showFindings);
       this.findings.publishCitations(document, result.read.citations, settings.showFindings);
+      this.citing.update(document, result.read.rows, result.read.citations);
       this.entryMaterials.set(panel, result.read.materials);
       this.openablePaths.set(
         panel,
@@ -477,6 +490,15 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         if (message.key) {
           await revealEntry(document, message.key);
         }
+        return;
+      case "cite":
+        if (message.keys?.length) {
+          await this.cite(document, message.keys, host());
+        }
+        return;
+      case "copyBib":
+      case "exportSelection":
+        if (message.keys?.length) await promptExport(host(), message.keys, message.type === "copyBib");
         return;
       case "copyKey":
         if (message.key) {
@@ -627,6 +649,36 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
     );
   }
 
+  /**
+   * Cite entries at the cursor of the TeX editor last used, then offer to link
+   * that source when the library does not read it — its citations would
+   * otherwise never count as cited. Linking is a `tex add` through the usual
+   * preview and approval; the citation itself is an ordinary buffer edit.
+   */
+  private async cite(document: vscode.TextDocument, keys: string[], host: StagingHost): Promise<void> {
+    const cited = await this.citing.insert(keys, document.uri);
+    if (!cited || cited.linked || cited.target.scheme !== "file" || document.uri.scheme !== "file") {
+      return;
+    }
+    const pair = `${document.uri.toString()}\n${cited.target.toString()}`;
+    if (this.declinedLinks.has(pair)) {
+      return;
+    }
+    const name = path.basename(cited.target.fsPath);
+    const link = `Link ${name}`;
+    const choice = await vscode.window.showInformationMessage(
+      `${name} is not among ${path.basename(document.uri.fsPath)}'s linked TeX sources, ` +
+        "so this view will not count its citations.",
+      link,
+      "Not now",
+    );
+    if (choice !== link) {
+      this.declinedLinks.add(pair);
+      return;
+    }
+    await runMutation(host, { kind: "linkTexSource", source: relativeSource(document.uri, cited.target) });
+  }
+
   // -- the slice handed to the write modules ----------------------------------
 
   /**
@@ -671,6 +723,7 @@ function toPayload(read: LibraryRead): Record<string, unknown> {
     metadata: read.metadata,
     groups: read.groups,
     groupsByEntry: read.groupsByEntry,
+    entrySchemas: read.entrySchemas,
     lint: read.lint,
     citations: read.citations,
     materials: read.materials,

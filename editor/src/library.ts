@@ -47,17 +47,22 @@ import {
   groupTree,
   inspectLibrary,
   keysRename,
+  keysGenerate,
+  refSchema,
+  type EntryFieldSchema,
   refAdd,
   refCompare,
   refImport,
   refRemove,
   searchBib,
+  texAdd,
 } from "./pynakes";
 
 /** Everything the view needs about a bibliography. */
 export interface LibraryRead {
+  entrySchemas?: EntryFieldSchema[];
   rows: EntryRow[];
-  metadata: { pynakes: MetadataNamespace; jabref: MetadataNamespace; valueChoices: Record<string, string[]> };
+  metadata: { pynakes: MetadataNamespace; jabref: MetadataNamespace; keyChoices: Record<string, string[]>; valueChoices: Record<string, string[]> };
   summary: Summary;
   groups: GroupNode[];
   /** Group names per citation key, for the detail pane. */
@@ -78,11 +83,12 @@ export type LibraryReadResult =
 /**
  * Read a bibliography.
  *
- * One engine process does the whole read: `inspect --insights` returns the
+ * `inspect --insights` returns the
  * inspection and every supplementary report — groups, lint, citations, and
  * materials — from one parse. `inspect` is authoritative: if it fails, there
  * is no view to show. Every supplementary report can fail independently and
- * degrade to a warning.
+ * degrade to a warning. A second read obtains `ref schema`; matching source
+ * digests ensure both reads describe the same bibliography.
  *
  * `neighbourPath` is where the library really lives, and it is deliberately
  * not `filePath`. The citation and material reports are about the files
@@ -111,11 +117,16 @@ export async function readLibrary(
     return { ok: false, error: { status: "error", error: "InvalidResponse",
       message: "The engine omitted inspect insights. Update pynakes." } };
   }
+  const schema = await refSchema(command, filePath, cwd);
+  if (schema.status === "success" && schema.source_sha256 !== inspected.source_sha256) {
+    return { ok: false, error: { status: "error", error: "ExternalModification", message: "Bibliography changed while reading field schemas; refresh the view." } };
+  }
   const { groups_tree: tree, groups_list: list, lint } = inspected.insights;
   const scan = neighbourPath ? inspected.insights.tex_scan : undefined;
   const assets = neighbourPath ? inspected.insights.asset_check : undefined;
 
   const warnings: string[] = [];
+  if (schema.status !== "success") warnings.push(`Field schema unavailable: ${schema.message}`);
   const membership = list.status === "success" ? list.groups : {};
   if (list.status === "error") {
     warnings.push(`Group membership unavailable: ${list.message}`);
@@ -139,9 +150,11 @@ export async function readLibrary(
   return {
     ok: true,
     read: {
+      entrySchemas: schema.status === "success" ? schema.entry_schemas : [],
       rows: toRows(inspected),
       metadata: {
         pynakes: inspected.pynakes_metadata, jabref: inspected.jabref_metadata,
+        keyChoices: inspected.metadata_key_choices ?? {},
         valueChoices: inspected.metadata_value_choices ?? {},
       },
       summary: summarize(inspected),
@@ -353,6 +366,7 @@ export async function commitEdits(
  * near-copies that could drift apart in what they check before writing.
  */
 export type Mutation =
+  | { kind: "generateKeys"; keys: string[] }
   | { kind: "metadata"; edit: MetadataEdit }
   | { kind: "add"; request: RefAddRequest }
   | { kind: "import"; request: RefImportRequest }
@@ -364,15 +378,18 @@ export type Mutation =
   /** A change to the declared hierarchy itself, not to any entry. */
   | { kind: "groupTree"; edit: GroupTreeEdit }
   /** One citation key, with the TeX citations and Pinax materials that follow it. */
-  | { kind: "renameKey"; oldKey: string; newKey: string };
+  | { kind: "renameKey"; oldKey: string; newKey: string }
+  /** A TeX source to link, relative to the `.bib`'s directory. */
+  | { kind: "linkTexSource"; source: string };
 
 /** A short label for the diff panel and the confirmation prompt. */
 export function describeMutation(mutation: Mutation): string {
   switch (mutation.kind) {
+    case "generateKeys": return `Generate keys for ${mutation.keys.length} entries`;
     case "metadata":
       return `${mutation.edit.value === null ? "Remove" : "Set"} ${mutation.edit.namespace} metadata "${mutation.edit.key}"`;
     case "add":
-      return `Add ${mutation.request.key}`;
+      return mutation.request.key ? `Add ${mutation.request.key}` : "Add entry with generated key";
     case "import":
       return `Import ${mutation.request.identifier}`;
     case "remove":
@@ -395,6 +412,8 @@ export function describeMutation(mutation: Mutation): string {
       return describeGroupTreeEdit(mutation.edit);
     case "renameKey":
       return `Rename ${mutation.oldKey} to ${mutation.newKey}`;
+    case "linkTexSource":
+      return `Link ${mutation.source} as a TeX source`;
   }
 }
 
@@ -428,6 +447,7 @@ function runMutation(
   expectSha256?: string,
 ): Promise<MutationEnvelope> {
   switch (mutation.kind) {
+    case "generateKeys": return keysGenerate(command, filePath, mutation.keys, dryRun, cwd, expectSha256);
     case "metadata":
       return editMetadata(command, filePath, mutation.edit, dryRun, cwd, expectSha256);
     case "add":
@@ -476,6 +496,8 @@ function runMutation(
         cwd,
         expectSha256,
       );
+    case "linkTexSource":
+      return texAdd(command, filePath, mutation.source, dryRun, cwd, expectSha256);
   }
 }
 

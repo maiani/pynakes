@@ -50,6 +50,7 @@ window.PV = window.PV || {};
     summary: null,
     groups: [],
     groupsByEntry: {},
+    entrySchemas: [],
     lint: null,
     /** Citation occurrences per key, from the linked TeX sources. */
     citations: null,

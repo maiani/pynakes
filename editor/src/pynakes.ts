@@ -17,6 +17,7 @@ import * as path from "node:path";
 import type { PynakesCommand } from "./engineDiscovery";
 import { END_OF_OPTIONS, run, runJson } from "./engineProcess";
 import { extractVersion } from "./version";
+import type { CitationGrammar } from "./citeContext";
 import type { AssetFetchEnvelope } from "./fetchPlan";
 import type {
   AssetCheckEnvelope,
@@ -27,6 +28,7 @@ import type {
   GroupsTreeEnvelope,
   MutationEnvelope,
   InspectEnvelope,
+  InspectError,
   KeysRenameEnvelope,
   LintEnvelope,
   RefCompareEnvelope,
@@ -34,6 +36,10 @@ import type {
   SearchEnvelope,
   TexScanEnvelope,
 } from "./model";
+
+export type CitationGrammarEnvelope =
+  | { status: "success"; action: "capabilities"; citation_grammar: CitationGrammar }
+  | InspectError;
 
 export type { PynakesCommand } from "./engineDiscovery";
 export {
@@ -379,7 +385,7 @@ export function keysRenameArgs(
 
 /** A new entry written by hand: a key, a type, and whatever fields are known. */
 export interface RefAddRequest {
-  key: string;
+  key?: string;
   entryType: string;
   fields: Record<string, string>;
 }
@@ -391,6 +397,7 @@ export function refAddArgs(
   expectSha256?: string,
 ): string[] {
   const flags = ["--type", request.entryType];
+  if (!request.key) flags.push("--no-interactive");
   for (const [field, value] of Object.entries(request.fields)) {
     if (value.trim()) {
       flags.push("--field", `${field}=${value}`);
@@ -399,7 +406,7 @@ export function refAddArgs(
   return invocation(
     ["ref", "add", filePath],
     modifyingFlags(flags, dryRun, expectSha256),
-    [request.key],
+    request.key ? [request.key] : [],
   );
 }
 
@@ -718,6 +725,41 @@ export function assetFetch(
   );
 }
 
+/**
+ * Link one TeX source to the library (`tex add`), so its citations count.
+ *
+ * `source` is stored as given, and the engine resolves a relative one from the
+ * `.bib`'s own directory, so the caller passes it relative to that.
+ */
+export function texAddArgs(
+  filePath: string, source: string, dryRun: boolean, expectSha256?: string,
+): string[] {
+  return invocation(["tex", "add", filePath], modifyingFlags([], dryRun, expectSha256), [source]);
+}
+
+export function texAdd(
+  command: PynakesCommand, filePath: string, source: string,
+  dryRun: boolean, cwd?: string, expectSha256?: string,
+): Promise<MutationEnvelope> {
+  return runJson<MutationEnvelope>(command, texAddArgs(filePath, source, dryRun, expectSha256), cwd);
+}
+
+/**
+ * What the engine counts as a citation, for inserting and completing keys in
+ * TeX sources. An engine before 0.8 has no such section and answers with an
+ * `InvalidInput` error envelope.
+ */
+export function citationGrammar(
+  command: PynakesCommand,
+  cwd?: string,
+): Promise<CitationGrammarEnvelope> {
+  return runJson<CitationGrammarEnvelope>(
+    command,
+    ["capabilities", "--section", "citation_grammar"],
+    cwd,
+  );
+}
+
 /** Engine version string, or `undefined` when it cannot be determined. */
 export async function engineVersion(
   command: PynakesCommand,
@@ -757,4 +799,36 @@ export function editMetadata(
   dryRun: boolean, cwd?: string, expectSha256?: string,
 ): Promise<MutationEnvelope> {
   return runJson<MutationEnvelope>(command, metadataEditArgs(filePath, edit, dryRun, expectSha256), cwd);
+}
+
+/** Field groups supplied by the engine; clients do not maintain type tables. */
+export interface EntryFieldSchema {
+  entry_type: string;
+  required: string[][];
+  profile_required: string[];
+  optional: string[];
+  other: string[];
+  known_type: boolean;
+}
+export type SchemaEnvelope =
+  | { status: "success"; source_sha256: string; entry_schemas: EntryFieldSchema[] }
+  | { status: "error"; message: string };
+export function refSchema(command: PynakesCommand, file: string, cwd?: string): Promise<SchemaEnvelope> {
+  return runJson<SchemaEnvelope>(command, ["ref", "schema", file], cwd);
+}
+export function keysGenerate(command: PynakesCommand, file: string, keys: string[], dryRun: boolean,
+  cwd?: string, digest?: string): Promise<MutationEnvelope> {
+  if (!keys.length) throw new Error("Select entries to generate keys");
+  return runJson<MutationEnvelope>(command,
+    ["keys", "generate", file, ...keys.flatMap(key => ["--key", key]), ...modifyingFlags([], dryRun, digest)], cwd);
+}
+export type SelectionFormat = "bib" | "csl-json" | "ris" | "mods" | "endnote" | "csv";
+export type ExportEnvelope =
+  | { status: "success"; content: string; warnings: { message?: string; type?: string }[] }
+  | { status: "error" | "conflict"; message: string };
+export function exportSelection(command: PynakesCommand, file: string, keys: string[], format: SelectionFormat,
+  cwd?: string): Promise<ExportEnvelope> {
+  if (!keys.length) throw new Error("Select entries to export");
+  return runJson<ExportEnvelope>(command,
+    ["convert", file, "--to", format, ...keys.flatMap(key => ["--key", key])], cwd);
 }
