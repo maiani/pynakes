@@ -39,7 +39,7 @@ covered by a backward-compatibility guarantee.
 | Work-matching evidence | `pynakes.identity` |
 | Analysis and maintenance | `pynakes.dedupe`, `pynakes.files`, `pynakes.integrity`, `pynakes.lint`, `pynakes.metadata`, `pynakes.scrub`, `pynakes.usage` |
 | Selection and search | `pynakes.query`, `pynakes.search`, `pynakes.saved_queries` |
-| Research reads and analysis | `pynakes.bounded`, `pynakes.entry_reader`, `pynakes.analysis`, `pynakes.coauthors` |
+| Research reads and analysis | `pynakes.bounded`, `pynakes.entry_reader`, `pynakes.analysis` |
 | Set operations (projections) | `pynakes.setops` |
 | Composition | `pynakes.batch` |
 | Introspection | `pynakes.capabilities` and `pynakes.__version__` |
@@ -48,6 +48,13 @@ The [API reference](../api/index.md) documents the data model, return objects,
 exceptions, and typical operation calls. The most important entry points are
 available directly as `pynakes.Bibliography`, `pynakes.BibEntry`,
 `pynakes.BibFile`, and `pynakes.EntryStore`.
+
+Bibliography analysis has one public home: import `analyze`, `AnalysisReport`,
+`coauthor_network` and `CoauthorNetwork` from `pynakes.analysis`. The same
+module exports `UnknownAuthorError`, `DEFAULT_MAX_AUTHORS`,
+`MAX_AUTHORS_SETTING`, `library_max_authors` and `COAUTHOR_SCHEMA`. The
+`analyze` and `coauthors` CLI commands both consume this API; graph construction,
+variant detection and rendering are private implementation modules.
 
 All operation functions mutate a supplied `BibFile` in place unless their
 documentation explicitly says otherwise. They return a count, a report, or a

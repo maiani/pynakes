@@ -43,8 +43,8 @@ src/pynakes/
   bounded.py          bounded-read contract: projection, char limits, snapshot cursors
   entry_reader.py    per-entry records: summary, fields, research context
   saved_queries.py    named --where expressions stored as query-<name> metadata
-  analysis.py         offline descriptive report for one bibliography (`analyze`)
-  coauthors.py        co-author network, ego views, name-variant candidates (`coauthors`)
+  analysis.py         public bibliography analysis API (`analyze` and `coauthors`)
+  _analysis_coauthors.py  co-author network, ego views, name-variant candidates
   _coauthor_*.py      its variant detection and GraphML/Markdown rendering
   integrity.py        verify / enrich / published (opt-in --online lookups)
   _integrity_*.py     integrity report types and the published-check half

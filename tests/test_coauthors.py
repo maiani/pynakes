@@ -9,15 +9,17 @@ from typer.testing import CliRunner
 
 from pynakes._analysis_people import entry_people
 from pynakes._coauthor_variants import classify, name_parts, plain_letters
-from pynakes.analysis import analyze
-from pynakes.cli import app
-from pynakes.coauthors import (
+from pynakes.analysis import (
+    COAUTHOR_SCHEMA as SCHEMA,
+)
+from pynakes.analysis import (
     DEFAULT_MAX_AUTHORS,
-    SCHEMA,
     UnknownAuthorError,
+    analyze,
     coauthor_network,
     library_max_authors,
 )
+from pynakes.cli import app
 from pynakes.engine import Bibliography
 from pynakes.model import BibEntry
 

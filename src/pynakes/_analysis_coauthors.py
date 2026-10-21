@@ -1,47 +1,4 @@
-"""Co-authorship network of one bibliography: who has written with whom.
-
-:func:`coauthor_network` reads the ``author`` field of each entry and reports,
-offline and deterministically:
-
-``authors``
-    Every person listed, with the entries they appear in, their distinct
-    collaborators, the years they span, and the spellings that normalized to
-    them.
-``pairs``
-    Every two people listed together on at least one entry, with the number of
-    shared entries, their first and last year, and the citation keys.
-``components``
-    Connected components of the network: groups of people linked by chains
-    of shared entries.
-``variants``
-    Distinct names that may be one person (``Smith, J.`` and ``Smith, John``),
-    with the reasons and the evidence against. They are never merged.
-
-People are compared exactly as the ``authors`` section of
-:func:`pynakes.analysis.analyze` compares them, so the two reconcile: the
-network has as many authors as that section's ``distinct``. ``others`` (or
-``et al.``) truncates an author list; the people it stands for are unknown, so
-the network links only the listed authors and counts the truncated entries
-under ``with_others``.
-
-With ``focus``, the report is an ego view of those people: the focus names,
-everyone who shares an entry with one of them, and the pairs among all of
-these, which answers "who among my co-authors has worked together". Its
-components leave the focus names out, since every collaborator is linked
-through them by definition. Several focus names are treated as one view, not
-as one person: pass each spelling of a person deliberately when the
-``variants`` list shows them.
-
-An entry listing more than ``max_authors`` people (default
-:data:`DEFAULT_MAX_AUTHORS`, the library's ``coauthors-max-authors`` setting
-in the CLI; ``0`` for no limit) is not linked: its people still count as
-authors, but it adds no pairs and joins no components, and its key is listed
-under ``unlinked_keys``. A thousand-author collaboration paper would otherwise
-add half a million pairs that describe the collaboration, not its members.
-
-Counts describe the records; they say nothing about the people's work or the
-strength of a collaboration beyond the entries in this file.
-"""
+"""Co-authorship graph implementation for the public :mod:`pynakes.analysis` API."""
 
 from __future__ import annotations
 
@@ -112,7 +69,7 @@ class UnknownAuthorError(ValueError):
 
 @dataclass
 class CoauthorNetwork:
-    """The co-authorship network of a set of entries (see the module docstring)."""
+    """The co-authorship network of selected entries (see :mod:`pynakes.analysis`)."""
 
     entries: dict[str, int]
     max_authors: int
@@ -126,7 +83,7 @@ class CoauthorNetwork:
 
     @property
     def summary(self) -> dict[str, int]:
-        """Headline counts: authors, pairs, components and variant candidates."""
+        """Visible authors/pairs; components and isolates exclude focus when given."""
         sizes = [int(component["size"]) for component in self.components]
         return {
             "authors": len(self.authors),
@@ -138,7 +95,7 @@ class CoauthorNetwork:
         }
 
     def to_dict(self, source: Record | None = None) -> Record:
-        """Serialize the network to the documented JSON document (:data:`SCHEMA`).
+        """Serialize the network using :data:`pynakes.analysis.COAUTHOR_SCHEMA`.
 
         ``source`` describes where the entries came from (the CLI records the
         file, its digest and the selection); it is included when given.
@@ -155,11 +112,24 @@ class CoauthorNetwork:
             "pairs": self.pairs,
             "components": self.components,
             "variants": self.variants,
+            "warnings": self.warnings,
+            "scope": {
+                "entries": "selection",
+                "author_counts_and_years": "selection",
+                "authors_and_pairs": "focus_neighborhood"
+                if self.focus is not None
+                else "selection",
+                "components_and_isolates": "excluding_focus"
+                if self.focus is not None
+                else "selection",
+                "component_entries": "selected linked entries incident to component members",
+                "warnings": "selection",
+            },
         }
 
-    def to_graphml(self) -> str:
-        """Render the network as GraphML (undirected, one node per author)."""
-        return render_graphml(self.to_dict())
+    def to_graphml(self, source: Record | None = None) -> str:
+        """Render GraphML with graph-level JSON context, warnings and optional source."""
+        return render_graphml(self.to_dict(source))
 
     def to_markdown(self, title: str = "Co-author network", source: Record | None = None) -> str:
         """Render the network as a Markdown report with one table per list."""
@@ -215,6 +185,18 @@ def coauthor_network(
     scan = _Scan(max_authors)
     for index, entry in enumerate(listed):
         scan.add(index, entry)
+    for key in sorted(scan.orcids):
+        if len(scan.orcids[key]) > 1:
+            scan.warnings.append(
+                {
+                    "type": "conflicting_author_orcids",
+                    "name": scan.names[key],
+                    "orcids": sorted(scan.orcids[key]),
+                    "evidence": scan.orcid_evidence[key],
+                    "message": f"{scan.names[key]} has multiple ORCID iDs; the name remains "
+                    "one node and may conflate different people. Review its annotated entries.",
+                }
+            )
 
     focus_keys: list[str] = []
     focus_report: list[dict[str, str]] | None = None
@@ -249,6 +231,7 @@ def coauthor_network(
             "name": scan.names[key],
             "entries": len(indices),
             "collaborators": len(neighbors[key]),
+            "visible_collaborators": len(neighbors[key] & nodes),
             "coauthored_entries": scan.coauthored[key],
             "entries_with_others": scan.with_others[key],
             "unlinked_entries": len(indices) - len(linked_entries[key]),
@@ -343,6 +326,7 @@ class _Scan:
         self.coauthored: Counter[str] = Counter()
         self.with_others: Counter[str] = Counter()
         self.orcids: dict[str, set[str]] = defaultdict(set)
+        self.orcid_evidence: dict[str, list[Record]] = defaultdict(list)
         self.pairs: dict[tuple[str, str], list[int]] = defaultdict(list)
         self.counts: Counter[str] = Counter()
         self.warnings: list[Record] = []
@@ -375,6 +359,9 @@ class _Scan:
             self.with_others[key] += listed.others
         for key, orcid in listed.orcids.items():
             self.orcids[key].add(orcid)
+            self.orcid_evidence[key].append(
+                {"key": entry.key, "selection_index": index, "orcid": orcid}
+            )
         if linked:
             for pair in combinations(sorted(keys), 2):
                 self.pairs[pair].append(index)

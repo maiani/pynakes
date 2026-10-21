@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pynakes
+from pynakes import analysis
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.canonical import CanonicalLayout, FormatLintError
@@ -22,6 +23,34 @@ from pynakes.identity import (
 )
 from pynakes.io import SaveResult, load_bib, save_bib
 from pynakes.model import BibEntry, BibFile, EntryStore, QueryFilter
+
+
+def test_analysis_api_supports_summary_and_network_workflows() -> None:
+    """Both CLI workflows have one public Python entry point."""
+    assert {
+        "analyze",
+        "AnalysisReport",
+        "coauthor_network",
+        "CoauthorNetwork",
+        "UnknownAuthorError",
+        "COAUTHOR_SCHEMA",
+        "DEFAULT_MAX_AUTHORS",
+        "MAX_AUTHORS_SETTING",
+        "library_max_authors",
+    } <= set(analysis.__all__)
+    bibliography = Bibliography.from_text(
+        "@article{Example, author={Example, Alice and Colleague, Beatrice}, year={1900}}"
+    )
+    network = analysis.coauthor_network(
+        bibliography.lib.entries.values(),
+        max_authors=analysis.library_max_authors(bibliography.lib),
+    )
+    report = analysis.analyze(bibliography, sections=["coauthors"])
+    assert isinstance(network, analysis.CoauthorNetwork)
+    assert isinstance(report, analysis.AnalysisReport)
+    assert network.to_dict()["schema"] == analysis.COAUTHOR_SCHEMA == "pynakes.coauthors/1"
+    assert report.sections["coauthors"]["pairs"] == network.summary["pairs"] == 1
+    assert network.to_graphml().startswith('<?xml version="1.0"')
 
 
 def test_top_level_api_exports_curated_symbols() -> None:

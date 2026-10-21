@@ -279,8 +279,14 @@ findings, and linked-file and Pinax materials. The `lint` section is exactly
 not present them as a measure of scientific quality.
 
 `coauthors refs.bib --json` returns the co-author network under `network`
-(schema `pynakes.coauthors/1`): `authors`, `pairs`, `components`, and
-`variants`. Start with `analyze --section coauthors` for the bounded summary,
+(schema `pynakes.coauthors/1`): `authors`, `pairs`, `components`, `variants`,
+`scope` and `warnings`. Entry and author totals cover the selection; visible
+authors/pairs cover the focus neighbourhood when requested. Components and
+isolates then exclude the focus names; `visible_collaborators` counts only
+neighbours in the displayed graph. Conflicting ORCIDs on one normalized name
+produce `conflicting_author_orcids` with entry keys and zero-based
+`selection_index` evidence. Warnings survive document export, including
+GraphML's graph-level JSON `context`. Start with `analyze --section coauthors` for the bounded summary,
 then narrow with `--focus NAME` or `--where` before reading the whole network
 of a large library. Names under `variants` may be one person; report them as
 candidates and never add their counts together yourself. A `focus_variants`

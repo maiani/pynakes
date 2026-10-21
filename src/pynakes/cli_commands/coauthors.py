@@ -7,6 +7,12 @@ from pathlib import Path
 
 import typer
 
+from pynakes.analysis import (
+    CoauthorNetwork,
+    UnknownAuthorError,
+    coauthor_network,
+    library_max_authors,
+)
 from pynakes.cli_choices import CoauthorFormat
 from pynakes.cli_commands.analyze import _MAX_AUTHORS_HELP
 from pynakes.cli_common import (
@@ -26,12 +32,6 @@ from pynakes.cli_common import (
     key_option,
     parse_key_selector,
     where_option,
-)
-from pynakes.coauthors import (
-    CoauthorNetwork,
-    UnknownAuthorError,
-    coauthor_network,
-    library_max_authors,
 )
 from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography
@@ -117,6 +117,7 @@ def coauthors(
             candidates=exc.candidates,
         )
     warnings.extend(network.warnings)
+    network.warnings = warnings
     selection = {"where": where, "keys": selected_keys or None, "entries": len(entries)}
     payload: dict[str, object] = {
         "status": "success",
@@ -171,7 +172,7 @@ def coauthors(
 def _render(network: CoauthorNetwork, to: CoauthorFormat, source: dict, file: str) -> str:
     """Return the network as the ``--to`` document."""
     if to is CoauthorFormat.GRAPHML:
-        return network.to_graphml()
+        return network.to_graphml(source)
     if to is CoauthorFormat.MARKDOWN:
         return network.to_markdown(f"Co-author network of {Path(file).name}", source=source)
     return json.dumps(network.to_dict(source=source), indent=2, ensure_ascii=False) + "\n"
@@ -181,18 +182,25 @@ def _summary(file: str, network: CoauthorNetwork) -> list[str]:
     """Return the plain-text summary: counts, then the head of each list."""
     entries, summary = network.entries, network.summary
     lines = [
-        f"{file}: {entries['total']} entries ({entries['coauthored']} co-authored, "
+        f"{file}: {entries['total']} selected entries ({entries['coauthored']} co-authored, "
         f"{entries['with_others']} with 'others'), {summary['authors']} authors, "
         f"{summary['pairs']} pairs, {summary['components']} components "
         f"(largest {summary['largest_component']})"
     ]
     if network.focus is not None:
         lines.append("focus: " + "; ".join(item["name"] for item in network.focus))
+        lines.append(
+            "Authors and pairs describe the visible network; components and isolates "
+            "exclude the focus names. Author counts and years describe the whole selection."
+        )
         collaborators = [a for a in network.authors if not a["focus"]]
         collaborators.sort(key=lambda a: (-a["with_focus"], str(a["name"]).casefold()))
         lines += _listing(
             "co-authors",
-            [f"{a['name']}: {a['with_focus']} shared" for a in collaborators],
+            [
+                f"{a['name']}: {a['with_focus']} shared ({'; '.join(a['with_focus_keys'])})"
+                for a in collaborators
+            ],
         )
     lines += _listing(
         "pairs",
@@ -200,7 +208,12 @@ def _summary(file: str, network: CoauthorNetwork) -> list[str]:
     )
     lines += _listing(
         "name-variant candidates",
-        [f"{' / '.join(v['names'])} ({', '.join(v['reasons'])})" for v in network.variants],
+        [
+            f"{' / '.join(v['names'])} ({', '.join(v['reasons'])}); "
+            f"evidence against: {', '.join(v['evidence_against']) or 'none'}; "
+            + " / ".join(f"{e['name']}: {'; '.join(e['keys'])}" for e in v["entries"])
+            for v in network.variants
+        ],
     )
     return lines
 

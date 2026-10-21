@@ -13,7 +13,7 @@
 ``coauthors``
     The co-authorship network in brief: authors, co-listed pairs, connected
     components and name-variant candidates, with the most frequent pairs and
-    the most connected authors (:func:`pynakes.coauthors.coauthor_network`
+    the most connected authors (:func:`pynakes.analysis.coauthor_network`
     reports the whole network).
 ``identifiers`` / ``fields``
     How many entries carry each identifier, and each field name.
@@ -41,6 +41,59 @@ alphabetically, so the report is deterministic.
 
 The report's ``sections`` mapping is the stable unit of composition: a later
 multi-file rollup sums per-file sections rather than re-deriving them.
+
+Co-authorship network
+--------------------
+
+:func:`coauthor_network` reads the ``author`` field of each entry and reports,
+offline and deterministically:
+
+``authors``
+    Every person listed, with the entries they appear in, their distinct
+    collaborators, the years they span, and the spellings that normalized to
+    them.
+``pairs``
+    Every two people listed together on at least one entry, with the number of
+    shared entries, their first and last year, and the citation keys.
+``components``
+    Connected components of the network: groups of people linked by chains
+    of shared entries.
+``variants``
+    Distinct names that may be one person (``Smith, J.`` and ``Smith, John``),
+    with the reasons and the evidence against. They are never merged.
+
+People are compared exactly as the ``authors`` section of
+:func:`pynakes.analysis.analyze` compares them, so the two reconcile: the
+network has as many authors as that section's ``distinct``. ``others`` (or
+``et al.``) truncates an author list; the people it stands for are unknown, so
+the network links only the listed authors and counts the truncated entries
+under ``with_others``.
+
+With ``focus``, the report is an ego view of those people: the focus names,
+everyone who shares an entry with one of them, and the pairs among all of
+these, which answers "who among my co-authors has worked together". Its
+components leave the focus names out, since every collaborator is linked
+through them by definition. Several focus names are treated as one view, not
+as one person: pass each spelling of a person deliberately when the
+``variants`` list shows them.
+
+An entry listing more than ``max_authors`` people (default
+:data:`DEFAULT_MAX_AUTHORS`, the library's ``coauthors-max-authors`` setting
+in the CLI; ``0`` for no limit) is not linked: its people still count as
+authors, but it adds no pairs and joins no components, and its key is listed
+under ``unlinked_keys``. A thousand-author collaboration paper would otherwise
+add half a million pairs that describe the collaboration, not its members.
+
+Counts describe the records; they say nothing about the people's work or the
+strength of a collaboration beyond the entries in this file.
+
+Entry totals, author counts and author years cover the whole selection even
+in a focus view. ``visible_collaborators`` counts neighbours in the visible
+graph; ``collaborators`` counts neighbours in the selection. The serialized
+``scope`` labels these distinctions and components/isolates excluding focus.
+Warnings are retained in documents, including conflicting ORCID annotations
+on one normalized name: these flag possible homonyms without splitting nodes.
+
 """
 
 from __future__ import annotations
@@ -51,9 +104,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from pynakes._analysis_coauthors import (
+    DEFAULT_MAX_AUTHORS,
+    MAX_AUTHORS_SETTING,
+    CoauthorNetwork,
+    UnknownAuthorError,
+    coauthor_network,
+    library_max_authors,
+)
+from pynakes._analysis_coauthors import SCHEMA as COAUTHOR_SCHEMA
 from pynakes._analysis_people import entry_people, fold, year_of
 from pynakes._text_utils import fold_field_names
-from pynakes.coauthors import coauthor_network, library_max_authors
 from pynakes.files import check_linked_files, parse_file_field
 from pynakes.filestore import FileStore
 from pynakes.group_tree import library_group_tree
@@ -64,7 +125,19 @@ from pynakes.model import BibEntry
 if TYPE_CHECKING:
     from pynakes.engine import Bibliography
 
-__all__ = ["IDENTIFIER_FIELDS", "SECTIONS", "AnalysisReport", "analyze"]
+__all__ = [
+    "COAUTHOR_SCHEMA",
+    "DEFAULT_MAX_AUTHORS",
+    "IDENTIFIER_FIELDS",
+    "MAX_AUTHORS_SETTING",
+    "SECTIONS",
+    "AnalysisReport",
+    "CoauthorNetwork",
+    "UnknownAuthorError",
+    "analyze",
+    "coauthor_network",
+    "library_max_authors",
+]
 
 #: Every section :func:`analyze` can report, in report order.
 SECTIONS = (
@@ -137,15 +210,21 @@ def analyze(
 
     entries = list(coll.lib.entries.values())
     report = AnalysisReport(file=str(coll.path) if coll.path is not None else None, top=top)
+
+    def coauthors_section() -> dict[str, object]:
+        network = coauthor_network(
+            entries,
+            max_authors=library_max_authors(coll.lib) if max_authors is None else max_authors,
+        )
+        report.warnings.extend(network.warnings)
+        return network.summary_section(top)
+
     builders: dict[str, Callable[[], dict[str, object]]] = {
         "entries": lambda: _entries_section(entries),
         "types": lambda: _types_section(entries),
         "years": lambda: _years_section(entries),
         "authors": lambda: _authors_section(entries, top),
-        "coauthors": lambda: coauthor_network(
-            entries,
-            max_authors=library_max_authors(coll.lib) if max_authors is None else max_authors,
-        ).summary_section(top),
+        "coauthors": coauthors_section,
         "venues": lambda: _venues_section(entries, top),
         "identifiers": lambda: _identifiers_section(entries),
         "fields": lambda: _fields_section(entries),

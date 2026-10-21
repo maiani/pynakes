@@ -1,12 +1,13 @@
 """GraphML and Markdown renderings of a co-author network document.
 
-Both read the documented JSON document (:meth:`pynakes.coauthors.CoauthorNetwork.to_dict`)
+Both read the documented JSON document (:meth:`pynakes.analysis.CoauthorNetwork.to_dict`)
 rather than internal state, so any consumer holding that document can render
 it the same way. Output is deterministic: lists keep the document's order.
 """
 
 from __future__ import annotations
 
+import json
 import xml.etree.ElementTree as ET
 
 _GRAPHML_NS = "http://graphml.graphdrawing.org/xmlns"
@@ -16,6 +17,7 @@ _NODE_KEYS = (
     ("label", "node", "label", "string"),
     ("entries", "node", "entries", "int"),
     ("collaborators", "node", "collaborators", "int"),
+    ("visible_collaborators", "node", "visible_collaborators", "int"),
     ("component", "node", "component", "int"),
     ("first_year", "node", "first_year", "string"),
     ("last_year", "node", "last_year", "string"),
@@ -43,11 +45,34 @@ def render_graphml(document: dict) -> str:
     """
     focus = document.get("focus") is not None
     root = ET.Element("graphml", xmlns=_GRAPHML_NS)
+    ET.SubElement(
+        root,
+        "key",
+        {
+            "id": "context",
+            "for": "graph",
+            "attr.name": "context",
+            "attr.type": "string",
+        },
+    )
     for key_id, domain, name, kind in (*_NODE_KEYS, *(_FOCUS_KEYS if focus else ()), *_EDGE_KEYS):
         ET.SubElement(
             root, "key", {"id": key_id, "for": domain, "attr.name": name, "attr.type": kind}
         )
     graph = ET.SubElement(root, "graph", id="coauthors", edgedefault="undirected")
+    _data(
+        graph,
+        {
+            "context": json.dumps(
+                {
+                    key: value
+                    for key, value in document.items()
+                    if key not in {"authors", "pairs", "components", "variants"}
+                },
+                ensure_ascii=False,
+            )
+        },
+    )
     node_ids: dict[str, str] = {}
     for number, author in enumerate(document["authors"]):
         node_id = f"n{number}"
@@ -57,6 +82,7 @@ def render_graphml(document: dict) -> str:
             "label": author["name"],
             "entries": author["entries"],
             "collaborators": author["collaborators"],
+            "visible_collaborators": author["visible_collaborators"],
             "component": author["component"],
             "first_year": author["first_year"],
             "last_year": author["last_year"],
@@ -92,6 +118,8 @@ def render_markdown(document: dict, title: str) -> str:
     """Return ``document`` as a Markdown report: summary, then one table per list."""
     summary = document["summary"]
     entries = document["entries"]
+    focus = document.get("focus")
+    component_scope = " (excluding focus)" if focus is not None else ""
     lines = [f"# {title}", ""]
     source = document.get("source")
     if source:
@@ -102,25 +130,55 @@ def render_markdown(document: dict, title: str) -> str:
             f"Source: `{source['file']}`" + (f", entries where `{selection}`" if selection else ""),
             "",
         ]
+        if source.get("sha256"):
+            lines += [f"Source SHA-256: `{source['sha256']}`", ""]
     lines += [
         _table(
             ["Count", "Value"],
             [
-                ["Entries", entries["total"]],
+                ["Selected entries", entries["total"]],
                 ["Entries with authors", entries["with_authors"]],
                 ["Co-authored entries", entries["coauthored"]],
                 ["Entries with a truncated author list (others)", entries["with_others"]],
-                ["Authors", summary["authors"]],
-                ["Pairs", summary["pairs"]],
-                ["Components", summary["components"]],
-                ["Largest component", summary["largest_component"]],
-                ["Isolated authors", summary["isolated_authors"]],
+                ["Entries excluded from linking", entries["over_max_authors"]],
+                ["Author-list limit (0: unlimited)", document["max_authors"]],
+                ["Visible authors", summary["authors"]],
+                ["Visible pairs", summary["pairs"]],
+                ["Components" + component_scope, summary["components"]],
+                ["Largest component" + component_scope, summary["largest_component"]],
+                ["Isolated authors" + component_scope, summary["isolated_authors"]],
                 ["Name-variant candidates", summary["variant_candidates"]],
             ],
         ),
         "",
     ]
-    focus = document.get("focus")
+    lines += [
+        "Counts describe bibliography records, not unique works or verified people. "
+        "Author entries, collaborators and years cover the whole selection; visible "
+        "collaborators count only neighbours in this graph. Component entry counts "
+        "cover selected linked entries incident to their members.",
+        "",
+        "Excluded entry keys: " + ("; ".join(document["unlinked_keys"]) or "none") + ".",
+        "",
+        "## Warnings",
+        "",
+        _table(
+            ["Type", "Details"],
+            [
+                [
+                    w["type"],
+                    w.get("message", "")
+                    + " "
+                    + json.dumps(
+                        {key: value for key, value in w.items() if key not in {"type", "message"}},
+                        ensure_ascii=False,
+                    ),
+                ]
+                for w in document["warnings"]
+            ],
+        ),
+        "",
+    ]
     if focus is not None:
         names = ", ".join(item["name"] for item in focus)
         collaborators = [a for a in document["authors"] if not a["focus"]]
@@ -144,9 +202,23 @@ def render_markdown(document: dict, title: str) -> str:
         "## Authors",
         "",
         _table(
-            ["Author", "Entries", "Collaborators", "Years", "Component"],
             [
-                [a["name"], a["entries"], a["collaborators"], _years(a), _blank(a["component"])]
+                "Author",
+                "Selected entries",
+                "Selected collaborators",
+                "Visible collaborators",
+                "Selected years",
+                "Component",
+            ],
+            [
+                [
+                    a["name"],
+                    a["entries"],
+                    a["collaborators"],
+                    a["visible_collaborators"],
+                    _years(a),
+                    _blank(a["component"]),
+                ]
                 for a in document["authors"]
             ],
         ),
@@ -177,13 +249,16 @@ def render_markdown(document: dict, title: str) -> str:
         "correct the records rather than the report.",
         "",
         _table(
-            ["Names", "Reasons", "Evidence against", "Entries"],
+            ["Names", "Reasons", "Evidence against", "Entries", "Keys by name"],
             [
                 [
                     " / ".join(v["names"]),
                     ", ".join(v["reasons"]),
                     ", ".join(v["evidence_against"]),
                     " / ".join(str(item["entries"]) for item in v["entries"]),
+                    " / ".join(
+                        f"{item['name']}: {'; '.join(item['keys'])}" for item in v["entries"]
+                    ),
                 ]
                 for v in document["variants"]
             ],

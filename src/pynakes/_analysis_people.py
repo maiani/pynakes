@@ -1,7 +1,7 @@
 """The people an entry lists, as the ``authors`` and ``coauthors`` analyses count them.
 
-One reading of an ``author`` field shared by :mod:`pynakes.analysis` and
-:mod:`pynakes.coauthors`, so a person the ``authors`` section counts is the
+One reading of an ``author`` field shared by the summary and network APIs in
+:mod:`pynakes.analysis`, so a person the ``authors`` section counts is the
 same person the co-author network links: each name is normalized to
 ``Last, First`` form (:func:`pynakes.authors.normalize_name_list`) and compared
 brace-free, spaced, and case-folded. ``others`` (and ``et al.``) marks a

@@ -1110,13 +1110,26 @@ People are compared exactly as `analyze`'s `authors` section compares them —
   `different_orcid`). Correct the records if they are one person.
 - **ORCID iDs** are read from the BibLaTeX named annotation
   `author+an:orcid = {1="0000-0002-1825-0097"; 3="..."}`, numbered by
-  position in the author list.
+  position in the author list. Multiple iDs attached to the same normalized
+  name produce a `conflicting_author_orcids` warning, with the annotated
+  entry keys and their zero-based positions in the selected entries
+  (`selection_index`, distinguishing duplicate keys). The name remains one
+  node: inspect the records to distinguish homonyms from annotation errors.
 - **Ego view.** `--focus NAME` keeps that person, everyone who shares an entry
   with them, and the pairs among all of these — who among your co-authors has
   worked together. Repeat it to treat several names as one view, such as two
   spellings of yourself; a `focus_variants` warning names spellings you left
   out. Components in this view leave the focus names out. A name no entry
   lists is refused with the similar names as `candidates`.
+  Entry totals and each author's counts and years cover the **whole selected
+  bibliography**. `authors` and `pairs` describe the visible graph;
+  `visible_collaborators` counts an author's neighbours in that graph, while
+  `collaborators` counts all their neighbours in the selection. Component
+  and isolated-author counts exclude the focus names: an isolated collaborator
+  here can still be connected to the focus person. Component entry counts
+  include selected linked entries incident to their members, including entries
+  with the focus person or people outside the visible graph. The JSON `scope`
+  object records these distinctions explicitly.
 - **Time slices** use the shared [`--where`](#selecting-entries-where)
   selector: `--where 'year >= 2020'`.
 - **`others`** (or `et al.`) truncates a list; only the listed authors are
@@ -1132,6 +1145,41 @@ People are compared exactly as `analyze`'s `authors` section compares them —
   `--to markdown` a report with one table per list. Without `--out` the
   document goes to stdout; `--out` refuses an existing file without `--force`
   and previews with `--dry-run`/`--diff`.
+  JSON documents retain `warnings` alongside the author limit and excluded
+  keys. GraphML carries a graph-level `context` string containing JSON with
+  the schema, source, scope, summary, entry counts, focus, limit, exclusions
+  and warnings. Markdown labels the scopes and includes warnings, exclusions,
+  the source digest and citation keys for each candidate spelling.
+
+### Review and correct a name variant
+
+Start with `pynakes coauthors refs.bib --to markdown --out review.md`.
+The candidate table names the affected keys, reasons and evidence against a
+match. Check the underlying references before deciding that the names denote
+one person; initials alone are not sufficient evidence. A repeated `--focus`
+combines views but does not resolve identity.
+
+This walkthrough adds two invented entries to demonstrate the correction.
+Suppose review has confirmed that `Example, A.` is Alice Example:
+
+```bash
+pynakes ref add refs.bib Example1900 --type article --field 'author=Example, A. and Colleague, Beatrice' --field 'title=An invented example' --field year=1900
+pynakes ref add refs.bib Example1901 --type article --field 'author=Example, Alice and Colleague, Beatrice' --field 'title=Another invented example' --field year=1901
+pynakes coauthors refs.bib --key Example1900,Example1901
+pynakes ref show refs.bib Example1900 --select author,title,year --json
+pynakes fields set refs.bib author 'Example, Alice and Colleague, Beatrice' --key Example1900 --dry-run --diff
+pynakes fields set refs.bib author 'Example, Alice and Colleague, Beatrice' --key Example1900
+pynakes coauthors refs.bib --focus 'Example, Alice'
+```
+
+`fields set` replaces the whole selected author field. Preserve every other
+author and their order so positional annotations still apply. Review entries
+individually when their author lists differ. A key selector can match duplicate
+keys; resolve that ambiguity before applying a key-based correction. These
+edits use the normal surgical editing path and leave unrelated text intact.
+If identical names denote different people and the records offer no justified
+way to distinguish them, retain the conflict warning rather than inventing a
+name correction; persistent identity directives remain future work.
 
 ## dedupe
 

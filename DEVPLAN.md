@@ -215,8 +215,18 @@ agent evaluation suite in `evals/agent`. Its tests cover the gate below.
   views, documents) is too large and option-heavy for an `analyze` section, so
   `coauthors` is its own read command in "Inspect & validate"; `analyze`
   carries only its counts and `--top`-capped lists. Both run
-  `pynakes.coauthors.coauthor_network`, which takes entries rather than a
+  `pynakes.analysis.coauthor_network`, which takes entries rather than a
   file, so a Library rollup can feed it the entries of many files.
+- **One public analysis API.** `pynakes.analysis` exposes `analyze`,
+  `coauthor_network`, both report types and the co-author configuration helpers.
+  Graph construction lives in private `_analysis_coauthors.py`; variant
+  detection and rendering retain their private modules. Separate CLI commands
+  do not imply separate public Python modules.
+- **Keep the name `coauthors`.** It names the relationship being inspected
+  and is short enough for everyday use. `network` would be ambiguous with
+  other graph types; `authors` would imply broader author management. Use
+  "co-authorship network" in explanatory prose. Identity curation remains
+  shared engine work, not a second editing interface inside this command.
 - **One reading of an author list.** `_analysis_people.py` is shared with the
   `authors` section: normalized `Last, First`, compared brace-, space- and
   case-insensitively, `others` recorded and never a person. The network's
@@ -229,6 +239,12 @@ agent evaluation suite in `evals/agent`. Its tests cover the gate below.
 - **Identity evidence.** ORCID iDs come only from `author+an:orcid`. BibLaTeX's
   extended name format (`family=..., given=...`) is not parsed yet; when it
   is, it belongs in `authors.py` so normalization and the network share it.
+- **Explicit report scopes.** Preserve selection-wide author counts and
+  label them; distinguish visible collaborators and connectivity excluding
+  focus. Standalone documents must retain warning and exclusion context.
+  Conflicting ORCIDs on one normalized name are evidence for review, not
+  grounds for an automatic identity split. The usage guide's correction
+  workflow uses the existing previewable field edits.
 - **No new selectors or settings beyond need.** Time slices reuse `--where`;
   `--focus`, `--to` and `--out` are views and output, not settings. The one
   behaviour-shaping option, the author-list limit, has all three forms

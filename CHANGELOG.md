@@ -69,13 +69,30 @@ commands and options that duplicated each other.
 
 #### Describing and checking a library
 
+- The unreleased co-author Python API now lives in `pynakes.analysis` alongside
+  `analyze`: `coauthor_network`, `CoauthorNetwork`, `UnknownAuthorError`,
+  `DEFAULT_MAX_AUTHORS`, `MAX_AUTHORS_SETTING`, `library_max_authors`, and
+  `COAUTHOR_SCHEMA`. Graph implementation is private. The `analyze` and
+  `coauthors` CLI commands and `pynakes.coauthors/1` document schema are unchanged.
+- Co-author reports now warn when one normalized name carries multiple
+  ORCID iDs, with entry-level evidence (including positions for duplicate
+  keys); `analyze` also propagates co-author warnings. No identities are
+  automatically split or merged.
+- Co-author JSON documents retain warnings and declare count scopes;
+  author records add `visible_collaborators` alongside selection-wide
+  `collaborators`. Focus reports label components and isolates as excluding
+  the focus names. GraphML embeds source, scope, limit, exclusions and warnings
+  as graph-level JSON context. Markdown includes that review context and
+  candidate citation keys; terminal summaries also show evidence against
+  candidate matches and their keys. The usage guide documents review,
+  dry-run correction and re-analysis with existing field-edit commands.
 - **`analyze`** and `pynakes.analysis`: offline descriptive counts for one
   bibliography in named sections — entries and duplicate keys, types, years,
   most frequent authors and venues (`--top`), identifier and field coverage,
   groups, `lint` findings, and linked-file and Pinax materials. `--section`
   selects sections. The `lint` section equals `lint`'s summary; duplicate-key
   and empty libraries are counted as they are.
-- **`coauthors`** and `pynakes.coauthors`: the offline co-author network of a
+- **`coauthors`** and `pynakes.analysis.coauthor_network`: the offline co-author network of a
   library or of the entries `--where`/`--key` select (`--where 'year >= 2020'`
   for a time slice) — authors, co-listed pairs with shared-entry counts, years
   and citation keys, and connected components. People are compared as

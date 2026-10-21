@@ -6,9 +6,9 @@ the tool rather than guessing. Update this when commands are added or removed.
 
 import pynakes
 from pynakes import __all__ as PUBLIC_API_EXPORTS
+from pynakes.analysis import COAUTHOR_SCHEMA
 from pynakes.analysis import SECTIONS as ANALYSIS_SECTIONS
 from pynakes.cli_errors import catalogue_description
-from pynakes.coauthors import SCHEMA as COAUTHOR_SCHEMA
 from pynakes.entry_reader import INCLUDE_PARTS
 from pynakes.metadata.schema import SAVED_QUERY_PREFIX
 from pynakes.query import FUZZY_THRESHOLD, WHERE_GRAMMAR
@@ -238,7 +238,7 @@ _SAVED_QUERIES = {
 
 _COAUTHORS = {
     "command": "coauthors",
-    "module": "pynakes.coauthors",
+    "module": "pynakes.analysis",
     "schema": COAUTHOR_SCHEMA,
     "descriptive_only": True,
     "offline": True,
@@ -259,22 +259,30 @@ _COAUTHORS = {
     "evidence_against (co_listed, different_orcid). Never merged: they stay separate "
     "authors.",
     "identity_evidence": "ORCID iDs from the BibLaTeX named annotation author+an:orcid "
-    '(1="0000-..."); unreadable items are an invalid_orcid_annotation warning.',
+    '(1="0000-..."); unreadable items are an invalid_orcid_annotation warning. '
+    "Multiple iDs on a normalized name produce conflicting_author_orcids with entry "
+    "keys and zero-based selection_index evidence; the node is not split automatically.",
+    "scope": "scope labels selection-wide entry/author counts and years, visible authors "
+    "and pairs, and components/isolates excluding focus. Author visible_collaborators "
+    "counts only neighbours in the displayed graph; collaborators covers the selection.",
     "documents": {
         "json": "The network document: schema, source, summary, entries, focus, authors, "
-        "pairs, components, variants.",
+        "pairs, components, variants, max_authors, unlinked_keys, scope and warnings.",
         "graphml": "Undirected; nodes n0.. in author order (label, entries, collaborators, "
         "component, years, orcids; focus and with_focus in a focus view); edge weight is "
-        "the number of shared entries, keys their citation keys.",
-        "markdown": "A summary table, then one table per list.",
+        "the number of shared entries, keys their citation keys. Nodes also carry "
+        "visible_collaborators. Graph context is JSON containing schema, source, scope, "
+        "summary, entries, focus, limit, excluded keys and warnings.",
+        "markdown": "Scope-labelled tables, source digest, exclusions, warnings and "
+        "variant entry keys for review.",
     },
     "envelope": "--json without --to returns the document under network; with --to it "
     "returns content (or out and written with --out).",
     "analyze_section": "analyze --section coauthors is the bounded summary: the summary "
     "counts plus top_pairs and top_collaborators capped by --top.",
     "reconciles": {
-        "components": "Every entry with authors belongs to exactly one component, so "
-        "component entries sum to entries.with_authors (without --focus).",
+        "components": "Without --focus, component entries sum to entries.with_authors "
+        "minus entries.over_max_authors. Excluded entries do not join components.",
         "entries": "single_author + coauthored = with_authors; with_authors + "
         "without_authors = total.",
     },
