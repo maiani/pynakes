@@ -13,14 +13,16 @@ are deferred to v0.9 in [DEVPLAN.md](DEVPLAN.md).
 
 | Scope | Recorded result | Evidence |
 | --- | --- | --- |
-| Current source after code consolidation | 3,339 tests (93.49% coverage); Ruff, types and strict docs pass; 4,758 encoding comparisons and both dialects' schema comparisons match previous behavior | `.cache/release-0.8.0/consolidation/CHECKPOINT.md` |
+| Current editor integration, metadata catalogue and publication fixes | 3,350 source tests (93.53% coverage); 172 editor tests; Ruff, types and strict docs pass; local extension package built and installed | `.cache/release-0.8.0/metadata-catalogue/CHECKPOINT.md` |
+| Earlier editor workflow checkpoint | 3,348 source tests; 170 editor tests; 31 CLI contracts against the local 0.8.0rc1 bundle | `.cache/release-0.8.0/editor-workflows/CHECKPOINT.md` |
+| Earlier source after code consolidation | 3,339 tests (93.49% coverage); Ruff, types and strict docs pass; 4,758 encoding comparisons and both dialects' schema comparisons match previous behavior | `.cache/release-0.8.0/consolidation/CHECKPOINT.md` |
 | Before code consolidation, including selection export and field encoding | 3,339 source tests (93.49% coverage), 3,339 installed-wheel tests; Ruff, types, strict docs, build, Twine and artifact-version checks pass | `.cache/release-0.8.0/selection-encoding/CHECKPOINT.md` |
 | Earlier editor-contract checkpoint | Five reference tasks and two disposable real-library smoke checks pass | `.cache/release-0.8.0/editor-contracts/CHECKPOINT.md` |
 | Blind agent evaluation | All five tasks passed mechanical and semantic review on the recorded wheel | [Evaluation review](evals/agent/REVIEW-0.8.md) and its linked raw run bundle |
 
 Earlier wheel, reference, smoke and blind-agent results describe their recorded
-artifacts. The consolidation has source validation; its installed-wheel checks
-remain part of the clean-commit rebuild. The evaluation review retains
+artifacts. The local 0.8.0rc1 bundle is a development build, not a release tag;
+full installed-wheel checks remain part of the clean-commit rebuild. The evaluation review retains
 historical failures; orchestrator review does not replace owner acceptance.
 
 ## Local candidate validation

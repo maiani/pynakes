@@ -127,12 +127,12 @@ being edited, not library-scoped exploration (see
     `asset fetch --progress jsonl` (also under `--json`); the view does not yet
     consume it or offer `--access institutional`.
 
-Engine support for group separators, complete key material-move reports, and
-entry-field schemas is included in v0.8 (see CHANGELOG). The next editor work
-uses `keys generate` for new entries and selected entries, and `ref schema`
-for Required / Optional / Other field panels; these rules belong to the engine.
-Selection copy/export can use `convert --to bib` or the interchange codecs with
-`--key` / `--where`; text encoding uses `fields encode --to latex|unicode`.
+The editor now consumes v0.8 group memberships, entry-field schemas and selection
+exports. Pending companion changes add citation insertion/completion, type-aware
+creation with generated keys, selected-key regeneration and copy/export actions;
+see [editor/CHANGELOG.md](editor/CHANGELOG.md). The engine additions for citation
+grammar and headless generated-key creation must ship with that companion.
+Host-level acceptance still needs interactive VS Code checks of these workflows.
 Local attachment, exact lint repair actions, and identifier discovery for an
 existing entry remain separate engine work, outside this v0.8 addition.
 
@@ -297,14 +297,80 @@ ambiguous keys, inconsistent declarations and cycles yield bounded, actionable
 reports; stale inputs and failed reciprocal edits cannot leave unreported
 partial changes. Tests exercise CLI/API parity and preservation of both files.
 
+#### Engine service layer
+
+One long-lived, in-process service over `Library` and `Bibliography`, which
+every interactive interface adapts rather than reimplementing. The MCP companion
+needs a long-running process anyway; the library-scoped GUI needs one to be
+responsive. Neither defines the server: both are adapters over this layer.
+
+- **Sessions.** Open a library once and keep it parsed. A cached file is reused
+  until its fingerprint changes; a change made outside the session is detected
+  (`externally_changed`) and reloaded, never silently overwritten. Writes keep
+  today's lifecycle — stage, preview, diff, then commit guarded by the source
+  digest — with the same errors, codes and provenance as the CLI.
+- **Incremental results.** An operation reports what it changed (entries added,
+  removed, modified or re-keyed, and metadata), and lint, group, citation and
+  material insights are recomputed for the entries it touched rather than the
+  whole library. This is what a session saves over a process per action; the
+  2026-10 measurements put full-library work, not startup, at most of a large
+  refresh.
+- **Adapters.** The MCP companion (MCP over stdio, query-only tools); the
+  `pynakes gui` host (local HTTP/WebSocket, reads and writes, guarded by a
+  per-launch token because it can write files); and later a stdio JSON-RPC
+  adapter for the VS Code extension, which removes its per-action process
+  startup. Text typed directly into the extension's buffer still needs a
+  re-read, since that edit bypasses the engine. Adapters carry the JSON envelope
+  where their protocol allows and are tested for parity with the CLI.
+- **No hidden behaviour.** A session performs no network I/O beyond what the
+  equivalent CLI call would, keeps ordering deterministic, and never writes
+  without an explicit commit.
+
+**Done when:** a session and the CLI produce the same results and errors for the
+same operations; external changes and stale previews are refused or reloaded,
+never overwritten; incremental insights match a full recomputation; and open,
+query and edit latency for representative library sizes is measured with
+`scripts/bench_scale.py` against the process-per-call baseline.
+
 #### MCP and editor integration
 
-Develop a query-only MCP companion against the v0.9 Library/Catalogue contract,
-with bounded results and the same errors and provenance as the CLI. Derive its
+Develop a query-only MCP companion as an adapter over the engine service layer,
+against the v0.9 Library/Catalogue contract, with bounded results and the same
+errors and provenance as the CLI. Derive its
 schemas from the engine and test adapter parity; declare an engine compatibility
 range. Add evidence reads after v0.12–v0.13. Companion publication does not gate
 an otherwise complete engine release. The editor may read library-scoped data
 but remains the project-scoped client, with no bibliography logic of its own.
+
+**Companion launchers.** `pynakes mcp` starts the MCP companion and `pynakes gui`
+the library-scoped client (Bimas). They are the documented ways in, so an MCP
+client is configured as `pynakes` with the argument `mcp` and needs nothing else
+on `PATH`. Both are thin launchers, not the companions themselves:
+
+- *Dependencies point one way.* The engine never imports companion code at
+  module level. A companion registers itself under a Python entry-point group
+  (`pynakes.companions`), and the launcher resolves it when it runs, so each
+  companion stays a separate package and later a separate repository. A
+  companion may also ship its own executable for packaging or desktop
+  launchers.
+- *Same engine, checked range.* The launcher runs the companion in the engine's
+  own interpreter, then checks the companion's declared engine compatibility
+  range and refuses a mismatch before starting it.
+- *Failures before start use the envelope.* A missing companion (with its
+  install hint, such as a `pynakes[mcp]` extra) or an incompatible one is a
+  catalogued error through `_safe`, never a traceback. Once started, the
+  companion owns the process: the MCP server speaks MCP over stdio, not the
+  JSON envelope, and the contract documentation names these commands as that
+  exception.
+- *No stubs.* The commands are always registered, and `capabilities` reports
+  whether each companion is installed and compatible, so the description is the
+  same in every environment and never claims a companion that is absent.
+- *Their own help panel*, apart from transforms and checks. Their flags
+  (transport, port, which library to open) are run mechanics, exempt from the
+  flag/setting/`metadata set` triple.
+- *Scope in the help text.* `gui` is described as the library-scoped client, so
+  it is not mistaken for the project-scoped VS Code extension, which has its own
+  entry point.
 
 ### v0.10 — Project assembly and synchronization of linked bibliographies
 
@@ -338,6 +404,12 @@ material copying until its recovery guarantees are tested.
 
 **Workflow:** resolve duplicate and metadata problems once, record deliberate
 exceptions, and have later maintenance respect those decisions.
+
+- Settle enrichment value policy: apply declared normalization to incoming
+  fields without changing existing values or silently enabling whole-entry
+  normalization. Cover page ranges, month expressions (including user string
+  definitions), DOI resolver URLs, and provenance for provider publisher names.
+  Provider spelling alone is not evidence that a publisher name is wrong.
 
 - Add field-level merge choices and provenance using existing identity evidence.
   Validate choices against source fingerprints; preserve materials and references
@@ -520,7 +592,9 @@ project at all. See
   bibliography implementation of its own. Starting it is the point at which the
   client layer earns its own repository, and the point by which the integration
   boundary must already be pinned — two clients cannot share an unversioned
-  contract.
+  contract. It starts with `pynakes gui`, a launcher on the terms set under
+  [MCP and editor integration](#mcp-and-editor-integration); the generic command
+  name outlives the working name.
 
 Schedule these as separate additive releases after their designs are accepted.
 Use a new major version only when a compatibility change requires one. Bimas
