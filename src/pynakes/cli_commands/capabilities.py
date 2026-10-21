@@ -47,6 +47,7 @@ class CapabilitySection(StrEnum):
     BATCH_OPERATIONS = "batch_operations"
     BOUNDED_READS = "bounded_reads"
     CAPABILITIES = "capabilities"
+    CITATION_GRAMMAR = "citation_grammar"
     COMMAND_GROUPS = "command_groups"
     COMMANDS = "commands"
     DEPRECATIONS = "deprecations"

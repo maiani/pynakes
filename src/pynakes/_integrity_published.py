@@ -34,6 +34,7 @@ from pynakes._integrity_common import (
     lookup_warning,
 )
 from pynakes.editing import set_entry_field, set_entry_type
+from pynakes.formatters import normalize_page_numbers
 from pynakes.identity import evidence_from_entry
 from pynakes.metadata import library_dialect
 from pynakes.model import BibEntry, BibFile
@@ -132,7 +133,21 @@ def _finish_arxiv_check(
         )
         return
 
-    status = "published" if result.get("doi") or result.get("journal") else "not_found"
+    unparsed = result.get("journal_reference")
+    if unparsed:
+        report.warnings.append(
+            {
+                "type": "unparsed_journal_reference",
+                "key": entry.key,
+                "message": "Publication reference could not be split safely; review it before adding journal fields",
+                "journal_reference": unparsed,
+            }
+        )
+    status = (
+        "published"
+        if result.get("doi") or result.get("journal")
+        else ("unparsed_reference" if unparsed else "not_found")
+    )
     candidate = PublishedCandidate(
         entry.key,
         source,
@@ -143,6 +158,8 @@ def _finish_arxiv_check(
         metadata=result,
         message="Published metadata found"
         if status == "published"
+        else "Publication reference needs review"
+        if unparsed
         else "No published metadata found",
     )
     report.candidates.append(candidate)
@@ -316,13 +333,23 @@ def _parse_journal_reference(value: str) -> dict[str, str]:
     """Parse the common arXiv ``journal_ref`` shape conservatively."""
     clean = " ".join(value.split()).rstrip(".")
     match = re.fullmatch(
-        r"(?P<journal>.+?)\s+(?P<volume>[^\s,]+),\s*"
-        r"(?P<pages>[^\s,]+)(?:\s*\((?P<year>\d{4})\))?",
+        r"(?P<journal>.+?)\s+(?P<volume>\d+[A-Za-z]?)"
+        r"(?:\s*\((?P<number>\d+)\))?,\s*"
+        r"(?:(?:pages?|pp?\.)\s*)?"
+        r"(?P<pages>[A-Za-z]?\d+(?:\s*[-–—]{1,2}\s*[A-Za-z]?\d+)?)"
+        r"(?:\s*\((?P<year>\d{4})\))?",
         clean,
+        flags=re.IGNORECASE,
     )
     if match is None:
-        return {"journal": clean} if clean else {}
-    return {name: part for name, part in match.groupdict().items() if part}
+        if not clean:
+            return {}
+        # A title-only value remains useful. Numeric citation details that we
+        # cannot separate are evidence for review, never a journal title.
+        return {"journal_reference" if re.search(r"\d", clean) else "journal": clean}
+    fields = {name: part for name, part in match.groupdict().items() if part}
+    fields["pages"] = normalize_page_numbers(fields["pages"])
+    return fields
 
 
 def _fetch_arxiv_fields(identifier: str, *, cache_file: str | Path | None = None) -> dict[str, str]:

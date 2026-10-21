@@ -22,6 +22,7 @@ from pynakes import fields as field_ops
 from pynakes import files as file_ops
 from pynakes import integrity as integrity_ops
 from pynakes import journals as journal_ops
+from pynakes import keys as key_ops
 from pynakes import metadata as metadata_ops
 from pynakes import normalize as normalize_ops
 from pynakes import scrub as scrub_ops
@@ -423,12 +424,17 @@ class BibliographyOperations:
     def add_entry(
         self,
         entry_type: str,
-        key: str,
+        key: str | None,
         fields: dict[str, str],
         *,
         allow_duplicate: bool = False,
     ) -> BibEntry:
-        """Append one manually specified entry to the bibliography."""
+        """Append an entry; a missing key uses the library pattern and a unique suffix."""
+        if key is None:
+            candidate = key_ops.generate_key(
+                BibEntry(key="", type=entry_type, fields=fields), self.lib
+            )
+            key = key_ops.unique_key(candidate, set(self.lib.entries.keys()))
         key = key.strip()
         entry_type = entry_type.strip().lower()
         if not key:

@@ -1,12 +1,14 @@
 """Tests for the machine-readable capability description."""
 
 import json
+import re
 
 from typer.testing import CliRunner
 
 import pynakes
 from pynakes.capabilities import get_capabilities
 from pynakes.cli import app
+from pynakes.usage import extract_keys_from_tex
 
 runner = CliRunner()
 
@@ -163,6 +165,21 @@ class TestErrorCatalogAndGrammar:
         grammar = get_capabilities()["search_query_grammar"]
         assert "field:term" in grammar["field_prefix"]
         assert grammar["examples"]
+
+    def test_citation_grammar_composes_into_what_tex_scan_counts(self) -> None:
+        grammar = get_capabilities()["citation_grammar"]
+        composed = re.compile(
+            rf"\\{grammar['macro_name']}{grammar['optional_arguments']}\{{([^}}]*)\}}",
+            re.IGNORECASE if grammar["case_insensitive"] else 0,
+        )
+        text = r"\citep*[see][p.~3]{Newton1687, Euler1748} \Textcite{Gauss1801} \ref{fig}"
+        composed_keys = [
+            key.strip()
+            for match in composed.finditer(text)
+            for key in match.group(1).split(grammar["key_separator"])
+        ]
+        assert composed_keys == extract_keys_from_tex(text)
+        assert composed_keys == ["Newton1687", "Euler1748", "Gauss1801"]
 
 
 class TestCapabilitiesCommand:

@@ -2,7 +2,6 @@
 
 import typer
 
-from pynakes import keys as keys_ops
 from pynakes.cli_commands._reference import (
     parse_field_assignments,
     prompt_citation_key,
@@ -25,7 +24,6 @@ from pynakes.cli_common import (
 from pynakes.engine import Bibliography
 from pynakes.lint import required_field_rules
 from pynakes.metadata import library_dialect
-from pynakes.model import BibEntry
 
 
 def _missing_required_fields(
@@ -52,6 +50,11 @@ def add(
     ),
     entry_type: str | None = typer.Option(None, "--type", help="BibTeX/BibLaTeX entry type"),
     field: list[str] = typer.Option([], "--field", help="Field assignment, repeatable: name=value"),
+    interactive: bool | None = typer.Option(
+        None,
+        "--interactive/--no-interactive",
+        help="Prompt for missing input; --no-interactive generates an omitted key from fields",
+    ),
     allow_duplicate: bool = typer.Option(
         False, "--allow-duplicate", help="Append even if the citation key already exists"
     ),
@@ -66,9 +69,10 @@ def add(
     Omitting the citation key starts an interactive prompt for the key, type,
     and required fields. That path needs an interactive terminal: with `--json`
     or headless stdin it errors instead, so supply the key (and `--field`) to
-    add non-interactively.
+    add non-interactively. Use `--no-interactive` to generate an omitted key
+    from supplied fields and the library key pattern, with collision handling.
     """
-    interactive = key is None
+    interactive = key is None if interactive is None else interactive
     if interactive:
         if json_output:
             _emit_error(
@@ -95,7 +99,7 @@ def add(
     try:
         fields = parse_field_assignments(field)
         coll = Bibliography.open(file)
-        if interactive:
+        if interactive and key is None:
             key = prompt_citation_key()
         if key is not None and coll.entries.get_all(key) and not allow_duplicate:
             # A taken key is a decision for the caller, not a malformed request:
@@ -121,13 +125,6 @@ def add(
             entry_type = entry_type or prompt_entry_type("article")
             fields = prompt_required_fields(coll, entry_type, fields)
         entry_type = entry_type or "article"
-        if key is None:
-            candidate = keys_ops.generate_key(
-                BibEntry(key="", type=entry_type, fields=fields),
-                coll.lib,
-            )
-            key = keys_ops.unique_key(candidate, set(coll.entries.keys()))
-            typer.echo(f"Generated citation key: {key}")
         entry = coll.add_entry(
             entry_type,
             key,
@@ -138,6 +135,8 @@ def add(
         _emit_error(json_output, "InvalidInput", str(exc))
         return
 
+    if interactive and key is None:
+        typer.echo(f"Generated citation key: {entry.key}")
     human = [f"{_verb('add', params)} {entry.type} {entry.key}."]
     warnings: list[dict] = []
     missing = _missing_required_fields(coll, entry.type, entry.fields)

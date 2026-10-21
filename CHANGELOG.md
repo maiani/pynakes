@@ -23,6 +23,15 @@ failures, while compact CLI output reduces the cost of automated workflows.
 
 #### Editing and interoperability
 
+- `inspect` exposes namespace-specific metadata key suggestions from the engine
+  registries, including all concrete normalization keys, alongside the existing
+  finite value choices.
+
+- `ref add --no-interactive` accepts an omitted citation key, generating it
+  from supplied fields and the library key pattern with collision handling.
+  `Bibliography.add_entry(..., key=None, ...)` uses the same implementation.
+  Explicit keys and the default interactive CLI behavior remain supported.
+
 - `fields encode FILE FIELD --to latex|unicode` converts supported text accents
   and named characters through surgical field edits, with selection, dry-run,
   diff and stale-write protection. `fields-encoding` stores the default direction.
@@ -164,7 +173,11 @@ failures, while compact CLI output reduces the cost of automated workflows.
   `import_reference(key_source=None)`, `library_lint_severity()` and
   `library_published()`.
 - **Machine-readable contracts.** `capabilities` describes bounded reads,
-  saved queries, analysis, material collection and deprecated forms.
+  saved queries, analysis, material collection and deprecated forms. It also
+  publishes `citation_grammar`, matching what `tex scan` counts as a citation.
+  Clients compose its pattern fragments; `pynakes.usage` exposes the same
+  `CITE_MACRO_NAME_PATTERN`, `CITE_OPTIONAL_ARGUMENTS_PATTERN`, and
+  `CITE_KEY_SEPARATOR` constants.
   Deprecated usage emits structured `old`, `new`, `removal` and `message`
   warnings, or stderr warnings outside JSON mode.
 - **Evaluation and benchmarks.** Repository tooling adds five agent tasks
@@ -217,6 +230,13 @@ These forms still work with warnings in 0.8 and are scheduled for removal in
   be combined with either replacement flag.
 
 ### Fixed
+
+- Published-version enrichment recognizes labelled page ranges in arXiv
+  journal references and updates the publication year. Unparsed numeric
+  references remain reported evidence instead of becoming journal titles.
+- Published-version reports distinguish `newly_found` from `already_present`,
+  expose candidate counts by status and clarify their scope. Verification also
+  surfaces publication-lookup warnings; the legacy `published` total is retained.
 
 - Sorting preserves the relative order of entries sharing a citation key,
   avoiding changes to which entry BibTeX reads.

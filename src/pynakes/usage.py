@@ -19,6 +19,9 @@ from pynakes.metadata import metadata_list_values
 from pynakes.model import BibFile
 
 __all__ = [
+    "CITE_KEY_SEPARATOR",
+    "CITE_MACRO_NAME_PATTERN",
+    "CITE_OPTIONAL_ARGUMENTS_PATTERN",
     "UsageReport",
     "KeyUsageMatch",
     "extract_keys_from_aux",
@@ -117,8 +120,16 @@ _AUX_CITATION_RE = re.compile(r"\\citation\s*\{([^}]*)\}")
 # The \cite family: \cite, \citep, \citet, \citeauthor, \parencite, \textcite,
 # \autocite, \footcite, \nocite, \Cite, ... — any command whose name contains
 # "cite", with an optional star and any number of optional [...] arguments.
+# The parts are public so a client (an editor completing keys inside a
+# citation) recognizes exactly the macros a scan counts; ``capabilities``
+# publishes them as ``citation_grammar``. Each part is valid in both Python
+# and ECMAScript regular expressions, matched case-insensitively.
+CITE_MACRO_NAME_PATTERN = r"[a-zA-Z]*cite[a-zA-Z]*"
+CITE_OPTIONAL_ARGUMENTS_PATTERN = r"\*?\s*(?:\[[^\]]*\]\s*)*"
+CITE_KEY_SEPARATOR = ","
+
 _TEX_CITE_RE = re.compile(
-    r"\\[a-zA-Z]*cite[a-zA-Z]*\*?\s*(?:\[[^\]]*\]\s*)*\{([^}]*)\}",
+    rf"\\{CITE_MACRO_NAME_PATTERN}{CITE_OPTIONAL_ARGUMENTS_PATTERN}\{{([^}}]*)\}}",
     re.IGNORECASE,
 )
 
@@ -183,7 +194,7 @@ def extract_keys_from_tex(text: str) -> list[str]:
 
 
 def _split_keys(raw: str) -> list[str]:
-    return [k.strip() for k in raw.split(",") if k.strip()]
+    return [k.strip() for k in raw.split(CITE_KEY_SEPARATOR) if k.strip()]
 
 
 def _strip_tex_comments(text: str) -> str:

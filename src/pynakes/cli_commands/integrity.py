@@ -108,15 +108,13 @@ def _verify_one(
             preprints = coll.published_check(
                 online=online, cache_file=cache_file, concurrency=concurrency, keys=selected
             )
-        result["preprints"] = {
-            "checked": preprints.checked,
-            "published": preprints.published,
-            "candidates": [candidate.to_dict() for candidate in preprints.candidates],
-        }
+        result["preprints"] = preprints.to_dict()
+        result["warnings"].extend(preprints.warnings)
         human.append(
-            f"  preprints: {preprints.published} of {preprints.checked} have "
-            "published-version metadata available"
+            f"  publication checks: {preprints.checked} candidate results; "
+            f"{preprints.newly_found} newly found, {preprints.already_present} already recorded"
         )
+        human += [f"  warning: {warning['message']}" for warning in preprints.warnings]
     return CheckOutcome(
         result=result,
         human=human,
@@ -305,6 +303,9 @@ def enrich(
         extra["preprints"] = {
             "checked": preprints.checked,
             "published": preprints.published,
+            "newly_found": preprints.newly_found,
+            "already_present": preprints.already_present,
+            "by_status": preprints.by_status,
             "promoted": preprints.promoted,
             "linked": preprints.linked,
             "not_found": sum(1 for c in preprints.candidates if c.status == "not_found"),

@@ -417,3 +417,26 @@ def test_metadata_value_choices_match_validation() -> None:
             metadata_pkg.validate_metadata_value(key, "not-a-choice")
     choices["dialect"].append("unexpected")
     assert "unexpected" not in metadata_pkg.metadata_value_choices()["dialect"]
+
+
+def test_metadata_key_choices_are_namespace_specific_and_fresh() -> None:
+    choices = metadata_pkg.metadata_key_choices()
+    assert "dialect" in choices["pynakes"]
+    assert "normalize-months" in choices["pynakes"]
+    assert "databasetype" in choices["jabref"]
+    assert "databasetype" not in choices["pynakes"]
+    for keys in choices.values():
+        assert keys == sorted(set(keys))
+        assert all(metadata_pkg.is_known_metadata_key(key) for key in keys)
+    choices["pynakes"].append("unexpected")
+    assert "unexpected" not in metadata_pkg.metadata_key_choices()["pynakes"]
+
+
+def test_key_catalogue_covers_documented_concrete_native_keys() -> None:
+    import re
+    from pathlib import Path
+
+    reference = Path("docs/guides/metadata-reference.md").read_text(encoding="utf-8")
+    native_section = reference.split("| `dialect`")[1].split("`lint-required-fields` values")[0]
+    documented = set(re.findall(r"^\| `([a-z][a-z-]+)` \|", native_section, re.MULTILINE))
+    assert documented <= set(metadata_pkg.metadata_key_choices()["pynakes"])

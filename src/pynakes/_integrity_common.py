@@ -172,13 +172,29 @@ class PublishedReport:
 
     @property
     def checked(self) -> int:
-        """Number of preprint candidates examined."""
+        """Number of preprint/backfill candidate results, excluding failed lookups."""
         return len(self.candidates)
 
     @property
     def published(self) -> int:
         """Number of candidates found to have published metadata available."""
         return sum(1 for c in self.candidates if c.status in {"published", "published_present"})
+
+    @property
+    def newly_found(self) -> int:
+        """Candidates whose lookup found publication metadata not already recorded."""
+        return sum(candidate.status == "published" for candidate in self.candidates)
+
+    @property
+    def already_present(self) -> int:
+        """Candidates that already carried DOI and journal metadata."""
+        return sum(candidate.status == "published_present" for candidate in self.candidates)
+
+    @property
+    def by_status(self) -> dict[str, int]:
+        """Candidate counts by outcome; their sum equals ``checked``."""
+        statuses = sorted({candidate.status for candidate in self.candidates})
+        return {status: sum(c.status == status for c in self.candidates) for status in statuses}
 
     @property
     def changed_entries(self) -> int:
@@ -200,6 +216,10 @@ class PublishedReport:
         return {
             "checked": self.checked,
             "published": self.published,
+            "newly_found": self.newly_found,
+            "already_present": self.already_present,
+            "by_status": self.by_status,
+            "checked_scope": "Preprint and DOI-to-arXiv candidate results; excludes failed lookups",
             "promoted": self.promoted,
             "linked": self.linked,
             "candidates": [candidate.to_dict() for candidate in self.candidates],

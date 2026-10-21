@@ -63,6 +63,10 @@ pynakes capabilities --json --section predicate_grammar   # one section
   selecting by citation key that every `--where` command also accepts.
 - `search_query_grammar`: term, phrase, field, fuzzy, ranking, and
   match-explanation behavior.
+- `citation_grammar`: what `tex scan` counts as a citation — the `\cite`
+  family's macro-name and optional-argument patterns and the key separator,
+  as regular-expression fragments valid in Python and ECMAScript, so a client
+  recognizes exactly the citations the engine does.
 - `batch_operations`: the operation vocabulary accepted by `corpus batch`.
 
 Use the schema to construct calls and `pynakes <command> --help` for a focused
@@ -593,3 +597,19 @@ Text encoding edits use `fields encode FILE FIELD --to latex|unicode` with the
 usual selectors, preview and hash precondition. `fields-encoding` supplies an
 optional stored default. Preserve and display `encoding_retained` warnings;
 these conversions cover a text subset, not arbitrary TeX rendering.
+
+
+For headless entry creation with a generated key, use `ref add FILE
+--no-interactive --type TYPE --field name=value --dry-run --diff --json`.
+The envelope names the generated key. Apply the same inputs with the preview's
+`--expect-sha256`; do not create a temporary entry and then rename it.
+
+
+For `verify --published`, `summary.checked` counts DOI verifications, whereas
+`preprints.checked` counts preprint and DOI-to-arXiv candidate results and
+excludes failed lookups. Compare the same scope when reconciling reports.
+`preprints.published` retains its legacy total; `newly_found` and `already_present`
+separate discovered publication metadata from metadata already recorded.
+`by_status` reconciles with `checked`; lookup failures appear in warnings.
+An `unparsed_journal_reference` warning preserves an unrecognized citation string
+for review rather than treating it as a journal title.

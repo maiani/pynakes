@@ -12,6 +12,11 @@ from pynakes.cli_errors import catalogue_description
 from pynakes.entry_reader import INCLUDE_PARTS
 from pynakes.metadata.schema import SAVED_QUERY_PREFIX
 from pynakes.query import FUZZY_THRESHOLD, WHERE_GRAMMAR
+from pynakes.usage import (
+    CITE_KEY_SEPARATOR,
+    CITE_MACRO_NAME_PATTERN,
+    CITE_OPTIONAL_ARGUMENTS_PATTERN,
+)
 
 # Stable type vocabulary for command-schema introspection. The on-disk click
 # type names are mapped to this small, version-independent set so the pinned
@@ -235,6 +240,24 @@ _SAVED_QUERIES = {
     "--where is evaluated (NoSources when none are linked).",
     "validation": "query set and metadata set validate the expression; lint reports "
     "a stored query that no longer parses (invalid_metadata_value).",
+}
+
+# What ``tex scan`` counts as a citation, in parts a client can compose into
+# its own matcher: an editor completing keys inside ``\cite{`` must recognize
+# the same macros the scan does, not a list of its own.
+_CITATION_GRAMMAR = {
+    "macro_name": CITE_MACRO_NAME_PATTERN,
+    "optional_arguments": CITE_OPTIONAL_ARGUMENTS_PATTERN,
+    "key_separator": CITE_KEY_SEPARATOR,
+    "case_insensitive": True,
+    "pattern_dialects": ["python", "ecmascript"],
+    "composition": "A citation is a backslash, macro_name, optional_arguments, then one "
+    "brace-delimited key list split on key_separator, with surrounding whitespace "
+    "ignored. Both patterns are regular-expression fragments without anchors or groups "
+    "that capture.",
+    "comments": "An unescaped % starts a line comment; citations inside one are not counted.",
+    "aux_files": "In .aux files only \\citation{...} lines are read.",
+    "commands": ["tex scan", "keys usage", "keys rename"],
 }
 
 _COAUTHORS = {
@@ -668,6 +691,7 @@ def get_capabilities() -> dict:
         "error_codes": catalogue_description(),
         "predicate_grammar": {"used_by": _selector_surfaces(schemas), **_PREDICATE_GRAMMAR},
         "search_query_grammar": _SEARCH_QUERY_GRAMMAR,
+        "citation_grammar": _CITATION_GRAMMAR,
         "bounded_reads": _BOUNDED_READS,
         "material_collection": _MATERIAL_COLLECTION,
         "selection_export": {
@@ -687,6 +711,7 @@ def get_capabilities() -> dict:
         "entry_fields": {
             "schema": "pynakes.entry-fields.v1",
             "command": "ref schema FILE [ENTRY_TYPE] --json",
+            "creation": "ref add FILE --no-interactive --type TYPE --field name=value generates an omitted key from library patterns; explicit keys override generation",
             "required": "AND of groups; each group is an OR of accepted field names, shared with lint",
             "profile_required": "Additional exact fields from the library lint profile",
             "optional": "Editing suggestions, not an exhaustive style whitelist",

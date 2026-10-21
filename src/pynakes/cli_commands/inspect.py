@@ -21,7 +21,7 @@ from pynakes.fields import TITLE_FIELDS
 from pynakes.filestore import FileStore
 from pynakes.formatters import latex_to_plain_text
 from pynakes.identity import entry_arxiv_id
-from pynakes.metadata import metadata_value_choices
+from pynakes.metadata import metadata_key_choices, metadata_value_choices
 
 # --- inspect ---------------------------------------------------------------
 
@@ -137,6 +137,7 @@ def inspect(
                 "blocks": [block.to_dict() for block in lib.pynakes_metadata_blocks],
             },
             "metadata_value_choices": metadata_value_choices(),
+            "metadata_key_choices": metadata_key_choices(),
             "duplicate_keys": duplicates,
         }
         if store is not None:

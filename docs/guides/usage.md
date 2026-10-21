@@ -459,10 +459,20 @@ This protects acronyms, uppercase/digit tokens, mixed-case terms such as
 ## add
 
 Use `ref add FILE KEY --field name=value...` to add a manual entry.
+For a generated key without prompts, omit `KEY` and use `--no-interactive`:
+
+```bash
+pynakes ref add refs.bib --no-interactive --type book --field author="Isaac Newton" --field title="Principia" --field year=1687 --dry-run --diff
+```
+
+Generation honors library key patterns and disambiguates collisions. The preview
+reports the resulting `key`; apply with its `source_sha256` as `--expect-sha256`.
+`--interactive/--no-interactive` controls prompting for this invocation; the
+existing `key-pattern` metadata controls generation policy.
 
 `--field` is repeatable and uses `name=value` syntax. `--type` defaults to
 `article`. Existing citation keys are rejected unless `--allow-duplicate` is
-passed. With no citation-key argument, `ref add` starts interactive mode and
+passed. By default, with no citation-key argument, `ref add` starts interactive mode and
 first asks for the key. Leave it blank to generate the key from the collected
 metadata and the library's configured key pattern. It then asks for the entry
 type and only the required fields not already supplied with `--type` or

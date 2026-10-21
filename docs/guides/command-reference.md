@@ -119,7 +119,7 @@ Show what pynakes can do: a compact index, or the details asked for.
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--command` | list[string] | no | null | — | Return the full schema of this command, e.g. 'ref show' (repeatable) |
-| `--section` | list[choice] | no | null | analysis, entry_fields, field_encoding, selection_export, groups_separator, batch_operations, bounded_reads, capabilities, command_groups, commands, deprecations, error_codes, formatting, material_collection, predicate_grammar, python_api, saved_queries, search_query_grammar, work_matching, write_precondition | Return this section of the description, e.g. predicate_grammar (repeatable) |
+| `--section` | list[choice] | no | null | analysis, entry_fields, field_encoding, selection_export, groups_separator, batch_operations, bounded_reads, capabilities, citation_grammar, command_groups, commands, deprecations, error_codes, formatting, material_collection, predicate_grammar, python_api, saved_queries, search_query_grammar, work_matching, write_precondition | Return this section of the description, e.g. predicate_grammar (repeatable) |
 | `--all` | boolean | no | false | — | Return the whole description (large: every command's schema) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
@@ -1046,6 +1046,7 @@ Add a manually specified reference entry.
 | `KEY` | string | no | — | — | Citation key for the new entry; omit to start interactive mode |
 | `--type` | string | no | null | — | BibTeX/BibLaTeX entry type |
 | `--field` | list[string] | no | — | — | Field assignment, repeatable: name=value |
+| `--interactive, --no-interactive` | boolean | no | null | — | Prompt for missing input; --no-interactive generates an omitted key from fields |
 | `--allow-duplicate` | boolean | no | false | — | Append even if the citation key already exists |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |

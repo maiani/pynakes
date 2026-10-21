@@ -106,6 +106,19 @@ from pynakes.metadata.schema import (
 )
 
 
+def metadata_key_choices() -> dict[str, list[str]]:
+    """Return suggested concrete metadata keys by owning namespace.
+
+    Derived from the engine registries, including finite-valued normalization
+    settings. Named/prefixed and custom keys remain valid manual input; this
+    catalogue is a discovery aid, not an exhaustive validation whitelist.
+    """
+    native = set(PYNAKES_EXACT_KEYS) | {
+        key for key in metadata_value_choices() if key not in JABREF_EXACT_KEYS
+    }
+    return {"pynakes": sorted(native), "jabref": sorted(JABREF_EXACT_KEYS)}
+
+
 def parse_metadata_comment(
     comment_text: str,
     *,
@@ -192,6 +205,7 @@ __all__ = [
     "parse_metadata_comment",
     "validate_metadata_value",
     "metadata_value_choices",
+    "metadata_key_choices",
     "parse_save_actions",
     "parse_save_order",
     "parse_sort_order_value",
