@@ -211,7 +211,7 @@ class TestTagging:
     def test_tag_group_appends_to_existing(self) -> None:
         lib = parse_bib("@article{A,\n  groups = {Existing},\n  year = {2020}\n}\n")
         tag_with_group(lib, ["A"], "Used")
-        assert lib.entries["A"].fields["groups"] == "Existing; Used"
+        assert lib.entries["A"].fields["groups"] == "Existing, Used"
 
     def test_tag_group_is_idempotent(self) -> None:
         lib = parse_bib("@article{A,\n  groups = {Used},\n  year = {2020}\n}\n")

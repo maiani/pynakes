@@ -1,0 +1,49 @@
+{
+  "task": "duplicate-conflict",
+  "engine_version": "0.8.0",
+  "wheel_sha256": "d8d337689483117599fa2a54618e96c24beaf70c902a6063e58a10405a60a8f3",
+  "agent": {
+    "model": "inherited Codex session model; exact backend identifier not exposed",
+    "client": "Codex isolated subagent",
+    "settings": "fork_turns=none; default inherited model/effort; shell and provided CLI only"
+  },
+  "prompt": "Add the note 'first edition' to Hooke1665.",
+  "conditions": "Fresh fixture; no parent history, oracle or repository access supplied. Offline instructed; CLI wrapper logs full stdout/stderr. Concurrent edit injected after first successful preview. Model sees only original task, CLI/library paths and tool isolation instructions.",
+  "calls": [
+    {
+      "argv": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Usage: python -m pynakes [OPTIONS] COMMAND [ARGS]...\n\n  Reference management engine for BibTeX, BibLaTeX, and their materials\n\nOptions:\n  -V, --version         Show the pynakes version and exit.\n  --install-completion  Install completion for the current shell.\n  --show-completion     Show completion for the current shell, to copy it or\n                        customize the installation.\n  --help                Show this message and exit.\n\nCommands:\n  inspect       Inspect a .bib file structure.\n  search        Search entries by free text, phrases, or field-scoped terms.\n  analyze       Describe a bibliography: what it holds and how complete...\n  coauthors     Map who has written with whom: co-author pairs,...\n  lint          Validate entries and report issues (accepts multiple...\n  verify        Verify entries against authoritative metadata (read-only).\n  capabilities  Show what pynakes can do: a compact index, or the details...\n  format        Rewrite layout only; never change bibliographic values or...\n  normalize     Normalize entries: titles, authors, journals, DOIs,...\n  convert       Convert a library between BibTeX/BibLaTeX dialects and...\n  enrich        Conservatively fill missing metadata (modifies the file).\n  init          Create or initialize a .bib library.\n  scrub         Write a copy of a library with its private content removed.\n  query         Save, list, and remove named selector queries → list, set,\n                remove\n  ref           Manage individual reference entries → add, import, show, edit,\n                directive, compare, find, remove\n  dedupe        Detect and merge duplicate works → check, merge\n  fields        Bulk-edit fields across matching references → set, rename,\n                move, append, clear, protect-title\n  keys          Work with citation keys → check, generate, repair, rename,\n                usage\n  groups        Manage entry groups → list, list-entries, add-entry, remove-\n                entry, tree, add-group, remove-group, rename-group, move-\n                group, update-group\n  metadata      Inspect and update library metadata → list, set, remove,\n                adopt-jabref\n  tex           Manage linked TeX sources and scan them for citations → list,\n                add, remove, clear, scan\n  asset         Fetch and validate Pinax materials → fetch, check, repair\n  corpus        Operate across multiple .bib files → combine, split, batch\n\n  Common jobs (add --json for machine-readable output):\n    find a reference          search FILE \"terms\" | ref show FILE --where EXPR\n    read entries              ref show FILE KEY | ref show FILE --key K1,K2\n    change one entry          ref edit FILE KEY --field name=value\n    change many entries       fields set|append|clear FILE ... --where EXPR\n    add by DOI/arXiv/URL      ref import FILE ID\n    check a library           lint FILE | verify FILE | dedupe check FILE\n    clean up conventions      normalize FILE | layout: format FILE\n    cited in a manuscript     tex scan FILE | --where used\n    PDFs and sources          asset fetch FILE | asset check FILE\n  Preview any change with --dry-run --diff; apply it with --expect-sha256.\n  Details: pynakes COMMAND --help, or capabilities --json --command 'ref show'.\n",
+      "stderr": "",
+      "response_bytes": 3283
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "/tmp/pynakes080-blind/duplicate-conflict/library.bib",
+        "Hooke1665",
+        "--json"
+      ],
+      "exit_code": 2,
+      "stdout": "{\"status\":\"conflict\",\"error\":\"DuplicateCitationKey\",\"message\":\"Citation key 'Hooke1665' identifies 2 references\",\"action\":\"ref_show\",\"key\":\"Hooke1665\",\"candidates\":[{\"index\":3,\"line\":31,\"type\":\"book\",\"fields\":{\"title\":\"Micrographia\",\"author\":\"Robert Hooke\",\"year\":\"1665\",\"publisher\":\"Royal Society\"},\"differs\":[\"title\",\"year\"],\"where\":\"key = \\\"Hooke1665\\\" and year = \\\"1665\\\"\"},{\"index\":4,\"line\":39,\"type\":\"book\",\"fields\":{\"title\":\"Micrographia, second issue\",\"author\":\"Robert Hooke\",\"year\":\"1667\",\"publisher\":\"Royal Society\"},\"differs\":[\"title\",\"year\"],\"where\":\"key = \\\"Hooke1665\\\" and year = \\\"1667\\\"\"}],\"options\":[{\"id\":\"ask_which\",\"description\":\"Ask which entry is meant: each candidate's fields show what tells them apart (differs names those fields)\"},{\"id\":\"select_one\",\"description\":\"Act on one entry with a --where command (fields set, ref show, ref directive, ...) using that candidate's where expression\"},{\"id\":\"repair_duplicates\",\"description\":\"Run keys repair to make the keys unique, then retry with the resulting key\"}]}\n",
+      "stderr": "",
+      "response_bytes": 1037
+    }
+  ],
+  "answer": {
+    "keys": [
+      "Hooke1665"
+    ],
+    "reported_ambiguity": true,
+    "text": "Two entries use `Hooke1665`: *Micrographia* (1665) and *Micrographia, second issue* (1667). Which should receive the note “first edition”? No changes made."
+  },
+  "library_sha256_after": "a1d26bf5babb1d77c4a60ba2be0c171e894ff40e86e998bcc3b087a673474bcd",
+  "review": {
+    "reviewer": "Codex orchestrator, checked against retained raw responses; not owner sign-off",
+    "unsupported_claims": 0,
+    "notes": "Verbatim final claims supported by retained responses; library outcome checked mechanically. Coauthor answer distinguishes six required semantic features; bounded answer acknowledges all excerpts are truncated."
+  }
+}

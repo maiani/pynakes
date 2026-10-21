@@ -1,0 +1,18 @@
+{
+  "task": "concurrent-edit",
+  "engine_version": "0.8.0",
+  "agent": {
+    "model": "inherited Codex session model; exact backend identifier not exposed",
+    "client": "Codex isolated subagent",
+    "settings": "fork_turns=none; default inherited model/effort; shell and provided CLI only"
+  },
+  "conditions": "Fresh fixture; no parent history, oracle or repository access supplied. Offline instructed; CLI wrapper logs full stdout/stderr. Concurrent edit injected after first successful preview. Model sees only original task, CLI/library paths and tool isolation instructions.",
+  "correct": true,
+  "uncertainty_preserved": true,
+  "unsupported_claims": 0,
+  "call_count": 4,
+  "unnecessary_calls": 2,
+  "response_bytes": 6612,
+  "response_size_ratio": 5.925,
+  "edits_match_plan": true
+}

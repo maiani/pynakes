@@ -94,6 +94,8 @@ to find the operation module that owns a key.
 | `verify-published` | integrity | Boolean (default: `false`): `verify` also reports preprints with a published version; `--published/--no-published` overrides it | `verify` | — |
 | `enrich-published` | integrity | Boolean (default: `false`): `enrich` also promotes preprints; the lookups still need `--online` (offline, the pass is skipped with a warning); `--published/--no-published` overrides it | `enrich` | — |
 | `tex-sources` | usage | List of TeX files or directories, relative to the `.bib` file | `keys`, `tex scan` | — |
+| `fields-encoding` | normalization | `latex` or `unicode`; no implicit direction when absent | `fields encode --to` overrides | — |
+| `groups-separator` | groups | `auto` (default), `comma`, or `semicolon`; auto detects library-wide and refuses mixed punctuation | Group membership reads, edits, selectors, analysis, TeX tagging and lint; global `--groups-separator` overrides | — |
 | `group-tree` | groups | Pipe-delimited group hierarchy; aliases JabRef's `grouping` (read native-first) — see [Grouping](#grouping) | `groups tree`/`add-group`/`remove-group`/`rename-group`/`move-group`/`update-group` | `grouping` / `groupsTree` / `groups:N...` |
 | `scrub-fields` | scrub | List of extra field names/globs `scrub` removes, on top of its default private set | `scrub` | — |
 | `scrub-keep-fields` | scrub | List of field names/globs `scrub` keeps despite that set (`*` keeps every field) | `scrub` | — |
@@ -159,6 +161,7 @@ schema does not yet cover them.
 | `versionDBStructure` | library | JabRef's internal database-structure version marker |
 | `fileDirectory` / `fileDirectory-<library>` (prefix `fileDirectory`) | files | Per-library linked-file search path(s) |
 | `fileDirectoryLatex` | files | Linked-file search path used when compiling with `\bibliography` |
+| `keywordSeparator` | groups | JabRef's declared library separator; comma or escaped semicolon is read before inferring `groups` memberships, unless `groups-separator` overrides it |
 | `groupsVersion` | groups | Version marker JabRef writes alongside `grouping` |
 | `groups-search-syntax-version` | groups | Version marker for the search-group expression syntax |
 | `bibdesk static groups` | groups | BibDesk-compatibility static-group marker some libraries carry |

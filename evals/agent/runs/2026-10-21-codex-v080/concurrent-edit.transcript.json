@@ -1,0 +1,82 @@
+{
+  "task": "concurrent-edit",
+  "engine_version": "0.8.0",
+  "wheel_sha256": "d8d337689483117599fa2a54618e96c24beaf70c902a6063e58a10405a60a8f3",
+  "agent": {
+    "model": "inherited Codex session model; exact backend identifier not exposed",
+    "client": "Codex isolated subagent",
+    "settings": "fork_turns=none; default inherited model/effort; shell and provided CLI only"
+  },
+  "prompt": "Preview adding the note 'first edition' to Newton1687, then apply exactly what you previewed.",
+  "conditions": "Fresh fixture; no parent history, oracle or repository access supplied. Offline instructed; CLI wrapper logs full stdout/stderr. Concurrent edit injected after first successful preview. Model sees only original task, CLI/library paths and tool isolation instructions.",
+  "calls": [
+    {
+      "argv": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Usage: python -m pynakes [OPTIONS] COMMAND [ARGS]...\n\n  Reference management engine for BibTeX, BibLaTeX, and their materials\n\nOptions:\n  -V, --version         Show the pynakes version and exit.\n  --install-completion  Install completion for the current shell.\n  --show-completion     Show completion for the current shell, to copy it or\n                        customize the installation.\n  --help                Show this message and exit.\n\nCommands:\n  inspect       Inspect a .bib file structure.\n  search        Search entries by free text, phrases, or field-scoped terms.\n  analyze       Describe a bibliography: what it holds and how complete...\n  coauthors     Map who has written with whom: co-author pairs,...\n  lint          Validate entries and report issues (accepts multiple...\n  verify        Verify entries against authoritative metadata (read-only).\n  capabilities  Show what pynakes can do: a compact index, or the details...\n  format        Rewrite layout only; never change bibliographic values or...\n  normalize     Normalize entries: titles, authors, journals, DOIs,...\n  convert       Convert a library between BibTeX/BibLaTeX dialects and...\n  enrich        Conservatively fill missing metadata (modifies the file).\n  init          Create or initialize a .bib library.\n  scrub         Write a copy of a library with its private content removed.\n  query         Save, list, and remove named selector queries → list, set,\n                remove\n  ref           Manage individual reference entries → add, import, show, edit,\n                directive, compare, find, remove\n  dedupe        Detect and merge duplicate works → check, merge\n  fields        Bulk-edit fields across matching references → set, rename,\n                move, append, clear, protect-title\n  keys          Work with citation keys → check, generate, repair, rename,\n                usage\n  groups        Manage entry groups → list, list-entries, add-entry, remove-\n                entry, tree, add-group, remove-group, rename-group, move-\n                group, update-group\n  metadata      Inspect and update library metadata → list, set, remove,\n                adopt-jabref\n  tex           Manage linked TeX sources and scan them for citations → list,\n                add, remove, clear, scan\n  asset         Fetch and validate Pinax materials → fetch, check, repair\n  corpus        Operate across multiple .bib files → combine, split, batch\n\n  Common jobs (add --json for machine-readable output):\n    find a reference          search FILE \"terms\" | ref show FILE --where EXPR\n    read entries              ref show FILE KEY | ref show FILE --key K1,K2\n    change one entry          ref edit FILE KEY --field name=value\n    change many entries       fields set|append|clear FILE ... --where EXPR\n    add by DOI/arXiv/URL      ref import FILE ID\n    check a library           lint FILE | verify FILE | dedupe check FILE\n    clean up conventions      normalize FILE | layout: format FILE\n    cited in a manuscript     tex scan FILE | --where used\n    PDFs and sources          asset fetch FILE | asset check FILE\n  Preview any change with --dry-run --diff; apply it with --expect-sha256.\n  Details: pynakes COMMAND --help, or capabilities --json --command 'ref show'.\n",
+      "stderr": "",
+      "response_bytes": 3283
+    },
+    {
+      "argv": [
+        "ref",
+        "edit",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Usage: python -m pynakes ref edit [OPTIONS] [file] {key}\n\n  Patch fields or type on one uniquely identified reference.\n\n  Supplying no change options (`--field` / `--clear-field` / `--type`) starts\n  an interactive prompt for the type and required fields, using the current\n  values as defaults. That path needs an interactive terminal: with `--json`\n  or headless stdin it errors instead.\n\nArguments:\n  file  Path to the .bib file (default: auto-detect single .bib in cwd)\n  key   Citation key to edit  [required]\n\nOptions:\n  --field <str>           Set or replace a field; repeatable: name=value\n  --clear-field <str>     Remove a field; repeatable\n  --type <str>            Set the entry type\n  --backup                Also write a <file>.bak copy before overwriting, or\n                          <file>.bak.1, .bak.2, ... when earlier backups\n                          exist, which are never overwritten (off by default;\n                          writes are already atomic and re-parse-validated)\n  --expect-sha256 SHA256  Refuse with an exit-2 ExternalModification conflict,\n                          writing nothing, unless the file's sha256 still\n                          equals this value: pass back the source_sha256 a\n                          --dry-run reported, so an edit made in between is\n                          never overwritten\n  --dry-run               Show changes without writing\n  --diff                  Show a unified diff\n  --json                  Emit machine-readable JSON\n  -f, --file FILE         The library to read, as an alternative to the\n                          leading FILE argument (default: the single .bib in\n                          the working directory)\n  --pretty                Indent --json output for reading (default: compact,\n                          one line)\n  --help                  Show this message and exit.\n",
+      "stderr": "",
+      "response_bytes": 1869
+    },
+    {
+      "argv": [
+        "ref",
+        "edit",
+        "/tmp/pynakes080-blind/concurrent-edit/library.bib",
+        "Newton1687",
+        "--field",
+        "note=first edition",
+        "--dry-run",
+        "--diff",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\":\"success\",\"action\":\"ref_edit\",\"file\":\"/tmp/pynakes080-blind/concurrent-edit/library.bib\",\"dry_run\":true,\"modified\":true,\"modified_entries\":1,\"warnings\":[],\"plan\":{\"summary\":{\"added\":0,\"removed\":0,\"renamed\":0,\"modified\":1,\"metadata_changed\":0},\"entries\":[{\"change\":\"modified\",\"key\":\"Newton1687\",\"fields\":{\"note\":{\"old\":null,\"new\":\"first edition\"}}}],\"metadata\":[]},\"source_sha256\":\"a1d26bf5babb1d77c4a60ba2be0c171e894ff40e86e998bcc3b087a673474bcd\",\"key\":\"Newton1687\",\"fields\":{\"note\":\"first edition\"},\"cleared_fields\":[],\"entry_type\":null,\"operations\":{\"fields_set\":1,\"fields_cleared\":0,\"entry_type_changed\":false},\"diff\":\"--- library.bib (original)\\n+++ library.bib (modified)\\n@@ -7,7 +7,8 @@\\n   title = {Philosophiae Naturalis Principia Mathematica},\\n   publisher = {Royal Society},\\n   location = {London},\\n-  year = {1687}\\n+  year = {1687},\\n+  note = {first edition}\\n }\\n \\n @book{Euler1748a,\"}\n",
+      "stderr": "",
+      "response_bytes": 915
+    },
+    {
+      "argv": [
+        "ref",
+        "edit",
+        "/tmp/pynakes080-blind/concurrent-edit/library.bib",
+        "Newton1687",
+        "--field",
+        "note=first edition",
+        "--expect-sha256",
+        "a1d26bf5babb1d77c4a60ba2be0c171e894ff40e86e998bcc3b087a673474bcd",
+        "--diff",
+        "--json"
+      ],
+      "exit_code": 2,
+      "stdout": "{\"status\":\"conflict\",\"error\":\"ExternalModification\",\"message\":\"File changed since it was previewed: /tmp/pynakes080-blind/concurrent-edit/library.bib\",\"file\":\"/tmp/pynakes080-blind/concurrent-edit/library.bib\",\"expected_sha256\":\"a1d26bf5babb1d77c4a60ba2be0c171e894ff40e86e998bcc3b087a673474bcd\",\"source_sha256\":\"4f7a4db1b321592ce92a25a7ab15c854a021233267f259b0d15eff2c3d06975a\",\"options\":[{\"id\":\"reload\",\"description\":\"Reload the file and retry the operation\"},{\"id\":\"manual_review\",\"description\":\"Review the on-disk changes before retrying\"}]}\n",
+      "stderr": "",
+      "response_bytes": 545
+    }
+  ],
+  "answer": {
+    "keys": [
+      "Newton1687"
+    ],
+    "reported_ambiguity": false,
+    "text": "Previewed adding `note = {first edition}` to `Newton1687`, but the file changed before application. The fingerprint check stopped the write; no changes were applied.\n\nShould I review the updated file and prepare a fresh preview?"
+  },
+  "library_sha256_after": "4f7a4db1b321592ce92a25a7ab15c854a021233267f259b0d15eff2c3d06975a",
+  "review": {
+    "reviewer": "Codex orchestrator, checked against retained raw responses; not owner sign-off",
+    "unsupported_claims": 0,
+    "notes": "Verbatim final claims supported by retained responses; library outcome checked mechanically. Coauthor answer distinguishes six required semantic features; bounded answer acknowledges all excerpts are truncated."
+  }
+}

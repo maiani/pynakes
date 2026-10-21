@@ -20,7 +20,6 @@ runner = CliRunner()
 #: Modifying commands without the full selector, and why they cannot take one.
 NOT_ENTRY_SELECTABLE = {
     "asset repair": "reconciles the manifest, never an entry",
-    "convert": "a dialect belongs to the whole file",
     "corpus batch": "each operation names its own entries",
     "corpus split": "routes entries with its own --route predicates",
     "dedupe merge": "--key picks clusters; a predicate over clusters is not defined",

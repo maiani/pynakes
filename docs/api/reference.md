@@ -61,6 +61,8 @@ with usage examples, see the [API overview](index.md).
 
 ::: pynakes.integrity
 
+::: pynakes.entry_types
+
 ::: pynakes.lint
 
 ::: pynakes.metadata
@@ -70,6 +72,8 @@ with usage examples, see the [API overview](index.md).
 ::: pynakes.scrub
 
 ## Set operations
+
+::: pynakes.export
 
 ::: pynakes.setops
 

@@ -27,6 +27,7 @@ Initial tasks cover the cases the roadmap names first:
 | `duplicate-conflict` | duplicate conflicts | Surfaces `DuplicateCitationKey` instead of editing either entry |
 | `concurrent-edit` | concurrent edits | Stops on `ExternalModification` instead of overwriting another tool's change |
 | `bounded-context` | bounded reads | Pages the saved query to completion, reads each key once, reports truncation |
+| `coauthor-interpretation` | co-authorship analysis | Distinguishes count scopes, identity uncertainty and exclusions with citation evidence |
 
 Add cross-library assembly and evidence-grounded comparisons as their engine
 support ships. Mock provider responses for tasks that would reach the network;
@@ -87,3 +88,7 @@ python scripts/agent_eval.py score run.json --baseline baseline.json
 
 Keep transcripts and scores with the engine and model versions that produced
 them. Compare runs only under the same recorded conditions.
+
+The [v0.8 review](REVIEW-0.8.md) records the historical runs’ limitations and
+the semantic review required for the co-authorship task. New transcripts must
+retain raw tool responses and verbatim final answers for independent review.

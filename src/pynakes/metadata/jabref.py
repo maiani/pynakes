@@ -66,6 +66,7 @@ JABREF_EXACT_KEYS: dict[str, MetadataCategory] = {
     "groupstree": CATEGORY_GROUPS,
     "groups": CATEGORY_GROUPS,
     "groupsversion": CATEGORY_GROUPS,
+    "keywordseparator": CATEGORY_GROUPS,
     "groups-search-syntax-version": CATEGORY_GROUPS,
     "bibdesk static groups": CATEGORY_GROUPS,
     "protectedflag": CATEGORY_LIBRARY,
@@ -605,3 +606,26 @@ class JabRefAdoptReport:
     def changed(self) -> bool:
         """Whether the call modified the file."""
         return bool(self.moved_keys) or self.database_type_added
+
+
+def jabref_keyword_separator(lib: BibFile) -> str | None:
+    """Read JabRef's library separator, decoding its metadata escaping.
+
+    ``keywordSeparator`` is a one-character item in JabRef's semicolon-ended
+    metadata list: comma is ``,;`` and semicolon is ``\\;;``. Read the raw
+    payload because the generic accessor strips all trailing semicolons.
+    This is a read fallback for group memberships, not a keyword conversion.
+    """
+    value = next(
+        (value for key, value in lib.metadata.items() if key.lower() == "keywordseparator"), None
+    )
+    if value is None:
+        return None
+    value = value.strip().removesuffix(";").strip()
+    if value == r"\;":
+        return ";"
+    if value == ",":
+        return ","
+    raise ValueError(
+        "Unsupported JabRef keywordSeparator; choose groups-separator comma or semicolon explicitly"
+    )

@@ -118,7 +118,7 @@ from pynakes._text_utils import fold_field_names
 from pynakes.files import check_linked_files, parse_file_field
 from pynakes.filestore import FileStore
 from pynakes.group_tree import library_group_tree
-from pynakes.groups import entry_groups
+from pynakes.groups import entry_groups, library_groups_separator
 from pynakes.lint import lint, suppress_findings
 from pynakes.model import BibEntry
 
@@ -382,9 +382,10 @@ def _groups_section(coll: Bibliography, entries: list[BibEntry]) -> dict[str, ob
     tree = library_group_tree(coll.lib)
     declared = [node.name for node in tree] if tree else []
     counts: Counter[str] = Counter()
+    delimiter = library_groups_separator(coll.lib)
     with_groups = 0
     for entry in entries:
-        groups = set(entry_groups(entry))
+        groups = set(entry_groups(entry, separator=delimiter))
         with_groups += bool(groups)
         counts.update(groups)
     ranked = _ranked(counts, {name: name for name in counts})

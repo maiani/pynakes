@@ -554,3 +554,42 @@ an error envelope independently while inspection succeeds. The option adds data
 only to JSON output; ordinary inspection is unchanged. TeX and material checks
 remain separate, allowing clients to check a saved bibliography's neighbouring
 files while inspecting an unsaved buffer through a temporary file.
+
+
+## Entry editing contracts
+
+Before building an entry form, read `pynakes ref schema refs.bib article --json`.
+Omit `article` to enumerate supported and existing custom types. The read-only
+response includes `source_sha256`, resolved `dialect`, and `entry_schemas`:
+
+- `required`: a list of groups. Every group needs at least one populated field;
+  `['author', 'editor']` means either field satisfies that requirement.
+- `profile_required`: additional exact-field requirements from the library's
+  lint profile, separate from built-in requirements because lint treats them
+  as profile findings.
+- `optional`: ordered editing suggestions, not a complete style whitelist.
+- `other`: existing field names outside those lists. Preserve them, including
+  custom fields on unknown types (`known_type: false`).
+
+`--dialect bibtex|biblatex` overrides the stored dialect for this read. The
+Python equivalent is `pynakes.entry_types.entry_field_schema()`; pass `lib`
+for profile requirements and `fields` for the existing field names. Required
+rules are shared with lint. Clients should not duplicate these tables.
+
+For generated citation keys, `keys generate` reports `pinax_materials` in both
+preview and apply responses, just as `keys rename` does. `keys repair` also
+returns the list, but leaves shared materials under a surviving original key.
+Preview material collisions fail before any bibliography or material is written.
+
+
+Selection export uses `convert FILE --to bib|csl-json|ris|mods|endnote|csv`
+with `--key` / `--where`. Read `content` for clipboard output, or supply `--out`.
+The envelope distinguishes `selected_entries` from exported `entry_count` and
+lists `dependency_keys` for native output. Native output retains library-level
+metadata/comments; this is not a privacy scrub. Interchange output resolves
+inheritance without exporting unselected parent records.
+
+Text encoding edits use `fields encode FILE FIELD --to latex|unicode` with the
+usual selectors, preview and hash precondition. `fields-encoding` supplies an
+optional stored default. Preserve and display `encoding_retained` warnings;
+these conversions cover a text subset, not arbitrary TeX rendering.

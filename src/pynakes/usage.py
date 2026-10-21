@@ -14,8 +14,7 @@ from pathlib import Path
 
 from pynakes._text_utils import LineCounter
 from pynakes.editing import append_delimited_field, splice_into_text
-from pynakes.groups import GROUPS_DELIM as _GROUPS_DELIM
-from pynakes.groups import GROUPS_JOIN as _GROUPS_JOIN
+from pynakes.groups import _validate_group, library_groups_separator
 from pynakes.metadata import metadata_list_values
 from pynakes.model import BibFile
 
@@ -525,7 +524,9 @@ def tag_with_group(lib: BibFile, keys: Iterable[str], group: str) -> int:
     Returns the number of entries newly tagged (already-tagged entries are
     skipped). Modifies ``lib`` in place.
     """
-    return _tag(lib, keys, "groups", group, _GROUPS_DELIM, _GROUPS_JOIN)
+    delimiter = library_groups_separator(lib)
+    _validate_group(group, delimiter, lib)
+    return _tag(lib, keys, "groups", group, delimiter, delimiter + " ")
 
 
 def tag_with_keyword(lib: BibFile, keys: Iterable[str], keyword: str) -> int:

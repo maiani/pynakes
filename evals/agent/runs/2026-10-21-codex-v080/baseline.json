@@ -1,0 +1,262 @@
+{
+  "suite": "evals/agent",
+  "engine_version": "0.8.0",
+  "python": "3.12.13",
+  "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+  "tasks": [
+    {
+      "id": "ambiguous-reference",
+      "category": "ambiguous_references",
+      "passed": true,
+      "call_count": 2,
+      "response_bytes": 2165,
+      "max_response_bytes": 1293,
+      "failed_checks": [],
+      "keys_seen": [
+        "Euler1748a",
+        "Euler1748b",
+        "Euler1748a",
+        "Euler1748b"
+      ],
+      "expected_keys_reachable": true,
+      "library_outcome_ok": true,
+      "calls": [
+        {
+          "argv": [
+            "search",
+            "/tmp/tmp_yuhmhdp/historical.bib",
+            "Introductio",
+            "--json"
+          ],
+          "exit_code": 0,
+          "response_bytes": 1293
+        },
+        {
+          "argv": [
+            "ref",
+            "show",
+            "/tmp/tmp_yuhmhdp/historical.bib",
+            "--key",
+            "Euler1748a,Euler1748b",
+            "--select",
+            "title,volume",
+            "--json"
+          ],
+          "exit_code": 0,
+          "response_bytes": 872
+        }
+      ]
+    },
+    {
+      "id": "duplicate-conflict",
+      "category": "duplicate_conflicts",
+      "passed": true,
+      "call_count": 2,
+      "response_bytes": 1580,
+      "max_response_bytes": 1037,
+      "failed_checks": [],
+      "keys_seen": [],
+      "expected_keys_reachable": true,
+      "library_outcome_ok": true,
+      "calls": [
+        {
+          "argv": [
+            "ref",
+            "edit",
+            "/tmp/tmp9dk8cf0c/historical.bib",
+            "Hooke1665",
+            "--field",
+            "note=first edition",
+            "--dry-run",
+            "--json"
+          ],
+          "exit_code": 2,
+          "response_bytes": 1037
+        },
+        {
+          "argv": [
+            "lint",
+            "/tmp/tmp9dk8cf0c/historical.bib",
+            "--only",
+            "duplicate_key",
+            "--json"
+          ],
+          "exit_code": 0,
+          "response_bytes": 543
+        }
+      ]
+    },
+    {
+      "id": "concurrent-edit",
+      "category": "concurrent_edits",
+      "passed": true,
+      "call_count": 2,
+      "response_bytes": 1116,
+      "max_response_bytes": 607,
+      "failed_checks": [],
+      "keys_seen": [],
+      "expected_keys_reachable": true,
+      "library_outcome_ok": true,
+      "calls": [
+        {
+          "argv": [
+            "ref",
+            "edit",
+            "/tmp/tmpem9himj5/historical.bib",
+            "Newton1687",
+            "--field",
+            "note=first edition",
+            "--dry-run",
+            "--json"
+          ],
+          "exit_code": 0,
+          "response_bytes": 607
+        },
+        {
+          "argv": [
+            "ref",
+            "edit",
+            "/tmp/tmpem9himj5/historical.bib",
+            "Newton1687",
+            "--field",
+            "note=first edition",
+            "--expect-sha256",
+            "a1d26bf5babb1d77c4a60ba2be0c171e894ff40e86e998bcc3b087a673474bcd",
+            "--json"
+          ],
+          "exit_code": 2,
+          "response_bytes": 509
+        }
+      ]
+    },
+    {
+      "id": "bounded-context",
+      "category": "bounded_reads",
+      "passed": true,
+      "call_count": 3,
+      "response_bytes": 8762,
+      "max_response_bytes": 3511,
+      "failed_checks": [],
+      "keys_seen": [
+        "Ashby1950",
+        "Gisler1952",
+        "Elling1954",
+        "Castell1956",
+        "Ashby1958",
+        "Gisler1960",
+        "Elling1962",
+        "Castell1964",
+        "Ashby1966",
+        "Gisler1968",
+        "Elling1970",
+        "Castell1972"
+      ],
+      "expected_keys_reachable": true,
+      "library_outcome_ok": true,
+      "calls": [
+        {
+          "argv": [
+            "ref",
+            "show",
+            "/tmp/tmptmwcnokd/optics.bib",
+            "--where",
+            "query \"optics\"",
+            "--select",
+            "title,abstract",
+            "--max-chars",
+            "300",
+            "--limit",
+            "5",
+            "--json"
+          ],
+          "exit_code": 0,
+          "response_bytes": 3501
+        },
+        {
+          "argv": [
+            "ref",
+            "show",
+            "/tmp/tmptmwcnokd/optics.bib",
+            "--where",
+            "query \"optics\"",
+            "--select",
+            "title,abstract",
+            "--max-chars",
+            "300",
+            "--limit",
+            "5",
+            "--json",
+            "--cursor",
+            "c1.eyJvIjo1LCJyIjoiNDlmYTA4ZjU2MTQwOGM4NSIsInMiOiIyODQwYmE5N2JiYjUxNGQwIn0"
+          ],
+          "exit_code": 0,
+          "response_bytes": 3511
+        },
+        {
+          "argv": [
+            "ref",
+            "show",
+            "/tmp/tmptmwcnokd/optics.bib",
+            "--where",
+            "query \"optics\"",
+            "--select",
+            "title,abstract",
+            "--max-chars",
+            "300",
+            "--limit",
+            "5",
+            "--json",
+            "--cursor",
+            "c1.eyJvIjoxMCwiciI6IjQ5ZmEwOGY1NjE0MDhjODUiLCJzIjoiMjg0MGJhOTdiYmI1MTRkMCJ9"
+          ],
+          "exit_code": 0,
+          "response_bytes": 1750
+        }
+      ]
+    },
+    {
+      "id": "coauthor-interpretation",
+      "category": "coauthor_analysis",
+      "passed": true,
+      "call_count": 2,
+      "response_bytes": 5211,
+      "max_response_bytes": 3807,
+      "failed_checks": [],
+      "keys_seen": [
+        "Pair1900",
+        "Outside1901",
+        "Variant1902",
+        "Large1903"
+      ],
+      "expected_keys_reachable": true,
+      "library_outcome_ok": true,
+      "calls": [
+        {
+          "argv": [
+            "coauthors",
+            "/tmp/tmpr3xflwff/coauthors.bib",
+            "--focus",
+            "Example, Alice",
+            "--json"
+          ],
+          "exit_code": 0,
+          "response_bytes": 3807
+        },
+        {
+          "argv": [
+            "ref",
+            "show",
+            "/tmp/tmpr3xflwff/coauthors.bib",
+            "--key",
+            "Pair1900,Outside1901,Variant1902,Large1903",
+            "--select",
+            "author,year,author+an:orcid",
+            "--json"
+          ],
+          "exit_code": 0,
+          "response_bytes": 1404
+        }
+      ]
+    }
+  ]
+}

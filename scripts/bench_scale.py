@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Time pynakes on a large synthetic library, to find and watch quadratic paths.
 
-Developer-only: not part of the package, and not run by the test suite. The benchmark
-measures parsing, ``lint``, and ``format --check`` on a 20,000-entry library,
-with timings recorded rather than asserted, since
-wall-clock time depends on the machine.
+Developer-only: not part of the package, and not run by the test suite. Measures
+parsing, writing, checks, bounded reads and analysis. Timings are observations,
+not assertions. Each operation runs again under tracemalloc to measure peak
+Python allocations separately; this is not total process RSS.
 
 The library is generated deterministically from the entry index: invented
 authors and titles, every common entry type, ``@string`` macros, braced and
@@ -14,12 +14,16 @@ paths a real library does without being derived from one.
 Usage:
     python scripts/bench_scale.py                 # 1,000 / 5,000 / 20,000 entries
     python scripts/bench_scale.py 8000 --only parse
+    python scripts/bench_scale.py 100 1000 --shape dense --only coauthors --out dense.json
 """
 
 import argparse
+import json
+import platform
 import sys
 import tempfile
 import time
+import tracemalloc
 from collections.abc import Callable
 from pathlib import Path
 
@@ -63,29 +67,47 @@ def entry(index: int) -> str:
     return text
 
 
-def library(count: int) -> str:
-    """Return a library of ``count`` entries with its ``@string`` preamble."""
+def library(count: int, shape: str = "mixed") -> str:
+    """Return a mixed library, unrelated names, or one dense surname block."""
+    if shape != "mixed":
+        rows = []
+        for i in range(count):
+            family = "Example" if shape == "dense" else f"Family{i}"
+            # Many distinct names in one surname block exercise candidate comparisons.
+            rows.append(
+                f"@article{{Key{i:06d}, author={{{family}, Given{i} and Peer{i}, Ada}}, "
+                f"title={{Invented work {i}}}, year={{1900}}, abstract={{{'context ' * 80}}}}}"
+            )
+        return "\n".join(rows)
     head = '@string{jphys = "Journal of Invented Physics"}\n\n'
     return head + "\n".join(entry(index) for index in range(count))
 
 
-def timed(label: str, action: Callable[[], object]) -> None:
+def timed(label: str, action: Callable[[], object]) -> dict[str, object]:
     start = time.perf_counter()
     action()
-    print(f"  {label:<16} {time.perf_counter() - start:8.2f} s", flush=True)
+    elapsed = time.perf_counter() - start
+    # A separate pass avoids charging allocation tracing to the timing.
+    tracemalloc.start()
+    action()
+    _, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    print(f"  {label:<16} {elapsed:8.2f} s  {peak / 1e6:8.2f} MB Python allocations", flush=True)
+    return {"operation": label, "seconds": elapsed, "peak_python_bytes": peak}
 
 
-def cli(*args: str) -> Callable[[], object]:
+def cli(*args: str, allowed: tuple[int, ...] = (0,)) -> Callable[[], object]:
     def run() -> None:
         result = CliRunner().invoke(app, list(args))
-        if result.exit_code not in (0, 1):
+        if result.exit_code not in allowed:
             sys.exit(f"{' '.join(args)} failed:\n{result.output}")
 
     return run
 
 
-def bench(count: int, only: set[str] | None) -> None:
-    text = library(count)
+def bench(count: int, only: set[str] | None, shape: str) -> list[dict[str, object]]:
+    text = library(count, shape)
+    records = []
     print(f"{count} entries, {len(text) / 1e6:.1f} MB", flush=True)
     with tempfile.TemporaryDirectory() as tmp:
         bib = Path(tmp) / "bench.bib"
@@ -93,22 +115,66 @@ def bench(count: int, only: set[str] | None) -> None:
         steps = {
             "parse": lambda: parse_bib(text),
             "write": lambda: write_bib(parse_bib(text)),
-            "lint": cli("lint", str(bib), "--json"),
-            "format --check": cli("format", str(bib), "--check", "--json"),
+            "lint": cli("lint", str(bib), "--json", allowed=(0, 1)),
+            "format --check": cli("format", str(bib), "--check", "--json", allowed=(0, 1)),
             "normalize": cli("normalize", str(bib), "--dry-run", "--json"),
         }
+        steps.update(
+            {
+                "bounded": cli(
+                    "ref",
+                    "show",
+                    str(bib),
+                    "--where",
+                    "year >= 1900",
+                    "--select",
+                    "title,abstract",
+                    "--limit",
+                    "20",
+                    "--max-chars",
+                    "100",
+                    "--json",
+                ),
+                "analyze": cli(
+                    "analyze", str(bib), "--section", "authors", "--section", "coauthors", "--json"
+                ),
+                "coauthors": cli("coauthors", str(bib), "--json"),
+            }
+        )
+        if only and only - steps.keys():
+            raise ValueError(f"Unknown operations: {sorted(only - steps.keys())}")
         for label, action in steps.items():
             if only is None or label in only:
-                timed(label, action)
+                records.append({"entries": count, "shape": shape, **timed(label, action)})
+    return records
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("counts", nargs="*", type=int, default=[1000, 5000, 20000])
     parser.add_argument("--only", action="append", help="Run only this step (repeatable)")
+    parser.add_argument("--shape", choices=["mixed", "unrelated", "dense"], default="mixed")
+    parser.add_argument("--out", type=Path, help="Write machine-readable measurements")
     args = parser.parse_args()
+    if any(count <= 0 for count in args.counts):
+        parser.error("counts must be positive")
+    records = []
     for count in args.counts:
-        bench(count, set(args.only) if args.only else None)
+        records.extend(bench(count, set(args.only) if args.only else None, args.shape))
+    if args.out:
+        args.out.write_text(
+            json.dumps(
+                {
+                    "python": platform.python_version(),
+                    "platform": platform.platform(),
+                    "memory": "peak traced Python allocations in a separate warm pass, not total RSS",
+                    "measurements": records,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
 
 
 if __name__ == "__main__":

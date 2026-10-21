@@ -237,7 +237,7 @@ only when — a `pinax-files-dir` is set:
 | See what materials exist | `inspect [--json]` | The report gains per-entry presence and local paths — the [agent surface](#agent-surface). |
 | Validate materials | `asset check` | Reports missing/orphan/drift between references and `pinax-files-dir`. |
 | Reconcile the manifest | `asset repair [--dry-run --diff]` | Brings the provenance manifest in line with the material files that exist. |
-| Rename / regenerate keys | `keys rename`, `keys generate`, `keys repair` | Every material sharing the key — `<citekey>.published.pdf`, `<citekey>.preprint.pdf`, `<citekey>.source/` — moves with it (see [Coordinated edits](#coordinated-edits-and-atomicity)). `keys rename` names each move in its envelope's `pinax_materials`, dry run included, and a dry run refuses a move whose target exists, as the write would. |
+| Rename / regenerate keys | `keys rename`, `keys generate`, `keys repair` | Every material sharing the key — `<citekey>.published.pdf`, `<citekey>.preprint.pdf`, `<citekey>.source/` — moves with it (see [Coordinated edits](#coordinated-edits-and-atomicity)). `keys rename`, `keys generate`, and `keys repair` name each planned move in their envelope's `pinax_materials`, dry run included, and a dry run refuses a move whose target exists, as the write would. Duplicate repair keeps materials under the original key while an entry still uses it, reporting no move. |
 | Download missing materials | `asset fetch` (the one new download verb) | See [Fetch](#fetch-the-first-slice). |
 | Combine / split | `corpus combine`, `corpus split` | Produce pinakes; each output entry's materials are copied into the output's `pinax-files-dir`. Non-destructive — inputs untouched. |
 

@@ -262,6 +262,27 @@ reported success survives a crash or power loss right after it. Handled
 failures clean up temporary files. These are safety mechanisms and design goals, not formal guarantees
 against every process crash, operating-system failure, or storage failure.
 
+## Analysis boundary
+
+`pynakes.analysis` owns the public `analyze` and `coauthor_network` APIs, their
+report types and configuration helpers. The CLI exposes a bounded `analyze`
+summary and a separate `coauthors` command for full networks, ego views and
+exports. The latter name identifies the relationship being inspected without
+implying general author editing or unrelated graph types.
+
+Both reports use `_analysis_people.py` for author interpretation: normalized
+`Last, First`, compared brace-, space- and case-insensitively, with `others`
+recorded as truncation rather than a person. Their author counts must reconcile.
+Variant names and conflicting ORCIDs are review evidence, never instructions to
+merge or split identities automatically. A multi-name focus is a view, not an
+identity assertion. Identity curation uses the shared editing operations.
+
+Preserve selection-wide counts separately from visible collaborators and
+connectivity excluding focus. Exported documents retain warning and exclusion
+context. Time slices reuse selectors; focus and output choices are views, while
+the author-list limit is a behavior policy exposed through API, CLI and metadata.
+See the [co-authorship guide](usage.md#coauthors) for report semantics and examples.
+
 ## Domain modules
 
 | Module | Concept it owns |

@@ -12,273 +12,227 @@ sections. Historical releases retain their original headings.
 
 ## [Unreleased]
 
-Research context and reusable selections: select a set of papers, read bounded
-comparison context for it, and save the selection for later. Collecting
-materials for a library now reports what is still missing and why. Every
-behaviour-shaping option is available three ways — a flag, a library setting,
-and that setting editable through `metadata set` — and the CLI loses several
-commands and options that duplicated each other.
+## [0.8.0] - 2026-10-21
+
+Research context, reusable queries and bibliography analysis: read bounded
+selections, save their criteria, and explore co-authorship with explicit
+identity evidence. Material acquisition reports coverage and recoverable
+failures, while compact CLI output reduces the cost of automated workflows.
 
 ### Added
 
-#### Selecting and reading entries
+#### Editing and interoperability
 
-- **Bounded reads.** `ref show --key`, `ref show --where`, and `search` share one
-  contract: `--limit` pages a deterministic selection (`--limit 0` only
-  counts), `page.next_cursor` resumes it with `--cursor`, and `--max-chars`
-  cuts text values, listing each cut under `truncated` with its full length
-  and naming the keys to re-read under `retrieve_full`. `--select` returns only
-  the named fields, with `missing_fields` and `omitted_fields` keeping absent
-  and left-out values apart. A single-key `ref show` accepts `--select`,
-  `--max-chars`, and `--include` too; without them its output is unchanged.
-  Limits count characters of the stored text, never tokens.
-- **Snapshot-bound cursors.** A cursor carries digests of the library and the
-  selection it was issued for. Resuming against a changed library is refused
-  with the new `StaleCursor` conflict (exit 2); resuming another selection is
-  `InvalidInput`.
-- **Materials and provenance in reads.** `ref show … --include
-  materials,provenance` adds the materials available for each entry (Pinax
-  materials for the key and `file` links with their resolution status) and
-  its recorded provenance (the Pinax manifest record of each material and the
-  directives above the entry). Parts the library lacks are listed under
-  `missing`; nothing is inferred.
-- **`ref show --where`** summarizes every entry a selector matches, in file
-  order, under the bounded-read options; with `--key` the two narrow each
-  other.
-- **Saved queries.** `query list`, `query set`, and `query remove` keep named
-  `--where` expressions as `query-<name>` lines in `pynakes-meta` (new
-  metadata category `queries`), validated by `query set`, `metadata set`, and
-  `lint`. A saved query is the `--where` predicate `query "name"`, so every
-  command that selects entries runs it against the current entries and can
-  narrow it further; a saved expression may refer to other saved queries, and
-  a missing or circular reference is refused.
-- **`used`/`unused` in every `--where`**, resolved against the library's linked
-  `tex-sources` (previously only `corpus split --route` with `--tex`/`--aux`,
-  which now also falls back to `tex-sources`). An expression that tests
-  citations in a library with no linked sources is a `NoSources` error;
-  linked sources missing on disk are warnings.
-- `search --in FIELDS` looks for the terms only in those stored fields, and
-  `search --select FIELDS` returns only those fields per match. Each does one
-  job; they combine freely. `search` reports the bounds it applied under
-  `bounds`.
-- `verify --key` / `--where` check only the selected entries of one library,
-  as `enrich` already did; `--published` follows the same selection.
-- `scrub --where` / `--key` keep only the selected entries in the public copy,
-  selected before scrubbing: `scrub refs.bib --where used --out public.bib`
-  releases just the cited entries.
+- `fields encode FILE FIELD --to latex|unicode` converts supported text accents
+  and named characters through surgical field edits, with selection, dry-run,
+  diff and stale-write protection. `fields-encoding` stores the default direction.
+  Math, unknown commands and capitalization braces are retained; unsupported
+  text is reported. This is not full TeX rendering or an ASCII-only conversion.
 
-#### Describing and checking a library
+- **Entry field schemas.** `ref schema FILE [ENTRY_TYPE] --json` and
+  `entry_types.entry_field_schema()` expose dialect-aware required alternatives
+  from lint, additional library-profile requirements, optional editing
+  suggestions, and existing custom fields. Unknown types remain editable.
+- **Group separators.** Group reads, edits, selectors, analysis, TeX tagging
+  and lint share library-wide detection of comma or semicolon memberships.
+  A stored JabRef `keywordSeparator` is respected before detection.
+  New libraries default to comma; existing semicolon libraries retain their
+  separator. Mixed punctuation requires an explicit `groups-separator`
+  setting (`auto`, `comma`, `semicolon`) or global `--groups-separator` override.
+- **Material-move reports.** `keys generate` and `keys repair` include
+  `pinax_materials` in preview and apply envelopes. Generation checks material
+  collisions during preview. Repair retains materials under an original
+  duplicate key that still exists and reports no move for it.
 
-- The unreleased co-author Python API now lives in `pynakes.analysis` alongside
-  `analyze`: `coauthor_network`, `CoauthorNetwork`, `UnknownAuthorError`,
-  `DEFAULT_MAX_AUTHORS`, `MAX_AUTHORS_SETTING`, `library_max_authors`, and
-  `COAUTHOR_SCHEMA`. Graph implementation is private. The `analyze` and
-  `coauthors` CLI commands and `pynakes.coauthors/1` document schema are unchanged.
-- Co-author reports now warn when one normalized name carries multiple
-  ORCID iDs, with entry-level evidence (including positions for duplicate
-  keys); `analyze` also propagates co-author warnings. No identities are
-  automatically split or merged.
-- Co-author JSON documents retain warnings and declare count scopes;
-  author records add `visible_collaborators` alongside selection-wide
-  `collaborators`. Focus reports label components and isolates as excluding
-  the focus names. GraphML embeds source, scope, limit, exclusions and warnings
-  as graph-level JSON context. Markdown includes that review context and
-  candidate citation keys; terminal summaries also show evidence against
-  candidate matches and their keys. The usage guide documents review,
-  dry-run correction and re-analysis with existing field-edit commands.
-- **`analyze`** and `pynakes.analysis`: offline descriptive counts for one
-  bibliography in named sections — entries and duplicate keys, types, years,
-  most frequent authors and venues (`--top`), identifier and field coverage,
-  groups, `lint` findings, and linked-file and Pinax materials. `--section`
-  selects sections. The `lint` section equals `lint`'s summary; duplicate-key
-  and empty libraries are counted as they are.
-- **`coauthors`** and `pynakes.analysis.coauthor_network`: the offline co-author network of a
-  library or of the entries `--where`/`--key` select (`--where 'year >= 2020'`
-  for a time slice) — authors, co-listed pairs with shared-entry counts, years
-  and citation keys, and connected components. People are compared as
-  `analyze`'s `authors` section compares them, so the counts reconcile.
-  `--focus NAME` (repeatable) gives the ego view: one person's co-authors and
-  the pairs among them. Names that may be one person (`Smith, J.` and
-  `Smith, John`, TeX-accented and Unicode spellings, divided family names, a
-  shared ORCID from `author+an:orcid`) are listed as candidates with their
-  reasons and the evidence against, never merged. `--to json|graphml|markdown`
-  renders a document (`--out`, `--force`, `--dry-run`, `--diff`); the JSON
-  document has the versioned schema `pynakes.coauthors/1`. Entries listing more
-  than `--max-authors` people (new setting `coauthors-max-authors`, category
-  `analysis`, default 100, `0` for no limit) count their authors but are not
-  linked.
-- `analyze` has a `coauthors` section: the network's counts with its top pairs
-  and most connected authors, capped by `--top`, and takes `--max-authors`.
-- **Narrower lint reports.** `lint --only TYPES` reports only the named
-  finding types (the counterpart of `--ignore`), `--severity` only findings at
-  least that severe, and `--summary` every count without listing each finding
-  (`issues_omitted`). The summary gains `by_type`, and each `duplicate_key`
-  finding lists the position of every entry sharing the key under `instances`.
-  `lint --include-ignored` also reports what the library's `lint-ignore` and
-  ignore directives waive.
-- **Invisible characters.** `lint` reports them in field values
-  (`invisible_character`: the code point, its name, and its offset), and
-  `normalize` removes them (step `invisible-characters`). Zero-width joiners
-  and directional marks are kept.
+#### Research context and selections
 
-#### Collecting materials
+- `convert --key` / `--where` exports selected references. `--to bib` preserves
+  native entry text and includes transitive referenced entries, string
+  definitions, preambles and library metadata/comments. Interchange exports
+  resolve inherited fields without adding parent entries to the selection.
+  Envelopes report selected/exported counts, dependency keys and warnings.
+- **Bounded reads.** `ref show --key`, `ref show --where`, and `search` share
+  `--select`, `--limit`, `--cursor`, and `--max-chars`. Results distinguish
+  missing, omitted and truncated fields, report original lengths, and name
+  the keys to re-read under `retrieve_full`. Limits count stored characters,
+  not tokens; `--limit 0` only counts. Single-key `ref show` also accepts
+  `--select`, `--max-chars`, and `--include`.
+- **Snapshot-bound pagination.** Cursors identify both the bibliography and
+  selection. A changed bibliography produces `StaleCursor` (exit 2); using
+  a cursor for another selection produces `InvalidInput`.
+- **Materials and provenance.** `ref show --include materials,provenance`
+  returns Pinax materials, resolved `file` links, manifest provenance and
+  entry directives, explicitly identifying missing information.
+- **Saved queries.** `query list/set/remove` stores named `--where`
+  expressions as `query-<name>` metadata. Use `--where 'query "name"'` in
+  any selecting command; queries reflect subsequent edits and can reference
+  other saved queries. Missing and circular references are refused. Queries
+  are validated by `query set`, `metadata set`, and `lint`.
+- **Shared selectors.** `ref show --where` reads matching entries in file
+  order; `--key` narrows the selection. `verify` (including `--published`)
+  and `scrub` now accept `--key`/`--where`. Scrub selects entries before
+  removing private content.
+- **Citation-aware selections.** `used`/`unused` works in every `--where`,
+  using linked `tex-sources`; `corpus split --route` also falls back to those
+  sources. No configured sources produces `NoSources`; missing linked files
+  produce warnings.
+- **Separate search and output fields.** `search --in FIELDS` restricts
+  matching; `--select FIELDS` controls returned fields. They combine freely,
+  and the response records the applied `bounds`.
 
-- **Collection coverage.** `asset fetch` reports `coverage` — the entries
-  still missing a requested PDF, each with the reason the run recorded — and a
-  top-level `complete`, so a partial run is visible without reading nested
-  items. `asset check` reports `coverage`, keeping `file`-field links
-  (`linked_files`) apart from Pinax material coverage (`materials`).
-- **Fetch progress stream.** `asset fetch --progress jsonl` writes one JSON
-  event per line on stderr, also with `--json`: the entry being worked on,
-  each material's outcome, and `retry` events with the wait and the attempt
-  that follows. `--progress none` silences the terminal bar.
-- **arXiv-id discovery.** `asset fetch --discover` looks up a missing arXiv id
-  by DOI when a preprint is needed and checks it against arXiv's record before
-  using it. A confirmed id is written as `eprint` only when the entry has
-  none; an unconfirmed one is reported as `ambiguous` and not used. Each
-  lookup is listed under `discovered`.
-- **Repairing misclassified PDFs.** `asset check` reports published PDFs that
-  are really preprints under `misclassified`, with the evidence (a recorded
-  arXiv source, an arXiv DOI, or arXiv's stamp in the PDF), and
-  `asset repair --reclassify` moves them to the preprint path with their
-  manifest records.
-- Every fetch attempt records its `stage` (`resolve` or `download`) and
-  whether it is `retryable`; a fetched item records its `artifact` and
-  `source`. `corpus combine --dry-run` lists the Pinax materials it would copy
-  under `pinax_materials`.
-- **Reviewed enrichment.** `enrich --only-field NAMES` applies only updates to
-  the named fields, so a reviewed `--dry-run` can be applied in part under
-  `--expect-sha256`.
-- **Lookup coverage.** A failed provider lookup in `enrich` is reported with
-  `checked: false`, `rate_limited`, and `retryable`, and `lookups` names the
-  entries not checked and the arguments that retry them; a throttle is no
-  longer indistinguishable from "no match".
+#### Bibliography analysis and checks
 
-#### Library settings
+- **`analyze`** reports offline counts by section: entries and duplicate
+  keys, types, years, authors, venues, co-authorship, identifiers, fields,
+  groups, lint findings and materials. `--section` selects reports and
+  `--top` bounds frequency lists. Counts reconcile with the underlying
+  reports, including empty libraries and duplicate-key entries.
+- **`coauthors`** maps the selected bibliography's authors, co-listed pairs,
+  shared-entry counts, years, citation keys and connected components.
+  Repeatable `--focus NAME` shows the focus authors, their collaborators and
+  the links among them. Author counts and years cover the whole selection;
+  `visible_collaborators` counts neighbours in the displayed graph. Focus
+  components and isolates exclude the focus names, with scopes explicitly
+  identified in reports.
+- **Identity evidence.** Co-author reports list candidate name variants with
+  reasons, evidence against a match and affected keys. ORCID annotations in
+  `author+an:orcid` support comparisons; conflicting identifiers on one
+  normalized name produce warnings with entry-level evidence. Names are
+  never automatically split or merged. The usage guide documents review,
+  previewed field correction and re-analysis.
+- **Network limits and exports.** `--max-authors` (setting
+  `coauthors-max-authors`, default 100, `0` for unlimited) excludes large
+  author lists from linking while retaining their author counts and keys.
+  `--to json|graphml|markdown` exports the network with `--out`, overwrite
+  protection, dry-run and diff support. JSON uses `pynakes.coauthors/1`;
+  exports retain warnings, scope and exclusion context, with source provenance
+  on CLI exports. `analyze --section coauthors` provides a bounded summary
+  and propagates network warnings.
+- **Focused lint reports.** `--only TYPES`, `--severity`, and `--summary`
+  narrow output; `--include-ignored` reveals waived findings. Summaries add
+  `by_type` and `issues_omitted`; duplicate-key findings include each entry's
+  position under `instances`.
+- **Invisible characters.** `lint` reports their code points, names and
+  offsets; the `normalize` step `invisible-characters` removes them while
+  preserving zero-width joiners and directional marks.
 
-Each setting is validated by `metadata set`, and the matching flag overrides
-it per run in either direction.
+#### Materials and enrichment
 
-- `normalize-months` and `normalize-invisible-characters`, with the new
-  `normalize --months` and `--invisible-characters`: those steps switch on and
-  off like every other step; before, only `--only` could leave them out.
-- `lint-severity`: the least severe finding `lint` (and `inspect --insights`)
-  reports; `--severity` overrides it.
-- `pinax-fetch-access` and `pinax-discover-arxiv`: `asset fetch`'s access mode
-  and arXiv-id discovery; `--access` and `--discover/--no-discover` override
-  them.
-- `import-key-source`: whether `ref import` generates a key or takes the
-  provider's; `--key-source` overrides it.
-- `verify-published` and `enrich-published` (new metadata category
-  `integrity`): the published-version pass of `verify` and `enrich`;
-  `--published/--no-published` overrides them. A setting never enables the
-  network: offline, `enrich` skips the pass with a
-  `published_skipped_offline` warning.
+- **Collection coverage.** `asset fetch` reports missing requested PDFs and
+  their reasons under `coverage`, plus top-level `complete`. `asset check`
+  distinguishes linked-file coverage from Pinax material coverage.
+- **Fetch diagnostics.** `asset fetch --progress jsonl` streams entry,
+  material and retry events to stderr; `--progress none` suppresses the
+  terminal bar. Attempts record `stage` and `retryable`; fetched items record
+  `artifact` and `source`. `corpus combine --dry-run` lists planned Pinax
+  copies under `pinax_materials`.
+- **arXiv discovery.** `asset fetch --discover` resolves a missing preprint
+  identifier from a DOI and verifies it against arXiv. Confirmed identifiers
+  fill an absent `eprint`; ambiguous results are reported and not used.
+  Lookups are recorded under `discovered`.
+- **PDF reclassification.** `asset check` identifies published PDFs that are
+  actually preprints using provenance, DOI or PDF-stamp evidence.
+  `asset repair --reclassify` moves them and their manifest records to the
+  preprint location.
+- **Reviewed enrichment.** `enrich --only-field NAMES` applies selected
+  proposed field updates under `--expect-sha256`. Failed provider lookups
+  report `checked: false`, rate-limit and retry status, and retry arguments
+  under `lookups`, distinguishing failure from a checked absence of matches.
 
-#### Clients, API, and tooling
+#### Library settings and integration
 
-- `inspect --insights` also returns the `tex scan` and `asset check`
-  envelopes from the same snapshot, so a client draws a library from one
-  process and one parse. `inspect --origin PATH` names where the library is
-  saved when FILE is a copy (an editor's unsaved buffer): `tex-sources`,
-  `pinax-files-dir`, and relative `file` links resolve from there.
-- `capabilities` describes the bounded-read contract (`bounded_reads`), saved
-  queries (`saved_queries`), the analysis sections (`analysis`), material
-  collection (`material_collection`), and deprecated forms (`deprecations`).
-- Deprecation warnings: a deprecated form still works, adds
-  `{"type": "deprecated", "old", "new", "removal", "message"}` to `warnings`
-  (stderr outside `--json`), and is listed in `capabilities`.
-- Python API: `pynakes.bounded`, `pynakes.entry_reader`,
-  `pynakes.saved_queries`, `pynakes.analysis`, `pynakes.lint.suppress_findings`
-  (the waiver step `lint` applies), `Bibliography.remove_entries()` for
-  specific physical entries, and `search_entries(search_in=...)`, which scopes
-  matching without restricting the reported fields (`fields=` keeps its
-  meaning). Settings resolve in the
-  API as on the CLI — explicit argument, then library setting, then default:
-  `fetch_materials(access=None, discover=None)`,
-  `import_reference(key_source=None)`, `library_lint_severity()`, and
+- New settings are validated through `metadata set` and overridden per run:
+  `normalize-months`, `normalize-invisible-characters`, `lint-severity`,
+  `pinax-fetch-access`, `pinax-discover-arxiv`, `import-key-source`,
+  `verify-published`, and `enrich-published`. Normalization adds `--months`
+  and `--invisible-characters`; published-version checks have
+  `--published/--no-published`. Settings never enable network access:
+  offline enrichment reports `published_skipped_offline` when applicable.
+- **Client snapshots.** `inspect --insights` includes `tex scan` and
+  `asset check` envelopes from one snapshot. `inspect --origin PATH`
+  resolves TeX sources, Pinax paths and file links relative to the saved
+  bibliography when inspecting a copy or unsaved editor buffer.
+- **Python API.** New modules `pynakes.bounded`, `pynakes.entry_reader`,
+  `pynakes.saved_queries` and `pynakes.analysis` expose research reads and
+  analysis. `pynakes.analysis` is the public home of `analyze`,
+  `coauthor_network`, their report types and co-author configuration helpers,
+  with `COAUTHOR_SCHEMA` naming the network document schema. Also added:
+  `lint.suppress_findings`, `Bibliography.remove_entries()` for physical
+  entries, and `search_entries(search_in=...)` independently of `fields=`.
+  API settings resolve as explicit argument, library setting, then default,
+  including `fetch_materials(access=None, discover=None)`,
+  `import_reference(key_source=None)`, `library_lint_severity()` and
   `library_published()`.
-- An agent evaluation suite in `evals/agent`: invented and historical fixtures,
-  tasks for ambiguous references, duplicate conflicts, concurrent edits, and
-  bounded reads, and `scripts/agent_eval.py` to measure the reference
-  solutions' call counts and response sizes and to score recorded agent runs.
-  It is repository tooling, not shipped in the sdist.
+- **Machine-readable contracts.** `capabilities` describes bounded reads,
+  saved queries, analysis, material collection and deprecated forms.
+  Deprecated usage emits structured `old`, `new`, `removal` and `message`
+  warnings, or stderr warnings outside JSON mode.
+- **Evaluation and benchmarks.** Repository tooling adds five agent tasks
+  covering ambiguity, duplicate conflicts, concurrent edits, bounded reads
+  and co-authorship interpretation, with reference measurements and recorded
+  run scoring. Fresh blind runs retain complete responses and final answers;
+  historical failures remain documented. Scale benchmarks cover bounded
+  reads and analysis on unrelated and dense-surname libraries, recording
+  platform, timings and peak traced Python allocations. Evaluation tooling
+  is excluded from the sdist.
 
 ### Changed
 
-- Help read through a pipe (an agent, a script) uses the plain layout instead
-  of Rich's padded boxes: 40–60% fewer bytes, the same content. A terminal
-  keeps the boxed layout. `pynakes --help` ends with a map from common jobs to
-  the commands that do them.
-- A `DuplicateCitationKey` conflict lists its `candidates`: each entry's
-  position, line, type, and summary fields, the fields that tell the entries
-  apart (`differs`), and a `--where` expression that selects that entry alone,
-  checked against the library before it is offered. The options now begin
-  with `ask_which`; `inspect_all` is gone, since the conflict already shows
-  every instance.
-- `capabilities --json` returns a compact index (about 6 KB, from 214 KB):
-  exit codes and conventions, a one-line summary of every command under
-  `command_index`, and the detailed sections by name and size. `--command
-  PATH` returns one command's schema and `--section NAME` one section (both
-  repeatable); `--all` returns the whole description as before. The Python
-  `get_capabilities()` is unchanged.
-- `--json` envelopes are compact — one line, no indentation — so an agent or
-  script pays for content, not padding (about a sixth fewer bytes per
-  envelope, a third on `capabilities`). `--pretty` restores the indented
-  form. The content of every envelope is unchanged.
-- `search` reports a `page` object and computes every match before applying
-  `--limit`, so `page.total` counts them all; `--no-rank` no longer stops the
-  scan early.
+- **Compact automation output.** `--json` emits one compact line;
+  `--pretty` restores indentation. Piped help uses plain text while terminals
+  retain the Rich layout. Root help includes a job-to-command map.
+- **Capability discovery.** `capabilities --json` returns a compact index;
+  repeatable `--command PATH` and `--section NAME` retrieve details, and
+  `--all` returns the full description. Python `get_capabilities()` is
+  unchanged.
+- **Duplicate-key conflicts.** `DuplicateCitationKey` includes candidates
+  with positions, lines, summaries, differing fields and verified selectors.
+  Options begin with `ask_which`; `inspect_all` is replaced by the included
+  candidate evidence.
+- **Search totals.** `search` computes all matches before applying `--limit`
+  and returns pagination metadata with `page.total`. `--no-rank` no longer
+  stops scanning early.
 
 ### Performance
 
-- Commands start faster: the HTTP client, the reference importer, the
-  progress bars, and the installed-version lookup load only when a command
-  uses them, so an offline command no longer imports `httpx`.
-- `lint` scans each entry's source once rather than once per check and field,
-  and parses each author list once for key-pattern checks: about a fifth
-  faster on a 3,000-entry library.
-- A read no longer re-parses the library to report an empty change plan.
+- Lazy imports reduce command startup work; offline commands no longer import
+  the HTTP client unnecessarily.
+- `lint` scans each entry's source once and parses author lists once for
+  key-pattern checks: about a fifth faster on a 3,000-entry library.
+- Reads no longer reparse the bibliography to report an empty change plan.
 
 ### Deprecated
 
-Each still works and warns in 0.8, and is removed in 0.9.0.
+These forms still work with warnings in 0.8 and are scheduled for removal in
+0.9.0:
 
-- `keys check`: use `lint --only duplicate_key` (with `--strict` to gate).
-- `tex scan --out`, `--group`, and `--keyword`: `tex scan` only reports.
-  Select the cited entries with `--where used` in the command that acts on
-  them — `corpus combine FILE --where used --out OUT`, `scrub FILE --where used
-  --out OUT`, or `fields append FILE keywords WORD --where used`.
-- `format --entry-order` and the `format-entry-order` setting: entry order is
-  not only layout (BibTeX reads the first of several entries sharing a key,
-  and an unsorted style with `\nocite{*}` lists entries in file order), so
-  sorting belongs to `normalize --sort-by` and the `sort-order` setting, which
-  move entries byte for byte. `format` warns whenever it reorders.
-- `search --in-field` restricted both the fields searched and the fields
-  returned. Replace `--in-field F` with `--in F --select F`; it cannot be
-  combined with `--in` or `--select`.
+- `keys check`: use `lint --only duplicate_key` (`--strict` to gate).
+- `tex scan --out`, `--group`, and `--keyword`: use `tex scan` to report;
+  select cited entries with `--where used` in `corpus combine`, `scrub`, or
+  `fields append`. For example, `scrub refs.bib --where used --out public.bib`.
+- `format --entry-order` and `format-entry-order` metadata: use
+  `normalize --sort-by` and `sort-order` metadata. Sorting moves entries
+  byte-for-byte; `format` warns when it reorders.
+- `search --in-field F`: use `--in F --select F`. The deprecated form cannot
+  be combined with either replacement flag.
 
 ### Fixed
 
-- Sorting entries (`normalize --sort-by`, `format --entry-order`) could swap
-  two entries sharing a citation key, changing which one BibTeX reads. Entries
-  sharing a key now keep their relative order.
-- A PDF served by arXiv was stored as the published PDF when a DOI route led
-  to it; it is now stored as the preprint, and publisher copies are tried
-  first. An arXiv DOI (`10.48550/arXiv.*`) is read as the arXiv id it encodes
-  rather than looked up as a published version.
-- A failed DOI landing-page or open-access lookup was reported with no
-  attempts; the request, its status, and its error are now recorded.
-- APS PDF routes are built with the journal prefix in APS's own spelling
-  (`PhysRevB`, not `physrevb`): the publisher serves the PDF only under that
-  path, so a lowercased DOI produced a 404. Under institutional access the
-  canonical APS route is tried even when the DOI landing page refuses.
-- OpenAlex, Crossref, and Semantic Scholar lookups were not retried: a single
-  HTTP 429 failed the lookup. They are now retried with `Retry-After` and
-  backoff like downloads, and requests to each provider's API host are paced
-  to its published rate for unauthenticated clients.
-- Imported records drop invisible characters (a byte-order mark inside a
-  title, a zero-width space).
+- Sorting preserves the relative order of entries sharing a citation key,
+  avoiding changes to which entry BibTeX reads.
+- PDFs served by arXiv are classified as preprints even when found through a
+  DOI route; publisher copies are tried first. arXiv DOIs
+  (`10.48550/arXiv.*`) are interpreted as arXiv identifiers.
+- Failed DOI landing-page and open-access lookups record the request,
+  status and error instead of reporting no attempts.
+- APS PDF routes preserve the publisher's journal-prefix spelling, avoiding
+  404s from lowercased DOI paths. Institutional access tries the canonical
+  route even when the landing page refuses access.
+- OpenAlex, Crossref and Semantic Scholar lookups retry HTTP 429 responses
+  with `Retry-After` and backoff; API requests are paced to published
+  unauthenticated rates.
+- Imports remove invisible characters such as embedded byte-order marks
+  and zero-width spaces.
 
 ## [0.7.0] - 2026-10-13
 

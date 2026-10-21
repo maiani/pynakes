@@ -49,6 +49,7 @@ class ConvertTarget(StrEnum):
 
     BIBLATEX = "biblatex"
     BIBTEX = "bibtex"
+    BIB = "bib"
     CSL_JSON = "csl-json"
     RIS = "ris"
     MODS = "mods"
@@ -151,3 +152,14 @@ class CoauthorFormat(StrEnum):
     JSON = "json"
     GRAPHML = "graphml"
     MARKDOWN = "markdown"
+
+
+class GroupsSeparator(StrEnum):
+    AUTO = "auto"
+    COMMA = "comma"
+    SEMICOLON = "semicolon"
+
+
+class FieldEncoding(StrEnum):
+    LATEX = "latex"
+    UNICODE = "unicode"

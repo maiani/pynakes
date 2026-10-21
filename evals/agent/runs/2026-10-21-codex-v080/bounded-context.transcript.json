@@ -1,0 +1,122 @@
+{
+  "task": "bounded-context",
+  "engine_version": "0.8.0",
+  "wheel_sha256": "d8d337689483117599fa2a54618e96c24beaf70c902a6063e58a10405a60a8f3",
+  "agent": {
+    "model": "inherited Codex session model; exact backend identifier not exposed",
+    "client": "Codex isolated subagent",
+    "settings": "fork_turns=none; default inherited model/effort; shell and provided CLI only"
+  },
+  "prompt": "Summarize the abstracts of every entry in the group Optics. Read at most 5 entries per call and at most 300 characters of any value.",
+  "conditions": "Fresh fixture; no parent history, oracle or repository access supplied. Offline instructed; CLI wrapper logs full stdout/stderr. Concurrent edit injected after first successful preview. Model sees only original task, CLI/library paths and tool isolation instructions.",
+  "calls": [
+    {
+      "argv": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Usage: python -m pynakes [OPTIONS] COMMAND [ARGS]...\n\n  Reference management engine for BibTeX, BibLaTeX, and their materials\n\nOptions:\n  -V, --version         Show the pynakes version and exit.\n  --install-completion  Install completion for the current shell.\n  --show-completion     Show completion for the current shell, to copy it or\n                        customize the installation.\n  --help                Show this message and exit.\n\nCommands:\n  inspect       Inspect a .bib file structure.\n  search        Search entries by free text, phrases, or field-scoped terms.\n  analyze       Describe a bibliography: what it holds and how complete...\n  coauthors     Map who has written with whom: co-author pairs,...\n  lint          Validate entries and report issues (accepts multiple...\n  verify        Verify entries against authoritative metadata (read-only).\n  capabilities  Show what pynakes can do: a compact index, or the details...\n  format        Rewrite layout only; never change bibliographic values or...\n  normalize     Normalize entries: titles, authors, journals, DOIs,...\n  convert       Convert a library between BibTeX/BibLaTeX dialects and...\n  enrich        Conservatively fill missing metadata (modifies the file).\n  init          Create or initialize a .bib library.\n  scrub         Write a copy of a library with its private content removed.\n  query         Save, list, and remove named selector queries → list, set,\n                remove\n  ref           Manage individual reference entries → add, import, show, edit,\n                directive, compare, find, remove\n  dedupe        Detect and merge duplicate works → check, merge\n  fields        Bulk-edit fields across matching references → set, rename,\n                move, append, clear, protect-title\n  keys          Work with citation keys → check, generate, repair, rename,\n                usage\n  groups        Manage entry groups → list, list-entries, add-entry, remove-\n                entry, tree, add-group, remove-group, rename-group, move-\n                group, update-group\n  metadata      Inspect and update library metadata → list, set, remove,\n                adopt-jabref\n  tex           Manage linked TeX sources and scan them for citations → list,\n                add, remove, clear, scan\n  asset         Fetch and validate Pinax materials → fetch, check, repair\n  corpus        Operate across multiple .bib files → combine, split, batch\n\n  Common jobs (add --json for machine-readable output):\n    find a reference          search FILE \"terms\" | ref show FILE --where EXPR\n    read entries              ref show FILE KEY | ref show FILE --key K1,K2\n    change one entry          ref edit FILE KEY --field name=value\n    change many entries       fields set|append|clear FILE ... --where EXPR\n    add by DOI/arXiv/URL      ref import FILE ID\n    check a library           lint FILE | verify FILE | dedupe check FILE\n    clean up conventions      normalize FILE | layout: format FILE\n    cited in a manuscript     tex scan FILE | --where used\n    PDFs and sources          asset fetch FILE | asset check FILE\n  Preview any change with --dry-run --diff; apply it with --expect-sha256.\n  Details: pynakes COMMAND --help, or capabilities --json --command 'ref show'.\n",
+      "stderr": "",
+      "response_bytes": 3283
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Usage: python -m pynakes ref show [OPTIONS] [file] [key]\n\n  Show one uniquely identified reference, or triage several at once.\n\n  With a citation key this prints every stored field of that one reference.\n  With `--key k1,k2,...` it prints a compact summary of each requested\n  reference instead — title, creator, date, venue, and identifiers, plus the\n  abstract under `--abstract` — so a set of candidates can be scanned in one\n  call rather than one invocation per key. Both forms refuse to guess when a\n  key is duplicated, and the `--key` form reports every unknown key together.\n  `--where EXPR` summarizes every entry the selector matches, in file order —\n  `--where 'query \"to-read\"'` runs a saved query, and `used`/`unused` test the\n  library's linked TeX sources.\n\n  Bounded reads: `--select` returns only the named fields (the abstract among\n  them); `--include materials,provenance` adds the materials available for\n  each entry and the provenance the library recorded; `--max-chars` cuts long\n  values and lists every cut under `truncated`. With `--key` or `--where`,\n  `--limit` pages the selection and `page.next_cursor` resumes it — a cursor\n  is refused once the library changes, so pages never silently skip or repeat\n  entries. Information the library lacks is reported as missing (`null`,\n  `missing`, `missing_fields`), never as an omission.\n\nArguments:\n  file  Path to the .bib file (default: auto-detect single .bib in cwd)\n  key   Citation key to display\n\nOptions:\n  --key <str>        Summarize several references at once: comma-separated\n                     keys, repeatable\n  --where <str>      Summarize every reference this selector matches, in file\n                     order (the shared --where grammar, saved queries and\n                     used/unused included); narrowed by --key\n  --resolved         Include fields inherited through crossref/xdata\n  --abstract         Include each abstract in the --key summary\n  --select <str>     Return only these fields under 'fields': comma-separated,\n                     repeatable. A selected field the entry lacks is null and\n                     listed in missing_fields\n  --include <str>    Also report what the library records outside the entry's\n                     fields: materials (Pinax files and file links),\n                     provenance (manifest records and directives). Comma-\n                     separated, repeatable\n  --max-chars <int>  Cut every returned text value to at most this many\n                     characters; each cut is listed under 'truncated'\n  --limit <int>      With --key or --where, return at most this many entries\n                     per page\n  --cursor <str>     Resume a paged read: pass page.next_cursor from the\n                     previous page. Refused when the library changed since\n  --json             Emit machine-readable JSON\n  -f, --file FILE    The library to read, as an alternative to the leading\n                     FILE argument (default: the single .bib in the working\n                     directory)\n  --pretty           Indent --json output for reading (default: compact, one\n                     line)\n  --help             Show this message and exit.\n",
+      "stderr": "",
+      "response_bytes": 3204
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "/tmp/pynakes080-blind/bounded-context/library.bib",
+        "--where",
+        "group \"Optics\"",
+        "--select",
+        "title,abstract",
+        "--max-chars",
+        "300",
+        "--limit",
+        "5",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\":\"success\",\"action\":\"ref_show\",\"file\":\"/tmp/pynakes080-blind/bounded-context/library.bib\",\"source_sha256\":\"2840ba97bbb514d0d0633a7a347d0d86e3fc4fcfdabab5c102d93a280bb98bb9\",\"warnings\":[],\"where\":\"group \\\"Optics\\\"\",\"keys\":[],\"resolved\":false,\"abstract\":false,\"bounds\":{\"select\":[\"title\",\"abstract\"],\"include\":[],\"max_chars\":300,\"limit\":5},\"count\":5,\"page\":{\"offset\":0,\"limit\":5,\"returned\":5,\"total\":12,\"complete\":false,\"next_cursor\":\"c1.eyJvIjo1LCJyIjoiNjBmMGZjNDI1ODk0YWRjZCIsInMiOiIyODQwYmE5N2JiYjUxNGQwIn0\"},\"entries\":[{\"key\":\"Ashby1950\",\"entry_type\":\"article\",\"fields\":{\"title\":\"On the Lens Problem, Part 1\",\"abstract\":\"We describe the lens apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classical account. We describe the lens apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classical\"},\"missing_fields\":[],\"omitted_fields\":[\"author\",\"journaltitle\",\"date\",\"groups\"],\"truncated\":{\"fields.abstract\":{\"length\":774,\"returned\":300}}},{\"key\":\"Gisler1952\",\"entry_type\":\"article\",\"fields\":{\"title\":\"On the Mirror Problem, Part 3\",\"abstract\":\"We describe the mirror apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classical account. We describe the mirror apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the class\"},\"missing_fields\":[],\"omitted_fields\":[\"author\",\"journaltitle\",\"date\",\"groups\"],\"truncated\":{\"fields.abstract\":{\"length\":784,\"returned\":300}}},{\"key\":\"Elling1954\",\"entry_type\":\"article\",\"fields\":{\"title\":\"On the Fibre Problem, Part 5\",\"abstract\":\"We describe the fibre apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classical account. We describe the fibre apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classic\"},\"missing_fields\":[],\"omitted_fields\":[\"author\",\"journaltitle\",\"date\",\"groups\"],\"truncated\":{\"fields.abstract\":{\"length\":779,\"returned\":300}}},{\"key\":\"Castell1956\",\"entry_type\":\"article\",\"fields\":{\"title\":\"On the Crystal Problem, Part 7\",\"abstract\":\"We describe the crystal apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classical account. We describe the crystal apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the cla\"},\"missing_fields\":[],\"omitted_fields\":[\"author\",\"journaltitle\",\"date\",\"groups\"],\"truncated\":{\"fields.abstract\":{\"length\":789,\"returned\":300}}},{\"key\":\"Ashby1958\",\"entry_type\":\"article\",\"fields\":{\"title\":\"On the Lens Problem, Part 9\",\"abstract\":\"We describe the lens apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classical account. We describe the lens apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classical\"},\"missing_fields\":[],\"omitted_fields\":[\"author\",\"journaltitle\",\"date\",\"groups\"],\"truncated\":{\"fields.abstract\":{\"length\":774,\"returned\":300}}}],\"retrieve_full\":{\"command\":\"ref show\",\"keys\":[\"Ashby1950\",\"Gisler1952\",\"Elling1954\",\"Castell1956\",\"Ashby1958\"],\"note\":\"Re-run without --max-chars (or with a larger limit) to read these values whole; ref show FILE KEY prints one complete record\"}}\n",
+      "stderr": "",
+      "response_bytes": 3523
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "/tmp/pynakes080-blind/bounded-context/library.bib",
+        "--where",
+        "group \"Optics\"",
+        "--select",
+        "title,abstract",
+        "--max-chars",
+        "300",
+        "--limit",
+        "5",
+        "--cursor",
+        "c1.eyJvIjo1LCJyIjoiNjBmMGZjNDI1ODk0YWRjZCIsInMiOiIyODQwYmE5N2JiYjUxNGQwIn0",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\":\"success\",\"action\":\"ref_show\",\"file\":\"/tmp/pynakes080-blind/bounded-context/library.bib\",\"source_sha256\":\"2840ba97bbb514d0d0633a7a347d0d86e3fc4fcfdabab5c102d93a280bb98bb9\",\"warnings\":[],\"where\":\"group \\\"Optics\\\"\",\"keys\":[],\"resolved\":false,\"abstract\":false,\"bounds\":{\"select\":[\"title\",\"abstract\"],\"include\":[],\"max_chars\":300,\"limit\":5},\"count\":5,\"page\":{\"offset\":5,\"limit\":5,\"returned\":5,\"total\":12,\"complete\":false,\"next_cursor\":\"c1.eyJvIjoxMCwiciI6IjYwZjBmYzQyNTg5NGFkY2QiLCJzIjoiMjg0MGJhOTdiYmI1MTRkMCJ9\"},\"entries\":[{\"key\":\"Gisler1960\",\"entry_type\":\"article\",\"fields\":{\"title\":\"On the Mirror Problem, Part 11\",\"abstract\":\"We describe the mirror apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classical account. We describe the mirror apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the class\"},\"missing_fields\":[],\"omitted_fields\":[\"author\",\"journaltitle\",\"date\",\"groups\"],\"truncated\":{\"fields.abstract\":{\"length\":784,\"returned\":300}}},{\"key\":\"Elling1962\",\"entry_type\":\"article\",\"fields\":{\"title\":\"On the Fibre Problem, Part 13\",\"abstract\":\"We describe the fibre apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classical account. We describe the fibre apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classic\"},\"missing_fields\":[],\"omitted_fields\":[\"author\",\"journaltitle\",\"date\",\"groups\"],\"truncated\":{\"fields.abstract\":{\"length\":779,\"returned\":300}}},{\"key\":\"Castell1964\",\"entry_type\":\"article\",\"fields\":{\"title\":\"On the Crystal Problem, Part 15\",\"abstract\":\"We describe the crystal apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classical account. We describe the crystal apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the cla\"},\"missing_fields\":[],\"omitted_fields\":[\"author\",\"journaltitle\",\"date\",\"groups\"],\"truncated\":{\"fields.abstract\":{\"length\":789,\"returned\":300}}},{\"key\":\"Ashby1966\",\"entry_type\":\"article\",\"fields\":{\"title\":\"On the Lens Problem, Part 17\",\"abstract\":\"We describe the lens apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classical account. We describe the lens apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classical\"},\"missing_fields\":[],\"omitted_fields\":[\"author\",\"journaltitle\",\"date\",\"groups\"],\"truncated\":{\"fields.abstract\":{\"length\":774,\"returned\":300}}},{\"key\":\"Gisler1968\",\"entry_type\":\"article\",\"fields\":{\"title\":\"On the Mirror Problem, Part 19\",\"abstract\":\"We describe the mirror apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classical account. We describe the mirror apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the class\"},\"missing_fields\":[],\"omitted_fields\":[\"author\",\"journaltitle\",\"date\",\"groups\"],\"truncated\":{\"fields.abstract\":{\"length\":784,\"returned\":300}}}],\"retrieve_full\":{\"command\":\"ref show\",\"keys\":[\"Gisler1960\",\"Elling1962\",\"Castell1964\",\"Ashby1966\",\"Gisler1968\"],\"note\":\"Re-run without --max-chars (or with a larger limit) to read these values whole; ref show FILE KEY prints one complete record\"}}\n",
+      "stderr": "",
+      "response_bytes": 3533
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "/tmp/pynakes080-blind/bounded-context/library.bib",
+        "--where",
+        "group \"Optics\"",
+        "--select",
+        "title,abstract",
+        "--max-chars",
+        "300",
+        "--limit",
+        "5",
+        "--cursor",
+        "c1.eyJvIjoxMCwiciI6IjYwZjBmYzQyNTg5NGFkY2QiLCJzIjoiMjg0MGJhOTdiYmI1MTRkMCJ9",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\":\"success\",\"action\":\"ref_show\",\"file\":\"/tmp/pynakes080-blind/bounded-context/library.bib\",\"source_sha256\":\"2840ba97bbb514d0d0633a7a347d0d86e3fc4fcfdabab5c102d93a280bb98bb9\",\"warnings\":[],\"where\":\"group \\\"Optics\\\"\",\"keys\":[],\"resolved\":false,\"abstract\":false,\"bounds\":{\"select\":[\"title\",\"abstract\"],\"include\":[],\"max_chars\":300,\"limit\":5},\"count\":2,\"page\":{\"offset\":10,\"limit\":5,\"returned\":2,\"total\":12,\"complete\":true,\"next_cursor\":null},\"entries\":[{\"key\":\"Elling1970\",\"entry_type\":\"article\",\"fields\":{\"title\":\"On the Fibre Problem, Part 21\",\"abstract\":\"We describe the fibre apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classical account. We describe the fibre apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classic\"},\"missing_fields\":[],\"omitted_fields\":[\"author\",\"journaltitle\",\"date\",\"groups\"],\"truncated\":{\"fields.abstract\":{\"length\":779,\"returned\":300}}},{\"key\":\"Castell1972\",\"entry_type\":\"article\",\"fields\":{\"title\":\"On the Crystal Problem, Part 23\",\"abstract\":\"We describe the crystal apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the classical account. We describe the crystal apparatus in detail, report measurements of its behaviour under controlled illumination, and compare them with the cla\"},\"missing_fields\":[],\"omitted_fields\":[\"author\",\"journaltitle\",\"date\",\"groups\"],\"truncated\":{\"fields.abstract\":{\"length\":789,\"returned\":300}}}],\"retrieve_full\":{\"command\":\"ref show\",\"keys\":[\"Elling1970\",\"Castell1972\"],\"note\":\"Re-run without --max-chars (or with a larger limit) to read these values whole; ref show FILE KEY prints one complete record\"}}\n",
+      "stderr": "",
+      "response_bytes": 1772
+    }
+  ],
+  "answer": {
+    "keys": [
+      "Ashby1950",
+      "Gisler1952",
+      "Elling1954",
+      "Castell1956",
+      "Ashby1958",
+      "Gisler1960",
+      "Elling1962",
+      "Castell1964",
+      "Ashby1966",
+      "Gisler1968",
+      "Elling1970",
+      "Castell1972"
+    ],
+    "reported_ambiguity": false,
+    "text": "Read all 12 Optics entries in pages of 5, 5, and 2, limiting values to 300 characters. Every abstract was truncated, so these summaries cover only the visible excerpts.\n\n| Entry | Abstract summary |\n|---|---|\n| Ashby1950 | Describes a lens apparatus, measurements under controlled illumination, and comparison with classical theory. |\n| Gisler1952 | Describes a mirror apparatus, controlled-illumination measurements, and comparison with classical theory. |\n| Elling1954 | Describes a fibre apparatus, controlled-illumination measurements, and comparison with classical theory. |\n| Castell1956 | Describes a crystal apparatus, controlled-illumination measurements, and comparison with classical theory. |\n| Ashby1958 | Describes a lens apparatus and compares its measured behaviour under controlled illumination with classical theory. |\n| Gisler1960 | Describes a mirror apparatus and compares its measured behaviour under controlled illumination with classical theory. |\n| Elling1962 | Describes a fibre apparatus and compares its measured behaviour under controlled illumination with classical theory. |\n| Castell1964 | Describes a crystal apparatus and compares its measured behaviour under controlled illumination with classical theory. |\n| Ashby1966 | Describes a lens apparatus, controlled-illumination measurements, and comparison with classical theory. |\n| Gisler1968 | Describes a mirror apparatus, controlled-illumination measurements, and comparison with classical theory. |\n| Elling1970 | Describes a fibre apparatus, controlled-illumination measurements, and comparison with classical theory. |\n| Castell1972 | Describes a crystal apparatus, controlled-illumination measurements, and comparison with classical theory. |\n\nThe visible excerpts do not specify measurement results or conclusions."
+  },
+  "library_sha256_after": "2840ba97bbb514d0d0633a7a347d0d86e3fc4fcfdabab5c102d93a280bb98bb9",
+  "review": {
+    "reviewer": "Codex orchestrator, checked against retained raw responses; not owner sign-off",
+    "unsupported_claims": 0,
+    "notes": "Verbatim final claims supported by retained responses; library outcome checked mechanically. Coauthor answer distinguishes six required semantic features; bounded answer acknowledges all excerpts are truncated."
+  }
+}

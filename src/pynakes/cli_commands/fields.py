@@ -8,6 +8,7 @@ from collections.abc import Callable
 
 import typer
 
+from pynakes.cli_choices import FieldEncoding
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     _EXPECT_SHA256_OPTION,
@@ -24,6 +25,7 @@ from pynakes.cli_common import (
     where_option,
 )
 from pynakes.engine import Bibliography
+from pynakes.fields import encode_field
 from pynakes.model import QueryFilter
 
 # --- fields ----------------------------------------------------------------
@@ -260,8 +262,48 @@ def fields_protect_title(
     )
 
 
+def fields_encode(
+    file: str | None = bib_file_argument(),
+    field: str = typer.Argument(..., help="Text field to convert"),
+    to: FieldEncoding | None = typer.Option(
+        None, "--to", help="Text encoding; defaults to fields-encoding metadata"
+    ),
+    where: str | None = where_option(),
+    key: list[str] | None = key_option(),
+    backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    diff: bool = typer.Option(False, "--diff"),
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
+    """Convert supported text accents, preserving math and capitalization braces."""
+    file = _resolve_input_bib(file, json_output)
+    params = RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
+    coll = Bibliography.open(file)
+    warnings: list[dict] = []
+    predicate = bind_where_filter(coll, where, keys=key, warnings=warnings)
+    report = encode_field(coll.lib, field, to=to, where=predicate)
+    _finish_mod(
+        file,
+        "fields_encode",
+        coll,
+        params,
+        [f"{_verb('convert', params)} {report['changed_entries']} entries to {report['to']}."],
+        warnings=warnings + report["warnings"],
+        field=field,
+        to=report["to"],
+    )
+
+
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
+    app.command("encode")(_safe(fields_encode))
     app.command("set")(_safe(fields_set))
     app.command("rename")(_safe(fields_rename))
     app.command("move")(_safe(fields_move))

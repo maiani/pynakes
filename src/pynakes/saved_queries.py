@@ -250,12 +250,12 @@ def compile_selector(
         NoCitationSourcesError: if it tests citations and no sources are known.
     """
     saved = saved_query_expressions(lib)
-    node = parse_query(expression, cited_keys=(), saved=saved)
+    node = parse_query(expression, cited_keys=(), saved=saved, lib=lib)
     warnings: list[dict] = []
     if query_uses_citations(node):
         if cited_keys is None:
             cited_keys, warnings = linked_cited_keys(lib, base_dir)
-        node = parse_query(expression, cited_keys=cited_keys, saved=saved)
+        node = parse_query(expression, cited_keys=cited_keys, saved=saved, lib=lib)
     return node, warnings
 
 

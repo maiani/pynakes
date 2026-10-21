@@ -120,18 +120,21 @@ being edited, not library-scoped exploration (see
   its client consumer land in one reviewable change. A second client is what
   would justify splitting them apart.
 - **Open after the 0.1.0 audit** (not gating the alpha):
-  - *Groups-field separator:* pynakes reads and writes `groups` memberships on
-    `;`, while JabRef's default keyword separator is `,`. A multi-group entry
-    from a default JabRef setup reads as one group. Decide how the separator
-    is declared or detected before 1.0.
   - *Opening materials with the system handler:* a `file`-field path is handed
     to the OS; on Windows an executable named by an untrusted `.bib` could run.
     Decide on an allow-list or a confirmation.
   - *Fetch progress:* the engine now streams per-entry progress with
     `asset fetch --progress jsonl` (also under `--json`); the view does not yet
     consume it or offer `--access institutional`.
-  - `keys generate` and `keys repair` move Pinax materials but do not report
-    `pinax_materials` as `keys rename` does.
+
+Engine support for group separators, complete key material-move reports, and
+entry-field schemas is included in v0.8 (see CHANGELOG). The next editor work
+uses `keys generate` for new entries and selected entries, and `ref schema`
+for Required / Optional / Other field panels; these rules belong to the engine.
+Selection copy/export can use `convert --to bib` or the interchange codecs with
+`--key` / `--where`; text encoding uses `fields encode --to latex|unicode`.
+Local attachment, exact lint repair actions, and identifier discovery for an
+existing entry remain separate engine work, outside this v0.8 addition.
 
 **Editor alpha gate**: the `.vsix` is published as a pre-release; its checks run
 in CI against the beta envelope; every gap it surfaced was closed in the engine
@@ -157,8 +160,8 @@ model dependency, or hidden network call is implied by this roadmap.
 | Release | Cohesive scope | Main dependency |
 | --- | --- | --- |
 | 0.8 | Research context, saved searches and bibliography analysis | Existing reads and checks |
-| 0.9 | Library, Catalogue and cross-file analysis | Bounded reads and identity evidence |
-| 0.10 | Project assembly and mirrored bibliographies | Library and guarded writes |
+| 0.9 | Library, Catalogue, cross-file analysis and bibliography links | Bounded reads and identity evidence |
+| 0.10 | Project assembly and synchronization of linked bibliographies | Library, declared links and guarded writes |
 | 0.11 | Curation: merges, directives and normalization | Existing editing and identity APIs |
 | 0.12 | Materials and acquisition: linking, extraction, ingestion and providers | Pinax, bounded reads and provider registry |
 | 0.13 | Evidence-linked research annotations | Material locations and hashes |
@@ -198,82 +201,36 @@ version. MCP and editor releases remain independently versioned companions.
 **Workflow:** select a set of papers, obtain bounded comparison context, and
 save the selection criteria for later use.
 
-The engine work is implemented and recorded under *Unreleased* in
-[CHANGELOG.md](CHANGELOG.md): the bounded-read contract (`--select`,
-`--include materials,provenance`, `--max-chars`, `--limit`, snapshot-bound
-`--cursor`)
-shared by `ref show --key`, `ref show --where`, and `search`, saved queries
-(`query list/set/remove`, run anywhere as `--where 'query "NAME"'`), `analyze`, their `capabilities` schemas, and the
-agent evaluation suite in `evals/agent`. Its tests cover the gate below.
+Feature work is implemented; [CHANGELOG.md](CHANGELOG.md)
+records the scope, including editor-facing engine contracts, selection export
+and field encoding. [RELEASE.md](RELEASE.md) owns candidate evidence, remaining
+release gates and the editor handoff; the
+[agent review](evals/agent/REVIEW-0.8.md) records historical failures and the fresh
+blind evaluation's artifact scope. Release acceptance and publication remain
+separate from feature completion.
 
-#### Co-author analysis (added to the v0.8 slice)
+Carry these analysis decisions into later milestones:
 
-`coauthors` and the `analyze` `coauthors` section are implemented under
-*Unreleased*. The decisions that constrain later work:
-
-- **A sibling command, plus a bounded section.** The network (pair lists, ego
-  views, documents) is too large and option-heavy for an `analyze` section, so
-  `coauthors` is its own read command in "Inspect & validate"; `analyze`
-  carries only its counts and `--top`-capped lists. Both run
-  `pynakes.analysis.coauthor_network`, which takes entries rather than a
-  file, so a Library rollup can feed it the entries of many files.
-- **One public analysis API.** `pynakes.analysis` exposes `analyze`,
-  `coauthor_network`, both report types and the co-author configuration helpers.
-  Graph construction lives in private `_analysis_coauthors.py`; variant
-  detection and rendering retain their private modules. Separate CLI commands
-  do not imply separate public Python modules.
-- **Keep the name `coauthors`.** It names the relationship being inspected
-  and is short enough for everyday use. `network` would be ambiguous with
-  other graph types; `authors` would imply broader author management. Use
-  "co-authorship network" in explanatory prose. Identity curation remains
-  shared engine work, not a second editing interface inside this command.
-- **One reading of an author list.** `_analysis_people.py` is shared with the
-  `authors` section: normalized `Last, First`, compared brace-, space- and
-  case-insensitively, `others` recorded and never a person. The network's
-  author count equals `authors.distinct` by construction.
-- **Variants are evidence.** Look-alike names are reported as candidate pairs
-  with reasons and evidence against, never merged; a `--focus` view of several
-  names is a view, not an identity claim. Resolving that two names are one
-  person is a record correction (or a future directive, v0.11), not an
-  analysis option.
-- **Identity evidence.** ORCID iDs come only from `author+an:orcid`. BibLaTeX's
-  extended name format (`family=..., given=...`) is not parsed yet; when it
-  is, it belongs in `authors.py` so normalization and the network share it.
-- **Explicit report scopes.** Preserve selection-wide author counts and
-  label them; distinguish visible collaborators and connectivity excluding
-  focus. Standalone documents must retain warning and exclusion context.
-  Conflicting ORCIDs on one normalized name are evidence for review, not
-  grounds for an automatic identity split. The usage guide's correction
-  workflow uses the existing previewable field edits.
-- **No new selectors or settings beyond need.** Time slices reuse `--where`;
-  `--focus`, `--to` and `--out` are views and output, not settings. The one
-  behaviour-shaping option, the author-list limit, has all three forms
-  (`--max-authors`, `coauthors-max-authors`, `metadata set`).
-- **Deferred:** editors as co-authors (an explicit `--role` choice if wanted),
-  per-year pair counts beyond first/last year, and weighted (fractional)
-  counting.
-
-Remaining before release:
-
-- Agent runs: two per task are recorded in `evals/agent/runs/` — the first,
-  then a second after compact envelopes, a 6 KB `capabilities` index,
-  duplicate-key candidates, and plain piped help, which cut response bytes by
-  88% (525 KB → 62 KB) and calls from 39 to 31. The owner still has to review
-  the `unsupported_claims` counts. What the second run still shows is agent
-  behaviour, not engine waste: the `duplicate-conflict` agent wrote to the
-  entry it inferred although the conflict listed both and offered `ask_which`,
-  and agents opted into `--pretty` or re-read `capabilities` unprompted.
-- Release per [RELEASE.md](RELEASE.md).
+- Keep the shared public `pynakes.analysis` API and distinct CLI views: bounded
+  summaries in `analyze`, full networks in `coauthors`. See the
+  [analysis boundary](docs/guides/architecture.md#analysis-boundary) for ownership
+  and identity semantics; the v0.9 rollup must preserve them.
+- BibLaTeX extended names (`family=..., given=...`) are not parsed yet. Add any
+  future support to `authors.py` so all consumers share it. Identity corrections
+  remain ordinary reviewed edits or future v0.11 directives.
+- Editors as co-authors (with an explicit role choice), per-year pair counts
+  beyond first/last year, and fractional counting remain unscheduled extensions.
 
 **Done when:** selected context can be paged without omissions under a stable
 snapshot; missing and truncated information are distinct; saved queries reflect
 subsequent edits; analysis counts reconcile with underlying reports, including
 empty and duplicate-key libraries.
 
-### v0.9 — Library discovery and indexed search
+### v0.9 — Library discovery, indexed search and bibliography links
 
 **Workflow:** find a paper across existing collections and inspect collection-wide
-coverage efficiently, without importing another copy.
+coverage efficiently, without importing another copy; declare and validate a
+manuscript bibliography's relationship to its source library.
 
 - Introduce `Library` over explicitly selected `.bib` files or a declared root,
   with collections, key lookup, search and cross-file identity reports. Settle
@@ -298,6 +255,48 @@ coverage efficiently, without importing another copy.
 rollups reconcile; the index can be rebuilt without losing information; stale
 results have explicit semantics and representative queries show measured benefit.
 
+#### Linked bibliographies: declaration and validation
+
+This belongs to v0.9's cross-file scope, not v0.8. Implement declaration and
+validation only; synchronization is a separate v0.10 workflow.
+
+- Store reciprocal link declarations in both participating `.bib` files using
+  native metadata. Each endpoint records the other file, its parent/child role,
+  and the agreed constraint. Resolve stored relative paths from the declaring
+  file, not the current working directory. Links are independent of Library
+  membership and do not require an index or a particular project layout.
+- Offer two explicit constraints: **key subset** requires every child citation
+  key to exist in the parent; **field subset** additionally requires matching
+  entry types and matching values for every field present in the child. Fields
+  present only in the parent may be omitted by the child. Specify comparison
+  semantics for macros, inherited fields and textual representation before
+  implementation; expose the same policies through Python, CLI, metadata and
+  `capabilities` rather than hard-coding one manuscript workflow.
+- Support multiple independent links per bibliography, including multiple
+  parents. Each declared constraint must hold separately; multiple parents do
+  not implicitly form a union. Siblings are discoverable through a shared
+  parent, with no implied equality or synchronization between siblings.
+- Creating, changing or removing a link is a coordinated metadata edit at both
+  endpoints, with previews and source fingerprints for both files. Preflight
+  both inputs before writing; define and test rollback/recovery for interrupted
+  or failed writes. Preserve unrelated metadata and entry source fidelity.
+- Checking from either endpoint is read-only. Report missing or mismatched
+  reciprocal declarations, inaccessible files, missing keys, field/type drift,
+  and duplicate-key ambiguity without silently choosing a matching entry.
+  Return file/key/field provenance and explicit incomplete-check status. Follow
+  only declared links within a documented traversal scope, terminate on cycles,
+  and never scan unrelated directories or repair declarations implicitly.
+- A parent role expresses a subset constraint, not ownership or authority over
+  edits. Do not propagate entry changes, key renames, additions or deletions in
+  this release. A link declaration is not consent to future synchronization.
+
+**Done when:** either endpoint can discover and validate the same relationship;
+key-only and field-subset checks distinguish valid omissions from drift;
+multiple-parent and sibling cases have explicit semantics; moved/missing files,
+ambiguous keys, inconsistent declarations and cycles yield bounded, actionable
+reports; stale inputs and failed reciprocal edits cannot leave unreported
+partial changes. Tests exercise CLI/API parity and preservation of both files.
+
 #### MCP and editor integration
 
 Develop a query-only MCP companion against the v0.9 Library/Catalogue contract,
@@ -307,7 +306,7 @@ range. Add evidence reads after v0.12–v0.13. Companion publication does not ga
 an otherwise complete engine release. The editor may read library-scoped data
 but remains the project-scoped client, with no bibliography logic of its own.
 
-### v0.10 — Project assembly and bibliography relationships
+### v0.10 — Project assembly and synchronization of linked bibliographies
 
 **Workflow:** seed a project from existing collections and maintain an explicitly
 declared relationship to its master bibliography.
@@ -319,10 +318,16 @@ declared relationship to its master bibliography.
   rules. Prepare and validate outputs before mutation; never silently overwrite
   target materials or move originals. Report source-to-destination mappings,
   operation counts, skips and conflicts, guarded by input/output fingerprints.
-- Declare master/subset relationships separately from Library membership and
-  arbitrary copying. Propagate key renames through declared mirrors with
+- Build on v0.9's reciprocal declarations. Define explicit synchronization
+  policies for direction, field ownership/local overrides, additions, deletions
+  and conflicts before offering updates. Support reviewed parent-to-child and
+  child-to-parent changes where the selected policy permits them; neither role
+  automatically wins. An omitted child field must not implicitly delete the
+  parent's value, and a shared parent must not trigger sibling propagation.
+- Propagate key renames through explicitly selected linked bibliographies with
   previews covering TeX references and materials. Check all participating files
-  before applying and reuse transaction/recovery mechanisms.
+  before applying and reuse transaction/recovery mechanisms. Validate the
+  declared constraints after proposed updates and reject unresolved conflicts.
 
 **Done when:** project assembly leaves sources intact; accepted copies and
 renames preserve declared relationships and references; conflicting mirror

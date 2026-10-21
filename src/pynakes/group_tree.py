@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from pynakes._text_utils import _split_escaped, check_balanced_braces
-from pynakes.groups import entry_groups
+from pynakes.groups import entry_groups, library_groups_separator
 from pynakes.model import BibFile
 
 # ---------------------------------------------------------------------------
@@ -551,9 +551,10 @@ def _matches_search_group(entry, node) -> bool:
 
 
 def _group_entry_keys(lib, node) -> set[str]:
+    delimiter = library_groups_separator(lib)
     keys: set[str] = set()
     for entry in lib.entries.values():
-        if node.name in entry_groups(entry):
+        if node.name in entry_groups(entry, separator=delimiter):
             keys.add(entry.key)
     if node.group_type == "KeywordGroup":
         for entry in lib.entries.values():
@@ -582,7 +583,12 @@ def list_entries_in_group_tree(lib: BibFile, group: str, *, exact: bool = False)
     ``KeywordGroup`` and ``SearchGroup`` expressions.
     """
     tree = library_group_tree(lib) or []
-    flat = sorted(entry.key for entry in lib.entries.values() if group in entry_groups(entry))
+    delimiter = library_groups_separator(lib)
+    flat = sorted(
+        entry.key
+        for entry in lib.entries.values()
+        if group in entry_groups(entry, separator=delimiter)
+    )
     node = _node_by_name(tree, group)
     if node is None or (node.name != group and flat):
         # No node by that name, or only a node spelled differently while some
@@ -637,4 +643,9 @@ def list_direct_members(lib: BibFile, name: str) -> list[str]:
     node = next((n for n in tree if n.name == name), None) if tree else None
     if node is not None:
         return sorted(_group_entry_keys(lib, node))
-    return sorted(entry.key for entry in lib.entries.values() if name in entry_groups(entry))
+    delimiter = library_groups_separator(lib)
+    return sorted(
+        entry.key
+        for entry in lib.entries.values()
+        if name in entry_groups(entry, separator=delimiter)
+    )

@@ -8,6 +8,7 @@ the touched field changes in a diff). A ``where`` filter — a predicate over a
 
 import re
 from collections.abc import Iterable, Iterator
+from typing import TypedDict
 
 from pynakes import query
 from pynakes._markup import TITLE_LIKE_FIELDS, has_markup, markup_to_latex
@@ -291,7 +292,9 @@ def convert_title_markup(
 # --- query filters ---------------------------------------------------------
 
 
-def parse_query(expr: str, *, cited_keys: Iterable[str] | None = None) -> query.Node:
+def parse_query(
+    expr: str, *, cited_keys: Iterable[str] | None = None, lib: BibFile | None = None
+) -> query.Node:
     """Compile a ``--where`` expression into a predicate.
 
     Examples::
@@ -304,9 +307,56 @@ def parse_query(expr: str, *, cited_keys: Iterable[str] | None = None) -> query.
 
     The grammar lives in :mod:`pynakes.query`, shared by every command that
     selects entries; see :func:`pynakes.query.parse_query` for its full
-    description and the meaning of ``cited_keys``.
+    description and the meaning of ``cited_keys``. Pass ``lib`` to resolve
+    group predicates using its separator policy.
 
     Raises:
         ValueError: if the expression cannot be parsed.
     """
-    return query.parse_query(expr, cited_keys=cited_keys)
+    return query.parse_query(expr, cited_keys=cited_keys, lib=lib)
+
+
+class FieldEncodingReport(TypedDict):
+    """Counts and retained-content warnings for a field encoding edit."""
+
+    to: str
+    changed_entries: int
+    warnings: list[dict]
+
+
+def encode_field(
+    lib: BibFile,
+    field: str,
+    *,
+    to: str | None = None,
+    where: QueryFilter = None,
+) -> FieldEncodingReport:
+    """Convert one selected field between supported LaTeX text and Unicode.
+
+    Explicit ``to`` overrides ``fields-encoding`` metadata. A direction must
+    be supplied by one of those forms. Math, unknown commands and capitalization
+    braces are preserved; unsupported text is retained and reported. No promise
+    of complete TeX rendering or ASCII-only output is made.
+    """
+    from pynakes._field_encoding import encode_text
+    from pynakes.metadata import metadata_value
+
+    target = (to or metadata_value(lib, "fields-encoding") or "").lower()
+    if target not in {"latex", "unicode"}:
+        raise ValueError("Choose --to latex|unicode or set fields-encoding metadata")
+    count = 0
+    warnings: list[dict] = []
+    for entry in _selected(lib, where):
+        name = find_field_name(entry.fields, field)
+        if name is None:
+            continue
+        old = entry.fields[name]
+        new, retained = encode_text(old, target)
+        if retained:
+            warnings.append(
+                {"type": "encoding_retained", "key": entry.key, "field": name, "retained": retained}
+            )
+        if new != old:
+            set_entry_field(entry, name, new)
+            count += 1
+    return {"to": target, "changed_entries": count, "warnings": warnings}

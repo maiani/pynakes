@@ -57,6 +57,14 @@ def _params(
     )
 
 
+def _material_move_lines(materials: list[dict], params: RunParams) -> list[str]:
+    """Render the same material plan for generate, repair and rename."""
+    return [
+        f"  {_verb('move', params)} {item['source_path']} -> {item['target_path']}"
+        for item in materials
+    ]
+
+
 def _keys_check_one(file: str, deprecated: dict | None = None) -> CheckOutcome:
     coll = Bibliography.open(file)
     duplicates = coll.lib.entries.duplicate_keys()
@@ -243,7 +251,9 @@ def keys_generate(
         ]
     else:
         human = [f"Citation key {key!r} already matches the preferred pattern."]
+    pinax_materials = coll.planned_pinax_renames()
     human += [f"  {old} -> {new}" for old, new in renames]
+    human += _material_move_lines(pinax_materials, params)
     source_changes, source_diff_parts, total_source_occurrences, source_warnings = (
         _rewrite_tex_sources(
             file,
@@ -285,6 +295,7 @@ def keys_generate(
         **({"key": key} if key is not None else {}),
         source_occurrences=total_source_occurrences,
         sources=source_changes,
+        pinax_materials=pinax_materials,
         **_rename_payload(renames),
     )
 
@@ -303,7 +314,9 @@ def keys_repair(
     coll = Bibliography.open(file)
     renames = coll.repair_keys()
     human = [f"{_verb('repair', params)} {len(renames)} duplicate key(s)."]
+    pinax_materials = coll.planned_pinax_renames()
     human += [f"  {old} -> {new}" for old, new in renames]
+    human += _material_move_lines(pinax_materials, params)
 
     # A repaired key still exists on the first (kept) entry, so a TeX
     # `\cite{key}` is now ambiguous rather than simply renamed — rewriting it
@@ -323,6 +336,7 @@ def keys_repair(
         params,
         human,
         warnings=warnings,
+        pinax_materials=pinax_materials,
         **_rename_payload(renames),
     )
 
@@ -437,10 +451,7 @@ def keys_rename(
         f"{_verb('rename', params)} citation key {old!r} to {new!r}.",
         f"  bib entries changed={bib_changed}, TeX citations changed={total_source_occurrences}",
     ]
-    human += [
-        f"  {_verb('move', params)} {item['source_path']} -> {item['target_path']}"
-        for item in pinax_materials
-    ]
+    human += _material_move_lines(pinax_materials, params)
 
     # A rename with no TeX sources configured succeeds (a fresh library has no
     # manuscript yet); warn so the caller knows no \cite keys were rewritten.

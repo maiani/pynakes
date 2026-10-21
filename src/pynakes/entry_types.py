@@ -25,10 +25,11 @@ entry-type aliases (section 2.1.1), so ``suppperiodical`` resolves like
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import NamedTuple
 
 from pynakes._text_utils import fold_field_names
+from pynakes.model import BibFile
 
 # Types whose container is a periodical: the container title goes in
 # ``journal`` (BibTeX) or ``journaltitle`` (BibLaTeX).
@@ -135,3 +136,62 @@ def preprint_entry_type(dialect: str) -> str:
     provides ``@online`` for exactly this.
     """
     return "online" if is_biblatex(dialect) else "misc"
+
+
+def entry_field_schema(
+    entry_type: str,
+    *,
+    dialect: str | None = None,
+    lib: BibFile | None = None,
+    fields: Iterable[str] = (),
+) -> dict[str, object]:
+    """Describe required, optional, and existing other fields for an editor.
+
+    ``required`` is a list of alternative groups: each group needs at least
+    one populated field, exactly as lint checks it. ``profile_required`` lists
+    the library's additional exact-field requirements separately (lint profile
+    warnings, rather than built-in missing-field errors). Optional fields are
+    editing suggestions, not an exhaustive whitelist for custom styles.
+
+    Explicit ``dialect`` overrides library metadata; without either, BibTeX
+    is used. Unknown entry types remain editable, with existing fields in
+    ``other`` and ``known_type`` false. No bibliography data is modified.
+    """
+    from pynakes._entry_schema import optional_field_suggestions
+    from pynakes._lint_profile import profile_required_fields
+    from pynakes._lint_required import required_field_rules
+    from pynakes.metadata import library_dialect
+
+    resolved = (dialect or (library_dialect(lib) if lib is not None else "bibtex")).strip().lower()
+    if resolved not in {"bibtex", "biblatex"}:
+        raise ValueError("dialect must be bibtex or biblatex")
+    name = entry_type.strip().lower()
+    if not name:
+        raise ValueError("entry_type must not be empty")
+    required = required_field_rules(name, resolved)
+    profile = profile_required_fields(lib, name) if lib is not None else ()
+    known, suggestions = optional_field_suggestions(name, resolved)
+    occupied = {field.lower() for group in required for field in group} | set(profile)
+    optional = [field for field in suggestions if field.lower() not in occupied]
+    described = occupied | {field.lower() for field in optional}
+    other = list(dict.fromkeys(field for field in fields if field.lower() not in described))
+    return {
+        "schema": "pynakes.entry-fields.v1",
+        "entry_type": name,
+        "dialect": resolved,
+        "known_type": known,
+        "required": [list(group) for group in required],
+        "profile_required": list(profile),
+        "optional": optional,
+        "other": other,
+    }
+
+
+def entry_type_names(*, dialect: str = "bibtex") -> list[str]:
+    """Return the types with field suggestions for a supported dialect."""
+    from pynakes._entry_schema import known_entry_types
+
+    resolved = dialect.strip().lower()
+    if resolved not in {"bibtex", "biblatex"}:
+        raise ValueError("dialect must be bibtex or biblatex")
+    return known_entry_types(resolved)

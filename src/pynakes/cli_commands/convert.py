@@ -32,10 +32,14 @@ from pynakes.cli_common import (
     _safe,
     _source_sha256,
     _verb,
+    bind_where_filter,
+    key_option,
+    where_option,
 )
 from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography
-from pynakes.interchange import export_library, import_library
+from pynakes.export import export_selection
+from pynakes.interchange import import_library
 from pynakes.io import _decode_bytes, save_plain_text
 
 _DIALECTS = ("biblatex", "bibtex")
@@ -50,7 +54,7 @@ def convert(
     to: ConvertTarget | None = typer.Option(
         None,
         "--to",
-        help="Target: a dialect (converted in place) or an interchange format (exported)",
+        help="Target: bib (native export), a dialect (in place), or an interchange format",
     ),
     from_format: ImportFormat | None = typer.Option(
         None,
@@ -62,6 +66,8 @@ def convert(
         "--out",
         help="Write export/import output here instead of stdout (- for stdout)",
     ),
+    where: str | None = where_option(),
+    key: list[str] | None = key_option(),
     force: bool = _FORCE_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(
@@ -85,6 +91,8 @@ def convert(
             backup=backup,
             expect_sha256=expect_sha256,
         ),
+        where=where,
+        key=key,
     )
 
 
@@ -95,7 +103,16 @@ def _convert(
     out: str | None,
     force: bool,
     params: RunParams,
+    *,
+    where: str | None = None,
+    key: list[str] | None = None,
 ) -> None:
+    if (where is not None or key) and (from_format is not None or to in _DIALECTS):
+        _emit_error(
+            params.json_output,
+            "InvalidInput",
+            "Selectors apply to exports only; use --to bib for native BibTeX export",
+        )
     json_output = params.json_output
     if out == "-":
         out = None
@@ -131,7 +148,7 @@ def _convert(
         return
 
     _check_output(file, out, force, params)
-    _convert_export(file, to, out, params)
+    _convert_export(file, to, out, params, where=where, key=key)
 
 
 def _check_output(file: str, out: str | None, force: bool, params: RunParams) -> None:
@@ -168,12 +185,41 @@ def _convert_dialect(file: str, to: str, params: RunParams) -> None:
     )
 
 
-def _convert_export(file: str, to: str, out: str | None, params: RunParams) -> None:
+def _convert_export(
+    file: str,
+    to: str,
+    out: str | None,
+    params: RunParams,
+    *,
+    where: str | None = None,
+    key: list[str] | None = None,
+) -> None:
     coll = Bibliography.open(file)
     _check_expected_sha256(file, coll, params)
-    content = export_library(coll.lib, to)
+    warnings: list[dict] = []
+    predicate = bind_where_filter(coll, where, keys=key, warnings=warnings)
+    entries = [
+        entry for entry in coll.lib.entries.values() if predicate is None or predicate(entry)
+    ]
+    if not entries and (where is not None or key):
+        warnings.append(
+            {"type": "no_entries_selected", "message": "No entry matched the export selection"}
+        )
+    report = export_selection(coll.lib, entries, to)
     _emit_conversion(
-        file, _source_sha256(coll), "bibtex", to, content, len(coll.lib.entries), out, params
+        file,
+        _source_sha256(coll),
+        "bibtex",
+        to,
+        report.content,
+        report.exported_entries,
+        out,
+        params,
+        warnings=[*warnings, *report.warnings],
+        details={
+            "selected_entries": report.selected_entries,
+            "dependency_keys": report.dependency_keys,
+        },
     )
 
 
@@ -197,6 +243,9 @@ def _emit_conversion(
     entry_count: int,
     out: str | None,
     params: RunParams,
+    *,
+    warnings: list[dict] | None = None,
+    details: dict | None = None,
 ) -> None:
     """Emit the result of an export/import: write to ``out`` or stream to stdout.
 
@@ -224,7 +273,8 @@ def _emit_conversion(
             "dry_run": params.dry_run,
             "modified": False,
             "modified_entries": 0,
-            "warnings": [],
+            "warnings": warnings or [],
+            **(details or {}),
             "plan": Bibliography.from_text("").change_plan(),
             "from": from_format,
             "to": to_format,
@@ -235,6 +285,9 @@ def _emit_conversion(
         }
         _emit(True, payload, [], diff_text, params.diff)
         return
+
+    for warning in warnings or []:
+        typer.echo(f"Warning: {warning.get('message', warning)}", err=True)
 
     if out:
         _emit(

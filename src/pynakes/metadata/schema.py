@@ -67,6 +67,7 @@ RENAMED_METADATA_KEYS: dict[str, str] = {
 PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     # Native library dialect, aliasing JabRef's ``databaseType``.
     "dialect": CATEGORY_LIBRARY,
+    "fields-encoding": CATEGORY_NORMALIZATION,
     # Native entry sort order, aliasing JabRef's ``saveOrderConfig``.
     "sort-order": CATEGORY_SAVE,
     # Native default citation-key pattern, aliasing JabRef's ``keypatterndefault``.
@@ -110,6 +111,7 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     "lint-severity": CATEGORY_LINT,
     # Native group tree (hierarchy of StaticGroup nodes).
     "group-tree": CATEGORY_GROUPS,
+    "groups-separator": CATEGORY_GROUPS,
     # What `scrub` removes when preparing a public copy of this library.
     "scrub-fields": CATEGORY_SCRUB,
     "scrub-keep-fields": CATEGORY_SCRUB,
@@ -154,6 +156,8 @@ _FORMAT_CHOICES = {
 #: Choice-valued settings outside the ``format-*`` family: the value a command's
 #: flag of the same meaning accepts.
 _SETTING_CHOICES: dict[str, set[str]] = {
+    "fields-encoding": {"latex", "unicode"},
+    "groups-separator": {"auto", "comma", "semicolon"},
     "pinax-fetch-access": {"open", "institutional"},
     "import-key-source": {"generated", "provider"},
     "lint-severity": {"error", "warning", "info"},

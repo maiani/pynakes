@@ -34,6 +34,7 @@ from pynakes._lint_directives import (
     entry_ignore_rules,
     is_waived,
 )
+from pynakes._lint_groups import lint_groups
 from pynakes._lint_invisible import lint_invisible
 from pynakes._lint_issue import (
     CATEGORY_FIXERS,
@@ -307,6 +308,7 @@ def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
             )
         )
 
+    issues.extend(lint_groups(lib))
     issues.extend(_lint_reference_targets(lib))
     issues.extend(_lint_metadata(lib))
     issues.extend(_lint_field_consistency(lib, dialect=dialect))
@@ -710,22 +712,6 @@ def _lint_reference_targets(lib: BibFile) -> list[LintIssue]:
     ]
 
 
-def _lint_groups(entry: BibEntry) -> list[LintIssue]:
-    """Check the groups field for malformed semicolon-separated values."""
-    groups = entry.fields.get("groups")
-    if groups and groups.strip() and any(not s.strip() for s in groups.split(";")):
-        return [
-            LintIssue(
-                "malformed_groups",
-                "warning",
-                f"Entry {entry.key!r} has a malformed groups field: {groups!r}",
-                key=entry.key,
-                field="groups",
-            )
-        ]
-    return []
-
-
 def _lint_required_fields(entry: BibEntry, fields: dict[str, str], dialect: str) -> list[LintIssue]:
     """Report missing required fields for the entry type."""
     etype = entry.type.lower()
@@ -790,5 +776,4 @@ def _lint_entry(
     issues += _lint_pages(entry, fields)
     issues += _lint_title_markup(entry, fields)
     issues += lint_invisible(entry)
-    issues += _lint_groups(entry)
     return issues

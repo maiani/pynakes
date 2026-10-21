@@ -40,6 +40,10 @@ class CapabilitySection(StrEnum):
     """``capabilities --section``: one detailed part of the description."""
 
     ANALYSIS = "analysis"
+    ENTRY_FIELDS = "entry_fields"
+    FIELD_ENCODING = "field_encoding"
+    SELECTION_EXPORT = "selection_export"
+    GROUPS_SEPARATOR = "groups_separator"
     BATCH_OPERATIONS = "batch_operations"
     BOUNDED_READS = "bounded_reads"
     CAPABILITIES = "capabilities"

@@ -22,6 +22,7 @@ Reference management engine for BibTeX, BibLaTeX, and their materials
 
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
+| `--groups-separator` | choice | no | null | auto, comma, semicolon | Override group membership separator for this invocation |
 | `--version, -V` | boolean | no | false | — | Show the pynakes version and exit. |
 | `--install-completion` | boolean | no | null | — | Install completion for the current shell. |
 | `--show-completion` | boolean | no | null | — | Show completion for the current shell, to copy it or customize the installation. |
@@ -118,7 +119,7 @@ Show what pynakes can do: a compact index, or the details asked for.
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--command` | list[string] | no | null | — | Return the full schema of this command, e.g. 'ref show' (repeatable) |
-| `--section` | list[choice] | no | null | analysis, batch_operations, bounded_reads, capabilities, command_groups, commands, deprecations, error_codes, formatting, material_collection, predicate_grammar, python_api, saved_queries, search_query_grammar, work_matching, write_precondition | Return this section of the description, e.g. predicate_grammar (repeatable) |
+| `--section` | list[choice] | no | null | analysis, entry_fields, field_encoding, selection_export, groups_separator, batch_operations, bounded_reads, capabilities, command_groups, commands, deprecations, error_codes, formatting, material_collection, predicate_grammar, python_api, saved_queries, search_query_grammar, work_matching, write_precondition | Return this section of the description, e.g. predicate_grammar (repeatable) |
 | `--all` | boolean | no | false | — | Return the whole description (large: every command's schema) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
@@ -159,9 +160,11 @@ Convert a library between BibTeX/BibLaTeX dialects and interchange formats.
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the input file (default: auto-detect single .bib in cwd) |
-| `--to` | choice | no | null | biblatex, bibtex, csl-json, ris, mods, endnote, csv | Target: a dialect (converted in place) or an interchange format (exported) |
+| `--to` | choice | no | null | biblatex, bibtex, bib, csl-json, ris, mods, endnote, csv | Target: bib (native export), a dialect (in place), or an interchange format |
 | `--from` | choice | no | null | csl-json, ris, mods, endnote | Import the input from this interchange format to BibTeX |
 | `--out` | string | no | null | — | Write export/import output here instead of stdout (- for stdout) |
+| `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing; 'used'/'unused' test the linked TeX sources and 'query NAME' runs a saved query. See `pynakes capabilities` for the full grammar. |
+| `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
 | `--force` | boolean | no | false | — | Overwrite the output file if it already exists |
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff of the library, or of the --out file |
@@ -334,6 +337,29 @@ Remove a field from matching references.
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `FIELD` | string | yes | — | — | Field name to remove |
+| `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing; 'used'/'unused' test the linked TeX sources and 'query NAME' runs a saved query. See `pynakes capabilities` for the full grammar. |
+| `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
+| `--dry-run` | boolean | no | false | — |  |
+| `--diff` | boolean | no | false | — |  |
+| `--json` | boolean | no | false | — |  |
+| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## fields encode
+
+**Stability: stable**
+
+Convert supported text accents, preserving math and capitalization braces.
+
+`pynakes fields encode [FILE] FIELD [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `FIELD` | string | yes | — | — | Text field to convert |
+| `--to` | choice | no | null | latex, unicode | Text encoding; defaults to fields-encoding metadata |
 | `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing; 'used'/'unused' test the linked TeX sources and 'query NAME' runs a saved query. See `pynakes capabilities` for the full grammar. |
 | `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
@@ -1155,6 +1181,23 @@ Remove entries by citation key.
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
+| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## ref schema
+
+**Stability: stable**
+
+Describe required alternatives, profile requirements, and optional fields.
+
+`pynakes ref schema [FILE] [ENTRY_TYPE] [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `ENTRY_TYPE` | string | no | — | — | Entry type; omit for all known and existing types |
+| `--dialect` | choice | no | null | biblatex, bibtex | Override the library dialect |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 

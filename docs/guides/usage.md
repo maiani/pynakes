@@ -259,6 +259,25 @@ gate a build; for `lint`, suppressed findings do not count. See
 
 Manage JabRef-style `groups` fields and the hierarchical group tree.
 
+Memberships use a library-wide separator: an explicit override, the native
+`groups-separator` setting, then JabRef's stored `keywordSeparator`. With no
+declaration, auto detection preserves existing
+semicolon libraries and recognizes comma-separated memberships; a library
+with no separator yet defaults to comma. If both punctuation marks occur,
+choose explicitly rather than splitting a group name accidentally:
+
+```sh
+pynakes metadata set refs.bib groups-separator semicolon
+pynakes --groups-separator comma groups list refs.bib --json
+```
+
+The global override precedes the command and lasts only for that invocation.
+`auto` explicitly overrides a stored choice. Group operations, selectors,
+analysis, TeX tagging and lint all use this policy. Neither detection nor
+changing the setting rewrites existing fields or converts their separator.
+Names containing the selected separator cannot be added; names containing
+other separator punctuation require an explicit choice.
+
 ### Flat group membership
 
 Use `groups add-entry` and `groups remove-entry` for tags on a reference.
@@ -982,6 +1001,39 @@ whose predicate matches, so the outputs are a partition. Pass `--copy` to send a
 entry to *every* matching output instead (outputs may then overlap). Entries that
 match no rule are dropped and reported under `unrouted`. `--dedupe` applies to the
 in-memory merge, exactly as for `corpus combine`.
+
+## Selection export and text encoding
+
+```sh
+pynakes convert refs.bib --to bib --key Newton1687,Euler1748 --json
+pynakes convert refs.bib --to ris --where 'group "Reviewed"' --out reviewed.ris
+pynakes fields encode refs.bib title --to unicode --key Newton1687 --dry-run --diff
+pynakes fields encode refs.bib author --to latex --where 'type = book' --dry-run --diff
+pynakes metadata set refs.bib fields-encoding unicode
+```
+
+Export never edits the source. `--to bib` exports the existing dialect rather
+than converting it. It includes transitive entry references (including
+`crossref` and `xdata`), all string definitions and preambles, library metadata,
+and retained comments. Missing and ambiguous dependencies are reported.
+This is not a scrubbed public copy: review private fields and metadata before
+sharing. Interchange targets export only the selected entries, resolving their
+inherited fields against the full source library. No selection means all entries.
+Selectors are refused on imports and in-place dialect conversions.
+
+With `--json` and no `--out`, `content` is ready for the clipboard. With `--out`,
+`--dry-run --diff` previews the destination; existing destinations need `--force`.
+`selected_entries` counts the physical selected entries, `entry_count` counts
+exported entries, and `dependency_keys` explains native export additions. Duplicate
+keys remain physical entries; a key selector includes every matching instance.
+
+`fields encode` uses the direction supplied by `--to` or `fields-encoding`.
+It edits only the named field on matching entries. It translates supported text
+accents and letters, preserving capitalization braces, existing commands and
+math spans (`$...$`, `$$...$$`, `\(...\)`, `\[...\]`). It retains unknown
+commands and characters, reporting unsupported constructs where encountered.
+It does not render arbitrary TeX, remove formatting, convert formulas, or promise
+ASCII-only output. Review the diff before applying; no network is used.
 
 ## convert
 

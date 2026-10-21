@@ -94,6 +94,66 @@
           "checks": [{"path": "page.total", "equals": 12}]
         }
       ]
+    },
+    {
+      "id": "coauthor-interpretation",
+      "category": "coauthor_analysis",
+      "fixture": "coauthors.bib",
+      "prompt": "Describe Alice Example\u2019s co-authorship neighbourhood in this bibliography, giving the supporting citation keys. Explain the counts, any identity uncertainty, and any excluded papers. Do not edit the library.",
+      "expected": {
+        "answer_keys": [
+          "Pair1900",
+          "Outside1901",
+          "Variant1902",
+          "Large1903"
+        ],
+        "must_report_ambiguity": true,
+        "library": "unchanged"
+      },
+      "notes": "Distinguish selected from visible collaborator counts and components excluding focus. Do not merge A. Example into Alice. Mention the ORCID conflict, truncated list and excluded large paper. This task needs semantic human review in addition to the mechanical score.",
+      "reference": [
+        {
+          "argv": [
+            "coauthors",
+            "{lib}",
+            "--focus",
+            "Example, Alice",
+            "--json"
+          ],
+          "checks": [
+            {
+              "path": "network.scope.components_and_isolates",
+              "equals": "excluding_focus"
+            },
+            {
+              "path": "network.summary.authors",
+              "equals": 2
+            },
+            {
+              "path": "network.unlinked_keys",
+              "equals": [
+                "Large1903"
+              ]
+            },
+            {
+              "path": "network.entries.with_others",
+              "equals": 1
+            }
+          ]
+        },
+        {
+          "argv": [
+            "ref",
+            "show",
+            "{lib}",
+            "--key",
+            "Pair1900,Outside1901,Variant1902,Large1903",
+            "--select",
+            "author,year,author+an:orcid",
+            "--json"
+          ]
+        }
+      ]
     }
   ]
 }

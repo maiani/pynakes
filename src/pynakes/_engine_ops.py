@@ -193,7 +193,7 @@ class BibliographyOperations:
 
     def _where(self, where: str | QueryFilter) -> QueryFilter:
         if isinstance(where, str):
-            return field_ops.parse_query(where)
+            return field_ops.parse_query(where, lib=self.lib)
         return where
 
     def rename_field(self, old: str, new: str, where: str | QueryFilter = None) -> int:

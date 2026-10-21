@@ -9,6 +9,7 @@ import typer.main
 from typer.core import TyperOption
 
 from pynakes.capabilities import COMMAND_GROUPS
+from pynakes.cli_choices import GroupsSeparator
 from pynakes.cli_commands import (
     add,
     analyze,
@@ -36,6 +37,7 @@ from pynakes.cli_commands import (
     normalize,
     query,
     remove,
+    schema,
     scrub,
     search,
     setops,
@@ -47,6 +49,7 @@ from pynakes.cli_completion import _bibfile_completer, _metadata_key_completer
 from pynakes.cli_completion import _citekey_completer as _complete_fn
 from pynakes.cli_discovery import AutoBibGroup
 from pynakes.cli_surface import FILE_OPTION, FILE_OPTION_HELP, LIBRARY_ARGUMENT
+from pynakes.groups import _groups_override
 
 #: Which command does which job, so one help read is enough to start. ``\b``
 #: keeps Click from rewrapping the lines in the plain (piped) layout.
@@ -95,6 +98,10 @@ def _version_callback(value: bool) -> None:
 
 @app.callback()
 def main(
+    ctx: typer.Context,
+    groups_separator: GroupsSeparator | None = typer.Option(
+        None, "--groups-separator", help="Override group membership separator for this invocation"
+    ),
     version: bool = typer.Option(
         False,
         "--version",
@@ -105,6 +112,8 @@ def main(
     ),
 ) -> None:
     """Reference management engine for BibTeX, BibLaTeX, and their materials."""
+    token = _groups_override.set(groups_separator)
+    ctx.call_on_close(lambda: _groups_override.reset(token))
 
 
 init.register(app)
@@ -134,6 +143,7 @@ directive.register(ref_app)
 compare.register(ref_app)
 find.register(ref_app)
 remove.register(ref_app)
+schema.register(ref_app)
 
 # tex: linked TeX sources (add/list/remove/clear) + scan (formerly `used`)
 tex.register(tex_app)

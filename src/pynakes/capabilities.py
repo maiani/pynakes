@@ -214,6 +214,7 @@ _MATERIAL_COLLECTION = {
     "transfer": "corpus combine project.bib scratch.bib --out project.bib --force keeps the "
     "project's pinax-files-dir and copies the scratch materials; --dry-run lists them "
     "under pinax_materials.",
+    "key_moves": "keys rename, generate, and repair report planned pinax_materials in previews and writes; repair retains materials under a duplicate key that still exists.",
     "compact_reads": "lint --summary / --severity; ref show --key K --select FIELDS "
     "(abstracts only when selected); asset check coverage.",
 }
@@ -627,7 +628,7 @@ def get_capabilities() -> dict:
             "keys": "Generate, rename, repair citation keys, and look up "
             "raw-TeX-source citations of one key (usage); check is deprecated",
             "fields": "Bulk-edit fields across matching references "
-            "(set, rename, move, append, clear, protect-title)",
+            "(set, rename, move, append, clear, protect-title, encode)",
             "dedupe": "Detect and conservatively merge duplicate works",
             "verify": "Verify entries against authoritative metadata "
             "(--published also reports published/preprint identity links)",
@@ -642,7 +643,7 @@ def get_capabilities() -> dict:
             "format": "Lint, then rewrite bibliography layout with portable profile settings "
             "and explicit policy overrides",
             "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "
-            "formats (export/import CSL-JSON, RIS, MODS, EndNote, and export CSV)",
+            "formats (selection export to native bib, CSL-JSON, RIS, MODS, EndNote, CSV)",
             "search": "Search entries by free text, phrases, or field-scoped terms",
             "query": "Save, list, remove, and run named selector queries (list, set, remove, run)",
             "analyze": "Describe a bibliography with offline counts: types, years, "
@@ -669,6 +670,36 @@ def get_capabilities() -> dict:
         "search_query_grammar": _SEARCH_QUERY_GRAMMAR,
         "bounded_reads": _BOUNDED_READS,
         "material_collection": _MATERIAL_COLLECTION,
+        "selection_export": {
+            "command": "convert FILE --to bib|csl-json|ris|mods|endnote|csv --key K --where EXPR",
+            "native": "Preserves entry text, all strings, preambles and library metadata/comments; includes transitive referenced entries",
+            "interchange": "Selected physical entries only, with inherited fields resolved against the source",
+            "report": ["selected_entries", "entry_count", "dependency_keys", "warnings", "content"],
+            "source_modified": False,
+        },
+        "field_encoding": {
+            "command": "fields encode FILE FIELD --to latex|unicode",
+            "setting": "fields-encoding",
+            "selection": "--key and --where",
+            "scope": "Supported text accents and named text characters; preserves math, commands and capitalization braces",
+            "warnings": "Unsupported constructs are retained; not a full TeX renderer or ASCII guarantee",
+        },
+        "entry_fields": {
+            "schema": "pynakes.entry-fields.v1",
+            "command": "ref schema FILE [ENTRY_TYPE] --json",
+            "required": "AND of groups; each group is an OR of accepted field names, shared with lint",
+            "profile_required": "Additional exact fields from the library lint profile",
+            "optional": "Editing suggestions, not an exhaustive style whitelist",
+            "other": "Existing fields outside required and optional lists; never discarded",
+        },
+        "groups_separator": {
+            "setting": "groups-separator",
+            "jabref_fallback": "keywordSeparator (comma or escaped semicolon)",
+            "flag": "--groups-separator (global, before the command)",
+            "choices": ["auto", "comma", "semicolon"],
+            "default": "auto",
+            "auto": "Library-wide detection; comma when no separator occurs; mixed punctuation requires an explicit choice",
+        },
         "deprecations": _DEPRECATIONS,
         "saved_queries": _SAVED_QUERIES,
         "analysis": _ANALYSIS,

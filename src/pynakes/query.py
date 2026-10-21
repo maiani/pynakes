@@ -45,8 +45,8 @@ from difflib import SequenceMatcher
 
 from pynakes._calendar import month_name_to_int
 from pynakes._text_utils import _normalize_text, entry_year
-from pynakes.groups import entry_groups
-from pynakes.model import BibEntry
+from pynakes.groups import entry_groups, library_groups_separator
+from pynakes.model import BibEntry, BibFile
 
 __all__ = [
     "FUZZY_THRESHOLD",
@@ -243,10 +243,11 @@ class Group(Node):
     """The ``group "Name"`` JabRef group-membership predicate."""
 
     name: str
+    separator: str | None = None
 
     def matches(self, entry: BibEntry) -> bool:
         """Return whether the entry belongs to the named group."""
-        return self.name in entry_groups(entry)
+        return self.name in entry_groups(entry, separator=self.separator)
 
     def to_dict(self) -> dict[str, object]:
         """Describe the group predicate."""
@@ -484,7 +485,9 @@ class _Parser:
         cited_keys: Iterable[str] | None,
         saved: Mapping[str, str] | None,
         resolving: tuple[str, ...] = (),
+        lib: BibFile | None = None,
     ) -> None:
+        self.lib = lib
         self.expr = expr
         self.tokens = tokens
         self.position = 0
@@ -601,7 +604,9 @@ class _Parser:
         tokens = _tokenize(expression)
         if not tokens:
             raise ValueError(f"saved query {name!r} is empty")
-        parser = _Parser(expression, tokens, self.cited_keys, self.saved, (*self.resolving, folded))
+        parser = _Parser(
+            expression, tokens, self.cited_keys, self.saved, (*self.resolving, folded), self.lib
+        )
         try:
             node = parser.parse()
         except ValueError as exc:
@@ -615,7 +620,7 @@ class _Parser:
         name = self._value("a group name")
         if not name:
             raise ValueError("predicate 'group' needs a group name")
-        return Group(name)
+        return Group(name, library_groups_separator(self.lib) if self.lib is not None else None)
 
     def _field_predicate(self, field: str) -> Node:
         token = self._advance(f"an operator after {field!r}")
@@ -655,6 +660,7 @@ def parse_query(
     *,
     cited_keys: Iterable[str] | None = None,
     saved: Mapping[str, str] | None = None,
+    lib: BibFile | None = None,
 ) -> Node:
     """Compile a ``--where`` expression into a callable predicate.
 
@@ -672,6 +678,9 @@ def parse_query(
     their expressions for the ``query "name"`` predicate, which raises without
     it; a saved query that refers back to itself is refused.
 
+    ``lib`` binds group predicates to the library-wide separator policy.
+    Without it, group membership is inferred separately for each entry.
+
     Raises:
         ValueError: if the expression cannot be parsed.
     """
@@ -679,7 +688,7 @@ def parse_query(
         tokens = _tokenize(expr)
         if not tokens:
             raise ValueError("expression is empty")
-        return _Parser(expr, tokens, cited_keys, saved).parse()
+        return _Parser(expr, tokens, cited_keys, saved, lib=lib).parse()
     except ValueError as exc:
         # Every failure names the whole expression: a caller sees the selector it
         # sent back, not just the fragment that stopped the parser.
