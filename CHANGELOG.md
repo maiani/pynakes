@@ -52,6 +52,15 @@ sections. Historical releases retain their original headings.
   failure that tried downloads keeps its own line. The JSON is unchanged.
 - Human-readable `lint` output opens with its totals and a count per category,
   before the findings; `--summary` shows the same two lines.
+- `init --agent-guide` ends the guide with a "Library conventions" section
+  generated from the library: the stored citation-key pattern (or the one
+  existing keys follow, proposed with the `metadata set` command but not
+  stored), the stored author style, the import, `enrich --online --published`
+  and `asset fetch` sequence, and a reminder to keep the Pinax folder out of
+  version control. `init` also reports a line to add to the root `AGENTS.md`
+  or `CLAUDE.md` (`agent_guide_pointer`), since agents load only the root
+  guide by default. `render_agents_md` takes the library as an optional
+  argument.
 
 ## [0.8.0] - 2026-10-22
 

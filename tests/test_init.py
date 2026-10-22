@@ -5,6 +5,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
+from pynakes.bibtex_parser import parse_bib
 from pynakes.cli import app
 from pynakes.initialize import apply_overrides, collect_profile, render_agents_md, render_library
 from pynakes.io import load_bib
@@ -208,9 +209,17 @@ def test_init_new_pinax_writes_agent_guide(tmp_path: Path) -> None:
     # Byte-exact on every platform: UTF-8 and LF, not the locale's code page
     # and CRLF a bare write_text gives on Windows.
     written = (tmp_path / "AGENTS.md").read_bytes()
-    assert written == render_agents_md("library").encode("utf-8")
+    assert written.startswith(render_agents_md("library").encode("utf-8"))
     assert b"\r\n" not in written
-    assert "library.bib" in written.decode("utf-8")
+    text = written.decode("utf-8")
+    assert "library.bib" in text
+    assert "## Library conventions" in text
+    assert "stored pattern `[auth][year][veryshorttitle]`" in text
+    assert "`library.files/`" in text and ".gitignore" in text
+    # Agents load the root guide first, so init says what to add there.
+    assert data["agent_guide_pointer"] == (
+        f"Before changing `{out}`, read `{tmp_path / 'AGENTS.md'}`."
+    )
 
 
 def test_init_converts_existing_library_to_pinax_idempotently(tmp_path: Path) -> None:
@@ -329,3 +338,19 @@ def test_agent_guide_says_how_to_fetch_sources_the_default_policy_skips() -> Non
     guide = render_agents_md("library")
     assert "{Key}.source/" in guide
     assert "--material source" in guide
+
+
+def test_agent_guide_proposes_the_key_pattern_existing_keys_follow_without_storing_it() -> None:
+    lib = parse_bib(
+        "".join(
+            f"@book{{{author}{year},\n  author = {{{author}, A.}},\n"
+            f"  title = {{Opera}},\n  year = {{{year}}}\n}}\n"
+            for author, year in (("Newton", 1687), ("Euler", 1748), ("Gauss", 1801))
+        )
+    )
+
+    guide = render_agents_md("library", lib)
+
+    assert "Existing citation keys follow `[Auth][year]`, which is not stored" in guide
+    assert "pynakes metadata set library.bib key-pattern '[Auth][year]'" in guide
+    assert "key-pattern" not in lib.metadata

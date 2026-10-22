@@ -20,6 +20,7 @@ from pathlib import Path
 import typer
 
 from pynakes._text_utils import strip_meta_terminator
+from pynakes.bibtex_parser import parse_bib
 from pynakes.cli_choices import Dialect
 from pynakes.cli_common import (
     _BACKUP_OPTION,
@@ -45,6 +46,7 @@ from pynakes.initialize import (
     render_library,
 )
 from pynakes.metadata import jabref_projection
+from pynakes.model import BibFile
 
 # --- init ------------------------------------------------------------------
 
@@ -74,14 +76,24 @@ def _project_jabref(entries: list[ProfileEntry]) -> list[ProfileEntry]:
     return result
 
 
-def _write_agents_guide(file: str, *, dry_run: bool) -> str | None:
+def _write_agents_guide(file: str, lib: BibFile, *, dry_run: bool) -> str | None:
     """Write ``AGENTS.md`` beside ``file``, returning the path or ``None``."""
     if dry_run:
         return None
     agents_path = Path(file).with_name("AGENTS.md")
+    guide = render_agents_md(Path(file).stem, lib)
     # Explicit, so the guide is the same UTF-8, LF-terminated file on Windows.
-    agents_path.write_text(render_agents_md(Path(file).stem), encoding="utf-8", newline="\n")
+    agents_path.write_text(guide, encoding="utf-8", newline="\n")
     return str(agents_path)
+
+
+def _guide_pointer(file: str, agents_path: str) -> str:
+    """The line for a root AGENTS.md or CLAUDE.md, which agents load before any other guide."""
+    return f"Before changing `{file}`, read `{agents_path}`."
+
+
+def _pointer_human(pointer: str) -> str:
+    return f"Add this line to the root AGENTS.md or CLAUDE.md: {pointer}"
 
 
 def _convert_to_pinax(
@@ -145,12 +157,16 @@ def _convert_to_pinax(
             }
         )
 
-    agents_path = _write_agents_guide(file, dry_run=params.dry_run) if agent_guide else None
+    agents_path = (
+        _write_agents_guide(file, coll.lib, dry_run=params.dry_run) if agent_guide else None
+    )
+    pointer = _guide_pointer(file, agents_path) if agents_path else None
 
     extra = {
         "pinax": True,
         "files_dir": f"{stem}.files",
         "agent_guide": agents_path,
+        "agent_guide_pointer": pointer,
         "profile_from": from_,
         "merged_keys": [entry.key for entry in missing] if from_ is not None else [],
     }
@@ -164,7 +180,9 @@ def _convert_to_pinax(
         "init",
         coll,
         params,
-        [f"Initialized pinax for {file}."] + [f"  {w['message']}" for w in warnings],
+        [f"Initialized pinax for {file}."]
+        + [f"  {w['message']}" for w in warnings]
+        + ([f"  {_pointer_human(pointer)}"] if pointer else []),
         warnings=warnings,
         **extra,
     )
@@ -300,8 +318,11 @@ def init(
         target.with_name(f"{target.stem}.files").mkdir(parents=True, exist_ok=True)
 
     agents_path = (
-        _write_agents_guide(file, dry_run=params.dry_run) if (agent_guide and pinax) else None
+        _write_agents_guide(file, parse_bib(content), dry_run=params.dry_run)
+        if (agent_guide and pinax)
+        else None
     )
+    pointer = _guide_pointer(file, agents_path) if agents_path else None
 
     keys = sorted({entry.key for entry in entries})
     effective = next(
@@ -313,6 +334,8 @@ def init(
     human = [f"{_verb('create', params)} {file}{detail} with {len(keys)} metadata key(s)."]
     if agents_path:
         human.append(f"Wrote agent guide to {agents_path}.")
+    if pointer:
+        human.append(_pointer_human(pointer))
 
     created = not params.dry_run
 
@@ -329,6 +352,7 @@ def init(
         dialect=effective_type,
         keys=keys,
         agent_guide=agents_path,
+        agent_guide_pointer=pointer,
         created=created,
         profile_from=from_,
     )
