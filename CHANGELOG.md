@@ -29,6 +29,10 @@ sections. Historical releases retain their original headings.
   `key_pattern_unset` when it generates keys for a library that stores no
   pattern but follows another one. `pynakes.keys.infer_key_pattern` exposes
   the inference.
+- `ref import` warns with `published_version_available` when an imported
+  arXiv preprint already names a published DOI, listing the keys and the
+  `enrich --published --online --key` command that promotes them. A batch
+  gets one warning for all of them.
 
 ## [0.8.0] - 2026-10-22
 

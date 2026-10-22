@@ -660,6 +660,17 @@ are applied to the new entry, and so is its `format-*` layout, such as
 declares none of these settings gets the entry as the provider described it;
 run `normalize` or `format` with `--key` to bring it in line by hand.
 
+### Preprints that are already published
+
+An arXiv import describes the preprint, so the entry stays `@misc` even when
+the arXiv record names the journal DOI. Promotion is a separate, online step,
+and the import says when it applies: a `published_version_available` warning
+lists those keys and gives the command, for example
+
+```sh
+pynakes enrich refs.bib --published --online --key Einstein1905Electrodynamics
+```
+
 ### Importing several at once
 
 Give several identifiers, or pipe a list, and they resolve in one call and

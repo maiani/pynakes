@@ -31,6 +31,7 @@ from pynakes.cli_common import (
     bib_file_argument,
 )
 from pynakes.engine import Bibliography
+from pynakes.model import BibEntry
 
 
 def read_identifier_lines(text: str) -> list[str]:
@@ -74,6 +75,42 @@ def key_pattern_warnings(coll: Bibliography, file: str) -> list[dict[str, object
                 f"but {inference.matched} of {inference.checked} existing keys follow "
                 f"{inference.pattern}. Adopt it with: "
                 f"pynakes metadata set {file} key-pattern '{inference.pattern}'"
+            ),
+        }
+    ]
+
+
+def published_version_warnings(entries: list[BibEntry], file: str) -> list[dict[str, object]]:
+    """Point out imported preprints whose record already names a published DOI.
+
+    The import keeps what the preprint server described, so such an entry stays
+    a preprint type with the journal's DOI. Promotion is a separate, online,
+    reviewable step; this names the command and the keys it applies to.
+    """
+    from pynakes._identifiers import is_arxiv_doi
+    from pynakes._integrity_common import _PREPRINT_DOI_PREFIXES
+    from pynakes.identity import entry_arxiv_id
+
+    keys = [
+        entry.key
+        for entry in entries
+        if entry.type.lower() in {"misc", "online", "unpublished"}
+        and entry_arxiv_id(entry)
+        and (doi := entry.fields.get("doi", "").strip())
+        and not is_arxiv_doi(doi)
+        and not doi.lower().startswith(_PREPRINT_DOI_PREFIXES)
+    ]
+    if not keys:
+        return []
+    joined = ",".join(keys)
+    return [
+        {
+            "type": "published_version_available",
+            "keys": keys,
+            "message": (
+                f"Imported as a preprint, but the record names a published DOI: "
+                f"{', '.join(keys)}. Promote with: "
+                f"pynakes enrich {file} --published --online --key {joined}"
             ),
         }
     ]
@@ -263,14 +300,15 @@ def import_reference(
     if fetch_report is not None:
         details["fetch"] = fetch_report
 
-    human.extend(f"  {warning['message']}" for warning in pattern_warnings)
+    warnings = [*pattern_warnings, *published_version_warnings([entry], file)]
+    human.extend(f"  {warning['message']}" for warning in warnings)
     _finish_mod(
         file,
         "ref_import",
         coll,
         params,
         human,
-        warnings=pattern_warnings,
+        warnings=warnings,
         **details,
     )
 
@@ -303,6 +341,7 @@ def _import_several(
 
     results: list[dict[str, object]] = []
     warnings: list[dict[str, object]] = list(pattern_warnings)
+    imported_entries: list[BibEntry] = []
     imported = 0
     for identifier, key in identifiers:
         try:
@@ -363,6 +402,7 @@ def _import_several(
             )
             continue
         imported += 1
+        imported_entries.append(entry)
         results.append(
             {
                 "identifier": importer_ops.imported_entry_identifier(entry, kind),
@@ -385,6 +425,7 @@ def _import_several(
         )
         return
 
+    warnings.extend(published_version_warnings(imported_entries, file))
     failed = sum(1 for result in results if result["status"] == "failed")
     skipped = sum(1 for result in results if result["status"] == "skipped")
     human = [
