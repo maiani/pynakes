@@ -21,6 +21,14 @@ sections. Historical releases retain their original headings.
   that is already taken fails only that identifier, with the reason
   `key_conflict`, and each imported result reports its `key_source`.
   `pynakes.importer.split_identifier_key` exposes the parsing.
+- `keys pattern` reports the stored citation-key pattern and the common
+  pattern most existing keys follow, with the `metadata set` command that
+  stores it. It recognizes the default style, two or three title words, author
+  and year with or without a separator, and their lowercase forms, and infers
+  nothing from a small or mixed library. `ref import` warns with
+  `key_pattern_unset` when it generates keys for a library that stores no
+  pattern but follows another one. `pynakes.keys.infer_key_pattern` exposes
+  the inference.
 
 ## [0.8.0] - 2026-10-22
 

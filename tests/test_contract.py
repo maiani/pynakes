@@ -73,6 +73,7 @@ POSITIONALS: dict[str, tuple[tuple[str, bool, bool], ...]] = {
     "inspect": (("file", False, False),),
     "keys check": (("files", True, True),),
     "keys generate": (("file", False, False), ("key", False, False)),
+    "keys pattern": (("file", False, False),),
     "keys rename": (
         ("file", False, False),
         ("old", True, False),
@@ -269,6 +270,7 @@ SAMPLES: dict[str, tuple[str, list[str]]] = {
     "inspect": ("read", ["inspect", "{bib}"]),
     "keys check": ("check", ["keys", "check", "{bib}"]),
     "keys generate": ("modify", ["keys", "generate", "{bib}", "--all", "--dry-run"]),
+    "keys pattern": ("read", ["keys", "pattern", "{bib}"]),
     "keys rename": ("modify", ["keys", "rename", "{bib}", "Smith2020", "Smith2020a", "--dry-run"]),
     "keys repair": ("modify", ["keys", "repair", "{dupes}", "--dry-run"]),
     "keys usage": ("read", ["keys", "usage", "Smith2020", "{tex}"]),

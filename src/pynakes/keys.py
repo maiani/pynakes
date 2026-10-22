@@ -9,12 +9,16 @@ its supported vocabulary mirror JabRef's citation-key patterns; markers or
 modifiers outside that vocabulary raise
 :class:`UnsupportedCitationKeyPatternError` rather than generating a wrong key.
 Generation is deterministic — the same entry always yields the same key.
+:func:`infer_key_pattern` recognizes the pattern a library's existing keys
+follow, so it can be proposed as the stored ``key-pattern``.
 """
 
 import functools
 import re
 from collections.abc import Callable, Collection
 
+from pynakes._keys_pattern import KeyPatternInference as KeyPatternInference
+from pynakes._keys_pattern import infer_key_pattern as infer_key_pattern
 from pynakes._lint_directives import entry_ignore_rules
 from pynakes._lint_issue import LintIssue
 from pynakes._text_utils import entry_year

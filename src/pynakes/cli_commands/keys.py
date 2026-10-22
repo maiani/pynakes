@@ -529,10 +529,65 @@ def keys_usage(
     _emit(json_output, result, human)
 
 
+def keys_pattern(
+    file: str | None = bib_file_argument(),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Show the stored citation-key pattern and the one existing keys follow.
+
+    Read-only. `configured` is the library's stored `key-pattern` (null when
+    none is stored, and generated keys then look like `Newton1687Philosophiae`).
+    `inferred` is the common pattern most existing keys match, or null when no
+    candidate matches more than half of them. Adopt it with
+    `metadata set FILE key-pattern PATTERN`, so new keys follow the library.
+    """
+    from pynakes.metadata import library_key_pattern
+
+    file = _resolve_input_bib(file, json_output)
+    coll = Bibliography.open(file)
+    lib = coll.lib
+    configured = library_key_pattern(lib, "")
+    inference = keys_ops.infer_key_pattern(lib)
+    suggestion = (
+        f"pynakes metadata set {file} key-pattern '{inference.pattern}'"
+        if configured is None and inference.pattern
+        else None
+    )
+    if configured is None:
+        human = [f"{file}: no key-pattern stored; generated keys use pynakes' default style."]
+    else:
+        human = [f"{file}: key-pattern is {configured}."]
+    if inference.pattern:
+        human.append(
+            f"  Existing keys follow {inference.pattern} "
+            f"({inference.matched} of {inference.checked} entries)."
+        )
+    elif inference.candidates:
+        best, matched = inference.candidates[0]
+        human.append(
+            f"  No common pattern matches most existing keys "
+            f"(closest: {best}, {matched} of {inference.checked} entries)."
+        )
+    if suggestion:
+        human.append(f"  To adopt it: {suggestion}")
+    result = {
+        "status": "success",
+        "action": "keys_pattern",
+        "warnings": [],
+        "file": file,
+        "source_sha256": _source_sha256(coll),
+        "configured": configured,
+        "inferred": inference.to_dict(),
+        "suggestion": suggestion,
+    }
+    _emit(json_output, result, human)
+
+
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
     app.command("check")(_safe(keys_check))
     app.command("generate")(_safe(keys_generate))
+    app.command("pattern")(_safe(keys_pattern))
     app.command("repair")(_safe(keys_repair))
     app.command("rename")(_safe(keys_rename))
     app.command("usage")(_safe(keys_usage))

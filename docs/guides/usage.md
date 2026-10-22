@@ -362,6 +362,21 @@ Pass a citation key to apply that preferred pattern to just one entry, or
 also rewrite matching TeX citations in linked `tex-sources` metadata when it is
 configured.
 
+A library that stores no pattern usually still has a style. `keys pattern`
+reports the stored pattern and the common pattern most existing keys follow:
+
+```sh
+pynakes keys pattern refs.bib
+```
+
+It recognizes a short list of styles: `Newton1687Philosophiae`, two or three
+title words instead of one, author and year with or without a separator, and
+their lowercase forms. It names a pattern only when it matches more than half
+of the entries that have an author or title, and at least three, and prints the
+`metadata set` command that stores it. Nothing changes until you run that
+command. `ref import` warns with `key_pattern_unset` when it generates a key
+while no pattern is stored and the existing keys follow another style.
+
 `keys rename` updates the entry key in the `.bib` file, every `crossref`, `xref`,
 `xdata`, `related`, and `entryset` value in the library that names it, and
 matching keys inside recognized TeX citation commands in the supplied `.tex`

@@ -48,6 +48,37 @@ def read_identifier_lines(text: str) -> list[str]:
     return identifiers
 
 
+def key_pattern_warnings(coll: Bibliography, file: str) -> list[dict[str, object]]:
+    """Warn when generated keys would not follow the library's evident style.
+
+    Run before staging: the library's own keys are the evidence. Nothing is
+    reported when a ``key-pattern`` is stored or the keys follow the default.
+    """
+    from pynakes import keys as keys_ops
+    from pynakes._keys_pattern import DEFAULT_PATTERN
+    from pynakes.metadata import library_key_pattern
+
+    if library_key_pattern(coll.lib, "") is not None:
+        return []
+    inference = keys_ops.infer_key_pattern(coll.lib)
+    if inference.pattern is None or inference.pattern == DEFAULT_PATTERN:
+        return []
+    return [
+        {
+            "type": "key_pattern_unset",
+            "pattern": inference.pattern,
+            "matched": inference.matched,
+            "checked": inference.checked,
+            "message": (
+                f"No key-pattern is stored, so generated keys use pynakes' default style, "
+                f"but {inference.matched} of {inference.checked} existing keys follow "
+                f"{inference.pattern}. Adopt it with: "
+                f"pynakes metadata set {file} key-pattern '{inference.pattern}'"
+            ),
+        }
+    ]
+
+
 def import_reference(
     file: str | None = bib_file_argument(),
     identifiers: list[str] = typer.Argument(
@@ -135,8 +166,14 @@ def import_reference(
     source = importer_ops.library_key_source(
         coll.lib, None if key_source is None else key_source.value
     )
+    generates_keys = source == "generated" and (
+        key is None and any(pair_key is None for _, pair_key in pairs)
+    )
+    pattern_warnings = key_pattern_warnings(coll, file) if generates_keys else []
     if len(pairs) > 1:
-        _import_several(coll, file, pairs, params, source, allow_duplicate, cache_file)
+        _import_several(
+            coll, file, pairs, params, source, allow_duplicate, cache_file, pattern_warnings
+        )
         return
 
     identifier, pair_key = pairs[0]
@@ -226,12 +263,14 @@ def import_reference(
     if fetch_report is not None:
         details["fetch"] = fetch_report
 
+    human.extend(f"  {warning['message']}" for warning in pattern_warnings)
     _finish_mod(
         file,
         "ref_import",
         coll,
         params,
         human,
+        warnings=pattern_warnings,
         **details,
     )
 
@@ -244,6 +283,7 @@ def _import_several(
     key_source: str,
     allow_duplicate: bool,
     cache_file: str | None,
+    pattern_warnings: list[dict[str, object]],
 ) -> None:
     """Resolve several identifiers, then commit whatever resolved in one write.
 
@@ -262,7 +302,7 @@ def _import_several(
     from pynakes import importer as importer_ops
 
     results: list[dict[str, object]] = []
-    warnings: list[dict[str, object]] = []
+    warnings: list[dict[str, object]] = list(pattern_warnings)
     imported = 0
     for identifier, key in identifiers:
         try:

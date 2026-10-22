@@ -380,9 +380,6 @@ bugs, fixed in 0.8.0, and the requests below. They are small and independent of
 `Library`, so they come first, right after the 0.8.0 tag, one at a time. Each
 new option gets its CLI flag, `pynakes-meta` setting and `metadata set` form.
 
-- `ref import` takes `IDENTIFIER=KEY` pairs, so a batch can name its own keys.
-  Without a `key-pattern` setting, generated keys follow the pattern the
-  library's existing keys show, reporting the inferred pattern.
 - An imported preprint whose record already names a journal DOI gets a hint
   to run `enrich --published --online`, instead of staying `@misc` silently.
 - `ref import` reports progress per identifier on stderr, even without a
