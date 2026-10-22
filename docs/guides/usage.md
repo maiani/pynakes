@@ -654,6 +654,17 @@ Piped input is one identifier per line; blank lines and `#` comments are
 skipped, so a list pasted out of a chat or a notes file needs no cleaning up
 first.
 
+To choose the citation keys, write an identifier as `IDENTIFIER=KEY`, on the
+command line or on a piped line:
+
+```sh
+pynakes ref import refs.bib arXiv:2301.00001=Lovelace1843 10.5555/engine=Babbage1822
+```
+
+The key follows the last `=` and starts with a letter. Identifiers without one
+get a generated key. A key that is already taken fails only that identifier,
+with the reason `key_conflict`. For a single identifier, `--key` works too.
+
 Each identifier is reported separately, and **one that does not resolve does not
 stop the others**:
 

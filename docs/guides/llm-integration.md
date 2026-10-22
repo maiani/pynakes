@@ -183,7 +183,8 @@ the all-or-nothing guarantee rather than an exception to it.
   inside a `corpus batch` when it is one of several related changes.
 - Use `ref import` for network-backed DOI, repository, preprint, and
   working-paper metadata resolution; give it several identifiers, or pipe them
-  with `-`, when a whole list has to resolve.
+  with `-`, when a whole list has to resolve. Write `IDENTIFIER=KEY` to choose
+  an entry's citation key, so a batch needs no renaming afterwards.
 - Use `ref find "<reference text>" --online` when a reference arrives written
   out rather than as an identifier, and you need to know whether it describes
   anything real before importing it. Read-only. It reports candidates with the

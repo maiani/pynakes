@@ -277,6 +277,35 @@ def resolve_identifier(value: str) -> tuple[str, str]:
     )
 
 
+#: The citation key an ``IDENTIFIER=KEY`` argument may name: a letter first,
+#: so the tail of a DOI or URL containing ``=`` is not mistaken for a key.
+_PAIR_KEY_RE = re.compile(r"[A-Za-z][A-Za-z0-9_:.+-]*")
+
+
+def split_identifier_key(value: str) -> tuple[str, str | None]:
+    """Split an ``IDENTIFIER=KEY`` import argument into identifier and key.
+
+    The key follows the last ``=``, with optional spaces around it. It must
+    start with a letter and use only letters, digits and ``_:.+-``, and the
+    text before it must be a recognized identifier on its own. An ``=`` that
+    follows a URL query-parameter name (``?id=123``) belongs to the URL.
+    Anything else is one identifier with no key, returned stripped. Offline:
+    the identifier is classified, not fetched.
+    """
+    raw = value.strip()
+    identifier, separator, key = raw.rpartition("=")
+    key = key.strip()
+    if not separator or not identifier.strip() or not _PAIR_KEY_RE.fullmatch(key):
+        return raw, None
+    if "?" in identifier and "=" not in re.split(r"[?&;]", identifier)[-1]:
+        return raw, None
+    try:
+        resolve_identifier(identifier)
+    except (UnsupportedIdentifierError, ValueError):
+        return raw, None
+    return identifier.strip(), key
+
+
 def fetch_bibtex_for_doi(doi: str, timeout: float = DEFAULT_TIMEOUT) -> str:
     """Fetch BibTeX metadata for ``doi`` via DOI content negotiation.
 

@@ -12,6 +12,16 @@ sections. Historical releases retain their original headings.
 
 ## [Unreleased]
 
+### Added
+
+- `ref import` accepts `IDENTIFIER=KEY` to name an imported entry's citation
+  key, on the command line or on a piped line, so a batch of identifiers can
+  carry project-style keys in one call. The key follows the last `=` and
+  starts with a letter; an `=` inside a URL query stays part of the URL. A key
+  that is already taken fails only that identifier, with the reason
+  `key_conflict`, and each imported result reports its `key_source`.
+  `pynakes.importer.split_identifier_key` exposes the parsing.
+
 ## [0.8.0] - 2026-10-22
 
 Research context, reusable queries and bibliography analysis: read bounded

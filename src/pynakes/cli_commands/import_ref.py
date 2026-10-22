@@ -53,10 +53,14 @@ def import_reference(
     identifiers: list[str] = typer.Argument(
         ...,
         help="One or more DOIs, repository identifiers, or supported reference URLs. "
+        "Append =KEY to name an entry's citation key (arXiv:2301.00001=Lovelace1843). "
         'Use "-" to read them from stdin, one per line',
     ),
     key: str | None = typer.Option(
-        None, "--key", help="Citation key to use (only with a single identifier)"
+        None,
+        "--key",
+        help="Citation key to use (only with a single identifier; for several, "
+        "write each as IDENTIFIER=KEY)",
     ),
     key_source: KeySource | None = typer.Option(
         None,
@@ -107,11 +111,20 @@ def import_reference(
     if not positional:
         _emit_error(json_output, "InvalidInput", "No identifier to import")
         return
-    if key is not None and len(positional) > 1:
+    pairs = [importer_ops.split_identifier_key(value) for value in positional]
+    if key is not None and len(pairs) > 1:
         _emit_error(
             json_output,
             "InvalidInput",
-            "--key names the key for one entry; omit it when importing several identifiers",
+            "--key names the key for one entry; to name keys for several identifiers, "
+            "write each as IDENTIFIER=KEY",
+        )
+        return
+    if key is not None and pairs[0][1] is not None:
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            "Give the citation key either with --key or as IDENTIFIER=KEY, not both",
         )
         return
 
@@ -122,11 +135,12 @@ def import_reference(
     source = importer_ops.library_key_source(
         coll.lib, None if key_source is None else key_source.value
     )
-    if len(positional) > 1:
-        _import_several(coll, file, positional, params, source, allow_duplicate, cache_file)
+    if len(pairs) > 1:
+        _import_several(coll, file, pairs, params, source, allow_duplicate, cache_file)
         return
 
-    identifier = positional[0]
+    identifier, pair_key = pairs[0]
+    key = key if key is not None else pair_key
     entry = None
     try:
         kind, entry = coll.import_reference(
@@ -225,7 +239,7 @@ def import_reference(
 def _import_several(
     coll: Bibliography,
     file: str,
-    identifiers: list[str],
+    identifiers: list[tuple[str, str | None]],
     params: RunParams,
     key_source: str,
     allow_duplicate: bool,
@@ -250,10 +264,11 @@ def _import_several(
     results: list[dict[str, object]] = []
     warnings: list[dict[str, object]] = []
     imported = 0
-    for identifier in identifiers:
+    for identifier, key in identifiers:
         try:
             kind, entry = coll.import_reference(
                 identifier,
+                key=key,
                 key_source=key_source,
                 allow_duplicate=allow_duplicate,
             )
@@ -272,6 +287,24 @@ def _import_several(
                     "type": "duplicate_reference",
                     "identifier": identifier,
                     "message": f"{identifier}: already present as {', '.join(exc.keys)}; skipped.",
+                }
+            )
+            continue
+        except importer_ops.CitationKeyConflictError as exc:
+            results.append(
+                {
+                    "identifier": identifier,
+                    "status": "failed",
+                    "reason": "key_conflict",
+                    "key": exc.key,
+                    "message": str(exc),
+                }
+            )
+            warnings.append(
+                {
+                    "type": "import_failed",
+                    "identifier": identifier,
+                    "message": f"{identifier}: {exc}; name another key.",
                 }
             )
             continue
@@ -296,6 +329,7 @@ def _import_several(
                 "status": "imported",
                 "identifier_type": kind,
                 "key": entry.key,
+                "key_source": "user" if key else key_source,
                 "entry_type": entry.type,
                 "doi": entry.fields.get("doi"),
             }

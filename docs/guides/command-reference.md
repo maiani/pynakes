@@ -1150,8 +1150,8 @@ Import one or more references from supported identifiers or URLs.
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
-| `IDENTIFIERS` | list[string] | yes | — | — | One or more DOIs, repository identifiers, or supported reference URLs. Use "-" to read them from stdin, one per line |
-| `--key` | string | no | null | — | Citation key to use (only with a single identifier) |
+| `IDENTIFIERS` | list[string] | yes | — | — | One or more DOIs, repository identifiers, or supported reference URLs. Append =KEY to name an entry's citation key (arXiv:2301.00001=Lovelace1843). Use "-" to read them from stdin, one per line |
+| `--key` | string | no | null | — | Citation key to use (only with a single identifier; for several, write each as IDENTIFIER=KEY) |
 | `--key-source` | choice | no | null | generated, provider | Citation key source when --key is absent: generated or provider; default: the library's import-key-source setting, else generated |
 | `--allow-duplicate` | boolean | no | false | — | Import even if the reference already exists |
 | `--fetch` | boolean | no | false | — | After importing, fetch configured Pinax materials for the new entry |
