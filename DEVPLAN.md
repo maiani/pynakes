@@ -380,22 +380,59 @@ bugs, fixed in 0.8.0, and the requests below. They are small and independent of
 `Library`, so they come first, right after the 0.8.0 tag, one at a time. Each
 new option gets its CLI flag, `pynakes-meta` setting and `metadata set` form.
 
+**Resume point (2026-10-22).** 0.8.0 is released (tag `v0.8.0` on `292d64a`).
+This work continues on the local branch `v0.9`, which is not pushed yet; its
+last feature commit is `f84db19`. The four items finished so far are under
+`[Unreleased]` in [CHANGELOG.md](CHANGELOG.md): `IDENTIFIER=KEY` in
+`ref import`, `keys pattern` with the `key_pattern_unset` import warning, the
+`published_version_available` hint, and the import cache with progress lines.
+The full suite last ran at `cd0312d`; `f84db19` ran only its focused tests, so
+the first push lets CI run everything. Keep to one feature per commit, run the
+tests for the touched area, and leave the full matrix to CI.
+
+Decisions taken in this block, to keep:
+
+- The library's key style is never inferred silently. `keys pattern` proposes
+  a pattern, `metadata set` stores it, and `ref import` only warns. Keys
+  change only after the pattern is stored.
+- Progress for people goes to stderr as plain lines, so captured output keeps
+  it. A `--json` run writes nothing to stderr, because agents often read
+  `--json 2>&1` as one JSON document.
+
+Remaining, in suggested order:
+
 - `asset fetch --dry-run` reports coverage as grouped counts with the affected
   keys, not one line listing every key. Default `lint` output starts with a
-  per-category summary before the findings.
+  per-category summary before the findings. `lint --summary` already exists;
+  only the default output changes. The coverage lines come from
+  `cli_commands/_fetch_report.py` and `cli_commands/fetch.py`.
 - `init --agent-guide` prints a one-line pointer to add to a parent
   `AGENTS.md` or `CLAUDE.md`, since agents usually load only the root guide.
   The guide gains a short conventions section generated from the library:
-  key pattern, author format, the import, `enrich --published`, fill-gaps
-  workflow, and a reminder that the Pinax folder belongs in `.gitignore`.
+  key pattern (stored, or the `keys pattern` inference), author format, the
+  import, `enrich --published`, fill-gaps workflow, and a reminder that the
+  Pinax folder belongs in `.gitignore`. The guide template is
+  `render_agents_md` in `initialize.py`, now five rules after 0.8.0 slimmed it;
+  keep it short.
 - Settle network consent. `ref import` and `asset fetch` go online simply by
   being run, `enrich` and `verify` use `--online` to leave their offline mode,
-  and `ref find` requires `--online` although it has no offline mode. Choose
-  one rule, document it, and route any change through deprecation.
+  and `ref find` requires `--online` although it has no offline mode
+  (`cli_commands/find.py`). Choose one rule, document it, and route any change
+  through deprecation, as the beta promise requires.
+
+Open question found along the way: a lowercase key-pattern marker lowercases
+its value (`[auth]` gives `newton`), and `_apply_marker_casing` in `keys.py`
+documents this as JabRef behaviour. JabRef's `[auth]` may keep the name's
+case. Check JabRef's own documentation or source before changing anything; if
+pynakes differs, a library with JabRef's `[auth][year]` pattern gets different
+keys here than in JabRef. `keys pattern` writes capitalized markers
+(`[Auth][year]`) for that reason.
 
 Making imports follow the library's author format and encoding, and making
 provider extras such as `abstract` or arXiv's `updated` opt-in, belongs to the
-v0.11 enrichment value policy.
+v0.11 enrichment value policy. Imports already apply the `normalize-*` and
+`format-*` settings a library declares; what remains is a library that
+declares none.
 
 ### v0.10 — Project assembly and synchronization of linked bibliographies
 
