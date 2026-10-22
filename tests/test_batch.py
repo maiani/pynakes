@@ -271,12 +271,22 @@ def test_ref_edit_trims_values_like_the_command() -> None:
     assert coll.lib.entries["Newton1687"].fields["note"] == "first edition"
 
 
+def test_ref_edit_accepts_the_standard_type_and_key_fields() -> None:
+    coll = Bibliography.from_text(EDIT_SRC)
+    apply_operations(
+        coll,
+        [{"op": "ref.edit", "key": "Newton1687", "fields": {"type": "Treatise", "key": "Newton"}}],
+    )
+    entry = coll.lib.entries["Newton1687"]
+    assert entry.fields["type"] == "Treatise"
+    assert entry.fields["key"] == "Newton"
+    assert entry.key == "Newton1687"
+
+
 @pytest.mark.parametrize(
     ("operation", "message"),
     [
         ({"fields": {"bad name": "x"}}, "Invalid field name"),
-        ({"fields": {"type": "article"}}, "is not a field"),
-        ({"fields": {"KEY": "Other"}}, "is not a field"),
         ({"fields": {"note": 3}}, "needs a string value"),
         ({"fields": ["note"]}, "'fields' must be an object"),
         ({"clear_fields": "title"}, "'clear_fields' must be an array"),

@@ -48,6 +48,27 @@ BOOK_CHAPTER = (
     "year={1801}, pages={3–56} }"
 )
 
+# DataCite renders a repository thesis with the university as `publisher` and,
+# when the repository registered the creator twice, the author twice.
+DATACITE_THESIS = """@phdthesis{https://doi.org/10.5555/thesis,
+  doi = {10.5555/THESIS},
+  url = {https://repository.example/thesis},
+  author = {Curie, Marie and Curie, Marie},
+  title = {Recherches sur les substances radioactives},
+  publisher = {Université de Paris},
+  year = {1903}
+}
+"""
+
+DATACITE_REPORT = """@techreport{https://doi.org/10.5555/report,
+  doi = {10.5555/REPORT},
+  author = {Rayleigh, John William Strutt and Ramsay, William},
+  title = {Argon, a New Constituent of the Atmosphere},
+  publisher = {Smithsonian Institution},
+  year = {1896}
+}
+"""
+
 
 def test_arxiv_deposits_normalize_to_one_entry_type() -> None:
     # The whole point: the same source and DOI shape must not yield two types,
@@ -189,6 +210,8 @@ def test_every_refined_import_passes_lint() -> None:
         "10.48550/arXiv.1906.05836": ARXIV_AS_MISC,
         "10.5555/elements": REFERENCE_BOOK,
         "10.5555/chapter": BOOK_CHAPTER,
+        "10.5555/thesis": DATACITE_THESIS,
+        "10.5555/report": DATACITE_REPORT,
     }
     dialects = (("bibtex", ""), ("biblatex", "@comment{pynakes-meta: dialect:biblatex;}\n"))
     for dialect, meta in dialects:
@@ -199,3 +222,52 @@ def test_every_refined_import_passes_lint() -> None:
             lib.entries["Imported"] = entry
             bad = [i for i in lint(lib) if i.severity in ("error", "warning")]
             assert bad == [], f"{dialect} {doi_value}: {[i.message for i in bad]}"
+
+
+def test_a_thesis_names_its_university_as_school() -> None:
+    metadata = parse_bibtex(DATACITE_THESIS, "10.5555/thesis")
+
+    assert metadata.entry_type == "phdthesis"
+    assert metadata.fields["school"] == "Université de Paris"
+    assert "publisher" not in metadata.fields
+    assert metadata.field_expressions["school"] == "{Université de Paris}"
+
+
+def test_a_biblatex_thesis_names_its_university_as_institution() -> None:
+    metadata = parse_bibtex(DATACITE_THESIS, "10.5555/thesis", dialect="biblatex")
+
+    assert metadata.fields["institution"] == "Université de Paris"
+    assert "school" not in metadata.fields
+    assert "publisher" not in metadata.fields
+
+
+def test_a_thesis_author_registered_twice_is_listed_once() -> None:
+    metadata = parse_bibtex(DATACITE_THESIS, "10.5555/thesis")
+
+    assert metadata.fields["author"] == "Curie, Marie"
+
+
+def test_a_thesis_keeps_a_school_the_record_already_names() -> None:
+    text = DATACITE_THESIS.replace(
+        "  year = {1903}", "  school = {Faculté des sciences de Paris},\n  year = {1903}"
+    )
+    metadata = parse_bibtex(text, "10.5555/thesis")
+
+    assert metadata.fields["school"] == "Faculté des sciences de Paris"
+    assert metadata.fields["publisher"] == "Université de Paris"
+
+
+def test_a_report_names_its_issuer_as_institution() -> None:
+    metadata = parse_bibtex(DATACITE_REPORT, "10.5555/report")
+
+    assert metadata.fields["institution"] == "Smithsonian Institution"
+    assert "publisher" not in metadata.fields
+
+
+def test_a_repeated_name_outside_a_thesis_may_be_two_people() -> None:
+    text = DATACITE_REPORT.replace(
+        "Rayleigh, John William Strutt and Ramsay, William", "Wang, Li and Wang, Li"
+    )
+    metadata = parse_bibtex(text, "10.5555/report")
+
+    assert metadata.fields["author"] == "Wang, Li and Wang, Li"

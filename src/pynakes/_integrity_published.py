@@ -329,17 +329,35 @@ def fetch_arxiv_metadata(
     return fields
 
 
-def _parse_journal_reference(value: str) -> dict[str, str]:
-    """Parse the common arXiv ``journal_ref`` shape conservatively."""
-    clean = " ".join(value.split()).rstrip(".")
-    match = re.fullmatch(
+_PAGES_PATTERN = (
+    r"(?:(?:pages?|pp?\.)\s*)?"
+    r"(?P<pages>[A-Za-z]?\d+(?:\s*[-–—]{1,2}\s*[A-Za-z]?\d+)?)"
+)
+
+#: The two common arXiv ``journal_ref`` orders, tried in turn:
+#: ``Journal 14 (2012) 073012``, where the parenthesized number must look like
+#: a year, and ``Journal 14, 073012 (2012)``, where an issue may follow the
+#: volume in parentheses (``Nature 505 (7484), 501 (2014)``).
+_JOURNAL_REFERENCE_PATTERNS = (
+    re.compile(
         r"(?P<journal>.+?)\s+(?P<volume>\d+[A-Za-z]?)"
-        r"(?:\s*\((?P<number>\d+)\))?,\s*"
-        r"(?:(?:pages?|pp?\.)\s*)?"
-        r"(?P<pages>[A-Za-z]?\d+(?:\s*[-–—]{1,2}\s*[A-Za-z]?\d+)?)"
-        r"(?:\s*\((?P<year>\d{4})\))?",
-        clean,
+        r"\s*\((?P<year>(?:1[5-9]|20)\d\d)\),?\s*" + _PAGES_PATTERN,
         flags=re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?P<journal>.+?)\s+(?P<volume>\d+[A-Za-z]?)"
+        r"(?:\s*\((?P<number>\d+)\))?,\s*" + _PAGES_PATTERN + r"(?:\s*\((?P<year>\d{4})\))?",
+        flags=re.IGNORECASE,
+    ),
+)
+
+
+def _parse_journal_reference(value: str) -> dict[str, str]:
+    """Parse the common arXiv ``journal_ref`` shapes conservatively."""
+    clean = " ".join(value.split()).rstrip(".")
+    match = next(
+        (m for pattern in _JOURNAL_REFERENCE_PATTERNS if (m := pattern.fullmatch(clean))),
+        None,
     )
     if match is None:
         if not clean:

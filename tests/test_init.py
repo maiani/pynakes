@@ -205,8 +205,8 @@ def test_init_new_pinax_writes_agent_guide(tmp_path: Path) -> None:
     assert data["pinax"] is True
     assert data["agent_guide"] == str(tmp_path / "AGENTS.md")
     assert (tmp_path / "library.files").is_dir()
-    # Byte-exact on every platform: UTF-8 (the template is not ASCII) and LF,
-    # not the locale's code page and CRLF a bare write_text gives on Windows.
+    # Byte-exact on every platform: UTF-8 and LF, not the locale's code page
+    # and CRLF a bare write_text gives on Windows.
     written = (tmp_path / "AGENTS.md").read_bytes()
     assert written == render_agents_md("library").encode("utf-8")
     assert b"\r\n" not in written
@@ -299,3 +299,33 @@ def load_bib_from_text(text: str) -> BibFile:
     from pynakes.bibtex_parser import parse_bib
 
     return parse_bib(text)
+
+
+def test_agent_guide_lint_check_passes_a_library_with_only_info_findings(
+    tmp_path: Path,
+) -> None:
+    # The guide's validation command must not fail on suggestions: an agent
+    # that treats info findings as failures edits entries that are fine.
+    guide = render_agents_md("library")
+    assert "pynakes lint --strict --severity warning library.bib" in guide
+    bib = tmp_path / "library.bib"
+    bib.write_text(
+        "@article{Newton1687,\n"
+        "  author = {Newton, Isaac},\n"
+        "  title = {Philosophiae Naturalis Principia Mathematica},\n"
+        "  journal = {Royal Society},\n"
+        "  year = {1687}\n"
+        "}\n"
+    )
+
+    strict_all = runner.invoke(app, ["lint", "--strict", str(bib), "--json"])
+    assert strict_all.exit_code == 1, "fixture needs an info finding"
+    assert json.loads(strict_all.output)["summary"]["info"] > 0
+    guided = runner.invoke(app, ["lint", "--strict", "--severity", "warning", str(bib)])
+    assert guided.exit_code == 0, guided.output
+
+
+def test_agent_guide_says_how_to_fetch_sources_the_default_policy_skips() -> None:
+    guide = render_agents_md("library")
+    assert "{Key}.source/" in guide
+    assert "--material source" in guide

@@ -15,6 +15,9 @@ against live DOIs:
 * arXiv records repeat a keyword verbatim (``FOS: Physical sciences`` twice)
   and none carry ``eprint``/``archiveprefix``, though the arXiv id is right
   there in the DOI.
+* A DataCite thesis names its university as ``publisher``, where a thesis
+  needs ``school`` (``institution`` in BibLaTeX), and can list its one author
+  twice when the repository registered the creator twice.
 
 (Page ranges arrive with Unicode en-dashes here too, but that is not specific
 to the registrars: :class:`~pynakes.providers.records.ReferenceMetadata`
@@ -32,6 +35,7 @@ from __future__ import annotations
 import re
 
 from pynakes._identifiers import arxiv_doi, arxiv_id_from_doi, is_arxiv_doi, normalize_arxiv
+from pynakes.authors import split_name_list
 from pynakes.entry_types import (
     CONTAINER_FIELDS,
     eprint_fields,
@@ -52,6 +56,7 @@ def refine(metadata: ReferenceMetadata, *, dialect: str = "bibtex") -> Reference
         _refine_arxiv(metadata, dialect=dialect)
     else:
         _refine_untyped(metadata, dialect=dialect)
+        _refine_institution(metadata, dialect=dialect)
     return metadata
 
 
@@ -182,6 +187,46 @@ def _chapter_type(fields: dict[str, str], dialect: str) -> str:
     if is_biblatex(dialect) and not fields.get("editor", "").strip():
         return "inbook"
     return "incollection"
+
+
+# --- theses and reports -----------------------------------------------------
+
+_THESIS_TYPES = frozenset({"phdthesis", "mastersthesis", "thesis"})
+_REPORT_TYPES = frozenset({"techreport", "report"})
+
+
+def _refine_institution(metadata: ReferenceMetadata, *, dialect: str) -> None:
+    """Name a thesis's or report's institution in the field its type requires.
+
+    DataCite records the awarding university or issuing body as ``publisher``,
+    a field thesis and report styles ignore, while ``lint`` requires ``school``
+    (``institution`` in BibLaTeX) for a thesis and ``institution`` for a report.
+    A thesis has one author, so a name repeated in its author list is the
+    repository registering the creator twice; for other types a repeated name
+    may be two people and is left alone.
+    """
+    entry_type = metadata.entry_type.lower()
+    if entry_type in _THESIS_TYPES:
+        _collapse_repeated_authors(metadata)
+        target = "institution" if is_biblatex(dialect) else "school"
+    elif entry_type in _REPORT_TYPES:
+        target = "institution"
+    else:
+        return
+    fields = metadata.fields
+    publisher = fields.get("publisher", "").strip()
+    if not publisher or fields.get("school", "").strip() or fields.get("institution", "").strip():
+        return
+    fields.pop("publisher")
+    metadata.field_expressions.pop("publisher", None)
+    _set(fields, metadata.field_expressions, target, publisher)
+
+
+def _collapse_repeated_authors(metadata: ReferenceMetadata) -> None:
+    names = split_name_list(metadata.fields.get("author", ""))
+    unique = list(dict.fromkeys(" ".join(name.split()) for name in names))
+    if len(unique) < len(names):
+        _set(metadata.fields, metadata.field_expressions, "author", " and ".join(unique))
 
 
 def _set(fields: dict[str, str], expressions: dict[str, str], name: str, value: str) -> None:

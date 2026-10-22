@@ -253,34 +253,15 @@ def enrich(
         if only_field
         else None
     )
-    if online and not json_output:
-        with _integrity_bar("Enriching") as progress:
-            report = coll.enrich(
-                online=online,
-                cache_file=cache_file,
-                progress=progress,
-                concurrency=concurrency,
-                keys=selected,
-                fields=fields,
-            )
-    else:
-        report = coll.enrich(
-            online=online,
-            cache_file=cache_file,
-            concurrency=concurrency,
-            keys=selected,
-            fields=fields,
-        )
-    updates = list(report.updates)
-    warnings = [*selection_warnings, *report.warnings]
-    if selected == []:
-        warnings.append(
-            {"type": "no_entries_selected", "message": "No entry matched the selection"}
-        )
-    extra: dict[str, object] = {}
-    detail: list[str] = []
+    updates: list = []
     if published:
-        if online and not json_output:
+        # Promote before the online DOI fill. A preprint is still @misc, a type
+        # with no journal field, so a fill that ran first dropped the published
+        # journal while keeping its volume and pages. The offline step (a DOI
+        # found in a URL field) still runs first, because the promotion reads a
+        # preprint DOI only from the doi field. Its warnings repeat below.
+        updates += coll.enrich(keys=selected, fields=fields).updates
+        if not json_output:
             with _integrity_bar("Checking preprints") as progress:
                 preprints = coll.apply_published(
                     online=online,
@@ -299,6 +280,33 @@ def enrich(
                 fields=fields,
             )
         updates += preprints.updates
+    if online and not json_output:
+        with _integrity_bar("Enriching") as progress:
+            report = coll.enrich(
+                online=online,
+                cache_file=cache_file,
+                progress=progress,
+                concurrency=concurrency,
+                keys=selected,
+                fields=fields,
+            )
+    else:
+        report = coll.enrich(
+            online=online,
+            cache_file=cache_file,
+            concurrency=concurrency,
+            keys=selected,
+            fields=fields,
+        )
+    updates += report.updates
+    warnings = [*selection_warnings, *report.warnings]
+    if selected == []:
+        warnings.append(
+            {"type": "no_entries_selected", "message": "No entry matched the selection"}
+        )
+    extra: dict[str, object] = {}
+    detail: list[str] = []
+    if published:
         warnings += preprints.warnings
         extra["preprints"] = {
             "checked": preprints.checked,

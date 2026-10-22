@@ -169,8 +169,9 @@ _FIELD_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_:-]*")
 def _ref_edit_arguments(coll: Bibliography, params: dict) -> tuple[dict[str, str], list[str]]:
     """Validate a ``ref.edit`` operation exactly as ``ref edit`` validates its options.
 
-    Field names must be names, ``key``/``type`` are not fields, values are
-    trimmed, and a field cannot be both set and cleared.
+    Field names must be names, values are trimmed, and a field cannot be both
+    set and cleared. ``key`` and ``type`` are ordinary BibTeX fields here; the
+    citation key and entry type have their own parameters.
     """
     raw_fields = params.get("fields") or {}
     raw_clear = params.get("clear_fields") or []
@@ -183,10 +184,6 @@ def _ref_edit_arguments(coll: Bibliography, params: dict) -> tuple[dict[str, str
         name = str(raw_name).strip()
         if not _FIELD_NAME_RE.fullmatch(name):
             raise _Refused("InvalidInput", f"Invalid field name: {name!r}")
-        if name.lower() in {"key", "type"}:
-            raise _Refused(
-                "InvalidInput", f"{name!r} is not a field; use the citation key or entry_type"
-            )
         if not isinstance(value, str):
             raise _Refused("InvalidInput", f"Field {name!r} needs a string value")
         fields[name] = value.strip()

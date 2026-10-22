@@ -253,6 +253,25 @@ These forms still work with warnings in 0.8 and are scheduled for removal in
   unauthenticated rates.
 - Imports remove invisible characters such as embedded byte-order marks
   and zero-width spaces.
+- `enrich --published --online` no longer promotes a preprint to `@article`
+  without its journal. The promotion now runs before the DOI fill, which
+  dropped the journal while the entry was still `@misc`; only the offline step
+  that finds a DOI in a URL field still runs first. arXiv journal references
+  in the `Journal 14 (1902) 31` order now split into journal, volume, year and
+  pages, and a year-like number after the volume is read as the year.
+- `ref import` of a DataCite thesis DOI writes the university as `school`
+  (`institution` in BibLaTeX) instead of `publisher`, and lists an author the
+  repository registered twice only once. Technical reports get `institution`
+  the same way. A repeated name in other entry types is kept, since it may be
+  two people.
+- `ref add`, `ref edit` and the batch `ref.edit` operation accept the standard
+  `type` and `key` fields, such as `--field "type=PhD thesis"`. The entry type
+  and citation key keep their own options.
+- The `AGENTS.md` that `init --agent-guide` writes recommends
+  `lint --strict --severity warning`, which does not fail on info findings,
+  and says that source bundles are fetched only when `pinax-fetch-policy`
+  includes `source` or with `asset fetch --material source`. The guide is
+  also shorter.
 
 ## [0.7.0] - 2026-10-13
 

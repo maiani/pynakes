@@ -163,65 +163,44 @@ def _normalize_line_endings(text: str, line_ending: str) -> str:
 AGENTS_GUIDE = """\
 # Bibliography management (Pinax)
 
-This directory manages a BibTeX library with an associated **Pinax** — a
-sidecar directory (`{bibname}.files/`) that stores downloaded materials
-(PDFs and LaTeX sources).
-
-## Pinax structure
+`{bibname}.bib` is managed with pynakes. Its **Pinax**, `{bibname}.files/`,
+holds downloaded materials named by citation key:
 
 ```
-{bibname}.bib               # BibTeX library (pynakes-managed)
-{bibname}.files/            # Pinax materials directory (auto-generated)
-  .pinax/manifest.json    # Integrity manifest (SHA-256, fetch dates, sources)
-  {{Key}}.preprint.pdf      # Preprint PDF for entry {{Key}}
-  {{Key}}.source/           # Preprint source bundle (LaTeX + figures)
-  {{Key}}.published.pdf     # Published PDF (when available)
-  {{Key}}.supplement.pdf    # One unambiguous supplementary PDF
+{bibname}.files/
+  .pinax/manifest.json    # SHA-256 hashes, fetch dates, sources
+  {{Key}}.preprint.pdf
+  {{Key}}.published.pdf
+  {{Key}}.supplement.pdf
+  {{Key}}.source/           # preprint LaTeX source and figures
 ```
 
-The materials path is set in the `pynakes-meta` block inside the `.bib`
-file (key: `pinax-files-dir`). Fetch behaviour is configured by:
-- `pinax-fetch-policy`: comma-separated list of ``preprint``, ``published``, ``source``,
-  ``supplement``, and/or ``bestpdf`` (default: ``bestpdf``, which tries published first then
-  falls back to preprint when no open-access copy exists)
+## Rules
 
-## Agent rules
+1. **Change the library only through pynakes.** Add a reference with
+   `pynakes ref import {bibname}.bib <identifier>` (DOI, arXiv id, `PMID:...`,
+   or a supported URL). Without an identifier, use
+   `pynakes ref add {bibname}.bib <citekey> --field name=value`. Remove one with
+   `pynakes ref remove {bibname}.bib <citekey>`, which also removes its
+   materials. Preview any change with `--dry-run --diff`.
 
-1. **Prefer source over PDF** — when an entry has a Pinax source directory
-   (`{{Key}}.source/`), read the `.tex` files there rather than the `.pdf`.
-   The source contains semantically meaningful content (equations, citations,
-   structured sections) that PDF reading tools cannot reliably extract.
+2. **Fetch materials with `pynakes asset fetch {bibname}.bib`**, never by
+   hand, so the manifest stays accurate. The `pinax-fetch-policy` setting
+   decides what is fetched; the default, `bestpdf`, fetches PDFs only. Add
+   `--material source --key <citekey>` to get an entry's LaTeX source.
 
-2. **Use `pynakes asset fetch` to download** — never manually download materials.
-   `pynakes asset fetch` handles the download and updates the manifest.
-   Run it from this directory (it auto-detects the `.bib` file).
+3. **Read the source when there is one.** `{{Key}}.source/` keeps equations,
+   citations and structure that PDF extraction loses.
 
-3. **Validate before editing** — run `pynakes lint --strict {bibname}.bib`
-   and `pynakes asset check {bibname}.bib --root .` before and after changes.
+4. **Check before and after changes.**
+   `pynakes lint --strict --severity warning {bibname}.bib` fails only on
+   errors and warnings. Info findings are suggestions: do not edit entries
+   just to silence them. `pynakes asset check --strict {bibname}.bib --root .`
+   verifies the materials; report checksum drift to the user rather than
+   fixing it.
 
-4. **Add new references through pynakes** — use
-   `pynakes ref import {bibname}.bib <identifier>` for DOI/repository metadata lookup,
-   or `pynakes ref add {bibname}.bib <key> --field name=value` for a manual entry,
-   rather than writing entries by hand. `ref import` auto-detects DOI
-   (`10.1103/PhysRevLett.116.061102`), arXiv ID (`2301.00001`),
-   provider-prefixed identifiers (`PMID:12345678`), and supported reference
-   URLs, then ensures consistent formatting and citation-key generation.
-
-5. **Remove entries with `pynakes ref remove`** — use
-   `pynakes ref remove {bibname}.bib <citekey>` to delete an entry and its Pinax
-   materials.
-
-6. **Inspect before deciding** — `pynakes inspect --json {bibname}.bib` gives a
-   machine-readable view of every entry and its local file presence, so you can
-   decide what to read or fetch without re-scanning the directory.
-
-7. **Review diffs before committing changes** — all modifying commands support
-   `--dry-run --diff`; use them to preview before applying.
-
-8. **Check pinax integrity** — after any fetch or modify operation, verify with
-   `pynakes asset check --strict {bibname}.bib --root .`. The manifest tracks
-   SHA-256 hashes and fetch dates; report any drift (mismatched checksums) to
-   the user rather than silently fixing.
+5. **Inspect instead of scanning.** `pynakes inspect --json {bibname}.bib`
+   lists every entry and which of its materials exist.
 """
 
 

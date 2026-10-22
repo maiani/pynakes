@@ -34,8 +34,6 @@ def parse_field_assignments(assignments: list[str]) -> dict[str, str]:
         name = name.strip()
         if not _FIELD_NAME_RE.fullmatch(name):
             raise ValueError(f"Invalid field name: {name!r}")
-        if name.lower() in {"key", "type"}:
-            raise ValueError(f"{name!r} is not a field; use the citation key or --type")
         fields[name] = value.strip()
         check_field_value(name, fields[name])
     return fields

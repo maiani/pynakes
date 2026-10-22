@@ -1933,6 +1933,40 @@ class TestAddCommand:
         assert result.exit_code == 1, result.output
         assert json.loads(result.output)["error"] == "InvalidInput"
 
+    def test_add_manual_entry_accepts_the_standard_type_field(self, tmp_path: Path) -> None:
+        # `type` names a thesis or report kind; `--type` stays the entry type.
+        bib = tmp_path / "refs.bib"
+        bib.write_text("")
+
+        result = runner.invoke(
+            app,
+            [
+                "ref",
+                "add",
+                str(bib),
+                "Turing1938Systems",
+                "--type",
+                "phdthesis",
+                "--field",
+                "type=PhD thesis",
+                "--field",
+                "author=Turing, Alan",
+                "--field",
+                "title=Systems of Logic Based on Ordinals",
+                "--field",
+                "school=Princeton University",
+                "--field",
+                "year=1938",
+                "--no-interactive",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        text = bib.read_text()
+        assert "@phdthesis{Turing1938Systems," in text
+        assert "type = {PhD thesis}" in text
+
     def test_add_stub_entry_warns_about_missing_required_fields(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text("")

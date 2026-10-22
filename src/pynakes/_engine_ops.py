@@ -640,7 +640,10 @@ class BibliographyOperations:
     ) -> integrity_ops.PublishedReport:
         """Apply published-version metadata updates in memory, for ``keys`` or every entry.
 
-        ``fields`` restricts the updates applied, as for :meth:`enrich`.
+        ``fields`` restricts the updates applied, as for :meth:`enrich`. Call it
+        before an online :meth:`enrich`, as ``enrich --published`` does: a
+        preprint is still ``@misc`` until promoted, and that type has no journal
+        field, so a DOI fill that ran first would leave the journal out.
         """
         return self._enrich_selected_fields(
             lambda lib: integrity_ops.check_published(
