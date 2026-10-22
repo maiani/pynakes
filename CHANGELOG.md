@@ -12,7 +12,7 @@ sections. Historical releases retain their original headings.
 
 ## [Unreleased]
 
-## [0.8.0] - 2026-10-21
+## [0.8.0] - 2026-10-22
 
 Research context, reusable queries and bibliography analysis: read bounded
 selections, save their criteria, and explore co-authorship with explicit

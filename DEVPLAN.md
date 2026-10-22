@@ -372,6 +372,38 @@ on `PATH`. Both are thin launchers, not the companions themselves:
   it is not mistaken for the project-scoped VS Code extension, which has its own
   entry point.
 
+#### Project setup follow-ups (first in the cycle)
+
+A field report from setting up a project bibliography with Pinax and an agent
+(import, `enrich --published`, `asset fetch`, `init --agent-guide`) found four
+bugs, fixed in 0.8.0, and the requests below. They are small and independent of
+`Library`, so they come first, right after the 0.8.0 tag, one at a time. Each
+new option gets its CLI flag, `pynakes-meta` setting and `metadata set` form.
+
+- `ref import` takes `IDENTIFIER=KEY` pairs, so a batch can name its own keys.
+  Without a `key-pattern` setting, generated keys follow the pattern the
+  library's existing keys show, reporting the inferred pattern.
+- An imported preprint whose record already names a journal DOI gets a hint
+  to run `enrich --published --online`, instead of staying `@misc` silently.
+- `ref import` reports progress per identifier on stderr, even without a
+  terminal, and accepts `--cache-file` like `enrich` and `asset fetch`.
+- `asset fetch --dry-run` reports coverage as grouped counts with the affected
+  keys, not one line listing every key. Default `lint` output starts with a
+  per-category summary before the findings.
+- `init --agent-guide` prints a one-line pointer to add to a parent
+  `AGENTS.md` or `CLAUDE.md`, since agents usually load only the root guide.
+  The guide gains a short conventions section generated from the library:
+  key pattern, author format, the import, `enrich --published`, fill-gaps
+  workflow, and a reminder that the Pinax folder belongs in `.gitignore`.
+- Settle network consent. `ref import` and `asset fetch` go online simply by
+  being run, `enrich` and `verify` use `--online` to leave their offline mode,
+  and `ref find` requires `--online` although it has no offline mode. Choose
+  one rule, document it, and route any change through deprecation.
+
+Making imports follow the library's author format and encoding, and making
+provider extras such as `abstract` or arXiv's `updated` opt-in, belongs to the
+v0.11 enrichment value policy.
+
 ### v0.10 — Project assembly and synchronization of linked bibliographies
 
 **Workflow:** seed a project from existing collections and maintain an explicitly
@@ -410,6 +442,9 @@ exceptions, and have later maintenance respect those decisions.
   normalization. Cover page ranges, month expressions (including user string
   definitions), DOI resolver URLs, and provenance for provider publisher names.
   Provider spelling alone is not evidence that a publisher name is wrong.
+  Imports follow the same policy: the library's author format and encoding
+  apply to a new entry, and provider extras such as `abstract` or arXiv's
+  `updated` field are opt-in through a setting.
 
 - Add field-level merge choices and provenance using existing identity evidence.
   Validate choices against source fingerprints; preserve materials and references
