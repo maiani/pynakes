@@ -51,7 +51,7 @@ Bibliography when `pynakes-meta` declares a `pinax-files-dir`.
 | Metadata block | MetadataBlock | One top-level metadata comment — `@comment{jabref-meta: ...}` or pynakes' superset `@comment{pynakes-meta: ...}` (tagged by `namespace`) — represented both structurally and as raw text. |
 | Bibliography (working unit) | Bibliography | A staged, reconciled handle over one `.bib` file — "a slice of references covering one aspect of a topic". Supports operations, preview, diff, commit, reset, reload, and external-change detection. |
 | Pinax mode | FileStore + fetch primitives | Optional mode of one Bibliography together with its `pinax-files-dir` of citation-key-addressed materials. Plain bibliographies have no Pinax behavior. Includes agent inspection, file checks/fixes, arXiv material fetch, provenance manifests, set-operation copying, and coordinated key-edit material moves. |
-| Library (corpus) | — (planned) | A directory of pinakes/bibliographies, enabling cross-file search, dedup, and identity resolution across the full research corpus. Not implemented yet (see [Roadmap](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md)). |
+| Library | — (planned) | A declared set of bibliographies searched and reconciled as one collection: membership, cross-member work identity, and a derived Catalogue, with no data of its own. See [Library](#library-a-declared-set-of-bibliographies-planned). Not implemented yet. |
 | Catalogue (index) | — (planned) | A derived, rebuildable search index over the Library (e.g. SQLite FTS). Never a competing source of truth; the Bibliographies are. Not implemented yet. |
 
 ### BibEntry: record plus preservation state
@@ -173,6 +173,48 @@ filesystem watcher is intentionally **not** in core: it is a background thread
 (non-deterministic, dependency-bearing, and a UX concern), so the watch loop is a
 consumer's job. If a push helper ever earns its place it would ship as an opt-in
 extra, never required by core.
+
+### Library: a declared set of bibliographies (planned)
+
+A **library** is a set of bibliographies chosen to be searched and reconciled
+as one collection. Its members are `.bib` files, each with its Pinax when it
+has one. The library adds only three things: **membership**, **work identity
+across members**, and a derived, rebuildable **Catalogue**. Everything else
+stays in the members:
+
+- **It owns no data.** Entries, settings and materials live in the member
+  files, which remain authoritative. Removing a library changes no `.bib`.
+  Per-bibliography settings stay in each file's `pynakes-meta`.
+- **Membership is explicit:** listed files, or a declared root with a pattern.
+  A library never scans directories it was not given.
+- **It is read-mostly.** Lookup, search, duplicate reports and rollups read
+  across members; an edit still goes to one `Bibliography`. Writes that span
+  members belong to project assembly and synchronization, not to the library.
+- **Identity is its contribution.** Two entries in different members can be
+  one work; a repeated citation key alone does not establish that. Reports
+  keep each entry's file and key, and keep exact and probable matches apart.
+
+A library is declared in two ways. A command given several member files forms
+an unnamed library for that call, which suits scripts and agents. A **library
+manifest**, a small TOML file, makes a named library that can be reopened: it
+lists the members (paths or patterns, resolved from the manifest's own
+folder), an optional name, and where the Catalogue lives. The manifest holds
+nothing else; defaults for import, normalization or formatting stay in each
+`.bib`, so the manifest never becomes project-level configuration.
+
+Membership is recorded in the library, not in the members, so one file may
+belong to several libraries. Libraries do not nest. A single master `.bib` is a
+library of one member: library scope is about whose bibliography it is, not how
+many files it has.
+
+A library is distinct from neighbouring concepts:
+
+| Not | Why |
+| --- | --- |
+| A `.bib` file | One file is a `Bibliography`; a library has one or more of them as members. |
+| A project | A project is a manuscript's bibliography and its sources. It may read a library (import from it, compare against it) but does not own or curate it. |
+| Linked bibliographies | A link is declared in both files it joins and constrains them; membership is the library's claim alone, and a link may cross library boundaries. |
+| A directory | A root is a way to list members, not the library itself. |
 
 ## Layers and dependency direction
 
@@ -410,7 +452,7 @@ downstream transport concern: the CLI already provides a machine-readable, safe
 agent interface.
 
 Pinax mode is implemented: one `Bibliography` plus its `pinax-files-dir`
-of materials. The next planned extensions are `Library` (a directory of
+of materials. The next planned extensions are `Library` (a declared set of
 bibliographies with cross-file search and identity resolution) and `Catalogue`
 (a derived, rebuildable index). Those collection APIs are not implemented — see
 [DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md) for the roadmap.

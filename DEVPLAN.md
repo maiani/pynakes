@@ -72,7 +72,8 @@ Decisions that still constrain new work:
   (`% pynakes: verb args -- reason`), never a `pynakes-*` field; a new
   directive adds a word to `ref directive`, not a command.
 - No project-level config (`pynakes.toml`, `[tool.pynakes]`): the `.bib` carries
-  its own settings. Revisit with the v0.9 `Library`.
+  its own settings. The v0.9 library manifest does not change this: it lists
+  members and the Catalogue location, never settings.
 - Group-tree commands edit the hierarchy, not entries, unless asked:
   `rename-group --members` moves memberships, and `remove-group` keeps them.
 - The surface contract is enforced by `tests/test_contract.py`, read from the
@@ -263,12 +264,16 @@ One feature per commit, each usable on the branch before the next starts.
 0. **Close the setup follow-ups** below, then get one full CI run of the
    branch (a draft pull request or a manual `ci.yml` dispatch; a push alone
    runs nothing) before `Library` work begins.
-1. **`Library` reads.** First settle where membership is declared: a library
-   file at the root, or `pynakes-meta` in one master `.bib`. A library file is
-   the leaning, since a library is not one of its own members. Then `Library`
-   over explicit files or a declared root, key lookup across members,
-   `corpus search` with file/entry provenance, and unreadable members reported
-   rather than skipped.
+1. **`Library` reads**, built to the definition in
+   [the architecture guide](docs/guides/architecture.md#library-a-declared-set-of-bibliographies-planned):
+   membership, work identity and a Catalogue over member files that keep all
+   the data. A named library is a TOML manifest listing members (paths or
+   patterns, resolved from the manifest's folder), an optional name and the
+   Catalogue location, and nothing else; several files given to one command
+   form an unnamed library. A file may belong to several libraries; libraries
+   do not nest. Settle the manifest's file name and schema first, then key
+   lookup across members, `corpus search` with file/entry provenance, and
+   unreadable members reported rather than skipped.
 2. **Cross-file identity and rollups.** Duplicate checks across members, exact
    versus probable, reusing work matching; `analyze` and `coauthors` over a
    `Library`, counting identified works rather than entry occurrences.
