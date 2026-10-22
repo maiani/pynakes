@@ -134,14 +134,17 @@ class TestLintMultiFile:
 
 
 class TestOtherStrictChecks:
-    def test_keys_check_strict(self, tmp_path: Path) -> None:
+    def test_duplicate_key_gate_strict(self, tmp_path: Path) -> None:
         errs = _bib(tmp_path, "errs.bib", WITH_ERRORS)
-        assert runner.invoke(app, ["keys", "check", str(errs)]).exit_code == 0
-        assert runner.invoke(app, ["keys", "check", str(errs), "--strict"]).exit_code == 1
-
-    def test_keys_check_strict_clean(self, tmp_path: Path) -> None:
+        gate = ["lint", "--only", "duplicate_key"]
+        assert runner.invoke(app, [*gate, str(errs)]).exit_code == 0
+        assert runner.invoke(app, [*gate, str(errs), "--strict"]).exit_code == 1
         clean = _bib(tmp_path, "clean.bib", CLEAN)
-        assert runner.invoke(app, ["keys", "check", str(clean), "--strict"]).exit_code == 0
+        assert runner.invoke(app, [*gate, str(clean), "--strict"]).exit_code == 0
+
+    def test_keys_check_was_removed(self, tmp_path: Path) -> None:
+        clean = _bib(tmp_path, "clean.bib", CLEAN)
+        assert runner.invoke(app, ["keys", "check", str(clean)]).exit_code != 0
 
     def test_files_check_strict(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"

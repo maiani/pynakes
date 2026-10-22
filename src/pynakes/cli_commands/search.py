@@ -23,7 +23,6 @@ from pynakes.cli_common import (
     _source_sha256,
     bib_file_argument,
     bind_where_filter,
-    deprecation_warning,
     key_option,
     parse_key_selector,
     where_option,
@@ -48,12 +47,6 @@ def search(
         "The citation key and entry type stay searchable",
     ),
     select: list[str] | None = select_option(),
-    in_field: list[str] | None = typer.Option(
-        None,
-        "--in-field",
-        help="Deprecated, removed in 0.9.0: use --in to choose the fields searched "
-        "and --select to choose the fields returned",
-    ),
     where: str | None = where_option(),
     key: list[str] | None = key_option(),
     case_sensitive: bool = typer.Option(False, "--case-sensitive", help="Match case sensitively"),
@@ -117,17 +110,6 @@ def search(
     """
     check_bounds(limit, max_chars)
     warnings: list[dict] = []
-    if in_field:
-        if search_in or select:
-            raise InvalidInputError(
-                "--in-field is deprecated and cannot be combined with --in or --select; "
-                "use --in and --select"
-            )
-        warnings.append(
-            deprecation_warning(
-                "--in-field", "--in and --select", removal="0.9.0", json_output=json_output
-            )
-        )
     try:
         scope = parse_field_selection(search_in)
     except ValueError as exc:
@@ -144,7 +126,6 @@ def search(
     results = search_ops.search_entries(
         lib,
         query,
-        fields=in_field,
         search_in=scope,
         extra_fields=("abstract",) if abstract else None,
         where=where_filter,
@@ -162,7 +143,7 @@ def search(
             query=query,
             where=where,
             keys=parse_key_selector(key),
-            in_fields=list(scope or in_field or []),
+            in_fields=list(scope or []),
             case_sensitive=case_sensitive,
             fuzzy=fuzzy,
             ranked=ranked,
@@ -183,7 +164,7 @@ def search(
                 "where": where,
                 "keys": parse_key_selector(key),
                 "where_parsed": where_filter.to_dict() if where_filter is not None else None,
-                "in_fields": list(scope or in_field or []),
+                "in_fields": list(scope or []),
                 "case_sensitive": case_sensitive,
                 "fuzzy": fuzzy,
                 "abstract": abstract,

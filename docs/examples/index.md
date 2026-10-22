@@ -152,17 +152,19 @@ pynakes keys rename refs.bib OldKey2020 NewKey2020 paper.tex chapters/
 pynakes tex scan refs.bib paper.tex paper.aux --json
 ```
 
-Tag cited entries:
+To act on the cited entries, link the manuscript once and select them with
+`--where used`. Tag them:
 
 ```bash
-pynakes tex scan refs.bib paper.tex --group Cited --dry-run --diff
-pynakes tex scan refs.bib paper.tex --group Cited
+pynakes tex add refs.bib paper.tex
+pynakes fields append refs.bib groups Cited --where used --dry-run --diff
+pynakes fields append refs.bib groups Cited --where used
 ```
 
 Export a cited-only `.bib` file:
 
 ```bash
-pynakes tex scan refs.bib paper.tex --out cited-only.bib
+pynakes corpus combine refs.bib --where used --out cited-only.bib
 ```
 
 ## Example 8b: Combine and Split Across Files

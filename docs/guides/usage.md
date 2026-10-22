@@ -357,10 +357,32 @@ usable directly as a modifier. A handful of rarer combinator markers
 (`authN_M`, `authorsAlpha`, `editorLastForeIni`, `keywordN`, and similar) are
 not yet supported and raise the same explicit error.
 
+As in JabRef, a marker keeps its value's case and only modifiers change it:
+`[auth]` on Isaac Newton gives `Newton`, `[auth:lower]` gives `newton`.
+`veryshorttitle` and `shorttitle` keep each title word's case, while `title`,
+`camel`, and `camelN` capitalize the words. Marker names are lowercase; a
+capitalized spelling such as `[Auth]` is accepted as an alias of `[auth]`, but
+pynakes never writes one.
+
 Pass a citation key to apply that preferred pattern to just one entry, or
 `--all` to regenerate the whole library. Like `keys rename`, generated renames
 also rewrite matching TeX citations in linked `tex-sources` metadata when it is
 configured.
+
+A library that stores no pattern usually still has a style. `keys pattern`
+reports the stored pattern and the common pattern most existing keys follow:
+
+```sh
+pynakes keys pattern refs.bib
+```
+
+It recognizes a short list of styles: `Newton1687Philosophiae`, two or three
+title words instead of one, author and year with or without a separator, and
+their lowercase forms. It names a pattern only when it matches more than half
+of the entries that have an author or title, and at least three, and prints the
+`metadata set` command that stores it. Nothing changes until you run that
+command. `ref import` warns with `key_pattern_unset` when it generates a key
+while no pattern is stored and the existing keys follow another style.
 
 `keys rename` updates the entry key in the `.bib` file, every `crossref`, `xref`,
 `xdata`, `related`, and `entryset` value in the library that names it, and
@@ -584,8 +606,9 @@ can be checked: `ref import` either resolves it or does not. A reference written
 out as text carries no such claim, and this is how to ask whether one describes
 anything that exists. Read-only; import a candidate you accept by its DOI.
 
-`ref find` requires `--online`. `ref import`, `asset fetch`, and
-`ref add` / `ref import --fetch` authorize network access explicitly without it.
+Like `ref import` and `asset fetch`, `ref find` goes online by being run: it
+has no offline mode for `--online` to leave. The flag is deprecated, ignored,
+and removed in 0.10.0.
 `--limit` caps the candidates (5 by default), and `--cache-file` reuses answers
 across runs.
 
@@ -645,6 +668,17 @@ are applied to the new entry, and so is its `format-*` layout, such as
 declares none of these settings gets the entry as the provider described it;
 run `normalize` or `format` with `--key` to bring it in line by hand.
 
+### Preprints that are already published
+
+An arXiv import describes the preprint, so the entry stays `@misc` even when
+the arXiv record names the journal DOI. Promotion is a separate, online step,
+and the import says when it applies: a `published_version_available` warning
+lists those keys and gives the command, for example
+
+```sh
+pynakes enrich refs.bib --published --online --key Einstein1905Electrodynamics
+```
+
 ### Importing several at once
 
 Give several identifiers, or pipe a list, and they resolve in one call and
@@ -653,6 +687,23 @@ commit in one write. Use `-` as the identifier to read standard input.
 Piped input is one identifier per line; blank lines and `#` comments are
 skipped, so a list pasted out of a chat or a notes file needs no cleaning up
 first.
+
+To choose the citation keys, write an identifier as `IDENTIFIER=KEY`, on the
+command line or on a piped line:
+
+```sh
+pynakes ref import refs.bib arXiv:2301.00001=Lovelace1843 10.5555/engine=Babbage1822
+```
+
+The key follows the last `=` and starts with a letter. Identifiers without one
+get a generated key. A key that is already taken fails only that identifier,
+with the reason `key_conflict`. For a single identifier, `--key` works too.
+
+Without `--json`, each identifier is announced on stderr as it is looked up
+(`[3/8] 10.5555/engine`), so a slow list shows progress even when stderr is
+captured. JSON runs keep stderr silent. To preview with `--dry-run` and then
+apply without asking every provider again, give both runs the same
+`--cache-file`; it holds the provider responses and is safe to delete.
 
 Each identifier is reported separately, and **one that does not resolve does not
 stop the others**:
@@ -775,14 +826,13 @@ readability convention chosen to make entries predictable and easy to scan:
    fields, avoiding an arbitrary alphabetical reshuffle.
 
 `--field-order` accepts `preferred`, `preserve`, or `alphabetical`.
-`--entry-order` accepts `preserve`, `key`, or `profile` (the library's `sort-order` /
-`saveOrderConfig`). It is deprecated and removed in 0.9.0, with the
-`format-entry-order` setting: entry order is not only layout — BibTeX reads the
-first of several entries sharing a key, and an unsorted style with `\nocite{*}`
-lists entries in file order — so sorting belongs to `normalize --sort-by` and
-the `sort-order` setting, which move entries byte for byte. `--block-order preserve` keeps comments, strings, preambles,
-and raw source in place as barriers while sorting entry runs (a comment attached
-directly above an entry is not a barrier; it moves with its entry); the default
+`format` keeps the entry order it is given: entry order is not only layout —
+BibTeX reads the first of several entries sharing a key, and an unsorted style
+with `\nocite{*}` lists entries in file order — so sorting belongs to
+`normalize --sort-by` and the `sort-order` setting, which move entries byte for
+byte. `--block-order preserve` keeps comments, strings, preambles,
+and raw source in place, with each run of entries between them (a comment attached
+directly above an entry stays with its entry); the default
 `canonical` policy retains pynakes' metadata/JabRef placement convention.
 
 Safe value wrapping is opt-in. `--wrap-values stable` preserves authored legal
@@ -799,7 +849,7 @@ including unmatched entries — stays identical, so the diff covers exactly the
 entries you asked for.
 
 A selection owns the layout *inside* each entry it matches, not the layout of
-the file, so the whole-file options `--entry-order`, `--block-order`, and
+the file, so the whole-file options `--block-order` and
 `--blank-lines`/`--no-blank-lines` cannot be combined with `--where`.
 
 ## normalize
@@ -938,8 +988,8 @@ pynakes scrub refs.bib --where used --out public.bib           # a public copy
 pynakes fields append refs.bib keywords cited --where used     # tag them
 ```
 
-`tex scan --out`, `--group`, and `--keyword` still export and tag until 0.9.0,
-with a `deprecated` warning.
+`tex scan` itself only reports: its former `--out`, `--group`, and `--keyword`
+options were removed in 0.9.0 in favour of these commands.
 
 With `--json`, the report's `usages` object locates every citation: each cited
 key maps to its occurrences, one `{path, line, column, text, macro}` per
@@ -1092,9 +1142,7 @@ Two more options shape a search independently. `--in title,abstract` looks for
 the terms only in those stored fields (the citation key and entry type stay
 searchable); `--select title,year` returns only those fields for each match,
 listing absent ones under `missing_fields`. `--in title --select abstract`
-matches titles and returns abstracts. `--in-field` is deprecated and will be
-removed in 0.9.0: it did both at once, so replace `--in-field title` with
-`--in title --select title`.
+matches titles and returns abstracts.
 
 `--abstract` prints a one-line abstract excerpt under each hit, so a
 result list can be triaged without a second command; a result with no stored

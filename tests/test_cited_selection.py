@@ -1,4 +1,4 @@
-"""Acting on cited entries: ``--where used`` replaces ``tex scan``'s write options."""
+"""Acting on cited entries: ``--where used`` selects what ``tex scan`` reports."""
 
 import json
 from pathlib import Path
@@ -31,38 +31,25 @@ def _json(*args: str) -> tuple[int, dict]:
     return result.exit_code, json.loads(result.output)
 
 
-def test_a_plain_scan_reports_no_deprecation_and_no_change(tmp_path: Path) -> None:
+def test_scan_only_reports(tmp_path: Path) -> None:
     bib = _library(tmp_path)
 
     code, payload = _json("tex", "scan", str(bib))
 
     assert code == 0 and payload["warnings"] == []
     assert payload["report"]["used"] == ["Euler1748"]
-    assert payload["plan"]["summary"]["modified"] == 0 and payload["plan"]["entries"] == []
+    assert bib.read_text(encoding="utf-8") == LIBRARY
 
 
-def test_scan_write_options_still_work_and_say_they_are_deprecated(tmp_path: Path) -> None:
+def test_where_used_tags_the_cited_entries(tmp_path: Path) -> None:
     bib = _library(tmp_path)
-    out = tmp_path / "cited.bib"
 
-    code, payload = _json("tex", "scan", str(bib), "--keyword", "cited", "--out", str(out))
+    code, _payload = _json("fields", "append", str(bib), "keywords", "cited", "--where", "used")
 
-    assert code == 0 and out.exists()
-    deprecated = {w["old"] for w in payload["warnings"] if w["type"] == "deprecated"}
-    assert deprecated == {"tex scan --out", "tex scan --keyword"}
-    assert "keywords = {cited}" in bib.read_text(encoding="utf-8")
-
-
-def test_where_used_tags_what_scan_keyword_tagged(tmp_path: Path) -> None:
-    tagged_by_scan = _library(tmp_path / "a")
-    tagged_by_where = _library(tmp_path / "b")
-
-    runner.invoke(app, ["tex", "scan", str(tagged_by_scan), "--keyword", "cited"])
-    runner.invoke(
-        app, ["fields", "append", str(tagged_by_where), "keywords", "cited", "--where", "used"]
-    )
-
-    assert tagged_by_scan.read_bytes() == tagged_by_where.read_bytes()
+    lib = Bibliography.open(bib).lib
+    assert code == 0
+    assert lib.entries["Euler1748"].fields["keywords"] == "cited"
+    assert "keywords" not in lib.entries["Newton1687"].fields
 
 
 def test_combine_where_used_exports_the_cited_entries(tmp_path: Path) -> None:

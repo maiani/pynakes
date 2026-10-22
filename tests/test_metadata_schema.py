@@ -313,7 +313,7 @@ def test_format_profile_keys_are_owned_and_validated() -> None:
     metadata_pkg.validate_metadata_value("format-indent", "tab")
     metadata_pkg.validate_metadata_value("format-line-width", "100")
     metadata_pkg.validate_metadata_value("format-field-order", "alphabetical")
-    metadata_pkg.validate_metadata_value("format-entry-order", "profile")
+    assert metadata_pkg.metadata_category("format-entry-order") == "unknown"
     metadata_pkg.validate_metadata_value("format-block-order", "preserve")
     metadata_pkg.validate_metadata_value("format-wrap-values", "stable")
     metadata_pkg.validate_metadata_value("format-trailing-comma", "false")

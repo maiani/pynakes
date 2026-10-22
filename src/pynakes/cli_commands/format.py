@@ -31,7 +31,6 @@ from pynakes.cli_common import (
     _verb,
     bib_file_argument,
     bind_where_filter,
-    deprecation_warning,
     is_auxiliary_bib_file,
     key_option,
     parse_key_selector,
@@ -50,12 +49,6 @@ class FieldOrderChoice(str, Enum):
     preferred = "preferred"
     preserve = "preserve"
     alphabetical = "alphabetical"
-
-
-class EntryOrderChoice(str, Enum):
-    preserve = "preserve"
-    key = "key"
-    profile = "profile"
 
 
 class BlockOrderChoice(str, Enum):
@@ -81,7 +74,6 @@ class FormatOverrides:
     trailing_comma: bool | None
     blank_line_entries: bool | None
     field_order: FieldOrderChoice | None
-    entry_order: EntryOrderChoice | None
     block_order: BlockOrderChoice | None
     wrap_values: WrapValuesChoice | None
     line_width: int | None
@@ -102,7 +94,6 @@ def _layout(
         trailing_comma=overrides.trailing_comma,
         blank_line_entries=overrides.blank_line_entries,
         field_order=overrides.field_order.value if overrides.field_order is not None else None,
-        entry_order=overrides.entry_order.value if overrides.entry_order is not None else None,
         block_order=overrides.block_order.value if overrides.block_order is not None else None,
         wrap_values=overrides.wrap_values.value if overrides.wrap_values is not None else None,
         line_width=overrides.line_width,
@@ -124,20 +115,6 @@ def _recursive_files(target: Path) -> list[Path]:
         ),
         key=lambda path: str(path).casefold(),
     )
-
-
-def _order_warnings(layout: CanonicalLayout, json_output: bool) -> list[dict]:
-    """Warn that format reorders entries, which moves to normalize in 0.9.0."""
-    if layout.entry_order == "preserve":
-        return []
-    return [
-        deprecation_warning(
-            "format --entry-order (and the format-entry-order setting)",
-            "normalize --sort-by SPEC (setting: sort-order)",
-            removal="0.9.0",
-            json_output=json_output,
-        )
-    ]
 
 
 def _check_payload(
@@ -198,10 +175,8 @@ def _run_recursive(
             layout = _layout(coll.lib, overrides)
             coll.format(layout, bind_where_filter(coll, where, keys=keys))
             plan = coll.change_plan()
-            order_warnings = _order_warnings(layout, params.json_output)
             if check:
                 payload = _check_payload(str(path), coll, where, keys)
-                payload["warnings"] = order_warnings
                 dirty += int(bool(payload["modified"]))
             else:
                 diff_text, modified, changed = _preview_or_commit(coll, params)
@@ -215,7 +190,7 @@ def _run_recursive(
                     "dry_run": params.dry_run,
                     "modified": modified,
                     "modified_entries": changed,
-                    "warnings": order_warnings,
+                    "warnings": [],
                     "where": where,
                     "keys": list(keys or []),
                     "plan": plan,
@@ -284,11 +259,6 @@ def format_bibliography(
     field_order: FieldOrderChoice | None = typer.Option(
         None, "--field-order", help="Field ordering policy"
     ),
-    entry_order: EntryOrderChoice | None = typer.Option(
-        None,
-        "--entry-order",
-        help="Deprecated (removed in 0.9.0): use normalize --sort-by. Entry ordering policy",
-    ),
     block_order: BlockOrderChoice | None = typer.Option(
         None, "--block-order", help="Top-level block ordering policy"
     ),
@@ -331,8 +301,9 @@ def format_bibliography(
 
     `--where` restricts the rewrite to the matching entries. A selection owns
     the layout inside each entry it matches, not the layout of the file, so
-    `--entry-order`, `--block-order`, and `--blank-lines` are whole-file
-    policies that cannot be combined with it.
+    `--block-order` and `--blank-lines` are whole-file policies that cannot
+    be combined with it. Entry order is not layout: `normalize --sort-by`
+    sorts entries, and format keeps the order it is given.
     """
     to_stdout = out == "-"
     if out is not None and (check or recursive):
@@ -351,7 +322,6 @@ def format_bibliography(
     selecting = where is not None or bool(selected_keys)
     if selecting:
         whole_file = {
-            "--entry-order": entry_order,
             "--block-order": block_order,
             "--blank-lines/--no-blank-lines": blank_line_entries,
         }
@@ -370,7 +340,6 @@ def format_bibliography(
         trailing_comma=trailing_comma,
         blank_line_entries=blank_line_entries,
         field_order=field_order,
-        entry_order=entry_order,
         block_order=block_order,
         wrap_values=wrap_values,
         line_width=line_width,
@@ -423,7 +392,6 @@ def format_bibliography(
     warnings: list[dict] = []
     selector = bind_where_filter(coll, where, keys=key, warnings=warnings)
     layout = _layout(coll.lib, overrides)
-    warnings.extend(_order_warnings(layout, json_output))
     try:
         selected = coll.format(layout, selector)
     except FormatLintError as exc:

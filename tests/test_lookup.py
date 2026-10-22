@@ -112,18 +112,21 @@ def test_find_reference_rejects_empty_text() -> None:
         find_reference("   ")
 
 
-def test_cli_requires_online(monkeypatch) -> None:
-    """Network access stays explicit, as it does everywhere else in the tool."""
+def test_cli_goes_online_by_being_run_and_deprecates_online(monkeypatch) -> None:
+    """Like ref import and asset fetch, the command is the consent; --online only warns."""
+    monkeypatch.setattr(
+        lookup_ops.crossref, "search_works", lambda query, rows=5, cache_file=None: []
+    )
 
-    def refuse(*args, **kwargs):
-        raise AssertionError("no provider call may happen without --online")
+    plain = runner.invoke(app, ["ref", "find", "some reference", "--json"])
+    flagged = runner.invoke(app, ["ref", "find", "some reference", "--online", "--json"])
 
-    monkeypatch.setattr(lookup_ops.crossref, "search_works", refuse)
-
-    result = runner.invoke(app, ["ref", "find", "some reference", "--json"])
-
-    assert result.exit_code == 1
-    assert json.loads(result.output)["error"] == "OnlineLookupRequired"
+    assert plain.exit_code == 0, plain.output
+    assert json.loads(plain.output)["warnings"] == []
+    assert flagged.exit_code == 0, flagged.output
+    (warning,) = json.loads(flagged.output)["warnings"]
+    assert warning["type"] == "deprecated"
+    assert warning["old"] == "ref find --online"
 
 
 def test_cli_reports_candidates_as_json(monkeypatch) -> None:
@@ -133,7 +136,7 @@ def test_cli_reports_candidates_as_json(monkeypatch) -> None:
         lambda query, rows=5, cache_file=None: [work(score=95.0)],
     )
 
-    result = runner.invoke(app, ["ref", "find", "Analytical Engines", "--online", "--json"])
+    result = runner.invoke(app, ["ref", "find", "Analytical Engines", "--json"])
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -150,7 +153,7 @@ def test_cli_says_an_empty_result_is_evidence_not_proof(monkeypatch) -> None:
         lookup_ops.crossref, "search_works", lambda query, rows=5, cache_file=None: []
     )
 
-    result = runner.invoke(app, ["ref", "find", "Invented Work", "--online"])
+    result = runner.invoke(app, ["ref", "find", "Invented Work"])
 
     assert result.exit_code == 0, result.output
     assert "not proof" in result.output
@@ -163,7 +166,7 @@ def test_cli_warns_when_nothing_plainly_matches(monkeypatch) -> None:
         lambda query, rows=5, cache_file=None: [work(title="Something Adjacent", score=20.0)],
     )
 
-    result = runner.invoke(app, ["ref", "find", "Recursive Gradient Sharpening", "--online"])
+    result = runner.invoke(app, ["ref", "find", "Recursive Gradient Sharpening"])
 
     assert result.exit_code == 0, result.output
     assert "No candidate plainly matches" in result.output
@@ -175,7 +178,7 @@ def test_cli_reports_a_provider_failure_without_a_traceback(monkeypatch) -> None
 
     monkeypatch.setattr(lookup_ops.crossref, "search_works", boom)
 
-    result = runner.invoke(app, ["ref", "find", "anything", "--online", "--json"])
+    result = runner.invoke(app, ["ref", "find", "anything", "--json"])
 
     assert result.exit_code == 1
     assert json.loads(result.output)["error"] == "ProviderUnavailable"

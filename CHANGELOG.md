@@ -12,6 +12,104 @@ sections. Historical releases retain their original headings.
 
 ## [Unreleased]
 
+### Breaking changes
+
+The forms deprecated in 0.8 are removed:
+
+- `keys check`: use `lint --only duplicate_key` (`--strict` to gate). The
+  `pynakes-keys-check` pre-commit hook keeps its id and now runs that command,
+  so it honours the library's `lint-ignore` setting.
+- `tex scan --out`, `--group`, and `--keyword`: select the cited entries with
+  `--where used` in `corpus combine`, `scrub`, or `fields append`. `tex scan`
+  now only reports, so its write-only options (`--dry-run`, `--diff`,
+  `--backup`, `--force`, `--expect-sha256`) went with them, and its envelope,
+  including the `tex_scan` block of `inspect --insights`, drops the `out`,
+  `written`, `tagged`, `exported`, `plan`, `dry_run`, `modified`, and
+  `modified_entries` keys.
+- `format --entry-order`, the `format-entry-order` setting, and
+  `CanonicalLayout.entry_order` / `layout_from_metadata(entry_order=...)`: use
+  `normalize --sort-by` and the `sort-order` setting. `format` keeps the entry
+  order it is given; `lint` reports a stored `format-entry-order` as an
+  `unknown_metadata_key` that is no longer read.
+- `search --in-field F`: use `--in F --select F`.
+
+### Deprecated
+
+- `ref find --online` is ignored and warns; it is removed in 0.10.0. One rule
+  now decides network consent: a command whose purpose is a network request
+  (`ref import`, `ref find`, `asset fetch`, `--fetch`) goes online by being
+  run, and a command with an offline mode (`verify`, `enrich`, `ref compare`)
+  leaves it only with `--online`. `ref find` had no offline mode, so requiring
+  the flag only made it fail. `capabilities` reports the rule and both groups
+  under `network_access`.
+
+### Added
+
+- `ref import` accepts `IDENTIFIER=KEY` to name an imported entry's citation
+  key, on the command line or on a piped line, so a batch of identifiers can
+  carry project-style keys in one call. The key follows the last `=` and
+  starts with a letter; an `=` inside a URL query stays part of the URL. A key
+  that is already taken fails only that identifier, with the reason
+  `key_conflict`, and each imported result reports its `key_source`.
+  `pynakes.importer.split_identifier_key` exposes the parsing.
+- `keys pattern` reports the stored citation-key pattern and the common
+  pattern most existing keys follow, with the `metadata set` command that
+  stores it. It recognizes the default style, two or three title words, author
+  and year with or without a separator, and their lowercase forms, and infers
+  nothing from a small or mixed library. `ref import` warns with
+  `key_pattern_unset` when it generates keys for a library that stores no
+  pattern but follows another one. `pynakes.keys.infer_key_pattern` exposes
+  the inference.
+- `ref import` warns with `published_version_available` when an imported
+  arXiv preprint already names a published DOI, listing the keys and the
+  `enrich --published --online --key` command that promotes them. A batch
+  gets one warning for all of them.
+- `ref import --cache-file` now also caches the import's own metadata lookups
+  (DOI BibTeX, arXiv records and every other provider), not only `--fetch`
+  downloads, so a `--dry-run` followed by the real run asks each provider once.
+  The DOI and arXiv entries are shared with `enrich`. `Bibliography.import_reference`
+  takes `cache_file`, and `pynakes.provider_cache.cache_scope` sets the cache
+  for a block of provider calls.
+- `ref import` with several identifiers reports each one on stderr as it is
+  looked up, as plain lines that captured output keeps. `--json` runs keep
+  stderr silent.
+
+### Changed
+
+- `asset fetch` (and `ref import --fetch`) groups its human-readable report:
+  entries skipped or, in a dry run, planned for the same reason share one line
+  that counts and names them, and the coverage line counts the entries still
+  missing a PDF by reason, naming only keys no earlier line named. A skip or
+  failure that tried downloads keeps its own line. The JSON is unchanged.
+- Human-readable `lint` output opens with its totals and a count per category,
+  before the findings; `--summary` shows the same two lines.
+- `init --agent-guide` ends the guide with a "Library conventions" section
+  generated from the library: the stored citation-key pattern (or the one
+  existing keys follow, proposed with the `metadata set` command but not
+  stored), the stored author style, the import, `enrich --online --published`
+  and `asset fetch` sequence, and a reminder to keep the Pinax folder out of
+  version control. `init` also reports a line to add to the root `AGENTS.md`
+  or `CLAUDE.md` (`agent_guide_pointer`), since agents load only the root
+  guide by default. `render_agents_md` takes the library as an optional
+  argument.
+
+### Fixed
+
+- `init --agent-guide` no longer replaces an `AGENTS.md` that pynakes did not
+  write, which beside a `.bib` at a repository root is the project's own guide.
+  It refuses with `FileExists` before writing anything; `--force` replaces the
+  file, and a guide pynakes wrote earlier is still regenerated.
+- Citation-key pattern markers keep the value's case, as in JabRef: `[auth]`
+  on Isaac Newton gives `Newton`, and only modifiers such as `:lower`,
+  `:upper` or `:capitalize` change it. `[veryshorttitle]` and `[shorttitle]`
+  keep each word's case. A capitalized marker (`[Auth]`) is still accepted as
+  an alias of the lowercase one but never written, and `keys pattern` now
+  proposes patterns JabRef reads the same way (`[auth][year]`,
+  `[auth:lower][year]`). A library storing lowercase markers gets differently
+  cased new keys; existing keys are unchanged. The default profile's
+  `[auth][year][veryshorttitle]` now gives `Newton1687Philosophiae`, but keeps
+  a title's lowercase first word, which the built-in style capitalizes.
+
 ## [0.8.0] - 2026-10-22
 
 Research context, reusable queries and bibliography analysis: read bounded

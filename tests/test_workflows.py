@@ -50,9 +50,8 @@ class TestMultiOperationSequences:
         path.write_text((FIXTURES / "duplicate_entries.bib").read_text())
 
         runner.invoke(app, ["keys", "repair", str(path)])
-        r = runner.invoke(app, ["keys", "check", str(path), "--json"])
+        r = runner.invoke(app, ["lint", str(path), "--only", "duplicate_key", "--strict"])
         assert r.exit_code == 0, r.output
-        assert json.loads(r.output)["has_duplicates"] is False
 
 
 class TestDryRunParity:

@@ -31,6 +31,7 @@ from pynakes.cli_common import (
     bib_file_argument,
 )
 from pynakes.engine import Bibliography
+from pynakes.model import BibEntry
 
 
 def read_identifier_lines(text: str) -> list[str]:
@@ -48,15 +49,86 @@ def read_identifier_lines(text: str) -> list[str]:
     return identifiers
 
 
+def key_pattern_warnings(coll: Bibliography, file: str) -> list[dict[str, object]]:
+    """Warn when generated keys would not follow the library's evident style.
+
+    Run before staging: the library's own keys are the evidence. Nothing is
+    reported when a ``key-pattern`` is stored or the keys follow the default.
+    """
+    from pynakes import keys as keys_ops
+    from pynakes._keys_pattern import DEFAULT_PATTERN
+    from pynakes.metadata import library_key_pattern
+
+    if library_key_pattern(coll.lib, "") is not None:
+        return []
+    inference = keys_ops.infer_key_pattern(coll.lib)
+    if inference.pattern is None or inference.pattern == DEFAULT_PATTERN:
+        return []
+    return [
+        {
+            "type": "key_pattern_unset",
+            "pattern": inference.pattern,
+            "matched": inference.matched,
+            "checked": inference.checked,
+            "message": (
+                f"No key-pattern is stored, so generated keys use pynakes' default style, "
+                f"but {inference.matched} of {inference.checked} existing keys follow "
+                f"{inference.pattern}. Adopt it with: "
+                f"pynakes metadata set {file} key-pattern '{inference.pattern}'"
+            ),
+        }
+    ]
+
+
+def published_version_warnings(entries: list[BibEntry], file: str) -> list[dict[str, object]]:
+    """Point out imported preprints whose record already names a published DOI.
+
+    The import keeps what the preprint server described, so such an entry stays
+    a preprint type with the journal's DOI. Promotion is a separate, online,
+    reviewable step; this names the command and the keys it applies to.
+    """
+    from pynakes._identifiers import is_arxiv_doi
+    from pynakes._integrity_common import _PREPRINT_DOI_PREFIXES
+    from pynakes.identity import entry_arxiv_id
+
+    keys = [
+        entry.key
+        for entry in entries
+        if entry.type.lower() in {"misc", "online", "unpublished"}
+        and entry_arxiv_id(entry)
+        and (doi := entry.fields.get("doi", "").strip())
+        and not is_arxiv_doi(doi)
+        and not doi.lower().startswith(_PREPRINT_DOI_PREFIXES)
+    ]
+    if not keys:
+        return []
+    joined = ",".join(keys)
+    return [
+        {
+            "type": "published_version_available",
+            "keys": keys,
+            "message": (
+                f"Imported as a preprint, but the record names a published DOI: "
+                f"{', '.join(keys)}. Promote with: "
+                f"pynakes enrich {file} --published --online --key {joined}"
+            ),
+        }
+    ]
+
+
 def import_reference(
     file: str | None = bib_file_argument(),
     identifiers: list[str] = typer.Argument(
         ...,
         help="One or more DOIs, repository identifiers, or supported reference URLs. "
+        "Append =KEY to name an entry's citation key (arXiv:2301.00001=Lovelace1843). "
         'Use "-" to read them from stdin, one per line',
     ),
     key: str | None = typer.Option(
-        None, "--key", help="Citation key to use (only with a single identifier)"
+        None,
+        "--key",
+        help="Citation key to use (only with a single identifier; for several, "
+        "write each as IDENTIFIER=KEY)",
     ),
     key_source: KeySource | None = typer.Option(
         None,
@@ -107,11 +179,20 @@ def import_reference(
     if not positional:
         _emit_error(json_output, "InvalidInput", "No identifier to import")
         return
-    if key is not None and len(positional) > 1:
+    pairs = [importer_ops.split_identifier_key(value) for value in positional]
+    if key is not None and len(pairs) > 1:
         _emit_error(
             json_output,
             "InvalidInput",
-            "--key names the key for one entry; omit it when importing several identifiers",
+            "--key names the key for one entry; to name keys for several identifiers, "
+            "write each as IDENTIFIER=KEY",
+        )
+        return
+    if key is not None and pairs[0][1] is not None:
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            "Give the citation key either with --key or as IDENTIFIER=KEY, not both",
         )
         return
 
@@ -122,11 +203,18 @@ def import_reference(
     source = importer_ops.library_key_source(
         coll.lib, None if key_source is None else key_source.value
     )
-    if len(positional) > 1:
-        _import_several(coll, file, positional, params, source, allow_duplicate, cache_file)
+    generates_keys = source == "generated" and (
+        key is None and any(pair_key is None for _, pair_key in pairs)
+    )
+    pattern_warnings = key_pattern_warnings(coll, file) if generates_keys else []
+    if len(pairs) > 1:
+        _import_several(
+            coll, file, pairs, params, source, allow_duplicate, cache_file, pattern_warnings
+        )
         return
 
-    identifier = positional[0]
+    identifier, pair_key = pairs[0]
+    key = key if key is not None else pair_key
     entry = None
     try:
         kind, entry = coll.import_reference(
@@ -134,6 +222,7 @@ def import_reference(
             key=key,
             key_source=source,
             allow_duplicate=allow_duplicate,
+            cache_file=cache_file,
         )
     except importer_ops.UnsupportedIdentifierError as exc:
         _emit_error(json_output, "UnsupportedIdentifier", str(exc))
@@ -212,12 +301,15 @@ def import_reference(
     if fetch_report is not None:
         details["fetch"] = fetch_report
 
+    warnings = [*pattern_warnings, *published_version_warnings([entry], file)]
+    human.extend(f"  {warning['message']}" for warning in warnings)
     _finish_mod(
         file,
         "ref_import",
         coll,
         params,
         human,
+        warnings=warnings,
         **details,
     )
 
@@ -225,11 +317,12 @@ def import_reference(
 def _import_several(
     coll: Bibliography,
     file: str,
-    identifiers: list[str],
+    identifiers: list[tuple[str, str | None]],
     params: RunParams,
     key_source: str,
     allow_duplicate: bool,
     cache_file: str | None,
+    pattern_warnings: list[dict[str, object]],
 ) -> None:
     """Resolve several identifiers, then commit whatever resolved in one write.
 
@@ -248,14 +341,22 @@ def _import_several(
     from pynakes import importer as importer_ops
 
     results: list[dict[str, object]] = []
-    warnings: list[dict[str, object]] = []
+    warnings: list[dict[str, object]] = list(pattern_warnings)
+    imported_entries: list[BibEntry] = []
     imported = 0
-    for identifier in identifiers:
+    total = len(identifiers)
+    for position, (identifier, key) in enumerate(identifiers, start=1):
+        if not params.json_output:
+            # Plain lines rather than a transient bar, so a captured or piped
+            # stderr shows progress too; JSON runs keep stderr silent.
+            typer.echo(f"[{position}/{total}] {identifier}", err=True)
         try:
             kind, entry = coll.import_reference(
                 identifier,
+                key=key,
                 key_source=key_source,
                 allow_duplicate=allow_duplicate,
+                cache_file=cache_file,
             )
         except importer_ops.DuplicateReferenceError as exc:
             results.append(
@@ -275,6 +376,24 @@ def _import_several(
                 }
             )
             continue
+        except importer_ops.CitationKeyConflictError as exc:
+            results.append(
+                {
+                    "identifier": identifier,
+                    "status": "failed",
+                    "reason": "key_conflict",
+                    "key": exc.key,
+                    "message": str(exc),
+                }
+            )
+            warnings.append(
+                {
+                    "type": "import_failed",
+                    "identifier": identifier,
+                    "message": f"{identifier}: {exc}; name another key.",
+                }
+            )
+            continue
         except (
             importer_ops.UnsupportedIdentifierError,
             importer_ops.ReferenceImportError,
@@ -290,12 +409,14 @@ def _import_several(
             )
             continue
         imported += 1
+        imported_entries.append(entry)
         results.append(
             {
                 "identifier": importer_ops.imported_entry_identifier(entry, kind),
                 "status": "imported",
                 "identifier_type": kind,
                 "key": entry.key,
+                "key_source": "user" if key else key_source,
                 "entry_type": entry.type,
                 "doi": entry.fields.get("doi"),
             }
@@ -311,6 +432,7 @@ def _import_several(
         )
         return
 
+    warnings.extend(published_version_warnings(imported_entries, file))
     failed = sum(1 for result in results if result["status"] == "failed")
     skipped = sum(1 for result in results if result["status"] == "skipped")
     human = [

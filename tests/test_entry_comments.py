@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 from pynakes._entry_comments import attached_comment_indices
 from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
-from pynakes.canonical import CanonicalLayout, write_bib_canonical
+from pynakes.canonical import write_bib_canonical
 from pynakes.cli import app
 from pynakes.engine import Bibliography
 from pynakes.normalize import sort_entries
@@ -100,21 +100,6 @@ class TestRemoval:
 
 
 class TestReordering:
-    def test_format_by_key_keeps_the_comment_directly_above_its_entry(self) -> None:
-        layout = CanonicalLayout(entry_order="key")
-        text = write_bib_canonical(parse_bib(LIBRARY), layout)
-
-        assert _above(text, "Euler1748") == SKIP
-        assert text.index("Darwin1859") < text.index(SKIP) < text.index("Euler1748")
-        assert write_bib_canonical(parse_bib(text), layout) == text
-
-    def test_preserve_block_order_moves_an_attached_comment_with_its_entry(self) -> None:
-        layout = CanonicalLayout(block_order="preserve", entry_order="key")
-        text = write_bib_canonical(parse_bib(LIBRARY), layout)
-
-        assert _above(text, "Euler1748") == SKIP
-        assert text.index("Darwin1859") < text.index("Euler1748") < text.index("Newton1687")
-
     def test_sorting_keeps_the_comment_with_its_entry(self) -> None:
         lib = parse_bib(LIBRARY)
         sort_entries(lib, [("year", True)])
@@ -127,7 +112,7 @@ class TestReordering:
         lib = parse_bib(
             "% A library\n\n@comment{jabref-meta: databaseType:bibtex;}\n\n@misc{B, title={T}}\n"
         )
-        text = write_bib_canonical(lib, CanonicalLayout(entry_order="key"))
+        text = write_bib_canonical(lib)
 
         assert text.startswith("% A library\n\n@misc{B,")
 

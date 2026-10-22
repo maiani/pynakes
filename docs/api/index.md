@@ -27,7 +27,6 @@ issues = bib.lint()
 bib.format(
     CanonicalLayout(
         field_order="preferred",
-        entry_order="preserve",
         wrap_values="stable",
         line_width=100,
     )

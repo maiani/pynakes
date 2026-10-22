@@ -21,7 +21,6 @@ LIBRARY = "@book{Newton1687,title={Principia},year={1687}}\n"
         ["scrub", "{bib}", "--out", "{out}"],
         ["convert", "{bib}", "--to", "ris", "--out", "{out}"],
         ["convert", "{ris}", "--from", "ris", "--out", "{out}"],
-        ["tex", "scan", "{bib}", "{tex}", "--out", "{out}"],
         ["corpus", "combine", "{bib}", "{other}", "--out", "{out}"],
         ["corpus", "split", "{bib}", "--route", "{out}=*"],
         ["init", "{out}"],
@@ -104,9 +103,7 @@ def test_ref_remove_refuses_ambiguous_key(tmp_path):
     assert bib.read_text(encoding="utf-8") == LIBRARY * 2
 
 
-@pytest.mark.parametrize(
-    "family", [["lint"], ["verify"], ["keys", "check"], ["dedupe", "check"], ["asset", "check"]]
-)
+@pytest.mark.parametrize("family", [["lint"], ["verify"], ["dedupe", "check"], ["asset", "check"]])
 def test_multi_file_failures_use_catalogued_codes(tmp_path, family):
     bib = tmp_path / "refs.bib"
     missing = tmp_path / "missing.bib"
@@ -160,7 +157,7 @@ def test_human_output_states_each_warning(tmp_path) -> None:
     """A warning's message reaches human output, not only ``--json``."""
     bib = tmp_path / "refs.bib"
     bib.write_text(
-        "@comment{pynakes-meta: key-pattern: [Auth][year]}\n\n"
+        "@comment{pynakes-meta: key-pattern: [auth][year]}\n\n"
         "@article{Old,\n  author = {Euler, Leonhard},\n  title = {Mechanica},\n"
         "  year = {1736}\n}\n",
         encoding="utf-8",

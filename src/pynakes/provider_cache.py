@@ -31,6 +31,9 @@ from __future__ import annotations
 import json
 import tempfile
 import threading
+from collections.abc import Generator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 
 from pynakes._atomic import match_mode, replace_file, sync_file
@@ -204,8 +207,35 @@ _INSTANCES: dict[Path | None, ProviderCache] = {}
 _INSTANCES_LOCK = threading.Lock()
 
 
+#: The cache file ``open_cache(None)`` resolves to inside :func:`cache_scope`.
+_SCOPED_LOCATION: ContextVar[Path | None] = ContextVar(
+    "pynakes_provider_cache_location", default=None
+)
+
+
+@contextmanager
+def cache_scope(location: str | Path | None) -> Generator[None]:
+    """Within the block, make ``open_cache(None)`` return the cache at ``location``.
+
+    For an operation whose provider calls are too many and too deep to thread a
+    ``cache_file`` through, such as an import across every provider. ``None``
+    leaves the in-process memo in place. The scope is a context variable, so a
+    worker thread started inside the block does not inherit it.
+    """
+    if location is None:
+        yield
+        return
+    token = _SCOPED_LOCATION.set(Path(location).expanduser())
+    try:
+        yield
+    finally:
+        _SCOPED_LOCATION.reset(token)
+
+
 def open_cache(location: str | Path | None) -> ProviderCache:
     """Return the cache at ``location``, or the in-process memo when ``None``.
+
+    Inside :func:`cache_scope`, ``None`` means the scope's cache file instead.
 
     ``None`` — no ``--cache-file`` — is not "no cache": it is a memo that writes
     nothing to disk, so a run still asks each provider about a given identifier
@@ -218,7 +248,7 @@ def open_cache(location: str | Path | None) -> ProviderCache:
     below are guarded by locks, since :class:`ProviderCache` itself has no
     notion of a single caller.
     """
-    path = None if location is None else Path(location).expanduser()
+    path = _SCOPED_LOCATION.get() if location is None else Path(location).expanduser()
     if path is not None and path.is_dir():
         raise ValueError(f"Provider cache path is a directory, not a file: {path}")
     with _INSTANCES_LOCK:

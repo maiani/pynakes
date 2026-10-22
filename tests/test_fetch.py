@@ -744,6 +744,46 @@ def test_dry_run_lines_say_what_would_happen_rather_than_skipped() -> None:
     assert lines[1] == "Skipped Gauss_1801_Disquisitiones (no DOI)."
 
 
+def test_report_lines_group_entries_by_reason_and_coverage_counts_them() -> None:
+    from pynakes.cli_commands._fetch_report import fetch_report_lines
+
+    report = {
+        "fetched": [],
+        "skipped": [
+            {"key": "Euler_1748", "reason": "would fetch"},
+            {"key": "Gauss_1801", "reason": "no DOI"},
+            {"key": "Euler_1768", "reason": "would fetch"},
+            {"key": "Gauss_1809", "reason": "no DOI"},
+            {"key": "Laplace_1799", "reason": "no DOI", "attempts": [{"url": "x"}]},
+        ],
+        "failed": [],
+        "coverage": {
+            "entries": 6,
+            "with_pdf": 0,
+            "missing": [
+                {"key": "Euler_1748", "reason": "would fetch"},
+                {"key": "Gauss_1801", "reason": "no DOI"},
+                {"key": "Euler_1768", "reason": "would fetch"},
+                {"key": "Gauss_1809", "reason": "no DOI"},
+                {"key": "Laplace_1799", "reason": "no DOI"},
+                {"key": "Newton_1687", "reason": "not attempted"},
+            ],
+        },
+    }
+
+    lines = fetch_report_lines(report)
+
+    assert lines[0].startswith("Skipped Laplace_1799 (no DOI); tried ")
+    assert lines[1] == "Would fetch 2 entries: Euler_1748, Euler_1768."
+    assert lines[2] == "Skipped 2 entries (no DOI): Gauss_1801, Gauss_1809."
+    assert lines[3] == (
+        "Coverage: 0 of 6 entries have a PDF; 6 still missing what was requested "
+        "(2 would fetch, 3 no DOI, 1 not attempted)."
+    )
+    # Only the keys no earlier line named are listed again.
+    assert lines[4:] == ["  not attempted: Newton_1687."]
+
+
 # --- regressions: a source bundle cannot unpack without bound ---------------
 
 

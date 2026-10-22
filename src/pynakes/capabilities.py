@@ -101,51 +101,31 @@ _SEARCH_QUERY_GRAMMAR = {
 
 # Old forms that still work, warn with {"type": "deprecated", ...}, and go away
 # in the named release. Empty once nothing is being retired.
-_DEPRECATIONS = [
+_DEPRECATIONS: list[dict] = [
     {
-        "command": "keys check",
-        "old": "keys check",
-        "new": "lint --only duplicate_key",
-        "removal": "0.9.0",
-        "note": "lint reports the same duplicate_key findings, with every entry's position "
-        "under instances, and gates them with --strict. Unlike keys check, lint honours "
-        "the library's lint-ignore setting.",
-    },
-    *(
-        {
-            "command": "tex scan",
-            "old": flag,
-            "new": replacement,
-            "removal": "0.9.0",
-            "note": "used works in every --where, so the commands that export and tag "
-            "select the cited entries themselves; tex scan only reports. For a public "
-            "copy of the cited entries, scrub FILE --where used --out OUT.",
-        }
-        for flag, replacement in (
-            ("--out", "corpus combine FILE --where used --out OUT"),
-            ("--group", "fields append FILE groups NAME --where used"),
-            ("--keyword", "fields append FILE keywords WORD --where used"),
-        )
-    ),
-    {
-        "command": "format",
-        "old": "--entry-order",
-        "new": "normalize --sort-by SPEC (setting: sort-order)",
-        "removal": "0.9.0",
-        "note": "Entry order is not layout: BibTeX reads the first of several entries "
-        "sharing a key, and an unsorted style with \\nocite{*} lists entries in file "
-        "order. normalize sorts by moving entries byte for byte; format keeps the "
-        "order it is given. format-entry-order metadata is deprecated with it.",
-    },
-    {
-        "command": "search",
-        "old": "--in-field",
-        "new": "--in and --select",
-        "removal": "0.9.0",
-        "note": "--in-field restricted both the fields searched and the fields "
-        "returned; --in chooses the first and --select the second.",
+        "command": "ref find",
+        "old": "--online",
+        "new": "ref find",
+        "removal": "0.10.0",
+        "note": "Commands that exist to make a network request go online by being run; "
+        "--online only lets a command with an offline mode leave it. ref find has none, "
+        "so the flag is ignored.",
     },
 ]
+
+# Which commands contact a service, and what authorizes it. Nothing else does.
+_NETWORK_ACCESS = {
+    "rule": "A command whose purpose is a network request goes online by being run; "
+    "a command with an offline mode leaves it only with --online.",
+    "by_running": [
+        "ref import",
+        "ref find",
+        "asset fetch",
+        "ref add --fetch",
+        "ref import --fetch",
+    ],
+    "with_online": ["verify", "enrich", "ref compare"],
+}
 
 # The bounded-read contract shared by every multi-entry read.
 _BOUNDED_READS = {
@@ -508,6 +488,7 @@ def get_capabilities() -> dict:
             "reviewable edits, structured JSON, and JabRef interoperability."
         ),
         "network_access_is_explicit": True,
+        "network_access": _NETWORK_ACCESS,
         "supports_dry_run": True,
         "supports_json_output": True,
         "supports_backup": True,
@@ -561,7 +542,6 @@ def get_capabilities() -> dict:
         "gate_commands": [
             "lint",
             "verify",
-            "keys check",
             "asset check",
             "dedupe check",
             "asset fetch",
@@ -740,7 +720,6 @@ def get_capabilities() -> dict:
                 "trailing_comma": True,
                 "blank_lines": True,
                 "field_order": "preferred",
-                "entry_order": "preserve",
                 "block_order": "canonical",
                 "wrap_values": "off",
                 "line_width": 100,
@@ -749,7 +728,6 @@ def get_capabilities() -> dict:
             "choices": {
                 "alignment": ["compact", "equals"],
                 "field_order": ["preferred", "preserve", "alphabetical"],
-                "entry_order": ["preserve", "key", "profile"],
                 "block_order": ["preserve", "canonical"],
                 "wrap_values": ["off", "stable", "canonical"],
                 "entry_type_case": ["lower", "preserve"],
@@ -768,8 +746,8 @@ def get_capabilities() -> dict:
             "selection": (
                 "--where reformats only the matching entries and leaves every "
                 "other byte untouched. A selection owns the layout inside an "
-                "entry, so the whole-file options --entry-order, --block-order, "
-                "and --blank-lines cannot be combined with it."
+                "entry, so the whole-file options --block-order and --blank-lines "
+                "cannot be combined with it."
             ),
         },
         "work_matching": {

@@ -65,7 +65,7 @@ class TestFormatCommand:
         assert "--indent" in output
         assert "--alignment" in output
         assert "--field-order" in output
-        assert "--entry-order" in output
+        assert "--entry-order" not in output
         assert "--block-order" in output
         assert "--wrap-values" in output
         assert "--line-width" in output
@@ -247,13 +247,21 @@ class TestFormatCommand:
 
         result = runner.invoke(
             app,
-            ["format", str(path), "--where", "type = article", "--entry-order", "key", "--json"],
+            [
+                "format",
+                str(path),
+                "--where",
+                "type = article",
+                "--block-order",
+                "preserve",
+                "--json",
+            ],
         )
 
         assert result.exit_code == 1
         payload = json.loads(result.output)
         assert payload["error"] == "InvalidInput"
-        assert "--entry-order" in payload["message"]
+        assert "--block-order" in payload["message"]
         assert path.read_text() == "@article{A,title={T}}\n"
 
     def test_where_expression_error_is_structured(self, tmp_path: Path) -> None:
@@ -355,32 +363,6 @@ class TestUsedCommand:
         # An entry cited nowhere has no occurrences at all.
         assert "Unused2019" not in usages
 
-    def test_dry_run_does_not_modify(self, tmp_path: Path) -> None:
-        bib = tmp_path / "refs.bib"
-        original = (FIXTURES / "simple.bib").read_text()
-        bib.write_text(original)
-
-        result = runner.invoke(
-            app,
-            ["tex", "scan", str(bib), str(FIXTURES / "paper.aux"), "--group", "Used", "--dry-run"],
-        )
-        assert result.exit_code == 0, result.output
-        assert bib.read_text() == original  # unchanged
-        assert "Would tag" in result.output
-
-    def test_group_tag_writes(self, tmp_path: Path) -> None:
-        bib = tmp_path / "refs.bib"
-        bib.write_text((FIXTURES / "simple.bib").read_text())
-
-        result = runner.invoke(
-            app, ["tex", "scan", str(bib), str(FIXTURES / "paper.aux"), "--group", "Cited"]
-        )
-        assert result.exit_code == 0, result.output
-        text = bib.read_text()
-        assert "groups = {Cited}" in text
-        # Only used entries are tagged.
-        assert text.count("groups = {Cited}") == 2
-
     def test_used_falls_back_to_tex_sources_metadata(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text(
@@ -405,39 +387,6 @@ class TestUsedCommand:
 
         assert result.exit_code == 1, result.output
         assert json.loads(result.output)["error"] == "NoSources"
-
-    def test_inplace_tag_preserves_untouched_entries(self, tmp_path: Path) -> None:
-        bib = tmp_path / "refs.bib"
-        original = (FIXTURES / "simple.bib").read_text()
-        bib.write_text(original)
-
-        runner.invoke(
-            app, ["tex", "scan", str(bib), str(FIXTURES / "paper.aux"), "--group", "Cited"]
-        )
-        new = bib.read_text()
-        # Exactly the two used entries gained a group line; no entry dropped.
-        assert new.count("groups = {Cited}") == 2
-        for key in ["Smith2020", "Jones2021", "Brown2022", "Green2023", "White2024"]:
-            assert key in new
-        # An uncited entry is byte-for-byte unchanged.
-        assert "@phdthesis{Green2023,\n  author = {Michael Green}," in new
-        # The blank line between entries is preserved (no whitespace churn).
-        assert "}\n\n@book{Jones2021," in new
-
-    def test_export_subset(self, tmp_path: Path) -> None:
-        bib = tmp_path / "refs.bib"
-        bib.write_text((FIXTURES / "simple.bib").read_text())
-        out = tmp_path / "cited.bib"
-
-        result = runner.invoke(
-            app, ["tex", "scan", str(bib), str(FIXTURES / "paper.aux"), "--out", str(out)]
-        )
-        assert result.exit_code == 0, result.output
-        assert out.exists()
-        exported = out.read_text()
-        assert "Smith2020" in exported
-        assert "Brown2022" in exported
-        assert "Green2023" not in exported  # not cited
 
     def test_used_warns_on_missing_tex_source(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -493,6 +442,19 @@ class TestInspectAndLint:
         assert result.exit_code == 0, result.output
         assert "refs.bib: no issues found." in result.output
 
+    def test_lint_human_output_opens_with_counts_by_category(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n@article{A,\n  title = {U}\n}\n")
+
+        result = runner.invoke(app, ["lint", str(bib)])
+
+        lines = result.output.splitlines()
+        totals = next(i for i, line in enumerate(lines) if " issue(s): " in line)
+        assert lines[totals + 1].startswith("By category: ")
+        assert "correctness " in lines[totals + 1]
+        first_finding = next(i for i, line in enumerate(lines) if line.startswith("  ["))
+        assert totals < first_finding
+
     def test_auto_discovery_ignores_revtex_notes_bib(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text("@article{A,\n  title = {T}\n}\n")
@@ -525,7 +487,7 @@ class TestInspectAndLint:
         bib.write_text("@article{A,\n  title = {T}\n}\n")
         monkeypatch.chdir(tmp_path)
 
-        result = runner.invoke(app, ["keys", "check", "--json"])
+        result = runner.invoke(app, ["dedupe", "check", "--json"])
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -951,7 +913,7 @@ class TestSearchCommand:
             "}\n"
         )
 
-        options = ["--in-field", "title", "--abstract", "--json"]
+        options = ["--in", "title", "--select", "title", "--abstract", "--json"]
         reported = runner.invoke(app, ["search", str(bib), "widgets", *options])
         # A term that only occurs in the abstract still does not match, so
         # reporting the field has not widened the search.
@@ -1673,9 +1635,9 @@ class TestImportCommand:
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
-        assert data["key"] == "smith24practical"
+        assert data["key"] == "Smith24Practical"
         assert data["key_source"] == "generated"
-        assert "@article{smith24practical," in bib.read_text()
+        assert "@article{Smith24Practical," in bib.read_text()
 
     def test_add_can_use_provider_key(self, tmp_path: Path, monkeypatch) -> None:
         bib = _copy(tmp_path, "simple.bib")
@@ -2391,9 +2353,9 @@ class TestKeysCommand:
         result = runner.invoke(app, ["keys", "generate", str(bib), "Old", "--json"])
 
         assert result.exit_code == 0, result.output
-        assert json.loads(result.output)["renames"] == [{"old": "Old", "new": "smith24"}]
+        assert json.loads(result.output)["renames"] == [{"old": "Old", "new": "Smith24"}]
         text = bib.read_text()
-        assert "@article{smith24," in text
+        assert "@article{Smith24," in text
         assert "@article{Keep," in text
 
     def test_generate_single_key_accepts_key_before_file(self, tmp_path: Path) -> None:
@@ -2575,17 +2537,6 @@ class TestKeysCommand:
         data = json.loads(result.output)
         assert data["error"] == "InvalidInput"
         assert "--all" in data["message"]
-
-    def test_check_reports_duplicates(self, tmp_path: Path) -> None:
-        bib = _copy(tmp_path, "duplicate_entries.bib")
-        result = runner.invoke(app, ["keys", "check", str(bib), "--json"])
-        assert result.exit_code == 0, result.output
-        data = json.loads(result.output)
-        assert data["has_duplicates"] is True
-        assert any(
-            issue["type"] == "duplicate_key" and issue["severity"] == "error"
-            for issue in data["issues"]
-        )
 
     def test_repair_dry_run_diff(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "duplicate_entries.bib")
@@ -4179,21 +4130,9 @@ class TestEnvelopeConsistency:
 
     def test_used_envelope_uses_file_key(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        r = runner.invoke(
-            app,
-            [
-                "tex",
-                "scan",
-                str(bib),
-                str(FIXTURES / "paper.aux"),
-                "--group",
-                "X",
-                "--dry-run",
-                "--json",
-            ],
-        )
+        r = runner.invoke(app, ["tex", "scan", str(bib), str(FIXTURES / "paper.aux"), "--json"])
         data = json.loads(r.output)
-        assert self.ENVELOPE <= set(data)
+        assert {"status", "action", "file", "warnings", "source_sha256"} <= set(data)
         assert "input_path" not in data  # standardized to "file"
 
 
@@ -4879,7 +4818,7 @@ class TestLintCategories:
             "message": f"TeX source {str(tmp_path / 'missing.tex')!r} not found",
             "path": str(tmp_path / "missing.tex"),
         }
-        assert "@article{doe_2024," in bib.read_text()
+        assert "@article{Doe_2024," in bib.read_text()
 
     def test_category_filter_narrows_the_report(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"

@@ -29,20 +29,18 @@ from pynakes._entry_comments import (
 from pynakes.bibtex_parser import parse_bib, parse_raw_string_definition
 from pynakes.bibtex_writer import _quote_field_value, render_entry
 from pynakes.editing import raw_field_names
-from pynakes.metadata import library_sort_order, metadata_bool, metadata_value
+from pynakes.metadata import metadata_bool, metadata_value
 from pynakes.model import BibEntry, BibFile
 
 __all__ = [
     "ALIGNMENTS",
     "BLOCK_ORDERS",
-    "ENTRY_ORDERS",
     "ENTRY_TYPE_CASES",
     "FIELD_ORDERS",
     "WRAP_VALUE_MODES",
     "Alignment",
     "BlockOrder",
     "CanonicalLayout",
-    "EntryOrder",
     "EntryTypeCase",
     "FieldOrder",
     "FormatLintError",
@@ -57,14 +55,12 @@ __all__ = [
 
 Alignment = Literal["compact", "equals"]
 FieldOrder = Literal["preferred", "preserve", "alphabetical"]
-EntryOrder = Literal["preserve", "key", "profile"]
 BlockOrder = Literal["preserve", "canonical"]
 EntryTypeCase = Literal["lower", "preserve"]
 WrapValues = Literal["off", "stable", "canonical"]
 
 ALIGNMENTS = ("compact", "equals")
 FIELD_ORDERS = ("preferred", "preserve", "alphabetical")
-ENTRY_ORDERS = ("preserve", "key", "profile")
 BLOCK_ORDERS = ("preserve", "canonical")
 ENTRY_TYPE_CASES = ("lower", "preserve")
 WRAP_VALUE_MODES = ("off", "stable", "canonical")
@@ -87,7 +83,6 @@ class CanonicalLayout:
     trailing_comma: bool = True
     blank_line_entries: bool = True
     field_order: FieldOrder = "preferred"
-    entry_order: EntryOrder = "preserve"
     block_order: BlockOrder = "canonical"
     wrap_values: WrapValues = "off"
     line_width: int = 100
@@ -98,7 +93,6 @@ class CanonicalLayout:
             raise ValueError("format indent must be a non-empty string")
         _validate_choice("alignment", self.alignment, ALIGNMENTS)
         _validate_choice("field order", self.field_order, FIELD_ORDERS)
-        _validate_choice("entry order", self.entry_order, ENTRY_ORDERS)
         _validate_choice("block order", self.block_order, BLOCK_ORDERS)
         _validate_choice("wrap-values mode", self.wrap_values, WRAP_VALUE_MODES)
         _validate_choice("entry-type case", self.entry_type_case, ENTRY_TYPE_CASES)
@@ -177,7 +171,6 @@ def layout_from_metadata(
     trailing_comma: bool | None = None,
     blank_line_entries: bool | None = None,
     field_order: FieldOrder | None = None,
-    entry_order: EntryOrder | None = None,
     block_order: BlockOrder | None = None,
     wrap_values: WrapValues | None = None,
     line_width: int | None = None,
@@ -218,11 +211,6 @@ def layout_from_metadata(
             _metadata_choice(lib, "format-field-order", "preferred", FIELD_ORDERS)
             if field_order is None
             else field_order
-        ),
-        entry_order=(
-            _metadata_choice(lib, "format-entry-order", "preserve", ENTRY_ORDERS)
-            if entry_order is None
-            else entry_order
         ),
         block_order=(
             _metadata_choice(lib, "format-block-order", "canonical", BLOCK_ORDERS)
@@ -441,29 +429,6 @@ def _validate_formatted_entry(
         )
 
 
-def _ordered_entries(
-    lib: BibFile,
-    layout: CanonicalLayout,
-    entries: list[BibEntry] | None = None,
-) -> list[BibEntry]:
-    selected = list(lib.entries.values()) if entries is None else list(entries)
-    if layout.entry_order == "preserve":
-        return selected
-    criteria = (
-        [("key", False)] if layout.entry_order == "key" else list(library_sort_order(lib) or [])
-    )
-    if not criteria:
-        return selected
-
-    # Reuse normalize's tested stable sorting and crossref-parent ordering on a
-    # temporary store so formatting never mutates the live bibliography model.
-    from pynakes.normalize import sort_entries
-
-    temporary = BibFile(entries=selected)
-    sort_entries(temporary, criteria)
-    return list(temporary.entries.values())
-
-
 def _write_preserved_blocks(lib: BibFile, layout: CanonicalLayout) -> str:
     """Format entries while preserving top-level block positions as barriers."""
     le = lib.line_ending
@@ -479,7 +444,7 @@ def _write_preserved_blocks(lib: BibFile, layout: CanonicalLayout) -> str:
     def flush_entries() -> None:
         if not entry_run:
             return
-        for entry in _ordered_entries(lib, layout, entry_run):
+        for entry in entry_run:
             blocks.append(("entry", render(entry)))
             emitted_entries.add(id(entry))
         entry_run.clear()
@@ -505,7 +470,7 @@ def _write_preserved_blocks(lib: BibFile, layout: CanonicalLayout) -> str:
     flush_entries()
 
     missing = [entry for entry in lib.entries.values() if id(entry) not in emitted_entries]
-    for entry in _ordered_entries(lib, layout, missing):
+    for entry in missing:
         blocks.append(("entry", render(entry)))
 
     trailing = lib.source_trailing.strip("\r\n")
@@ -659,7 +624,7 @@ def write_bib_canonical(
         parts.append(le * 2)
 
     # Entries.
-    entries = _ordered_entries(lib, layout)
+    entries = list(lib.entries.values())
     for idx, entry in enumerate(entries):
         entry_text = with_comments(entry, format_entry(entry, layout, le), attached_texts, le)
         parts.append(entry_text)

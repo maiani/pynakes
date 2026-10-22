@@ -34,6 +34,7 @@ from pynakes.identity import (
 from pynakes.keys import UnsupportedCitationKeyPatternError, generate_key, unique_key
 from pynakes.metadata import library_dialect, metadata_value
 from pynakes.model import BibEntry, BibFile
+from pynakes.provider_cache import open_cache
 from pynakes.providers._http import DEFAULT_TIMEOUT, ProviderFetchError
 from pynakes.providers.metadata import (
     acl_anthology,
@@ -277,16 +278,54 @@ def resolve_identifier(value: str) -> tuple[str, str]:
     )
 
 
+#: The citation key an ``IDENTIFIER=KEY`` argument may name: a letter first,
+#: so the tail of a DOI or URL containing ``=`` is not mistaken for a key.
+_PAIR_KEY_RE = re.compile(r"[A-Za-z][A-Za-z0-9_:.+-]*")
+
+
+def split_identifier_key(value: str) -> tuple[str, str | None]:
+    """Split an ``IDENTIFIER=KEY`` import argument into identifier and key.
+
+    The key follows the last ``=``, with optional spaces around it. It must
+    start with a letter and use only letters, digits and ``_:.+-``, and the
+    text before it must be a recognized identifier on its own. An ``=`` that
+    follows a URL query-parameter name (``?id=123``) belongs to the URL.
+    Anything else is one identifier with no key, returned stripped. Offline:
+    the identifier is classified, not fetched.
+    """
+    raw = value.strip()
+    identifier, separator, key = raw.rpartition("=")
+    key = key.strip()
+    if not separator or not identifier.strip() or not _PAIR_KEY_RE.fullmatch(key):
+        return raw, None
+    if "?" in identifier and "=" not in re.split(r"[?&;]", identifier)[-1]:
+        return raw, None
+    try:
+        resolve_identifier(identifier)
+    except (UnsupportedIdentifierError, ValueError):
+        return raw, None
+    return identifier.strip(), key
+
+
 def fetch_bibtex_for_doi(doi: str, timeout: float = DEFAULT_TIMEOUT) -> str:
     """Fetch BibTeX metadata for ``doi`` via DOI content negotiation.
 
     Thin domain wrapper over :func:`pynakes.providers.metadata.doi.fetch_bibtex` that
     translates provider transport errors into :class:`DOIImportError`.
+    The response is cached (namespace ``doi``, format ``bib``, as ``enrich``
+    caches it), in memory or in the file of an active
+    :func:`~pynakes.provider_cache.cache_scope`.
     """
+    cache = open_cache(None)
+    cached = cache.get("doi", doi, "bib")
+    if cached is not None:
+        return cached
     try:
-        return doi_provider.fetch_bibtex(doi, timeout=timeout)
+        text = doi_provider.fetch_bibtex(doi, timeout=timeout)
     except ProviderFetchError as exc:
         raise DOIImportError(str(exc)) from exc
+    cache.put("doi", doi, "bib", text)
+    return text
 
 
 def fetch_crossref_work(doi: str) -> dict | None:
@@ -361,12 +400,20 @@ def fetch_arxiv_atom(identifier: str, timeout: float = DEFAULT_TIMEOUT) -> str:
     """Fetch arXiv Atom XML for ``identifier``. Split out so tests can stub it.
 
     Thin domain wrapper over :func:`pynakes.providers.repositories.arxiv.fetch_atom` that
-    translates provider transport errors into :class:`ArxivImportError`.
+    translates provider transport errors into :class:`ArxivImportError`. Cached
+    like :func:`fetch_bibtex_for_doi`, under namespace ``arxiv`` and format
+    ``xml``.
     """
+    cache = open_cache(None)
+    cached = cache.get("arxiv", identifier, "xml")
+    if cached is not None:
+        return cached
     try:
-        return arxiv.fetch_atom(identifier, timeout=timeout)
+        text = arxiv.fetch_atom(identifier, timeout=timeout)
     except ProviderFetchError as exc:
         raise ArxivImportError(str(exc)) from exc
+    cache.put("arxiv", identifier, "xml", text)
+    return text
 
 
 def arxiv_doi(identifier: str) -> str:
@@ -441,6 +488,8 @@ def prepare_imported_entry(
             normalized, dialect or library_dialect(lib), fetcher
         )
     except ProviderFetchError as exc:
+        # A response that does not parse must not be served from the cache again.
+        open_cache(None).drop("doi", normalized, "bib")
         raise DOIImportError(str(exc)) from exc
     if supplement:
         metadata = _with_crossref_locator(metadata, normalized)
@@ -508,6 +557,8 @@ def prepare_imported_arxiv(
         metadata = get_import_provider(ARXIV).load(normalized, dialect, fetcher)
     except (ProviderFetchError, ArxivImportError) as exc:
         # The default fetcher, fetch_arxiv_atom, reports failure as ArxivImportError.
+        # A cached response that does not parse must not be served again.
+        open_cache(None).drop("arxiv", normalized, "xml")
         metadata = None
         if may_fall_back:
             metadata = _arxiv_metadata_via_doi(normalized, doi_fetcher, dialect)

@@ -19,6 +19,7 @@ The module also renders the optional ``AGENTS.md`` guide (``init --agent-guide``
 that tells LLM agents how to work with a Pinax bibliography.
 """
 
+import textwrap
 from dataclasses import dataclass
 
 from pynakes.metadata import (
@@ -49,8 +50,9 @@ _PROFILE_SKIP_CATEGORIES = {"selectors"}
 
 # A sensible starting profile for a brand-new library, so `init` produces a
 # working library rather than an empty file: the modern BibLaTeX dialect and a
-# citation-key pattern equivalent to pynakes' own ``AuthorYearTitle`` fallback,
-# so `keys generate` behaves consistently and the convention is visible in the
+# citation-key pattern matching pynakes' own ``AuthorYearTitle`` fallback (save
+# that, as in JabRef, it keeps a title's lowercase first word lowercase), so
+# `keys generate` behaves consistently and the convention is visible in the
 # file. Both are overridable via `--dialect` / `--key-pattern`, or replaced wholesale
 # by `--profile-from`.
 DEFAULT_TYPE = "biblatex"
@@ -204,13 +206,78 @@ holds downloaded materials named by citation key:
 """
 
 
-def render_agents_md(bibname: str) -> str:
+def is_agents_guide(text: str) -> bool:
+    """Whether ``text`` is a guide ``render_agents_md`` wrote, judged by its title line."""
+    return text.partition("\n")[0].strip() == AGENTS_GUIDE.partition("\n")[0]
+
+
+def render_agents_md(bibname: str, lib: BibFile | None = None) -> str:
     """Return the ``AGENTS.md`` guide for a Pinax bibliography.
 
     ``bibname`` is the stem of the ``.bib`` file (e.g. ``"library"`` for
-    ``library.bib``).
+    ``library.bib``). With ``lib``, the guide ends with the conventions that
+    library declares or follows (see :func:`library_conventions`).
     """
-    return AGENTS_GUIDE.format(bibname=bibname)
+    guide = AGENTS_GUIDE.format(bibname=bibname)
+    if lib is None:
+        return guide
+    lines = "\n".join(
+        textwrap.fill(
+            line,
+            width=76,
+            initial_indent="- ",
+            subsequent_indent="  ",
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        for line in library_conventions(lib, bibname)
+    )
+    return f"{guide}\n## Library conventions\n\n{lines}\n"
+
+
+def library_conventions(lib: BibFile, bibname: str) -> list[str]:
+    """Return the guide's convention lines for ``lib``, one Markdown paragraph each.
+
+    The citation-key line names the stored ``key-pattern`` (or JabRef's
+    ``keypatterndefault``); without one, the pattern most existing keys follow,
+    which is proposed but never stored here. The author line names the stored
+    ``normalize-author-style``. The rest is the same for every library.
+    """
+    # Imported here: keys imports the metadata package, which imports this module.
+    from pynakes.keys import infer_key_pattern
+    from pynakes.metadata import metadata_value
+    from pynakes.metadata.jabref import library_key_pattern
+
+    bib = f"{bibname}.bib"
+    stored = library_key_pattern(lib, "")
+    if stored is not None:
+        keys = f"Citation keys follow the stored pattern `{stored}`; `ref import` applies it."
+    elif (inferred := infer_key_pattern(lib).pattern) is not None:
+        keys = (
+            f"Existing citation keys follow `{inferred}`, which is not stored, so "
+            "`ref import` generates keys in another style. Ask the user before storing it "
+            f"with `pynakes metadata set {bib} key-pattern '{inferred}'`."
+        )
+    else:
+        keys = (
+            "No citation-key pattern is stored. `pynakes keys pattern "
+            f"{bib}` proposes one; ask the user before storing it."
+        )
+    author_style = metadata_value(lib, "normalize-author-style")
+    authors = (
+        f"Author names use the `{author_style}` style; `pynakes normalize {bib}` applies it."
+        if author_style
+        else "No author-name style is stored: keep names as they are."
+    )
+    return [
+        keys,
+        authors,
+        f"For a new reference: `pynakes ref import {bib} <identifier>`, then "
+        f"`pynakes enrich {bib} --online --published --key <citekey>` to fill missing "
+        "fields and promote a preprint to its published version, then "
+        f"`pynakes asset fetch {bib} --key <citekey>`.",
+        f"`{bibname}.files/` holds downloaded materials: keep it in `.gitignore`.",
+    ]
 
 
 def render_library(entries: list[ProfileEntry], line_ending: str = "\n") -> str:

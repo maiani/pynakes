@@ -54,7 +54,7 @@ class TestGenerateKey:
         )
 
         assert generate_key(e) == "Smith2025Phi"
-        assert generate_key_from_pattern(e, "[auth]_[year]_[veryshorttitle]") == ("smith_2025_phi")
+        assert generate_key_from_pattern(e, "[auth]_[year]_[veryshorttitle]") == ("Smith_2025_Phi")
 
     def test_tex_math_wrappers_do_not_become_title_words(self) -> None:
         e = _entry(
@@ -63,8 +63,8 @@ class TestGenerateKey:
             title=r"{\ensuremath{\phi}}-junction effect",
         )
 
-        assert generate_key_from_pattern(e, "[auth]_[year]_[Veryshorttitle]") == ("smith_2025_Phi")
-        assert generate_key_from_pattern(e, "[auth]_[year]_[title]") == (
+        assert generate_key_from_pattern(e, "[auth]_[year]_[veryshorttitle]") == ("Smith_2025_Phi")
+        assert generate_key_from_pattern(e, "[auth:lower]_[year]_[title:lower]") == (
             "smith_2025_phijunctioneffect"
         )
 
@@ -91,7 +91,7 @@ class TestGenerateKey:
             "  title = {A Practical Test}\n"
             "}\n"
         )
-        assert generate_key(lib.entries["old"], lib) == "smith24practical"
+        assert generate_key(lib.entries["old"], lib) == "Smith24Practical"
 
     def test_jabref_entry_type_pattern_overrides_default(self) -> None:
         lib = parse_bib(
@@ -103,13 +103,13 @@ class TestGenerateKey:
             "  title = {A Practical Test}\n"
             "}\n"
         )
-        assert generate_key(lib.entries["old"], lib) == "smith2024practical"
+        assert generate_key(lib.entries["old"], lib) == "Smith2024Practical"
 
     def test_jabref_pattern_supports_literals_and_field_markers(self) -> None:
         e = _entry(
             author="John Smith", year="2024", title="A Practical Test", journal="Test Journal"
         )
-        assert generate_key_from_pattern(e, "[auth]-[YEAR]-[journal:abbr]") == "smith-2024-tj"
+        assert generate_key_from_pattern(e, "[auth]-[YEAR]-[journal:abbr]") == "Smith-2024-TJ"
 
     @pytest.mark.parametrize("marker", ["unknownSpecial", "auth.ini", "auth.easy", "author2"])
     def test_unsupported_jabref_pattern_errors(self, marker: str) -> None:
@@ -124,32 +124,41 @@ class TestGenerateKey:
             year="2024",
             title="A Practical Study of Things",
         )
-        assert generate_key_from_pattern(e, "[auth3]") == "smi"  # truncated, lowercased last name
-        assert generate_key_from_pattern(e, "[authors]") == "smithdoeroe"
+        assert generate_key_from_pattern(e, "[auth3]") == "Smi"  # truncated last name
+        assert generate_key_from_pattern(e, "[authors]") == "SmithDoeRoe"
         assert generate_key_from_pattern(e, "[shortyear]") == "24"
-        assert generate_key_from_pattern(e, "[shorttitle]") == "practicalstudythings"
-        assert generate_key_from_pattern(e, "[camel2]") == "apractical"
-        assert generate_key_from_pattern(e, "[entrytype]") == "article"
-        assert generate_key_from_pattern(e, "[authorlast]") == "roe"
-        assert generate_key_from_pattern(e, "[Authorlast]") == "Roe"
+        assert generate_key_from_pattern(e, "[shorttitle]") == "PracticalStudyThings"
+        assert generate_key_from_pattern(e, "[camel2]") == "APractical"
+        assert generate_key_from_pattern(e, "[entrytype]") == "Article"
+        assert generate_key_from_pattern(e, "[authorlast]") == "Roe"
         assert generate_key_from_pattern(e, "[authIni4]") == "SmDR"
         assert generate_key_from_pattern(e, "[authorIni]") == "SmithDR"
-        assert generate_key_from_pattern(e, "[authors2]") == "smithdoeetal"
+        assert generate_key_from_pattern(e, "[authors2]") == "SmithDoeEtAl"
 
-    def test_mixed_case_marker_only_forces_first_letter(self) -> None:
-        # Regression: [Auth]-style markers (capital first letter) used to
-        # force the *entire rest* of the value to lowercase too, corrupting
-        # legitimately mixed-case values: a compound surname stripped of its
-        # hyphen ("Pioro-Ladriere" -> "PioroLadriere") or a title starting
-        # with an acronym ("AI for ..."). Real JabRef markers are
-        # case-insensitive except for the explicit all-lower/all-upper forms
-        # already covered by test_marker_variants; a mixed-case marker should
-        # only guarantee an uppercase first letter, not reshape the rest.
-        e = _entry(author="Michel Pioro-Ladriere", year="2008", title="Electrically driven spin")
-        assert generate_key_from_pattern(e, "[Auth]") == "PioroLadriere"
+    def test_markers_keep_the_value_case_and_modifiers_change_it(self) -> None:
+        # As in JabRef, a marker never recases its value; only modifiers such
+        # as :lower and :upper do. JabRef's marker names are lowercase:
+        # pynakes accepts a capitalized spelling as an alias of the lowercase
+        # marker (never writing one), and a capitalized field name is the
+        # field's raw value.
+        e = _entry(author="Isaac Newton", year="1687", title="on the principia mathematica")
+        assert generate_key_from_pattern(e, "[auth]") == "Newton"
+        assert generate_key_from_pattern(e, "[auth:lower]") == "newton"
+        assert generate_key_from_pattern(e, "[auth:upper]") == "NEWTON"
+        assert generate_key_from_pattern(e, "[Auth]") == "Newton"
+        assert generate_key_from_pattern(e, "[AUTH]") == "Newton"
+        assert generate_key_from_pattern(e, "[veryshorttitle]") == "principia"
+        assert generate_key_from_pattern(e, "[shorttitle]") == "principiamathematica"
+        assert generate_key_from_pattern(e, "[Veryshorttitle]") == "principia"
+        # [TITLE] is the raw title field, not an uppercased one.
+        assert generate_key_from_pattern(e, "[TITLE]") == "ontheprincipiamathematica"
+        # title, camel and camelN capitalize each word, as in JabRef.
+        assert generate_key_from_pattern(e, "[title]") == "PrincipiaMathematica"
+        assert generate_key_from_pattern(e, "[camel2]") == "OnThe"
 
-        e2 = _entry(author="Xin Gao", year="2025", title="AI for materials discovery")
-        assert generate_key_from_pattern(e2, "[Veryshorttitle]") == "AI"
+        e2 = _entry(author="Michel Pioro-Ladriere", year="2008", title="AI for materials")
+        assert generate_key_from_pattern(e2, "[auth]") == "PioroLadriere"
+        assert generate_key_from_pattern(e2, "[veryshorttitle]") == "AI"
 
     def test_accented_author_names_fold_to_ascii(self) -> None:
         e = _entry(
@@ -159,9 +168,9 @@ class TestGenerateKey:
         )
         # The leading accented letter must fold to ASCII (Š → S), not be dropped.
         assert generate_key_from_pattern(e, "[auth]_[year]_[veryshorttitle]") == (
-            "sexample_2020_generic"
+            "Sexample_2020_Generic"
         )
-        assert generate_key_from_pattern(e, "[authors]") == "sexampleofoobar"
+        assert generate_key_from_pattern(e, "[authors]") == "SexampleOfooBar"
 
     def test_von_particle_dropped_from_comma_form_last_name(self) -> None:
         # BibTeX "von Last, First" names: a leading lowercase particle
@@ -173,7 +182,7 @@ class TestGenerateKey:
         assert generate_key_from_pattern(e2, "[Auth]") == "RiggelenDoelman"
 
         e3 = _entry(author="de la Cruz, Maria", year="2020", title="Sample")
-        assert generate_key_from_pattern(e3, "[auth]") == "cruz"
+        assert generate_key_from_pattern(e3, "[auth]") == "Cruz"
 
         # An all-lowercase "von Last" segment with no capitalized word at all
         # is kept whole rather than discarded down to nothing.
@@ -188,7 +197,7 @@ class TestGenerateKey:
         assert generate_key_from_pattern(e, "[auth:upper]") == "SMITH"
         assert generate_key_from_pattern(e, "[journal:abbr]") == "tj"
         assert generate_key_from_pattern(e, "[journal:capitalize]") == "TestJournal"
-        assert generate_key_from_pattern(e, "[auth:truncate3]") == "smi"
+        assert generate_key_from_pattern(e, "[auth:truncate3]") == "Smi"
 
     def test_unsupported_modifier_errors(self) -> None:
         e = _entry(author="John Smith", year="2024", title="A Study")
@@ -219,15 +228,15 @@ class TestGenerateKey:
             year="2024",
             title="A Study",
         )
-        assert generate_key_from_pattern(e, "[edtr]") == "example"
-        assert generate_key_from_pattern(e, "[Edtr]") == "Example"
-        assert generate_key_from_pattern(e, "[EDTR]") == "EXAMPLE"
-        assert generate_key_from_pattern(e, "[edtr3]") == "exa"
-        assert generate_key_from_pattern(e, "[editors]") == "examplesamplefixture"
-        assert generate_key_from_pattern(e, "[editors2]") == "examplesampleetal"
-        assert generate_key_from_pattern(e, "[editorlast]") == "fixture"
-        assert generate_key_from_pattern(e, "[editorini]") == "exampsf"
-        assert generate_key_from_pattern(e, "[edtrini4]") == "exsf"
+        assert generate_key_from_pattern(e, "[edtr]") == "Example"
+        assert generate_key_from_pattern(e, "[edtr:lower]") == "example"
+        assert generate_key_from_pattern(e, "[EDTR]") == "Example"
+        assert generate_key_from_pattern(e, "[edtr3]") == "Exa"
+        assert generate_key_from_pattern(e, "[editors]") == "ExampleSampleFixture"
+        assert generate_key_from_pattern(e, "[editors2]") == "ExampleSampleEtAl"
+        assert generate_key_from_pattern(e, "[editorlast]") == "Fixture"
+        assert generate_key_from_pattern(e, "[editorini]") == "ExampSF"
+        assert generate_key_from_pattern(e, "[edtrini4]") == "ExSF"
 
     def test_editor_marker_does_not_fall_back_to_author(self) -> None:
         # Unlike [auth]/[authors], which fall back to editor when author is
@@ -236,7 +245,7 @@ class TestGenerateKey:
         # trigger the unrelated "empty pattern falls back to AuthorYearTitle"
         # behavior and mask what this test checks.
         e = _entry(author="John Smith", year="2024", title="A Study")
-        assert generate_key_from_pattern(e, "[edtr]") == "anon"
+        assert generate_key_from_pattern(e, "[edtr]") == "Anon"
         assert generate_key_from_pattern(e, "x[editors]") == "x"
 
     def test_page_markers(self) -> None:
@@ -258,7 +267,7 @@ class TestGenerateKey:
         e = _entry(author="John Smith", year="2024", title="A Study of Rare Things")
         # Unlike [title]/[shorttitle], [fulltitle] keeps every word and its
         # original spacing (spaces only disappear at final key sanitization).
-        assert generate_key_from_pattern(e, "[fulltitle:truncate3]") == "as"
+        assert generate_key_from_pattern(e, "[fulltitle:truncate3]") == "AS"
         assert generate_key_from_pattern(e, "[title]") != generate_key_from_pattern(
             e, "[fulltitle]"
         )
@@ -266,8 +275,8 @@ class TestGenerateKey:
     def test_formatter_modifier_variants(self) -> None:
         # Any registered field formatter is usable directly as a modifier.
         e = _entry(author="John Smith", year="2024", title="A Study", journal="{Sample} Journal")
-        assert generate_key_from_pattern(e, "[journal:remove_braces]") == "samplejournal"
-        assert generate_key_from_pattern(e, "[journal:sentencecase]") == "samplejournal"
+        assert generate_key_from_pattern(e, "[journal:remove_braces]") == "SampleJournal"
+        assert generate_key_from_pattern(e, "[journal:sentencecase]") == "Samplejournal"
 
     def test_title_word_modifiers_apply_to_arbitrary_fields(self) -> None:
         # veryshorttitle/shorttitle/camel are markers, but JabRef also exposes
@@ -279,8 +288,8 @@ class TestGenerateKey:
             title="A Study",
             journal="the deep learning review quarterly",
         )
-        assert generate_key_from_pattern(e, "[journal:veryshorttitle]") == "Deep"
-        assert generate_key_from_pattern(e, "[journal:shorttitle]") == "DeepLearningReview"
+        assert generate_key_from_pattern(e, "[journal:veryshorttitle]") == "deep"
+        assert generate_key_from_pattern(e, "[journal:shorttitle]") == "deeplearningreview"
         # Unlike shorttitle, camel does not filter stopwords.
         assert generate_key_from_pattern(e, "[journal:camel]") == "TheDeepLearningReviewQuarterly"
 
@@ -318,9 +327,9 @@ class TestGenerateKey:
 
     def test_truncate_trims_trailing_whitespace(self) -> None:
         e = _entry(author="John Smith", year="2024", title="A Study", journal="ab cd")
-        # Truncating "ab cd" (marker-cased to "Ab cd") to 3 chars lands on a
-        # trailing space, which JabRef's truncateN strips.
-        assert generate_key_from_pattern(e, "[Journal:truncate3]") == "Ab"
+        # Truncating "ab cd" to 3 chars lands on a trailing space, which
+        # JabRef's truncateN strips.
+        assert generate_key_from_pattern(e, "[journal:truncate3]") == "ab"
 
 
 class TestDuplicateDetection:
@@ -438,9 +447,9 @@ class TestRegenerate:
             "@article{keep,\n  author = {Jane Doe},\n  year = {2023},\n  title = {Other}\n}\n"
         )
 
-        assert regenerate_key(lib, "old") == ("old", "smith24")
+        assert regenerate_key(lib, "old") == ("old", "Smith24")
 
-        assert "smith24" in lib.entries
+        assert "Smith24" in lib.entries
         assert "keep" in lib.entries
 
     def test_regenerate_one_disambiguates_against_existing_keys(self) -> None:
@@ -488,7 +497,7 @@ class TestRegenerate:
             "  title = {Data}\n}\n"
         )
         renames = regenerate_keys(lib)
-        assert renames == [("old", "smith24")]
+        assert renames == [("old", "Smith24")]
 
     def test_regenerate_skips_xdata_entries(self) -> None:
         # @xdata entries are referenced by key from other entries via
@@ -628,7 +637,7 @@ class TestRenameFollowsReferencesThroughTheCli:
 
 
 _KEPT_LIBRARY = (
-    "@comment{pynakes-meta: key-pattern: [Auth][year]}\n\n"
+    "@comment{pynakes-meta: key-pattern: [auth][year]}\n\n"
     "% pynakes: ignore citation_key_pattern_mismatch -- cited in the manuscript\n"
     "@article{Kept,\n  author = {Newton, Isaac},\n  title = {Principia},\n  year = {1687}\n}\n\n"
     "@article{Moved,\n  author = {Euler, Leonhard},\n  title = {Mechanica},\n  year = {1736}\n}\n"

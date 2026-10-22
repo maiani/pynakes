@@ -120,10 +120,15 @@ def _lint_collection(
     if not issues:
         human = [f"{file}: no issues found."]
     else:
-        human = [] if summary_only else [f"  {_format_issue(issue)}" for issue in issues]
-        human.append(
-            f"{len(issues)} issue(s): {errors} error(s), {warnings} warning(s), {infos} info."
-        )
+        # The counts come first, so a long report opens with its shape.
+        human = [
+            f"{len(issues)} issue(s): {errors} error(s), {warnings} warning(s), {infos} info.",
+            "By category: "
+            + ", ".join(f"{category} {count}" for category, count in by_category.items())
+            + ".",
+        ]
+        if not summary_only:
+            human.extend(f"  {_format_issue(issue)}" for issue in issues)
         human.extend(_fixer_hints(issues))
     if suppressed:
         human.append(

@@ -14,9 +14,11 @@ contract. For command-by-command tutorials, see the [usage guide](usage.md).
 
 ## Automation behavior
 
-- **Explicit network access.** Network use is limited to `ref import`, `asset
-  fetch`, `ref import --fetch`, `verify --online`, `enrich --online`,
-  `ref compare --online`, and `ref find --online`.
+- **Explicit network access.** A command whose purpose is a network request
+  goes online by being run: `ref import`, `ref find`, `asset fetch`, and
+  `--fetch` on `ref add` / `ref import`. A command with an offline mode leaves
+  it only with `--online`: `verify`, `enrich`, `ref compare`. Nothing else
+  makes a request; `capabilities` lists both groups under `network_access`.
 - **Reviewable edits.** Modifying commands support `--dry-run` and `--diff`,
   including `asset repair`, whose diff is of the Pinax manifest it reconciles.
 - **Structured output.** Use `--json`; do not parse human-readable output.
@@ -183,8 +185,9 @@ the all-or-nothing guarantee rather than an exception to it.
   inside a `corpus batch` when it is one of several related changes.
 - Use `ref import` for network-backed DOI, repository, preprint, and
   working-paper metadata resolution; give it several identifiers, or pipe them
-  with `-`, when a whole list has to resolve.
-- Use `ref find "<reference text>" --online` when a reference arrives written
+  with `-`, when a whole list has to resolve. Write `IDENTIFIER=KEY` to choose
+  an entry's citation key, so a batch needs no renaming afterwards.
+- Use `ref find "<reference text>"` when a reference arrives written
   out rather than as an identifier, and you need to know whether it describes
   anything real before importing it. Read-only. It reports candidates with the
   index's own relevance score and marks those that plainly match; it never

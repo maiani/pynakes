@@ -367,36 +367,3 @@ def test_search_abstract_joins_a_selection(tmp_path: Path) -> None:
     _code, payload = _json("search", str(bib), "Principia", "--select", "year", "--abstract")
 
     assert payload["matches"][0]["fields"] == {"year": "1687", "abstract": ABSTRACT}
-
-
-def test_in_field_is_deprecated_but_still_works(fixtures_dir: Path) -> None:
-    bib = str(fixtures_dir / "simple.bib")
-
-    _code, payload = _json("search", bib, "learning", "--in-field", "title")
-    human = runner.invoke(app, ["search", bib, "learning", "--in-field", "title"])
-
-    assert payload["matches"][0]["fields"] == {"title": "A Comprehensive Study on Machine Learning"}
-    (warning,) = payload["warnings"]
-    assert warning["type"] == "deprecated"
-    assert (warning["old"], warning["new"], warning["removal"]) == (
-        "--in-field",
-        "--in and --select",
-        "0.9.0",
-    )
-    assert human.exit_code == 0
-    assert "warning: --in-field is deprecated" in human.stderr
-
-
-def test_in_field_cannot_be_mixed_with_its_replacements(fixtures_dir: Path) -> None:
-    code, payload = _json(
-        "search", str(fixtures_dir / "simple.bib"), "x", "--in-field", "title", "--select", "doi"
-    )
-
-    assert code == 1 and payload["error"] == "InvalidInput"
-
-
-def test_capabilities_list_the_deprecation() -> None:
-    from pynakes.capabilities import get_capabilities
-
-    listed = {(item["command"], item["old"]) for item in get_capabilities()["deprecations"]}
-    assert ("search", "--in-field") in listed
