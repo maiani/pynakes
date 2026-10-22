@@ -357,6 +357,13 @@ usable directly as a modifier. A handful of rarer combinator markers
 (`authN_M`, `authorsAlpha`, `editorLastForeIni`, `keywordN`, and similar) are
 not yet supported and raise the same explicit error.
 
+As in JabRef, a marker keeps its value's case and only modifiers change it:
+`[auth]` on Isaac Newton gives `Newton`, `[auth:lower]` gives `newton`.
+`veryshorttitle` and `shorttitle` keep each title word's case, while `title`,
+`camel`, and `camelN` capitalize the words. Marker names are lowercase; a
+capitalized spelling such as `[Auth]` is accepted as an alias of `[auth]`, but
+pynakes never writes one.
+
 Pass a citation key to apply that preferred pattern to just one entry, or
 `--all` to regenerate the whole library. Like `keys rename`, generated renames
 also rewrite matching TeX citations in linked `tex-sources` metadata when it is

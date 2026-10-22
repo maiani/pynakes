@@ -707,7 +707,7 @@ test("linking a TeX source records it relative to the library", { skip }, async 
 
 
 test("generated new entries preview their key and honor library patterns", { skip }, async () => {
-  const file = tempBib('@comment{pynakes-meta: key-pattern:[auth][year];}\n');
+  const file = tempBib('@comment{pynakes-meta: key-pattern:[auth:lower][year];}\n');
   const request = {entryType: "book", fields: {author: "Newton, Isaac", title: "Principia", year: "1687"}};
   const first = await previewThenApply(file, {kind: "add", request});
   assert.equal(first.key, "newton1687");

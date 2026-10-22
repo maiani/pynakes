@@ -50,9 +50,9 @@ def test_key_pattern_expectation_uses_the_generation_collision_suffix() -> None:
 
     assert [issue.message for issue in issues] == [
         "Entry 'First' does not match configured citation-key pattern '[auth]_[year]'; "
-        "expected 'doe_2024'",
+        "expected 'Doe_2024'",
         "Entry 'Second' does not match configured citation-key pattern '[auth]_[year]'; "
-        "expected 'doe_2024a'",
+        "expected 'Doe_2024a'",
     ]
 
 

@@ -9,7 +9,7 @@ from pynakes.engine import Bibliography
 
 
 def test_generated_add_api_and_headless_preview(tmp_path):
-    source = "@comment{pynakes-meta: key-pattern:[auth][year];}\n"
+    source = "@comment{pynakes-meta: key-pattern:[auth:lower][year];}\n"
     fields = {"author": "Newton, Isaac", "year": "1687", "title": "Principia"}
     coll = Bibliography.from_text(source)
     assert coll.add_entry("book", None, fields).key == "newton1687"

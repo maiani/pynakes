@@ -21,25 +21,26 @@ from dataclasses import dataclass, field
 
 from pynakes.model import BibFile
 
-#: pynakes' built-in key style (``Newton1687Philosophiae``) as a pattern. A
-#: capitalized marker keeps the name's own casing; an all-lowercase marker
-#: lowercases it, which is how the Google Scholar style below is written.
-DEFAULT_PATTERN = "[Auth][year][Veryshorttitle]"
+#: pynakes' built-in key style (``Newton1687Philosophiae``) as a pattern. As in
+#: JabRef, a marker keeps its value's case, so this reproduces the built-in
+#: style whenever a title's first significant word is capitalized; a ``:lower``
+#: modifier lowercases a value, which is how the Google Scholar style is written.
+DEFAULT_PATTERN = "[auth][year][veryshorttitle]"
 
 #: The patterns recognized, in order of preference for ties.
 CANDIDATE_PATTERNS: tuple[str, ...] = (
     DEFAULT_PATTERN,
-    "[Auth][year][Shorttitle]",
-    "[Auth][year][Camel2]",
-    "[Auth][year][Camel3]",
-    "[Auth][year]",
-    "[Auth][shortyear]",
-    "[Auth]:[year]",
-    "[Auth]_[year]",
-    "[auth][year][veryshorttitle]",
+    "[auth][year][shorttitle]",
+    "[auth][year][camel2]",
+    "[auth][year][camel3]",
     "[auth][year]",
-    "[auth]_[year]",
+    "[auth][shortyear]",
     "[auth]:[year]",
+    "[auth]_[year]",
+    "[auth:lower][year][veryshorttitle:lower]",
+    "[auth:lower][year]",
+    "[auth:lower]_[year]",
+    "[auth:lower]:[year]",
 )
 
 #: Fewest entries with key material before a pattern is inferred.

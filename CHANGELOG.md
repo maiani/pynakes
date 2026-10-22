@@ -93,6 +93,19 @@ The forms deprecated in 0.8 are removed:
   guide by default. `render_agents_md` takes the library as an optional
   argument.
 
+### Fixed
+
+- Citation-key pattern markers keep the value's case, as in JabRef: `[auth]`
+  on Isaac Newton gives `Newton`, and only modifiers such as `:lower`,
+  `:upper` or `:capitalize` change it. `[veryshorttitle]` and `[shorttitle]`
+  keep each word's case. A capitalized marker (`[Auth]`) is still accepted as
+  an alias of the lowercase one but never written, and `keys pattern` now
+  proposes patterns JabRef reads the same way (`[auth][year]`,
+  `[auth:lower][year]`). A library storing lowercase markers gets differently
+  cased new keys; existing keys are unchanged. The default profile's
+  `[auth][year][veryshorttitle]` now gives `Newton1687Philosophiae`, but keeps
+  a title's lowercase first word, which the built-in style capitalizes.
+
 ## [0.8.0] - 2026-10-22
 
 Research context, reusable queries and bibliography analysis: read bounded

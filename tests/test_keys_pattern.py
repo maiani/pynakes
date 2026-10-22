@@ -33,7 +33,7 @@ def _library(keys: list[str], extra: str = "") -> str:
     [
         (
             ["Newton1687Philosophiae", "Euler1748Introductio", "Gauss1801Disquisitiones"],
-            "[Auth][year][Veryshorttitle]",
+            "[auth][year][veryshorttitle]",
         ),
         (
             [
@@ -41,11 +41,11 @@ def _library(keys: list[str], extra: str = "") -> str:
                 "Euler1748IntroductioIn",
                 "Gauss1801DisquisitionesArithmeticae",
             ],
-            "[Auth][year][Camel2]",
+            "[auth][year][camel2]",
         ),
-        (["newton1687", "euler1748", "gauss1801"], "[auth][year]"),
+        (["newton1687", "euler1748", "gauss1801"], "[auth:lower][year]"),
         # A disambiguating letter suffix still matches the pattern.
-        (["Newton1687a", "Euler1748", "Gauss1801b"], "[Auth][year]"),
+        (["Newton1687a", "Euler1748", "Gauss1801b"], "[auth][year]"),
     ],
 )
 def test_infers_the_pattern_most_keys_follow(keys: list[str], pattern: str) -> None:
@@ -75,7 +75,7 @@ def test_entries_with_nothing_to_build_a_key_from_are_not_counted() -> None:
     inference = infer_key_pattern(parse_bib(source))
 
     assert inference.checked == 3
-    assert inference.pattern == "[auth][year]"
+    assert inference.pattern == "[auth:lower][year]"
 
 
 def test_keys_pattern_reports_and_suggests(tmp_path: Path) -> None:
@@ -87,8 +87,8 @@ def test_keys_pattern_reports_and_suggests(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["configured"] is None
-    assert data["inferred"]["pattern"] == "[auth][year]"
-    assert data["suggestion"] == f"pynakes metadata set {bib} key-pattern '[auth][year]'"
+    assert data["inferred"]["pattern"] == "[auth:lower][year]"
+    assert data["suggestion"] == f"pynakes metadata set {bib} key-pattern '[auth:lower][year]'"
 
 
 def test_keys_pattern_with_a_stored_pattern_suggests_nothing(tmp_path: Path) -> None:
@@ -124,7 +124,7 @@ def test_import_warns_when_generated_keys_ignore_the_library_style(
     assert result.exit_code == 0, result.output
     warning = next(w for w in json.loads(result.output)["warnings"])
     assert warning["type"] == "key_pattern_unset"
-    assert warning["pattern"] == "[auth][year]"
+    assert warning["pattern"] == "[auth:lower][year]"
     assert "metadata set" in warning["message"]
 
 
@@ -140,7 +140,7 @@ def test_import_with_a_named_key_does_not_warn(lowercase_library: Path) -> None:
 def test_import_following_a_stored_pattern_does_not_warn(lowercase_library: Path) -> None:
     text = lowercase_library.read_text(encoding="utf-8")
     lowercase_library.write_text(
-        "@comment{pynakes-meta: key-pattern: [auth][year];}\n\n" + text, encoding="utf-8"
+        "@comment{pynakes-meta: key-pattern: [auth:lower][year];}\n\n" + text, encoding="utf-8"
     )
 
     result = runner.invoke(

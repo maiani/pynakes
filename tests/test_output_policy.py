@@ -157,7 +157,7 @@ def test_human_output_states_each_warning(tmp_path) -> None:
     """A warning's message reaches human output, not only ``--json``."""
     bib = tmp_path / "refs.bib"
     bib.write_text(
-        "@comment{pynakes-meta: key-pattern: [Auth][year]}\n\n"
+        "@comment{pynakes-meta: key-pattern: [auth][year]}\n\n"
         "@article{Old,\n  author = {Euler, Leonhard},\n  title = {Mechanica},\n"
         "  year = {1736}\n}\n",
         encoding="utf-8",

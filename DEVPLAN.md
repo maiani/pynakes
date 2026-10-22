@@ -404,14 +404,6 @@ Decisions taken in this block, to keep:
 Remaining: `init --agent-guide` overwrites an `AGENTS.md` already beside the
 `.bib`, which at a repository root is the project's own guide.
 
-Open question found along the way: a lowercase key-pattern marker lowercases
-its value (`[auth]` gives `newton`), and `_apply_marker_casing` in `keys.py`
-documents this as JabRef behaviour. JabRef's `[auth]` may keep the name's
-case. Check JabRef's own documentation or source before changing anything; if
-pynakes differs, a library with JabRef's `[auth][year]` pattern gets different
-keys here than in JabRef. `keys pattern` writes capitalized markers
-(`[Auth][year]`) for that reason.
-
 Making imports follow the library's author format and encoding, and making
 provider extras such as `abstract` or arXiv's `updated` opt-in, belongs to the
 v0.11 enrichment value policy. Imports already apply the `normalize-*` and

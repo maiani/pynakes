@@ -50,8 +50,9 @@ _PROFILE_SKIP_CATEGORIES = {"selectors"}
 
 # A sensible starting profile for a brand-new library, so `init` produces a
 # working library rather than an empty file: the modern BibLaTeX dialect and a
-# citation-key pattern equivalent to pynakes' own ``AuthorYearTitle`` fallback,
-# so `keys generate` behaves consistently and the convention is visible in the
+# citation-key pattern matching pynakes' own ``AuthorYearTitle`` fallback (save
+# that, as in JabRef, it keeps a title's lowercase first word lowercase), so
+# `keys generate` behaves consistently and the convention is visible in the
 # file. Both are overridable via `--dialect` / `--key-pattern`, or replaced wholesale
 # by `--profile-from`.
 DEFAULT_TYPE = "biblatex"

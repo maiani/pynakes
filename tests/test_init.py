@@ -351,6 +351,6 @@ def test_agent_guide_proposes_the_key_pattern_existing_keys_follow_without_stori
 
     guide = render_agents_md("library", lib)
 
-    assert "Existing citation keys follow `[Auth][year]`, which is not stored" in guide
-    assert "pynakes metadata set library.bib key-pattern '[Auth][year]'" in guide
+    assert "Existing citation keys follow `[auth][year]`, which is not stored" in guide
+    assert "pynakes metadata set library.bib key-pattern '[auth][year]'" in guide
     assert "key-pattern" not in lib.metadata

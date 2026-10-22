@@ -1635,9 +1635,9 @@ class TestImportCommand:
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
-        assert data["key"] == "smith24practical"
+        assert data["key"] == "Smith24Practical"
         assert data["key_source"] == "generated"
-        assert "@article{smith24practical," in bib.read_text()
+        assert "@article{Smith24Practical," in bib.read_text()
 
     def test_add_can_use_provider_key(self, tmp_path: Path, monkeypatch) -> None:
         bib = _copy(tmp_path, "simple.bib")
@@ -2353,9 +2353,9 @@ class TestKeysCommand:
         result = runner.invoke(app, ["keys", "generate", str(bib), "Old", "--json"])
 
         assert result.exit_code == 0, result.output
-        assert json.loads(result.output)["renames"] == [{"old": "Old", "new": "smith24"}]
+        assert json.loads(result.output)["renames"] == [{"old": "Old", "new": "Smith24"}]
         text = bib.read_text()
-        assert "@article{smith24," in text
+        assert "@article{Smith24," in text
         assert "@article{Keep," in text
 
     def test_generate_single_key_accepts_key_before_file(self, tmp_path: Path) -> None:
@@ -4818,7 +4818,7 @@ class TestLintCategories:
             "message": f"TeX source {str(tmp_path / 'missing.tex')!r} not found",
             "path": str(tmp_path / "missing.tex"),
         }
-        assert "@article{doe_2024," in bib.read_text()
+        assert "@article{Doe_2024," in bib.read_text()
 
     def test_category_filter_narrows_the_report(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
