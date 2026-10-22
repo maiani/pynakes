@@ -599,8 +599,9 @@ can be checked: `ref import` either resolves it or does not. A reference written
 out as text carries no such claim, and this is how to ask whether one describes
 anything that exists. Read-only; import a candidate you accept by its DOI.
 
-`ref find` requires `--online`. `ref import`, `asset fetch`, and
-`ref add` / `ref import --fetch` authorize network access explicitly without it.
+Like `ref import` and `asset fetch`, `ref find` goes online by being run: it
+has no offline mode for `--online` to leave. The flag is deprecated, ignored,
+and removed in 0.10.0.
 `--limit` caps the candidates (5 by default), and `--cache-file` reuses answers
 across runs.
 

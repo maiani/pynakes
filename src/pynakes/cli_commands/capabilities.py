@@ -24,6 +24,7 @@ _INDEX_KEYS = (
     "version",
     "description",
     "network_access_is_explicit",
+    "network_access",
     "supports_dry_run",
     "supports_json_output",
     "supports_backup",

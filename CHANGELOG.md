@@ -33,6 +33,16 @@ The forms deprecated in 0.8 are removed:
   `unknown_metadata_key` that is no longer read.
 - `search --in-field F`: use `--in F --select F`.
 
+### Deprecated
+
+- `ref find --online` is ignored and warns; it is removed in 0.10.0. One rule
+  now decides network consent: a command whose purpose is a network request
+  (`ref import`, `ref find`, `asset fetch`, `--fetch`) goes online by being
+  run, and a command with an offline mode (`verify`, `enrich`, `ref compare`)
+  leaves it only with `--online`. `ref find` had no offline mode, so requiring
+  the flag only made it fail. `capabilities` reports the rule and both groups
+  under `network_access`.
+
 ### Added
 
 - `ref import` accepts `IDENTIFIER=KEY` to name an imported entry's citation

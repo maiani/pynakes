@@ -1133,7 +1133,7 @@ Find the real records matching a reference written out in prose.
 | --- | --- | --- | --- | --- | --- |
 | `TEXT` | string | yes | — | — | A reference written out in prose: author, title, venue, year, in any order |
 | `--limit` | integer | no | 5 | — | Maximum candidates to return |
-| `--online` | boolean | no | false | — | Required: this command exists to query a bibliographic index |
+| `--online` | boolean | no | false | — | Deprecated and ignored: running ref find is the consent to query the index |
 | `--cache-file` | string | no | null | — | Keep provider responses in a reusable cache file at this path (safe to delete or .gitignore). Omit it and nothing is written to disk: responses are reused for this run only |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |

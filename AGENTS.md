@@ -177,9 +177,11 @@ tests pass:
 - Don't replace or bypass the custom parser; it is deliberate and preserves
   round-trip fidelity.
 - Don't introduce time, randomness, or unstable ordering in core logic.
-  Network access must remain explicit: `ref import`, `ref ... --fetch`,
-  `asset fetch`, `ref find --online`, or opt-in `--online` integrity
-  operations. Everything else stays offline and performs no hidden network I/O.
+  Network access must remain explicit: a command whose purpose is a network
+  request (`ref import`, `ref find`, `asset fetch`, `ref ... --fetch`) goes
+  online by being run; a command with an offline mode (`verify`, `enrich`,
+  `ref compare`) leaves it only with `--online`. Everything else stays offline
+  and performs no hidden network I/O.
 - Don't let a command emit a traceback — route failures through `_safe`.
 - Don't claim a feature is implemented when it is a stub. Keep `capabilities`,
   README, and docs honest; keep DEVPLAN forward-looking and put completed work

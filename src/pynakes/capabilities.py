@@ -101,7 +101,31 @@ _SEARCH_QUERY_GRAMMAR = {
 
 # Old forms that still work, warn with {"type": "deprecated", ...}, and go away
 # in the named release. Empty once nothing is being retired.
-_DEPRECATIONS: list[dict] = []
+_DEPRECATIONS: list[dict] = [
+    {
+        "command": "ref find",
+        "old": "--online",
+        "new": "ref find",
+        "removal": "0.10.0",
+        "note": "Commands that exist to make a network request go online by being run; "
+        "--online only lets a command with an offline mode leave it. ref find has none, "
+        "so the flag is ignored.",
+    },
+]
+
+# Which commands contact a service, and what authorizes it. Nothing else does.
+_NETWORK_ACCESS = {
+    "rule": "A command whose purpose is a network request goes online by being run; "
+    "a command with an offline mode leaves it only with --online.",
+    "by_running": [
+        "ref import",
+        "ref find",
+        "asset fetch",
+        "ref add --fetch",
+        "ref import --fetch",
+    ],
+    "with_online": ["verify", "enrich", "ref compare"],
+}
 
 # The bounded-read contract shared by every multi-entry read.
 _BOUNDED_READS = {
@@ -464,6 +488,7 @@ def get_capabilities() -> dict:
             "reviewable edits, structured JSON, and JabRef interoperability."
         ),
         "network_access_is_explicit": True,
+        "network_access": _NETWORK_ACCESS,
         "supports_dry_run": True,
         "supports_json_output": True,
         "supports_backup": True,

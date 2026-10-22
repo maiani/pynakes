@@ -8,6 +8,7 @@ from pynakes.cli_common import (
     _emit_error,
     _emit_json,
     _safe,
+    deprecation_warning,
 )
 from pynakes.providers._http import ProviderFetchError
 
@@ -21,7 +22,7 @@ def find(
     online: bool = typer.Option(
         False,
         "--online",
-        help="Required: this command exists to query a bibliographic index",
+        help="Deprecated and ignored: running ref find is the consent to query the index",
     ),
     cache_file: str | None = _CACHE_FILE_OPTION,
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
@@ -38,14 +39,19 @@ def find(
     index's own relevance score; an empty result means the index matched
     nothing, which is evidence but not proof, since an obscure or very recent
     work also comes back empty. Import a candidate you accept by its DOI.
+
+    Like `ref import` and `asset fetch`, it goes online by being run: it has no
+    offline mode for `--online` to leave.
     """
-    if not online:
-        _emit_error(
-            json_output,
-            "OnlineLookupRequired",
-            "ref find queries a bibliographic index; pass --online to allow the request.",
-        )
-        return
+    warnings = (
+        [
+            deprecation_warning(
+                "ref find --online", "ref find", removal="0.10.0", json_output=json_output
+            )
+        ]
+        if online
+        else []
+    )
     try:
         report = lookup_ops.find_reference(text, rows=limit, cache_file=cache_file)
     except ValueError as exc:
@@ -56,7 +62,9 @@ def find(
         return
 
     if json_output:
-        _emit_json({"status": "success", "action": "ref_find", **report.to_dict()})
+        _emit_json(
+            {"status": "success", "action": "ref_find", "warnings": warnings, **report.to_dict()}
+        )
         return
 
     if not report.candidates:

@@ -401,16 +401,8 @@ Decisions taken in this block, to keep:
   it. A `--json` run writes nothing to stderr, because agents often read
   `--json 2>&1` as one JSON document.
 
-Remaining:
-
-- Settle network consent. `ref import` and `asset fetch` go online simply by
-  being run, `enrich` and `verify` use `--online` to leave their offline mode,
-  and `ref find` requires `--online` although it has no offline mode
-  (`cli_commands/find.py`). Choose one rule, document it, and route any change
-  through deprecation, as the beta promise requires.
-
-Found along the way: `init --agent-guide` overwrites an `AGENTS.md` already
-beside the `.bib`, which at a repository root is the project's own guide.
+Remaining: `init --agent-guide` overwrites an `AGENTS.md` already beside the
+`.bib`, which at a repository root is the project's own guide.
 
 Open question found along the way: a lowercase key-pattern marker lowercases
 its value (`[auth]` gives `newton`), and `_apply_marker_casing` in `keys.py`
