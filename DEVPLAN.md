@@ -381,13 +381,15 @@ bugs, fixed in 0.8.0, and the requests below. They are small and independent of
 new option gets its CLI flag, `pynakes-meta` setting and `metadata set` form.
 
 **Resume point (2026-10-22).** 0.8.0 is released (tag `v0.8.0` on `292d64a`).
-This work continues on the local branch `v0.9`, which is not pushed yet; its
-last feature commit is `f84db19`. The four items finished so far are under
-`[Unreleased]` in [CHANGELOG.md](CHANGELOG.md): `IDENTIFIER=KEY` in
-`ref import`, `keys pattern` with the `key_pattern_unset` import warning, the
-`published_version_available` hint, and the import cache with progress lines.
-The full suite last ran at `cd0312d`; `f84db19` ran only its focused tests, so
-the first push lets CI run everything. Keep to one feature per commit, run the
+This work continues on the local branch `v0.9`, which is not pushed yet. The
+items finished so far are under `[Unreleased]` in
+[CHANGELOG.md](CHANGELOG.md): `IDENTIFIER=KEY` in `ref import`, `keys pattern`
+with the `key_pattern_unset` import warning, the `published_version_available`
+hint, the import cache with progress lines, grouped `asset fetch` reports, the
+counts-first `lint` output, the generated conventions in the agent guide, and
+the removal of every form deprecated for 0.9.0. The full suite last ran at
+`cd0312d`; later commits ran only their focused tests, so the first push lets
+CI run everything. Keep to one feature per commit, run the
 tests for the touched area, and leave the full matrix to CI.
 
 Decisions taken in this block, to keep:
@@ -399,26 +401,16 @@ Decisions taken in this block, to keep:
   it. A `--json` run writes nothing to stderr, because agents often read
   `--json 2>&1` as one JSON document.
 
-Remaining, in suggested order:
+Remaining:
 
-- `asset fetch --dry-run` reports coverage as grouped counts with the affected
-  keys, not one line listing every key. Default `lint` output starts with a
-  per-category summary before the findings. `lint --summary` already exists;
-  only the default output changes. The coverage lines come from
-  `cli_commands/_fetch_report.py` and `cli_commands/fetch.py`.
-- `init --agent-guide` prints a one-line pointer to add to a parent
-  `AGENTS.md` or `CLAUDE.md`, since agents usually load only the root guide.
-  The guide gains a short conventions section generated from the library:
-  key pattern (stored, or the `keys pattern` inference), author format, the
-  import, `enrich --published`, fill-gaps workflow, and a reminder that the
-  Pinax folder belongs in `.gitignore`. The guide template is
-  `render_agents_md` in `initialize.py`, now five rules after 0.8.0 slimmed it;
-  keep it short.
 - Settle network consent. `ref import` and `asset fetch` go online simply by
   being run, `enrich` and `verify` use `--online` to leave their offline mode,
   and `ref find` requires `--online` although it has no offline mode
   (`cli_commands/find.py`). Choose one rule, document it, and route any change
   through deprecation, as the beta promise requires.
+
+Found along the way: `init --agent-guide` overwrites an `AGENTS.md` already
+beside the `.bib`, which at a repository root is the project's own guide.
 
 Open question found along the way: a lowercase key-pattern marker lowercases
 its value (`[auth]` gives `newton`), and `_apply_marker_casing` in `keys.py`
