@@ -161,14 +161,15 @@ model dependency, or hidden network call is implied by this roadmap.
 | --- | --- | --- |
 | 0.8 | Research context, saved searches and bibliography analysis | Existing reads and checks |
 | 0.9 | Library, Catalogue, cross-file analysis and bibliography links | Bounded reads and identity evidence |
-| 0.10 | Project assembly and synchronization of linked bibliographies | Library, declared links and guarded writes |
-| 0.11 | Curation: merges, directives and normalization | Existing editing and identity APIs |
-| 0.12 | Materials and acquisition: linking, extraction, ingestion and providers | Pinax, bounded reads and provider registry |
-| 0.13 | Evidence-linked research annotations | Material locations and hashes |
-| 0.14 | Resumable plans and execution receipts | Batch, acquisition and material operations |
+| 0.10 | Engine service layer and companion launchers | Library, Catalogue and the Bibliography lifecycle |
+| 0.11 | Project assembly and synchronization of linked bibliographies | Library, declared links and guarded writes |
+| 0.12 | Curation: merges, directives and normalization | Existing editing and identity APIs |
+| 0.13 | Materials and acquisition: linking, extraction, ingestion and providers | Pinax, bounded reads and provider registry |
+| 0.14 | Evidence-linked research annotations | Material locations and hashes |
+| 0.15 | Resumable plans and execution receipts | Batch, acquisition and material operations |
 | 1.0 | Pin the exercised API and end-to-end contracts | Accepted workflows below |
 
-These are seven substantial feature releases before 1.0. Related features share
+These are eight substantial feature releases before 1.0. Related features share
 one release and acceptance workflow; implementation tasks do not each need a
 version. MCP and editor releases remain independently versioned companions.
 
@@ -217,7 +218,7 @@ Carry these analysis decisions into later milestones:
   and identity semantics; the v0.9 rollup must preserve them.
 - BibLaTeX extended names (`family=..., given=...`) are not parsed yet. Add any
   future support to `authors.py` so all consumers share it. Identity corrections
-  remain ordinary reviewed edits or future v0.11 directives.
+  remain ordinary reviewed edits or future v0.12 directives.
 - Editors as co-authors (with an explicit role choice), per-year pair counts
   beyond first/last year, and fractional counting remain unscheduled extensions.
 
@@ -255,10 +256,32 @@ manuscript bibliography's relationship to its source library.
 rollups reconcile; the index can be rebuilt without losing information; stale
 results have explicit semantics and representative queries show measured benefit.
 
+#### Order of work
+
+One feature per commit, each usable on the branch before the next starts.
+
+0. **Close the setup follow-ups** below, then get one full CI run of the
+   branch (a draft pull request or a manual `ci.yml` dispatch; a push alone
+   runs nothing) before `Library` work begins.
+1. **`Library` reads.** First settle where membership is declared: a library
+   file at the root, or `pynakes-meta` in one master `.bib`. A library file is
+   the leaning, since a library is not one of its own members. Then `Library`
+   over explicit files or a declared root, key lookup across members,
+   `corpus search` with file/entry provenance, and unreadable members reported
+   rather than skipped.
+2. **Cross-file identity and rollups.** Duplicate checks across members, exact
+   versus probable, reusing work matching; `analyze` and `coauthors` over a
+   `Library`, counting identified works rather than entry occurrences.
+3. **Linked bibliographies** (below). Independent of membership, so it may
+   follow phase 1 directly or run alongside phase 2.
+4. **Measure, then the `Catalogue`.** Extend `scripts/bench_scale.py` with
+   multi-file shapes, then index only what representative queries show
+   benefits from. Test refresh, deletion, rename and corruption recovery.
+
 #### Linked bibliographies: declaration and validation
 
 This belongs to v0.9's cross-file scope, not v0.8. Implement declaration and
-validation only; synchronization is a separate v0.10 workflow.
+validation only; synchronization is a separate v0.11 workflow.
 
 - Store reciprocal link declarations in both participating `.bib` files using
   native metadata. Each endpoint records the other file, its parent/child role,
@@ -296,6 +319,57 @@ multiple-parent and sibling cases have explicit semantics; moved/missing files,
 ambiguous keys, inconsistent declarations and cycles yield bounded, actionable
 reports; stale inputs and failed reciprocal edits cannot leave unreported
 partial changes. Tests exercise CLI/API parity and preservation of both files.
+
+#### Project setup follow-ups (first in the cycle)
+
+A field report from setting up a project bibliography with Pinax and an agent
+(import, `enrich --published`, `asset fetch`, `init --agent-guide`) found four
+bugs, fixed in 0.8.0, and the requests below. They are small and independent of
+`Library`, so they come first, right after the 0.8.0 tag, one at a time. Each
+new option gets its CLI flag, `pynakes-meta` setting and `metadata set` form.
+
+**Resume point (2026-10-22).** 0.8.0 is released (tag `v0.8.0` on `292d64a`).
+This work continues on the local branch `v0.9`, which is not pushed yet. The
+items finished so far are under `[Unreleased]` in
+[CHANGELOG.md](CHANGELOG.md): `IDENTIFIER=KEY` in `ref import`, `keys pattern`
+with the `key_pattern_unset` import warning, the `published_version_available`
+hint, the import cache with progress lines, grouped `asset fetch` reports, the
+counts-first `lint` output, the generated conventions in the agent guide, and
+the removal of every form deprecated for 0.9.0. The full suite last ran at
+`cd0312d`; later commits ran only their focused tests, so phase 0 below ends
+with a full CI run. Keep to one feature per commit, run the
+tests for the touched area, and leave the full matrix to CI.
+
+Decisions taken in this block, to keep:
+
+- The library's key style is never inferred silently. `keys pattern` proposes
+  a pattern, `metadata set` stores it, and `ref import` only warns. Keys
+  change only after the pattern is stored.
+- Progress for people goes to stderr as plain lines, so captured output keeps
+  it. A `--json` run writes nothing to stderr, because agents often read
+  `--json 2>&1` as one JSON document.
+
+Remaining: `init --agent-guide` overwrites an `AGENTS.md` already beside the
+`.bib`, which at a repository root is the project's own guide.
+
+Making imports follow the library's author format and encoding, and making
+provider extras such as `abstract` or arXiv's `updated` opt-in, belongs to the
+v0.12 enrichment value policy. Imports already apply the `normalize-*` and
+`format-*` settings a library declares; what remains is a library that
+declares none.
+
+### v0.10 — Engine service layer and companions
+
+**Workflow:** keep a library open across many operations, so an interactive
+client pays for parsing and full-library checks once rather than on every
+action, and start the MCP companion and the library-scoped client from
+`pynakes` itself.
+
+Split from v0.9 on 2026-10-22: the service layer opens a `Library`, and the MCP
+companion is built against the Library/Catalogue contract, so both follow the
+release that settles that contract. The 2026-10 measurements also put
+full-library work, not process startup, at most of a large refresh; what a
+session saves depends on recomputing only what an operation touched.
 
 #### Engine service layer
 
@@ -338,7 +412,7 @@ Develop a query-only MCP companion as an adapter over the engine service layer,
 against the v0.9 Library/Catalogue contract, with bounded results and the same
 errors and provenance as the CLI. Derive its
 schemas from the engine and test adapter parity; declare an engine compatibility
-range. Add evidence reads after v0.12–v0.13. Companion publication does not gate
+range. Add evidence reads after v0.13–v0.14. Companion publication does not gate
 an otherwise complete engine release. The editor may read library-scoped data
 but remains the project-scoped client, with no bibliography logic of its own.
 
@@ -372,45 +446,7 @@ on `PATH`. Both are thin launchers, not the companions themselves:
   it is not mistaken for the project-scoped VS Code extension, which has its own
   entry point.
 
-#### Project setup follow-ups (first in the cycle)
-
-A field report from setting up a project bibliography with Pinax and an agent
-(import, `enrich --published`, `asset fetch`, `init --agent-guide`) found four
-bugs, fixed in 0.8.0, and the requests below. They are small and independent of
-`Library`, so they come first, right after the 0.8.0 tag, one at a time. Each
-new option gets its CLI flag, `pynakes-meta` setting and `metadata set` form.
-
-**Resume point (2026-10-22).** 0.8.0 is released (tag `v0.8.0` on `292d64a`).
-This work continues on the local branch `v0.9`, which is not pushed yet. The
-items finished so far are under `[Unreleased]` in
-[CHANGELOG.md](CHANGELOG.md): `IDENTIFIER=KEY` in `ref import`, `keys pattern`
-with the `key_pattern_unset` import warning, the `published_version_available`
-hint, the import cache with progress lines, grouped `asset fetch` reports, the
-counts-first `lint` output, the generated conventions in the agent guide, and
-the removal of every form deprecated for 0.9.0. The full suite last ran at
-`cd0312d`; later commits ran only their focused tests, so the first push lets
-CI run everything. Keep to one feature per commit, run the
-tests for the touched area, and leave the full matrix to CI.
-
-Decisions taken in this block, to keep:
-
-- The library's key style is never inferred silently. `keys pattern` proposes
-  a pattern, `metadata set` stores it, and `ref import` only warns. Keys
-  change only after the pattern is stored.
-- Progress for people goes to stderr as plain lines, so captured output keeps
-  it. A `--json` run writes nothing to stderr, because agents often read
-  `--json 2>&1` as one JSON document.
-
-Remaining: `init --agent-guide` overwrites an `AGENTS.md` already beside the
-`.bib`, which at a repository root is the project's own guide.
-
-Making imports follow the library's author format and encoding, and making
-provider extras such as `abstract` or arXiv's `updated` opt-in, belongs to the
-v0.11 enrichment value policy. Imports already apply the `normalize-*` and
-`format-*` settings a library declares; what remains is a library that
-declares none.
-
-### v0.10 — Project assembly and synchronization of linked bibliographies
+### v0.11 — Project assembly and synchronization of linked bibliographies
 
 **Workflow:** seed a project from existing collections and maintain an explicitly
 declared relationship to its master bibliography.
@@ -438,7 +474,7 @@ renames preserve declared relationships and references; conflicting mirror
 edits and interruptions cannot leave unreported partial changes. Do not expose
 material copying until its recovery guarantees are tested.
 
-### v0.11 — Curation decisions and bibliographic consistency
+### v0.12 — Curation decisions and bibliographic consistency
 
 **Workflow:** resolve duplicate and metadata problems once, record deliberate
 exceptions, and have later maintenance respect those decisions.
@@ -455,7 +491,7 @@ exceptions, and have later maintenance respect those decisions.
 - Add field-level merge choices and provenance using existing identity evidence.
   Validate choices against source fingerprints; preserve materials and references
   and keep unresolved conflicts blocking. Extend this contract to annotations
-  when v0.13 introduces them.
+  when v0.14 introduces them.
 - Add `distinct-from`, `keep-key`, `no-fetch` and enrichment opt-outs to the
   directive grammar. Expose reasons, specify affected commands and explicit
   overrides, and handle renamed or missing targets.
@@ -471,7 +507,7 @@ exceptions, and have later maintenance respect those decisions.
 commands honor exceptions, journal data is distributable and tested, and
 normalization preserves untouched bytes with documented loss where applicable.
 
-### v0.12 — Material acquisition and source-linked extraction
+### v0.13 — Material acquisition and source-linked extraction
 
 **Workflow:** bring existing papers into a research library, identify their
 references, and retrieve passages tied to the exact material read.
@@ -506,7 +542,7 @@ passes offline fixtures and a separate access check. Record an explicit decision
 for every provider candidate; unavailable access defers that adapter, not the
 whole release. No stub or invented metadata counts as supported ingestion.
 
-### v0.13 — Evidence-linked research annotations
+### v0.14 — Evidence-linked research annotations
 
 **Workflow:** record “uses a Markov approximation” with its supporting passage,
 author, and review status, then find it after the citation key changes.
@@ -529,7 +565,7 @@ author, and review status, then find it after the citation key changes.
 changed sources invalidate anchors visibly; unreviewed interpretations cannot
 be mistaken for verbatim excerpts or human-reviewed records in the envelope.
 
-### v0.14 — Resumable plans and execution receipts
+### v0.15 — Resumable plans and execution receipts
 
 **Workflow:** resume a collection-maintenance job after interruption without
 repeating completed downloads or losing track of what changed.
@@ -566,9 +602,9 @@ existing deprecation promise throughout.
   compatibility/migration rules for persisted annotations and plans, and the
   limits of recovery across network and filesystem operations.
 - Review the outstanding editor interoperability issues before pinning affected
-  engine behavior. Complete the scheduled v0.8–v0.14 workflows before launch.
+  engine behavior. Complete the scheduled v0.8–v0.15 workflows before launch.
   Bimas and MCP publication are independent; provider candidates deferred from
-  v0.12 must have a documented disposition, not an implied implementation claim.
+  v0.13 must have a documented disposition, not an implied implementation claim.
 
 **Done when:** these workflows and API boundaries have recorded acceptance
 results, all applicable checks pass, compatibility and migration policies are
@@ -614,12 +650,12 @@ project at all. See
 - **Material metadata writing** — `asset embed-xmp`: write an entry's
   bibliographic metadata into its linked PDF as XMP, making the file
   self-describing for sharing and archival, and the natural companion to
-  PDF ingestion in v0.12. This one modifies a material rather
+  PDF ingestion in v0.13. This one modifies a material rather
   than the `.bib`, so it needs the same preview-and-approve treatment as a
   bibliography edit and must never be implied by another command.
 - **Further material formats** — EPUB metadata extraction alongside PDF, as
   open-access monographs become common. Lower priority than PDF by usage, and
-  it shares the v0.12 extraction pipeline rather than duplicating it.
+  it shares the v0.13 extraction pipeline rather than duplicating it.
 - **Optional semantic retrieval** — RAG/embeddings and richer agent memory
   built on the source-linked extraction and annotation contracts above. Keep
   model-specific dependencies optional, results attributable, and semantic
