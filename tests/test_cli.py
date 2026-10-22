@@ -493,6 +493,19 @@ class TestInspectAndLint:
         assert result.exit_code == 0, result.output
         assert "refs.bib: no issues found." in result.output
 
+    def test_lint_human_output_opens_with_counts_by_category(self, tmp_path: Path) -> None:
+        bib = tmp_path / "refs.bib"
+        bib.write_text("@article{A,\n  title = {T}\n}\n@article{A,\n  title = {U}\n}\n")
+
+        result = runner.invoke(app, ["lint", str(bib)])
+
+        lines = result.output.splitlines()
+        totals = next(i for i, line in enumerate(lines) if " issue(s): " in line)
+        assert lines[totals + 1].startswith("By category: ")
+        assert "correctness " in lines[totals + 1]
+        first_finding = next(i for i, line in enumerate(lines) if line.startswith("  ["))
+        assert totals < first_finding
+
     def test_auto_discovery_ignores_revtex_notes_bib(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text("@article{A,\n  title = {T}\n}\n")

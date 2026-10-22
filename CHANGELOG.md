@@ -43,6 +43,16 @@ sections. Historical releases retain their original headings.
   looked up, as plain lines that captured output keeps. `--json` runs keep
   stderr silent.
 
+### Changed
+
+- `asset fetch` (and `ref import --fetch`) groups its human-readable report:
+  entries skipped or, in a dry run, planned for the same reason share one line
+  that counts and names them, and the coverage line counts the entries still
+  missing a PDF by reason, naming only keys no earlier line named. A skip or
+  failure that tried downloads keeps its own line. The JSON is unchanged.
+- Human-readable `lint` output opens with its totals and a count per category,
+  before the findings; `--summary` shows the same two lines.
+
 ## [0.8.0] - 2026-10-22
 
 Research context, reusable queries and bibliography analysis: read bounded
