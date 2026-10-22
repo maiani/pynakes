@@ -45,7 +45,6 @@ NOT_ENTRY_SELECTABLE = {
     "tex add": "edits the TeX source list, not entries",
     "tex clear": "edits the TeX source list, not entries",
     "tex remove": "edits the TeX source list, not entries",
-    "tex scan": "reports on the whole library against its TeX sources",
 }
 
 LIBRARY = (
