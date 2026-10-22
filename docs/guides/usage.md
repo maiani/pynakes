@@ -691,6 +691,12 @@ The key follows the last `=` and starts with a letter. Identifiers without one
 get a generated key. A key that is already taken fails only that identifier,
 with the reason `key_conflict`. For a single identifier, `--key` works too.
 
+Without `--json`, each identifier is announced on stderr as it is looked up
+(`[3/8] 10.5555/engine`), so a slow list shows progress even when stderr is
+captured. JSON runs keep stderr silent. To preview with `--dry-run` and then
+apply without asking every provider again, give both runs the same
+`--cache-file`; it holds the provider responses and is safe to delete.
+
 Each identifier is reported separately, and **one that does not resolve does not
 stop the others**:
 

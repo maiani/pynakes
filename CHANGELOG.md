@@ -33,6 +33,15 @@ sections. Historical releases retain their original headings.
   arXiv preprint already names a published DOI, listing the keys and the
   `enrich --published --online --key` command that promotes them. A batch
   gets one warning for all of them.
+- `ref import --cache-file` now also caches the import's own metadata lookups
+  (DOI BibTeX, arXiv records and every other provider), not only `--fetch`
+  downloads, so a `--dry-run` followed by the real run asks each provider once.
+  The DOI and arXiv entries are shared with `enrich`. `Bibliography.import_reference`
+  takes `cache_file`, and `pynakes.provider_cache.cache_scope` sets the cache
+  for a block of provider calls.
+- `ref import` with several identifiers reports each one on stderr as it is
+  looked up, as plain lines that captured output keeps. `--json` runs keep
+  stderr silent.
 
 ## [0.8.0] - 2026-10-22
 

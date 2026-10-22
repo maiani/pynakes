@@ -394,6 +394,7 @@ class BibliographyOperations:
         key: str | None = None,
         key_source: str | None = None,
         allow_duplicate: bool = False,
+        cache_file: str | Path | None = None,
     ) -> tuple[str, BibEntry]:
         """Import one reference from a supported identifier or URL into memory.
 
@@ -402,20 +403,24 @@ class BibliographyOperations:
         library's declared ``normalize-*`` and ``format-*`` settings, so it
         needs no clean-up pass of its own. ``key_source`` ``None`` reads the
         library's ``import-key-source`` setting (default ``generated``).
+        ``cache_file`` keeps provider responses in that file, so a later
+        import of the same identifier (after a dry run, say) asks no provider.
         Returns ``(kind, entry)``.
         """
         # Imported here: the importer pulls in the HTTP stack, which only a
         # network-backed command should pay for at startup.
         from pynakes import importer as importer_ops
+        from pynakes.provider_cache import cache_scope
 
-        kind, entry = importer_ops.prepare_imported_reference(
-            self.lib,
-            identifier,
-            dialect=metadata_ops.library_dialect(self.lib),
-            key=key,
-            key_source=importer_ops.library_key_source(self.lib, key_source),
-            allow_duplicate=allow_duplicate,
-        )
+        with cache_scope(cache_file):
+            kind, entry = importer_ops.prepare_imported_reference(
+                self.lib,
+                identifier,
+                dialect=metadata_ops.library_dialect(self.lib),
+                key=key,
+                key_source=importer_ops.library_key_source(self.lib, key_source),
+                allow_duplicate=allow_duplicate,
+            )
         apply_library_style(self.lib, entry)
         self.lib.entries.add(entry)
         self._appended_entries.append(entry)

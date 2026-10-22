@@ -222,6 +222,7 @@ def import_reference(
             key=key,
             key_source=source,
             allow_duplicate=allow_duplicate,
+            cache_file=cache_file,
         )
     except importer_ops.UnsupportedIdentifierError as exc:
         _emit_error(json_output, "UnsupportedIdentifier", str(exc))
@@ -343,13 +344,19 @@ def _import_several(
     warnings: list[dict[str, object]] = list(pattern_warnings)
     imported_entries: list[BibEntry] = []
     imported = 0
-    for identifier, key in identifiers:
+    total = len(identifiers)
+    for position, (identifier, key) in enumerate(identifiers, start=1):
+        if not params.json_output:
+            # Plain lines rather than a transient bar, so a captured or piped
+            # stderr shows progress too; JSON runs keep stderr silent.
+            typer.echo(f"[{position}/{total}] {identifier}", err=True)
         try:
             kind, entry = coll.import_reference(
                 identifier,
                 key=key,
                 key_source=key_source,
                 allow_duplicate=allow_duplicate,
+                cache_file=cache_file,
             )
         except importer_ops.DuplicateReferenceError as exc:
             results.append(
