@@ -12,6 +12,27 @@ sections. Historical releases retain their original headings.
 
 ## [Unreleased]
 
+### Breaking changes
+
+The forms deprecated in 0.8 are removed:
+
+- `keys check`: use `lint --only duplicate_key` (`--strict` to gate). The
+  `pynakes-keys-check` pre-commit hook keeps its id and now runs that command,
+  so it honours the library's `lint-ignore` setting.
+- `tex scan --out`, `--group`, and `--keyword`: select the cited entries with
+  `--where used` in `corpus combine`, `scrub`, or `fields append`. `tex scan`
+  now only reports, so its write-only options (`--dry-run`, `--diff`,
+  `--backup`, `--force`, `--expect-sha256`) went with them, and its envelope,
+  including the `tex_scan` block of `inspect --insights`, drops the `out`,
+  `written`, `tagged`, `exported`, `plan`, `dry_run`, `modified`, and
+  `modified_entries` keys.
+- `format --entry-order`, the `format-entry-order` setting, and
+  `CanonicalLayout.entry_order` / `layout_from_metadata(entry_order=...)`: use
+  `normalize --sort-by` and the `sort-order` setting. `format` keeps the entry
+  order it is given; `lint` reports a stored `format-entry-order` as an
+  `unknown_metadata_key` that is no longer read.
+- `search --in-field F`: use `--in F --select F`.
+
 ### Added
 
 - `ref import` accepts `IDENTIFIER=KEY` to name an imported entry's citation

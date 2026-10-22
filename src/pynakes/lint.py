@@ -80,7 +80,7 @@ from pynakes.metadata import (
     metadata_value,
     validate_metadata_value,
 )
-from pynakes.metadata.schema import RENAMED_METADATA_KEYS
+from pynakes.metadata.schema import RENAMED_METADATA_KEYS, RETIRED_METADATA_KEYS
 from pynakes.model import BibEntry, BibFile, MetadataBlock, undefined_string_references
 from pynakes.usage import tex_sources_from_metadata, validate_tex_sources
 
@@ -410,6 +410,19 @@ def _lint_unknown_metadata_key(block: MetadataBlock) -> list[LintIssue]:
     value against the replacement's grammar, so a typo (``prepring``) is
     caught now rather than after the rename.
     """
+    retired = RETIRED_METADATA_KEYS.get(block.key.lower())
+    if retired is not None:
+        return [
+            LintIssue(
+                "unknown_metadata_key",
+                "warning",
+                f"Metadata key {block.key!r} in pynakes-meta was removed and is no longer "
+                f"read: {retired}; remove it: `pynakes metadata remove FILE {block.key}`",
+                key=block.key,
+                field=block.key,
+                line=block.start_line,
+            )
+        ]
     replacement = RENAMED_METADATA_KEYS.get(block.key.lower())
     if replacement is None:
         return [

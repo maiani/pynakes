@@ -23,9 +23,9 @@
   types: [file]
 
 - id: pynakes-keys-check
-  name: pynakes keys check
-  description: Fail if any citation key is duplicated.
-  entry: pynakes keys check --strict
+  name: pynakes lint --only duplicate_key
+  description: Fail if any citation key is duplicated (unless lint-ignore suppresses it).
+  entry: pynakes lint --only duplicate_key --strict
   language: python
   files: \.bib$
   types: [file]

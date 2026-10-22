@@ -1250,20 +1250,16 @@ def test_lint_only_reports_the_named_types_and_gates_on_them(tmp_path: Path) -> 
     assert unknown.exit_code == 1 and "duplicate_keys" in json.loads(unknown.output)["message"]
 
 
-def test_keys_check_still_works_and_says_it_is_deprecated(tmp_path: Path) -> None:
-    from typer.testing import CliRunner
+def test_retired_format_entry_order_setting_is_reported_with_the_way_forward() -> None:
+    lib = parse_bib(
+        "@comment{pynakes-meta:\nformat-entry-order: key\n}\n\n@book{Euler1748, title = {I}}\n"
+    )
 
-    from pynakes.cli import app
+    (issue,) = [issue for issue in lint(lib) if issue.type == "unknown_metadata_key"]
 
-    bib = tmp_path / "refs.bib"
-    bib.write_text("@book{Euler1748,\n  title = {I}\n}\n\n@book{Euler1748,\n  title = {II}\n}\n")
-
-    result = CliRunner().invoke(app, ["keys", "check", str(bib), "--json"])
-
-    payload = json.loads(result.output)
-    assert payload["has_duplicates"] is True
-    (warning,) = payload["warnings"]
-    assert warning["type"] == "deprecated" and warning["new"] == "lint --only duplicate_key"
+    assert "no longer read" in issue.message
+    assert "normalize --sort-by" in issue.message
+    assert "metadata remove FILE format-entry-order" in issue.message
 
 
 def test_lint_severity_setting_and_both_overrides(tmp_path: Path) -> None:

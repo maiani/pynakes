@@ -818,14 +818,13 @@ readability convention chosen to make entries predictable and easy to scan:
    fields, avoiding an arbitrary alphabetical reshuffle.
 
 `--field-order` accepts `preferred`, `preserve`, or `alphabetical`.
-`--entry-order` accepts `preserve`, `key`, or `profile` (the library's `sort-order` /
-`saveOrderConfig`). It is deprecated and removed in 0.9.0, with the
-`format-entry-order` setting: entry order is not only layout — BibTeX reads the
-first of several entries sharing a key, and an unsorted style with `\nocite{*}`
-lists entries in file order — so sorting belongs to `normalize --sort-by` and
-the `sort-order` setting, which move entries byte for byte. `--block-order preserve` keeps comments, strings, preambles,
-and raw source in place as barriers while sorting entry runs (a comment attached
-directly above an entry is not a barrier; it moves with its entry); the default
+`format` keeps the entry order it is given: entry order is not only layout —
+BibTeX reads the first of several entries sharing a key, and an unsorted style
+with `\nocite{*}` lists entries in file order — so sorting belongs to
+`normalize --sort-by` and the `sort-order` setting, which move entries byte for
+byte. `--block-order preserve` keeps comments, strings, preambles,
+and raw source in place, with each run of entries between them (a comment attached
+directly above an entry stays with its entry); the default
 `canonical` policy retains pynakes' metadata/JabRef placement convention.
 
 Safe value wrapping is opt-in. `--wrap-values stable` preserves authored legal
@@ -842,7 +841,7 @@ including unmatched entries — stays identical, so the diff covers exactly the
 entries you asked for.
 
 A selection owns the layout *inside* each entry it matches, not the layout of
-the file, so the whole-file options `--entry-order`, `--block-order`, and
+the file, so the whole-file options `--block-order` and
 `--blank-lines`/`--no-blank-lines` cannot be combined with `--where`.
 
 ## normalize
@@ -981,8 +980,8 @@ pynakes scrub refs.bib --where used --out public.bib           # a public copy
 pynakes fields append refs.bib keywords cited --where used     # tag them
 ```
 
-`tex scan --out`, `--group`, and `--keyword` still export and tag until 0.9.0,
-with a `deprecated` warning.
+`tex scan` itself only reports: its former `--out`, `--group`, and `--keyword`
+options were removed in 0.9.0 in favour of these commands.
 
 With `--json`, the report's `usages` object locates every citation: each cited
 key maps to its occurrences, one `{path, line, column, text, macro}` per
@@ -1135,9 +1134,7 @@ Two more options shape a search independently. `--in title,abstract` looks for
 the terms only in those stored fields (the citation key and entry type stay
 searchable); `--select title,year` returns only those fields for each match,
 listing absent ones under `missing_fields`. `--in title --select abstract`
-matches titles and returns abstracts. `--in-field` is deprecated and will be
-removed in 0.9.0: it did both at once, so replace `--in-field title` with
-`--in title --select title`.
+matches titles and returns abstracts.
 
 `--abstract` prints a one-line abstract excerpt under each hit, so a
 result list can be triaged without a second command; a result with no stored

@@ -82,7 +82,6 @@ to find the operation module that owns a key.
 | `format-trailing-comma` | formatting | Boolean (default: `true`) | `format` | — |
 | `format-blank-lines` | formatting | Boolean (default: `true`) | `format` | — |
 | `format-field-order` | formatting | `preferred`, `preserve`, or `alphabetical` | `format` | — |
-| `format-entry-order` | formatting | `preserve`, `key`, or `profile`; deprecated, removed in 0.9.0 — use `sort-order` | `format` | — |
 | `format-block-order` | formatting | `canonical` or `preserve` (default: `canonical`) | `format` | — |
 | `format-wrap-values` | formatting | `off`, `stable`, or `canonical` (default: `off`) | `format` | — |
 | `format-line-width` | formatting | Integer at least 20 (default: `100`) | `format` wrapping | — |

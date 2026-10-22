@@ -41,8 +41,6 @@ def _error(result) -> dict:
     "args",
     [
         ["convert", "{bib}", "--to", "ris", "--out", "{bib}"],
-        ["tex", "scan", "{bib}", "{tex}", "--out", "{bib}"],
-        ["tex", "scan", "{bib}", "{tex}", "--out", "{tex}"],
         ["corpus", "split", "{bib}", "--route", "{bib}=*"],
     ],
 )
@@ -65,7 +63,6 @@ def test_output_naming_an_input_is_refused(tmp_path: Path, args: list[str]) -> N
     "args",
     [
         ["convert", "{bib}", "--to", "ris", "--out", "{out}/x.ris"],
-        ["tex", "scan", "{bib}", "{tex}", "--out", "{out}/used.bib"],
         ["corpus", "split", "{bib}", "--route", "{out}/all.bib=*"],
     ],
 )

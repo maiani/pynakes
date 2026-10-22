@@ -363,29 +363,12 @@ class TestWriteBibCanonical:
         result2 = write_bib_canonical(lib)
         assert result1 == result2
 
-    def test_preserve_block_order_uses_comments_as_entry_sort_barriers(self) -> None:
-        source = (
-            "@misc{B, title={B}}\n"
-            "@misc{A, title={A}}\n"
-            "@comment{second section}\n"
-            "\n"
-            "@misc{D, title={D}}\n"
-            "@misc{C, title={C}}\n"
-        )
-        layout = CanonicalLayout(block_order="preserve", entry_order="key")
-        result = write_bib_canonical(parse_bib(source), layout)
-        assert result.index("@misc{A") < result.index("@misc{B")
-        assert result.index("@misc{B") < result.index("@comment{second section}")
-        assert result.index("@comment{second section}") < result.index("@misc{C")
-        assert result.index("@misc{C") < result.index("@misc{D")
-
     def test_portable_format_profile_resolves_with_cli_precedence(self) -> None:
         source = (
             "@comment{pynakes-meta:\n"
             "format-indent: 4\n"
             "format-alignment: equals\n"
             "format-field-order: alphabetical\n"
-            "format-entry-order: key\n"
             "format-block-order: preserve\n"
             "format-wrap-values: stable\n"
             "format-line-width: 72\n"
@@ -402,7 +385,6 @@ class TestWriteBibCanonical:
             trailing_comma=False,
             blank_line_entries=False,
             field_order="alphabetical",
-            entry_order="key",
             block_order="preserve",
             wrap_values="stable",
             line_width=72,
@@ -707,31 +689,14 @@ def test_format_selected_entries_wrapping_is_idempotent() -> None:
     assert "and\n" in once  # the value really was wrapped
 
 
-def test_format_reordering_is_deprecated_in_favour_of_normalize(tmp_path: Path) -> None:
-    import json
-
+def test_format_no_longer_reorders_entries(tmp_path: Path) -> None:
     from typer.testing import CliRunner
 
     from pynakes.cli import app
 
     bib = tmp_path / "refs.bib"
     bib.write_text("@book{Newton1687, title = {P}}\n\n@book{Euler1748, title = {I}}\n")
-    runner = CliRunner()
 
-    formatted = json.loads(
-        runner.invoke(
-            app, ["format", str(bib), "--entry-order", "key", "--dry-run", "--json"]
-        ).output
-    )
-    sorted_ = json.loads(
-        runner.invoke(
-            app,
-            ["normalize", str(bib), "--only", "sort", "--sort-by", "key", "--dry-run", "--json"],
-        ).output
-    )
-    preserved = json.loads(runner.invoke(app, ["format", str(bib), "--dry-run", "--json"]).output)
+    result = CliRunner().invoke(app, ["format", str(bib), "--entry-order", "key", "--dry-run"])
 
-    (warning,) = formatted["warnings"]
-    assert warning["type"] == "deprecated" and "normalize --sort-by" in warning["new"]
-    assert not [w for w in sorted_["warnings"] if w.get("type") == "deprecated"]
-    assert preserved["warnings"] == []
+    assert result.exit_code != 0

@@ -7,7 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from pynakes.bibtex_parser import parse_bib
-from pynakes.canonical import CanonicalLayout, write_bib_canonical
+from pynakes.canonical import write_bib_canonical
 from pynakes.cli import app
 from pynakes.directives import (
     EntryDirective,
@@ -18,6 +18,7 @@ from pynakes.directives import (
 )
 from pynakes.engine import Bibliography
 from pynakes.lint import entry_ignore_rules, is_waived, lint
+from pynakes.normalize import sort_entries
 
 runner = CliRunner()
 
@@ -165,7 +166,8 @@ def test_invalid_and_unused_directives_are_findings() -> None:
 def test_format_keeps_a_directive_with_its_entry_when_sorting() -> None:
     lib = parse_bib(NEWTON + "\n% pynakes: ignore missing_doi\n" + DARWIN)
 
-    output = write_bib_canonical(lib, CanonicalLayout(entry_order="key"))
+    sort_entries(lib, [("key", False)])
+    output = write_bib_canonical(lib)
 
     assert "% pynakes: ignore missing_doi\n@article{Darwin1858," in output
     assert output.index("Darwin1858") < output.index("Newton1687")

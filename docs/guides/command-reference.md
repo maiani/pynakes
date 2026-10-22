@@ -478,7 +478,6 @@ Rewrite layout only; never change bibliographic values or conventions.
 | `--trailing-comma, --no-trailing-comma` | boolean | no | null | — | Comma after the last field |
 | `--blank-lines, --no-blank-lines` | boolean | no | null | — | Blank line between entries |
 | `--field-order` | choice | no | null | preferred, preserve, alphabetical | Field ordering policy |
-| `--entry-order` | choice | no | null | preserve, key, profile | Deprecated (removed in 0.9.0): use normalize --sort-by. Entry ordering policy |
 | `--block-order` | choice | no | null | preserve, canonical | Top-level block ordering policy |
 | `--wrap-values` | choice | no | null | off, stable, canonical | Safe field-value wrapping policy |
 | `--line-width` | integer | no | null | — | Maximum line width for wrapped values |
@@ -741,21 +740,6 @@ Inspect a .bib file structure.
 | `--origin` | string | no | null | — | Where the library is saved, when FILE is a copy of it (an editor's unsaved buffer): tex-sources, pinax-files-dir, and relative file links resolve from there |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
-| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
-
-## keys check
-
-**Stability: stable**
-
-Report duplicate citation keys (deprecated: use `lint --only duplicate_key`).
-
-`pynakes keys check FILES... [OPTIONS]`
-
-| Parameter | Type | Required | Default | Choices | Description |
-| --- | --- | --- | --- | --- | --- |
-| `FILES` | list[string] | yes | — | — | One or more .bib files |
-| `--strict` | boolean | no | false | — | Exit 1 when duplicate citation keys are found (for CI and pre-commit gating) |
-| `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## keys generate
@@ -1283,7 +1267,6 @@ Search entries by free text, phrases, or field-scoped terms.
 | `QUERY` | string | yes | — | — | Search query: words/phrases, optionally scoped as field:term or field:"phrase". Pass "" to select by --where alone |
 | `--in` | list[string] | no | null | — | Search only these stored fields: comma-separated, repeatable. The citation key and entry type stay searchable |
 | `--select` | list[string] | no | null | — | Return only these fields under 'fields': comma-separated, repeatable. A selected field the entry lacks is null and listed in missing_fields |
-| `--in-field` | list[string] | no | null | — | Deprecated, removed in 0.9.0: use --in to choose the fields searched and --select to choose the fields returned |
 | `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing; 'used'/'unused' test the linked TeX sources and 'query NAME' runs a saved query. See `pynakes capabilities` for the full grammar. |
 | `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
 | `--case-sensitive` | boolean | no | false | — | Match case sensitively |
@@ -1383,14 +1366,6 @@ Report which entries are used in LaTeX sources, and which citations are missing.
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `SOURCES` | list[string] | no | — | — | One or more .tex/.aux files or directories to scan (defaults to the library's 'tex-sources' metadata) |
-| `--out` | string | no | null | — | Deprecated (removed in 0.9.0): use corpus combine FILE --where used --out OUT |
-| `--force` | boolean | no | false | — | Overwrite the output file if it already exists |
-| `--group` | string | no | null | — | Deprecated (removed in 0.9.0): use fields append FILE groups NAME --where used |
-| `--keyword` | string | no | null | — | Deprecated (removed in 0.9.0): use fields append FILE keywords WORD --where used |
-| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
-| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
-| `--dry-run` | boolean | no | false | — | Show what would change without writing |
-| `--diff` | boolean | no | false | — | Show a unified diff of changes |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |

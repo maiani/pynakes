@@ -71,7 +71,6 @@ POSITIONALS: dict[str, tuple[tuple[str, bool, bool], ...]] = {
     "groups update-group": (("file", False, False), ("name", True, False)),
     "init": (("file", False, False),),
     "inspect": (("file", False, False),),
-    "keys check": (("files", True, True),),
     "keys generate": (("file", False, False), ("key", False, False)),
     "keys pattern": (("file", False, False),),
     "keys rename": (
@@ -268,7 +267,6 @@ SAMPLES: dict[str, tuple[str, list[str]]] = {
     ),
     "init": ("create", ["init", "{new}", "--dry-run"]),
     "inspect": ("read", ["inspect", "{bib}"]),
-    "keys check": ("check", ["keys", "check", "{bib}"]),
     "keys generate": ("modify", ["keys", "generate", "{bib}", "--all", "--dry-run"]),
     "keys pattern": ("read", ["keys", "pattern", "{bib}"]),
     "keys rename": ("modify", ["keys", "rename", "{bib}", "Smith2020", "Smith2020a", "--dry-run"]),
@@ -317,7 +315,7 @@ SAMPLES: dict[str, tuple[str, list[str]]] = {
     "tex clear": ("modify", ["tex", "clear", "{bib}", "--dry-run"]),
     "tex list": ("read", ["tex", "list", "{bib}"]),
     "tex remove": ("modify", ["tex", "remove", "{bib}", "{tex}", "--dry-run"]),
-    "tex scan": ("modify", ["tex", "scan", "{bib}", "{tex}"]),
+    "tex scan": ("read", ["tex", "scan", "{bib}", "{tex}"]),
     "verify": ("check", ["verify", "{bib}"]),
 }
 

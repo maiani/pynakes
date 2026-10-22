@@ -98,7 +98,6 @@ WRITES = {
     "tex add": ["tex", "add", "{bib}", "appendix.tex"],
     "tex remove": ["tex", "remove", "{bib}", "paper.tex"],
     "tex clear": ["tex", "clear", "{bib}"],
-    "tex scan": ["tex", "scan", "{bib}", "--keyword", "cited"],
     "normalize": ["normalize", "{bib}", "--drop-field", "year"],
     "format": ["format", "{bib}", "--indent", "    "],
     "convert": ["convert", "{bib}", "--to", "biblatex"],

@@ -62,6 +62,13 @@ RENAMED_METADATA_KEYS: dict[str, str] = {
     "ltwa-table": "normalize-ltwa-table",
 }
 
+#: Retired ``pynakes-meta`` keys with no one-to-one replacement, mapped to what
+#: to do instead. They are no longer read; ``lint`` says so and points the way.
+RETIRED_METADATA_KEYS: dict[str, str] = {
+    "format-entry-order": "format keeps the entry order it is given; sort with "
+    "`normalize --sort-by` or the sort-order setting",
+}
+
 # pynakes-owned metadata keys. These live in ``pynakes-meta`` by default because
 # they have no JabRef equivalent or deliberately extend JabRef behavior.
 PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
@@ -95,7 +102,6 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     "format-trailing-comma": CATEGORY_FORMATTING,
     "format-blank-lines": CATEGORY_FORMATTING,
     "format-field-order": CATEGORY_FORMATTING,
-    "format-entry-order": CATEGORY_FORMATTING,
     "format-block-order": CATEGORY_FORMATTING,
     "format-wrap-values": CATEGORY_FORMATTING,
     "format-line-width": CATEGORY_FORMATTING,
@@ -157,7 +163,6 @@ _VALID_JOURNAL_SOURCES = {"jabref", "none"}
 _FORMAT_CHOICES = {
     "format-alignment": {"compact", "equals"},
     "format-field-order": {"preferred", "preserve", "alphabetical"},
-    "format-entry-order": {"preserve", "key", "profile"},
     "format-block-order": {"preserve", "canonical"},
     "format-wrap-values": {"off", "stable", "canonical"},
     "format-entry-type-case": {"lower", "preserve"},

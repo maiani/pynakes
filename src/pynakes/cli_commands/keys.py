@@ -10,7 +10,6 @@ import typer
 
 from pynakes import _tex_rewrite
 from pynakes import keys as keys_ops
-from pynakes.cli_checks import CheckOutcome, _run_checks, strict_option
 from pynakes.cli_commands._duplicates import duplicate_candidates
 from pynakes.cli_common import (
     _BACKUP_OPTION,
@@ -27,7 +26,6 @@ from pynakes.cli_common import (
     _source_sha256,
     _verb,
     bib_file_argument,
-    deprecation_warning,
     key_option,
     select_keys,
     where_option,
@@ -63,67 +61,6 @@ def _material_move_lines(materials: list[dict], params: RunParams) -> list[str]:
         f"  {_verb('move', params)} {item['source_path']} -> {item['target_path']}"
         for item in materials
     ]
-
-
-def _keys_check_one(file: str, deprecated: dict | None = None) -> CheckOutcome:
-    coll = Bibliography.open(file)
-    duplicates = coll.lib.entries.duplicate_keys()
-    instances = coll.lib.entries.duplicate_key_instances()
-    issues = [
-        {
-            "type": "duplicate_key",
-            "severity": "error",
-            "message": f"Citation key {key!r} appears {count} times",
-            "key": key,
-            "instances": instances.get(key, []),
-        }
-        for key, count in duplicates.items()
-    ]
-    result = {
-        "status": "success",
-        "action": "keys_check",
-        "file": file,
-        "source_sha256": _source_sha256(coll),
-        "warnings": [] if deprecated is None else [deprecated],
-        "has_duplicates": bool(duplicates),
-        "duplicate_keys": duplicates,
-        "duplicate_key_instances": instances,
-        "issues": issues,
-    }
-    if not duplicates:
-        human = [f"{file}: all citation keys are unique."]
-    else:
-        human = []
-        for key, indices in instances.items():
-            line_refs = ", ".join(f"#{i}" for i in indices)
-            human.append(f"  {key}: appears {len(indices)} times (entry {line_refs})")
-        human.append(f"{len(duplicates)} duplicated key(s).")
-    return CheckOutcome(
-        result=result,
-        human=human,
-        failed=bool(duplicates),
-        summary={"duplicate_keys": len(duplicates)},
-    )
-
-
-def keys_check(
-    files: list[str] = typer.Argument(..., help="One or more .bib files"),
-    strict: bool = strict_option("duplicate citation keys are found"),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
-) -> None:
-    """Report duplicate citation keys (deprecated: use `lint --only duplicate_key`).
-
-    `lint --only duplicate_key` reports the same findings, with the position
-    of every entry sharing a key under `instances`, and gates with
-    `--strict`. This command remains until 0.9.0 and reports a `deprecated`
-    warning.
-    """
-    deprecated = deprecation_warning(
-        "keys check", "lint --only duplicate_key", removal="0.9.0", json_output=json_output
-    )
-    _run_checks(
-        files, "keys_check", lambda file: _keys_check_one(file, deprecated), json_output, strict
-    )
 
 
 def _rename_payload(renames: list[tuple[str, str]]) -> dict:
@@ -585,7 +522,6 @@ def keys_pattern(
 
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
-    app.command("check")(_safe(keys_check))
     app.command("generate")(_safe(keys_generate))
     app.command("pattern")(_safe(keys_pattern))
     app.command("repair")(_safe(keys_repair))
