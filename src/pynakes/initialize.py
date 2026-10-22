@@ -206,6 +206,11 @@ holds downloaded materials named by citation key:
 """
 
 
+def is_agents_guide(text: str) -> bool:
+    """Whether ``text`` is a guide ``render_agents_md`` wrote, judged by its title line."""
+    return text.partition("\n")[0].strip() == AGENTS_GUIDE.partition("\n")[0]
+
+
 def render_agents_md(bibname: str, lib: BibFile | None = None) -> str:
     """Return the ``AGENTS.md`` guide for a Pinax bibliography.
 

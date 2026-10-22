@@ -714,7 +714,7 @@ Create or initialize a .bib library.
 | `--profile-from` | string | no | null | — | Copy the metadata profile from an existing .bib library |
 | `--pinax` | boolean | no | false | — | Seed pinax mode (pinax-files-dir, pinax-fetch-policy) |
 | `--agent-guide` | boolean | no | false | — | Write an AGENTS.md guide for LLM agents (requires --pinax) |
-| `--force` | boolean | no | false | — | Overwrite the target file if it already exists |
+| `--force` | boolean | no | false | — | Overwrite the target file if it already exists, and an AGENTS.md that pynakes did not write |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
 | `--dry-run` | boolean | no | false | — | Show what would be written without creating the file |

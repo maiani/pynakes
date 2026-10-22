@@ -41,6 +41,7 @@ from pynakes.initialize import (
     apply_overrides,
     collect_profile,
     default_profile,
+    is_agents_guide,
     missing_profile_entries,
     render_agents_md,
     render_library,
@@ -85,6 +86,24 @@ def _write_agents_guide(file: str, lib: BibFile, *, dry_run: bool) -> str | None
     # Explicit, so the guide is the same UTF-8, LF-terminated file on Windows.
     agents_path.write_text(guide, encoding="utf-8", newline="\n")
     return str(agents_path)
+
+
+def _check_agents_guide(file: str, *, force: bool, json_output: bool) -> None:
+    """Refuse, before anything is written, to replace an AGENTS.md pynakes did not write.
+
+    Beside a ``.bib`` at a repository root, that file is the project's own guide.
+    """
+    path = Path(file).with_name("AGENTS.md")
+    if force or not path.is_file():
+        return
+    if is_agents_guide(path.read_text(encoding="utf-8", errors="replace")):
+        return
+    _emit_error(
+        json_output,
+        "FileExists",
+        f"{path} already exists and was not written by pynakes; pass --force to replace it, "
+        "or leave out --agent-guide and add a pointer to the guide yourself",
+    )
 
 
 def _guide_pointer(file: str, agents_path: str) -> str:
@@ -221,7 +240,10 @@ def init(
         help="Write an AGENTS.md guide for LLM agents (requires --pinax)",
     ),
     force: bool = typer.Option(
-        False, "--force", help="Overwrite the target file if it already exists"
+        False,
+        "--force",
+        help="Overwrite the target file if it already exists, and an AGENTS.md that "
+        "pynakes did not write",
     ),
     backup: bool = _BACKUP_OPTION,
     expect_sha256: str | None = _EXPECT_SHA256_OPTION,
@@ -247,7 +269,8 @@ def init(
     converts it in place; combined with `--profile-from` on an existing file, it
     merges in the template's missing profile keys instead of replacing
     anything already set. `--agent-guide` writes AGENTS.md (only meaningful
-    alongside `--pinax`).
+    alongside `--pinax`); it replaces an AGENTS.md pynakes did not write only
+    with `--force`.
     """
     params = RunParams(
         dry_run=dry_run,
@@ -269,6 +292,9 @@ def init(
             )
 
     exists = Path(file).exists()
+
+    if agent_guide and pinax:
+        _check_agents_guide(file, force=force, json_output=params.json_output)
 
     # Pinax conversion: additive metadata update on an existing file.
     if pinax and exists:

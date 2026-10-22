@@ -354,9 +354,6 @@ Decisions taken in this block, to keep:
   it. A `--json` run writes nothing to stderr, because agents often read
   `--json 2>&1` as one JSON document.
 
-Remaining: `init --agent-guide` overwrites an `AGENTS.md` already beside the
-`.bib`, which at a repository root is the project's own guide.
-
 Making imports follow the library's author format and encoding, and making
 provider extras such as `abstract` or arXiv's `updated` opt-in, belongs to the
 v0.12 enrichment value policy. Imports already apply the `normalize-*` and

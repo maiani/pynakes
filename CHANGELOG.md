@@ -95,6 +95,10 @@ The forms deprecated in 0.8 are removed:
 
 ### Fixed
 
+- `init --agent-guide` no longer replaces an `AGENTS.md` that pynakes did not
+  write, which beside a `.bib` at a repository root is the project's own guide.
+  It refuses with `FileExists` before writing anything; `--force` replaces the
+  file, and a guide pynakes wrote earlier is still regenerated.
 - Citation-key pattern markers keep the value's case, as in JabRef: `[auth]`
   on Isaac Newton gives `Newton`, and only modifiers such as `:lower`,
   `:upper` or `:capitalize` change it. `[veryshorttitle]` and `[shorttitle]`

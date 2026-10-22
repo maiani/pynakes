@@ -354,3 +354,27 @@ def test_agent_guide_proposes_the_key_pattern_existing_keys_follow_without_stori
     assert "Existing citation keys follow `[auth][year]`, which is not stored" in guide
     assert "pynakes metadata set library.bib key-pattern '[auth][year]'" in guide
     assert "key-pattern" not in lib.metadata
+
+
+def test_agent_guide_refuses_to_replace_an_agents_md_pynakes_did_not_write(tmp_path: Path) -> None:
+    # Beside a .bib at a repository root, AGENTS.md is the project's own guide.
+    out = tmp_path / "library.bib"
+    out.write_text("@book{Euclid300,\n  title = {Elements}\n}\n")
+    own = tmp_path / "AGENTS.md"
+    own.write_text("# Project guide\n\nBuild with make.\n")
+
+    refused = runner.invoke(app, ["init", str(out), "--pinax", "--agent-guide", "--json"])
+
+    assert refused.exit_code == 1
+    assert json.loads(refused.output)["error"] == "FileExists"
+    assert own.read_text() == "# Project guide\n\nBuild with make.\n"
+    # Refused before any write: the library was not converted either.
+    assert "pinax-files-dir" not in out.read_text()
+
+    forced = runner.invoke(app, ["init", str(out), "--pinax", "--agent-guide", "--force", "--json"])
+    assert forced.exit_code == 0, forced.output
+    assert own.read_text().startswith("# Bibliography management (Pinax)")
+
+    # A guide pynakes wrote is regenerated without --force.
+    again = runner.invoke(app, ["init", str(out), "--pinax", "--agent-guide", "--json"])
+    assert again.exit_code == 0, again.output
