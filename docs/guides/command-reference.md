@@ -108,6 +108,27 @@ Reconcile the Pinax manifest with the material files that exist.
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
+## batch
+
+**Stability: stable**
+
+Apply a sequence of operations atomically (one preview, one commit).
+
+`pynakes batch [FILE] [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `--ops` | string | no | null | — | JSON array of operations (or use --ops-file) |
+| `--ops-file` | string | no | null | — | Path to a JSON file with the operations array |
+| `--dry-run` | boolean | no | false | — | Show changes without writing |
+| `--diff` | boolean | no | false | — | Show a unified diff |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
 ## capabilities
 
 **Stability: stable**
@@ -149,6 +170,28 @@ Map who has written with whom: co-author pairs, components, and name variants.
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
+## combine
+
+**Stability: stable**
+
+Combine several .bib files into one (optionally deduping by citation key).
+
+`pynakes combine INPUTS... [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `INPUTS` | list[string] | yes | — | — | Two or more .bib files to combine |
+| `--out` | string | yes | null | — | Path to write the combined .bib |
+| `--force` | boolean | no | false | — | Overwrite the output file if it already exists |
+| `--dedupe` | boolean | no | false | — | Collapse entries that share a citation key; differing same-key entries are reported as a conflict instead of guessing |
+| `--where` | string | no | null | — | Keep only the entries matching this selector in the combined output |
+| `--key` | list[string] | no | null | — | Keep only these citation keys in the combined output: comma-separated, repeatable. Narrows --where when both are given |
+| `--dry-run` | boolean | no | false | — | Show what would change without writing |
+| `--diff` | boolean | no | false | — | Show a unified diff of the output |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
 ## convert
 
 **Stability: stable**
@@ -172,73 +215,6 @@ Convert a library between BibTeX/BibLaTeX dialects and interchange formats.
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
-| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
-
-## corpus batch
-
-**Stability: stable**
-
-Apply a sequence of operations atomically (one preview, one commit).
-
-`pynakes corpus batch [FILE] [OPTIONS]`
-
-| Parameter | Type | Required | Default | Choices | Description |
-| --- | --- | --- | --- | --- | --- |
-| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
-| `--ops` | string | no | null | — | JSON array of operations (or use --ops-file) |
-| `--ops-file` | string | no | null | — | Path to a JSON file with the operations array |
-| `--dry-run` | boolean | no | false | — | Show changes without writing |
-| `--diff` | boolean | no | false | — | Show a unified diff |
-| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
-| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
-| `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
-| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
-
-## corpus combine
-
-**Stability: stable**
-
-Combine several .bib files into one (optionally deduping by citation key).
-
-`pynakes corpus combine INPUTS... [OPTIONS]`
-
-| Parameter | Type | Required | Default | Choices | Description |
-| --- | --- | --- | --- | --- | --- |
-| `INPUTS` | list[string] | yes | — | — | Two or more .bib files to combine |
-| `--out` | string | yes | null | — | Path to write the combined .bib |
-| `--force` | boolean | no | false | — | Overwrite the output file if it already exists |
-| `--dedupe` | boolean | no | false | — | Collapse entries that share a citation key; differing same-key entries are reported as a conflict instead of guessing |
-| `--where` | string | no | null | — | Keep only the entries matching this selector in the combined output |
-| `--key` | list[string] | no | null | — | Keep only these citation keys in the combined output: comma-separated, repeatable. Narrows --where when both are given |
-| `--dry-run` | boolean | no | false | — | Show what would change without writing |
-| `--diff` | boolean | no | false | — | Show a unified diff of the output |
-| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
-| `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
-
-## corpus split
-
-**Stability: stable**
-
-Combine inputs, then route entries into several outputs by predicate.
-
-`pynakes corpus split INPUTS... [OPTIONS]`
-
-| Parameter | Type | Required | Default | Choices | Description |
-| --- | --- | --- | --- | --- | --- |
-| `INPUTS` | list[string] | yes | — | — | One or more .bib files (merged in memory) |
-| `--route` | list[string] | yes | null | — | Output rule FILE='predicate' (repeatable). Predicate: any --where expression (including and/or/not), or one of * / used / unused / group "Name". used/unused read --tex/--aux, else the linked tex-sources. |
-| `--force` | boolean | no | false | — | Overwrite the output file if it already exists |
-| `--copy` | boolean | no | false | — | Send an entry to every matching bucket (default: first match only) |
-| `--minimal` | boolean | no | false | — | Drop jabref-meta/pynakes-meta blocks and skip Pinax materials in outputs, for standalone single-entry or few-entry snippets |
-| `--tex` | list[string] | no | null | — | TeX file(s)/dir(s) feeding the used/unused predicates |
-| `--aux` | list[string] | no | null | — | AUX file(s)/dir(s) feeding the used/unused predicates |
-| `--dedupe` | boolean | no | false | — | Dedupe by citation key while merging the inputs |
-| `--dry-run` | boolean | no | false | — | Show what would change without writing |
-| `--diff` | boolean | no | false | — | Show a unified diff of each output |
-| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
-| `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## dedupe check
@@ -1278,6 +1254,30 @@ Search entries by free text, phrases, or field-scoped terms.
 | `--no-rank` | boolean | no | false | — | Keep raw file order instead of ranking by match strength |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## split
+
+**Stability: stable**
+
+Combine inputs, then route entries into several outputs by predicate.
+
+`pynakes split INPUTS... [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `INPUTS` | list[string] | yes | — | — | One or more .bib files (merged in memory) |
+| `--route` | list[string] | yes | null | — | Output rule FILE='predicate' (repeatable). Predicate: any --where expression (including and/or/not), or one of * / used / unused / group "Name". used/unused read --tex/--aux, else the linked tex-sources. |
+| `--force` | boolean | no | false | — | Overwrite the output file if it already exists |
+| `--copy` | boolean | no | false | — | Send an entry to every matching bucket (default: first match only) |
+| `--minimal` | boolean | no | false | — | Drop jabref-meta/pynakes-meta blocks and skip Pinax materials in outputs, for standalone single-entry or few-entry snippets |
+| `--tex` | list[string] | no | null | — | TeX file(s)/dir(s) feeding the used/unused predicates |
+| `--aux` | list[string] | no | null | — | AUX file(s)/dir(s) feeding the used/unused predicates |
+| `--dedupe` | boolean | no | false | — | Dedupe by citation key while merging the inputs |
+| `--dry-run` | boolean | no | false | — | Show what would change without writing |
+| `--diff` | boolean | no | false | — | Show a unified diff of each output |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## tex add

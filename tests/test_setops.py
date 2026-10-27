@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from pynakes.bibtex_parser import parse_bib
@@ -156,14 +157,53 @@ def _write(dir_: Path, name: str, content: str) -> str:
     return str(path)
 
 
+@pytest.mark.parametrize("command", ["combine", "split", "batch"])
+def test_corpus_forms_still_run_with_their_old_action(tmp_path: Path, command: str) -> None:
+    a = _write(tmp_path, "1.bib", A)
+    out = str(tmp_path / "out.bib")
+    tail = {
+        "combine": [a, _write(tmp_path, "2.bib", B), "--out", out],
+        "split": [a, "--route", f"{out}=*"],
+        "batch": [a, "--ops", "[]"],
+    }[command]
+    result = runner.invoke(app, ["corpus", command, *tail, "--dry-run", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["action"] == f"corpus_{command}"
+    deprecated = [w for w in data["warnings"] if w["type"] == "deprecated"]
+    assert deprecated == [
+        {
+            "type": "deprecated",
+            "old": f"corpus {command}",
+            "new": command,
+            "removal": "0.10.0",
+            "message": f"corpus {command} is deprecated and will be removed in 0.10.0; "
+            f"use {command}",
+        }
+    ]
+
+    human = runner.invoke(app, ["corpus", command, *tail, "--dry-run"])
+    assert f"corpus {command} is deprecated" in human.stderr
+
+
+def test_corpus_is_hidden_and_described_as_deprecated() -> None:
+    from pynakes.capabilities import get_capabilities
+
+    assert "corpus" not in runner.invoke(app, ["--help"]).output
+    caps = get_capabilities()
+    assert not any(name.startswith("corpus") for name in caps["command_schemas"])
+    old = {d["old"] for d in caps["deprecations"]}
+    assert {"corpus combine", "corpus split", "corpus batch"} <= old
+
+
 def test_cli_combine_writes_combined_file(tmp_path: Path) -> None:
     a = _write(tmp_path, "1.bib", A)
     b = _write(tmp_path, "2.bib", B)
     out = str(tmp_path / "all.bib")
-    result = runner.invoke(app, ["corpus", "combine", a, b, "--out", out, "--json"])
+    result = runner.invoke(app, ["combine", a, b, "--out", out, "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
-    assert data["action"] == "corpus_combine"
+    assert data["action"] == "combine"
     assert data["entries"] == 2
     assert data["written"] is True
     reparsed = parse_bib(Path(out).read_text(encoding="utf-8"))
@@ -177,7 +217,7 @@ def test_cli_combine_where_keeps_only_matching_entries(tmp_path: Path) -> None:
 
     result = runner.invoke(
         app,
-        ["corpus", "combine", a, b, "--out", out, "--where", 'group "Bio"', "--json"],
+        ["combine", a, b, "--out", out, "--where", 'group "Bio"', "--json"],
     )
 
     assert result.exit_code == 0, result.output
@@ -192,7 +232,7 @@ def test_cli_combine_where_error_is_structured(tmp_path: Path) -> None:
     out = tmp_path / "all.bib"
 
     result = runner.invoke(
-        app, ["corpus", "combine", a, a, "--out", str(out), "--where", "title contains", "--json"]
+        app, ["combine", a, a, "--out", str(out), "--where", "title contains", "--json"]
     )
 
     assert result.exit_code == 1
@@ -208,7 +248,6 @@ def test_cli_split_routes_by_a_composed_predicate(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "corpus",
             "split",
             source,
             "--route",
@@ -254,7 +293,7 @@ def test_cli_combine_copies_pinax_materials_and_manifest(tmp_path: Path) -> None
     b = _write(tmp_path, "2.bib", B)
     out = str(tmp_path / "all.bib")
 
-    result = runner.invoke(app, ["corpus", "combine", str(source), b, "--out", out, "--json"])
+    result = runner.invoke(app, ["combine", str(source), b, "--out", out, "--json"])
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -270,7 +309,7 @@ def test_cli_combine_dry_run_writes_nothing(tmp_path: Path) -> None:
     a = _write(tmp_path, "1.bib", A)
     b = _write(tmp_path, "2.bib", B)
     out = str(tmp_path / "all.bib")
-    result = runner.invoke(app, ["corpus", "combine", a, b, "--out", out, "--dry-run", "--json"])
+    result = runner.invoke(app, ["combine", a, b, "--out", out, "--dry-run", "--json"])
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["written"] is False
     assert not Path(out).exists()
@@ -280,7 +319,7 @@ def test_cli_combine_dedupe_conflict_exits_2(tmp_path: Path) -> None:
     a = _write(tmp_path, "1.bib", "@article{Smith2020,\n  title = {Alpha}\n}\n")
     b = _write(tmp_path, "2.bib", "@article{Smith2020,\n  title = {Other}\n}\n")
     out = str(tmp_path / "all.bib")
-    result = runner.invoke(app, ["corpus", "combine", a, b, "--out", out, "--dedupe", "--json"])
+    result = runner.invoke(app, ["combine", a, b, "--out", out, "--dedupe", "--json"])
     assert result.exit_code == 2, result.output
     data = json.loads(result.output)
     assert data["status"] == "conflict"
@@ -289,7 +328,7 @@ def test_cli_combine_dedupe_conflict_exits_2(tmp_path: Path) -> None:
 
 
 def test_cli_combine_self_output_does_not_crash_on_own_materials(tmp_path: Path) -> None:
-    # Regression (F14): `corpus combine A.bib B.bib --out A.bib` aborted with a
+    # Regression (F14): `combine A.bib B.bib --out A.bib` aborted with a
     # SameFileError copying A's own pinax materials onto themselves.
     primary = tmp_path / "primary.bib"
     primary.write_text(
@@ -303,7 +342,7 @@ def test_cli_combine_self_output_does_not_crash_on_own_materials(tmp_path: Path)
 
     result = runner.invoke(
         app,
-        ["corpus", "combine", str(primary), harvest, "--out", str(primary), "--force", "--json"],
+        ["combine", str(primary), harvest, "--out", str(primary), "--force", "--json"],
     )
 
     assert result.exit_code == 0, result.output
@@ -328,7 +367,7 @@ def test_cli_combine_self_output_preserves_custom_files_dir(tmp_path: Path) -> N
 
     result = runner.invoke(
         app,
-        ["corpus", "combine", str(primary), harvest, "--out", str(primary), "--force", "--json"],
+        ["combine", str(primary), harvest, "--out", str(primary), "--force", "--json"],
     )
 
     assert result.exit_code == 0, result.output
@@ -346,11 +385,11 @@ def test_cli_split_by_group(tmp_path: Path) -> None:
     rest = str(tmp_path / "rest.bib")
     result = runner.invoke(
         app,
-        ["corpus", "split", a, b, "--route", f'{ml}=group "ML"', "--route", f"{rest}=*", "--json"],
+        ["split", a, b, "--route", f'{ml}=group "ML"', "--route", f"{rest}=*", "--json"],
     )
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
-    assert data["action"] == "corpus_split"
+    assert data["action"] == "split"
     assert {o["path"]: o["entries"] for o in data["outputs"]} == {ml: 1, rest: 1}
     assert list(parse_bib(Path(ml).read_text(encoding="utf-8")).entries.keys()) == ["Smith2020"]
     assert list(parse_bib(Path(rest).read_text(encoding="utf-8")).entries.keys()) == ["Jones2021"]
@@ -372,7 +411,6 @@ def test_cli_split_copies_pinax_materials_to_matching_output(tmp_path: Path) -> 
     result = runner.invoke(
         app,
         [
-            "corpus",
             "split",
             str(source),
             "--route",
@@ -412,7 +450,6 @@ def test_cli_split_catch_all_bucket_with_no_materials_does_not_crash(tmp_path: P
     result = runner.invoke(
         app,
         [
-            "corpus",
             "split",
             str(source),
             "--route",
@@ -449,7 +486,6 @@ def test_cli_split_minimal_drops_metadata_and_skips_materials(tmp_path: Path) ->
     result = runner.invoke(
         app,
         [
-            "corpus",
             "split",
             str(source),
             "--route",
@@ -481,9 +517,7 @@ def test_cli_split_without_minimal_keeps_metadata(tmp_path: Path) -> None:
     )
     ml = str(tmp_path / "ml.bib")
 
-    result = runner.invoke(
-        app, ["corpus", "split", str(source), "--route", f'{ml}=group "ML"', "--json"]
-    )
+    result = runner.invoke(app, ["split", str(source), "--route", f'{ml}=group "ML"', "--json"])
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["minimal"] is False
@@ -499,7 +533,6 @@ def test_cli_split_used_unused_with_tex(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "corpus",
             "split",
             a,
             b,
@@ -519,7 +552,7 @@ def test_cli_split_used_unused_with_tex(tmp_path: Path) -> None:
 
 def test_cli_split_bad_rule_errors(tmp_path: Path) -> None:
     a = _write(tmp_path, "1.bib", A)
-    result = runner.invoke(app, ["corpus", "split", a, "--route", "no-equals-sign", "--json"])
+    result = runner.invoke(app, ["split", a, "--route", "no-equals-sign", "--json"])
     assert result.exit_code == 1, result.output
     assert json.loads(result.output)["status"] == "error"
 
@@ -527,7 +560,7 @@ def test_cli_split_bad_rule_errors(tmp_path: Path) -> None:
 def test_cli_split_used_without_sources_errors(tmp_path: Path) -> None:
     a = _write(tmp_path, "1.bib", A)
     out = str(tmp_path / "u.bib")
-    result = runner.invoke(app, ["corpus", "split", a, "--route", f"{out}=used", "--json"])
+    result = runner.invoke(app, ["split", a, "--route", f"{out}=used", "--json"])
     assert result.exit_code == 1, result.output
     assert json.loads(result.output)["status"] == "error"
 
@@ -539,7 +572,7 @@ def test_cli_combine_human_output_with_diff(tmp_path: Path) -> None:
     a = _write(tmp_path, "1.bib", A)
     b = _write(tmp_path, "2.bib", B)
     out = str(tmp_path / "all.bib")
-    result = runner.invoke(app, ["corpus", "combine", a, b, "--out", out, "--diff"])
+    result = runner.invoke(app, ["combine", a, b, "--out", out, "--diff"])
     assert result.exit_code == 0, result.output
     assert "Combined 2 file(s)" in result.output
     assert "Wrote" in result.output
@@ -550,7 +583,7 @@ def test_cli_combine_reports_duplicate_keys_human(tmp_path: Path) -> None:
     a = _write(tmp_path, "1.bib", A)
     b = _write(tmp_path, "2.bib", A)
     out = str(tmp_path / "all.bib")
-    result = runner.invoke(app, ["corpus", "combine", a, b, "--out", out])
+    result = runner.invoke(app, ["combine", a, b, "--out", out])
     assert result.exit_code == 0, result.output
     assert "duplicate key(s): Smith2020" in result.output
 
@@ -559,7 +592,7 @@ def test_cli_split_human_output_with_diff_and_unrouted(tmp_path: Path) -> None:
     a = _write(tmp_path, "1.bib", A)
     b = _write(tmp_path, "2.bib", B)
     ml = str(tmp_path / "ml.bib")
-    result = runner.invoke(app, ["corpus", "split", a, b, "--route", f'{ml}=group "ML"', "--diff"])
+    result = runner.invoke(app, ["split", a, b, "--route", f'{ml}=group "ML"', "--diff"])
     assert result.exit_code == 0, result.output
     assert "Split 2 input(s) into 1 output(s)" in result.output
     assert "matched no output" in result.output  # Jones2021 is unrouted
@@ -569,7 +602,7 @@ def test_cli_split_human_output_with_diff_and_unrouted(tmp_path: Path) -> None:
 def test_cli_split_dry_run_writes_nothing(tmp_path: Path) -> None:
     a = _write(tmp_path, "1.bib", A)
     ml = str(tmp_path / "ml.bib")
-    result = runner.invoke(app, ["corpus", "split", a, "--route", f"{ml}=*", "--dry-run", "--json"])
+    result = runner.invoke(app, ["split", a, "--route", f"{ml}=*", "--dry-run", "--json"])
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["outputs"][0]["written"] is False
     assert not Path(ml).exists()
@@ -582,7 +615,6 @@ def test_cli_split_copy_overlaps(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "corpus",
             "split",
             a,
             "--copy",
@@ -602,7 +634,7 @@ def test_cli_split_duplicate_to_target_errors(tmp_path: Path) -> None:
     a = _write(tmp_path, "1.bib", A)
     dup = str(tmp_path / "x.bib")
     result = runner.invoke(
-        app, ["corpus", "split", a, "--route", f"{dup}=*", "--route", f"{dup}=used", "--json"]
+        app, ["split", a, "--route", f"{dup}=*", "--route", f"{dup}=used", "--json"]
     )
     assert result.exit_code == 1, result.output
     assert json.loads(result.output)["status"] == "error"
@@ -640,7 +672,7 @@ def test_cli_combine_into_a_library_previews_and_transfers_its_materials(tmp_pat
     (tmp_path / "pdfs" / "Euler1748.published.pdf").write_bytes(b"%PDF one")
     (tmp_path / "scratch.files").mkdir()
     (tmp_path / "scratch.files" / "Gauss1801.preprint.pdf").write_bytes(b"%PDF two")
-    args = ["corpus", "combine", str(project), str(scratch), "--out", str(project), "--force"]
+    args = ["combine", str(project), str(scratch), "--out", str(project), "--force"]
     expected = [
         {
             "key": "Gauss1801",

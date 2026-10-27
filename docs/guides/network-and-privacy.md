@@ -2,7 +2,7 @@
 
 Bibliography maintenance is offline by default. `inspect`, `search`, `lint`,
 `format`, `normalize`, metadata/group/field/key edits, `tex` operations,
-`asset check`, `asset repair`, `scrub` and corpus operations make no network
+`asset check`, `asset repair`, `scrub`, `combine`, `split` and `batch` make no network
 requests. Files and bibliographies are not uploaded to an analytics service.
 
 ## Commands that contact services

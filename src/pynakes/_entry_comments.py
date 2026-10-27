@@ -99,7 +99,7 @@ def detach_into(source: BibFile, derived: BibFile) -> None:
 def carry_from(source: BibFile, derived: BibFile) -> None:
     """Add the attached comments of *derived*'s entries that came from *source*.
 
-    For a library built from several sources (``corpus combine``), whose
+    For a library built from several sources (``combine``), whose
     ``raw_comments`` come from only one of them.
     """
     kept = {id(entry) for entry in derived.entries.values()}

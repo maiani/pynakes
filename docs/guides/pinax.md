@@ -215,12 +215,12 @@ These extend the core invariants in
    network into core logic.
 7. **Operations preserve the pinax.** Any operation that produces a `.bib` from a
    pinax produces a *pinax* — carrying the materials and per-entry state for the
-   entries it emits. `corpus combine` of pinakes yields a pinax whose
+   entries it emits. `combine` of pinakes yields a pinax whose
    `pinax-files-dir` is the
-   union; `corpus split` yields several pinakes, each with its entries' materials. These
+   union; `split` yields several pinakes, each with its entries' materials. These
    stay **non-destructive**: materials are plainly **copied** into the outputs (no
    hardlinks or clever sharing), so inputs remain intact and a wrong result is
-   undone by deleting the outputs. To reclaim disk after a `corpus split`, delete the
+   undone by deleting the outputs. To reclaim disk after a `split`, delete the
    source pinax — an explicit, reversible step rather than baked-in destruction.
    Each entry's provenance row is copied alongside, so it survives the move
    between files without having to live on the entry.
@@ -239,7 +239,7 @@ only when — a `pinax-files-dir` is set:
 | Reconcile the manifest | `asset repair [--dry-run --diff]` | Brings the provenance manifest in line with the material files that exist. |
 | Rename / regenerate keys | `keys rename`, `keys generate`, `keys repair` | Every material sharing the key — `<citekey>.published.pdf`, `<citekey>.preprint.pdf`, `<citekey>.source/` — moves with it (see [Coordinated edits](#coordinated-edits-and-atomicity)). `keys rename`, `keys generate`, and `keys repair` name each planned move in their envelope's `pinax_materials`, dry run included, and a dry run refuses a move whose target exists, as the write would. Duplicate repair keeps materials under the original key while an entry still uses it, reporting no move. |
 | Download missing materials | `asset fetch` (the one new download verb) | See [Fetch](#fetch-the-first-slice). |
-| Combine / split | `corpus combine`, `corpus split` | Produce pinakes; each output entry's materials are copied into the output's `pinax-files-dir`. Non-destructive — inputs untouched. |
+| Combine / split | `combine`, `split` | Produce pinakes; each output entry's materials are copied into the output's `pinax-files-dir`. Non-destructive — inputs untouched. |
 
 Everything else keeps working unchanged and simply *gains* file-awareness the
 moment the metadata key is present. That is the whole point of making a pinax a
@@ -528,8 +528,8 @@ drift is always detectable and the fix always reviewable.
 
 Rename is the **only in-place** material operation, and so the riskiest: it
 mutates an existing `pinax-files-dir` rather than writing fresh outputs the way
-`corpus combine`
-/ `corpus split` do (where a failure just discards a half-written output). It warrants
+`combine`
+/ `split` do (where a failure just discards a half-written output). It warrants
 its own focused design pass before implementation.
 
 ## Provenance manifest (Tier 1)
@@ -658,7 +658,7 @@ checklist.
 5. **Provenance manifest (Tier 1).** `.pinax/manifest.json` with `source` /
    `fetched_date` / `sha256` / `refetchable` per artifact; `asset fetch` writes
    it. *(Implemented.)*
-6. **Pinax-aware `corpus combine` / `corpus split`.** Each output is a pinax; an output entry's
+6. **Pinax-aware `combine` / `split`.** Each output is a pinax; an output entry's
    materials and per-entry state are copied into its `pinax-files-dir`. Non-destructive —
    inputs untouched. (Lower-risk than rename: outputs are fresh, so a failure just
    discards a half-written output.) *(Implemented.)*
@@ -694,7 +694,7 @@ Settled in discussion:
   runs the same metadata-driven fetch policy for the new key.
 - **Canonical is the published PDF**, falling back to the preprint and its source.
 - **PDF-only e-prints** are handled gracefully (the source step is skipped).
-- **Operations preserve the pinax** — `corpus combine` / `corpus split` produce pinakes,
+- **Operations preserve the pinax** — `combine` / `split` produce pinakes,
   **plainly copying** materials into the outputs (no hardlinks); both stay
   non-destructive, and you delete the source pinax to reclaim disk after a split.
   Provenance travels as copied per-entry state.

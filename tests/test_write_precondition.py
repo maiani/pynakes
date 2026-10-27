@@ -103,8 +103,7 @@ WRITES = {
     "convert": ["convert", "{bib}", "--to", "biblatex"],
     "init": ["init", "{bib}", "--pinax"],
     "dedupe merge": ["dedupe", "merge", "{bib}", "--key", "Euler1748"],
-    "corpus batch": [
-        "corpus",
+    "batch": [
         "batch",
         "{bib}",
         "--ops",
@@ -216,7 +215,7 @@ def test_batch_checks_the_precondition_before_running_operations(tmp_path: Path)
     bib = _library(tmp_path)
     ops = '[{"op": "ref.edit", "key": "Missing1900", "fields": {"note": "x"}}]'
     result = runner.invoke(
-        app, ["corpus", "batch", str(bib), "--ops", ops, "--expect-sha256", STALE, "--json"]
+        app, ["batch", str(bib), "--ops", ops, "--expect-sha256", STALE, "--json"]
     )
     assert result.exit_code == 2
     assert _payload(result)["error"] == "ExternalModification"

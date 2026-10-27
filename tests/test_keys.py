@@ -614,12 +614,12 @@ class TestRenameFollowsReferencesThroughTheCli:
         assert result.exit_code == 0, result.output
         self._assert_followed(bib.read_text(encoding="utf-8"))
 
-    def test_corpus_batch_keys_rename(self, tmp_path) -> None:
+    def test_batch_keys_rename(self, tmp_path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text(self.SOURCE, encoding="utf-8")
         ops = json.dumps([{"op": "keys.rename", "old": "Newton1687", "new": "Newton1688"}])
 
-        result = CliRunner().invoke(app, ["corpus", "batch", str(bib), "--ops", ops, "--json"])
+        result = CliRunner().invoke(app, ["batch", str(bib), "--ops", ops, "--json"])
 
         assert result.exit_code == 0, result.output
         self._assert_followed(bib.read_text(encoding="utf-8"))

@@ -41,7 +41,7 @@ def _error(result) -> dict:
     "args",
     [
         ["convert", "{bib}", "--to", "ris", "--out", "{bib}"],
-        ["corpus", "split", "{bib}", "--route", "{bib}=*"],
+        ["split", "{bib}", "--route", "{bib}=*"],
     ],
 )
 def test_output_naming_an_input_is_refused(tmp_path: Path, args: list[str]) -> None:
@@ -63,7 +63,7 @@ def test_output_naming_an_input_is_refused(tmp_path: Path, args: list[str]) -> N
     "args",
     [
         ["convert", "{bib}", "--to", "ris", "--out", "{out}/x.ris"],
-        ["corpus", "split", "{bib}", "--route", "{out}/all.bib=*"],
+        ["split", "{bib}", "--route", "{out}/all.bib=*"],
     ],
 )
 def test_a_failed_write_is_an_error_not_a_success(tmp_path: Path, args: list[str]) -> None:
@@ -108,7 +108,7 @@ def test_dedupe_conflict_inside_a_batch_is_a_conflict(tmp_path: Path) -> None:
     bib.write_text(original)
     ops = json.dumps([{"op": "dedupe.merge"}])
 
-    result = runner.invoke(app, ["corpus", "batch", str(bib), "--ops", ops, "--json"])
+    result = runner.invoke(app, ["batch", str(bib), "--ops", ops, "--json"])
 
     assert result.exit_code == 2, result.output
     assert _error(result)["error"] == "DedupeConflict"

@@ -60,7 +60,7 @@ pynakes capabilities --json --section predicate_grammar   # one section
 - `predicate_grammar`: the one selector grammar every entry-addressable
   command accepts, including boolean composition and its operator table. Its
   `used_by` list is read from the live commands (`normalize`, `enrich`,
-  `fields`, `format`, `search`, and the rest), plus `corpus split --route`.
+  `fields`, `format`, `search`, and the rest), plus `split --route`.
   Its `key_selector` entry documents `--key`, the no-grammar shorthand for
   selecting by citation key that every `--where` command also accepts.
 - `search_query_grammar`: term, phrase, field, fuzzy, ranking, and
@@ -69,7 +69,7 @@ pynakes capabilities --json --section predicate_grammar   # one section
   family's macro-name and optional-argument patterns and the key separator,
   as regular-expression fragments valid in Python and ECMAScript, so a client
   recognizes exactly the citations the engine does.
-- `batch_operations`: the operation vocabulary accepted by `corpus batch`.
+- `batch_operations`: the operation vocabulary accepted by `batch`.
 
 Use the schema to construct calls and `pynakes <command> --help` for a focused
 human-readable view. The [usage guide](usage.md) explains the individual
@@ -103,9 +103,9 @@ commands and their semantics.
    applying the approved change on top of an edit nobody reviewed:
 
    ```bash
-   pynakes corpus batch refs.bib --dry-run --diff --json --ops-file ops.json
+   pynakes batch refs.bib --dry-run --diff --json --ops-file ops.json
    # ... review; then, with the source_sha256 from that preview:
-   pynakes corpus batch refs.bib --json --ops-file ops.json \
+   pynakes batch refs.bib --json --ops-file ops.json \
      --expect-sha256 9a6660d44e528fcd22a29a915bddea03a86d6587f6c708a39b19a5f734afb786
    ```
 
@@ -124,14 +124,14 @@ commands and their semantics.
    ```
 
 Only add `verify --online` when provider lookups are intentionally allowed.
-For several related edits, use `corpus batch`: it stages all operations in
+For several related edits, use `batch`: it stages all operations in
 memory and commits them atomically, or writes nothing if one fails. This is the
 right shape for anything proposed as a set — add these two, drop that one,
 retag the rest — because it is previewed as one diff and approved as one
 decision rather than as a sequence of writes that can half-apply:
 
 ```bash
-pynakes corpus batch refs.bib --dry-run --diff --json --ops '[
+pynakes batch refs.bib --dry-run --diff --json --ops '[
   {"op": "ref.add", "key": "Newton1687", "entry_type": "book",
    "fields": {"title": "Principia", "author": "Newton, Isaac", "year": "1687"}},
   {"op": "ref.remove", "key": "Fabricated2021"},
@@ -178,11 +178,11 @@ the all-or-nothing guarantee rather than an exception to it.
   always-fill or always-report operations; `ref compare` is for one entry at a
   time with a human choosing per field.
 - Use `fields` with `--where` for bulk field operations over a selection. The
-  same selector works on `search`, `format`, and the corpus operations, so
+  same selector works on `search`, `format`, `combine` and `split`, so
   scope a set once — `'year >= 2025 and doi missing'` — and reuse the
   expression rather than filtering with `grep`.
 - Use `ref add` for a fully local, manually supplied reference, or `ref.add`
-  inside a `corpus batch` when it is one of several related changes.
+  inside a `batch` when it is one of several related changes.
 - Use `ref import` for network-backed DOI, repository, preprint, and
   working-paper metadata resolution; give it several identifiers, or pipe them
   with `-`, when a whole list has to resolve. Write `IDENTIFIER=KEY` to choose
@@ -350,7 +350,7 @@ provider throttled the run.
 
 To move reviewed references from a scratch library into a project library with
 their materials, run
-`corpus combine project.bib scratch.bib --out project.bib --force --dry-run --json`:
+`combine project.bib scratch.bib --out project.bib --force --dry-run --json`:
 the project keeps its `pinax-files-dir`, and `pinax_materials` names every file
 that would be copied. Run it again without `--dry-run` to apply.
 
@@ -404,7 +404,7 @@ keys a caller can rely on; each command adds its own fields alongside them.
 | Family | Commands | Keys always present on success |
 |---|---|---|
 | modify | edits one library in place (`normalize`, `ref edit`, `fields set`, `tex add`, …) | `status`, `action`, `file`, `dry_run`, `modified`, `modified_entries`, `warnings`, `source_sha256` |
-| create | writes new files (`init`, `scrub`, `corpus combine`, `corpus split`) | `status`, `action`, `dry_run`, `warnings`, plus `out`/`written` or `outputs` |
+| create | writes new files (`init`, `scrub`, `combine`, `split`) | `status`, `action`, `dry_run`, `warnings`, plus `out`/`written` or `outputs` |
 | read | reports without writing (`ref show`, `search`, `inspect`, `tex list`, …) | `status`, `action`, `warnings`, `source_sha256` |
 | check | gates a library (`lint`, `verify`, `dedupe check`, `asset check`) | `status`, `action`, `file`, `warnings`, `source_sha256`, `strict` |
 | error | any failure or conflict | `status`, `error`, `message` |
@@ -514,14 +514,14 @@ from `capabilities.error_codes`.
 ### Commands that create files
 
 File-producing commands retain the common envelope where applicable.
-`scrub` and `corpus combine` report the input in `file` and the destination
-in `out`; `corpus split` reports destinations as `outputs` objects with `path`.
+`scrub` and `combine` report the input in `file` and the destination
+in `out`; `split` reports destinations as `outputs` objects with `path`.
 Command-specific fields include `inputs`, `entries`, `removed` and `unrouted`.
 Do not assume every file-producing command has an `out` key or omits `modified`
 and `plan`. The `status` and exit-code rules are the same, and every create command
 supports `--dry-run`, `--diff`, and `--json`.
 
-For `corpus split`, inspect every output bucket and `unrouted`; warnings report
+For `split`, inspect every output bucket and `unrouted`; warnings report
 duplicate or unrouted entries. With `--dedupe`, incompatible same-key entries
 produce a standard exit-`2` conflict.
 

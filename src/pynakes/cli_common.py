@@ -134,6 +134,11 @@ def _warning_object(warning: object) -> dict:
 #: Whether ``--json`` output is indented for reading (``--pretty``). Set by the
 #: option's callback on every invocation, so it never leaks between commands.
 _PRETTY_JSON: ContextVar[bool] = ContextVar("pynakes_pretty_json", default=False)
+#: Set while a deprecated alias runs: the old ``action`` its envelope keeps and
+#: the ``deprecated`` warning it carries. See :func:`deprecated_alias`.
+_DEPRECATED_ALIAS: ContextVar[tuple[str, dict] | None] = ContextVar(
+    "pynakes_deprecated_alias", default=None
+)
 
 
 def set_pretty_json(pretty: bool) -> None:
@@ -148,6 +153,12 @@ def _emit_json(payload: dict) -> None:
     The envelope is compact — one line, no padding — because its usual reader
     is a program or an agent paying per token; ``--pretty`` indents it.
     """
+    alias = _DEPRECATED_ALIAS.get()
+    if alias is not None and "warnings" in payload:
+        old_action, warning = alias
+        if "action" in payload:
+            payload["action"] = old_action
+        payload["warnings"] = [*(payload["warnings"] or []), warning]
     if "warnings" in payload:
         payload["warnings"] = [_warning_object(w) for w in payload["warnings"] or []]
     if _PRETTY_JSON.get():
@@ -212,6 +223,28 @@ def deprecation_warning(old: str, new: str, *, removal: str, json_output: bool) 
     if not json_output:
         typer.echo(f"warning: {message}", err=True)
     return {"type": "deprecated", "old": old, "new": new, "removal": removal, "message": message}
+
+
+def deprecated_alias(fn: _F, *, old: str, new: str, action: str, removal: str) -> _F:
+    """Return ``fn`` under its deprecated name ``old``, for one more minor release.
+
+    The alias runs the same command with the same options. It reports the
+    ``deprecated`` warning (to stderr outside ``--json``, in ``warnings``
+    inside it) and keeps the ``action`` value the old form always emitted, so a
+    caller that matches on it keeps working until ``removal``.
+    """
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        json_output = bool(kwargs.get("json_output", False))
+        warning = deprecation_warning(old, new, removal=removal, json_output=json_output)
+        token = _DEPRECATED_ALIAS.set((action, warning))
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            _DEPRECATED_ALIAS.reset(token)
+
+    return wrapper  # type: ignore[return-value]
 
 
 def _entries(count: int) -> str:
@@ -736,7 +769,7 @@ def _finish_create(
 ) -> None:
     """Write a new file and emit the standard creation-command result.
 
-    File-creation commands (``init``, ``scrub``, ``corpus combine``) share this
+    File-creation commands (``init``, ``scrub``, ``combine``) share this
     envelope: ``status, action, file, out, dry_run, written, warnings``, plus
     command-specific keys, and an optional ``diff`` when ``--diff`` is set.
     ``file`` is the library the command read (omitted when it read several),

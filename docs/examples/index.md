@@ -164,7 +164,7 @@ pynakes fields append refs.bib groups Cited --where used
 Export a cited-only `.bib` file:
 
 ```bash
-pynakes corpus combine refs.bib --where used --out cited-only.bib
+pynakes combine refs.bib --where used --out cited-only.bib
 ```
 
 ## Example 8b: Combine and Split Across Files
@@ -172,14 +172,14 @@ pynakes corpus combine refs.bib --where used --out cited-only.bib
 Combine two libraries into one:
 
 ```bash
-pynakes corpus combine 1.bib 2.bib --out combined.bib --dedupe --dry-run --diff
+pynakes combine 1.bib 2.bib --out combined.bib --dedupe --dry-run --diff
 ```
 
 Combine `1.bib` and `2.bib` and split the result into two outputs — here cited
 entries go to `3.bib` and the rest to `4.bib`:
 
 ```bash
-pynakes corpus split 1.bib 2.bib --tex paper.tex \
+pynakes split 1.bib 2.bib --tex paper.tex \
   --to 3.bib='used' \
   --to 4.bib='*'
 ```
@@ -187,7 +187,7 @@ pynakes corpus split 1.bib 2.bib --tex paper.tex \
 Or partition by group instead (first match wins; `*` is the catch-all):
 
 ```bash
-pynakes corpus split 1.bib 2.bib \
+pynakes split 1.bib 2.bib \
   --to ml.bib='group "Machine Learning"' \
   --to archive.bib='group "Archive"' \
   --to rest.bib='*'

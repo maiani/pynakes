@@ -2,7 +2,7 @@
 
 One grammar, one parser, one predicate object, used by every entry-addressable
 surface: ``fields --where``, ``search --where``, ``format --where``, and the
-corpus operations (``corpus combine --where``, ``corpus split --to`` rules).
+multi-file operations (``combine --where``, ``split --route`` rules).
 Keeping the grammar in one module — rather than re-deriving a filter per
 command — is what makes a selector written for one command valid for the rest.
 
@@ -725,7 +725,7 @@ WHERE_GRAMMAR: dict[str, object] = {
         "*": "matches every entry (catch-all / rest bucket)",
         "used": (
             "citation key appears in the library's linked TeX sources (tex-sources), "
-            "or in the --tex/--aux sources of corpus split"
+            "or in the --tex/--aux sources of split"
         ),
         "unused": "citation key does not appear in those sources",
         'group "Name"': "entry belongs to the named group",

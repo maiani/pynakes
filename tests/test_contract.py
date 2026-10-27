@@ -45,9 +45,9 @@ POSITIONALS: dict[str, tuple[tuple[str, bool, bool], ...]] = {
     "capabilities": (),
     "coauthors": (("file", False, False),),
     "convert": (("file", False, False),),
-    "corpus batch": (("file", False, False),),
-    "corpus combine": (("inputs", True, True),),
-    "corpus split": (("inputs", True, True),),
+    "batch": (("file", False, False),),
+    "combine": (("inputs", True, True),),
+    "split": (("inputs", True, True),),
     "dedupe check": (("files", True, True),),
     "dedupe merge": (("file", False, False),),
     "enrich": (("file", False, False),),
@@ -189,12 +189,12 @@ SAMPLES: dict[str, tuple[str, list[str]]] = {
     "capabilities": ("read", ["capabilities"]),
     "coauthors": ("read", ["coauthors", "{bib}"]),
     "convert": ("modify", ["convert", "{bib}", "--to", "biblatex", "--dry-run"]),
-    "corpus batch": ("modify", ["corpus", "batch", "{bib}", "--ops-file", "{ops}", "--dry-run"]),
-    "corpus combine": (
+    "batch": ("modify", ["batch", "{bib}", "--ops-file", "{ops}", "--dry-run"]),
+    "combine": (
         "create",
-        ["corpus", "combine", "{bib}", "{groups}", "--out", "{out}", "--dry-run"],
+        ["combine", "{bib}", "{groups}", "--out", "{out}", "--dry-run"],
     ),
-    "corpus split": ("create", ["corpus", "split", "{bib}", "--route", "{out}=*", "--dry-run"]),
+    "split": ("create", ["split", "{bib}", "--route", "{out}=*", "--dry-run"]),
     "dedupe check": ("check", ["dedupe", "check", "{bib}"]),
     "dedupe merge": ("modify", ["dedupe", "merge", "{dupes}", "--dry-run"]),
     "enrich": ("modify", ["enrich", "{bib}", "--dry-run"]),
@@ -473,6 +473,8 @@ def _click_commands() -> dict:
 
     def walk(group, prefix: str) -> None:
         for name, command in group.commands.items():
+            if command.hidden:  # deprecated, described under deprecations
+                continue
             if hasattr(command, "commands"):
                 walk(command, f"{prefix}{name} ")
             else:

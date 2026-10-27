@@ -21,8 +21,8 @@ LIBRARY = "@book{Newton1687,title={Principia},year={1687}}\n"
         ["scrub", "{bib}", "--out", "{out}"],
         ["convert", "{bib}", "--to", "ris", "--out", "{out}"],
         ["convert", "{ris}", "--from", "ris", "--out", "{out}"],
-        ["corpus", "combine", "{bib}", "{other}", "--out", "{out}"],
-        ["corpus", "split", "{bib}", "--route", "{out}=*"],
+        ["combine", "{bib}", "{other}", "--out", "{out}"],
+        ["split", "{bib}", "--route", "{out}=*"],
         ["init", "{out}"],
     ],
 )

@@ -10,6 +10,7 @@ import shutil
 from pathlib import Path
 
 import pytest
+import typer.main
 from typer.testing import CliRunner
 
 from pynakes.capabilities import get_capabilities
@@ -92,7 +93,7 @@ def test_short_file_flag_names_the_library_on_ref_add(bib: Path) -> None:
         ["normalize", "{bib}", "--keys", "on"],
         ["normalize", "{bib}", "--title-protection", "true"],
         ["init", "{out}", "--type", "bibtex"],
-        ["corpus", "split", "{bib}", "--to", "{out}=*"],
+        ["split", "{bib}", "--to", "{out}=*"],
         ["format", "{bib}", "--stdout"],
         ["keys", "usage", "Smith2020", "--path", "paper.tex"],
         ["asset", "fetch", "{bib}", "--preprint"],
@@ -113,11 +114,19 @@ def test_every_listed_deprecation_is_still_accepted() -> None:
     # A form in its deprecation period must keep working until its removal
     # release, so each one listed is still an option of its live command.
     capabilities = get_capabilities()
+    live = typer.main.get_command(app)
     for deprecation in capabilities["deprecations"]:
-        schema = capabilities["command_schemas"][deprecation["command"]]
-        flags = {flag for option in schema["options"] for flag in option["flags"]}
-        # A whole command in its deprecation period names itself as the old form.
-        assert deprecation["old"] in flags | {deprecation["command"]}, deprecation
+        if deprecation["old"] == deprecation["command"]:
+            # A whole command in its deprecation period is hidden from the
+            # surface but still registered.
+            command = live
+            for part in deprecation["command"].split():
+                command = command.commands[part]
+            assert command.hidden or live.commands[deprecation["command"].split()[0]].hidden
+        else:
+            schema = capabilities["command_schemas"][deprecation["command"]]
+            flags = {flag for option in schema["options"] for flag in option["flags"]}
+            assert deprecation["old"] in flags, deprecation
         assert deprecation["new"] and deprecation["removal"], deprecation
         major, minor, _patch = (int(part) for part in deprecation["removal"].split("."))
         assert (major, minor) > (0, 7), deprecation

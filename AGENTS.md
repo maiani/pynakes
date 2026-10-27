@@ -88,8 +88,8 @@ the future Bimas application's job, not something to grow the extension into. Th
 axis is project versus library, not one file versus many: a master library is
 often a single `.bib`, and `tex ... scan` spans one `.bib` with many `.tex` files.
 The extension may *read* library-scoped things; it never owns or curates them.
-Avoid "corpus" when naming this axis — that word already denotes the multi-file
-`combine`/`split`/`batch` group. Until Bimas starts, the CLI and the extension are
+Avoid "corpus" when naming this axis — the word already has several meanings
+here, and the `corpus` command group was retired for that reason. Until Bimas starts, the CLI and the extension are
 developed concurrently in this repository; a second client is what would justify
 splitting them apart. See
 [docs/vision.md](docs/vision.md#graphical-clients-and-their-scope).
@@ -153,8 +153,7 @@ tests pass:
 
 - Python ≥ 3.12, type hints throughout. Ruff line length 100 (E501 ignored).
 - CLI: top-level transforms/checks plus Typer resource families (`ref`,
-  `groups`, `keys`, `fields`, `dedupe`, `metadata`, `tex`, `asset`, `query`,
-  `corpus`).
+  `groups`, `keys`, `fields`, `dedupe`, `metadata`, `tex`, `asset`, `query`).
   Command callbacks live in `cli_commands/`; operation modules stay independently
   unit-testable. Keep `capabilities` synchronized with the live command surface.
 - Every behaviour-shaping option has three forms: a CLI flag / Python API

@@ -3,7 +3,7 @@
 These are stateless, deterministic projections — read-only inputs in, new
 libraries out — generalizing the cited-subset export in :mod:`pynakes.usage`.
 They operate on whole files (no index, no persistent state), so they belong to
-the single-file engine rather than the future corpus ``Library``.
+the single-file engine rather than the future ``Library``.
 
 ``merge_libraries`` concatenates several libraries into one (optionally deduping
 entries that share a citation key). ``partition_library`` routes each entry of a

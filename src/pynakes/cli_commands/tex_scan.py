@@ -69,9 +69,10 @@ def scan(
 
     The report reads the given sources, else the library's linked
     `tex-sources`, and changes nothing. To act on the cited entries, select
-    them with `--where used` wherever entries are selected: `corpus combine
-    FILE --where used --out cited.bib` exports them, and `fields append FILE
-    keywords cited --where used` tags them.
+    them with `--where used` wherever entries are selected: `combine FILE
+    --where used --out cited.bib` exports them, and `fields append FILE
+    keywords cited --where used` tags them. To locate one key's citations in
+    any `.tex`, with no `.bib`, use `keys usage`.
     """
     file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)

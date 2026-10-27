@@ -4,7 +4,7 @@ This guide explains the engine's workflows and selection semantics. The
 [generated command reference](command-reference.md) lists every live command,
 argument, option, default, choice and stability marker. It is rebuilt from the
 same Click tree as `capabilities --json`; it includes `metadata remove`,
-`tex list/remove/clear`, `ref remove --keep-files`, `corpus batch --ops-file`
+`tex list/remove/clear`, `ref remove --keep-files`, `batch --ops-file`
 and `init --agent-guide`.
 
 ## Offline walkthrough
@@ -67,9 +67,9 @@ so there are no command-specific filter flags to learn.
 
 Accepted by [`ref show`](#show-and-edit), [`fields`](#fields), [`search`](#search), [`format`](#format),
 [`normalize`](#normalize), [`verify` and `enrich`](#verify-enrich), `keys generate`,
-`asset fetch`, `ref directive`, [`corpus combine`](#combine),
-[`corpus split`](#split) (`--route` rules), and the `fields.*` operations of
-`corpus batch`. A `--key` that names no entry is a `KeyNotFound` error, and a
+`asset fetch`, `ref directive`, [`combine`](#combine),
+[`split`](#split) (`--route` rules), and the `fields.*` operations of
+`batch`. A `--key` that names no entry is a `KeyNotFound` error, and a
 selection that matches nothing writes nothing and warns `no_entries_selected`.
 `pynakes capabilities --json --section predicate_grammar` lists every command
 that takes the selector under `predicate_grammar.used_by`.
@@ -115,7 +115,7 @@ search term.
 Quote values containing spaces or punctuation; bare tokens may not contain
 whitespace, brackets, commas, or comparison characters. A comparison against a
 field an entry does not have is false, except `!=` and `missing`, which are
-true. `corpus split --route` additionally accepts the bucket predicate `*`
+true. `split --route` additionally accepts the bucket predicate `*`
 (catch-all), and resolves `used` / `unused` against its `--tex`/`--aux`
 sources, which compose with everything else (`used and year >= 2020`).
 
@@ -440,7 +440,7 @@ a note about it, or a directive another tool reads for the next entry, such as a
 linter suppression. Every command that moves or drops entries keeps such a
 comment with its entry: `format` and sorting write it directly above the entry
 wherever the entry lands, `ref remove` and `dedupe merge` remove it with the
-entry, and `corpus split`/`combine` send it to the output that receives the
+entry, and `split`/`combine` send it to the output that receives the
 entry. Separate a comment from the entry below it with a blank line to make it a
 free, file-level comment instead.
 
@@ -983,7 +983,7 @@ that does the work:
 
 ```bash
 pynakes tex add refs.bib paper.tex                             # link the manuscript once
-pynakes corpus combine refs.bib --where used --out cited.bib   # a working subset
+pynakes combine refs.bib --where used --out cited.bib   # a working subset
 pynakes scrub refs.bib --where used --out public.bib           # a public copy
 pynakes fields append refs.bib keywords cited --where used     # tag them
 ```
@@ -1039,7 +1039,7 @@ reported by default; `--dedupe` collapses entries that share a key when their
 content is identical and reports a **conflict** (exit `2`) when it differs,
 rather than guessing.
 
-(`corpus combine` unions whole files; merging two records of the *same* work is a
+(`combine` unions whole files; merging two records of the *same* work is a
 different operation — see [`dedupe merge`](#dedupe).)
 
 `--where` keeps only the entries a [selector](#selecting-entries-where) matches,
@@ -1060,7 +1060,7 @@ Routing is **first match** by default — each entry lands in the first output
 whose predicate matches, so the outputs are a partition. Pass `--copy` to send an
 entry to *every* matching output instead (outputs may then overlap). Entries that
 match no rule are dropped and reported under `unrouted`. `--dedupe` applies to the
-in-memory merge, exactly as for `corpus combine`.
+in-memory merge, exactly as for `combine`.
 
 ## Selection export and text encoding
 

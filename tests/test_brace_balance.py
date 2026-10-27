@@ -63,8 +63,7 @@ COMMANDS = {
         f"title={BAD}",
     ],
     "ref edit --field": ["ref", "edit", "{bib}", "Newton1687", "--field", f"title={BAD}"],
-    "corpus batch fields.set": [
-        "corpus",
+    "batch fields.set": [
         "batch",
         "{bib}",
         "--ops",
@@ -75,15 +74,13 @@ COMMANDS = {
             ]
         ),
     ],
-    "corpus batch ref.edit": [
-        "corpus",
+    "batch ref.edit": [
         "batch",
         "{bib}",
         "--ops",
         json.dumps([{"op": "ref.edit", "key": "Newton1687", "fields": {"title": BAD}}]),
     ],
-    "corpus batch metadata.set": [
-        "corpus",
+    "batch metadata.set": [
         "batch",
         "{bib}",
         "--ops",

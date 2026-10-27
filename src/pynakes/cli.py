@@ -83,7 +83,9 @@ tex_app = typer.Typer(
     help="Manage linked TeX sources and scan them for citations", cls=AutoBibGroup
 )
 asset_app = typer.Typer(help="Fetch and validate Pinax materials", cls=AutoBibGroup)
-corpus_app = typer.Typer(help="Operate across multiple .bib files", cls=AutoBibGroup)
+corpus_app = typer.Typer(
+    help="Deprecated: use combine, split, and batch (removed in 0.10.0)", cls=AutoBibGroup
+)
 query_app = typer.Typer(help="Save, list, and remove named selector queries", cls=AutoBibGroup)
 
 
@@ -156,9 +158,11 @@ asset_check.register(asset_app)
 # query: named selector queries saved in pynakes-meta
 query.register(query_app)
 
-# corpus: operations across multiple .bib files
-setops.register(corpus_app)
-batch.register(corpus_app)
+setops.register(app)
+batch.register(app)
+# corpus: the deprecated home of combine, split, and batch, hidden until 0.10.0
+setops.register_deprecated(corpus_app)
+batch.register_deprecated(corpus_app)
 
 app.add_typer(ref_app, name="ref")
 app.add_typer(groups_app, name="groups")
@@ -169,7 +173,7 @@ app.add_typer(metadata_app, name="metadata")
 app.add_typer(tex_app, name="tex")
 app.add_typer(asset_app, name="asset")
 app.add_typer(query_app, name="query")
-app.add_typer(corpus_app, name="corpus")
+app.add_typer(corpus_app, name="corpus", hidden=True)
 
 # --- Group top-level --help by nature ---------------------------------------
 # The taxonomy lives once in capabilities.COMMAND_GROUPS (shared with the

@@ -223,7 +223,7 @@ One feature per commit, each usable on the branch before the next starts.
 
 0. **Surface cleanup** ([below](#surface-cleanup)), before
    `--library` and the `library` group are added to the surface, so v0.10's
-   adapters build against settled names. Retiring `corpus` comes first.
+   adapters build against settled names.
 1. **`Library` reads**, built to the definition in
    [the architecture guide](docs/guides/architecture.md#library-a-declared-set-of-bibliographies-planned):
    membership, work identity and a Catalogue over member files that keep all
@@ -264,24 +264,20 @@ each phase lands:
 - **A small `library` group for the library itself:** creating a manifest,
   showing how members resolved and which are unreadable, and later refreshing
   the Catalogue. Writes still go to one `Bibliography`.
-- **Retire `corpus`.** `combine` and `split` work on bare `.bib` files and
-  use nothing a library adds; `batch` works on a single file. All three
-  become top-level commands beside `format`, `convert` and `scrub`, and
-  `corpus` goes through one deprecation release. The name also overloaded a
-  word with other meanings in the project. v0.11's `pick` follows the same
-  rule: bare source files, optionally given as a library.
+- **No multi-file group.** `combine`, `split` and `batch` are top-level
+  commands (the `corpus` group that held them is deprecated until 0.10.0):
+  they use nothing a library adds. v0.11's `pick` follows the same rule: bare
+  source files, optionally given as a library.
 
 #### Surface cleanup
 
-Accepted 2026-10-27. Each change follows the beta promise: the old form keeps
-working in 0.9 with a structured `deprecated` warning and is removed in 0.10. `capabilities`, the contract tests, the generated command
-reference and every help text that names an old form change in the same
-commit.
+Accepted 2026-10-27; retiring `corpus` is done. Each change follows the beta
+promise: the old form keeps working in 0.9 with a structured `deprecated`
+warning and is removed in 0.10. `capabilities`, the contract tests, the
+generated command reference and every help text that names an old form change
+in the same commit.
 
-1. **Retire `corpus`.** `corpus combine`, `corpus split` and
-   `corpus batch` become `combine`, `split` and `batch`. The `tex scan` help
-   text, which points to `corpus combine`, follows.
-2. **Name `groups` subcommands after the group they are already in.** Five
+1. **Name `groups` subcommands after the group they are already in.** Five
    subcommands repeat it, three list overlapping things, and `move-group`
    duplicates `update-group --parent`.
 
@@ -295,7 +291,7 @@ commit.
    | `groups add-entry KEY GROUP` / `remove-entry` | `groups assign KEY GROUP` / `unassign` (keeps `--create`) |
 
    Ten subcommands become seven, and a node verb never needs a suffix.
-3. **`normalize` owns value conventions; `fields` only edits fields.**
+2. **`normalize` owns value conventions; `fields` only edits fields.**
    `fields protect-title` already exists as `normalize`'s `titles` step:
    `normalize --only titles --title-protection on --key K` does the same
    thing. `fields encode` is the Unicode/LaTeX conversion that v0.12 plans to
@@ -304,13 +300,11 @@ commit.
    `fields-encoding` becomes `normalize-encoding`, since settings are named
    for the command that applies them. `lint` reports the old key until it is
    removed. `fields` keeps `set`, `rename`, `move`, `append` and `clear`.
-4. **`ref find` becomes `ref lookup`.** `search` reads the local file;
+3. **`ref find` becomes `ref lookup`.** `search` reads the local file;
    `ref find` goes online to find the records a written-out reference
    describes. The two names read as synonyms. "Lookup" says it asks an outside
    index, and matches `lookup.py`. Key lookup across library members is
    `ref show --library`, so the name is free.
-5. **`tex scan` points to `keys usage`.** Its help names `keys usage` for
-   locating one key without a `.bib`, as `keys usage` already names it back.
 
 Help and docs saying "bibliography" for one `.bib` is wording only; it rides
 along with whichever commit touches each help text.

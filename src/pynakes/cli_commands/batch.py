@@ -1,4 +1,4 @@
-"""CLI command for transactional multi-operation edits: ``corpus batch``.
+"""CLI command for transactional multi-operation edits: ``batch``.
 
 Applies a JSON list of operations to one `.bib` file in memory, previews a single
 combined diff/plan, and commits them atomically (all-or-nothing).
@@ -21,6 +21,7 @@ from pynakes.cli_common import (
     _safe,
     _verb,
     bib_file_argument,
+    deprecated_alias,
 )
 from pynakes.engine import Bibliography
 from pynakes.metadata import DuplicateMetadataError
@@ -101,7 +102,7 @@ def batch(
 
     _finish_mod(
         file,
-        "corpus_batch",
+        "batch",
         coll,
         params,
         [f"{_verb('apply', params, 'Applied')} {len(op_results)} operation(s);"],
@@ -112,3 +113,11 @@ def batch(
 def register(app: typer.Typer) -> None:
     """Register the ``batch`` command."""
     app.command()(_safe(batch))
+
+
+def register_deprecated(corpus_app: typer.Typer) -> None:
+    """Register ``corpus batch``, deprecated until 0.10.0."""
+    alias = deprecated_alias(
+        batch, old="corpus batch", new="batch", action="corpus_batch", removal="0.10.0"
+    )
+    corpus_app.command("batch")(_safe(alias))

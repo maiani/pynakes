@@ -125,7 +125,7 @@ class TestDerivedLibraries:
 
         result = runner.invoke(
             app,
-            ["corpus", "split", str(bib), "--route", f"{old}=year<1800", "--route", f"{new}=*"],
+            ["split", str(bib), "--route", f"{old}=year<1800", "--route", f"{new}=*"],
         )
 
         assert result.exit_code == 0, result.output
@@ -139,9 +139,7 @@ class TestDerivedLibraries:
         second.write_text(LIBRARY, encoding="utf-8", newline="")
         out = tmp_path / "all.bib"
 
-        result = runner.invoke(
-            app, ["corpus", "combine", str(first), str(second), "--out", str(out)]
-        )
+        result = runner.invoke(app, ["combine", str(first), str(second), "--out", str(out)])
 
         assert result.exit_code == 0, result.output
         text = out.read_text(encoding="utf-8")

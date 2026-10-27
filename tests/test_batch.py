@@ -189,10 +189,10 @@ def test_cli_batch_atomic_commit(tmp_path: Path) -> None:
             {"op": "normalize", "journal_style": "abbreviated"},
         ]
     )
-    result = runner.invoke(app, ["corpus", "batch", str(bib), "--ops", ops, "--json"])
+    result = runner.invoke(app, ["batch", str(bib), "--ops", ops, "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
-    assert data["action"] == "corpus_batch"
+    assert data["action"] == "batch"
     assert len(data["operations"]) == 2
     assert data["plan"]["summary"]["modified"] == 1
     reparsed = parse_bib(bib.read_text())
@@ -210,7 +210,7 @@ def test_cli_batch_failure_writes_nothing(tmp_path: Path) -> None:
             {"op": "bogus.op"},
         ]
     )
-    result = runner.invoke(app, ["corpus", "batch", str(bib), "--ops", ops, "--json"])
+    result = runner.invoke(app, ["batch", str(bib), "--ops", ops, "--json"])
     assert result.exit_code == 1, result.output
     assert json.loads(result.output)["status"] == "error"
     assert bib.read_text() == original  # all-or-nothing
@@ -219,7 +219,7 @@ def test_cli_batch_failure_writes_nothing(tmp_path: Path) -> None:
 def test_cli_batch_requires_exactly_one_source(tmp_path: Path) -> None:
     bib = tmp_path / "r.bib"
     bib.write_text(SRC)
-    result = runner.invoke(app, ["corpus", "batch", str(bib), "--json"])
+    result = runner.invoke(app, ["batch", str(bib), "--json"])
     assert result.exit_code == 1, result.output
     assert json.loads(result.output)["status"] == "error"
 
@@ -230,7 +230,7 @@ def test_cli_batch_reads_ops_file_and_reports_human_result(tmp_path: Path) -> No
     ops_file = tmp_path / "ops.json"
     ops_file.write_text(json.dumps([{"op": "fields.append", "field": "keywords", "value": "ml"}]))
 
-    result = runner.invoke(app, ["corpus", "batch", str(bib), "--ops-file", str(ops_file)])
+    result = runner.invoke(app, ["batch", str(bib), "--ops-file", str(ops_file)])
 
     assert result.exit_code == 0, result.output
     assert "Applied 1 operation" in result.output
@@ -245,12 +245,12 @@ def test_cli_batch_rejects_two_sources_and_bad_json(tmp_path: Path) -> None:
 
     both = runner.invoke(
         app,
-        ["corpus", "batch", str(bib), "--ops", "[]", "--ops-file", str(ops_file), "--json"],
+        ["batch", str(bib), "--ops", "[]", "--ops-file", str(ops_file), "--json"],
     )
     assert both.exit_code == 1, both.output
     assert json.loads(both.output)["error"] == "InvalidInput"
 
-    malformed = runner.invoke(app, ["corpus", "batch", str(bib), "--ops", "not-json", "--json"])
+    malformed = runner.invoke(app, ["batch", str(bib), "--ops", "not-json", "--json"])
     assert malformed.exit_code == 1, malformed.output
     assert "not valid JSON" in json.loads(malformed.output)["message"]
 
@@ -306,7 +306,7 @@ def test_cli_batch_ref_edit_of_an_unknown_key_is_key_not_found(tmp_path: Path) -
     bib.write_text(EDIT_SRC)
     ops = json.dumps([{"op": "ref.edit", "key": "Missing1900", "fields": {"note": "x"}}])
 
-    result = runner.invoke(app, ["corpus", "batch", str(bib), "--ops", ops, "--json"])
+    result = runner.invoke(app, ["batch", str(bib), "--ops", ops, "--json"])
 
     assert result.exit_code == 1, result.output
     payload = json.loads(result.output)
@@ -321,7 +321,7 @@ def test_cli_batch_ref_edit_of_a_duplicated_key_is_a_conflict(tmp_path: Path) ->
     bib.write_text(EDIT_SRC + EDIT_SRC)
     ops = json.dumps([{"op": "ref.edit", "key": "Newton1687", "fields": {"note": "x"}}])
 
-    result = runner.invoke(app, ["corpus", "batch", str(bib), "--ops", ops, "--json"])
+    result = runner.invoke(app, ["batch", str(bib), "--ops", ops, "--json"])
 
     assert result.exit_code == 2, result.output
     payload = json.loads(result.output)
@@ -353,7 +353,7 @@ def test_cli_batch_edits_several_entries_in_one_write(tmp_path: Path) -> None:
         ]
     )
 
-    result = runner.invoke(app, ["corpus", "batch", str(bib), "--ops", ops, "--json"])
+    result = runner.invoke(app, ["batch", str(bib), "--ops", ops, "--json"])
 
     assert result.exit_code == 0, result.output
     plan = {entry["key"]: entry for entry in json.loads(result.output)["plan"]["entries"]}
@@ -376,7 +376,7 @@ def test_cli_batch_writes_nothing_when_a_later_edit_fails(tmp_path: Path) -> Non
         ]
     )
 
-    result = runner.invoke(app, ["corpus", "batch", str(bib), "--ops", ops, "--json"])
+    result = runner.invoke(app, ["batch", str(bib), "--ops", ops, "--json"])
 
     assert result.exit_code == 1, result.output
     assert bib.read_text() == EDIT_SRC

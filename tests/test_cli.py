@@ -46,7 +46,7 @@ class TestTopLevelHelp:
         # ends with "→ <subcommands>".
         assert "→ add, import, show, edit, directive, compare, find, remove" in out
         assert "→ fetch, check, repair" in out
-        assert "→ combine, split, batch" in out
+        assert "corpus" not in out
         assert "→ list, add, remove, clear, scan" in out
 
     def test_leaf_commands_have_no_arrow(self) -> None:

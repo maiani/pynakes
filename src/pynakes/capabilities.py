@@ -51,7 +51,7 @@ _PREDICATE_GRAMMAR = {
         "are ANDed). On ref add and ref import, which create an entry rather "
         "than select one, --key names the key to assign."
     ),
-    "bucket_predicates_used_by": ["corpus split (--route)"],
+    "bucket_predicates_used_by": ["split (--route)"],
     **WHERE_GRAMMAR,
 }
 
@@ -102,6 +102,18 @@ _SEARCH_QUERY_GRAMMAR = {
 # Old forms that still work, warn with {"type": "deprecated", ...}, and go away
 # in the named release. Empty once nothing is being retired.
 _DEPRECATIONS: list[dict] = [
+    *(
+        {
+            "command": f"corpus {name}",
+            "old": f"corpus {name}",
+            "new": name,
+            "removal": "0.10.0",
+            "note": "The corpus group is retired: combine and split work on plain .bib "
+            "files and batch on one, so all three are top-level commands. The old form "
+            f"keeps its corpus_{name} action until it is removed.",
+        }
+        for name in ("combine", "split", "batch")
+    ),
     {
         "command": "ref find",
         "old": "--online",
@@ -196,7 +208,7 @@ _MATERIAL_COLLECTION = {
     "--only-field NAMES --expect-sha256 <source_sha256> applies only the reviewed fields. "
     "lookups.not_checked names entries whose lookup failed (never read as no match), "
     "lookups.retry the arguments that rerun the retryable ones.",
-    "transfer": "corpus combine project.bib scratch.bib --out project.bib --force keeps the "
+    "transfer": "combine project.bib scratch.bib --out project.bib --force keeps the "
     "project's pinax-files-dir and copies the scratch materials; --dry-run lists them "
     "under pinax_materials.",
     "key_moves": "keys rename, generate, and repair report planned pinax_materials in previews and writes; repair retains materials under a duplicate key that still exists.",
@@ -334,6 +346,7 @@ COMMAND_GROUPS: dict[str, list[str]] = {
         "normalize",
         "convert",
         "enrich",
+        "batch",
         "dedupe",
         "fields",
         "keys",
@@ -342,8 +355,7 @@ COMMAND_GROUPS: dict[str, list[str]] = {
         "tex",
     ],
     "Materials (pinax)": ["asset"],
-    "Corpus (multiple files)": ["corpus"],
-    "Create": ["init", "scrub"],
+    "Create": ["init", "scrub", "combine", "split"],
 }
 
 
@@ -411,6 +423,10 @@ def _walk_commands(group, prefix: str, out: dict) -> None:
     # (Checked structurally rather than by isinstance, since Typer vendors its
     # own click fork whose Group is not the public ``click.Group``.)
     for name, command in sorted(group.commands.items()):
+        if getattr(command, "hidden", False):
+            # A deprecated form still runs, but is described under
+            # ``deprecations`` rather than as part of the surface.
+            continue
         full = f"{prefix}{name}"
         if hasattr(command, "commands"):
             _walk_commands(command, f"{full} ", out)
@@ -470,7 +486,7 @@ def _selector_surfaces(schemas: dict[str, dict]) -> list[str]:
     return [
         *(f"{name} (--where, --key)" for name in selecting),
         "query set (saved expressions, run as --where 'query \"NAME\"')",
-        "corpus split (--route)",
+        "split (--route)",
         "batch (fields.* where)",
     ]
 
@@ -661,7 +677,12 @@ def get_capabilities() -> dict:
             "asset": "Fetch and validate Pinax materials — arXiv PDF/source, "
             "open or institutionally entitled published/supplement PDF download, "
             "linked-file checks, and manifest repair (fetch, check, repair)",
-            "corpus": "Operate across multiple .bib files (combine, split, batch)",
+            "combine": "Combine several .bib files into one, optionally deduping by "
+            "citation key and keeping only the selected entries (--where, --key)",
+            "split": "Route the entries of one or more .bib files into several outputs "
+            "by predicate (--route)",
+            "batch": "Apply a sequence of entry and field operations to one .bib file "
+            "atomically: one preview, one commit",
             "capabilities": "Show this capability description",
         },
         # Self-description for agents: the full per-command schema (args/options/

@@ -63,7 +63,7 @@ class TestGetCapabilities:
         # The declared command list must not drift from the actual CLI surface.
         declared = set(get_capabilities()["commands"])
         registered = {cmd.name or cmd.callback.__name__ for cmd in app.registered_commands}
-        registered |= {group.name for group in app.registered_groups}
+        registered |= {group.name for group in app.registered_groups if not group.hidden}
         assert declared == registered
 
     def test_command_groups_partition_every_command(self) -> None:
@@ -87,6 +87,8 @@ class TestGetCapabilities:
             name = cmd.name or cmd.callback.__name__
             assert cmd.rich_help_panel == panel_by_command[name]
         for group in app.registered_groups:
+            if group.hidden:  # a deprecated group, described under deprecations
+                continue
             assert group.rich_help_panel == panel_by_command[group.name]
 
 
@@ -97,7 +99,7 @@ class TestCommandSchemas:
         schemas = get_capabilities()["command_schemas"]
         top_level = {name.split(" ", 1)[0] for name in schemas}
         registered = {cmd.name or cmd.callback.__name__ for cmd in app.registered_commands}
-        registered |= {group.name for group in app.registered_groups}
+        registered |= {group.name for group in app.registered_groups if not group.hidden}
         assert top_level == registered
 
     def test_subcommands_are_expanded(self) -> None:
@@ -109,7 +111,7 @@ class TestCommandSchemas:
         assert all(not name.startswith("journals ") for name in schemas)
 
     def test_schema_shape_for_a_command(self) -> None:
-        split = get_capabilities()["command_schemas"]["corpus split"]
+        split = get_capabilities()["command_schemas"]["split"]
         assert split["help"]
         # variadic positional input
         inputs = next(a for a in split["arguments"] if a["name"] == "inputs")
@@ -156,7 +158,7 @@ class TestErrorCatalogAndGrammar:
         used_by = grammar["used_by"]
         for name in ("enrich", "normalize", "keys generate", "asset fetch", "ref directive"):
             assert f"{name} (--where, --key)" in used_by
-        assert used_by[-2:] == ["corpus split (--route)", "batch (fields.* where)"]
+        assert used_by[-2:] == ["split (--route)", "batch (fields.* where)"]
         # --key is the no-grammar shorthand, so its relationship to --where has
         # to be stated where an agent reads the selector surface.
         assert "key in [...]" in grammar["key_selector"]

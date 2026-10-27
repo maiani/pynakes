@@ -1,4 +1,4 @@
-"""CLI commands for whole-file set operations: ``corpus combine`` and ``corpus split``.
+"""CLI commands for whole-file set operations: ``combine`` and ``split``.
 
 ``combine`` unions several ``.bib`` files into one; ``split`` routes the entries
 of one or more inputs into several outputs selected by per-bucket predicates.
@@ -29,6 +29,7 @@ from pynakes.cli_common import (
     _safe,
     _source_sha256,
     _verb,
+    deprecated_alias,
     key_option,
     library_where_filter,
     parse_key_selector,
@@ -231,7 +232,7 @@ def combine(
     _finish_create(
         params,
         out,
-        "corpus_combine",
+        "combine",
         content,
         human,
         previous_content=previous_content,
@@ -424,7 +425,7 @@ def split(
 
     payload = {
         "status": "success",
-        "action": "corpus_split",
+        "action": "split",
         "inputs": merged.inputs,
         "sources_sha256": digests,
         "dry_run": params.dry_run,
@@ -451,3 +452,12 @@ def register(app: typer.Typer) -> None:
     """Register the ``combine`` and ``split`` commands."""
     app.command()(_safe(combine))
     app.command()(_safe(split))
+
+
+def register_deprecated(corpus_app: typer.Typer) -> None:
+    """Register ``corpus combine`` and ``corpus split``, deprecated until 0.10.0."""
+    for name, fn in (("combine", combine), ("split", split)):
+        alias = deprecated_alias(
+            fn, old=f"corpus {name}", new=name, action=f"corpus_{name}", removal="0.10.0"
+        )
+        corpus_app.command(name)(_safe(alias))

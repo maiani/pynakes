@@ -145,7 +145,7 @@ CATALOGUE: dict[ErrorCode, ErrorSpec] = {
         2, "Several metadata blocks match the key, so the target is ambiguous."
     ),
     _E.DUPLICATE_MERGE_KEY: ErrorSpec(
-        2, "corpus combine/split --dedupe: a shared citation key has differing content."
+        2, "combine/split --dedupe: a shared citation key has differing content."
     ),
     _E.DEDUPE_CONFLICT: ErrorSpec(2, "dedupe merge: a cluster has irreconcilable field values."),
     _E.DUPLICATE_REFERENCE: ErrorSpec(

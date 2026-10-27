@@ -119,7 +119,7 @@ surfaces and the Python API follow the semantic-versioning policy above. Include
 
 `capabilities.command_schemas` marks each command `stable` or `experimental`.
 All current commands are stable under the 0.7 CLI contract, including Pinax
-and corpus operations. The generated command reference shows the same marker.
+operations and `combine`/`split`. The generated command reference shows the same marker.
 An experimental addition must be explicitly marked before it ships; it has no
 compatibility guarantee. Stability does not imply that a development checkout
 is a published release.

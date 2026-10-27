@@ -42,6 +42,14 @@ The forms deprecated in 0.8 are removed:
   leaves it only with `--online`. `ref find` had no offline mode, so requiring
   the flag only made it fail. `capabilities` reports the rule and both groups
   under `network_access`.
+- The `corpus` group is retired: `corpus combine`, `corpus split` and
+  `corpus batch` are now the top-level `combine`, `split` and `batch`, with
+  the `action` values `combine`, `split` and `batch`. `combine` and `split`
+  work on plain `.bib` files and `batch` on one, so none of them needed a
+  group, and "corpus" had other meanings in the project. The old forms still
+  run until 0.10.0, hidden from `--help`; each reports a `deprecated` warning
+  and keeps its old `corpus_*` action, and `capabilities` lists them under
+  `deprecations` rather than `command_schemas`.
 
 ### Added
 
