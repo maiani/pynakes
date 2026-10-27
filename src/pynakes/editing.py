@@ -160,9 +160,12 @@ def _raw_field_name_spans(raw: str) -> tuple[tuple[int, int], ...]:
             depth += 1
             i += 1
             continue
-        if char in "})":
-            if depth == 0:
-                break
+        if char in "})" and depth == 0:
+            break
+        # Inside braces only ``}`` closes one; a ``)`` there is literal text,
+        # as in ``{Parity (an experiment)}``, and counting it as a close would
+        # hide every field name after the value.
+        if char == "}":
             depth -= 1
             i += 1
             continue

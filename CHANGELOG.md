@@ -95,6 +95,16 @@ The forms deprecated in 0.8 are removed:
 
 ### Fixed
 
+- Editing a field that followed a braced value containing a `)`, such as
+  `title = {Principia (third edition)}`, appended a second copy of the field
+  instead of replacing the first, and each rerun added another. The field
+  scanner counted the `)` as a closing brace and stopped seeing field names for
+  the rest of the entry. `fields`, `normalize`, `enrich`, `ref edit` and every
+  other command that edits fields were affected; `lint` checks that read the
+  entry's source missed the fields after it.
+- `fields encode` converts a thin space (U+2009) to `\,` and a Unicode minus
+  (U+2212) to `\textminus`, and back with `--to unicode`, instead of leaving
+  them unchanged with an `encoding_retained` warning.
 - `init --agent-guide` no longer replaces an `AGENTS.md` that pynakes did not
   write, which beside a `.bib` at a repository root is the project's own guide.
   It refuses with `FileExists` before writing anything; `--force` replaces the

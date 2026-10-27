@@ -209,3 +209,19 @@ class TestQuoteInsideBraces:
         raw = '@article{k,\n  title = "Zur K{\\"o}rper",\n  year = {1905},\n}'
         assert raw_field_names(raw) == ["title", "year"]
         assert set_raw_field(raw, "year", "1906").count("year") == 1
+
+
+class TestParenthesisInsideBraces:
+    """A ``)`` inside braces is literal text, never the end of the entry."""
+
+    def test_field_after_a_parenthesis_is_edited_in_place(self) -> None:
+        raw = "@article{k,\n  title = {Principia (third edition)},\n  author = {Isaac Newton},\n}"
+        assert raw_field_names(raw) == ["title", "author"]
+        out = set_raw_field(raw, "author", "Newton, Isaac")
+        assert out.count("author") == 1
+        assert "author = {Newton, Isaac}," in out
+
+    def test_parenthesis_delimited_entry_still_ends_at_its_close(self) -> None:
+        raw = "@article(k,\n  note = {(a) and (b)},\n  year = 1687\n)"
+        assert raw_field_names(raw) == ["note", "year"]
+        assert set_raw_field(raw, "year", "1713").count("year") == 1

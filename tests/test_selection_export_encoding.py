@@ -167,6 +167,15 @@ def test_key_export_keeps_physical_duplicates_and_reports_empty_selection(tmp_pa
     assert report["warnings"][0]["type"] == "no_entries_selected"
 
 
+def test_thin_space_and_minus_round_trip():
+    latex, warnings = encode_text("Euler, L.\u2009P. and \u22121 \u00b0C", "latex")
+    assert warnings == []
+    assert latex == "Euler, L.{\\,}P. and {\\textminus}1 {\\textdegree}C"
+    assert encode_text(latex, "unicode")[0] == "Euler, L.{\u2009}P. and {\u2212}1 {\u00b0}C"
+    # A control symbol keeps the space after it; a control word consumes it.
+    assert encode_text("L.\\, P. \\textminus 1", "unicode")[0] == "L.\u2009 P. \u22121"
+
+
 def test_supported_text_formatting_is_retained_while_its_text_is_converted():
     converted, warnings = encode_text(r"\textit{Caf\'{e}} and \custom{Caf\'{e}}", "unicode")
     assert converted == r"\textit{Café} and \custom{Caf\'{e}}"

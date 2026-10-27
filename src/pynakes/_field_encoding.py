@@ -43,12 +43,14 @@ _SYMBOLS = {
     "textquoteright": "’",
     "textquotedblleft": "“",
     "textquotedblright": "”",
+    "textminus": "\u2212",
     "textdegree": "°",
     "textcopyright": "©",
     "textregistered": "®",
     "texttrademark": "™",
     "i": "ı",
     "j": "ȷ",
+    ",": "\u2009",
 }
 _REVERSE_ACCENTS = {mark: command for command, mark in _ACCENTS.items()}
 _REVERSE_SYMBOLS = {char: command for command, char in _SYMBOLS.items()}
@@ -128,8 +130,9 @@ def encode_text(value: str, target: str) -> tuple[str, list[str]]:
                     pos = end + 2
                 else:
                     pos = end
-                    # TeX consumes whitespace after a bare control word.
-                    while pos < len(value) and value[pos].isspace():
+                    # TeX consumes whitespace after a bare control word, but
+                    # not after a control symbol such as ``\,``.
+                    while name.isalpha() and pos < len(value) and value[pos].isspace():
                         pos += 1
                 continue
             if target == "unicode" and name.isalpha() and name not in _TEXT_COMMANDS:
