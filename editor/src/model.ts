@@ -686,7 +686,7 @@ export interface DedupeMergeSuccess extends MutationSuccess {
 // A cluster whose copies disagree irreconcilably is an exit-2 `DedupeConflict`.
 export type DedupeMergeEnvelope = DedupeMergeSuccess | MutationConflict | InspectError;
 
-/** One `corpus batch` operation, spelled in the engine's batch vocabulary. */
+/** One `batch` operation, spelled in the engine's batch vocabulary. */
 export interface RefEditOperation {
   op: "ref.edit";
   key: string;
@@ -696,12 +696,12 @@ export interface RefEditOperation {
 }
 
 /**
- * `corpus batch`: several operations previewed as one diff and written in one
+ * `batch`: several operations previewed as one diff and written in one
  * commit — every one of them, or none.
  */
-export interface CorpusBatchSuccess extends MutationSuccess {
-  action: "corpus_batch";
+export interface BatchSuccess extends MutationSuccess {
+  action: "batch";
   operations: { op: string; result: Record<string, unknown> }[];
 }
 
-export type CorpusBatchEnvelope = CorpusBatchSuccess | MutationConflict | InspectError;
+export type BatchEnvelope = BatchSuccess | MutationConflict | InspectError;

@@ -109,7 +109,7 @@ and committing asks for explicit confirmation with that diff on screen. Three
 properties matter:
 
 - *The diff you approve is the diff that lands.* Every pending entry goes into
-  one `corpus batch`; its diff is the engine's own, from `--dry-run --diff`,
+  one `batch`; its diff is the engine's own, from `--dry-run --diff`,
   never reconstructed here, and the commit reruns the same operations in the
   same order.
 - *A commit lands whole or not at all.* The batch is one write, so a commit that

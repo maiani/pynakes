@@ -21,7 +21,7 @@ import type { CitationGrammar } from "./citeContext";
 import type { AssetFetchEnvelope } from "./fetchPlan";
 import type {
   AssetCheckEnvelope,
-  CorpusBatchEnvelope,
+  BatchEnvelope,
   DedupeCheckEnvelope,
   DedupeMergeEnvelope,
   GroupsListEnvelope,
@@ -241,18 +241,18 @@ export function refEditOperation(request: RefEditRequest): RefEditOperation {
   return operation;
 }
 
-/** Build the argument list for one `corpus batch` invocation over an operations file. */
-export function corpusBatchArgs(
+/** Build the argument list for one `batch` invocation over an operations file. */
+export function batchArgs(
   filePath: string,
   opsFile: string,
   dryRun: boolean,
   expectSha256?: string,
 ): string[] {
-  return modifyingFlags(["corpus", "batch", filePath, "--ops-file", opsFile], dryRun, expectSha256);
+  return modifyingFlags(["batch", filePath, "--ops-file", opsFile], dryRun, expectSha256);
 }
 
 /**
- * Apply (or preview) every staged entry's changes as one `corpus batch`.
+ * Apply (or preview) every staged entry's changes as one `batch`.
  *
  * One invocation, so one write: the engine applies all of them or none, and
  * the preview is the single diff of exactly that write. With `dryRun` it also
@@ -263,33 +263,33 @@ export function corpusBatchArgs(
  * commit of several long fields (abstracts, say) would otherwise approach the
  * platform's argument-length limit.
  */
-export async function corpusBatch(
+export async function refEditBatch(
   command: PynakesCommand,
   filePath: string,
   requests: RefEditRequest[],
   dryRun: boolean,
   expectSha256?: string,
   cwd?: string,
-): Promise<CorpusBatchEnvelope> {
-  return corpusOperations(command, filePath, requests.map(refEditOperation), dryRun, expectSha256, cwd);
+): Promise<BatchEnvelope> {
+  return batchOperations(command, filePath, requests.map(refEditOperation), dryRun, expectSha256, cwd);
 }
 
 /** Submit engine operations together, with one preview and atomic commit. */
-export async function corpusOperations(
+export async function batchOperations(
   command: PynakesCommand,
   filePath: string,
   operations: Array<RefEditOperation | { op: "groups.add_entry" | "groups.remove_entry"; key: string; group: string; create?: boolean }>,
   dryRun: boolean,
   expectSha256?: string,
   cwd?: string,
-): Promise<CorpusBatchEnvelope> {
+): Promise<BatchEnvelope> {
   const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "pynakes-batch-"));
   try {
     const opsFile = path.join(dir, "ops.json");
     await fs.promises.writeFile(opsFile, JSON.stringify(operations), "utf-8");
-    return await runJson<CorpusBatchEnvelope>(
+    return await runJson<BatchEnvelope>(
       command,
-      corpusBatchArgs(filePath, opsFile, dryRun, expectSha256),
+      batchArgs(filePath, opsFile, dryRun, expectSha256),
       cwd,
     );
   } finally {

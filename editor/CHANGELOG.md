@@ -20,6 +20,8 @@ release. Its version says nothing about which engine it runs.
 
 ### Changed
 
+- Staged commits run the engine's top-level `batch` command, replacing the
+  deprecated `corpus batch`, and expect its `batch` action.
 - Refresh the whole view — inspection, groups, lint, citations, and material
   state — through one engine invocation that parses the bibliography once,
   reducing those reads from six processes to one. A separate `ref schema` read

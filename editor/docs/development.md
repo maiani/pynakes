@@ -106,7 +106,7 @@ there. This requires an engine supporting both (included in the bundled
 engine).
 
 Writes run sequentially because each rewrites the file atomically. A staged
-commit is one `corpus batch` write, however many entries it covers.
+commit is one `batch` write, however many entries it covers.
 
 ## Packaging
 

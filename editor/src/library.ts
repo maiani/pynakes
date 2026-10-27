@@ -37,8 +37,8 @@ import {
   type RefEditRequest,
   type RefImportRequest,
   type SearchOptions,
-  corpusBatch,
-  corpusOperations,
+  refEditBatch,
+  batchOperations,
   editMetadata,
   type MetadataEdit,
   dedupeCheck,
@@ -251,7 +251,7 @@ export function notApplied(envelope: {
 }
 
 /**
- * Dry-run every staged change as the one `corpus batch` the commit will run.
+ * Dry-run every staged change as the one `batch` the commit will run.
  *
  * The caller sorted the requests, so a preview and the commit that follows it
  * apply the same operations in the same order, and the diff approved is the
@@ -263,7 +263,7 @@ export async function previewEdits(
   requests: RefEditRequest[],
   cwd?: string,
 ): Promise<PreviewResult> {
-  const envelope = await corpusBatch(command, filePath, requests, true, undefined, cwd);
+  const envelope = await refEditBatch(command, filePath, requests, true, undefined, cwd);
   if (envelope.status !== "success") {
     return notApplied(envelope);
   }
@@ -327,7 +327,7 @@ export type CommitResult =
   | NotApplied;
 
 /**
- * Apply staged changes as one `corpus batch`: one write, all of them or none.
+ * Apply staged changes as one `batch`: one write, all of them or none.
  *
  * `expectSha256` is the digest the approved preview reported. The engine
  * refuses with an `ExternalModification` conflict, writing nothing, when the
@@ -341,7 +341,7 @@ export async function commitEdits(
   expectSha256: string,
   cwd?: string,
 ): Promise<CommitResult> {
-  const envelope = await corpusBatch(command, filePath, requests, false, expectSha256, cwd);
+  const envelope = await refEditBatch(command, filePath, requests, false, expectSha256, cwd);
   if (envelope.status !== "success") {
     return notApplied(envelope);
   }
@@ -465,7 +465,7 @@ function runMutation(
         expectSha256,
       );
     case "groups":
-      return corpusOperations(command, filePath, mutation.keys.map((key) => ({
+      return batchOperations(command, filePath, mutation.keys.map((key) => ({
         op: mutation.member ? "groups.add_entry" : "groups.remove_entry",
         key, group: mutation.group,
         ...(mutation.member ? { create: mutation.create ?? false } : {}),

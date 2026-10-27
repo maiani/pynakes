@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  corpusBatchArgs,
+  batchArgs,
   groupTreeArgs,
   groupsEntryArgs,
   keysRenameArgs,
@@ -123,12 +123,11 @@ test("staged requests become ref.edit batch operations, omitting what is not cha
 });
 
 test("a batch preview and its commit differ only by --dry-run and the precondition", () => {
-  const preview = corpusBatchArgs("refs.bib", "ops.json", true);
-  const commit = corpusBatchArgs("refs.bib", "ops.json", false, "ab".repeat(32));
+  const preview = batchArgs("refs.bib", "ops.json", true);
+  const commit = batchArgs("refs.bib", "ops.json", false, "ab".repeat(32));
 
-  assert.deepEqual(preview, ["corpus", "batch", "refs.bib", "--ops-file", "ops.json", "--dry-run", "--diff"]);
+  assert.deepEqual(preview, ["batch", "refs.bib", "--ops-file", "ops.json", "--dry-run", "--diff"]);
   assert.deepEqual(commit, [
-    "corpus",
     "batch",
     "refs.bib",
     "--ops-file",

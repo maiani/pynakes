@@ -2,7 +2,7 @@
  * Previewing and committing the staged field edits.
  *
  * Staged edits accumulate in the extension (see `staging.ts`); this module
- * turns them into the one `corpus batch` that previews them and the identical
+ * turns them into the one `batch` that previews them and the identical
  * one that writes them. Kept apart from the custom editor so the order of the
  * checks a commit makes — reconcile, dry run, conflict check, approval,
  * guarded write — reads in one place.
@@ -81,7 +81,7 @@ export async function previewStaged(host: StagingHost): Promise<void> {
  * against — that is what stops a commit from silently reverting a change
  * someone else made in between. Only then is approval requested.
  *
- * The write is one `corpus batch`, so it lands whole or not at all, and it
+ * The write is one `batch`, so it lands whole or not at all, and it
  * carries the digest the dry run reported, so a change made while the
  * approval dialog was open is refused rather than overwritten. Anything short
  * of success leaves every staged edit in place: nothing was written.

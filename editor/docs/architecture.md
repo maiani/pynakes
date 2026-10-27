@@ -37,7 +37,7 @@ Envelope bugs surfaced the same way and were fixed in the engine: `ref remove
 --diff` emitted its warnings in the `diff` field and dropped them from
 `warnings`; `ref add` reported a taken citation key as an exit-1 error while
 `ref import` reported the identical situation as an exit-2 conflict with
-options; and `corpus batch`'s `ref.edit` neither trimmed values nor checked
+options; and `batch`'s `ref.edit` neither trimmed values nor checked
 field names the way `ref edit` does, so the batch operation was fixed rather
 than the values trimmed here.
 
