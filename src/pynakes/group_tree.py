@@ -611,7 +611,7 @@ def known_group_names(lib: BibFile) -> list[str]:
     that appear only in some entry's ``groups`` field, with no corresponding
     tree node (or when no tree is defined at all) — follow, in first-seen
     order. This is the deterministic union that ``groups list`` and
-    ``groups list-entries`` (for unknown-name detection) share, so a flat-only
+    ``groups show`` (for unknown-name detection) share, so a flat-only
     group is never dropped just because an unrelated tree exists. Names compare
     exactly, as membership does, so a tag differing from a node only in case is
     listed as a group of its own rather than hidden behind the node.

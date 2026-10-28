@@ -81,10 +81,10 @@ If the DOI already exists, the command exits with a conflict unless you pass
 ```bash
 pynakes groups list refs.bib
 
-pynakes groups add-entry refs.bib Smith2020 "Machine Learning" --dry-run --diff
-pynakes groups add-entry refs.bib Smith2020 "Machine Learning"
+pynakes groups assign refs.bib Smith2020 "Machine Learning" --dry-run --diff
+pynakes groups assign refs.bib Smith2020 "Machine Learning"
 
-pynakes groups remove-entry refs.bib Smith2020 "Machine Learning" --dry-run --diff
+pynakes groups unassign refs.bib Smith2020 "Machine Learning" --dry-run --diff
 ```
 
 ## Example 5: Add Keywords to Matching Papers

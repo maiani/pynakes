@@ -38,7 +38,7 @@ class BibliographyGroups:
         """Add every entry with ``key`` to ``group``.
 
         When the library has a group-tree, the group is also registered as a node
-        so the new membership is visible to ``groups tree``/``groups list`` and to
+        so the new membership is visible to ``groups list`` and to
         JabRef: an entry ``groups={X}`` with no ``X`` in the tree is an orphan
         membership, invisible everywhere the tree drives the view. Flat, tree-less
         libraries keep entry-field-only groups (surfaced by ``groups list``).
@@ -87,7 +87,7 @@ class BibliographyGroups:
 
         The membership half of a group rename, separate from
         :meth:`rename_group_node` (the hierarchy half) as membership and the
-        tree are separate records; ``groups rename-group --members`` calls
+        tree are separate records; ``groups rename --members`` calls
         both. Matches the exact name only and never duplicates ``new_name`` in
         an entry. Returns the keys of the entries whose ``groups`` field changed,
         in file order.

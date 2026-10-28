@@ -22,11 +22,11 @@ def test_apply_operations_runs_in_order() -> None:
     results = apply_operations(
         coll,
         [
-            {"op": "groups.add_entry", "key": "A", "group": "ML", "create": True},
+            {"op": "groups.assign", "key": "A", "group": "ML", "create": True},
             {"op": "fields.append", "field": "keywords", "value": "ml"},
         ],
     )
-    assert [r["op"] for r in results] == ["groups.add_entry", "fields.append"]
+    assert [r["op"] for r in results] == ["groups.assign", "fields.append"]
     assert "ML" in coll.lib.entries["A"].fields["groups"]
     assert coll.lib.entries["A"].fields["keywords"] == "ml"
 
@@ -44,7 +44,7 @@ def test_bad_params_raise_batch_error() -> None:
     coll = Bibliography.from_text(SRC)
     for bad in (
         {"op": "fields.rename", "old": "a"},
-        {"op": "groups.add_entry", "key": "A", "x": 1},
+        {"op": "groups.assign", "key": "A", "x": 1},
     ):
         try:
             apply_operations(coll, [bad])
@@ -66,8 +66,8 @@ def test_every_declared_operation_has_a_dispatch_branch() -> None:
         "fields.append": {"field": "keywords", "value": "ml"},
         "fields.clear": {"field": "journal"},
         "fields.protect_title": {},
-        "groups.add_entry": {"key": "A", "group": "ML", "create": True},
-        "groups.remove_entry": {"key": "A", "group": "ML"},
+        "groups.assign": {"key": "A", "group": "ML", "create": True},
+        "groups.unassign": {"key": "A", "group": "ML"},
         "keys.generate": {},
         "keys.repair": {},
         "keys.rename": {"old": "A", "new": "Renamed"},
@@ -185,7 +185,7 @@ def test_cli_batch_atomic_commit(tmp_path: Path) -> None:
     bib.write_text(SRC)
     ops = json.dumps(
         [
-            {"op": "groups.add_entry", "key": "A", "group": "ML", "create": True},
+            {"op": "groups.assign", "key": "A", "group": "ML", "create": True},
             {"op": "normalize", "journal_style": "abbreviated"},
         ]
     )
@@ -206,7 +206,7 @@ def test_cli_batch_failure_writes_nothing(tmp_path: Path) -> None:
     bib.write_text(original)
     ops = json.dumps(
         [
-            {"op": "groups.add_entry", "key": "A", "group": "ML"},
+            {"op": "groups.assign", "key": "A", "group": "ML"},
             {"op": "bogus.op"},
         ]
     )
@@ -333,7 +333,7 @@ def test_cli_batch_ref_edit_of_a_duplicated_key_is_a_conflict(tmp_path: Path) ->
 def test_batch_group_membership_needs_an_existing_group_or_create() -> None:
     coll = Bibliography.from_text(SRC)
     with pytest.raises(batch_ops.BatchError) as raised:
-        apply_operations(coll, [{"op": "groups.add_entry", "key": "A", "group": "ML"}])
+        apply_operations(coll, [{"op": "groups.assign", "key": "A", "group": "ML"}])
     assert raised.value.code == "KeyNotFound"
     assert not coll.is_modified
 

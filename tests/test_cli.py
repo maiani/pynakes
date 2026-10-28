@@ -2284,22 +2284,20 @@ class TestGroupsCommand:
         bib = _copy(tmp_path, "simple.bib")
         original = bib.read_text()
         result = runner.invoke(
-            app, ["groups", "add-entry", str(bib), "Smith2020", "Fav", "--create", "--dry-run"]
+            app, ["groups", "assign", str(bib), "Smith2020", "Fav", "--create", "--dry-run"]
         )
         assert result.exit_code == 0, result.output
         assert bib.read_text() == original
 
     def test_add_entry_writes(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        result = runner.invoke(
-            app, ["groups", "add-entry", str(bib), "Smith2020", "Fav", "--create"]
-        )
+        result = runner.invoke(app, ["groups", "assign", str(bib), "Smith2020", "Fav", "--create"])
         assert result.exit_code == 0, result.output
         assert "groups = {Fav}" in bib.read_text()
 
     def test_add_entry_unknown_key_errors(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        result = runner.invoke(app, ["groups", "add-entry", str(bib), "Nope", "Fav"])
+        result = runner.invoke(app, ["groups", "assign", str(bib), "Nope", "Fav"])
         assert result.exit_code == 1
 
 
@@ -3973,7 +3971,7 @@ class TestErrorHandling:
 
     def test_unknown_key_human_mode_not_json(self, tmp_path: Path) -> None:
         bib = _copy(tmp_path, "simple.bib")
-        result = runner.invoke(app, ["groups", "add-entry", str(bib), "Nope", "Fav"])
+        result = runner.invoke(app, ["groups", "assign", str(bib), "Nope", "Fav"])
         assert result.exit_code == 1
         # Human mode must not dump JSON.
         assert not result.output.strip().startswith("{")
@@ -4107,7 +4105,7 @@ class TestEnvelopeConsistency:
         bib = _copy(tmp_path, "simple.bib")
         r = runner.invoke(
             app,
-            ["groups", "add-entry", str(bib), "Smith2020", "X", "--create", "--dry-run", "--json"],
+            ["groups", "assign", str(bib), "Smith2020", "X", "--create", "--dry-run", "--json"],
         )
         assert self.ENVELOPE <= set(json.loads(r.output))
 
@@ -4365,7 +4363,7 @@ class TestSourcesCommand:
 
 
 _MODIFYING_CASES = [
-    (["groups", "add-entry"], ["Smith2020", "Fav", "--create"], "simple.bib"),
+    (["groups", "assign"], ["Smith2020", "Fav", "--create"], "simple.bib"),
     (["keys", "repair"], [], "duplicate_entries.bib"),
     (["keys", "generate"], ["--all"], "simple.bib"),
     (["fields", "rename"], ["journal", "journaltitle"], "simple.bib"),

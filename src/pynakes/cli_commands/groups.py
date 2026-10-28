@@ -1,7 +1,7 @@
-"""CLI command registration for pynakes.
+"""CLI commands for the ``groups`` family: the hierarchy and its memberships.
 
-This module keeps command callbacks separate from application assembly while
-retaining the stable CLI contract.
+``list``, ``show``, ``add``, ``remove``, ``rename`` and ``update`` work on
+groups; ``assign`` and ``unassign`` file an entry under a group or take it out.
 """
 
 import typer
@@ -22,22 +22,40 @@ from pynakes.cli_common import (
     _source_sha256,
     _verb,
     bib_file_argument,
+    deprecated_alias,
 )
 from pynakes.engine import Bibliography
 
 # --- groups ----------------------------------------------------------------
 
 
+def groups_list_report(lib) -> dict:
+    """Return the ``groups``, ``tree`` and ``undeclared`` keys of ``groups list``."""
+    names = group_tree_ops.known_group_names(lib)
+    tree = group_tree_ops.list_tree(lib) or []
+    declared = {node.name for node in tree}
+    return {
+        "groups": {name: group_tree_ops.list_direct_members(lib, name) for name in names},
+        "tree": [node.to_dict() for node in tree],
+        "undeclared": [name for name in names if name not in declared],
+    }
+
+
 def groups_list(
     file: str | None = bib_file_argument(),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """List all groups and their members."""
+    """List the group hierarchy with each group's direct members.
+
+    `tree` is the hierarchy the library's metadata declares; `groups` maps
+    every group, declared or not, to its direct members; `undeclared` names the
+    groups only entries mention. The two can disagree, and the report says so
+    rather than reconciling them. `groups show NAME` lists one group's entries,
+    descendants included.
+    """
     file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
-    lib = coll.lib
-    names = group_tree_ops.known_group_names(lib)
-    members = {g: group_tree_ops.list_direct_members(lib, g) for g in names}
+    report = groups_list_report(coll.lib)
 
     if json_output:
         _emit_json(
@@ -47,16 +65,42 @@ def groups_list(
                 "file": file,
                 "source_sha256": _source_sha256(coll),
                 "warnings": [],
-                "groups": members,
+                **report,
             }
         )
         return
 
-    if not names:
+    members = report["groups"]
+    tree = group_tree_ops.list_tree(coll.lib) or []
+    undeclared = report["undeclared"]
+    if not members:
         typer.echo(f"{file}: no groups found.")
         return
-    for name in names:
-        typer.echo(f"{name} ({len(members[name])}): {', '.join(members[name])}")
+
+    def line(prefix: str, name: str, color: str = "") -> str:
+        keys = members.get(name, [])
+        listed = f": {', '.join(keys)}" if keys else ""
+        return f"{prefix}{name}{color} ({len(keys)}){listed}"
+
+    def show(parent: str, prefix: str, seen: set[str]) -> None:
+        for node in tree:
+            if node.parent == parent and node.name not in seen:
+                seen.add(node.name)
+                color = f" [{node.color}]" if node.color else ""
+                typer.echo(line(f"{prefix}{'+' if node.expanded else '-'} ", node.name, color))
+                show(node.name, prefix + "  ", seen)
+
+    shown: set[str] = set()
+    show("", "", shown)
+    # A node whose parent is missing or part of a cycle is still listed.
+    for node in tree:
+        if node.name not in shown:
+            shown.add(node.name)
+            typer.echo(line("- ", node.name))
+    if undeclared:
+        typer.echo("Not declared in the hierarchy:")
+        for name in undeclared:
+            typer.echo(line("  ", name))
 
 
 def groups_tree(
@@ -142,20 +186,20 @@ def _group_mod_entry(
     coll = Bibliography.open(file)
     _require_key(coll.lib, key, params.json_output)
     if not (add and create):
-        hint = "; create it with groups add-group, or pass --create" if add else ""
+        hint = "; create it with groups add, or pass --create" if add else ""
         _require_group(coll.lib, group, params.json_output, hint)
     if add:
-        action, count = "groups_add_entry", coll.add_to_group(key, group)
+        action, count = "groups_assign", coll.add_to_group(key, group)
         msg = (
             f"{_verb('add', params)} {key} to group {group!r} ({count} {_entries(count)} changed)."
         )
     else:
-        action, count = "groups_remove_entry", coll.remove_from_group(key, group)
+        action, count = "groups_unassign", coll.remove_from_group(key, group)
         msg = f"{_verb('remove', params)} {key} from group {group!r} ({count} {_entries(count)} changed)."
     _finish_mod(file, action, coll, params, [msg], key=key, group=group)
 
 
-def groups_add_entry(
+def groups_assign(
     file: str | None = bib_file_argument(),
     key: str = typer.Argument(..., help="Citation key to add"),
     group: str = typer.Argument(..., help="Group name"),
@@ -184,7 +228,7 @@ def groups_add_entry(
     _group_mod_entry(file, key, group, params, add=True, create=create)
 
 
-def groups_remove_entry(
+def groups_unassign(
     file: str | None = bib_file_argument(),
     key: str = typer.Argument(..., help="Citation key to remove"),
     group: str = typer.Argument(..., help="Group name"),
@@ -206,7 +250,7 @@ def groups_remove_entry(
     _group_mod_entry(file, key, group, params, add=False)
 
 
-def groups_add_group(
+def groups_add(
     file: str | None = bib_file_argument(),
     name: str = typer.Argument(..., help="Group name to add"),
     parent: str = typer.Option("", "--parent", help="Parent group name"),
@@ -238,12 +282,12 @@ def groups_add_group(
     ok = coll.add_group_node(name, parent=parent, color=color, context=GROUP_CONTEXT_CODES[context])
     if not ok:
         _emit_error(json_output, "InvalidInput", f"Group {name!r} could not be added to the tree")
-    action = "groups_add_group"
+    action = "groups_add"
     msg = f"{_verb('add', params)} group {name!r} (parent={parent!r})."
     _finish_mod(file, action, coll, params, [msg], group=name, parent=parent)
 
 
-def groups_remove_group(
+def groups_remove(
     file: str | None = bib_file_argument(),
     name: str = typer.Argument(..., help="Group name to remove"),
     backup: bool = _BACKUP_OPTION,
@@ -274,7 +318,7 @@ def groups_remove_group(
             "KeyNotFound",
             f"Group {name!r} not found in the tree",
         )
-    action = "groups_remove_group"
+    action = "groups_remove"
     msg = f"{_verb('remove', params)} group {name!r} ({count} nodes removed)."
     _finish_mod(
         file,
@@ -288,7 +332,7 @@ def groups_remove_group(
     )
 
 
-def groups_rename_group(
+def groups_rename(
     file: str | None = bib_file_argument(),
     old: str = typer.Argument(..., help="Current group name"),
     new: str = typer.Argument(..., help="New group name"),
@@ -332,7 +376,7 @@ def groups_rename_group(
     # Named, in file order, so a caller confirming the rename can say which
     # entries move with the group.
     renamed = coll.rename_group_members(old, new) if members else []
-    action = "groups_rename_group"
+    action = "groups_rename"
     moved = f" ({len(renamed)} {_entries(len(renamed))} moved with it)" if members else ""
     msg = f"{_verb('rename', params)} group {old!r} to {new!r}{moved}."
     _finish_mod(
@@ -385,7 +429,7 @@ def groups_move_group(
     _finish_mod(file, action, coll, params, [msg], group=name, parent=parent)
 
 
-def groups_update_group(
+def groups_update(
     file: str | None = bib_file_argument(),
     name: str = typer.Argument(..., help="Group name to update"),
     parent: str | None = typer.Option(
@@ -438,7 +482,7 @@ def groups_update_group(
                 "KeyNotFound",
                 f"Group {name!r} not found in the tree",
             )
-        action = "groups_update_group"
+        action = "groups_update"
         msg = f"No properties given for group {name!r}; nothing to update."
         _finish_mod(file, action, coll, params, [msg], group=name)
         return
@@ -450,13 +494,13 @@ def groups_update_group(
             "KeyNotFound",
             f"Group {name!r} not found in the tree",
         )
-    action = "groups_update_group"
+    action = "groups_update"
     changed = ", ".join(f"{k}={v!r}" for k, v in kwargs.items())
     msg = f"{_verb('update', params)} group {name!r} ({changed})."
     _finish_mod(file, action, coll, params, [msg], group=name, **kwargs)
 
 
-def groups_list_entries(
+def groups_show(
     file: str | None = bib_file_argument(),
     name: str = typer.Argument(..., help="Group name"),
     exact: bool = typer.Option(
@@ -477,7 +521,7 @@ def groups_list_entries(
         _emit_json(
             {
                 "status": "success",
-                "action": "groups_list_entries",
+                "action": "groups_show",
                 "file": file,
                 "source_sha256": _source_sha256(coll),
                 "warnings": [],
@@ -492,15 +536,31 @@ def groups_list_entries(
     typer.echo(f"{name}{desc}: {', '.join(entries) if entries else '(no entries)'}")
 
 
+#: Forms deprecated in 0.9.0 and removed in 0.10.0: (old name, callback, new
+#: form, the action the old form keeps emitting). Hidden from ``--help``.
+_DEPRECATED = (
+    ("tree", groups_tree, "groups list", "groups_tree"),
+    ("list-entries", groups_show, "groups show", "groups_list_entries"),
+    ("add-entry", groups_assign, "groups assign", "groups_add_entry"),
+    ("remove-entry", groups_unassign, "groups unassign", "groups_remove_entry"),
+    ("add-group", groups_add, "groups add", "groups_add_group"),
+    ("remove-group", groups_remove, "groups remove", "groups_remove_group"),
+    ("rename-group", groups_rename, "groups rename", "groups_rename_group"),
+    ("move-group", groups_move_group, "groups update --parent", "groups_move_group"),
+    ("update-group", groups_update, "groups update", "groups_update_group"),
+)
+
+
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
     app.command("list")(_safe(groups_list))
-    app.command("list-entries")(_safe(groups_list_entries))
-    app.command("add-entry")(_safe(groups_add_entry))
-    app.command("remove-entry")(_safe(groups_remove_entry))
-    app.command("tree")(_safe(groups_tree))
-    app.command("add-group")(_safe(groups_add_group))
-    app.command("remove-group")(_safe(groups_remove_group))
-    app.command("rename-group")(_safe(groups_rename_group))
-    app.command("move-group")(_safe(groups_move_group))
-    app.command("update-group")(_safe(groups_update_group))
+    app.command("show")(_safe(groups_show))
+    app.command("add")(_safe(groups_add))
+    app.command("remove")(_safe(groups_remove))
+    app.command("rename")(_safe(groups_rename))
+    app.command("update")(_safe(groups_update))
+    app.command("assign")(_safe(groups_assign))
+    app.command("unassign")(_safe(groups_unassign))
+    for old, fn, new, action in _DEPRECATED:
+        alias = deprecated_alias(fn, old=f"groups {old}", new=new, action=action, removal="0.10.0")
+        app.command(old, hidden=True)(_safe(alias))

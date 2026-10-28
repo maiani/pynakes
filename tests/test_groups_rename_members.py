@@ -1,6 +1,6 @@
-"""``groups rename-group --members`` carries a group's members along with its name.
+"""``groups rename --members`` carries a group's members along with its name.
 
-``groups remove-group``, which keeps memberships, is covered here too: its
+``groups remove``, which keeps memberships, is covered here too: its
 envelope names every node the removal takes.
 """
 
@@ -41,9 +41,7 @@ def _library(tmp_path: Path, *entries: str) -> Path:
 
 
 def _rename(bib: Path, *extra: str):
-    result = runner.invoke(
-        app, ["groups", "rename-group", str(bib), "Optics", "Light", *extra, "--json"]
-    )
+    result = runner.invoke(app, ["groups", "rename", str(bib), "Optics", "Light", *extra, "--json"])
     return result, json.loads(result.output)
 
 
@@ -54,7 +52,7 @@ def test_members_moves_entries_with_the_group(tmp_path: Path) -> None:
 
     assert result.exit_code == 0, result.output
     assert envelope["status"] == "success"
-    assert envelope["action"] == "groups_rename_group"
+    assert envelope["action"] == "groups_rename"
     assert envelope["members"] is True
     assert envelope["members_renamed"] == ["Newton1704", "Young1804"]
     assert envelope["modified_entries"] == 2
@@ -98,7 +96,7 @@ def test_dry_run_diff_shows_only_the_changed_lines(tmp_path: Path) -> None:
 
     result = runner.invoke(
         app,
-        ["groups", "rename-group", str(bib), "Optics", "Light", "--members", "--dry-run"],
+        ["groups", "rename", str(bib), "Optics", "Light", "--members", "--dry-run"],
         catch_exceptions=False,
     )
     assert result.exit_code == 0, result.output
@@ -167,7 +165,7 @@ def test_a_taken_name_is_a_conflict_and_writes_nothing(tmp_path: Path) -> None:
 
     for new in ("Mechanics", "Optics Lab"):
         result = runner.invoke(
-            app, ["groups", "rename-group", str(bib), "Optics", new, "--members", "--json"]
+            app, ["groups", "rename", str(bib), "Optics", new, "--members", "--json"]
         )
         assert result.exit_code == 2, result.output
         assert json.loads(result.output)["error"] == "GroupConflict"
@@ -177,7 +175,7 @@ def test_a_taken_name_is_a_conflict_and_writes_nothing(tmp_path: Path) -> None:
 def test_remove_group_still_keeps_memberships(tmp_path: Path) -> None:
     bib = _library(tmp_path)
 
-    result = runner.invoke(app, ["groups", "remove-group", str(bib), "Optics", "--json"])
+    result = runner.invoke(app, ["groups", "remove", str(bib), "Optics", "--json"])
 
     assert result.exit_code == 0, result.output
     assert NEWTON in bib.read_text()
@@ -189,9 +187,7 @@ def test_remove_group_names_the_group_and_its_descendants(tmp_path: Path) -> Non
     bib = _library(tmp_path, GALILEO)
     original = bib.read_text()
 
-    result = runner.invoke(
-        app, ["groups", "remove-group", str(bib), "Optics", "--dry-run", "--json"]
-    )
+    result = runner.invoke(app, ["groups", "remove", str(bib), "Optics", "--dry-run", "--json"])
 
     assert result.exit_code == 0, result.output
     envelope = json.loads(result.output)
@@ -203,7 +199,7 @@ def test_remove_group_names_the_group_and_its_descendants(tmp_path: Path) -> Non
 def test_remove_group_without_descendants_names_only_itself(tmp_path: Path) -> None:
     bib = _library(tmp_path, GALILEO)
 
-    result = runner.invoke(app, ["groups", "remove-group", str(bib), "Mechanics", "--json"])
+    result = runner.invoke(app, ["groups", "remove", str(bib), "Mechanics", "--json"])
 
     assert result.exit_code == 0, result.output
     envelope = json.loads(result.output)

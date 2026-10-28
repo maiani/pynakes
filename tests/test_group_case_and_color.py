@@ -39,18 +39,18 @@ def _invoke(*args: str) -> tuple[int, dict]:
 def test_case_only_rename_renames_the_node_and_its_children(tmp_path: Path) -> None:
     bib = _library(tmp_path)
 
-    code, envelope = _invoke("groups", "rename-group", str(bib), "Optics", "OPTICS")
+    code, envelope = _invoke("groups", "rename", str(bib), "Optics", "OPTICS")
 
     assert code == 0, envelope
     assert envelope["status"] == "success"
-    tree = {node["name"]: node["parent"] for node in _invoke("groups", "tree", str(bib))[1]["tree"]}
+    tree = {node["name"]: node["parent"] for node in _invoke("groups", "list", str(bib))[1]["tree"]}
     assert tree == {"Physics": "", "OPTICS": "Physics", "Lenses": "OPTICS"}
 
 
 def test_case_only_rename_with_members_moves_the_entries(tmp_path: Path) -> None:
     bib = _library(tmp_path)
 
-    code, envelope = _invoke("groups", "rename-group", str(bib), "Optics", "OPTICS", "--members")
+    code, envelope = _invoke("groups", "rename", str(bib), "Optics", "OPTICS", "--members")
 
     assert code == 0, envelope
     assert envelope["members_renamed"] == ["Newton1704"]
@@ -60,7 +60,7 @@ def test_case_only_rename_with_members_moves_the_entries(tmp_path: Path) -> None
 def test_rename_onto_another_node_differing_in_case_is_a_conflict(tmp_path: Path) -> None:
     bib = _library(tmp_path)
 
-    code, envelope = _invoke("groups", "rename-group", str(bib), "Lenses", "optics")
+    code, envelope = _invoke("groups", "rename", str(bib), "Lenses", "optics")
 
     assert code == 2
     assert envelope["status"] == "conflict"
@@ -70,7 +70,7 @@ def test_rename_onto_another_node_differing_in_case_is_a_conflict(tmp_path: Path
 def test_add_group_differing_from_a_node_only_in_case_is_a_conflict(tmp_path: Path) -> None:
     bib = _library(tmp_path)
 
-    code, envelope = _invoke("groups", "add-group", str(bib), "OPTICS")
+    code, envelope = _invoke("groups", "add", str(bib), "OPTICS")
 
     assert code == 2
     assert envelope["error"] == "GroupConflict"
@@ -100,7 +100,7 @@ def test_membership_differing_in_case_is_its_own_group(tmp_path: Path) -> None:
     bib = _library(tmp_path, NEWTON, YOUNG)
 
     _, listed = _invoke("groups", "list", str(bib))
-    _, entries = _invoke("groups", "list-entries", str(bib), "optics")
+    _, entries = _invoke("groups", "show", str(bib), "optics")
 
     assert listed["groups"]["Optics"] == ["Newton1704"]
     assert listed["groups"]["optics"] == ["Young1804"]
@@ -110,7 +110,7 @@ def test_membership_differing_in_case_is_its_own_group(tmp_path: Path) -> None:
 def test_membership_differing_in_case_can_be_removed(tmp_path: Path) -> None:
     bib = _library(tmp_path, NEWTON, YOUNG)
 
-    code, envelope = _invoke("groups", "remove-entry", str(bib), "Young1804", "optics")
+    code, envelope = _invoke("groups", "unassign", str(bib), "Young1804", "optics")
 
     assert code == 0, envelope
     assert envelope["modified_entries"] == 1
@@ -121,7 +121,7 @@ def test_list_entries_by_another_case_includes_descendants(tmp_path: Path) -> No
     lenses = "@book{Kepler1611,\n  title = {Dioptrice},\n  groups = {Lenses}\n}\n"
     bib = _library(tmp_path, NEWTON, lenses)
 
-    _, envelope = _invoke("groups", "list-entries", str(bib), "OPTICS")
+    _, envelope = _invoke("groups", "show", str(bib), "OPTICS")
 
     assert envelope["entries"] == ["Kepler1611", "Newton1704"]
 
@@ -130,7 +130,7 @@ def test_list_entries_of_a_flat_group_beside_a_tree(tmp_path: Path) -> None:
     flat = "@book{Hooke1665,\n  title = {Micrographia},\n  groups = {Microscopy}\n}\n"
     bib = _library(tmp_path, NEWTON, flat)
 
-    _, envelope = _invoke("groups", "list-entries", str(bib), "Microscopy")
+    _, envelope = _invoke("groups", "show", str(bib), "Microscopy")
 
     assert envelope["entries"] == ["Hooke1665"]
 
@@ -151,11 +151,11 @@ def test_other_colors_are_refused(color: str) -> None:
         check_group_color(color)
 
 
-@pytest.mark.parametrize("command", ["add-group", "update-group"])
+@pytest.mark.parametrize("command", ["add", "update"])
 def test_cli_refuses_an_invalid_color_without_writing(tmp_path: Path, command: str) -> None:
     bib = _library(tmp_path)
     before = bib.read_text()
-    name = "Mechanics" if command == "add-group" else "Optics"
+    name = "Mechanics" if command == "add" else "Optics"
 
     code, envelope = _invoke("groups", command, str(bib), name, "--color", "zz")
 
@@ -168,8 +168,8 @@ def test_cli_refuses_an_invalid_color_without_writing(tmp_path: Path, command: s
 def test_cli_accepts_jabref_color_spelling(tmp_path: Path) -> None:
     bib = _library(tmp_path)
 
-    code, envelope = _invoke("groups", "update-group", str(bib), "Optics", "--color", "0x8a8a8aff")
+    code, envelope = _invoke("groups", "update", str(bib), "Optics", "--color", "0x8a8a8aff")
 
     assert code == 0, envelope
-    tree = _invoke("groups", "tree", str(bib))[1]["tree"]
+    tree = _invoke("groups", "list", str(bib))[1]["tree"]
     assert next(node for node in tree if node["name"] == "Optics")["color"] == "0x8a8a8aff"

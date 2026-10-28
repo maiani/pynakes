@@ -6,6 +6,7 @@ the tool rather than guessing. Update this when commands are added or removed.
 
 import pynakes
 from pynakes import __all__ as PUBLIC_API_EXPORTS
+from pynakes._cli_deprecations import DEPRECATIONS
 from pynakes.analysis import COAUTHOR_SCHEMA
 from pynakes.analysis import SECTIONS as ANALYSIS_SECTIONS
 from pynakes.cli_errors import catalogue_description
@@ -98,32 +99,6 @@ _SEARCH_QUERY_GRAMMAR = {
     ),
 }
 
-
-# Old forms that still work, warn with {"type": "deprecated", ...}, and go away
-# in the named release. Empty once nothing is being retired.
-_DEPRECATIONS: list[dict] = [
-    *(
-        {
-            "command": f"corpus {name}",
-            "old": f"corpus {name}",
-            "new": name,
-            "removal": "0.10.0",
-            "note": "The corpus group is retired: combine and split work on plain .bib "
-            "files and batch on one, so all three are top-level commands. The old form "
-            f"keeps its corpus_{name} action until it is removed.",
-        }
-        for name in ("combine", "split", "batch")
-    ),
-    {
-        "command": "ref find",
-        "old": "--online",
-        "new": "ref find",
-        "removal": "0.10.0",
-        "note": "Commands that exist to make a network request go online by being run; "
-        "--online only lets a command with an offline mode leave it. ref find has none, "
-        "so the flag is ignored.",
-    },
-]
 
 # Which commands contact a service, and what authorizes it. Nothing else does.
 _NETWORK_ACCESS = {
@@ -439,7 +414,7 @@ def command_schemas() -> dict:
 
     Derived from the actual Typer/click application, so it can never drift from
     the real command surface. Each entry (keyed by full command path, e.g.
-    ``"groups add-entry"``) lists the command's help, positional ``arguments``,
+    ``"groups assign"``) lists the command's help, positional ``arguments``,
     and ``options`` with stable type names, flags, defaults, and choices.
     """
     import typer.main
@@ -642,10 +617,9 @@ def get_capabilities() -> dict:
             "references, and set per-entry directives "
             "(add, show, edit, directive, compare, find, import, remove)",
             "groups": "Manage entry groups and group hierarchy "
-            "(list, list-entries, add-entry, remove-entry, tree, add-group, "
-            "remove-group, rename-group, move-group, update-group)",
+            "(list, show, add, remove, rename, update, assign, unassign)",
             "keys": "Generate, rename, repair citation keys, and look up "
-            "raw-TeX-source citations of one key (usage); check is deprecated",
+            "raw-TeX-source citations of one key (usage)",
             "fields": "Bulk-edit fields across matching references "
             "(set, rename, move, append, clear, protect-title, encode)",
             "dedupe": "Detect and conservatively merge duplicate works",
@@ -726,7 +700,7 @@ def get_capabilities() -> dict:
             "default": "auto",
             "auto": "Library-wide detection; comma when no separator occurs; mixed punctuation requires an explicit choice",
         },
-        "deprecations": _DEPRECATIONS,
+        "deprecations": DEPRECATIONS,
         "saved_queries": _SAVED_QUERIES,
         "analysis": _ANALYSIS,
         "formatting": {

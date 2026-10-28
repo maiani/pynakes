@@ -472,35 +472,13 @@ Rewrite layout only; never change bibliographic values or conventions.
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
-## groups add-entry
-
-**Stability: stable**
-
-Add an entry to a group.
-
-`pynakes groups add-entry [FILE] KEY GROUP [OPTIONS]`
-
-| Parameter | Type | Required | Default | Choices | Description |
-| --- | --- | --- | --- | --- | --- |
-| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
-| `KEY` | string | yes | — | — | Citation key to add |
-| `GROUP` | string | yes | — | — | Group name |
-| `--create` | boolean | no | false | — | Create the group if the library does not have it yet |
-| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
-| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
-| `--dry-run` | boolean | no | false | — | Show changes without writing |
-| `--diff` | boolean | no | false | — | Show a unified diff |
-| `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
-| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
-
-## groups add-group
+## groups add
 
 **Stability: stable**
 
 Add a group node to the hierarchy tree.
 
-`pynakes groups add-group [FILE] NAME [OPTIONS]`
+`pynakes groups add [FILE] NAME [OPTIONS]`
 
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -517,11 +495,33 @@ Add a group node to the hierarchy tree.
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
+## groups assign
+
+**Stability: stable**
+
+Add an entry to a group.
+
+`pynakes groups assign [FILE] KEY GROUP [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `KEY` | string | yes | — | — | Citation key to add |
+| `GROUP` | string | yes | — | — | Group name |
+| `--create` | boolean | no | false | — | Create the group if the library does not have it yet |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
+| `--dry-run` | boolean | no | false | — | Show changes without writing |
+| `--diff` | boolean | no | false | — | Show a unified diff |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
 ## groups list
 
 **Stability: stable**
 
-List all groups and their members.
+List the group hierarchy with each group's direct members.
 
 `pynakes groups list [FILE] [OPTIONS]`
 
@@ -532,72 +532,13 @@ List all groups and their members.
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
-## groups list-entries
-
-**Stability: stable**
-
-List entries belonging to a group (with descendant propagation by default).
-
-`pynakes groups list-entries [FILE] NAME [OPTIONS]`
-
-| Parameter | Type | Required | Default | Choices | Description |
-| --- | --- | --- | --- | --- | --- |
-| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
-| `NAME` | string | yes | — | — | Group name |
-| `--exact` | boolean | no | false | — | Exact group match only (default: include descendants) |
-| `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
-| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
-
-## groups move-group
-
-**Stability: stable**
-
-Move a group node to a new parent (empty string for root-level).
-
-`pynakes groups move-group [FILE] NAME [OPTIONS]`
-
-| Parameter | Type | Required | Default | Choices | Description |
-| --- | --- | --- | --- | --- | --- |
-| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
-| `NAME` | string | yes | — | — | Group name to move |
-| `--parent` | string | no | "" | — | New parent group name |
-| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
-| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
-| `--dry-run` | boolean | no | false | — | Show changes without writing |
-| `--diff` | boolean | no | false | — | Show a unified diff |
-| `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
-| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
-
-## groups remove-entry
-
-**Stability: stable**
-
-Remove an entry from a group.
-
-`pynakes groups remove-entry [FILE] KEY GROUP [OPTIONS]`
-
-| Parameter | Type | Required | Default | Choices | Description |
-| --- | --- | --- | --- | --- | --- |
-| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
-| `KEY` | string | yes | — | — | Citation key to remove |
-| `GROUP` | string | yes | — | — | Group name |
-| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
-| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
-| `--dry-run` | boolean | no | false | — | Show changes without writing |
-| `--diff` | boolean | no | false | — | Show a unified diff |
-| `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
-| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
-
-## groups remove-group
+## groups remove
 
 **Stability: stable**
 
 Remove a group node and all its descendants from the hierarchy.
 
-`pynakes groups remove-group [FILE] NAME [OPTIONS]`
+`pynakes groups remove [FILE] NAME [OPTIONS]`
 
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -611,13 +552,13 @@ Remove a group node and all its descendants from the hierarchy.
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
-## groups rename-group
+## groups rename
 
 **Stability: stable**
 
 Rename a group node, updating parent references in child groups.
 
-`pynakes groups rename-group [FILE] OLD NEW [OPTIONS]`
+`pynakes groups rename [FILE] OLD NEW [OPTIONS]`
 
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -633,28 +574,51 @@ Rename a group node, updating parent references in child groups.
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
-## groups tree
+## groups show
 
 **Stability: stable**
 
-Show the group hierarchy tree.
+List entries belonging to a group (with descendant propagation by default).
 
-`pynakes groups tree [FILE] [OPTIONS]`
+`pynakes groups show [FILE] NAME [OPTIONS]`
 
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `NAME` | string | yes | — | — | Group name |
+| `--exact` | boolean | no | false | — | Exact group match only (default: include descendants) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
-## groups update-group
+## groups unassign
+
+**Stability: stable**
+
+Remove an entry from a group.
+
+`pynakes groups unassign [FILE] KEY GROUP [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `KEY` | string | yes | — | — | Citation key to remove |
+| `GROUP` | string | yes | — | — | Group name |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
+| `--dry-run` | boolean | no | false | — | Show changes without writing |
+| `--diff` | boolean | no | false | — | Show a unified diff |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## groups update
 
 **Stability: stable**
 
 Update properties of a group node in the hierarchy.
 
-`pynakes groups update-group [FILE] NAME [OPTIONS]`
+`pynakes groups update [FILE] NAME [OPTIONS]`
 
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |

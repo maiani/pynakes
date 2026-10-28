@@ -92,7 +92,6 @@ def test_insights_match_individual_reads_and_open_once(tmp_path, monkeypatch):
     runner = CliRunner()
     expected = {}
     for name, command in (
-        ("groups_tree", ["groups", "tree"]),
         ("groups_list", ["groups", "list"]),
         ("lint", ["lint"]),
         ("tex_scan", ["tex", "scan"]),
@@ -101,6 +100,14 @@ def test_insights_match_individual_reads_and_open_once(tmp_path, monkeypatch):
         result = runner.invoke(app, [*command, str(path), "--json"])
         assert result.exit_code == 0, result.output
         expected[name] = json.loads(result.output)
+    # The deprecated groups tree read stays in the insights until 0.10.0: the
+    # list's tree, under its old action.
+    listed = expected["groups_list"]
+    expected["groups_tree"] = {
+        **{key: listed[key] for key in ("status", "file", "source_sha256", "warnings")},
+        "action": "groups_tree",
+        "tree": listed["tree"],
+    }
     opened = []
     original = Bibliography.open
 

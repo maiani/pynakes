@@ -20,9 +20,9 @@ pynakes ref add refs.bib Newton1687 --type book --field author="Isaac Newton" --
 pynakes ref add refs.bib Euler1748 --type book --field author="Leonhard Euler" --field title="Introductio" --field year=1748 --field publisher="Bousquet"
 pynakes fields set refs.bib note "review" --where 'year < 1800 and type = book'
 pynakes search refs.bib "" --where 'key in [Newton1687, Euler1748]' --json
-pynakes groups add-group refs.bib Classics
-pynakes groups add-entry refs.bib Newton1687 Classics
-pynakes groups list-entries refs.bib Classics --json
+pynakes groups add refs.bib Classics
+pynakes groups assign refs.bib Newton1687 Classics
+pynakes groups show refs.bib Classics --json
 pynakes metadata set refs.bib normalize-journal-style abbreviated
 pynakes metadata remove refs.bib normalize-journal-style
 pynakes tex list refs.bib --json
@@ -57,7 +57,7 @@ Exit codes:
 
 A citation key, group name, or query that begins with `-` would be read as an
 option. Put the options first and such values after `--`, which ends the
-options: `pynakes groups add-entry refs.bib --create -- Newton1687 -draft`.
+options: `pynakes groups assign refs.bib --create -- Newton1687 -draft`.
 
 ## Selecting entries (`--where`)
 
@@ -280,8 +280,8 @@ other separator punctuation require an explicit choice.
 
 ### Flat group membership
 
-Use `groups add-entry` and `groups remove-entry` for tags on a reference.
-Create the group first with `groups add-group`, or pass `--create` when adding
+Use `groups assign` and `groups unassign` for tags on a reference.
+Create the group first with `groups add`, or pass `--create` when adding
 a member to a new group. `groups list` reports the membership.
 
 ### Group tree (hierarchical groups)
@@ -294,8 +294,10 @@ metadata.
 
 `groups list` reports every known group — the union of flat per-entry tags and
 tree nodes — so a flat-only group is never hidden by the presence of a tree, and
-a member-less tree node still appears. Each group lists its direct members only;
-it does not expand tree descendants. Use `groups list-entries` for
+a member-less tree node still appears. Its JSON carries `groups` (each group's
+direct members), `tree` (the declared hierarchy) and `undeclared` (groups only
+entries mention); the human view prints the hierarchy with each group's direct
+members. It does not expand tree descendants. Use `groups show` for
 descendant-inclusive membership, or `--exact` to restrict it to direct members.
 
 A group name that matches neither a tree node nor a flat tag is a `KeyNotFound`
@@ -303,7 +305,7 @@ error rather than an empty result, so a typo is distinguishable from a group
 that genuinely has no members.
 
 The tree and per-entry membership are separate records, and the tree commands
-edit only the first unless asked. `groups rename-group OLD NEW` renames the node
+edit only the first unless asked. `groups rename OLD NEW` renames the node
 (and the parent reference of each child); entries filed under `OLD` keep that
 membership, which then shows up as a group the tree does not declare. Pass
 `--members` to carry the members along: every entry whose `groups` field names
@@ -311,13 +313,13 @@ exactly `OLD` is rewritten to `NEW` (`Optics Lab` is not a member of `Optics`),
 an entry never ends up naming `NEW` twice, and only those `groups` lines change.
 The JSON envelope lists the moved entries' keys as `members_renamed` (empty
 without `--members`), so a preview can name them before the write.
-`groups remove-group` never edits entries: a removed group's members keep it.
+`groups remove` never edits entries: a removed group's members keep it.
 
 ```bash
-pynakes groups rename-group refs.bib Classics "Natural Philosophy" --members --dry-run --diff
+pynakes groups rename refs.bib Classics "Natural Philosophy" --members --dry-run --diff
 ```
 
-`groups update-group` distinguishes an omitted option from an explicit empty
+`groups update` distinguishes an omitted option from an explicit empty
 one: passing `--parent ""`, `--color ""`, or `--description ""` clears that
 property, and `--expanded`/`--collapsed` both take effect. Invoked with no
 options it reports no modification instead of claiming an update.

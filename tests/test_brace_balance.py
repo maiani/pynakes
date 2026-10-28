@@ -86,19 +86,19 @@ COMMANDS = {
         "--ops",
         json.dumps([{"op": "metadata.set", "key": "tex-sources", "value": "{paper.tex"}]),
     ],
-    "groups add-entry": [
+    "groups assign": [
         "groups",
-        "add-entry",
+        "assign",
         "{bib}",
         "Newton1687",
         "{Mechanics",
         "--create",
     ],
-    "groups add-group": ["groups", "add-group", "{bib}", "Mechanics}"],
-    "groups rename-group": ["groups", "rename-group", "{bib}", "Physics", "{Physics"],
-    "groups update-group": [
+    "groups add": ["groups", "add", "{bib}", "Mechanics}"],
+    "groups rename": ["groups", "rename", "{bib}", "Physics", "{Physics"],
+    "groups update": [
         "groups",
-        "update-group",
+        "update",
         "{bib}",
         "Physics",
         "--description",

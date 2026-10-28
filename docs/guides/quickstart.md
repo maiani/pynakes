@@ -18,9 +18,9 @@ pynakes lint refs.bib --json
 pynakes normalize refs.bib --dry-run --diff
 pynakes normalize refs.bib
 pynakes normalize refs.bib --author-style conservative
-pynakes groups add-group refs.bib Classics
-pynakes groups add-entry refs.bib Newton1687 Classics --dry-run --diff
-pynakes groups add-entry refs.bib Newton1687 Classics
+pynakes groups add refs.bib Classics
+pynakes groups assign refs.bib Newton1687 Classics --dry-run --diff
+pynakes groups assign refs.bib Newton1687 Classics
 pynakes groups list refs.bib --json
 pynakes fields append refs.bib keywords history --key Newton1687 --dry-run --diff
 pynakes fields protect-title refs.bib --dry-run --diff

@@ -366,9 +366,9 @@ imported entry, the calling agent should:
 
 1. Import the reference and retain its returned key.
 2. Read it with `ref show <key> --json`.
-3. Read candidate groups with `groups tree --json`; descriptions provide the
+3. Read candidate groups with `groups list --json` (its `tree`); descriptions provide the
    semantic context.
-4. Choose a group, preview `groups add-entry` with `--dry-run --diff --json`,
+4. Choose a group, preview `groups assign` with `--dry-run --diff --json`,
    and then apply it.
 
 This choice belongs to the caller rather than to a pynakes operation.
@@ -413,7 +413,7 @@ Shared rules:
 
 - `status` is `success`, `error`, or `conflict`.
 - `action` is the command path with spaces and hyphens as underscores:
-  `ref show` reports `ref_show`, `groups add-entry` reports `groups_add_entry`.
+  `ref show` reports `ref_show`, `groups assign` reports `groups_assign`.
 - `warnings` is always an array of objects, each with at least `type` and
   `message`. Branch on `type`.
 - `source_sha256` is the sha256 of the library as this invocation read it —

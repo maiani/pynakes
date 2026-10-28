@@ -226,8 +226,8 @@ _CITEKEY_ARGS: dict[tuple[str, ...], str] = {
     ("asset", "fetch"): "target",
     ("keys", "rename"): "old",
     ("keys", "usage"): "key",
-    ("groups", "add-entry"): "key",
-    ("groups", "remove-entry"): "key",
+    ("groups", "assign"): "key",
+    ("groups", "unassign"): "key",
 }
 
 _METADATA_KEY_ARGS: dict[tuple[str, ...], str] = {

@@ -98,7 +98,7 @@ def test_short_file_flag_names_the_library_on_ref_add(bib: Path) -> None:
         ["keys", "usage", "Smith2020", "--path", "paper.tex"],
         ["asset", "fetch", "{bib}", "--preprint"],
         ["asset", "check", "{bib}", "--fix"],
-        ["groups", "add-group", "{bib}", "Optics", "--context", "1"],
+        ["groups", "add", "{bib}", "Optics", "--context", "1"],
         ["lint", "{bib}", "--category", "layout"],
     ],
 )
@@ -142,16 +142,14 @@ def _envelope(args: list[str]) -> dict:
 
 
 def test_double_dash_passes_a_dash_led_group_name(bib: Path) -> None:
-    added = _envelope(["groups", "add-group", str(bib), "--json", "--", "-x"])
+    added = _envelope(["groups", "add", str(bib), "--json", "--", "-x"])
     assert added["status"] == "success", added
     assert added["group"] == "-x"
 
-    filed = _envelope(["groups", "add-entry", str(bib), "--json", "--", "Smith2020", "-x"])
+    filed = _envelope(["groups", "assign", str(bib), "--json", "--", "Smith2020", "-x"])
     assert filed["status"] == "success", filed
 
-    renamed = _envelope(
-        ["groups", "rename-group", str(bib), "--members", "--json", "--", "-x", "-y"]
-    )
+    renamed = _envelope(["groups", "rename", str(bib), "--members", "--json", "--", "-x", "-y"])
     assert renamed["status"] == "success", renamed
     assert renamed["members_renamed"] == ["Smith2020"]
 
@@ -172,7 +170,7 @@ def test_double_dash_passes_a_dash_led_citation_key(bib: Path) -> None:
 def test_double_dash_with_an_autodetected_library(bib: Path, monkeypatch) -> None:
     monkeypatch.chdir(bib.parent)
 
-    added = _envelope(["groups", "add-group", "--json", "--", "-x"])
+    added = _envelope(["groups", "add", "--json", "--", "-x"])
 
     assert added["status"] == "success", added
     assert added["file"] == "refs.bib"

@@ -104,7 +104,7 @@ class TestCommandSchemas:
 
     def test_subcommands_are_expanded(self) -> None:
         schemas = get_capabilities()["command_schemas"]
-        assert "groups add-entry" in schemas
+        assert "groups assign" in schemas
         assert "keys rename" in schemas
         assert "metadata set" in schemas
         assert "journals" not in get_capabilities()["commands"]

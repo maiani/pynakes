@@ -107,10 +107,10 @@ OPERATION_SPECS: dict[str, OperationSpec] = {
     "fields.protect_title": OperationSpec(
         (), ("field", "where", "terms"), "Brace-protect title case"
     ),
-    "groups.add_entry": OperationSpec(
+    "groups.assign": OperationSpec(
         ("key", "group"), ("create",), "Add an entry to a group (create: make a new group)"
     ),
-    "groups.remove_entry": OperationSpec(("key", "group"), (), "Remove an entry from a group"),
+    "groups.unassign": OperationSpec(("key", "group"), (), "Remove an entry from a group"),
     "keys.generate": OperationSpec((), (), "Regenerate every citation key"),
     "keys.repair": OperationSpec((), (), "Make duplicate citation keys unique"),
     "keys.rename": OperationSpec(("old", "new"), (), "Rename one citation key in the .bib"),
@@ -149,6 +149,27 @@ OPERATION_SPECS: dict[str, OperationSpec] = {
         (), ("keys",), "Merge duplicate clusters, or only those containing the given keys"
     ),
 }
+
+
+#: Operation names deprecated in 0.9.0, still accepted until their removal
+#: release, mapped to the operation that replaced them.
+DEPRECATED_OPERATIONS: dict[str, str] = {
+    "groups.add_entry": "groups.assign",
+    "groups.remove_entry": "groups.unassign",
+}
+_DEPRECATED_OPERATIONS_REMOVAL = "0.10.0"
+
+
+def _deprecated_operation_warning(old: str, new: str) -> dict:
+    removal = _DEPRECATED_OPERATIONS_REMOVAL
+    return {
+        "type": "deprecated",
+        "old": old,
+        "new": new,
+        "removal": removal,
+        "message": f"batch operation {old} is deprecated and will be removed in {removal}; "
+        f"use {new}",
+    }
 
 
 def _validate(spec: OperationSpec, params: dict, index: int, op: str) -> None:
@@ -216,12 +237,12 @@ def _apply_one(coll: Bibliography, op: str, params: dict) -> dict:
         if selected and not any(field in entry.fields for entry in selected):
             result["warnings"] = [f"No matching entries had field {field!r}"]
         return result
-    if op == "groups.add_entry":
+    if op == "groups.assign":
         _existing_key(coll, params["key"])
         if not params.get("create"):
             _existing_group(coll, params["group"])
         return {"changed": coll.add_to_group(params["key"], params["group"])}
-    if op == "groups.remove_entry":
+    if op == "groups.unassign":
         _existing_key(coll, params["key"])
         _existing_group(coll, params["group"])
         return {"changed": coll.remove_from_group(params["key"], params["group"])}
@@ -294,22 +315,32 @@ def apply_operations(coll: Bibliography, operations: list[dict]) -> list[dict]:
         if not isinstance(raw, dict) or "op" not in raw:
             raise BatchError(index, "?", "each operation needs an 'op' field")
         op = raw["op"]
-        spec = OPERATION_SPECS.get(op)
+        name = DEPRECATED_OPERATIONS.get(op, op)
+        spec = OPERATION_SPECS.get(name)
         if spec is None:
             raise BatchError(index, op, "unknown operation")
         params = {k: v for k, v in raw.items() if k != "op"}
         _validate(spec, params, index, op)
         try:
-            result = _apply_one(coll, op, params)
+            result = _apply_one(coll, name, params)
         except _Refused as exc:
             raise BatchError(index, op, str(exc), code=exc.code) from exc
+        if name != op:
+            result["warnings"] = [
+                *result.get("warnings", []),
+                _deprecated_operation_warning(op, name),
+            ]
         results.append({"op": op, "result": result})
     return results
 
 
 def operation_catalog() -> dict:
-    """Describe the supported batch operations (for ``capabilities``)."""
-    return {
+    """Describe the supported batch operations (for ``capabilities``).
+
+    A deprecated name is listed with ``deprecated`` naming its replacement and
+    removal release, and the same parameters.
+    """
+    catalog: dict[str, dict] = {
         name: {
             "required": list(spec.required),
             "optional": list(spec.optional),
@@ -317,3 +348,9 @@ def operation_catalog() -> dict:
         }
         for name, spec in OPERATION_SPECS.items()
     }
+    for old, new in DEPRECATED_OPERATIONS.items():
+        catalog[old] = {
+            **catalog[new],
+            "deprecated": {"new": new, "removal": _DEPRECATED_OPERATIONS_REMOVAL},
+        }
+    return catalog

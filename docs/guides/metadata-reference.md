@@ -144,7 +144,7 @@ equivalent). A pynakes-native library needs none of them.
 | `keypattern_<entrytype>` | `key-pattern-<entrytype>` | Per-entry-type key generation and `lint` conformance; overrides the default |
 | `databaseType` | `dialect` | engine, `lint`, importer |
 | `saveOrderConfig` | `sort-order` (only its `specified` form) | `normalize` |
-| `grouping` / `groupsTree` / `groups:N ...` (flat) | `group-tree` | `groups tree`/`add-group`/etc — see [Grouping](#grouping) |
+| `grouping` / `groupsTree` / `groups:N ...` (flat) | `group-tree` | `groups list`/`add`/etc — see [Grouping](#grouping) |
 | `saveActions` | *(no native equivalent)* | `normalize` author, DOI, and field-formatter defaults |
 
 ### JabRef-only keys (category, no native equivalent)
@@ -235,8 +235,8 @@ backslash-escaped (`\\`, `\|`, `\;`).
 `library_group_tree()` reads, in order: the native `group-tree` key; then
 JabRef's modern `grouping` block (or the legacy `groupsTree` spelling); then
 JabRef's flat `groups:N name:context;` comments (one per group, depth encoded
-as `N`). Editing the tree through any `pynakes groups` tree command (`tree`,
-`add-group`, `remove-group`, `rename-group`, `move-group`, `update-group`)
+as `N`). Editing the tree through any `pynakes groups` tree command (`add`,
+`remove`, `rename`, `update`)
 always writes the canonical native `group-tree` key; on a JabRef-tracked file
 it additionally projects the tree into `grouping` (plus a `groupsVersion`
 marker) so JabRef keeps reading the same hierarchy. All four JabRef group
@@ -251,12 +251,12 @@ dynamic membership is still something only JabRef computes when it opens the
 file; pynakes commands report it as having no explicit members until JabRef
 (or a future pynakes feature) evaluates the expression.
 
-`groups add-entry`/`remove-entry` maintain flat per-entry membership, but they
+`groups assign`/`unassign` maintain flat per-entry membership, but they
 are not fully independent of the tree: when a tree already exists, adding an
 entry to a group that has no node registers one, so the tree stays a complete
 index of the groups in use. `groups list` reads both views and reports their
 union. The tree commands leave entries alone, with one opt-in exception:
-`groups rename-group --members` also renames the membership in every entry
+`groups rename --members` also renames the membership in every entry
 filed under the old name. See the [Usage guide](usage.md#groups) for the full CLI surface,
 including the CRUD commands available on the tree.
 

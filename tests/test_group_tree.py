@@ -908,7 +908,7 @@ def test_list_entries_in_group_tree_explicit_inline() -> None:
 
 
 # ---------------------------------------------------------------------------
-# CLI: groups list-entries
+# CLI: groups show
 # ---------------------------------------------------------------------------
 
 
@@ -923,11 +923,11 @@ def test_groups_list_entries_cli_includes_descendants(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text(text)
 
-    result = CliRunner().invoke(app, ["groups", "list-entries", str(bib), "CS", "--json"])
+    result = CliRunner().invoke(app, ["groups", "show", str(bib), "CS", "--json"])
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
-    assert data["action"] == "groups_list_entries"
+    assert data["action"] == "groups_show"
     assert data["group"] == "CS"
     assert data["exact"] is False
     # Descendant propagation: PaperA (in child ML) and PaperB (in CS itself).
@@ -946,9 +946,7 @@ def test_groups_list_entries_cli_exact_omits_descendants(tmp_path: Path) -> None
     bib = tmp_path / "refs.bib"
     bib.write_text(text)
 
-    result = CliRunner().invoke(
-        app, ["groups", "list-entries", str(bib), "CS", "--exact", "--json"]
-    )
+    result = CliRunner().invoke(app, ["groups", "show", str(bib), "CS", "--exact", "--json"])
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -964,20 +962,20 @@ def test_groups_list_entries_cli_exact_omits_descendants(tmp_path: Path) -> None
 
 
 def test_groups_add_group_cli_persists_on_fresh_library(tmp_path: Path) -> None:
-    # Regression: `groups add-group` on a library with no group-tree reported
+    # Regression: `groups add` on a library with no group-tree reported
     # success while writing nothing — the commit gate saw modified=False because
     # the metadata-only change was never staged for the surgical renderer.
     bib = tmp_path / "refs.bib"
     bib.write_text("@article{Bardeen1948,\n  title = {The Transistor}\n}\n")
 
-    r1 = CliRunner().invoke(app, ["groups", "add-group", str(bib), "Devices", "--json"])
+    r1 = CliRunner().invoke(app, ["groups", "add", str(bib), "Devices", "--json"])
     assert r1.exit_code == 0, r1.output
     assert json.loads(r1.output)["modified"] is True
     assert "group-tree" in bib.read_text()
 
     # A second node bootstraps a real hierarchy through the CLI alone.
     r2 = CliRunner().invoke(
-        app, ["groups", "add-group", str(bib), "Transistors", "--parent", "Devices", "--json"]
+        app, ["groups", "add", str(bib), "Transistors", "--parent", "Devices", "--json"]
     )
     assert r2.exit_code == 0, r2.output
 
@@ -995,7 +993,7 @@ def test_groups_remove_group_cli_persists(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text(write_bib(lib))
 
-    result = CliRunner().invoke(app, ["groups", "remove-group", str(bib), "Drop", "--json"])
+    result = CliRunner().invoke(app, ["groups", "remove", str(bib), "Drop", "--json"])
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["modified"] is True
@@ -1010,35 +1008,35 @@ def test_groups_cli_human_views_and_tree_lifecycle(tmp_path: Path) -> None:
     bib.write_text("@article{Noether1918,\n  title = {Invariant Variational Problems}\n}\n")
     runner = CliRunner()
 
-    empty = runner.invoke(app, ["groups", "tree", str(bib)])
+    empty = runner.invoke(app, ["groups", "list", str(bib)])
     assert empty.exit_code == 0, empty.output
-    assert "no group tree defined" in empty.output
+    assert "no groups found" in empty.output
 
     add_root = runner.invoke(
         app,
-        ["groups", "add-group", str(bib), "Physics", "--color", "8a8a8aff"],
+        ["groups", "add", str(bib), "Physics", "--color", "8a8a8aff"],
     )
     assert add_root.exit_code == 0, add_root.output
     add_child = runner.invoke(
         app,
-        ["groups", "add-group", str(bib), "Symmetry", "--parent", "Physics"],
+        ["groups", "add", str(bib), "Symmetry", "--parent", "Physics"],
     )
     assert add_child.exit_code == 0, add_child.output
 
-    shown = runner.invoke(app, ["groups", "tree", str(bib)])
+    shown = runner.invoke(app, ["groups", "list", str(bib)])
     assert shown.exit_code == 0, shown.output
     assert "+ Physics [8a8a8aff]" in shown.output
     assert "  + Symmetry" in shown.output
 
     listed = runner.invoke(app, ["groups", "list", str(bib)])
     assert listed.exit_code == 0, listed.output
-    assert "Physics (0)" in listed.output
+    assert "Physics [8a8a8aff] (0)" in listed.output
 
     updated = runner.invoke(
         app,
         [
             "groups",
-            "update-group",
+            "update",
             str(bib),
             "Symmetry",
             "--description",
@@ -1051,22 +1049,22 @@ def test_groups_cli_human_views_and_tree_lifecycle(tmp_path: Path) -> None:
         ],
     )
     assert updated.exit_code == 0, updated.output
-    renamed = runner.invoke(app, ["groups", "rename-group", str(bib), "Symmetry", "Field Theory"])
+    renamed = runner.invoke(app, ["groups", "rename", str(bib), "Symmetry", "Field Theory"])
     assert renamed.exit_code == 0, renamed.output
-    moved = runner.invoke(app, ["groups", "move-group", str(bib), "Field Theory", "--parent", ""])
+    moved = runner.invoke(app, ["groups", "update", str(bib), "Field Theory", "--parent", ""])
     assert moved.exit_code == 0, moved.output
 
-    add_entry = runner.invoke(app, ["groups", "add-entry", str(bib), "Noether1918", "Field Theory"])
+    add_entry = runner.invoke(app, ["groups", "assign", str(bib), "Noether1918", "Field Theory"])
     assert add_entry.exit_code == 0, add_entry.output
-    entries = runner.invoke(app, ["groups", "list-entries", str(bib), "Field Theory"])
+    entries = runner.invoke(app, ["groups", "show", str(bib), "Field Theory"])
     assert entries.exit_code == 0, entries.output
     assert "Noether1918" in entries.output
     remove_entry = runner.invoke(
-        app, ["groups", "remove-entry", str(bib), "Noether1918", "Field Theory"]
+        app, ["groups", "unassign", str(bib), "Noether1918", "Field Theory"]
     )
     assert remove_entry.exit_code == 0, remove_entry.output
 
-    removed = runner.invoke(app, ["groups", "remove-group", str(bib), "Field Theory"])
+    removed = runner.invoke(app, ["groups", "remove", str(bib), "Field Theory"])
     assert removed.exit_code == 0, removed.output
 
 
@@ -1077,20 +1075,20 @@ def test_groups_cli_structured_errors(tmp_path: Path) -> None:
 
     # A missing group is KeyNotFound everywhere; an existing one is a conflict.
     for args, error, exit_code in (
-        (["add-entry", str(bib), "Missing", "Physics"], "KeyNotFound", 1),
-        (["add-entry", str(bib), "Noether1918", "Physics"], "KeyNotFound", 1),
-        (["add-group", str(bib), "Physics"], None, 0),
-        (["add-group", str(bib), "Physics"], "GroupConflict", 2),
-        (["add-group", str(bib), "Waves", "--parent", "Missing"], "KeyNotFound", 1),
-        (["remove-entry", str(bib), "Noether1918", "Missing"], "KeyNotFound", 1),
-        (["remove-group", str(bib), "Missing"], "KeyNotFound", 1),
-        (["rename-group", str(bib), "Missing", "Other"], "KeyNotFound", 1),
-        (["add-group", str(bib), "Optics"], None, 0),
-        (["rename-group", str(bib), "Optics", "Physics"], "GroupConflict", 2),
-        (["move-group", str(bib), "Missing"], "KeyNotFound", 1),
-        (["move-group", str(bib), "Optics", "--parent", "Missing"], "KeyNotFound", 1),
-        (["update-group", str(bib), "Missing"], "KeyNotFound", 1),
-        (["update-group", str(bib), "Optics", "--parent", "Missing"], "KeyNotFound", 1),
+        (["assign", str(bib), "Missing", "Physics"], "KeyNotFound", 1),
+        (["assign", str(bib), "Noether1918", "Physics"], "KeyNotFound", 1),
+        (["add", str(bib), "Physics"], None, 0),
+        (["add", str(bib), "Physics"], "GroupConflict", 2),
+        (["add", str(bib), "Waves", "--parent", "Missing"], "KeyNotFound", 1),
+        (["unassign", str(bib), "Noether1918", "Missing"], "KeyNotFound", 1),
+        (["remove", str(bib), "Missing"], "KeyNotFound", 1),
+        (["rename", str(bib), "Missing", "Other"], "KeyNotFound", 1),
+        (["add", str(bib), "Optics"], None, 0),
+        (["rename", str(bib), "Optics", "Physics"], "GroupConflict", 2),
+        (["update", str(bib), "Missing"], "KeyNotFound", 1),
+        (["update", str(bib), "Optics", "--parent", "Missing"], "KeyNotFound", 1),
+        (["update", str(bib), "Missing"], "KeyNotFound", 1),
+        (["update", str(bib), "Optics", "--parent", "Missing"], "KeyNotFound", 1),
     ):
         result = runner.invoke(app, ["groups", *args, "--json"])
         assert result.exit_code == exit_code, (args, result.output)
@@ -1103,7 +1101,7 @@ def test_add_entry_create_makes_a_new_group(tmp_path: Path) -> None:
     bib.write_text("@article{Noether1918,\n  title = {Invariant Variational Problems}\n}\n")
 
     result = CliRunner().invoke(
-        app, ["groups", "add-entry", str(bib), "Noether1918", "Physics", "--create", "--json"]
+        app, ["groups", "assign", str(bib), "Noether1918", "Physics", "--create", "--json"]
     )
 
     assert result.exit_code == 0, result.output
@@ -1111,7 +1109,7 @@ def test_add_entry_create_makes_a_new_group(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Regression: `groups add-entry` keeps the group-tree in sync
+# Regression: `groups assign` keeps the group-tree in sync
 # ---------------------------------------------------------------------------
 
 
@@ -1128,7 +1126,7 @@ def test_add_entry_registers_group_in_existing_tree(tmp_path: Path) -> None:
 
     result = CliRunner().invoke(
         app,
-        ["groups", "add-entry", str(bib), "Shockley1949", "Semiconductors", "--create", "--json"],
+        ["groups", "assign", str(bib), "Shockley1949", "Semiconductors", "--create", "--json"],
     )
 
     assert result.exit_code == 0, result.output
@@ -1140,13 +1138,13 @@ def test_add_entry_registers_group_in_existing_tree(tmp_path: Path) -> None:
 
 
 def test_add_entry_on_treeless_library_creates_no_tree(tmp_path: Path) -> None:
-    # A flat, tree-less library keeps entry-field-only groups: add-entry must not
+    # A flat, tree-less library keeps entry-field-only groups: assign must not
     # synthesize a group-tree behind the user's back (`groups list` still shows it).
     bib = tmp_path / "refs.bib"
     bib.write_text("@article{Bardeen1948,\n  title = {Transistor}\n}\n")
 
     result = CliRunner().invoke(
-        app, ["groups", "add-entry", str(bib), "Bardeen1948", "Devices", "--create", "--json"]
+        app, ["groups", "assign", str(bib), "Bardeen1948", "Devices", "--create", "--json"]
     )
 
     assert result.exit_code == 0, result.output
@@ -1237,7 +1235,7 @@ def test_groups_list_cli_flat_and_tree_union(tmp_path: Path) -> None:
     runner = CliRunner()
 
     add_entry = runner.invoke(
-        app, ["groups", "add-entry", str(bib), "Euclid300BCE", "FlatGroup", "--create", "--json"]
+        app, ["groups", "assign", str(bib), "Euclid300BCE", "FlatGroup", "--create", "--json"]
     )
     assert add_entry.exit_code == 0, add_entry.output
 
@@ -1246,7 +1244,7 @@ def test_groups_list_cli_flat_and_tree_union(tmp_path: Path) -> None:
     before_data = json.loads(before.output)
     assert before_data["groups"] == {"FlatGroup": ["Euclid300BCE"]}
 
-    add_group = runner.invoke(app, ["groups", "add-group", str(bib), "TreeGroup", "--json"])
+    add_group = runner.invoke(app, ["groups", "add", str(bib), "TreeGroup", "--json"])
     assert add_group.exit_code == 0, add_group.output
 
     after = runner.invoke(app, ["groups", "list", str(bib), "--json"])
@@ -1259,7 +1257,7 @@ def test_groups_list_cli_flat_and_tree_union(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Fix 2: `update-group --expanded` can re-expand a collapsed node
+# Fix 2: `update --expanded` can re-expand a collapsed node
 # ---------------------------------------------------------------------------
 
 
@@ -1268,29 +1266,29 @@ def test_groups_update_group_cli_collapse_then_expand_roundtrip(tmp_path: Path) 
     bib.write_text("@article{Euclid300BCE,\n  title = {On the Ratios of Straight Lines}\n}\n")
     runner = CliRunner()
 
-    assert runner.invoke(app, ["groups", "add-group", str(bib), "Geometry"]).exit_code == 0
+    assert runner.invoke(app, ["groups", "add", str(bib), "Geometry"]).exit_code == 0
 
     collapsed = runner.invoke(
-        app, ["groups", "update-group", str(bib), "Geometry", "--collapsed", "--json"]
+        app, ["groups", "update", str(bib), "Geometry", "--collapsed", "--json"]
     )
     assert collapsed.exit_code == 0, collapsed.output
     tree_after_collapse = json.loads(
-        runner.invoke(app, ["groups", "tree", str(bib), "--json"]).output
+        runner.invoke(app, ["groups", "list", str(bib), "--json"]).output
     )["tree"]
     assert tree_after_collapse[0]["expanded"] is False
 
     expanded = runner.invoke(
-        app, ["groups", "update-group", str(bib), "Geometry", "--expanded", "--json"]
+        app, ["groups", "update", str(bib), "Geometry", "--expanded", "--json"]
     )
     assert expanded.exit_code == 0, expanded.output
     tree_after_expand = json.loads(
-        runner.invoke(app, ["groups", "tree", str(bib), "--json"]).output
+        runner.invoke(app, ["groups", "list", str(bib), "--json"]).output
     )["tree"]
     assert tree_after_expand[0]["expanded"] is True
 
 
 # ---------------------------------------------------------------------------
-# Fix 3: `update-group` empty-string clearing, and zero-flag no-op
+# Fix 3: `update` empty-string clearing, and zero-flag no-op
 # ---------------------------------------------------------------------------
 
 
@@ -1299,13 +1297,13 @@ def test_groups_update_group_cli_clears_parent_color_description(tmp_path: Path)
     bib.write_text("@article{Euclid300BCE,\n  title = {On the Ratios of Straight Lines}\n}\n")
     runner = CliRunner()
 
-    assert runner.invoke(app, ["groups", "add-group", str(bib), "Geometry"]).exit_code == 0
+    assert runner.invoke(app, ["groups", "add", str(bib), "Geometry"]).exit_code == 0
     assert (
         runner.invoke(
             app,
             [
                 "groups",
-                "add-group",
+                "add",
                 str(bib),
                 "Postulates",
                 "--parent",
@@ -1318,7 +1316,7 @@ def test_groups_update_group_cli_clears_parent_color_description(tmp_path: Path)
         app,
         [
             "groups",
-            "update-group",
+            "update",
             str(bib),
             "Postulates",
             "--color",
@@ -1334,7 +1332,7 @@ def test_groups_update_group_cli_clears_parent_color_description(tmp_path: Path)
         app,
         [
             "groups",
-            "update-group",
+            "update",
             str(bib),
             "Postulates",
             "--parent",
@@ -1348,7 +1346,7 @@ def test_groups_update_group_cli_clears_parent_color_description(tmp_path: Path)
     )
     assert cleared.exit_code == 0, cleared.output
 
-    tree = json.loads(runner.invoke(app, ["groups", "tree", str(bib), "--json"]).output)["tree"]
+    tree = json.loads(runner.invoke(app, ["groups", "list", str(bib), "--json"]).output)["tree"]
     node = next(n for n in tree if n["name"] == "Postulates")
     assert node["parent"] == ""
     assert node["color"] == ""
@@ -1359,10 +1357,10 @@ def test_groups_update_group_cli_zero_flags_reports_no_change(tmp_path: Path) ->
     bib = tmp_path / "refs.bib"
     bib.write_text("@article{Euclid300BCE,\n  title = {On the Ratios of Straight Lines}\n}\n")
     runner = CliRunner()
-    assert runner.invoke(app, ["groups", "add-group", str(bib), "Geometry"]).exit_code == 0
+    assert runner.invoke(app, ["groups", "add", str(bib), "Geometry"]).exit_code == 0
 
     before_text = bib.read_text()
-    result = runner.invoke(app, ["groups", "update-group", str(bib), "Geometry", "--json"])
+    result = runner.invoke(app, ["groups", "update", str(bib), "Geometry", "--json"])
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -1375,13 +1373,13 @@ def test_groups_update_group_cli_zero_flags_reports_no_change(tmp_path: Path) ->
 def test_groups_update_group_cli_zero_flags_missing_group_still_errors(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text("@article{Euclid300BCE,\n  title = {On the Ratios of Straight Lines}\n}\n")
-    result = CliRunner().invoke(app, ["groups", "update-group", str(bib), "Missing", "--json"])
+    result = CliRunner().invoke(app, ["groups", "update", str(bib), "Missing", "--json"])
     assert result.exit_code == 1, result.output
     assert json.loads(result.output)["error"] == "KeyNotFound"
 
 
 # ---------------------------------------------------------------------------
-# Fix 4: unknown group name errors on `list-entries`; a real-but-empty group
+# Fix 4: unknown group name errors on `show`; a real-but-empty group
 # still succeeds
 # ---------------------------------------------------------------------------
 
@@ -1392,12 +1390,12 @@ def test_groups_list_entries_cli_unknown_name_errors(tmp_path: Path) -> None:
     runner = CliRunner()
     assert (
         runner.invoke(
-            app, ["groups", "add-entry", str(bib), "Euclid300BCE", "FlatGroup", "--create"]
+            app, ["groups", "assign", str(bib), "Euclid300BCE", "FlatGroup", "--create"]
         ).exit_code
         == 0
     )
 
-    result = runner.invoke(app, ["groups", "list-entries", str(bib), "TypoedName", "--json"])
+    result = runner.invoke(app, ["groups", "show", str(bib), "TypoedName", "--json"])
 
     assert result.exit_code == 1, result.output
     assert json.loads(result.output)["error"] == "KeyNotFound"
@@ -1407,9 +1405,9 @@ def test_groups_list_entries_cli_known_empty_group_succeeds(tmp_path: Path) -> N
     bib = tmp_path / "refs.bib"
     bib.write_text("@article{Euclid300BCE,\n  title = {On the Ratios of Straight Lines}\n}\n")
     runner = CliRunner()
-    assert runner.invoke(app, ["groups", "add-group", str(bib), "Geometry"]).exit_code == 0
+    assert runner.invoke(app, ["groups", "add", str(bib), "Geometry"]).exit_code == 0
 
-    result = runner.invoke(app, ["groups", "list-entries", str(bib), "Geometry", "--json"])
+    result = runner.invoke(app, ["groups", "show", str(bib), "Geometry", "--json"])
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -1447,13 +1445,13 @@ def test_groups_tree_cli_json_keys_unchanged(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text("@article{Euclid300BCE,\n  title = {On the Ratios of Straight Lines}\n}\n")
     runner = CliRunner()
-    assert runner.invoke(app, ["groups", "add-group", str(bib), "Geometry"]).exit_code == 0
+    assert runner.invoke(app, ["groups", "add", str(bib), "Geometry"]).exit_code == 0
     assert (
         runner.invoke(
             app,
             [
                 "groups",
-                "update-group",
+                "update",
                 str(bib),
                 "Geometry",
                 "--color",
@@ -1465,7 +1463,7 @@ def test_groups_tree_cli_json_keys_unchanged(tmp_path: Path) -> None:
         == 0
     )
 
-    result = runner.invoke(app, ["groups", "tree", str(bib), "--json"])
+    result = runner.invoke(app, ["groups", "list", str(bib), "--json"])
     assert result.exit_code == 0, result.output
     tree = json.loads(result.output)["tree"]
     assert len(tree) == 1
@@ -1489,16 +1487,14 @@ def test_groups_tree_cli_json_keys_unchanged(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Fix 6: `groups list-entries --exact` renames `--strict` (breaking change)
+# Fix 6: `groups show --exact` renames `--strict` (breaking change)
 # ---------------------------------------------------------------------------
 
 
 def test_groups_list_entries_cli_strict_flag_no_longer_exists(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text("@article{Euclid300BCE,\n  title = {On the Ratios of Straight Lines}\n}\n")
-    result = CliRunner().invoke(
-        app, ["groups", "list-entries", str(bib), "Anything", "--strict", "--json"]
-    )
+    result = CliRunner().invoke(app, ["groups", "show", str(bib), "Anything", "--strict", "--json"])
     assert result.exit_code != 0
     assert "--strict" in result.output or "No such option" in result.output
 
@@ -1512,10 +1508,8 @@ def test_groups_list_entries_cli_exact_matches_old_strict_semantics(tmp_path: Pa
     bib = tmp_path / "refs.bib"
     bib.write_text(write_bib(lib))
 
-    default = CliRunner().invoke(app, ["groups", "list-entries", str(bib), "Geometry", "--json"])
-    exact = CliRunner().invoke(
-        app, ["groups", "list-entries", str(bib), "Geometry", "--exact", "--json"]
-    )
+    default = CliRunner().invoke(app, ["groups", "show", str(bib), "Geometry", "--json"])
+    exact = CliRunner().invoke(app, ["groups", "show", str(bib), "Geometry", "--exact", "--json"])
 
     assert default.exit_code == 0 and exact.exit_code == 0
     default_data = json.loads(default.output)

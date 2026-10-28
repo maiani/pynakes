@@ -50,6 +50,21 @@ The forms deprecated in 0.8 are removed:
   run until 0.10.0, hidden from `--help`; each reports a `deprecated` warning
   and keeps its old `corpus_*` action, and `capabilities` lists them under
   `deprecations` rather than `command_schemas`.
+- `groups` subcommands are named for what they do, without repeating the group
+  name: `add`, `remove`, `rename` and `update` work on a group, `assign` and
+  `unassign` file an entry under one or take it out, and `show` lists a
+  group's entries (formerly `add-group`, `remove-group`, `rename-group`,
+  `update-group`, `add-entry`, `remove-entry` and `list-entries`). Each
+  reports its new action (`groups_add`, `groups_assign`, ...). `move-group`
+  duplicated `update --parent` and goes; `tree` is folded into `groups list`,
+  whose JSON now also carries `tree` (the declared hierarchy) and
+  `undeclared` (groups only entries mention), and whose human view prints the
+  hierarchy with each group's members. `inspect --insights` gains the same
+  keys in `groups_list`. The old subcommands run hidden until 0.10.0 with a
+  `deprecated` warning and their old actions, as does the `groups_tree`
+  insight. The batch operations `groups.add_entry` and `groups.remove_entry`
+  are now `groups.assign` and `groups.unassign`; the old names still apply
+  and add a `deprecated` warning to the envelope.
 
 ### Added
 

@@ -12,6 +12,7 @@ from pynakes import group_tree
 from pynakes.bibtex_parser import ParseError
 from pynakes.cli_checks import _file_result, error_code_for
 from pynakes.cli_commands.asset_check import asset_check_collection
+from pynakes.cli_commands.groups import groups_list_report
 from pynakes.cli_commands.lint import _lint_collection
 from pynakes.cli_commands.tex_scan import linked_scan_result
 from pynakes.cli_common import _source_sha256
@@ -49,15 +50,7 @@ def inspect_insights(
                 "tree": [node.to_dict() for node in group_tree.list_tree(coll.lib) or []],
             },
         ),
-        "groups_list": report(
-            "groups_list",
-            lambda: {
-                "groups": {
-                    name: group_tree.list_direct_members(coll.lib, name)
-                    for name in group_tree.known_group_names(coll.lib)
-                },
-            },
-        ),
+        "groups_list": report("groups_list", lambda: groups_list_report(coll.lib)),
         "lint": report(
             "lint", lambda: _file_result(_lint_collection(coll, file, location=where), False)
         ),

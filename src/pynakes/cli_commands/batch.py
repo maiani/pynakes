@@ -106,6 +106,14 @@ def batch(
         coll,
         params,
         [f"{_verb('apply', params, 'Applied')} {len(op_results)} operation(s);"],
+        # A deprecated operation name is the caller's to fix, so it surfaces
+        # in the envelope's warnings, not only in that operation's result.
+        warnings=[
+            warning
+            for item in op_results
+            for warning in item["result"].get("warnings", [])
+            if isinstance(warning, dict) and warning.get("type") == "deprecated"
+        ],
         operations=op_results,
     )
 
