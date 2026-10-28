@@ -234,12 +234,13 @@ recorded.
 
 #### Linked bibliographies: declaration and validation
 
-Implement declaration and validation only; synchronization is a separate v0.12
-workflow.
+Declaration and validation first; one-link downward sync is a stretch goal for
+this release, and the rest of synchronization belongs to v0.12.
 
 - Store reciprocal link declarations in both participating `.bib` files using
   native metadata. Each endpoint records the other file, its parent/child role,
-  and the agreed constraint. Resolve stored relative paths from the declaring
+  the agreed constraint and a sync flow (`down`, `up`, `both` or `none`, default
+  `down`), so adding synchronization never changes the format. Resolve stored relative paths from the declaring
   file, not the current working directory. Links are independent of Library
   membership and do not require an index or a particular project layout.
 - Offer two explicit constraints: **key subset** requires every child citation
@@ -250,7 +251,8 @@ workflow.
   implementation; expose the same policies through Python, CLI, metadata and
   `capabilities` rather than hard-coding one manuscript workflow.
 - Support multiple independent links per bibliography, including multiple
-  parents. Each declared constraint must hold separately; multiple parents do
+  parents, and a bibliography that is a child of one file and a parent of
+  another (master, thesis, chapter). Each declared constraint must hold separately; multiple parents do
   not implicitly form a union. Siblings are discoverable through a shared
   parent, with no implied equality or synchronization between siblings.
 - Creating, changing or removing a link is a coordinated metadata edit at both
@@ -264,8 +266,16 @@ workflow.
   only declared links within a documented traversal scope, terminate on cycles,
   and never scan unrelated directories or repair declarations implicitly.
 - A parent role expresses a subset constraint, not ownership or authority over
-  edits. Do not propagate entry changes, key renames, additions or deletions in
-  this release. A link declaration is not consent to future synchronization.
+  edits. A declaration never propagates anything by itself: values move only
+  when a sync command runs, and only along the flow the link declares.
+- **Stretch: one-link downward sync.** `link sync FILE --parents | --children
+  | --all` updates the child's copies of the fields the field-subset check
+  reports as drifted, from the parent, along each selected link of FILE: its
+  parents, its children, or both. It reuses the drift report, previews every
+  touched file in one `--dry-run --diff`, guards each with its source digest,
+  and writes all or none. A child whose parents disagree on a field is a
+  reported conflict, never "last parent wins". Additions, deletions and key
+  renames do not propagate.
 
 **Done when:** either endpoint can discover and validate the same relationship;
 key-only and field-subset checks distinguish valid omissions from drift;
@@ -447,8 +457,12 @@ declared relationship to its master bibliography.
   rules. Prepare and validate outputs before mutation; never silently overwrite
   target materials or move originals. Report source-to-destination mappings,
   operation counts, skips and conflicts, guarded by input/output fingerprints.
-- Build on v0.9's reciprocal declarations. Define explicit synchronization
-  policies for direction, field ownership/local overrides, additions, deletions
+- Build on v0.9's reciprocal declarations and `link sync`: add `--recursive`
+  (follow declared links past the first, parents before children, as one
+  multi-file plan; cycles stop it) and upward flow for links declaring `up` or
+  `both`. Upward and two-way flow need a stored baseline of last-synced values
+  to tell which side changed a field, the same three-way comparison the merge
+  driver below uses. Define explicit synchronization policies for direction, field ownership/local overrides, additions, deletions
   and conflicts before offering updates. Support reviewed parent-to-child and
   child-to-parent changes where the selected policy permits them; neither role
   automatically wins. An omitted child field must not implicitly delete the
