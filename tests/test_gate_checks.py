@@ -213,9 +213,27 @@ class TestPreCommitHooks:
         for hook in hooks:
             # Every gate hook is a read-only, strict pynakes check on .bib files.
             assert hook["entry"].startswith("pynakes ")
-            assert hook["entry"].endswith("--strict")
+            assert "--strict" in shlex.split(hook["entry"])
             assert hook["language"] == "python"
             assert hook["files"] == r"\.bib$"
+
+    def test_lint_hook_does_not_fail_on_info_findings(self, tmp_path: Path) -> None:
+        # Info findings are suggestions; the hook gates on warnings and errors,
+        # and the last --severity wins, so args can restore the info gate.
+        bib = tmp_path / "refs.bib"
+        bib.write_text(
+            "@article{Euler1748,\n  author = {Euler, Leonhard},\n"
+            "  title = {Introductio},\n  journal = {Opera},\n  year = {1748}\n}\n"
+        )
+        hooks = yaml.safe_load((REPO_ROOT / ".pre-commit-hooks.yaml").read_text())
+        entry = next(h["entry"] for h in hooks if h["id"] == "pynakes-lint")
+        argv = shlex.split(entry)[1:]
+        assert argv[-2:] == ["--severity", "warning"]
+
+        report = runner.invoke(app, ["lint", str(bib)])
+        assert "info" in report.output
+        assert runner.invoke(app, [*argv, str(bib)]).exit_code == 0
+        assert runner.invoke(app, [*argv, "--severity", "info", str(bib)]).exit_code == 1
 
     def test_every_hook_entry_runs_on_a_clean_library(self, tmp_path: Path) -> None:
         # The files-check hook once named a command renamed away in 0.5.0 and

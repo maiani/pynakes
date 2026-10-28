@@ -113,7 +113,17 @@ pre-commit run pynakes-dedupe-check --hook-stage manual --all-files
 Move them into the default stages (drop the `stages: [manual]`) if you want
 them on every commit.
 
-Because `lint --strict` fails on any finding, an existing bibliography usually needs
+The `pynakes-lint` hook runs `lint --strict --severity warning`: it fails on warnings
+and errors, while info findings, such as a field most entries define but one lacks,
+are suggestions that do not block a commit. To gate on info findings too, override
+the severity; the last `--severity` wins:
+
+```yaml
+      - id: pynakes-lint
+        args: [--severity, info]
+```
+
+Because `lint --strict` fails on any finding it reports, an existing bibliography usually needs
 its known, accepted findings recorded before the hook passes — for a group of
 entries at once with `ref directive ... --where`, or for the whole bibliography with
 `lint-ignore`. New findings then fail the commit that introduces them.

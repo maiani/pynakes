@@ -13,11 +13,13 @@
 #
 # Every hook is read-only, offline, and deterministic. pre-commit passes the
 # staged .bib files as arguments; --strict makes a finding fail the commit.
+# pynakes-lint gates on warnings and errors; info findings are not reported
+# (add `args: [--severity, info]` to gate on them too).
 
 - id: pynakes-lint
   name: pynakes lint
-  description: Validate BibTeX entries and fail on any finding not suppressed by lint-ignore, --ignore, or an ignore directive.
-  entry: pynakes lint --strict
+  description: Validate BibTeX entries and fail on any warning or error not suppressed by lint-ignore, --ignore, or an ignore directive; info findings do not fail the commit.
+  entry: pynakes lint --strict --severity warning
   language: python
   files: \.bib$
   types: [file]

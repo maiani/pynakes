@@ -149,6 +149,10 @@ The forms deprecated in 0.8 are removed:
 
 ### Changed
 
+- The `pynakes-lint` pre-commit hook runs `lint --strict --severity warning`,
+  so info findings no longer fail a commit; warnings and errors still do, as
+  `init --agent-guide` already recommended. `lint --strict` itself is unchanged.
+  To gate on info findings as before, add `args: [--severity, info]` to the hook.
 - Conflicts say to stop and ask. The `DuplicateCitationKey` option
   `select_one` now applies once the person has chosen a candidate, a batch
   duplicate-key conflict offers `ask_which` first, and the
