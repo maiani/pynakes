@@ -160,6 +160,15 @@ class GroupsSeparator(StrEnum):
     SEMICOLON = "semicolon"
 
 
+class TextEncoding(StrEnum):
+    """normalize's encoding step: defer to the library, convert, or leave text alone."""
+
+    METADATA = "metadata"
+    LATEX = "latex"
+    UNICODE = "unicode"
+    OFF = "off"
+
+
 class FieldEncoding(StrEnum):
     LATEX = "latex"
     UNICODE = "unicode"

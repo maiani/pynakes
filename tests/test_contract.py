@@ -54,8 +54,6 @@ POSITIONALS: dict[str, tuple[tuple[str, bool, bool], ...]] = {
     "fields append": (("file", False, False), ("field", True, False), ("value", True, False)),
     "fields clear": (("file", False, False), ("field", True, False)),
     "fields move": (("file", False, False), ("old", True, False), ("new", True, False)),
-    "fields protect-title": (("file", False, False),),
-    "fields encode": (("file", False, False), ("field", True, False)),
     "fields rename": (("file", False, False), ("old", True, False), ("new", True, False)),
     "fields set": (("file", False, False), ("field", True, False), ("value", True, False)),
     "format": (("file", False, False),),
@@ -135,8 +133,6 @@ FLAG_SHAPE_EXCEPTIONS = {
     # The key to assign on `ref import`; the keys to act on everywhere else
     # (see `pynakes.cli_common.key_option`).
     "--key": 2,
-    # The same field name: several on `normalize`, one on `fields protect-title`.
-    "--title-field": 2,
 }
 
 
@@ -207,11 +203,6 @@ SAMPLES: dict[str, tuple[str, list[str]]] = {
     "fields move": (
         "modify",
         ["fields", "move", "{bib}", "doi", "note", "--key", "Smith2020", "--dry-run"],
-    ),
-    "fields protect-title": ("modify", ["fields", "protect-title", "{bib}", "--dry-run"]),
-    "fields encode": (
-        "modify",
-        ["fields", "encode", "{bib}", "title", "--to", "unicode", "--dry-run"],
     ),
     "fields rename": ("modify", ["fields", "rename", "{bib}", "doi", "note", "--dry-run"]),
     "fields set": (

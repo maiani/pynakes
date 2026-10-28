@@ -104,15 +104,15 @@ special field `type`.
 ## Example 6: Protect Title Capitalization
 
 ```bash
-pynakes fields protect-title refs.bib --dry-run --diff
-pynakes fields protect-title refs.bib
+pynakes normalize refs.bib --only titles --title-protection on --dry-run --diff
+pynakes normalize refs.bib --only titles --title-protection on
 ```
 
 Protect an additional exact term in another title-like field:
 
 ```bash
-pynakes fields protect-title refs.bib \
-  --field booktitle \
+pynakes normalize refs.bib --only titles --title-protection on \
+  --title-field booktitle \
   --term Proceedings \
   --dry-run --diff
 ```

@@ -84,8 +84,6 @@ WRITES = {
     "fields move": ["fields", "move", "{bib}", "year", "date"],
     "fields append": ["fields", "append", "{bib}", "keywords", "classic"],
     "fields clear": ["fields", "clear", "{bib}", "year"],
-    "fields encode": ["fields", "encode", "{bib}", "note", "--to", "latex"],
-    "fields protect-title": ["fields", "protect-title", "{bib}", "--term", "Principia"],
     "keys generate": ["keys", "generate", "{bib}", "--all"],
     "keys repair": ["keys", "repair", "{bib}"],
     "keys rename": ["keys", "rename", "{bib}", "Euler1748", "Euler1748a"],

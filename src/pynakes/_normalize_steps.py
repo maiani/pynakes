@@ -23,6 +23,7 @@ STEPS: tuple[str, ...] = (
     "metadata",
     "drop_fields",
     "invisible_characters",
+    "encoding",
     "titles",
     "authors",
     "dois",

@@ -596,9 +596,10 @@ lists `dependency_keys` for native output. Native output retains library-level
 metadata/comments; this is not a privacy scrub. Interchange output resolves
 inheritance without exporting unselected parent records.
 
-Text encoding edits use `fields encode FILE FIELD --to latex|unicode` with the
-usual selectors, preview and hash precondition. `fields-encoding` supplies an
-optional stored default. Preserve and display `encoding_retained` warnings;
+Text encoding edits use `normalize FILE --only encoding --encoding
+latex|unicode` (`--encoding-field FIELD` to narrow the prose fields it converts)
+with the usual selectors, preview and hash precondition. `normalize-encoding`
+supplies an optional stored default. Preserve and display `encoding_retained` warnings;
 these conversions cover a text subset, not arbitrary TeX rendering.
 
 

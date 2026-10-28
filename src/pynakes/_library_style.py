@@ -23,6 +23,7 @@ from pynakes.model import BibEntry, BibFile, EntryStore
 #: is left out: whoever adds an entry names its key or has one generated.
 _STEP_KEYS = {
     "drop_fields": "normalize-drop-fields",
+    "encoding": "normalize-encoding",
     "titles": "normalize-protect-titles",
     "authors": "normalize-author-style",
     "dois": "normalize-dois",

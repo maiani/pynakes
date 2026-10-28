@@ -120,6 +120,8 @@ OPERATION_SPECS: dict[str, OperationSpec] = {
             "protect_titles",
             "title_fields",
             "protected_terms",
+            "encoding",
+            "encoding_fields",
             "author_style",
             "journal_style",
             "journal_table",
@@ -127,8 +129,11 @@ OPERATION_SPECS: dict[str, OperationSpec] = {
             "normalize_dois",
             "identifier_case",
             "format_metadata",
+            "only",
+            "where",
         ),
-        "Normalize entries (titles, authors, journals, DOIs, identifier case, ordering)",
+        "Normalize entries (titles, encoding, authors, journals, DOIs, identifier case, "
+        "ordering); only runs some steps, where some entries",
     ),
     "convert": OperationSpec(("to",), (), "Convert between bibtex and biblatex"),
     "metadata.set": OperationSpec(("key", "value"), ("namespace",), "Set a metadata key"),
@@ -156,6 +161,11 @@ OPERATION_SPECS: dict[str, OperationSpec] = {
 DEPRECATED_OPERATIONS: dict[str, str] = {
     "groups.add_entry": "groups.assign",
     "groups.remove_entry": "groups.unassign",
+}
+#: Operations deprecated in 0.9.0 that keep their own parameters until removal,
+#: mapped to the operation that does their job.
+SUPERSEDED_OPERATIONS: dict[str, str] = {
+    "fields.protect_title": "normalize",
 }
 _DEPRECATED_OPERATIONS_REMOVAL = "0.10.0"
 
@@ -256,7 +266,13 @@ def _apply_one(coll: Bibliography, op: str, params: dict) -> dict:
             raise _Refused("CitationKeyConflict", f"Citation key {params['new']!r} already exists")
         return {"changed": coll.rename_key(params["old"], params["new"])}
     if op == "normalize":
-        return {"operations": coll.normalize(NormalizeOptions(**params)).operations}
+        options = dict(params)
+        where = options.pop("where", None)
+        keys = None
+        selected = coll._where(where) if where is not None else None
+        if selected is not None:
+            keys = [entry.key for entry in coll.lib.entries.values() if selected(entry)]
+        return {"operations": coll.normalize(NormalizeOptions(**options), keys=keys).operations}
     if op == "convert":
         report = coll.convert(params["to"])
         return {"entries": report.entries, "fields_renamed": report.fields_renamed}
@@ -325,10 +341,11 @@ def apply_operations(coll: Bibliography, operations: list[dict]) -> list[dict]:
             result = _apply_one(coll, name, params)
         except _Refused as exc:
             raise BatchError(index, op, str(exc), code=exc.code) from exc
-        if name != op:
+        replacement = DEPRECATED_OPERATIONS.get(op) or SUPERSEDED_OPERATIONS.get(op)
+        if replacement is not None:
             result["warnings"] = [
                 *result.get("warnings", []),
-                _deprecated_operation_warning(op, name),
+                _deprecated_operation_warning(op, replacement),
             ]
         results.append({"op": op, "result": result})
     return results
@@ -353,4 +370,6 @@ def operation_catalog() -> dict:
             **catalog[new],
             "deprecated": {"new": new, "removal": _DEPRECATED_OPERATIONS_REMOVAL},
         }
+    for old, new in SUPERSEDED_OPERATIONS.items():
+        catalog[old]["deprecated"] = {"new": new, "removal": _DEPRECATED_OPERATIONS_REMOVAL}
     return catalog

@@ -23,7 +23,7 @@ pynakes groups assign refs.bib Newton1687 Classics --dry-run --diff
 pynakes groups assign refs.bib Newton1687 Classics
 pynakes groups list refs.bib --json
 pynakes fields append refs.bib keywords history --key Newton1687 --dry-run --diff
-pynakes fields protect-title refs.bib --dry-run --diff
+pynakes normalize refs.bib --only titles --dry-run --diff
 pynakes asset check refs.bib --json
 ```
 

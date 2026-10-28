@@ -150,7 +150,10 @@ class AutoBibGroup(TyperGroup):
             saved.append((command, command.short_help))
             base = (command.help or command.short_help or "").strip().splitlines()
             head = base[0].rstrip(".") if base else ""
-            names = ", ".join(subcommands)
+            # A hidden subcommand is a deprecated form: it runs but is not listed.
+            names = ", ".join(
+                name for name, sub in subcommands.items() if not getattr(sub, "hidden", False)
+            )
             if rich:
                 names = f"[cyan]{names}[/cyan]"
             command.short_help = f"{head} → {names}" if head else names

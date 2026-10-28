@@ -12,6 +12,7 @@ from pynakes.analysis import SECTIONS as ANALYSIS_SECTIONS
 from pynakes.cli_errors import catalogue_description
 from pynakes.entry_reader import INCLUDE_PARTS
 from pynakes.metadata.schema import SAVED_QUERY_PREFIX
+from pynakes.normalize import ENCODING_FIELDS
 from pynakes.query import FUZZY_THRESHOLD, WHERE_GRAMMAR
 from pynakes.usage import (
     CITE_KEY_SEPARATOR,
@@ -621,7 +622,7 @@ def get_capabilities() -> dict:
             "keys": "Generate, rename, repair citation keys, and look up "
             "raw-TeX-source citations of one key (usage)",
             "fields": "Bulk-edit fields across matching references "
-            "(set, rename, move, append, clear, protect-title, encode)",
+            "(set, rename, move, append, clear)",
             "dedupe": "Detect and conservatively merge duplicate works",
             "verify": "Verify entries against authoritative metadata "
             "(--published also reports published/preprint identity links)",
@@ -631,7 +632,7 @@ def get_capabilities() -> dict:
             "(list, add, remove, clear, scan)",
             "metadata": "Inspect and update top-level library metadata "
             "(list, set, remove, adopt-jabref)",
-            "normalize": "Normalize entries (titles, authors, journals, DOIs, "
+            "normalize": "Normalize entries (titles, encoding, authors, journals, DOIs, "
             "identifier case, ordering) per the library's configured settings",
             "format": "Lint, then rewrite bibliography layout with portable profile settings "
             "and explicit policy overrides",
@@ -677,8 +678,10 @@ def get_capabilities() -> dict:
             "source_modified": False,
         },
         "field_encoding": {
-            "command": "fields encode FILE FIELD --to latex|unicode",
-            "setting": "fields-encoding",
+            "command": "normalize FILE --only encoding --encoding latex|unicode "
+            "[--encoding-field FIELD]",
+            "setting": "normalize-encoding (fields: normalize-encoding-fields)",
+            "default_fields": list(ENCODING_FIELDS),
             "selection": "--key and --where",
             "scope": "Supported text accents and named text characters; preserves math, commands and capitalization braces",
             "warnings": "Unsupported constructs are retained; not a full TeX renderer or ASCII guarantee",

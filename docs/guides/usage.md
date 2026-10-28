@@ -475,7 +475,7 @@ several fields.
 
 `--where` is the shared [entry selector](#selecting-entries-where).
 
-`fields protect-title` protects capitalization in title-family fields.
+`normalize --only titles` protects capitalization in title-family fields.
 
 This protects acronyms, uppercase/digit tokens, mixed-case terms such as
 `LaTeX`, and explicit terms.
@@ -1070,9 +1070,10 @@ in-memory merge, exactly as for `combine`.
 ```sh
 pynakes convert refs.bib --to bib --key Newton1687,Euler1748 --json
 pynakes convert refs.bib --to ris --where 'group "Reviewed"' --out reviewed.ris
-pynakes fields encode refs.bib title --to unicode --key Newton1687 --dry-run --diff
-pynakes fields encode refs.bib author --to latex --where 'type = book' --dry-run --diff
-pynakes metadata set refs.bib fields-encoding unicode
+pynakes normalize refs.bib --only encoding --encoding unicode --encoding-field title \
+  --key Newton1687 --dry-run --diff
+pynakes normalize refs.bib --only encoding --encoding latex --where 'type = book' --dry-run --diff
+pynakes metadata set refs.bib normalize-encoding unicode
 ```
 
 Export never edits the source. `--to bib` exports the existing dialect rather
@@ -1090,8 +1091,13 @@ With `--json` and no `--out`, `content` is ready for the clipboard. With `--out`
 exported entries, and `dependency_keys` explains native export additions. Duplicate
 keys remain physical entries; a key selector includes every matching instance.
 
-`fields encode` uses the direction supplied by `--to` or `fields-encoding`.
-It edits only the named field on matching entries. It translates supported text
+The `encoding` step of `normalize` uses the direction supplied by `--encoding`
+or the `normalize-encoding` setting, and is off when neither gives one. It
+converts the prose fields (`author`, `editor`, `title`, `booktitle`, `journal`,
+`series`, `publisher`, `address`, `institution`, `organization`, `school`,
+`note`, `abstract`, `keywords`) unless `--encoding-field` or
+`normalize-encoding-fields` names others; identifiers, links and paths are never
+among the defaults. It translates supported text
 accents and letters, preserving capitalization braces, existing commands and
 math spans (`$...$`, `$$...$$`, `\(...\)`, `\[...\]`). It retains unknown
 commands and characters, reporting unsupported constructs where encountered.

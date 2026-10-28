@@ -84,6 +84,7 @@ def test_normalize_library_runs_standard_pass() -> None:
         "title_markup": 0,
         "dropped_fields": 0,
         "invisible_characters": 0,
+        "encoded_fields": {},
         "authors": 1,
         "journals": 0,
         "dois": 1,
@@ -97,10 +98,12 @@ def test_normalize_library_runs_standard_pass() -> None:
         # A step that never ran says so, so a caller can tell it apart from one
         # that ran and changed nothing.
         "skipped": {
+            "encoding": report.skipped["encoding"],
             "journals": report.skipped["journals"],
             "keys": report.skipped["keys"],
         },
     }
+    assert "--encoding" in report.skipped["encoding"]
     assert "--journal-style" in report.skipped["journals"]
     assert "--key-generation" in report.skipped["keys"]
 

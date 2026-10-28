@@ -323,29 +323,6 @@ Remove a field from matching references.
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
-## fields encode
-
-**Stability: stable**
-
-Convert supported text accents, preserving math and capitalization braces.
-
-`pynakes fields encode [FILE] FIELD [OPTIONS]`
-
-| Parameter | Type | Required | Default | Choices | Description |
-| --- | --- | --- | --- | --- | --- |
-| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
-| `FIELD` | string | yes | — | — | Text field to convert |
-| `--to` | choice | no | null | latex, unicode | Text encoding; defaults to fields-encoding metadata |
-| `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing; 'used'/'unused' test the linked TeX sources and 'query NAME' runs a saved query. See `pynakes capabilities` for the full grammar. |
-| `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
-| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
-| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
-| `--dry-run` | boolean | no | false | — |  |
-| `--diff` | boolean | no | false | — |  |
-| `--json` | boolean | no | false | — |  |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
-| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
-
 ## fields move
 
 **Stability: stable**
@@ -359,29 +336,6 @@ Move a field on matching references, without replacing the target.
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `OLD` | string | yes | — | — | Existing field name |
 | `NEW` | string | yes | — | — | Target field name |
-| `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing; 'used'/'unused' test the linked TeX sources and 'query NAME' runs a saved query. See `pynakes capabilities` for the full grammar. |
-| `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
-| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
-| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
-| `--dry-run` | boolean | no | false | — |  |
-| `--diff` | boolean | no | false | — |  |
-| `--json` | boolean | no | false | — |  |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
-| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
-
-## fields protect-title
-
-**Stability: stable**
-
-Brace-protect capitalization-sensitive tokens in title-like fields.
-
-`pynakes fields protect-title [FILE] [OPTIONS]`
-
-| Parameter | Type | Required | Default | Choices | Description |
-| --- | --- | --- | --- | --- | --- |
-| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
-| `--title-field` | string | no | "title" | — | Title-like field to protect |
-| `--term` | list[string] | no | null | — | Additional exact term to brace-protect |
 | `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing; 'used'/'unused' test the linked TeX sources and 'query NAME' runs a saved query. See `pynakes capabilities` for the full grammar. |
 | `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
@@ -879,7 +833,7 @@ Set one top-level metadata block (jabref-meta or pynakes-meta).
 
 **Stability: stable**
 
-Normalize entries: titles, authors, journals, DOIs, identifier case, and ordering.
+Normalize entries: titles, authors, journals, DOIs, encoding, identifier case, order.
 
 `pynakes normalize [FILE] [OPTIONS]`
 
@@ -899,11 +853,13 @@ Normalize entries: titles, authors, journals, DOIs, identifier case, and orderin
 | `--pages` | choice | no | "metadata" | metadata, on, off | Rewrite page ranges to start--end |
 | `--months` | choice | no | "metadata" | metadata, on, off | Rewrite bare month names to BibTeX month macros (month = june -> jun) |
 | `--invisible-characters` | choice | no | "metadata" | metadata, on, off | Remove characters that render as nothing (zero-width spaces, stray BOMs) |
+| `--encoding` | choice | no | "metadata" | metadata, latex, unicode, off | Convert accents and named characters in text fields to LaTeX or to Unicode (off unless set, here or in the normalize-encoding setting) |
+| `--encoding-field` | list[string] | no | null | — | Field the encoding step converts; can be repeated (default: the prose fields such as author, title, journal, note, abstract) |
 | `--key-generation` | choice | no | "metadata" | metadata, on, off | Regenerate citation keys from the library's key pattern |
 | `--identifier-case` | choice | no | "metadata" | metadata, on, off | Lowercase entry types and field names |
 | `--metadata-formatting` | choice | no | "metadata" | metadata, on, off | Consolidate metadata layout: pynakes-meta top, jabref-meta bottom |
 | `--sort-by` | list[string] | no | null | — | Sort entries by a BibTeX field name; repeat for secondary keys (e.g. --sort-by author --sort-by year:desc). Use "citationkey" (or "key") for the citation key and append ":desc" for descending. "original" keeps the current order. Omit to follow the file's configured sort order. |
-| `--only` | list[string] | no | null | — | Run only these steps, comma-separated and repeatable: metadata, drop-fields, invisible-characters, titles, authors, dois, pages, journals, save-actions, months, identifier-case, sort, keys |
+| `--only` | list[string] | no | null | — | Run only these steps, comma-separated and repeatable: metadata, drop-fields, invisible-characters, encoding, titles, authors, dois, pages, journals, save-actions, months, identifier-case, sort, keys |
 | `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing; 'used'/'unused' test the linked TeX sources and 'query NAME' runs a saved query. See `pynakes capabilities` for the full grammar. |
 | `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
 | `--dry-run` | boolean | no | false | — | Show changes without writing |

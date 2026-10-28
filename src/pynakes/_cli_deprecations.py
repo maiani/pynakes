@@ -5,6 +5,23 @@ the named release. The list is empty once nothing is being retired.
 """
 
 DEPRECATIONS: list[dict] = [
+    {
+        "command": "fields encode",
+        "old": "fields encode",
+        "new": "normalize --encoding latex|unicode --encoding-field FIELD",
+        "removal": "0.10.0",
+        "note": "normalize owns value conventions and fields only edits fields. The "
+        "encoding step reads normalize-encoding, not fields-encoding, and converts the "
+        "prose fields unless --encoding-field or normalize-encoding-fields names others.",
+    },
+    {
+        "command": "fields protect-title",
+        "old": "fields protect-title",
+        "new": "normalize --only titles --title-protection on",
+        "removal": "0.10.0",
+        "note": "normalize's titles step already brace-protects title words, with "
+        "--title-field, --term, --key and --where.",
+    },
     *(
         {
             "command": f"groups {old}",

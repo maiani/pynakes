@@ -174,10 +174,10 @@ def test_protect_title_warns_when_matching_entries_lack_field() -> None:
 
     result = apply_operations(coll, [{"op": "fields.protect_title"}])
 
-    assert result[0]["result"] == {
-        "changed": 0,
-        "warnings": ["No matching entries had field 'title'"],
-    }
+    assert result[0]["result"]["changed"] == 0
+    warnings = result[0]["result"]["warnings"]
+    assert warnings[0] == "No matching entries had field 'title'"
+    assert (warnings[1]["old"], warnings[1]["new"]) == ("fields.protect_title", "normalize")
 
 
 def test_cli_batch_atomic_commit(tmp_path: Path) -> None:

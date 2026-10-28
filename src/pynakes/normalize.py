@@ -88,6 +88,10 @@ class NormalizeOptions:
     normalize_pages: bool | None = None
     normalize_months: bool | None = None
     remove_invisible: bool | None = None
+    #: ``latex``, ``unicode`` or ``off``; ``None``/``metadata`` defers to the
+    #: ``normalize-encoding`` setting, and the step is off when neither says.
+    encoding: str | None = None
+    encoding_fields: list[str] | None = None
     normalize_keys: bool | None = None
     identifier_case: bool | None = None
     format_metadata: bool | None = None
@@ -113,6 +117,8 @@ class NormalizeResult:
     dropped_fields: int = 0
     #: Entries whose field values had invisible characters removed.
     invisible_characters: int = 0
+    #: Per field, the entries whose text was converted to LaTeX or Unicode.
+    encoded_fields: dict[str, int] = field(default_factory=dict)
     authors: int = 0
     journals: int = 0
     dois: int = 0
@@ -143,6 +149,7 @@ class NormalizeResult:
             "title_markup": self.title_markup,
             "dropped_fields": self.dropped_fields,
             "invisible_characters": self.invisible_characters,
+            "encoded_fields": dict(self.encoded_fields),
             "authors": self.authors,
             "journals": self.journals,
             "dois": self.dois,
@@ -169,6 +176,7 @@ SKIPPABLE_STEPS: dict[str, tuple[str, str]] = {
     "pages": ("--pages on", "normalize-pages"),
     "months": ("--months on", "normalize-months"),
     "invisible_characters": ("--invisible-characters on", "normalize-invisible-characters"),
+    "encoding": ("--encoding latex|unicode", "normalize-encoding"),
     "identifier_case": ("--identifier-case on", "normalize-identifier-case"),
     "keys": ("--key-generation on", "normalize-keys"),
 }
@@ -218,6 +226,34 @@ def _resolve_choice(
             f"{', '.join(sorted(allowed | {'metadata'}))}"
         )
     return resolved
+
+
+#: Fields of human-readable text the encoding step converts unless the
+#: ``normalize-encoding-fields`` setting or ``--encoding-field`` names others.
+#: Identifiers, links, and paths (``doi``, ``url``, ``file``, ``eprint``) are
+#: never in it: converting them would change what they point to.
+ENCODING_FIELDS: tuple[str, ...] = (
+    "author",
+    "editor",
+    "title",
+    "booktitle",
+    "journal",
+    "series",
+    "publisher",
+    "address",
+    "institution",
+    "organization",
+    "school",
+    "note",
+    "abstract",
+    "keywords",
+)
+
+
+def _resolve_encoding_fields(lib: BibFile, option: list[str] | None) -> list[str]:
+    if option:
+        return option
+    return list(metadata_list(_normalize_setting(lib, "encoding-fields"))) or list(ENCODING_FIELDS)
 
 
 def _resolve_title_fields(lib: BibFile, option: list[str] | None) -> list[str]:
@@ -423,6 +459,20 @@ def normalize_library(
         result.invisible_characters = remove_invisible(selection)
     else:
         _record_skip(result, "invisible_characters", "invisible-character removal is off")
+
+    # Before title protection, so the braces it adds are the ones a converted
+    # value keeps. Off unless asked: which encoding a library wants is its own
+    # choice, and the deprecated ``fields-encoding`` setting is not read here.
+    if runs("encoding"):
+        target = _resolve_choice(lib, opts.encoding, "encoding", {"latex", "unicode", "off"}, "off")
+        if target == "off":
+            _record_skip(result, "encoding", "text encoding conversion is off")
+        else:
+            for name in _resolve_encoding_fields(lib, opts.encoding_fields):
+                encoded = field_ops.encode_field(selection, name, to=target)
+                if encoded["changed_entries"]:
+                    result.encoded_fields[name] = encoded["changed_entries"]
+                result.warnings.extend(encoded["warnings"])
 
     titles_run = runs("titles")
     if titles_run:

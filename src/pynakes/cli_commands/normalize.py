@@ -8,7 +8,7 @@ import typer
 
 from pynakes import normalize as normalize_ops
 from pynakes._normalize_steps import NOT_IN_ONLY, STEPS, WHOLE_FILE, WHOLE_FILE_STEPS, step_name
-from pynakes.cli_choices import AuthorStyle, JournalSource, JournalStyle, Switch
+from pynakes.cli_choices import AuthorStyle, JournalSource, JournalStyle, Switch, TextEncoding
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     _EXPECT_SHA256_OPTION,
@@ -119,6 +119,19 @@ def normalize(
         case_sensitive=False,
         help="Remove characters that render as nothing (zero-width spaces, stray BOMs)",
     ),
+    encoding: TextEncoding = typer.Option(
+        TextEncoding.METADATA,
+        "--encoding",
+        case_sensitive=False,
+        help="Convert accents and named characters in text fields to LaTeX or to Unicode "
+        "(off unless set, here or in the normalize-encoding setting)",
+    ),
+    encoding_field: list[str] | None = typer.Option(
+        None,
+        "--encoding-field",
+        help="Field the encoding step converts; can be repeated (default: the prose "
+        "fields such as author, title, journal, note, abstract)",
+    ),
     key_normalization: Switch = typer.Option(
         Switch.METADATA,
         "--key-generation",
@@ -163,7 +176,7 @@ def normalize(
         help="Regenerate keys despite missing linked TeX sources; those sources are not rewritten",
     ),
 ) -> None:
-    """Normalize entries: titles, authors, journals, DOIs, identifier case, and ordering.
+    """Normalize entries: titles, authors, journals, DOIs, encoding, identifier case, order.
 
     Each step follows the library's configured settings (its normalization
     metadata) unless overridden by a flag. `--only` runs just the named steps,
@@ -207,6 +220,8 @@ def normalize(
             "--pages": page_normalization != "metadata",
             "--months": months != "metadata",
             "--invisible-characters": invisible_characters != "metadata",
+            "--encoding": encoding != "metadata",
+            "--encoding-field": bool(encoding_field),
             "--key-generation": key_normalization != "metadata",
             "--identifier-case": identifier_case != "metadata",
             "--metadata-formatting": metadata_formatting != "metadata",
@@ -236,6 +251,8 @@ def normalize(
         options.only = steps
         options.normalize_months = _optional_bool(months)
         options.remove_invisible = _optional_bool(invisible_characters)
+        options.encoding = str(encoding)
+        options.encoding_fields = encoding_field
         coll = Bibliography.open(file)
         selected = select_keys(
             coll, where, key, json_output, "normalize", warnings=selection_warnings
@@ -267,6 +284,7 @@ def normalize(
         ("titles", sum(report.title_fields.values()), "titles"),
         ("title_markup", report.title_markup, "title_markup"),
         ("invisible_characters", report.invisible_characters, "invisible_characters"),
+        ("encoding", sum(report.encoded_fields.values()), "encoding"),
         ("authors", report.authors, "authors"),
         ("journals", report.journals, "journals"),
         ("dois", report.dois, "dois"),
@@ -333,6 +351,8 @@ _FLAG_STEPS = {
     "--pages": "pages",
     "--months": "months",
     "--invisible-characters": "invisible_characters",
+    "--encoding": "encoding",
+    "--encoding-field": "encoding",
     "--key-generation": "keys",
     "--identifier-case": "identifier_case",
     "--metadata-formatting": "metadata",

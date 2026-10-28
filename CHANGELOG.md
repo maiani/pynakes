@@ -69,9 +69,29 @@ The forms deprecated in 0.8 are removed:
   insight. The batch operations `groups.add_entry` and `groups.remove_entry`
   are now `groups.assign` and `groups.unassign`; the old names still apply
   and add a `deprecated` warning to the envelope.
+- `normalize` owns value conventions and `fields` only edits fields.
+  `fields protect-title` duplicated `normalize`'s titles step
+  (`normalize --only titles --title-protection on`), and `fields encode` is now
+  the `encoding` step (`normalize --only encoding --encoding latex|unicode`).
+  Both still run, hidden, until 0.10.0 with a `deprecated` warning and their old
+  actions, as does the batch operation `fields.protect_title`. The
+  `fields-encoding` setting is read only by the deprecated `fields encode`;
+  `normalize` does not migrate it, so no library starts converting text on its
+  next run, and `lint` reports it as `deprecated_metadata_key`.
 
 ### Added
 
+- `normalize` has an `encoding` step, between invisible-character removal and
+  title protection, that converts accents and named characters to LaTeX or to
+  Unicode. It is off unless `--encoding latex|unicode` or the
+  `normalize-encoding` setting asks for it, and converts the prose fields
+  (`author`, `editor`, `title`, `booktitle`, `journal`, `series`, `publisher`,
+  `address`, `institution`, `organization`, `school`, `note`, `abstract`,
+  `keywords`) unless `--encoding-field` or `normalize-encoding-fields` names
+  others; identifiers, links and paths are never converted by default. Its
+  counts are in `operations.encoded_fields`. Imports into a library that sets
+  `normalize-encoding` apply it to the new entry. The batch `normalize`
+  operation accepts `encoding`, `encoding_fields`, `only` and `where`.
 - `lint` reports `group_cycle`, a `correctness` error, for groups whose parents
   lead back to themselves in the declared hierarchy, once per cycle and naming
   its groups in order. Such a cycle has no root, so neither JabRef nor a tree

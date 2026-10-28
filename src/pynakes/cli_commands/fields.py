@@ -20,6 +20,7 @@ from pynakes.cli_common import (
     _verb,
     bib_file_argument,
     bind_where_filter,
+    deprecated_alias,
     key_option,
     parse_key_selector,
     where_option,
@@ -303,10 +304,25 @@ def fields_encode(
 
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
-    app.command("encode")(_safe(fields_encode))
     app.command("set")(_safe(fields_set))
     app.command("rename")(_safe(fields_rename))
     app.command("move")(_safe(fields_move))
     app.command("append")(_safe(fields_append))
     app.command("clear")(_safe(fields_clear))
-    app.command("protect-title")(_safe(fields_protect_title))
+    # Value conventions belong to normalize; these run hidden until 0.10.0.
+    for name, fn, new in (
+        ("encode", fields_encode, "normalize --encoding latex|unicode --encoding-field FIELD"),
+        (
+            "protect-title",
+            fields_protect_title,
+            "normalize --only titles --title-protection on",
+        ),
+    ):
+        alias = deprecated_alias(
+            fn,
+            old=f"fields {name}",
+            new=new,
+            action=f"fields_{name.replace('-', '_')}",
+            removal="0.10.0",
+        )
+        app.command(name, hidden=True)(_safe(alias))

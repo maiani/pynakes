@@ -70,6 +70,8 @@ to find the operation module that owns a key.
 | `normalize-ltwa-table` | normalization | CSV/TSV path with LTWA word mappings | `normalize`, `lint` | — |
 | `normalize-protect-titles` | normalization | Boolean (default: `true`); `--title-protection` | `normalize` | — |
 | `normalize-title-fields` | normalization | List of title-like fields to protect; `--title-field` | `normalize` | — |
+| `normalize-encoding` | normalization | `latex`, `unicode` or `off` (default: `off`); `--encoding` | `normalize` | — |
+| `normalize-encoding-fields` | normalization | List of fields the encoding step converts (default: the prose fields); `--encoding-field` | `normalize` | — |
 | `normalize-dois` | normalization | Boolean | `normalize` | — |
 | `normalize-pages` | normalization | Boolean (default: `true`); `--pages` | `normalize` | — |
 | `normalize-months` | normalization | Boolean (default: `true`); `--months` | `normalize` | — |
@@ -93,7 +95,7 @@ to find the operation module that owns a key.
 | `verify-published` | integrity | Boolean (default: `false`): `verify` also reports preprints with a published version; `--published/--no-published` overrides it | `verify` | — |
 | `enrich-published` | integrity | Boolean (default: `false`): `enrich` also promotes preprints; the lookups still need `--online` (offline, the pass is skipped with a warning); `--published/--no-published` overrides it | `enrich` | — |
 | `tex-sources` | usage | List of TeX files or directories, relative to the `.bib` file | `keys`, `tex scan` | — |
-| `fields-encoding` | normalization | `latex` or `unicode`; no implicit direction when absent | `fields encode --to` overrides | — |
+| `fields-encoding` | normalization | Deprecated, removed in 0.10.0: `latex` or `unicode`, read only by the deprecated `fields encode`; `normalize` does not read it, and `lint` reports it. Use `normalize-encoding` | `fields encode --to` overrides | — |
 | `groups-separator` | groups | `auto` (default), `comma`, or `semicolon`; auto detects library-wide and refuses mixed punctuation | Group membership reads, edits, selectors, analysis, TeX tagging and lint; global `--groups-separator` overrides | — |
 | `group-tree` | groups | Pipe-delimited group hierarchy; aliases JabRef's `grouping` (read native-first) — see [Grouping](#grouping) | `groups tree`/`add-group`/`remove-group`/`rename-group`/`move-group`/`update-group` | `grouping` / `groupsTree` / `groups:N...` |
 | `scrub-fields` | scrub | List of extra field names/globs `scrub` removes, on top of its default private set | `scrub` | — |
