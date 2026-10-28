@@ -15,7 +15,7 @@ For the *mechanics* of the two namespaces (routing, tracking, mirror-on-write,
 round-trip fidelity), see the [JabRef compatibility guide](jabref-compatibility.md);
 this page only lists *what* the keys are.
 
-A fresh `pynakes init` library is **pynakes-native**: its settings live in
+A fresh `pynakes init` bibliography is **pynakes-native**: its settings live in
 `pynakes-meta` and it carries no `jabref-meta` at all. Pass `init --jabref` (or
 run `metadata adopt-jabref` later) to also emit the JabRef projection. On a
 JabRef-tracked file, changing an aliased native key (see below) is **mirrored**
@@ -44,8 +44,8 @@ lint-required-fields-article: url
 }
 ```
 
-The older one-comment-per-key and `key:value;` layouts are still read;
-`normalize` rewrites them into this form on its next pass.
+One-comment-per-key and `key:value;` layouts are read too; `normalize`
+rewrites them into this form on its next pass.
 
 ## `pynakes-meta` keys
 
@@ -59,8 +59,8 @@ to find the operation module that owns a key.
 | `key-pattern` | citation-key | Default citation-key pattern (e.g. `[auth][year][veryshorttitle]`); aliases JabRef's `keypatterndefault` (read native-first) | `keys`, `lint` | `keypatterndefault` |
 | `import-key-source` | citation-key | `generated` (default) or `provider`: where `ref import` takes a new entry's key from; `--key-source` overrides it | `ref import` | — |
 | `key-pattern-<entrytype>` | citation-key | Per-entry-type key pattern; aliases JabRef's `keypattern_<entrytype>` (read native-first) | `keys`, `lint` | `keypattern_<entrytype>` |
-| `normalize-protect-titles` | normalization | Boolean; default `true` for `normalize`; `lint` checks it when stored | `normalize`, `lint` | — |
-| `normalize-title-fields` | normalization | List; default `title,booktitle,maintitle,subtitle` | `normalize`, `lint` | — |
+| `normalize-protect-titles` | normalization | Boolean (default: `true`); `--title-protection`; `lint` checks it when stored | `normalize`, `lint` | — |
+| `normalize-title-fields` | normalization | List of title-like fields to protect (default: `title,booktitle,maintitle,subtitle`); `--title-field` | `normalize`, `lint` | — |
 | `normalize-protected-terms` | normalization | List of case-sensitive terms | `normalize`, `lint` | — |
 | `normalize-drop-fields` | normalization | List of field names to remove from every entry; default none (off) | `normalize` | — |
 | `normalize-author-style` | normalization | `jabref`, `conservative`, or `none` | `normalize` | — |
@@ -68,8 +68,6 @@ to find the operation module that owns a key.
 | `normalize-journal-source` | normalization | `jabref` (bundled JabRef lists, default) or `none` (rule-based only) | `normalize`, `lint` | — |
 | `normalize-journal-table` | normalization | CSV/TSV path with exact journal mappings, layered on top of `normalize-journal-source` | `normalize`, `lint` | — |
 | `normalize-ltwa-table` | normalization | CSV/TSV path with LTWA word mappings | `normalize`, `lint` | — |
-| `normalize-protect-titles` | normalization | Boolean (default: `true`); `--title-protection` | `normalize` | — |
-| `normalize-title-fields` | normalization | List of title-like fields to protect; `--title-field` | `normalize` | — |
 | `normalize-encoding` | normalization | `latex`, `unicode` or `off` (default: `off`); `--encoding` | `normalize` | — |
 | `normalize-encoding-fields` | normalization | List of fields the encoding step converts (default: the prose fields); `--encoding-field` | `normalize` | — |
 | `normalize-dois` | normalization | Boolean | `normalize` | — |
@@ -95,9 +93,8 @@ to find the operation module that owns a key.
 | `verify-published` | integrity | Boolean (default: `false`): `verify` also reports preprints with a published version; `--published/--no-published` overrides it | `verify` | — |
 | `enrich-published` | integrity | Boolean (default: `false`): `enrich` also promotes preprints; the lookups still need `--online` (offline, the pass is skipped with a warning); `--published/--no-published` overrides it | `enrich` | — |
 | `tex-sources` | usage | List of TeX files or directories, relative to the `.bib` file | `keys`, `tex scan` | — |
-| `fields-encoding` | normalization | Deprecated, removed in 0.10.0: `latex` or `unicode`, read only by the deprecated `fields encode`; `normalize` does not read it, and `lint` reports it. Use `normalize-encoding` | `fields encode --to` overrides | — |
-| `groups-separator` | groups | `auto` (default), `comma`, or `semicolon`; auto detects library-wide and refuses mixed punctuation | Group membership reads, edits, selectors, analysis, TeX tagging and lint; global `--groups-separator` overrides | — |
-| `group-tree` | groups | Pipe-delimited group hierarchy; aliases JabRef's `grouping` (read native-first) — see [Grouping](#grouping) | `groups tree`/`add-group`/`remove-group`/`rename-group`/`move-group`/`update-group` | `grouping` / `groupsTree` / `groups:N...` |
+| `groups-separator` | groups | `auto` (default), `comma`, or `semicolon`; auto detects bibliography-wide and refuses mixed punctuation | Group membership reads, edits, selectors, analysis and lint; global `--groups-separator` overrides | — |
+| `group-tree` | groups | Pipe-delimited group hierarchy; aliases JabRef's `grouping` (read native-first) — see [Grouping](#grouping) | `groups list`/`add`/`remove`/`rename`/`update` | `grouping` / `groupsTree` / `groups:N...` |
 | `scrub-fields` | scrub | List of extra field names/globs `scrub` removes, on top of its default private set | `scrub` | — |
 | `scrub-keep-fields` | scrub | List of field names/globs `scrub` keeps despite that set (`*` keeps every field) | `scrub` | — |
 | `scrub-comments` | scrub | Boolean; default `true` — whether `scrub` removes free comment blocks | `scrub` | — |
@@ -110,7 +107,7 @@ to find the operation module that owns a key.
 | `pinax-discover-arxiv` | pinax | Boolean (default: `false`): look up a missing arXiv id by DOI when a preprint is needed; `asset fetch --discover/--no-discover` overrides it | `asset fetch` | — |
 
 `lint-required-fields` values are additive to pynakes' built-in requirements,
-which follow the library's `dialect` (`bibtex` or `biblatex`, aliasing JabRef's
+which follow the bibliography's `dialect` (`bibtex` or `biblatex`, aliasing JabRef's
 `databaseType`). The
 BibLaTeX built-ins are sourced from the official BibLaTeX manual from CTAN,
 section 2.1 entry types and aliases:
@@ -138,7 +135,7 @@ it is simply reported as `unknown` category by `metadata list`.
 
 These JabRef-native keys are read only as **fallbacks** when the pynakes-native
 key is absent (or, for `saveActions`, as a JabRef-only input with no native
-equivalent). A pynakes-native library needs none of them.
+equivalent). A pynakes-native bibliography needs none of them.
 
 | Key | Read as fallback for | Used by |
 | --- | --- | --- |
@@ -146,7 +143,7 @@ equivalent). A pynakes-native library needs none of them.
 | `keypattern_<entrytype>` | `key-pattern-<entrytype>` | Per-entry-type key generation and `lint` conformance; overrides the default |
 | `databaseType` | `dialect` | engine, `lint`, importer |
 | `saveOrderConfig` | `sort-order` (only its `specified` form) | `normalize` |
-| `grouping` / `groupsTree` / `groups:N ...` (flat) | `group-tree` | `groups list`/`add`/etc — see [Grouping](#grouping) |
+| `grouping` / `groupsTree` / `groups:N ...` (flat) | `group-tree` | `groups list`/`add`/`remove`/`rename`/`update` — see [Grouping](#grouping) |
 | `saveActions` | *(no native equivalent)* | `normalize` author, DOI, and field-formatter defaults |
 
 ### JabRef-only keys (category, no native equivalent)
@@ -162,10 +159,10 @@ schema does not yet cover them.
 | `versionDBStructure` | library | JabRef's internal database-structure version marker |
 | `fileDirectory` / `fileDirectory-<library>` (prefix `fileDirectory`) | files | Per-library linked-file search path(s) |
 | `fileDirectoryLatex` | files | Linked-file search path used when compiling with `\bibliography` |
-| `keywordSeparator` | groups | JabRef's declared library separator; comma or escaped semicolon is read before inferring `groups` memberships, unless `groups-separator` overrides it |
+| `keywordSeparator` | groups | JabRef's declared keyword separator for the file; comma or escaped semicolon is read before inferring `groups` memberships, unless `groups-separator` overrides it |
 | `groupsVersion` | groups | Version marker JabRef writes alongside `grouping` |
 | `groups-search-syntax-version` | groups | Version marker for the search-group expression syntax |
-| `bibdesk static groups` | groups | BibDesk-compatibility static-group marker some libraries carry |
+| `bibdesk static groups` | groups | BibDesk-compatibility static-group marker some bibliographies carry |
 | `selector_<field>` (prefix `selector_`) | selectors | JabRef's per-field autocomplete/selector value lists (e.g. `selector_publisher`) |
 
 ## Grouping

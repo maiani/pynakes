@@ -1,6 +1,9 @@
 # Examples
 
-Practical examples for the currently implemented `pynakes` workflow.
+Short recipes for common jobs. Each modifying command is shown with
+`--dry-run --diff` first; the [usage guide](../guides/usage.md) explains the
+commands and the [command reference](../guides/command-reference.md) lists
+their options.
 
 ## Example 1: Daily Bibliography Maintenance
 
@@ -16,8 +19,9 @@ pynakes normalize refs.bib
 pynakes lint refs.bib
 ```
 
-`normalize` protects title capitalization, normalizes JabRef-style author/editor
-lists, normalizes DOI fields, and abbreviates journal titles.
+By default `normalize` protects title capitalization, normalizes author/editor
+lists in JabRef style, cleans DOI fields, page ranges and month macros, and
+leaves journal titles alone unless a journal style is configured.
 
 Use conservative author handling if you do not want `John Smith` rewritten to
 `Smith, John`:
@@ -36,10 +40,10 @@ Nature Machine Intelligence,Nat. Mach. Intell.,2522-5839
 Canonical Journal,Can. J.,1234-567X
 ```
 
-Run:
+Run (a table applies only when a journal style requests abbreviation):
 
 ```bash
-pynakes normalize refs.bib --journal-table journals.csv --dry-run --diff
+pynakes normalize refs.bib --journal-style abbreviated --journal-table journals.csv --dry-run --diff
 ```
 
 Add an LTWA-style word table when you want broader word-level generation:
@@ -53,7 +57,7 @@ Science,Sci.,English
 Run:
 
 ```bash
-pynakes normalize refs.bib --ltwa-table ltwa.csv --dry-run --diff
+pynakes normalize refs.bib --journal-style abbreviated --ltwa-table ltwa.csv --dry-run --diff
 ```
 
 ## Example 3: Import or Add a Reference
@@ -98,8 +102,9 @@ pynakes fields append refs.bib keywords "transformers" \
   --where 'title contains "neural network"'
 ```
 
-The current filter syntax supports `contains`, `=`, `==`, `exists`, and the
-special field `type`.
+`--where` takes the shared selector grammar — comparisons, lists, regular
+expressions, fuzzy matches, and `and`/`or`/`not`; see
+[Selecting entries](../guides/usage.md#selecting-entries-where).
 
 ## Example 6: Protect Title Capitalization
 
@@ -121,12 +126,11 @@ pynakes normalize refs.bib --only titles --title-protection on \
 
 ```bash
 pynakes lint refs.bib --only duplicate_key --json
-pynakes keys repair --dry-run --diff
 pynakes keys repair refs.bib --dry-run --diff
 pynakes keys repair refs.bib
 ```
 
-Regenerate a key from entry metadata, or regenerate the whole library explicitly:
+Regenerate a key from entry metadata, or regenerate every key explicitly:
 
 ```bash
 pynakes keys generate refs.bib OldKey2020 --dry-run --diff
@@ -167,9 +171,9 @@ Export a cited-only `.bib` file:
 pynakes combine refs.bib --where used --out cited-only.bib
 ```
 
-## Example 8b: Combine and Split Across Files
+## Example 9: Combine and Split Across Files
 
-Combine two libraries into one:
+Combine two bibliographies into one:
 
 ```bash
 pynakes combine 1.bib 2.bib --out combined.bib --dedupe --dry-run --diff
@@ -180,20 +184,20 @@ entries go to `3.bib` and the rest to `4.bib`:
 
 ```bash
 pynakes split 1.bib 2.bib --tex paper.tex \
-  --to 3.bib='used' \
-  --to 4.bib='*'
+  --route 3.bib='used' \
+  --route 4.bib='*'
 ```
 
 Or partition by group instead (first match wins; `*` is the catch-all):
 
 ```bash
 pynakes split 1.bib 2.bib \
-  --to ml.bib='group "Machine Learning"' \
-  --to archive.bib='group "Archive"' \
-  --to rest.bib='*'
+  --route ml.bib='group "Machine Learning"' \
+  --route archive.bib='group "Archive"' \
+  --route rest.bib='*'
 ```
 
-## Example 9: Batch Field Editing
+## Example 10: Bulk Field Editing
 
 ```bash
 pynakes fields rename refs.bib journal journaltitle --dry-run --diff
@@ -207,44 +211,13 @@ Apply only the changes you reviewed:
 pynakes fields rename refs.bib journal journaltitle
 ```
 
-## Example 10: Repository CI
-
-This repository’s CI runs:
-
-```bash
-ruff check src tests
-ruff format --check src tests
-pytest
-```
-
-Install the same local checks:
-
-```bash
-pip install -e ".[dev]"
-pre-commit install
-pre-commit run --all-files
-```
-
-## Example 11: Agent-Friendly JSON Workflow
-
-```bash
-pynakes inspect refs.bib --json > state.json
-pynakes lint refs.bib --json > issues.json
-pynakes normalize refs.bib --dry-run --diff --json > normalize-preview.json
-```
-
-An agent or script can inspect `normalize-preview.json`, show the diff to a
-user, and then run the same command without `--dry-run` after approval.
-
-## Example 12: A `.bib` file with library metadata
+## Example 11: A `.bib` File with Metadata Settings
 
 pynakes reads two top-level metadata namespaces. JabRef writes its own settings
 as `@comment{jabref-meta: …}`, one comment per key. pynakes adds a
-`@comment{pynakes-meta: …}` namespace for settings JabRef has no place for;
-because JabRef never reads it, pynakes packs all of its keys into one
-consolidated block, one setting per line. Each setting is a `key: value` line — pynakes also reads the older
-`key:value;` spelling and rewrites it to this form. A library that carries both
-namespaces looks like this:
+`@comment{pynakes-meta: …}` namespace for settings JabRef has no place for, and
+packs all of its keys into one consolidated block, one `key: value` line per
+setting. A bibliography that carries both namespaces looks like this:
 
 ```bibtex
 @comment{jabref-meta: databaseType:biblatex;}
@@ -284,9 +257,9 @@ pynakes metadata list refs.bib
 #   [jabref:known:library] databaseType = biblatex
 #   [jabref:known:citation-key] keypatterndefault = [auth][year]
 #   [jabref:known:files] fileDirectory = /home/me/papers
-#   [pynakes:known:pynakes] normalize-journal-style = abbreviated
-#   [pynakes:known:pynakes] normalize-author-style = jabref
-#   [pynakes:known:pynakes] normalize-protected-terms = GPU,API,JSON
+#   [pynakes:known:normalization] normalize-journal-style = abbreviated
+#   [pynakes:known:normalization] normalize-author-style = jabref
+#   [pynakes:known:normalization] normalize-protected-terms = GPU,API,JSON
 ```
 
 Add a preference. A JabRef-native key lands in `jabref-meta` (so JabRef keeps
@@ -294,11 +267,9 @@ seeing it); a pynakes-only key lands in `pynakes-meta` — automatically:
 
 ```bash
 pynakes metadata set refs.bib databaseType bibtex            # → jabref-meta
-pynakes metadata set refs.bib normalize-dois on             # → pynakes-meta
+pynakes metadata set refs.bib normalize-dois true           # → pynakes-meta
 ```
 
-## Next Steps
-
-- [Usage Guide](../guides/usage.md)
-- [API Reference](../api/index.md)
-- [Architecture](../guides/architecture.md)
+For scripted and agent workflows built on `--json`, see
+[LLM & automation integration](../guides/llm-integration.md); for repository
+gates, [Git workflows](../guides/git-workflows.md).

@@ -1,17 +1,17 @@
 # Public API and compatibility
 
-This page describes the intended public surface of the reference management
-engine. This checkout targets the v0.7.0 CLI beta contract. From 0.7.0, CLI commands, options, JSON envelopes,
-exit codes and error codes require a documented deprecation period before
-incompatible changes. Additions remain possible in minor releases.
+This page describes the public surface of the reference management engine
+and the compatibility promise attached to each part.
 
-The Python API is intended to stabilize at 1.0. Until then, Python API changes
-are documented in `CHANGELOG.md` but do not require deprecation. Consumers
-that need reproducibility should pin exact versions.
-
-The CLI and its JSON envelopes are a co-equal public API. Their command syntax,
-exit codes, and response shapes are defined in the [LLM & automation integration
-guide](llm-integration.md).
+- **The CLI and its JSON envelopes** are a beta contract: commands, options,
+  envelope keys, `action` values, exit codes and error codes change
+  incompatibly only after a deprecation period (see
+  [Compatibility policy](#compatibility-policy)). Their syntax, exit codes and
+  response shapes are defined in the
+  [LLM & automation integration guide](llm-integration.md).
+- **The Python API** is experimental until 1.0. Its changes are documented in
+  `CHANGELOG.md` but do not require deprecation. Consumers that need
+  reproducibility should pin exact versions.
 
 ## Supported Python modules
 
@@ -27,7 +27,7 @@ points, their result types, and the exceptions callers commonly need to handle.
 `pynakes.__all__` is the authoritative list. Domain-specific operations remain
 in the modules below instead of being duplicated wholesale at package level.
 
-The following modules are the intended public Python surface. Until 1.0, non-underscore classes, functions, exceptions, and constants in these
+The following modules are the public Python surface. Until 1.0, non-underscore classes, functions, exceptions, and constants in these
 modules are the supported way to integrate with pynakes, but they are not yet
 covered by a backward-compatibility guarantee.
 
@@ -58,25 +58,22 @@ variant detection and rendering are private implementation modules.
 
 All operation functions mutate a supplied `BibFile` in place unless their
 documentation explicitly says otherwise. They return a count, a report, or a
-specific result; they do not replace the supplied library. Field/key mutations
-continue to use the surgical editing path, preserving untouched entry text.
+specific result; they do not replace the supplied `BibFile`. Field/key mutations
+use the surgical editing path, preserving untouched entry text.
 
 The `pynakes.setops` projections are the documented exception: `merge_libraries`
 and `partition_library` read their inputs read-only and return **new**
-`BibFile` objects (a combined library and a label-to-library mapping,
+`BibFile` objects (a combined bibliography and a label-to-bibliography mapping,
 respectively) rather than mutating in place.
 
 ## Metadata names
 
-The generic names below are settled before the API freeze because both
-`jabref-meta` and `pynakes-meta` use the same structures:
+Both `jabref-meta` and `pynakes-meta` use the same structures, under generic
+names:
 
 - `model.MetadataBlock`
 - `metadata.MetadataUpdate`
 - `metadata.DuplicateMetadataError`
-
-The earlier `JabRefMetadata*` names are not part of the public API. Code should
-use the generic names above.
 
 `MetadataBlock.value` preserves the parsed metadata payload, including JabRef's
 trailing semicolon when the source had one. Use
@@ -94,9 +91,20 @@ This rule lets the public modules expose ordinary, readable operation names
 without turning parser details, raw-text splicing, or CLI plumbing into a
 compatibility burden.
 
-## Semantic-versioning policy
+## Compatibility policy
 
-Starting with 1.0.0:
+The CLI contract covers command syntax, options, envelope keys, `action`
+values, exit codes and error codes. Removing or renaming any of them requires
+one minor release in which the old form still works and emits a structured
+deprecation warning: an entry in the envelope's `warnings` with
+`type: deprecated`, `old`, `new`, and the `removal` release (on stderr outside
+`--json`). Deprecated forms are hidden from `--help`; `capabilities` lists every
+form currently in its deprecation period under `deprecations`. Minor releases
+may add compatible commands, options and report data; patch releases fix bugs
+and documentation only. Include the version (`pynakes --version`,
+`pynakes.__version__`, or `version` in `capabilities --json`) in diagnostics.
+
+From 1.0.0 the Python API joins the CLI under semantic versioning:
 
 - Patch releases fix bugs and documentation only; they do not remove or change
   the behavior of the public Python API or CLI/JSON contract.
@@ -106,31 +114,19 @@ Starting with 1.0.0:
   documented operation result, change a CLI command/option/exit-code meaning,
   or make an incompatible JSON-envelope change.
 
-From 0.7.0, removing or renaming a CLI command, option, envelope key, action,
-exit-code meaning or error code requires one minor release in which the old
-form still works and emits a structured deprecation warning: an entry in the
-envelope's `warnings` with `type: deprecated`, `old`, `new`, and the `removal`
-release (on stderr outside `--json`). `capabilities` lists every form currently
-in its deprecation period under `deprecations`. At 1.0.0, these
-surfaces and the Python API follow the semantic-versioning policy above. Include
-`pynakes.__version__` or `capabilities.VERSION` in diagnostics.
-
 ## Stability markers
 
-`capabilities.command_schemas` marks each command `stable` or `experimental`.
-All current commands are stable under the 0.7 CLI contract, including Pinax
-operations and `combine`/`split`. The generated command reference shows the same marker.
-An experimental addition must be explicitly marked before it ships; it has no
-compatibility guarantee. Stability does not imply that a development checkout
-is a published release.
+`capabilities.command_schemas` marks each command `stable` or `experimental`,
+and the generated command reference shows the same marker. Every current
+command, including the Pinax operations and `combine`/`split`, is stable. An
+experimental addition must be explicitly marked before it ships; it has no
+compatibility guarantee.
 
-The beta promise covers command syntax, options, envelope keys, `action` values,
-exit codes and error codes. Before removal or incompatible replacement, the old
-form must work for one minor release and emit a structured warning with
-`type: deprecated`, `old` and `new`. Minor releases may add compatible features;
-patch releases fix bugs and documentation only. No known data-loss bugs or
-uncaught tracebacks are acceptable release regressions. The advertised platform
-and dependency matrix and generated documentation must be tested.
+## Release requirements
+
+No known data-loss bugs or uncaught tracebacks are acceptable release
+regressions, and the advertised platform and dependency matrix and the
+generated documentation must be tested.
 
 Use **Breaking changes** in CHANGELOG for incompatible behavior and
 **Deprecated** for old forms entering their deprecation period. Each deprecation

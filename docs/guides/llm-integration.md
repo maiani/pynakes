@@ -7,7 +7,9 @@ remain responsible for deciding which changes to request and accept.
 
 This guide defines how an LLM or automation workflow should drive that engine:
 command discovery, the preview-and-commit workflow, exit codes, and the structured JSON
-contract. For command-by-command tutorials, see the [usage guide](usage.md).
+contract. This page is the authority for that contract; the
+[usage guide](usage.md) explains what each command does, and the
+[command reference](command-reference.md) lists its options.
 
 > Working *on* the pynakes codebase instead of using it? See `AGENTS.md` at the
 > repository root.
@@ -77,7 +79,7 @@ commands and their semantics.
 
 ## Preview and apply workflow
 
-1. Inspect the library and run the relevant checks.
+1. Inspect the bibliography and run the relevant checks.
 
    ```bash
    pynakes inspect refs.bib --json
@@ -169,12 +171,12 @@ the all-or-nothing guarantee rather than an exception to it.
   reports the waiver as `unused_entry_directive` once it no longer applies.
 - Use `ref compare <key> --online` to check one reference's DOI (or, absent a
   DOI, its arXiv id) against provider metadata, or `ref compare <key> --with
-  <other-key>` to compare it against another entry already in the library
+  <other-key>` to compare it against another entry already in the bibliography
   (e.g. a candidate duplicate) with no network access. Either way it's
   read-only and reports only the fields where a non-empty value on the other
   side differs from the local one — review the `fields` list, then apply the
   ones you want with `ref edit <key> --field name=value` (repeatable). Use
-  `enrich --online` and `verify --online` instead for whole-library,
+  `enrich --online` and `verify --online` instead for whole-bibliography,
   always-fill or always-report operations; `ref compare` is for one entry at a
   time with a human choosing per field.
 - Use `fields` with `--where` for bulk field operations over a selection. The
@@ -194,7 +196,7 @@ the all-or-nothing guarantee rather than an exception to it.
   decides. Treat an empty result as evidence rather than proof — an obscure or
   very recent work also matches nothing.
 - Use `format` for layout only and `normalize` for bibliographic conventions.
-- Use `scrub` before a library leaves the author's machine — an arXiv upload, a
+- Use `scrub` before a bibliography leaves the author's machine — an arXiv upload, a
   submission bundle, a public repository. It writes a copy (`--out`) without
   private entry fields, metadata blocks, or free comments, and leaves the source
   untouched; `--check` reports and exits `1` instead of writing. Add
@@ -232,7 +234,7 @@ entry reports:
 - `--select f1,f2` returns exactly those stored fields — `abstract` is one —
   under `fields`, in place of the triage `summary` (on `search`, as each
   match's `fields`; `search --in` separately chooses the fields searched).
-- `--include materials,provenance` adds what the library records outside the
+- `--include materials,provenance` adds what the bibliography records outside the
   entry's fields, each part under its own key. `materials`: the Pinax materials
   present for the key (`pinax.configured` is `false` without
   `pinax-files-dir`) and the BibLaTeX `file` links with their status.
@@ -249,7 +251,7 @@ Keep the response bounded with the same options on `ref show --key`,
 - `--limit N` returns at most `N` entries; `page.total` counts the whole
   selection and `--limit 0` reports only that count.
 - `--cursor` resumes with `page.next_cursor` until `page.complete` is `true`.
-  The cursor is bound to the library snapshot: if the file changes between
+  The cursor is bound to the bibliography snapshot: if the file changes between
   pages, the next page is refused with the `StaleCursor` conflict (exit 2), so
   pages never silently skip or repeat entries. Restart from the first page.
 - `--max-chars N` cuts every text value to `N` characters (characters of the
@@ -258,7 +260,7 @@ Keep the response bounded with the same options on `ref show --key`,
   re-read in full.
 
 Keep missing and omitted apart when you report on a selection. *Missing* means
-the library has nothing: a selected field is `null` and listed in
+the bibliography has nothing: a selected field is `null` and listed in
 `missing_fields`, and an included part with nothing recorded is listed in
 `missing`. *Omitted* means a value exists but was left out: `omitted_fields`
 names stored fields outside `--select`, and `truncated` names cut values. Say
@@ -267,7 +269,7 @@ complete.
 
 ### Saved queries and analysis
 
-A selection worth repeating can be saved in the library:
+A selection worth repeating can be saved in the bibliography:
 `query set refs.bib to-read 'abstract exists and not group "Read"'` stores a
 `query-to-read` line in `pynakes-meta`, validated with the `--where` grammar.
 A saved query is a `--where` predicate: `ref show refs.bib --where 'query
@@ -277,7 +279,7 @@ above. Every command that takes `--where` runs it the same way and can narrow
 it (`--where 'query "to-read" and year >= 1900'`). `query list` reports
 whether each stored query still parses; `lint` reports one that does not.
 
-`analyze refs.bib --json` describes a library with offline counts in named
+`analyze refs.bib --json` describes a bibliography with offline counts in named
 `sections`: entries and duplicate keys, types, years, the most frequent
 authors and venues (`--top`), identifier and field coverage, groups, `lint`
 findings, and linked-file and Pinax materials. The `lint` section is exactly
@@ -287,15 +289,10 @@ not present them as a measure of scientific quality.
 
 `coauthors refs.bib --json` returns the co-author network under `network`
 (schema `pynakes.coauthors/1`): `authors`, `pairs`, `components`, `variants`,
-`scope` and `warnings`. Entry and author totals cover the selection; visible
-authors/pairs cover the focus neighbourhood when requested. Components and
-isolates then exclude the focus names; `visible_collaborators` counts only
-neighbours in the displayed graph. Conflicting ORCIDs on one normalized name
-produce `conflicting_author_orcids` with entry keys and zero-based
-`selection_index` evidence. Warnings survive document export, including
-GraphML's graph-level JSON `context`. Start with `analyze --section coauthors` for the bounded summary,
-then narrow with `--focus NAME` or `--where` before reading the whole network
-of a large library. Names under `variants` may be one person; report them as
+`scope` and `warnings`; the [usage guide](usage.md#coauthors) defines each
+count and the focus view. Start with `analyze --section coauthors` for the
+bounded summary, then narrow with `--focus NAME` or `--where` before reading
+the whole network of a large bibliography. Names under `variants` may be one person; report them as
 candidates and never add their counts together yourself. A `focus_variants`
 warning means entries under another spelling of the focus are outside the
 view: pass that spelling as a second `--focus` if the user confirms it is the
@@ -303,7 +300,7 @@ same person. An unknown `--focus` name is `InvalidInput` with `candidates`.
 
 ### Collecting materials
 
-One command collects the best available PDF for a library and says whether the
+One command collects the best available PDF for a bibliography and says whether the
 collection is complete:
 
 ```bash
@@ -348,8 +345,8 @@ provider lookup is reported with `checked: false` and listed under
 arguments that rerun only the retryable ones, at a lower concurrency when a
 provider throttled the run.
 
-To move reviewed references from a scratch library into a project library with
-their materials, run
+To move reviewed references from a scratch bibliography into a project
+bibliography with their materials, run
 `combine project.bib scratch.bib --out project.bib --force --dry-run --json`:
 the project keeps its `pinax-files-dir`, and `pinax_materials` names every file
 that would be copied. Run it again without `--dry-run` to apply.
@@ -398,15 +395,16 @@ Always evaluate both the process exit code and the JSON `status`.
 
 Every `--json` envelope belongs to one of five families. The family fixes the
 keys a caller can rely on; each command adds its own fields alongside them.
-`tests/test_contract.py` checks every command against its family, and from
-0.7.0 removing or renaming one of these keys is a breaking change.
+`tests/test_contract.py` checks every command against its family. Removing
+or renaming one of these keys follows the
+[deprecation policy](public-api.md#compatibility-policy).
 
 | Family | Commands | Keys always present on success |
 |---|---|---|
-| modify | edits one library in place (`normalize`, `ref edit`, `fields set`, `tex add`, …) | `status`, `action`, `file`, `dry_run`, `modified`, `modified_entries`, `warnings`, `source_sha256` |
+| modify | edits one bibliography in place (`normalize`, `ref edit`, `fields set`, `tex add`, …) | `status`, `action`, `file`, `dry_run`, `modified`, `modified_entries`, `warnings`, `source_sha256` |
 | create | writes new files (`init`, `scrub`, `combine`, `split`) | `status`, `action`, `dry_run`, `warnings`, plus `out`/`written` or `outputs` |
 | read | reports without writing (`ref show`, `search`, `inspect`, `tex list`, …) | `status`, `action`, `warnings`, `source_sha256` |
-| check | gates a library (`lint`, `verify`, `dedupe check`, `asset check`) | `status`, `action`, `file`, `warnings`, `source_sha256`, `strict` |
+| check | gates a bibliography (`lint`, `verify`, `dedupe check`, `asset check`) | `status`, `action`, `file`, `warnings`, `source_sha256`, `strict` |
 | error | any failure or conflict | `status`, `error`, `message` |
 
 Shared rules:
@@ -416,11 +414,11 @@ Shared rules:
   `ref show` reports `ref_show`, `groups assign` reports `groups_assign`.
 - `warnings` is always an array of objects, each with at least `type` and
   `message`. Branch on `type`.
-- `source_sha256` is the sha256 of the library as this invocation read it —
+- `source_sha256` is the sha256 of the bibliography as this invocation read it —
   before the write, also on a real run. Pass it back as `--expect-sha256` to
   make a later write conditional on the file being unchanged. A create command
-  reports it for the library it read, or `sources_sha256` when it read several;
-  `init`, `capabilities`, and `keys usage` read no library and omit it.
+  reports it for the bibliography it read, or `sources_sha256` when it read several;
+  `init`, `capabilities`, and `keys usage` read no bibliography and omit it.
 - `diff` is included when `--diff` was passed and a textual change exists.
 
 A modify envelope looks like this:
@@ -454,8 +452,8 @@ A modify envelope looks like this:
 counts the changed entries, and `plan` describes the staged changes (below).
 
 A check envelope puts its counts under `summary` and its findings beside it
-(`issues` for `lint`). Given several libraries, a check reports them under
-`files`, one object per library, with an aggregate `summary` that also counts
+(`issues` for `lint`). Given several bibliographies, a check reports them under
+`files`, one object per bibliography, with an aggregate `summary` that also counts
 `files` and `failed_files`; the top level then has no `file` or
 `source_sha256`, and each item carries its own.
 
@@ -548,8 +546,7 @@ compatibility aliases and remain accepted on input.
 Clients can use it for dropdowns, including when adding a new metadata block.
 List-valued settings, numbers, and free-form values are omitted. Existing raw
 values can have different casing or a trailing terminator; reading the choices
-must not silently replace them. Older engines may omit the map, in which case
-clients can retain free-form editing and rely on `metadata set` validation.
+must not silently replace them.
 
 ### Shared inspection reports
 
@@ -571,7 +568,7 @@ response includes `source_sha256`, resolved `dialect`, and `entry_schemas`:
 
 - `required`: a list of groups. Every group needs at least one populated field;
   `['author', 'editor']` means either field satisfies that requirement.
-- `profile_required`: additional exact-field requirements from the library's
+- `profile_required`: additional exact-field requirements from the bibliography's
   lint profile, separate from built-in requirements because lint treats them
   as profile findings.
 - `optional`: ordered editing suggestions, not a complete style whitelist.
@@ -592,8 +589,8 @@ Preview material collisions fail before any bibliography or material is written.
 Selection export uses `convert FILE --to bib|csl-json|ris|mods|endnote|csv`
 with `--key` / `--where`. Read `content` for clipboard output, or supply `--out`.
 The envelope distinguishes `selected_entries` from exported `entry_count` and
-lists `dependency_keys` for native output. Native output retains library-level
-metadata/comments; this is not a privacy scrub. Interchange output resolves
+lists `dependency_keys` for native output. Native output retains the
+bibliography's metadata and comments; this is not a privacy scrub. Interchange output resolves
 inheritance without exporting unselected parent records.
 
 Text encoding edits use `normalize FILE --only encoding --encoding
@@ -612,7 +609,7 @@ The envelope names the generated key. Apply the same inputs with the preview's
 For `verify --published`, `summary.checked` counts DOI verifications, whereas
 `preprints.checked` counts preprint and DOI-to-arXiv candidate results and
 excludes failed lookups. Compare the same scope when reconciling reports.
-`preprints.published` retains its legacy total; `newly_found` and `already_present`
+`preprints.published` is the total; `newly_found` and `already_present`
 separate discovered publication metadata from metadata already recorded.
 `by_status` reconciles with `checked`; lookup failures appear in warnings.
 An `unparsed_journal_reference` warning preserves an unrecognized citation string

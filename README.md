@@ -18,12 +18,11 @@ track citations in manuscripts, and optionally manage PDFs and source bundles
 through **Pinax**, addressed by citation key. The `.bib` remains authoritative,
 and JabRef interoperability keeps existing libraries usable across tools.
 
-> **Release preparation:** this checkout targets **pynakes 0.7.0 Beta** and the
-> **VS Code editor 0.1.0 Alpha**, neither published yet. The Python API is
-> experimental until 1.0; the 0.7 CLI, JSON envelope, and error codes follow the
-> [compatibility policy](https://github.com/maiani/pynakes/blob/main/docs/guides/public-api.md).
-> See the [release checklist](https://github.com/maiani/pynakes/blob/main/RELEASE.md)
-> for remaining gates.
+> **Status:** the engine is **Beta**. Its CLI, JSON envelope, and error codes
+> follow the
+> [compatibility policy](https://github.com/maiani/pynakes/blob/main/docs/guides/public-api.md);
+> the Python API is experimental until 1.0.
+> The VS Code editor is an unpublished **Alpha**.
 
 ## What it offers
 
@@ -34,13 +33,13 @@ and JabRef interoperability keeps existing libraries usable across tools.
   report conflicts rather than guessing.
 - **Reference management.** Import, search, lint, normalize, deduplicate, edit,
   convert, and export references. Track TeX citations and prepare scrubbed public
-  copies without altering the working library.
+  copies without altering the working bibliography.
 - **References and materials together.** Pinax tracks PDFs, source bundles, and
   provenance. Materials can follow entries through citation-key changes and
   bibliography combine/split operations.
 - **Research reads.** Compare a set of papers through bounded, paged reads of
   their abstracts, materials, and recorded provenance; save selections as named
-  queries; describe a library's coverage with `analyze`; and map its co-author
+  queries; describe a bibliography's coverage with `analyze`; and map its co-author
   network with `coauthors`.
 - **Automation.** Structured JSON, change plans, exit codes, and machine-readable
   capabilities support scripts, CI, and agent workflows. Network access is
@@ -78,8 +77,8 @@ pynakes ref edit refs.bib Newton1687 --field note="Reviewed"
 pynakes search refs.bib Principia --json
 ```
 
-When the current directory has exactly one `.bib` file, single-library commands
-can infer its path. Otherwise, provide the file explicitly. See the
+When the current directory has exactly one `.bib` file, commands that take one
+bibliography can infer its path. Otherwise, provide the file explicitly. See the
 [quick-start guide](https://github.com/maiani/pynakes/blob/main/docs/guides/quickstart.md)
 for imports, normalization, and other workflows.
 
@@ -96,7 +95,7 @@ bib.commit(backup=True)
 ```
 
 See the [API reference](https://github.com/maiani/pynakes/blob/main/docs/api/reference.md)
-for `preview()`, `change_plan()`, and the other library operations.
+for `preview()`, `change_plan()`, and the other `Bibliography` operations.
 
 ## VS Code editor
 

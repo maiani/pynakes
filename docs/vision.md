@@ -41,14 +41,16 @@ BibTeX:
   ambiguous operations report conflicts instead of choosing silently.
 - **Preserve unless asked to transform.** Normalization and formatting happen
   only through explicit commands. Lint findings are advisory unless strict mode
-  is requested, and strict mode accepts only findings the library explicitly
+  is requested, and strict mode accepts only findings the bibliography explicitly
   suppresses.
-- **Explicit side effects.** Network access is limited to `ref import`, `asset
-  fetch`, `ref add --fetch` / `ref import --fetch`, and operations invoked with `--online`.
+- **Explicit side effects.** Network access is limited to commands whose
+  purpose is a request — `ref import`, `ref lookup`, `asset fetch`, and
+  `--fetch` on `ref add` / `ref import` — and to operations invoked with
+  `--online`.
 - **Every setting three ways.** Each behaviour a command can be configured
   into is selectable per run (CLI flag or Python API parameter), storable in
-  the library as a metadata setting, and that setting is itself editable
-  through the CLI and API (`metadata set`), never only by hand. A library's
+  the bibliography as a metadata setting, and that setting is itself editable
+  through the CLI and API (`metadata set`), never only by hand. A bibliography's
   profile therefore reproduces its behaviour from the file alone, and any run
   can override it in either direction. Three things are deliberately not
   settings: how one run is carried out (`--json`, `--dry-run`, `--diff`,
@@ -60,14 +62,15 @@ BibTeX:
 
 ## In JabRef's lineage
 
-JabRef helped establish the value of curating a `.bib` as a durable library.
+JabRef helped establish the value of curating a `.bib` as a durable library of
+references.
 pynakes carries that conviction into programmable reference management: it
 preserves JabRef metadata and understands its save-order, normalization and
-citation-key conventions wherever a library uses them.
+citation-key conventions wherever a bibliography uses them.
 
 The kinship is interop, not imitation. pynakes keeps its own settings in a
 `pynakes-meta` namespace and treats `jabref-meta` as a projection it maintains on
-JabRef's behalf — already present in libraries that use it, and added to a
+JabRef's behalf — already present in bibliographies that use it, and added to a
 pynakes-native file only when you opt in with `metadata adopt-jabref`. It follows
 JabRef's intent rather than its byte-for-byte output, so the two can evolve on
 their own schedules and either can still open the file and find it whole.
@@ -81,8 +84,8 @@ CI, and agents — with no dependency on any application above it.
 
 The optional Pinax mode keeps that base intact while letting a bibliography own a
 `pinax-files-dir` of citation-key-addressed materials. No `pinax-files-dir` means no Pinax
-behavior. Cross-file corpus work — a `Library` over many pinakes, a derived
-`Catalogue` index — is planned for the v0.9 discovery release; see
+behavior. Cross-file work — a `Library` over many pinakes, a derived
+`Catalogue` index — is planned; see
 [DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
 
 The name points past the single file. The *Pinakes* was Callimachus's catalog of

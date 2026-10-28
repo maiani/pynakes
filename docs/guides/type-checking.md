@@ -1,43 +1,41 @@
 # Type checking
 
-Run `ty check` locally; the same command gates CI and runs in pre-commit.
-Astral describes ty as [beta](https://github.com/astral-sh/ty); the development
-extra pins the evaluated version. Ty replaces mypy throughout this repository.
+The repository is type-checked with [ty](https://github.com/astral-sh/ty),
+which Astral describes as beta. Run it from the repository root:
 
-The 2026-10-11 trial used ty 0.0.86, Python 3.12 as the type target, and all
-supported platforms. The initial run reported 134 diagnostics. Correcting the
-source-layout tag casts and the normalization warning annotation, and selecting
-all platforms, reduced that to 122 diagnostics. Removing an unreachable import fallback,
-accepting read-only manifest rows as mappings, and defaulting an optional
-provider DOI to an empty string reduced the final baseline to 118 diagnostics. These are existing
-annotation debt in CLI envelopes, callbacks, provider protocols and heterogeneous
-source-layout/model structures, rather than observed runtime failures.
+```sh
+ty check
+```
 
-`pyproject.toml` records a provisional baseline per module and rule family;
-other rules and other modules remain checked. Remove exemptions as annotations
-are repaired; do not add exemptions for new code. The previous mypy baseline exempted entire modules; the ty baseline
-exempts only the recorded rule families. The conditional `importlib_resources` fallback was removed because supported
-Python versions supply `importlib.resources`. Cross-platform ctypes names are
-handled by checking all platforms, rather than adding an exemption.
+The same command runs in pre-commit and gates CI. The `dev` extra in
+`pyproject.toml` pins the ty version, so a local run and CI report the same
+diagnostics; update the pin deliberately, in its own change.
 
-Moving to ty 0.0.93 on 2026-10-28 added no diagnostics. Repairing annotations
-then shrank the baseline to 59 diagnostics in 12 modules. What remains is
-mostly CLI glue: `**details` envelopes passed to `_finish_mod`, Click
-subclasses typed against the click that typer vendors, and monkey-patched
-Typer hooks. The rest is the loosely typed source-layout segments and the
-injectable URL opener. None is an observed runtime failure.
+`[tool.ty]` in `pyproject.toml` configures the run: it checks `src/pynakes`
+against Python 3.12, the lowest supported version, on all platforms at once,
+so platform-specific names such as `ctypes` attributes are checked without
+exemptions.
 
-| Module | Outstanding diagnostics | Rule families |
-| --- | ---: | --- |
-| `bibtex_writer.py` | 10 | `invalid-argument-type`, `unresolved-attribute` |
-| `cli.py` | 2 | `invalid-assignment` |
-| `cli_commands/dedupe.py` | 1 | `invalid-argument-type` |
-| `cli_commands/import_ref.py` | 2 | `invalid-argument-type` |
-| `cli_commands/init.py` | 2 | `invalid-argument-type` |
-| `cli_commands/integrity.py` | 4 | `invalid-argument-type` |
-| `cli_commands/keys.py` | 1 | `invalid-argument-type` |
-| `cli_commands/remove.py` | 2 | `invalid-argument-type` |
-| `cli_commands/setops.py` | 1 | `invalid-argument-type` |
-| `cli_discovery.py` | 31 | `invalid-argument-type`, `invalid-assignment`, `invalid-attribute-access`, `invalid-method-override`, `unresolved-attribute` |
-| `cli_surface.py` | 1 | `invalid-assignment` |
-| `providers/_http.py` | 2 | `invalid-context-manager` |
+## The baseline
+
+Each `[[tool.ty.overrides]]` table names one module and the rule families
+ignored in it. Every other rule in that module, and every rule in every other
+module, is enforced. The overrides record existing annotation debt, not
+observed runtime failures, and the list only shrinks:
+
+- Do not add an override, or a rule to an existing one, for new code. Fix the
+  annotation instead.
+- When a repair clears a module's last diagnostic of a rule family, remove that
+  rule from the override, and the table once it is empty.
+
+The remaining overrides cover a few kinds of code:
+
+| Modules | What remains |
+| --- | --- |
+| `cli.py`, `cli_surface.py`, `cli_discovery.py` | Click subclasses typed against the Click that Typer vendors, and monkey-patched Typer hooks. |
+| `cli_commands/` (`dedupe`, `import_ref`, `init`, `integrity`, `keys`, `remove`, `setops`) | `**details` envelopes passed to `_finish_mod`, which ty cannot match to its keyword parameters. |
+| `bibtex_writer.py` | The loosely typed source-layout segments the writer reassembles. |
+| `providers/_http.py` | The injectable `urlopen`-style opener, used as a context manager. |
+
+`pyproject.toml` is the authoritative list; read it rather than this table when
+the two differ.

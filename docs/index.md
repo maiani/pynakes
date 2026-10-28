@@ -6,81 +6,55 @@ Its Python API and CLI help researchers and automation acquire references,
 curate BibTeX and BibLaTeX bibliographies, compare and enrich records, track
 citations, and optionally manage PDFs and source materials with provenance.
 Previewed edits, explicit conflicts and source preservation keep the work
-reviewable. JabRef compatibility supports existing libraries and workflows.
+reviewable. JabRef compatibility keeps existing libraries and workflows usable.
 
-The ambition is a research library that stays usable across projects and tools.
-The current engine works with individual bibliographies and explicit operations
-across files; `Library`, `Catalogue` and broader client integrations are planned
-in the [roadmap](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
+The engine works with individual bibliographies and explicit operations across
+files. Collection-wide `Library` and `Catalogue` APIs and further clients are
+planned in the [roadmap](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
 
-> **Development status.** This checkout prepares 0.7.0 Beta (not yet published), with a beta CLI contract
-> and an experimental VS Code client. Engine readiness precedes editor work;
-> the engine and editor 0.1.0 will be published together. The
-> Python API is intended to stabilize at 1.0; from 0.7.0 the CLI contract requires
-> deprecation before incompatible changes. Pin versions for reproducible use.
+> **Development status.** The engine is Beta: the CLI and its JSON envelope
+> follow a [deprecation policy](guides/public-api.md#compatibility-policy), and
+> the Python API is experimental until 1.0.
+> The VS Code editor companion is an unpublished alpha.
+> Pin versions for reproducible use.
 
-## Overview
+## What it offers
 
-`pynakes` exposes bounded commands for making reviewable changes to `.bib`
-files:
+- **Source preservation.** Untouched entries, comments and JabRef metadata
+  write back byte-for-byte; surgical edits keep diffs focused, and whole-file
+  formatting is an explicit operation.
+- **Review before writing.** Modifying commands preview with `--dry-run --diff`
+  and report conflicts instead of guessing.
+- **Reference management.** Import by DOI, repository identifier, ISBN or URL;
+  search, lint, normalize, format, deduplicate, edit, group, convert and export
+  references; track TeX citations; prepare scrubbed public copies.
+- **Materials.** [Pinax](guides/pinax.md) keeps PDFs and arXiv sources beside a
+  `.bib`, addressed by citation key, with provenance.
+- **Automation.** Structured JSON, exit codes, change plans and machine-readable
+  capabilities serve scripts, CI and agents. Network access is always explicit.
 
-- **Previews**: modifying commands support `--dry-run` and `--diff`
-- **Structured output**: commands support `--json` where useful
-- **Round-trip preservation**: unmodified entries, comments, and JabRef metadata stay intact
-- **Explicit behavior**: local operations are testable and network access is opt-in
-- **Conflict-aware**: ambiguous cases return errors or conflicts rather than guessing
+## Start here
 
-## Quick Start
-
-```bash
-pip install -e ".[dev]"
-
-pynakes inspect refs.bib
-pynakes lint refs.bib --json
+```sh
+pip install pynakes
+pynakes init refs.bib
+pynakes lint refs.bib
 pynakes normalize refs.bib --dry-run --diff
-pynakes normalize refs.bib
 ```
 
-## Implemented Features
-
-- BibTeX parsing/writing with duplicate-key preserving entry storage
-- JabRef group fields and structured `jabref-meta` parsing/preservation/update
-- JabRef citation-key pattern metadata for key generation and DOI imports
-- JabRef metadata list/set commands and `inspect --json` metadata output
-- Read-only library search with free text, phrase, and field-scoped terms
-- Group list/add/remove commands
-- Citation-key check/generate/repair commands
-- Field rename/move/append/clear and title-capitalization protection
-- Reference import through DOI, supported repository identifiers, ISBN and URLs
-- Deduplication and conservative merge workflows
-- Integrity/enrichment workflows with opt-in online provider lookups
-- JabRef linked-file validation through `asset check`
-- AUX/TeX citation analysis with used/unused/missing reporting
-- Daily `normalize` routine:
-  - title capitalization protection
-  - JabRef-style author/editor normalization
-  - DOI normalization
-  - exact journal mappings and LTWA-style journal abbreviation
-- Local pre-commit hooks and GitHub Actions CI
-- Capability introspection JSON
-
-## Documentation
-
-- [Installation Guide](guides/installation.md)
-- [Quick Start](guides/quickstart.md)
-- [Usage Guide](guides/usage.md)
-- [Public API and compatibility](guides/public-api.md)
-- [API Reference](api/index.md)
-- [Examples](examples/index.md)
-- [Architecture](guides/architecture.md)
-- [Philosophy](vision.md)
-
-## Why pynakes?
-
-BibTeX libraries grow unwieldy: duplicate entries, inconsistent fields, fragile
-title casing, and mixed metadata conventions. `pynakes` gives you small,
-inspectable operations that preserve human-curated data while making routine
-maintenance scriptable.
+| To… | Read |
+| --- | --- |
+| Install, or set up a development checkout | [Installation](guides/installation.md) |
+| Try an offline walkthrough | [Quick Start](guides/quickstart.md) |
+| Learn what each command does | [Usage](guides/usage.md) |
+| Look up every option | [Command Reference](guides/command-reference.md) |
+| Drive pynakes from a script or LLM agent | [LLM Integration](guides/llm-integration.md) |
+| Gate a repository in pre-commit or CI | [Git Workflows](guides/git-workflows.md) |
+| Configure a bibliography through metadata | [Metadata Reference](guides/metadata-reference.md) |
+| Manage PDFs and sources | [Pinax](guides/pinax.md) |
+| Know what goes over the network | [Network and Privacy](guides/network-and-privacy.md) |
+| Use the Python API | [API Overview](api/index.md) and [Public API](guides/public-api.md) |
+| Understand the design | [Philosophy](vision.md) and [Architecture](guides/architecture.md) |
 
 ## License
 

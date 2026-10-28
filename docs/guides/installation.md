@@ -32,28 +32,21 @@ uv add pynakes
 
 See [uv’s tools guide](https://docs.astral.sh/uv/guides/tools/) for tool management.
 
-### Development Installation
+### Development installation
 
-Clone the repository and install in editable mode:
+Clone the repository with its tags and install it in editable mode with the
+development and documentation tools (`pytest`, `ruff`, `ty`, `pre-commit`,
+`mkdocs`):
 
 ```bash
 git clone https://github.com/maiani/pynakes.git
 cd pynakes
-pip install -e .
+pip install -e ".[dev,docs]"
 ```
 
-### With Development Tools
+## Development checks
 
-Install with dev dependencies (`pytest`, `ruff`, `pre-commit`):
-
-```bash
-pip install -e ".[dev]"
-```
-
-
-## Development Checks
-
-Run the same checks as CI:
+Run the same checks as CI (see [Type checking](type-checking.md) for `ty`):
 
 ```bash
 ruff check src tests
@@ -100,32 +93,25 @@ which pynakes
 python -m pynakes --help
 ```
 
-### Version mismatch
+### Version conflicts
 
-If you see version conflicts during installation, try upgrading pip:
+If you see version conflicts during installation, upgrade pip and retry:
 
 ```bash
 pip install --upgrade pip
-pip install -e .
+pip install pynakes
 ```
 
-### Development installation issues
-
-For development, ensure you have git and the latest setuptools:
-
-```bash
-pip install --upgrade setuptools wheel
-pip install -e ".[dev]"
-```
+### Development version numbers
 
 The version comes from git tags (setuptools-scm), so install from a clone with
-its history and tags: a shallow clone reports a version such as `0.1.dev1`.
+its history and tags: a shallow clone reports a placeholder such as `0.1.dev1`.
 Between releases, `pynakes --version` names the next release, the commits since
-the last tag, and the commit (`0.7.0.dev12+g1a2b3c4`). An editable install
-records the version when it is installed; reinstall to refresh it.
+the last tag, and the commit (for example `1.2.0.dev12+g1a2b3c4`). An editable
+install records the version when it is installed; reinstall to refresh it.
 
-## Next Steps
+## Next steps
 
-- [Quick Start Guide](quickstart.md)
-- [Usage Guide](usage.md)
+- [Quick Start](quickstart.md)
+- [Usage](usage.md)
 - [Examples](../examples/index.md)

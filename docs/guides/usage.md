@@ -1,16 +1,15 @@
 # Usage Guide
 
-This guide explains the engine's workflows and selection semantics. The
-[generated command reference](command-reference.md) lists every live command,
-argument, option, default, choice and stability marker. It is rebuilt from the
-same Click tree as `capabilities --json`; it includes `metadata remove`,
-`tex list/remove/clear`, `ref remove --keep-files`, `batch --ops-file`
-and `init --agent-guide`.
+This guide explains what the commands do and how they select entries. It does
+not repeat option lists: the [command reference](command-reference.md),
+generated from the live CLI, lists every command, argument, option, default,
+choice and stability marker. The JSON envelope, exit codes and agent workflows
+are specified in [LLM & automation integration](llm-integration.md).
 
 ## Offline walkthrough
 
-Run this block in an empty directory. It creates its own library, so no
-private bibliography or network service is needed. The README, quickstart and
+Run this block in an empty directory. It creates its own bibliography, so no
+private data or network service is needed. The README, quickstart and
 this guide's `bash` blocks are executed in CI. Installation, online and
 terminal-only examples use `sh` and are labeled separately.
 
@@ -41,19 +40,13 @@ pynakes capabilities --json
 citation rewrites require actual TeX sources. Online operations and their
 transmitted data are described in [Network and privacy](network-and-privacy.md).
 
-## Command Conventions
+## Command conventions
 
-Modifying commands support:
-
-- `--dry-run`: show what would change without writing
-- `--diff`: include a unified diff
-- `--json`: emit structured output where supported
-
-Exit codes:
-
-- `0`: success
-- `1`: error, such as parse, I/O, or validation failure
-- `2`: conflict, such as duplicate DOI import without `--allow-duplicate`
+Modifying commands accept `--dry-run` (report without writing) and `--diff`
+(include a unified diff), and `--json` emits the structured envelope. Exit code
+`0` is success, `1` an error, and `2` a conflict that needs a decision, such as
+a duplicate DOI import without `--allow-duplicate`; the full rules are in
+[Exit codes](llm-integration.md#exit-codes).
 
 A citation key, group name, or query that begins with `-` would be read as an
 option. Put the options first and such values after `--`, which ends the
@@ -101,9 +94,9 @@ Besides stored fields, four names are special: `key` (citation key), `type`
 (entry type), `year` (falls back to the year inside `date`), and `date` (falls
 back to a date composed from `year`/`month`/`day`). `group "Name"` tests JabRef
 group membership; the stored field itself is reachable as `groups`.
-`used` / `unused` test whether a citation key appears in the library's
-[linked TeX sources](#linked-tex-sources), and `query "name"` runs one of the
-library's [saved queries](#query), so `--where 'query "to-read" and unused'`
+`used` / `unused` test whether a citation key appears in the bibliography's
+[linked TeX sources](#linked-tex-sources), and `query "name"` runs one of its
+[saved queries](#query), so `--where 'query "to-read" and unused'`
 composes both.
 
 To read a selection, use `ref show FILE --where EXPRESSION`: it returns a
@@ -130,17 +123,15 @@ acts on whichever of the two is an article.
 
 On [`ref add`](#add) and [`ref import`](#import), which create an entry rather
 than select one, `--key` names the key to assign. Commands that act on exactly
-one existing reference — [`ref show` and `ref edit`](#show-and-edit),
-— take the citation key as a positional argument. `ref remove` accepts
-one or more keys.
-
-`pynakes capabilities --json --section predicate_grammar` reports this grammar.
+one existing reference — [`ref show` and `ref edit`](#show-and-edit) — take
+the citation key as a positional argument. `ref remove` accepts one or more
+keys.
 
 ## init
 
-Create a new `.bib` library, seeded with a metadata profile. With no options it
+Create a new `.bib` bibliography, seeded with a metadata profile. With no options it
 writes a sensible default — the BibLaTeX dialect and pynakes' default
-citation-key pattern (`[auth][year][veryshorttitle]`) — so the library works with
+citation-key pattern (`[auth][year][veryshorttitle]`) — so the bibliography works with
 `keys generate` and `normalize` out of the box. It refuses to overwrite an
 existing file unless `--force`; pass `--backup` to keep a `.bak` copy.
 
@@ -154,7 +145,7 @@ settings on top of the default (or copied) profile.
 Inspect a `.bib` file.
 
 JSON output includes file encoding, line ending, entries, duplicate keys, and
-structured JabRef library metadata under `jabref_metadata`. Use `lint` for
+structured JabRef metadata under `jabref_metadata`. Use `lint` for
 validation findings.
 
 `--display` adds a `display` object per entry: title-family fields
@@ -175,11 +166,10 @@ fields, and mixed-case entry types or field names. BibLaTeX required-field
 validation follows the official BibLaTeX manual from CTAN, section 2.1 entry
 types and aliases:
 <https://mirrors.ctan.org/macros/latex/contrib/biblatex/doc/biblatex.pdf>. It
-also verifies the lintable parts of a stored library profile: citation-key
+also verifies the lintable parts of a stored profile: citation-key
 patterns, journal style, profile-required fields, and title brace protection.
 
-The library's stored metadata comments are validated too, so metadata drift no
-longer passes silently: a `pynakes-meta` key outside the pynakes schema is
+The bibliography's stored metadata comments are validated too: a `pynakes-meta` key outside the pynakes schema is
 flagged, a key's value is checked against the grammar pynakes defines for it
 (a typo'd `pinax-fetch-policy` or `normalize-journal-style` token, a dialect
 that is not `bibtex`/`biblatex`, or a bad formatting choice), and repeated
@@ -188,7 +178,7 @@ ambiguous — are reported. The JabRef flat `groups:` format is exempt from the
 duplicate check, since it repeats the `groups` key once per group line by
 design.
 
-`lint` only diagnoses; it never rewrites a library. Every finding carries a
+`lint` only diagnoses; it never rewrites a bibliography. Every finding carries a
 **category** naming what kind of problem it is and which command resolves it,
 and a **severity** ranking urgency:
 
@@ -198,7 +188,7 @@ and a **severity** ranking urgency:
 | `content` | `normalize` | `warning` | journal style, malformed DOI, non-BibTeX page range, unprotected title case, key-pattern mismatch |
 | `formatting` | `format` | `info` | mixed-case field names, and entry types unless `format-entry-type-case` is `preserve` |
 | `consistency` | nothing — an observation | `info` | missing article DOI, a field most comparable peers define |
-| `profile` | you decide | `warning` | deviations from the library's stored lint profile |
+| `profile` | you decide | `warning` | deviations from the bibliography's stored lint profile |
 
 The cross-entry consistency check compares an entry only with peers of the same
 entry type **and** identity class — `preprint`, `published`, `book`, `code`, or
@@ -212,7 +202,7 @@ Layout and consistency findings are `info` so that they cannot bury a structural
 `error`; `--category` filters the report, and `--json` adds `info` and
 `by_category` counts plus per-finding `category` and `fixer` keys.
 `--strict` means *clean*: any finding left in the report fails it, whatever its
-severity, as every other check fails on any finding. A finding the library
+severity, as every other check fails on any finding. A finding the bibliography
 accepts is suppressed explicitly — `lint-ignore`, `--ignore`, or an `ignore`
 directive on the entry — rather than tolerated by a severity rule. Human output ends
 with the commands that would clear the fixable findings, for example
@@ -222,7 +212,7 @@ Some findings can never be fixed — a venue that assigns no DOIs, a journal wit
 no volumes — and would keep a commit hook failing or noisy. `--ignore NAME`
 (repeatable) leaves a finding type (`missing_doi`) or a whole category
 (`consistency`) out of the report and out of the `--strict` gate. To make that a
-property of the library rather than of one invocation, store it:
+property of the bibliography rather than of one invocation, store it:
 
 ```bibtex
 @comment{pynakes-meta:
@@ -230,28 +220,22 @@ lint-ignore: missing_doi, formatting
 }
 ```
 
-`--ignore` adds to the stored list; it cannot re-enable what the library
+`--ignore` adds to the stored list; it cannot re-enable what the bibliography
 ignores. To accept a finding on one entry only — this venue assigns no DOIs —
 write an `ignore` [directive](#per-entry-directives) above it instead. Suppression is never silent: the summary's `suppressed` count, and a
 closing line in human output, report how many findings were left out. An
 unknown name is refused on the command line and reported as
 `invalid_metadata_value` in the stored setting.
 
-`pynakes normalize refs.bib` also repairs bare full month names such as
-`month = june`, which BibTeX interprets as an undefined string reference. It
-rewrites them to the standard macro (`month = jun`) and canonicalizes macro
-casing (`month = Jan` → `month = jan`), while preserving literals such as
-`month = {June}` and declared custom strings.
-
 `lint` (along with `asset check`, `dedupe check`, and `verify`)
 accepts multiple files, or auto-detects a single `.bib` in the current directory
 when no file is given. Auto-detection ignores the `<jobname>Notes.bib` file
 REVTeX generates, recognized by that name and the `@CONTROL{REVTEX4...}` entry it
 opens with, and names it in the error when it was the only `.bib` found; pass one
-explicitly if you really want to inspect it. A library you named `notes.bib` is
-not skipped. These
-checks support `--strict`, which exits `1` when any finding remains so it can
-gate a build; for `lint`, suppressed findings do not count. See
+explicitly if you really want to inspect it. A bibliography you named
+`notes.bib` is not skipped. These checks support `--strict`, which exits `1`
+when any finding remains so it can gate a build; for `lint`, suppressed
+findings do not count. See
 [Metadata Reference](metadata-reference.md) for the complete schema and
 [Git Workflows](git-workflows.md) for pre-commit and CI recipes.
 
@@ -259,11 +243,11 @@ gate a build; for `lint`, suppressed findings do not count. See
 
 Manage JabRef-style `groups` fields and the hierarchical group tree.
 
-Memberships use a library-wide separator: an explicit override, the native
+Memberships use a bibliography-wide separator: an explicit override, the native
 `groups-separator` setting, then JabRef's stored `keywordSeparator`. With no
-declaration, auto detection preserves existing
-semicolon libraries and recognizes comma-separated memberships; a library
-with no separator yet defaults to comma. If both punctuation marks occur,
+declaration, auto detection preserves semicolon-separated memberships and
+recognizes comma-separated ones; a bibliography with no memberships yet
+defaults to comma. If both punctuation marks occur,
 choose explicitly rather than splitting a group name accidentally:
 
 ```sh
@@ -273,7 +257,7 @@ pynakes --groups-separator comma groups list refs.bib --json
 
 The global override precedes the command and lasts only for that invocation.
 `auto` explicitly overrides a stored choice. Group operations, selectors,
-analysis, TeX tagging and lint all use this policy. Neither detection nor
+analysis and lint all use this policy. Neither detection nor
 changing the setting rewrites existing fields or converts their separator.
 Names containing the selected separator cannot be added; names containing
 other separator punctuation require an explicit choice.
@@ -329,7 +313,8 @@ schema and native format.
 
 ## keys
 
-Check, generate, rename, and repair citation keys.
+Generate, rename and repair citation keys, and report key patterns and
+citation usage. Duplicate keys are reported by `lint --only duplicate_key`.
 
 Generated keys default to `AuthorYearTitle`. JabRef metadata is honored when
 present:
@@ -367,11 +352,11 @@ capitalized spelling such as `[Auth]` is accepted as an alias of `[auth]`, but
 pynakes never writes one.
 
 Pass a citation key to apply that preferred pattern to just one entry, or
-`--all` to regenerate the whole library. Like `keys rename`, generated renames
+`--all` to regenerate the whole bibliography. Like `keys rename`, generated renames
 also rewrite matching TeX citations in linked `tex-sources` metadata when it is
 configured.
 
-A library that stores no pattern usually still has a style. `keys pattern`
+A bibliography that stores no pattern usually still has a style. `keys pattern`
 reports the stored pattern and the common pattern most existing keys follow:
 
 ```sh
@@ -387,13 +372,13 @@ command. `ref import` warns with `key_pattern_unset` when it generates a key
 while no pattern is stored and the existing keys follow another style.
 
 `keys rename` updates the entry key in the `.bib` file, every `crossref`, `xref`,
-`xdata`, `related`, and `entryset` value in the library that names it, and
+`xdata`, `related`, and `entryset` value in the bibliography that names it, and
 matching keys inside recognized TeX citation commands in the supplied `.tex`
 files/directories. It does not edit commented-out citations, and it exits with
 conflict if the target key already exists. `keys generate` and `dedupe merge`
 update those reference fields the same way; `keys repair` leaves them alone,
 since a reference to a duplicated key is ambiguous. `lint` reports a reference
-field naming a key the library lacks as `missing_reference_target`.
+field naming a key the bibliography lacks as `missing_reference_target`.
 
 `keys usage` is a read-only lookup: given a key and one or more `.tex`
 files or directories, it reports every `\cite`-family occurrence (file and line)
@@ -404,7 +389,7 @@ someone else's copy of the manuscript.
 
 ### Linked TeX sources
 
-Record the `.tex` files that cite a library once, and the citation-key commands
+Record the `.tex` files that cite a bibliography once, and the citation-key commands
 reuse them — no need to pass paths every time. Use `tex add FILE PATH...`
 or set `tex-sources` metadata.
 
@@ -412,7 +397,7 @@ or set `tex-sources` metadata.
 @comment{pynakes-meta: tex-sources:paper.tex, chapters_src/;}
 ```
 
-Paths are stored relative to the `.bib` (so the library stays portable). With it
+Paths are stored relative to the `.bib` (so the bibliography stays portable). With it
 set, `keys rename refs.bib Old New` and generated `keys generate` renames update
 the linked sources automatically, and `tex scan refs.bib` scans them when no
 paths are given. Explicit arguments still override the metadata. `keys repair`
@@ -423,9 +408,9 @@ cited (the citation is ambiguous, so it is not rewritten).
 
 pynakes recognizes **two** structurally identical top-level comment namespaces:
 
-- `@comment{jabref-meta: key:value;}` — JabRef's own library settings.
-- `@comment{pynakes-meta: key:value;}` — pynakes' **superset**, for settings
-  JabRef cannot represent (pynakes is a superset of JabRef metadata).
+- `@comment{jabref-meta: key:value;}` — JabRef's own settings.
+- `@comment{pynakes-meta: key: value}` — pynakes' **superset**, for settings
+  JabRef cannot represent.
 
 `metadata list` shows both, tagged by namespace; reads (`lint`, `normalize`,
 key generation) use the **merged** view, where `pynakes-meta` overrides
@@ -469,16 +454,10 @@ code `2` if duplicate blocks in the target namespace make an update ambiguous.
 
 ## fields
 
-Bulk-edit one field operation across all references matching `--where`, while
-preserving entry formatting. Use `ref edit` when patching one reference across
-several fields.
-
+Bulk-edit one field across every reference matching `--where` or `--key` —
+`set`, `rename`, `move`, `append` or `clear` — changing only the touched field
+line. Use `ref edit` when patching one reference across several fields.
 `--where` is the shared [entry selector](#selecting-entries-where).
-
-`normalize --only titles` protects capitalization in title-family fields.
-
-This protects acronyms, uppercase/digit tokens, mixed-case terms such as
-`LaTeX`, and explicit terms.
 
 ## add
 
@@ -489,7 +468,7 @@ For a generated key without prompts, omit `KEY` and use `--no-interactive`:
 pynakes ref add refs.bib --no-interactive --type book --field author="Isaac Newton" --field title="Principia" --field year=1687 --dry-run --diff
 ```
 
-Generation honors library key patterns and disambiguates collisions. The preview
+Generation honors the bibliography's key patterns and disambiguates collisions. The preview
 reports the resulting `key`; apply with its `source_sha256` as `--expect-sha256`.
 `--interactive/--no-interactive` controls prompting for this invocation; the
 existing `key-pattern` metadata controls generation policy.
@@ -498,12 +477,12 @@ existing `key-pattern` metadata controls generation policy.
 `article`. Existing citation keys are rejected unless `--allow-duplicate` is
 passed. By default, with no citation-key argument, `ref add` starts interactive mode and
 first asks for the key. Leave it blank to generate the key from the collected
-metadata and the library's configured key pattern. It then asks for the entry
+metadata and the bibliography's configured key pattern. It then asks for the entry
 type and only the required fields not already supplied with `--type` or
-`--field`. The prompts follow the library's BibTeX or BibLaTeX required-field
+`--field`. The prompts follow the bibliography's BibTeX or BibLaTeX required-field
 rules. Supply the key (and `--field`) to add non-interactively; interactive
 mode requires a terminal and errors under `--json` or headless stdin. Use
-`--file` when an interactive run cannot auto-detect the library.
+`--file` when an interactive run cannot auto-detect the bibliography.
 
 ## show and edit
 
@@ -527,15 +506,12 @@ is reported together in one exit-1 `KeyNotFound` error.
 `--where 'query "to-read"'` for a saved query. With `--key` as well, the two
 narrow each other.
 
-For comparing a set, `--select` returns exactly the named stored fields
-(`--select title,abstract`) in place of the summary, and `--include` adds what
-the library records outside the fields: `materials` (Pinax materials for the
-key and `file` links with their status) and `provenance` (the Pinax manifest
-record of each material and the directives above the entry). What the library
-lacks is listed under `missing_fields` or `missing`, never hidden.
-`--max-chars` cuts long values and lists each cut under `truncated`, and
-`--limit` pages the selection, printing a `--cursor` that resumes it. A cursor is refused once the library changes, so
-the pages of one read always come from one snapshot.
+For comparing a set, `--select title,abstract` returns exactly the named
+stored fields in place of the summary, `--include materials,provenance` adds
+the Pinax materials, `file` links and recorded provenance, and `--limit`,
+`--cursor` and `--max-chars` keep the response bounded.
+[Bounded reads](llm-integration.md#bounded-reads) specifies these options and
+how missing, omitted and truncated values are reported.
 
 `ref edit` applies all requested field and type changes in one commit. It does
 not rename the citation key: use `keys rename` for that coordinated operation,
@@ -549,7 +525,7 @@ stdin is an error rather than a prompt.
 
 ## Per-entry directives
 
-A library's settings live in its `pynakes-meta` comment. A setting for **one
+A bibliography's settings live in its `pynakes-meta` comment. A setting for **one
 entry** lives in a comment directly above that entry — a *directive*:
 
 ```bibtex
@@ -576,7 +552,7 @@ keep it. Only naming that one key, `keys generate FILE KEY`, still renames it.
 `ref directive` writes and removes directives on the entries named by `--key`
 or selected by `--where`, changing only the directive lines.
 
-`--where` is how a library adopts `lint --strict`: waive the findings it has
+`--where` is how a bibliography adopts `lint --strict`: waive the findings it has
 accepted, by selection, and every new finding still fails the gate.
 
 Arguments the entry's directives already carry are not repeated; giving a new
@@ -603,15 +579,13 @@ Look up the real records matching a reference written out in prose.
   Import one with: pynakes ref import <doi>
 ```
 
-Every other way into a library starts from an identifier, which is a claim that
+Every other way into a bibliography starts from an identifier, which is a claim that
 can be checked: `ref import` either resolves it or does not. A reference written
 out as text carries no such claim, and this is how to ask whether one describes
 anything that exists. Read-only; import a candidate you accept by its DOI.
 
 Like `ref import` and `asset fetch`, `ref lookup` goes online by being run;
-`search` is its offline counterpart over the library itself. It was called
-`ref find` before 0.9.0; that name still runs, with a `deprecated` warning,
-until 0.10.0.
+`search` is its offline counterpart over the bibliography itself.
 `--limit` caps the candidates (5 by default), and `--cache-file` reuses answers
 across runs.
 
@@ -661,13 +635,13 @@ Some platforms publish article URLs with no identifier in them at all — AIP's
 fail with advice to import the DOI printed on the article page rather than
 guessing at a match.
 
-### Imports follow the library's style
+### Imports follow the bibliography's style
 
-An imported entry is written the way the library says its entries look, so a
-clean file stays clean. The `normalize-*` settings the library declares (journal
+An imported entry is written the way the bibliography says its entries look, so a
+clean file stays clean. The `normalize-*` settings it declares (journal
 style, author style, title protection, and the rest) and its JabRef saveActions
 are applied to the new entry, and so is its `format-*` layout, such as
-`format-alignment: equals`. Nothing else in the file changes. A library that
+`format-alignment: equals`. Nothing else in the file changes. A bibliography that
 declares none of these settings gets the entry as the provider described it;
 run `normalize` or `format` with `--key` to bring it in line by hand.
 
@@ -725,12 +699,12 @@ everything that resolved is staged in memory and committed once, so the file
 never holds half a list. With `--json`, `results` carries one record per
 identifier (`imported`, `skipped`, or `failed`) alongside the usual envelope.
 
-An identifier already in the library is `skipped`, not a conflict — exit 2 is
+An identifier already in the bibliography is `skipped`, not a conflict — exit 2 is
 for a question only you can answer, and here the rest of the list still has to
 resolve. Re-run that one with `--allow-duplicate` if a second copy was wanted.
 
-A single identifier keeps its existing behavior exactly: a failure is the
-command's failure, and `--key` applies to the one entry.
+With a single identifier, a failure is the command's failure, and `--key`
+applies to that entry.
 
 All import options are listed in the [generated reference](command-reference.md#ref-import).
 
@@ -739,40 +713,22 @@ Each identifier is fetched through its matching provider. By default
 materials for the new entry: arXiv preprint PDF/source when an arXiv id is
 present, and an open-access published PDF when the entry has a DOI and a
 suitable `pinax-fetch-policy`. Existing matching provider ids and returned DOIs are
-detected before importing. Provider entries follow the library's
+detected before importing. Provider entries follow the bibliography's
 BibTeX/BibLaTeX dialect.
 
 See [Import providers](import-providers.md) for the complete supported and
 planned identifier, repository, catalogue, and publisher URL inventory.
 
-## files
+## asset
 
-Validate JabRef linked files stored in `file` fields.
+The `asset` commands check, fetch and repair the files a bibliography points
+at: linked files in `file` fields and, in a [pinax](pinax.md), its materials.
 
-`asset check` only reports, so it can gate a commit. `asset repair` reconciles
-the Pinax manifest with the material files that exist: it drops records for
-keys the library no longer has and for files that are gone, and records files
-the manifest does not know. It changes only the manifest — no material file and
-no byte of the library.
-With `--reclassify` it also moves each published PDF that `asset check` reports
-as `misclassified` — a preprint, on recorded evidence — to the preprint path,
-with its manifest record; a file whose preprint path is taken is reported as a
-conflict and left alone.
-
-`asset check` keeps two questions apart under `coverage`: `linked_files`
+`asset check` only reports, so it can gate a commit, and accepts several
+bibliographies. It keeps two questions apart under `coverage`: `linked_files`
 counts `file`-field links (the top-level `checked`/`ok`/`missing`), and
 `materials` counts the entries that have a PDF in Pinax and names those that
-do not.
-
-`asset check` takes one or more libraries as positional arguments (handy for CI
-gating). `asset fetch` downloads materials for one entry or for a whole library;
-its first positional is the library, followed by an optional citation key.
-Omit the key to fetch the whole library.
-
-See the [Pinax guide](pinax.md#fetch-the-first-slice) for what gets downloaded
-and how `pinax-fetch-policy` governs it.
-
-The checker parses plain paths and JabRef descriptors such as:
+do not. It parses plain paths and JabRef descriptors such as:
 
 ```bibtex
 file = {Paper:papers/Smith2020.pdf:PDF}
@@ -781,10 +737,24 @@ file = {:/path/to/folder:directory}
 ```
 
 Relative paths are resolved against the `.bib` file directory, repeated
-`--root` directories, and JabRef `fileDirectory*` metadata. It reports `ok`,
-`missing`, `wrong_type`, and `unresolved` statuses. This command is read-only.
-In Pinax mode, `asset repair` reconciles manifest drift. Neither command
-repairs arbitrary JabRef attachment paths or recomputes checksums.
+`--root` directories, and JabRef `fileDirectory*` metadata. Each link is
+reported as `ok`, `missing`, `wrong_type`, or `unresolved`. Stored checksums are
+not recomputed.
+
+`asset repair` reconciles the Pinax manifest with the material files that
+exist: it drops records for keys the bibliography no longer has and for files
+that are gone, and records files the manifest does not know. It changes only
+the manifest — no material file and no byte of the bibliography.
+With `--reclassify` it also moves each published PDF that `asset check` reports
+as `misclassified` — a preprint, on recorded evidence — to the preprint path,
+with its manifest record; a file whose preprint path is taken is reported as a
+conflict and left alone. Neither command repairs arbitrary JabRef attachment
+paths.
+
+`asset fetch` downloads materials for one bibliography: its first positional is
+the bibliography, followed by an optional citation key; omit the key to fetch
+every entry. See the [Pinax guide](pinax.md#fetch) for what gets downloaded
+and how `pinax-fetch-policy` governs it.
 
 ## format
 
@@ -801,7 +771,7 @@ and field names, both of which BibTeX treats case-insensitively, so recasing the
 changes no bibliographic value. An ordinary surgical edit leaves the spelling of
 entries it was not asked to change untouched.
 
-A library that another tool saves in its own type spelling — JabRef writes
+A bibliography that another tool saves in its own type spelling — JabRef writes
 `@Article` and `@InProceedings` — would churn: `format` lowercases the types and
 the next JabRef save restores them. Set `format-entry-type-case: preserve` (or
 pass `--entry-type-case preserve`) to keep each entry's own spelling. The
@@ -869,7 +839,7 @@ Default behavior:
   `format-entry-type-case: preserve`; see [format](#format))
 - leave journal titles unchanged unless a journal style is configured
 
-A step the library has turned off reports `off` rather than `0`, because the
+A step the bibliography has turned off reports `off` rather than `0`, because the
 two are different claims: `journals=0` means "checked every journal title and
 changed none", while `journals=off` means the step never ran. The human summary
 names the flag that turns each one on, and `--json` carries the full reason
@@ -878,15 +848,16 @@ under `operations.skipped`.
 To run some steps on some entries, name the steps with `--only` and the
 entries with `--key` or `--where`.
 
-The steps are `metadata`, `drop-fields`, `titles`, `authors`, `dois`, `pages`,
-`journals`, `save-actions`, `months`, `identifier-case`, `sort`, and `keys`. A
+The steps are `metadata`, `drop-fields`, `invisible-characters`, `encoding`,
+`titles`, `authors`, `dois`, `pages`, `journals`, `save-actions`, `months`,
+`identifier-case`, `sort`, and `keys`. A
 step left out reports why under `operations.skipped`. A selection never re-sorts
 the file or rearranges its metadata, since those act on the file as a whole, and
 `--sort-by` or `--metadata-formatting` given with a selection is refused. So is a
 flag that configures a step `--only` leaves out, such as
 `--only journals --author-style biblatex`.
 
-See the generated reference for the full set of overrides.
+The [command reference](command-reference.md#normalize) lists every override.
 
 Page ranges are rewritten to BibTeX's `start--end`: a Unicode en-dash
 (`1052–1055`, which is what Crossref hands out) or a single hyphen becomes
@@ -901,7 +872,7 @@ visible before it reaches a build.
 Provider markup in titles is converted to LaTeX. Publishers deposit titles
 with MathML, JATS or HTML structure (`<mml:math>…`, `<i>…</i>`), and DOI
 content negotiation passes it on verbatim. Imports convert it on the way in;
-`normalize` converts any already in the library, whatever the title-protection
+`normalize` converts any already in the bibliography, whatever the title-protection
 setting, and `lint` reports what is left as `title_markup`. A chemical formula
 becomes `Fe$_3$O$_4$`, a symbol becomes inline math (`$p$`), and italics become
 `\textit{…}`.
@@ -920,8 +891,8 @@ To always strip a field — `abstract` is the common case — across every entry
 use `--drop-field` (repeatable) or persist it as `normalize-drop-fields`
 metadata.
 
-Off by default, like journal-style conversion: dropping a field is opinionated
-and not reversible, so it only runs for fields named explicitly.
+This is off by default, like journal-style conversion: dropping a field is
+opinionated and not reversible, so it only runs for fields named explicitly.
 
 Normalization preferences live in metadata. pynakes-specific settings (no
 JabRef equivalent) go in `pynakes-meta`, under the `normalize-` key prefix.
@@ -941,14 +912,22 @@ normalize-drop-fields: abstract
 }
 ```
 
-pynakes also reads the older one-comment-per-key and `key:value;` layouts, and
+pynakes also reads one-comment-per-key and `key:value;` layouts, and
 `normalize` rewrites them into this consolidated block on its next pass.
 
-Where JabRef already has a setting, pynakes uses **that**: if the library has
+Where JabRef already has a setting, pynakes uses **that**: if the bibliography has
 JabRef `saveActions` enabled, `normalize` honors them — a `normalize_names`
 formatter on a name field drives author normalization and a
 `clean_up_doi` formatter on `doi` drives DOI cleanup; its absence
 disables those steps. An explicit flag or a `pynakes-meta` key overrides.
+
+```bibtex
+@comment{jabref-meta: saveActions:enabled;
+author[normalize_names]
+doi[clean_up_doi]
+;}
+```
+
 JabRef's `short_doi` action is not run: it requires the shortdoi.org network
 service, outside pynakes' offline normalization boundary, and is
 reported as an unsupported formatter warning.
@@ -968,18 +947,47 @@ bibliography entry is renamed in the `.bib` file and any Pinax
 material files on disk are renamed consistently. TeX source rewrites
 are handled separately.
 
-```bibtex
-@comment{jabref-meta: saveActions:enabled;
-author[normalize_names]
-doi[clean_up_doi]
-;}
+### Titles, months and text encoding
+
+The `titles` step brace-protects capitalization in title-family fields
+(`normalize-title-fields`, or `--title-field`): acronyms, uppercase and digit
+tokens, mixed-case terms such as `LaTeX`, and the terms named by
+`normalize-protected-terms` or `--term`. Run it alone with
+`normalize --only titles`.
+
+The `months` step repairs bare full month names such as `month = june`, which
+BibTeX interprets as an undefined string reference. It rewrites them to the
+standard macro (`month = jun`) and canonicalizes macro casing
+(`month = Jan` → `month = jan`), while preserving literals such as
+`month = {June}` and declared custom strings.
+
+The `encoding` step converts text between LaTeX escapes and Unicode:
+
+```sh
+pynakes normalize refs.bib --only encoding --encoding unicode --encoding-field title \
+  --key Newton1687 --dry-run --diff
+pynakes normalize refs.bib --only encoding --encoding latex --where 'type = book' --dry-run --diff
+pynakes metadata set refs.bib normalize-encoding unicode
 ```
+
+It uses the direction supplied by `--encoding`
+or the `normalize-encoding` setting, and is off when neither gives one. It
+converts the prose fields (`author`, `editor`, `title`, `booktitle`, `journal`,
+`series`, `publisher`, `address`, `institution`, `organization`, `school`,
+`note`, `abstract`, `keywords`) unless `--encoding-field` or
+`normalize-encoding-fields` names others; identifiers, links and paths are never
+among the defaults. It translates supported text
+accents and letters, preserving capitalization braces, existing commands and
+math spans (`$...$`, `$$...$$`, `\(...\)`, `\[...\]`). It retains unknown
+commands and characters, reporting unsupported constructs where encountered.
+It does not render arbitrary TeX, remove formatting, convert formulas, or promise
+ASCII-only output. Review the diff before applying; no network is used.
 
 ## tex scan
 
 Analyze which entries are cited by `.tex` or `.aux` files: the given ones,
-else the library's [linked TeX sources](#linked-tex-sources). The report
-lists the used and unused entries and the cited keys the library lacks.
+else the bibliography's [linked TeX sources](#linked-tex-sources). The report
+lists the used and unused entries and the cited keys the bibliography lacks.
 
 To act on the cited entries, select them with `--where used` in the command
 that does the work:
@@ -991,20 +999,19 @@ pynakes scrub refs.bib --where used --out public.bib           # a public copy
 pynakes fields append refs.bib keywords cited --where used     # tag them
 ```
 
-`tex scan` itself only reports: its former `--out`, `--group`, and `--keyword`
-options were removed in 0.9.0 in favour of these commands.
+`tex scan` itself only reports and never writes.
 
 With `--json`, the report's `usages` object locates every citation: each cited
 key maps to its occurrences, one `{path, line, column, text, macro}` per
-`\cite`-family macro that names it. Keys **missing** from the library are in
+`\cite`-family macro that names it. Keys **missing** from the bibliography are in
 there too — a cited key with no entry is the one most worth locating — while an
-entry cited nowhere simply has no occurrences. This is the whole-library
+entry cited nowhere simply has no occurrences. This is the whole-bibliography
 counterpart to [`keys usage`](#keys), which locates one key at a time
 without needing a `.bib` file at all.
 
 ## scrub
 
-Write a public copy of a library with its private content removed — the step
+Write a public copy of a bibliography with its private content removed — the step
 before a `.bib` goes to arXiv, into a submission bundle, or into a public
 repository. The input is read-only; `--out` names the copy (give it the input
 path to scrub in place).
@@ -1022,7 +1029,7 @@ Bibliographic content is never removed unasked: `abstract`, `keywords`, and
 
 Use `--drop-field` and `--keep-field` to adjust what counts as private.
 
-A library can record its own policy instead of repeating flags — see
+A bibliography can record its own policy instead of repeating flags — see
 [`scrub-fields`, `scrub-keep-fields`, `scrub-comments`, and
 `scrub-metadata`](metadata-reference.md#pynakes-meta-keys).
 
@@ -1046,7 +1053,7 @@ rather than guessing.
 different operation — see [`dedupe merge`](#dedupe).)
 
 `--where` keeps only the entries a [selector](#selecting-entries-where) matches,
-so a focused subset of several libraries is one command.
+so a focused subset of several bibliographies is one command.
 
 ## split
 
@@ -1065,45 +1072,6 @@ entry to *every* matching output instead (outputs may then overlap). Entries tha
 match no rule are dropped and reported under `unrouted`. `--dedupe` applies to the
 in-memory merge, exactly as for `combine`.
 
-## Selection export and text encoding
-
-```sh
-pynakes convert refs.bib --to bib --key Newton1687,Euler1748 --json
-pynakes convert refs.bib --to ris --where 'group "Reviewed"' --out reviewed.ris
-pynakes normalize refs.bib --only encoding --encoding unicode --encoding-field title \
-  --key Newton1687 --dry-run --diff
-pynakes normalize refs.bib --only encoding --encoding latex --where 'type = book' --dry-run --diff
-pynakes metadata set refs.bib normalize-encoding unicode
-```
-
-Export never edits the source. `--to bib` exports the existing dialect rather
-than converting it. It includes transitive entry references (including
-`crossref` and `xdata`), all string definitions and preambles, library metadata,
-and retained comments. Missing and ambiguous dependencies are reported.
-This is not a scrubbed public copy: review private fields and metadata before
-sharing. Interchange targets export only the selected entries, resolving their
-inherited fields against the full source library. No selection means all entries.
-Selectors are refused on imports and in-place dialect conversions.
-
-With `--json` and no `--out`, `content` is ready for the clipboard. With `--out`,
-`--dry-run --diff` previews the destination; existing destinations need `--force`.
-`selected_entries` counts the physical selected entries, `entry_count` counts
-exported entries, and `dependency_keys` explains native export additions. Duplicate
-keys remain physical entries; a key selector includes every matching instance.
-
-The `encoding` step of `normalize` uses the direction supplied by `--encoding`
-or the `normalize-encoding` setting, and is off when neither gives one. It
-converts the prose fields (`author`, `editor`, `title`, `booktitle`, `journal`,
-`series`, `publisher`, `address`, `institution`, `organization`, `school`,
-`note`, `abstract`, `keywords`) unless `--encoding-field` or
-`normalize-encoding-fields` names others; identifiers, links and paths are never
-among the defaults. It translates supported text
-accents and letters, preserving capitalization braces, existing commands and
-math spans (`$...$`, `$$...$$`, `\(...\)`, `\[...\]`). It retains unknown
-commands and characters, reporting unsupported constructs where encountered.
-It does not render arbitrary TeX, remove formatting, convert formulas, or promise
-ASCII-only output. Review the diff before applying; no network is used.
-
 ## convert
 
 Convert between BibTeX and BibLaTeX field/type conventions (in place), or
@@ -1121,13 +1089,38 @@ CSL-JSON that is not an item or array of items, MODS that declares XML
 entities, or a value with unbalanced braces — is a JSON error envelope (exit 1)
 and writes no output file.
 
+### Exporting a selection
+
+```sh
+pynakes convert refs.bib --to bib --key Newton1687,Euler1748 --json
+pynakes convert refs.bib --to ris --where 'group "Reviewed"' --out reviewed.ris
+```
+
+Export never edits the source. `--to bib` exports the existing dialect rather
+than converting it. It includes transitive entry references (including
+`crossref` and `xdata`), all string definitions and preambles, the
+bibliography's metadata, and retained comments. Missing and ambiguous
+dependencies are reported. This is not a scrubbed public copy: review private
+fields and metadata before sharing, or use [`scrub`](#scrub). Interchange
+targets export only the selected entries, resolving their inherited fields
+against the full source bibliography. No selection means all entries.
+Selectors are refused on imports and in-place dialect conversions.
+
+With `--json` and no `--out`, `content` is ready for the clipboard. With `--out`,
+`--dry-run --diff` previews the destination; existing destinations need `--force`.
+`selected_entries` counts the physical selected entries, `entry_count` counts
+exported entries, and `dependency_keys` explains native export additions. Duplicate
+keys remain physical entries; a key selector includes every matching instance.
+
 ## capabilities
 
-Print the machine-readable command/capability description.
+Print the machine-readable description of the command surface: a compact
+index by default, details with `--command` or `--section`. See
+[Discover the command surface](llm-integration.md#discover-the-command-surface).
 
 ## search
 
-Search entries without modifying the library.
+Search entries without modifying the bibliography.
 
 Terms are ANDed. Quoted phrases stay together. `field:term` scopes a term to a
 field; plain terms search the key, type, and stored fields.
@@ -1162,13 +1155,13 @@ reporting the abstract never widens what the query matches.
 For the promising keys, `ref show --key k1,k2,…` prints the summarized
 entries; a single `ref show <key>` prints one in full.
 
-`--limit` caps a page of results and `--cursor` resumes the same search at the
-next page; `--max-chars` cuts long field values in `--json` output.
+`--limit`, `--cursor` and `--max-chars` page and cut the results as for
+`ref show`; see [Bounded reads](llm-integration.md#bounded-reads).
 
 ## query
 
-Save a selection the library keeps reusing, and run it later against the
-entries as they are then:
+Save a selection you keep reusing, and run it later against the entries as
+they are then:
 
 ```bash
 pynakes query set refs.bib to-read 'abstract exists and not group "Read"'
@@ -1179,15 +1172,15 @@ pynakes query remove refs.bib to-read
 ```
 
 A saved query is one `query-<name>` line in `pynakes-meta` holding a
-[`--where`](#selecting-entries-where) expression; the library stores the query,
-never its result. `query "name"` is a predicate of the `--where` grammar, so
+[`--where`](#selecting-entries-where) expression; the bibliography stores the
+query, never its result. `query "name"` is a predicate of the `--where` grammar, so
 every command that selects entries runs it, and a saved expression may itself
 refer to other saved queries. `ref show --where` returns the matches in file
 order with the same options as `ref show --key`.
 
 ## analyze
 
-Describe what a library holds and how complete its records are:
+Describe what a bibliography holds and how complete its records are:
 
 ```bash
 pynakes analyze refs.bib
@@ -1204,7 +1197,7 @@ behind it. The `coauthors` section summarizes the co-author network below;
 
 ## coauthors
 
-Map who has written with whom in a library, or in a slice of it:
+Map who has written with whom in a bibliography, or in a slice of it:
 
 ```bash
 pynakes coauthors refs.bib
@@ -1298,7 +1291,7 @@ keys; resolve that ambiguity before applying a key-based correction. These
 edits use the normal surgical editing path and leave unrelated text intact.
 If identical names denote different people and the records offer no justified
 way to distinguish them, retain the conflict warning rather than inventing a
-name correction; persistent identity directives remain future work.
+name correction.
 
 ## dedupe
 
@@ -1313,7 +1306,7 @@ without accepting every other merge the file invites. The selector is the shared
 A key belonging to no cluster is an error rather than a silent no-op.
 
 `merge` exits with code `2` when field values disagree and cannot be safely
-resolved. In a Pinax library, `merge` also moves the duplicate entries'
+resolved. In a pinax, `merge` also moves the duplicate entries'
 materials and provenance onto the surviving key when the survivor has no
 material of the same kind; an existing survivor material is reported as a
 conflict rather than overwritten.
@@ -1328,7 +1321,7 @@ Pass `--cache-file PATH` to keep them for later runs; see
 [Caching provider responses](#caching-provider-responses).
 
 `--key` and `--where` limit `verify` and `enrich` to the selected entries of
-one library, so a lookup for a few references never queries a provider for the
+one bibliography, so a lookup for a few references never queries a provider for the
 rest of it.
 
 `verify --strict` exits with code `1` when warnings or errors are reported.
@@ -1336,7 +1329,7 @@ rest of it.
 An `--online` pass looks up entries concurrently — `-j/--concurrency N`
 (default 8) controls how many provider lookups run at once. Output is
 identical at any concurrency: reports, applied field updates, and the
-progress bar all follow the library's own entry order, not fetch completion
+progress bar all follow the bibliography's own entry order, not fetch completion
 order.
 
 ### Caching provider responses
@@ -1355,21 +1348,6 @@ refetches, so there is nothing to manage and no command to learn.
 No record ever expires. Provider metadata does change, which is why `verify
 --online` exists at all, so treat a cache as a snapshot you chose to keep: delete
 it when you want a genuinely fresh comparison.
-
-## Best Practices
-
-1. Preview modifying commands with `--dry-run --diff`.
-2. Use `--json` for scripts and agent workflows.
-3. Run `pynakes lint refs.bib` after bulk changes.
-4. Keep exact journal mappings in a local CSV when journal style matters.
-5. Commit `.bib` changes separately from unrelated edits for easy review.
-
-## Still Planned
-
-The following commands/features are not implemented yet:
-
-- `entries`
-- repair of arbitrary JabRef linked-file paths (Pinax manifest repair is implemented)
 
 ## Next Steps
 

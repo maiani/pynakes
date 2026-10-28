@@ -1,236 +1,140 @@
 # FAQ
 
-Frequently asked questions about pynakes.
+Short answers, with links to the page that covers each topic in full.
 
-## Installation & Setup
+## Installation and setup
 
-### Q: Can I use pynakes with different Python versions?
+### Which Python versions are supported?
 
-A: pynakes requires **Python 3.12 or later**. It uses modern Python features like type hints and pattern matching.
+Python 3.12 or later, on Linux, macOS, and Windows. See the
+[installation guide](installation.md), which also covers development installs.
 
-### Q: How do I install pynakes for development?
+### Can I use pynakes in CI or pre-commit?
 
-A: Clone the repo and use editable install:
-```bash
-git clone https://github.com/maiani/pynakes.git
-cd pynakes
-pip install -e ".[dev]"
-```
+Yes. The read-only checks are offline and deterministic, and `--strict` turns
+findings into a non-zero exit code. See [Git workflows](git-workflows.md) for
+hooks and a GitHub Actions job, and [Exit codes](llm-integration.md#exit-codes)
+for what each code means.
 
-### Q: Can I use pynakes in my CI/CD pipeline?
+## Everyday use
 
-A: Yes! Use `--json` for programmatic output and check exit codes:
-- `0` = success
-- `1` = error
-- `2` = conflict (needs resolution)
+### How do I preview a change?
 
-## Usage
+Add `--dry-run --diff` to any modifying command. It reports what would change
+without writing; run the same command without `--dry-run` to apply it.
 
-### Q: What's the difference between `--dry-run --diff` and just applying changes?
+### Does pynakes create a `.bak` file?
 
-A: `--dry-run` shows what *would* happen without modifying the file. Always use it to preview before committing. After reviewing the diff, run the command without `--dry-run` to apply.
+Not by default. Writes are atomic (write-to-temp-then-rename) and
+re-parse-validated, so the original is never left half-written. Pass `--backup`
+to keep a `<file>.bak` copy of the previous contents. An existing backup is
+never overwritten: while `<file>.bak` exists, the next backup is
+`<file>.bak.1`, then `<file>.bak.2`, and so on.
 
-### Q: Does pynakes create a ".bak" file?
+### Can I undo a change?
 
-A: Not by default. Writes are atomic (write-to-temp-then-rename) and
-re-parse-validated, so the original is never left half-written. If you also want
-a `<file>.bak` copy of the previous contents, pass `--backup` to the modifying
-command. An existing backup is never overwritten: while `<file>.bak` exists, the
-next backup is `<file>.bak.1`, then `<file>.bak.2`, and so on.
+Use version control. If you ran the command with `--backup`, restore the most
+recent copy (the highest-numbered `.bak.N`, or `.bak` if there is none):
 
-### Q: Can I use pynakes with BibLaTeX?
-
-A: Yes, `pynakes` can parse and preserve BibLaTeX-style fields such as
-`journaltitle` and `date`. Use `pynakes convert refs.bib --to biblatex` to
-convert BibTeX field/type conventions in place.
-
-### Q: How do I handle entry types that pynakes doesn't recognize?
-
-A: pynakes preserves unknown entry types and fields automatically. Full
-The conformance corpus targets TeX Live 2026; external BibTeX/Biber oracle
-tests skip when those tools are unavailable.
-
-### Q: What if I have a very large bibliography?
-
-A: Pynakes does not yet publish a supported size limit or a performance
-guarantee. The current automated stress tests exercise parse/write with 2,000
-entries, lint with 1,500 entries, and duplicate-key repair with 200 entries.
-Those are correctness tests, not benchmarks. Larger libraries may expose slow
-paths, especially fuzzy deduplication; performance work is planned for v0.8.
-
-## Troubleshooting
-
-### Q: I get "ParseError: malformed entry at line X"
-
-A: Check line X in your BibTeX file for syntax errors:
-- Missing closing braces `}`
-- Mismatched quotes
-- Invalid field syntax
-
-Fix the syntax error and retry.
-
-### Q: pynakes says there's a conflict. What do I do?
-
-A: Conflicts happen when an operation has multiple valid outcomes. For example,
-DOI import reports a conflict when the DOI is already present:
-
-```json
-{
-  "status": "conflict",
-  "error": "DuplicateReference",
-  "options": [
-    {"id": "keep_existing", "description": "Do not import a duplicate reference"},
-    {"id": "allow_duplicate", "description": "Retry with --allow-duplicate"}
-  ]
-}
-```
-
-Choose an option and retry with the documented flag, such as
-`--allow-duplicate` for DOI import.
-
-### Q: Why does the diff show unchanged entries?
-
-A: If you see entries in the diff that didn't change, it might be due to whitespace or line ending changes. pynakes preserves formatting for unmodified entries, so this shouldn't happen unless the entry was actually modified.
-
-### Q: Can I undo a change?
-
-A: Preview first with `--dry-run`, and use version control. If you ran the
-command with `--backup`, restore the `.bak` copy (the highest-numbered
-`.bak.N`, if there is one, is the most recent):
-```bash
+```sh
 cp refs.bib.bak refs.bib
 ```
 
-Otherwise use git (or your editor's history) to revert.
+### Can I use pynakes with BibLaTeX?
 
-## Features & Capabilities
+Yes. pynakes parses and preserves BibLaTeX fields such as `journaltitle` and
+`date`, follows the bibliography's `dialect` setting, and converts between
+conventions with `pynakes convert refs.bib --to biblatex` (or `--to bibtex`).
 
-### Q: Can pynakes check whether JabRef linked files exist?
+### What about entry types and fields pynakes does not recognize?
 
-A: Yes. Use `pynakes asset check refs.bib --json`. It validates JabRef `file`
-fields, including multiple attachments, directory links, relative paths,
-explicit `--root` directories, and JabRef `fileDirectory*` metadata. It is
-read-only. In Pinax mode, `asset repair` reconciles the material manifest
-with files on disk; it does not repair arbitrary JabRef attachment paths.
+They are preserved unchanged, as are comments and unknown metadata. pynakes
+validates required fields for the standard BibTeX and BibLaTeX types; the
+[parser conformance baseline](architecture.md#parser-conformance-baseline)
+names the toolchain versions it targets.
 
-### Q: What BibTeX entry types are supported?
+### Why does a diff show an entry I did not change?
 
-A: pynakes supports all standard BibTeX entry types:
-- article, book, inproceedings, conference
-- phdthesis, mastersthesis, thesis
-- misc, techreport, manual
-- And any custom entry type
+It should not: unmodified entries are written back byte-for-byte. Only
+explicit whole-file commands such as `format` rewrite layout. If you see one,
+please report it with a minimal example.
 
+## Errors and conflicts
 
-### Q: Does pynakes support JabRef metadata?
+### I get "ParseError: malformed entry at line X"
 
-A: Yes. JabRef group metadata is preserved, and `groups` fields can be managed
-with `pynakes groups`. A hierarchical group tree (native `group-tree` key,
-projected to/from JabRef's `grouping` block) supports parent/child groups and
-downward-membership propagation. For citation-key patterns pynakes prefers its native
-`key-pattern`/`key-pattern-<entrytype>` keys and falls back to JabRef's
-`keypatterndefault`/`keypattern_<entrytype>` for key generation and DOI imports.
-See the [JabRef compatibility guide](jabref-compatibility.md) for the full
-native/JabRef alias model.
+Check that line for a missing closing brace, mismatched quotes, or invalid
+field syntax, fix it, and retry.
 
-Use `pynakes metadata list refs.bib --json` to inspect structured
-`jabref-meta` blocks, and `pynakes metadata set refs.bib KEY VALUE` to update a
-known metadata block. Unknown metadata is preserved, unknown writes require
-`--allow-unknown`, and duplicate matching blocks are reported as conflicts.
+### pynakes reports a conflict. What do I do?
 
-### Q: Can I use pynakes to fetch metadata (DOIs, abstracts)?
+A conflict (exit code `2`) means the operation has more than one valid outcome
+and nothing was written. The envelope lists `options`; choose one and retry
+with the flag it names, such as `--allow-duplicate` when importing a DOI that is
+already present. See [Errors and conflicts](llm-integration.md#errors-and-conflicts).
 
-A: DOI import is implemented:
+## Features
 
-```bash
-pynakes ref import refs.bib 10.5555/example --dry-run --diff
-```
+### Does pynakes work with JabRef?
 
-`verify` and `enrich` also support opt-in provider lookups with `--online` (and
-a `--published` flag for preprint published-version checks/promotion); responses
-are cached across runs only when `--cache-file` is supplied. Modifying
-enrichment commands support `--dry-run --diff`, which still performs lookups.
-Abstract/PDF metadata extraction is still out of scope.
+Yes. JabRef metadata, groups, citation-key patterns and save actions are read
+and preserved, and a JabRef-tracked file stays readable in JabRef. See
+[JabRef compatibility](jabref-compatibility.md) and the
+[metadata reference](metadata-reference.md).
 
-## Agent & Automation
+### Can pynakes check linked PDFs?
 
-### Q: Can I use pynakes with Claude or other LLMs?
+`asset check` validates JabRef `file` fields and, in a [pinax](pinax.md), the
+material directory and its manifest. See [asset](usage.md#asset).
 
-A: Yes. See the [LLM Integration guide](llm-integration.md) for the command surface, JSON envelope, and recommended workflows, or the [API Reference](../api/index.md) for Python usage. The `--json` output is designed for agent integration.
+### Can pynakes fetch metadata and PDFs?
 
-### Q: How do I integrate pynakes with my automation workflow?
+Yes, when asked: `ref import` resolves DOIs, repository identifiers, ISBNs and
+supported URLs ([Import providers](import-providers.md)); `verify` and `enrich`
+compare and fill metadata with `--online`; `asset fetch` downloads PDFs and
+arXiv sources into a pinax. pynakes does not extract text from PDFs. See
+[Network and privacy](network-and-privacy.md) for what each command sends.
 
-A: Use the CLI with `--json` output:
-```bash
-pynakes inspect refs.bib --json > state.json
-pynakes lint refs.bib --json > issues.json
-```
+### Can I use pynakes with Claude or other LLM agents?
 
-Parse the JSON and make decisions in your workflow.
+Yes. The CLI is the agent interface: `pynakes capabilities --json`, the JSON
+envelope, exit codes and `--dry-run`. See
+[LLM & automation integration](llm-integration.md), or the
+[API reference](../api/index.md) for in-process Python use.
 
-### Q: Does pynakes have an MCP server?
+### Is there an MCP server?
 
-A: No, and it isn't planned for the core. pynakes' agent interface *is* the CLI —
-`pynakes capabilities --json`, the structured JSON envelope, exit codes, and
-`--dry-run`. An agent drives pynakes by calling the CLI as a tool (see the
-[LLM integration guide](llm-integration.md)). An MCP server is a downstream
-concern — it suits querying a personal library/corpus, which belongs to a
-corpus-management app or a thin companion built on pynakes' pinned API.
+Not yet. A query-only MCP companion, started as `pynakes mcp`, is planned in
+the [development plan](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md);
+until then an agent calls the CLI as a tool.
 
 ## Performance
 
-### Q: How fast is pynakes?
+### How large a bibliography can pynakes handle?
 
-A: There is no published cross-platform benchmark yet. Runtime depends on file
-size, entry shape, the operation, cache state, and—where providers are
-used—network latency. v0.8 will add a reproducible benchmark suite and publish
-measurements with their environment and corpus.
+No supported maximum or performance guarantee is published. pynakes keeps the
+parsed data and the source text in memory. The repository's
+`scripts/bench_scale.py` times parsing, writing, checks, bounded reads and
+analysis on synthetic bibliographies (1,000 to 20,000 entries by default);
+its timings are observations for finding slow paths, not guarantees. Large
+bibliographies may still expose slow paths, especially in fuzzy deduplication.
 
-### Q: What's the largest bibliography pynakes can handle?
+## Contributing and support
 
-A: No supported maximum has been established. Pynakes keeps both parsed data
-and preservation source text in memory, so size and memory behavior must be
-measured rather than inferred. The exact automated stress-test coverage is
-listed above.
+### How do I report a bug or request a feature?
 
-## Contributing
+Open an issue on [GitHub Issues](https://github.com/maiani/pynakes/issues) with
+your pynakes version (`pynakes --version`), the command you ran, a minimal
+`.bib` that reproduces the problem, and the expected and actual behavior.
+Questions and ideas are welcome on
+[GitHub Discussions](https://github.com/maiani/pynakes/discussions); the
+[development plan](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md)
+shows what is planned. To contribute code, see
+[CONTRIBUTING.md](https://github.com/maiani/pynakes/blob/main/CONTRIBUTING.md).
 
-### Q: How can I contribute?
+You can also write to [dev@andreamaiani.com](mailto:dev@andreamaiani.com).
 
-A: See [CONTRIBUTING.md](https://github.com/maiani/pynakes/blob/main/CONTRIBUTING.md) for guidelines. Areas we need help:
-- Testing with diverse BibTeX files
-- New operation implementations
-- Documentation and examples
-- Feedback on CLI UX
+### What license is pynakes under?
 
-### Q: How do I report a bug?
-
-A: Open an issue on [GitHub Issues](https://github.com/maiani/pynakes/issues) with:
-- Your pynakes version (`pynakes --version`)
-- The command you ran
-- Your BibTeX file (if possible, a minimal reproducer)
-- Expected vs actual behavior
-
-### Q: Can I request a feature?
-
-A: Yes! Open a [GitHub Discussion](https://github.com/maiani/pynakes/discussions) or create an issue. Check the roadmap in [DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md) to see what's planned.
-
-## Licensing
-
-### Q: What license is pynakes under?
-
-A: MIT License. See [LICENSE](https://github.com/maiani/pynakes/blob/main/LICENSE) for details.
-
-### Q: Can I use pynakes in a commercial project?
-
-A: Yes, MIT is permissive. You can use, modify, and distribute pynakes freely, including in commercial projects.
-
-## Support
-
-### Q: Where can I get help?
-
-A: 
-- **Quick questions**: Check this FAQ
-- **Issues**: Report bugs on [GitHub Issues](https://github.com/maiani/pynakes/issues)
-- **Discussions**: Ask questions on [GitHub Discussions](https://github.com/maiani/pynakes/discussions)
-- **Email**: [dev@andreamaiani.com](mailto:dev@andreamaiani.com)
+MIT, which permits use, modification and distribution, including in commercial
+projects. See [LICENSE](https://github.com/maiani/pynakes/blob/main/LICENSE).

@@ -21,12 +21,12 @@ build. Pass `--strict` to turn a finding into a non-zero exit code:
 
 `asset fetch --strict` is the one gate on a command that is not read-only and
 not offline: it downloads, then gates on completeness, and still emits its full
-envelope (see [Pinax](pinax.md#fetch-the-first-slice)). It takes one library.
+envelope (see [Pinax](pinax.md#fetch)). It takes one bibliography.
 
 `verify --strict` is intentionally broader: its warnings flag integrity
 mismatches against authoritative DOI metadata, which you usually *do* want to
-block on. `lint` profile warnings are intentionally gated: they say the library
-no longer matches its declared preferences. Other warnings (e.g. a missing DOI)
+block on. `lint` profile warnings are intentionally gated: they say the
+bibliography does not match its declared preferences. Other warnings (e.g. a missing DOI)
 remain advisory. See [Metadata Reference](metadata-reference.md).
 
 ## Multiple files
@@ -38,8 +38,9 @@ The gate checks — `lint`, `verify`, `asset check`,
 pynakes lint refs.bib chapters/*.bib --strict
 ```
 
-- **One file** preserves the historical per-file JSON envelope unchanged.
-- **Multiple files** emit an aggregate envelope:
+- **One file** emits that command's ordinary envelope.
+- **Multiple files** emit an aggregate envelope (specified under
+  [JSON contract](llm-integration.md#json-contract)):
 
 ```json
 {
@@ -67,7 +68,7 @@ Add it to your repository's `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/maiani/pynakes
-    rev: v0.6.5
+    rev: vX.Y.Z  # a released tag; pre-commit autoupdate moves it
     hooks:
       - id: pynakes-lint
       - id: pynakes-keys-check
@@ -91,7 +92,9 @@ therefore reports a placeholder such as `0.1.0.dev1`. The code is the release
 `rev` names; only the label is missing. To check which release a hook runs, read
 `rev`, not the version string.
 
-`pynakes-lint` and `pynakes-keys-check` run on every commit. Two more hooks are
+`pynakes-lint` and `pynakes-keys-check` (which runs
+`lint --only duplicate_key --strict`, so it honors `lint-ignore`) run on every
+commit. Two more hooks are
 defined but gated behind pre-commit's `manual` stage, because they have
 preconditions you may not always meet (linked PDFs checked into the repo;
 deciding duplicates are truly unwanted):
@@ -110,13 +113,13 @@ pre-commit run pynakes-dedupe-check --hook-stage manual --all-files
 Move them into the default stages (drop the `stages: [manual]`) if you want
 them on every commit.
 
-Because `lint --strict` fails on any finding, an existing library usually needs
+Because `lint --strict` fails on any finding, an existing bibliography usually needs
 its known, accepted findings recorded before the hook passes — for a group of
-entries at once with `ref directive ... --where`, or for the whole library with
+entries at once with `ref directive ... --where`, or for the whole bibliography with
 `lint-ignore`. New findings then fail the commit that introduces them.
 
-A finding your library can never clear fails the lint hook on every commit. Leave
-it out either for the hook alone, with `args`, or for the library itself, with a
+A finding your bibliography can never clear fails the lint hook on every commit. Leave
+it out either for the hook alone, with `args`, or for the bibliography itself, with a
 `lint-ignore` setting that every `pynakes lint` run then honors (see
 [lint](usage.md#lint)):
 

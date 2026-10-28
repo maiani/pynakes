@@ -76,8 +76,8 @@ and provider results; treat it as research data before sharing or committing
 it. Pinax downloads and manifests record local material paths, source URLs,
 fetch dates and hashes. A recorded source URL, like a URL in a fetch's
 `attempts`, keeps no userinfo, fragment, or query parameter that looks like a
-token, signature or key; a manifest written by an earlier version is left as it
-is. A manifest's stored hash is provenance:
+token, signature or key; manifest records already on disk are not rewritten.
+A manifest's stored hash is provenance:
 `asset check` does not recompute checksums.
 
 `scrub` prepares a public bibliography copy by removing configured private

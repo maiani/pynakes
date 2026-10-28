@@ -1,11 +1,9 @@
 # Pinax — a bibliography and its materials
 
-> **Status: core Pinax layer implemented including open-access published PDF
-> import.** This document specifies the optional *Pinax* layer (a bibliography
-> plus its materials) within the reference management engine, and
-> scopes what is deliberately deferred. For the engine it builds on, see
-> [Architecture](architecture.md); for philosophy, [vision](../vision.md); for
-> sequencing, [DEVPLAN](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
+This guide describes the optional *Pinax* layer — a bibliography together with
+its materials — and what it deliberately leaves out. For the engine it builds
+on, see [Architecture](architecture.md); for the design philosophy, the
+[Philosophy](../vision.md) page.
 
 ## Identity
 
@@ -77,7 +75,7 @@ and it is a plain `.bib` again, the materials left untouched on disk.
 1. **Single source of truth, no invalid states.** A separate flag would permit
    contradictions (`pinax: true` with no directory; a `pinax-files-dir` with
    `pinax: false`) that then need precedence rules to resolve.
-2. **The directory is the substantive fact.** "Is this a corpus?" and "where are
+2. **The directory is the substantive fact.** "Is this a pinax?" and "where are
    its materials?" are the same question; the path answers both.
 3. **The consequence it adds is self-justifying.** The one thing a pinax changes
    — duplicate keys, already a lint finding, block the file-addressing operations
@@ -95,11 +93,9 @@ the UX layer, not as a stored duplicate key:
   files share a folder). A valueless `pinax-files-dir:` means "I am a pinax — use the
   default."
 
-The one future condition that would justify an umbrella flag: if "pinax" ever
-means a *bundle* of behaviors toggled independently of whether materials are
-present (e.g. an auto-index). Since those are [deferred](#deliberately-deferred),
-that day is not here — and keeping such behaviors as their own keys lets an
-umbrella appear later without repainting `pinax-files-dir`.
+Behaviors that might one day be toggled independently of whether materials are
+present (an automatic index, say) would get their own keys rather than an
+umbrella flag; they are [deferred](#deliberately-deferred) in any case.
 
 ## On-disk layout
 
@@ -141,7 +137,7 @@ version later appears: you just add `<citekey>.published.pdf` beside the existin
 | --- | --- | --- |
 | **Published PDF** | `<pinax-files-dir>/<citekey>.published.pdf` | The version of record — present when available (often only if open-access). |
 | **Preprint PDF** | `<pinax-files-dir>/<citekey>.preprint.pdf` | The arXiv PDF. |
-| **Preprint source** | `<pinax-files-dir>/<citekey>.source/` | The arXiv source tree. **Read-only** in v1 — fetched, not authored. |
+| **Preprint source** | `<pinax-files-dir>/<citekey>.source/` | The arXiv source tree. **Read-only** — fetched, not authored. |
 | **Supplement PDF** | `<pinax-files-dir>/<citekey>.supplement.pdf` | Supplementary material (data, extended proofs, etc.). |
 | **Erratum PDF** | `<pinax-files-dir>/<citekey>.erratum.pdf` | Corrected / revised version. |
 
@@ -176,7 +172,7 @@ tiny.
 
 A consequence worth stating plainly: **the basic feature needs no manifest at
 all.** Re-fetchability is derivable from the entry's own identifiers (does it
-carry an arXiv id? a DOI?). The manifest ([Tier 1](#provenance-manifest-tier-1))
+carry an arXiv id? a DOI?). The [manifest](#provenance-manifest)
 is additive — it earns its place by recording provenance for precious files.
 
 ## Invariants the pinax mode adds
@@ -190,7 +186,7 @@ These extend the core invariants in
    *tolerates* them (it must, so a broken file can be opened and repaired), and
    that tolerance holds for a pinax too. What a pinax changes is the
    *consequence*: because the key now addresses a file (`bohr1913` →
-   `bohr1913.pdf`), any operation that resolves materials by key — fetch,
+   `bohr1913.preprint.pdf`), any operation that resolves materials by key — fetch,
    rename-with-files, the presence scan — refuses to act on a duplicated key and
    reports a conflict until it is resolved. The advisory lint finding becomes a
    hard precondition for those operations.
@@ -202,7 +198,7 @@ These extend the core invariants in
    `../../elsewhere` is rejected.
 3. **Presence is the filesystem; the manifest is provenance-only and
    rebuildable** for everything except precious files.
-4. **Source bundles are read-only fetched material** in v1. The
+4. **Source bundles are read-only fetched material.** The
    `<citekey>.source/` tree is content pynakes downloaded, not a directory it
    authors into.
 5. **Material mutations are coordinated, never guessed.** As `editing.py` is the
@@ -225,11 +221,11 @@ These extend the core invariants in
    Each entry's provenance row is copied alongside, so it survives the move
    between files without having to live on the entry.
 
-## No new command namespace
+## No separate command namespace
 
-A pinax is a mode, not a tool, so the CLI gains **no `pinax` namespace** — at most
-one new top-level verb (`asset fetch`). Existing commands become file-aware when — and
-only when — a `pinax-files-dir` is set:
+A pinax is a mode, not a tool, so there is **no `pinax` command namespace**.
+The `asset` family fetches, checks and repairs materials, and the existing
+commands become file-aware when — and only when — a `pinax-files-dir` is set:
 
 | To… | Use | What changes for a pinax |
 | --- | --- | --- |
@@ -238,14 +234,14 @@ only when — a `pinax-files-dir` is set:
 | Validate materials | `asset check` | Reports missing/orphan/drift between references and `pinax-files-dir`. |
 | Reconcile the manifest | `asset repair [--dry-run --diff]` | Brings the provenance manifest in line with the material files that exist. |
 | Rename / regenerate keys | `keys rename`, `keys generate`, `keys repair` | Every material sharing the key — `<citekey>.published.pdf`, `<citekey>.preprint.pdf`, `<citekey>.source/` — moves with it (see [Coordinated edits](#coordinated-edits-and-atomicity)). `keys rename`, `keys generate`, and `keys repair` name each planned move in their envelope's `pinax_materials`, dry run included, and a dry run refuses a move whose target exists, as the write would. Duplicate repair keeps materials under the original key while an entry still uses it, reporting no move. |
-| Download missing materials | `asset fetch` (the one new download verb) | See [Fetch](#fetch-the-first-slice). |
+| Download missing materials | `asset fetch` | See [Fetch](#fetch). |
 | Combine / split | `combine`, `split` | Produce pinakes; each output entry's materials are copied into the output's `pinax-files-dir`. Non-destructive — inputs untouched. |
 
 Everything else keeps working unchanged and simply *gains* file-awareness the
 moment the metadata key is present. That is the whole point of making a pinax a
 property of the data rather than a separate command.
 
-### Library-side shape
+### Python API shape
 
 The same principle holds in the Python API: **a pinax is a mode of
 `Bibliography`, not a wrapper class.** A bibliography opened from a `.bib` with a
@@ -259,17 +255,17 @@ if bib.files:  # truthy ⇔ this bibliography is a pinax
 ```
 
 The mechanics stay out of the text engine: path computation, scanning, and moves
-live in a new `filestore.py` (pure filesystem, no bib semantics); downloading
-lives in `fetch.py` (network, mirroring `importer.py`'s injectable-fetcher
-pattern). `engine.py` gains only an optional `FileStore` and the coordinating
-methods; the `.bib` text-rendering path is untouched, so round-trip fidelity is
+live in `filestore.py` (pure filesystem, no bib semantics); downloading lives in
+`fetch.py` (network, with injectable fetchers like `importer.py`). `engine.py`
+holds only an optional `FileStore` and the coordinating methods; the `.bib`
+text-rendering path does not involve them, so round-trip fidelity is
 unaffected.
 
-## Fetch — the first slice
+## Fetch
 
-`asset fetch` is the first concrete brick, and it sits dead-center on the identity:
-materials, addressed by citekey, with the `.bib` staying authoritative,
-reviewable, and free of content-intelligence.
+`asset fetch` sits squarely on the identity: materials, addressed by citekey,
+with the `.bib` staying authoritative, reviewable, and free of
+content-intelligence.
 
 Given an arXiv entry, it downloads the PDF and the source bundle into the right
 place:
@@ -280,10 +276,10 @@ pynakes asset fetch refs.bib alvarez2019  →  refs.files/alvarez2019.preprint.p
 ```
 
 Omit the citation key to fetch every entry with configured missing materials.
-The library is the first positional argument; `--file` is an alternative:
+The bibliography is the first positional argument; `--file` is an alternative:
 
 ```bash
-pynakes asset fetch refs.bib                 # every entry in this library
+pynakes asset fetch refs.bib                 # every entry in this bibliography
 pynakes asset fetch refs.bib alvarez2019     # one entry
 pynakes asset fetch                          # every entry, lone .bib auto-detected
 ```
@@ -328,7 +324,7 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
   upgrade. `PYNAKES_APS_API_TOKEN` is not sent with PDF downloads: it
   authenticates APS Harvest *metadata* requests only.
 - **Zero-config.** If the `.bib` is not yet a pinax, `asset fetch` records the default
-  `pinax-files-dir` (`<stem>.files`) and creates it — one command bootstraps the corpus.
+  `pinax-files-dir` (`<stem>.files`) and creates it — one command bootstraps the pinax.
 - **Atomic writes.** A download lands in a temporary name inside `pinax-files-dir` and
   is atomically renamed into place; a partial download never leaves a half-file
   under a citation key. Source tarballs extract safely (no path traversal, no
@@ -345,7 +341,7 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
   entry needs an arXiv id it does not have — `--material preprint`/`source`, or
   `best-pdf` with no open-access published PDF — and it has a DOI, the skip
   reason says so and names `pynakes enrich --published --online`, which looks
-  one up by DOI ([backfill](#recovering-the-arxiv-source-for-published-papers-doi-to-arxiv-backfill)).
+  one up by DOI ([backfill](#recovering-the-arxiv-source-for-published-papers)).
   Nothing attaches a preprint automatically.
 - **`best-pdf` falls back on failure too.** When the published PDF is
   unavailable *or* its download fails, `best-pdf` fetches the preprint PDF
@@ -358,7 +354,7 @@ It obeys the existing [network boundary](architecture.md#network-boundary):
 
   | Key | Counts |
   | --- | --- |
-  | `requested` | entries the run considered (the selection, or the whole library) |
+  | `requested` | entries the run considered (the selection, or the whole bibliography) |
   | `fetched` | items in `fetched` |
   | `already_present` | skips because what the policy selects is already stored |
   | `unavailable` | skips because a requested material could not be had: no identifier, no open-access copy, a page that was not a PDF, … |
@@ -456,31 +452,27 @@ If a work is split across two *entries* (a separate `@misc` arXiv and an
 pinax must reconcile their materials onto the surviving key, the same
 coordinated-edit machinery as rename.
 
-### Recovering the arXiv source for published papers (DOI to arXiv backfill)
+### Recovering the arXiv source for published papers
 
 The source bundle is only ever reachable through the **arXiv id**: a published
 PDF carries no LaTeX. So the rule that a published entry keeps *both* its `doi`
 and its arXiv `eprint` is what makes the source fetchable at all. Two directions
 have to hold it:
 
-- **Preprint → published** is already additive. `enrich --published` adds `doi`
+- **Preprint → published** is additive. `enrich --published` adds `doi`
   / `journal` and promotes `@misc`/`@online` → `@article` **without ever
-  removing `eprint`** (`integrity._apply_published_candidate`), so a promoted
-  entry stays a valid `fetch-source` target.
-- **Published → arXiv is the gap.** A paper entered by its publisher DOI
-  (`add 10.1103/…`) never had an arXiv id — Crossref metadata does not carry one
-  — so its source is unreachable. This is the real "we lose the arXiv".
+  removing `eprint`**, so a promoted entry can still have its source fetched.
+- **Published → arXiv** needs a lookup. A paper imported by its publisher DOI
+  has no arXiv id — Crossref metadata does not carry one — so its source is
+  unreachable until one is found.
 
-The fix is a **DOI → arXiv back-resolution** folded into the online published
-pass, so `enrich --published --online` reconciles identity *both* ways: for an
-entry that has a publisher DOI but no resolvable arXiv id
-(`identity.entry_arxiv_id` returns `None`), it looks the work up by DOI and, when
-a preprint exists, backfills the arXiv id.
+`enrich --published --online` therefore reconciles identity *both* ways: for an
+entry that has a publisher DOI but no resolvable arXiv id, it looks the work up
+by DOI and, when a preprint exists, backfills the arXiv id.
 
 - **Sources: OpenAlex first, Semantic Scholar fallback.** OpenAlex
-  (`https://api.openalex.org/works/doi:<doi>`) needs no API key, its data is CC0,
-  and it is already the identity backbone named for
-  [v0.6](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md). OpenAlex
+  (`https://api.openalex.org/works/doi:<doi>`) needs no API key and its data is
+  CC0. OpenAlex
   represents arXiv as a *location*, not an id field, so the resolver scans the
   work's `locations[]` for an `arxiv.org/abs/<id>` URL and parses it with the
   shared identifier helpers. When OpenAlex has the work but not the arXiv
@@ -494,22 +486,21 @@ a preprint exists, backfills the arXiv id.
   - biblatex → `eprint = {<id>}`, `eprinttype = {arxiv}`
   - bibtex → `eprint = {<id>}`, `archiveprefix = {arXiv}`
 
-  Both pairs are read back by `entry_arxiv_id`, so either makes `fetch-source`
-  work; the dialect choice is only about idiomatic output.
+  Both pairs are read back as the entry's arXiv id, so either makes the source
+  fetchable; the dialect choice is only about idiomatic output.
 - **Graceful gaps.** No provider record, or records with no arXiv id, is a skip
   with a reason — never an error. The backfill only *adds* an identifier; it
   never changes the citation identity (`doi` / `journal` / type stay put).
-- **Envelope.** It reuses `enrich`'s existing `updates` (a `FieldUpdate` per
-  `eprint`/`eprinttype` written) and `changed_entries` / `changed_fields`; no new
-  top-level keys. No provenance manifest entry — the recovered id lives on the
-  entry, which *is* its provenance.
+- **Envelope.** It reports through `enrich`'s `updates` (a `FieldUpdate` per
+  `eprint`/`eprinttype` written) and `changed_entries` / `changed_fields`, with
+  no other top-level keys. It writes no provenance manifest entry — the
+  recovered id lives on the entry, which *is* its provenance.
 
-Once `eprint` is present, the existing `fetch-source` machinery downloads the
-`<citekey>.source/` tree unchanged, so you can read the arXiv source at
-`preprint_source` while still citing the version of record. This is distinct
-from [step 9](#implementation-steps) (open-access *published PDF* bytes): this
-step recovers the *identifier linkage*, and is useful to any library, pinax or
-not.
+Once `eprint` is present, `asset fetch --material source` downloads the
+`<citekey>.source/` tree, so you can read the arXiv source at
+`preprint_source` while still citing the version of record. The backfill
+recovers the *identifier linkage*, not material bytes, and is useful to any
+bibliography, pinax or not.
 
 ## Coordinated edits and atomicity
 
@@ -528,11 +519,9 @@ drift is always detectable and the fix always reviewable.
 
 Rename is the **only in-place** material operation, and so the riskiest: it
 mutates an existing `pinax-files-dir` rather than writing fresh outputs the way
-`combine`
-/ `split` do (where a failure just discards a half-written output). It warrants
-its own focused design pass before implementation.
+`combine` / `split` do (where a failure just discards a half-written output).
 
-## Provenance manifest (Tier 1)
+## Provenance manifest
 
 The manifest is additive and optional, at `<pinax-files-dir>/.pinax/manifest.json`, and
 records **provenance only**:
@@ -594,19 +583,21 @@ command.
 ## Breaking with JabRef's `file` field
 
 JabRef records attachments in a per-entry `file` field. A pinax deliberately does
-**not** use it as the source of truth: the convention (`<citekey>.pdf`) is
-canonical, so there is no per-entry path to drift from the filesystem. This is a
+**not** use it as the source of truth: the naming convention
+(`<citekey>.published.pdf`, `<citekey>.preprint.pdf`, …) is canonical, so there
+is no per-entry path to drift from the filesystem. This is a
 conscious break with JabRef compatibility for this one relationship — acceptable
 for a materials directory driven by pynakes and read by agents.
 
-Because the convention is canonical, the `file` field is *derivable*. A future
-opt-in (e.g. `files export-links`) can emit `file` descriptors for JabRef users on
-demand, without ever putting that field on the core write path — so it can never
-silently orphan a material.
+Because the convention is canonical, the `file` field is *derivable*: emitting
+`file` descriptors for JabRef users would be an explicit, opt-in export, never
+part of the core write path, so it could not silently orphan a material.
+`asset check` still validates any `file` descriptors a bibliography carries,
+reporting them separately from Pinax materials.
 
 ## Deliberately deferred
 
-These are **not in the near-term identity** and deserve dedicated thought. They
+These are **outside the current identity** and deserve dedicated thought. They
 are deferred, not forbidden; when they arrive they sit *above or beside* the
 bib-file-centric core — as an opt-in extra (e.g. `pynakes[…]`) or a separate
 tool, such as the library-scoped Bimas application — never woven into the core
@@ -614,7 +605,7 @@ write path.
 
 - **Full-text extraction** of PDF/source content into text.
 - **Search over content** and any derived index (e.g. SQLite FTS) — distinct from
-  today's `search` over `.bib` fields.
+  `search` over `.bib` fields.
 - **RAG / embeddings** and an agent vector store.
 - **Rich notes / annotation / agent memory** (beyond a simple file-centric
   `<citekey>.md` or `note` field, which would be on-identity).
@@ -624,95 +615,6 @@ write path.
 The discipline that protects the core: a deferred feature must not make the
 `.bib` stop being the source of truth, must not introduce nondeterminism into
 core logic, and must not require its dependencies for a base install.
-
-## Implementation steps
-
-The corpus layer ships as a sequence of small, independently committable steps —
-each is code + tests + a `CHANGELOG.md` entry and ends green on
-`pytest && ruff check src tests`. This is the build order; the spec above is what
-each step conforms to, and
-[DEVPLAN](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md) tracks it as a
-checklist.
-
-1. **`pinax-files-dir` + `FileStore` foundation (offline).** Recognize the
-   `pinax-files-dir`
-   `pynakes-meta` key; add `filestore.py` with the deterministic version-class
-    paths (`<citekey>.published.pdf`, `<citekey>.preprint.pdf`, `<citekey>.source/`),
-   directory scan, and presence checks; expose `Bibliography.files`
-   (`FileStore | None`). No network.
-2. **arXiv download core.** Add `fetch.py`: injectable `fetch_arxiv_pdf` /
-   `fetch_arxiv_source`, the URL builders, and safe tar extraction; add the
-   `FileStore` atomic writers for the preprint PDF and the extracted source.
-   Unit-tested with fixtures, no real network. *(Implemented.)*
-3. **The `asset fetch` command.** `pynakes asset fetch [file] [target]
-    [--dry-run] [--cache-file PATH] [--json]`, with what-to-download governed by
-    the `pinax-fetch-policy` metadata key;
-    `Bibliography.ensure_files_dir` + `fetch_materials`; the zero-config default
-   `pinax-files-dir`; the JSON envelope; registration in `cli.py` and
-   `capabilities.py`. *(The first end-to-end useful slice — "given an arXiv
-   entry, download the PDF and source into the right place.")*
-4. **Agent surface.** `inspect --json` reports per-entry `published_pdf` /
-   `preprint_pdf` / `preprint_source` / `canonical_pdf`; `asset check` reports
-   presence, orphans, and drift, and enforces the unique-key precondition for
-   file-addressing operations. *(Implemented.)*
-5. **Provenance manifest (Tier 1).** `.pinax/manifest.json` with `source` /
-   `fetched_date` / `sha256` / `refetchable` per artifact; `asset fetch` writes
-   it. *(Implemented.)*
-6. **Pinax-aware `combine` / `split`.** Each output is a pinax; an output entry's
-   materials and per-entry state are copied into its `pinax-files-dir`. Non-destructive —
-   inputs untouched. (Lower-risk than rename: outputs are fresh, so a failure just
-   discards a half-written output.) *(Implemented.)*
-7. **Coordinated key edits (own design pass).** `keys rename` / `generate` /
-   `repair` move every `<citekey>*` material *in place* (filesystem first, then
-   commit, rollback on failure); `asset repair` reconciles drift. The only
-   in-place material operation, so the riskiest. *(Implemented.)*
-8. **`ref import --fetch` for arXiv Pinax materials.** One-step import-and-download for
-   arXiv references, using the existing Pinax fetch policy for preprint
-   PDF/source materials. *(Implemented.)*
-9. **Open-access published PDFs.** DOI → open-access resolver landing the
-    published version at `<citekey>.pdf`, when a resolvable open-access copy
-    exists. *(Implemented.)*
-10. **Dedupe material merge.** `dedupe` merge reconciles Pinax materials onto the
-    surviving key, preserving moved provenance and refusing ambiguous material
-    overwrites. *(Implemented.)*
-11. **DOI → arXiv backfill.** `enrich --published --online` reconciles identity
-    both ways: when an entry has a publisher DOI but no arXiv id, resolve the
-    work via OpenAlex and backfill `eprint` (+ `eprinttype`/`archiveprefix` per
-    dialect), so a published-first entry becomes a `fetch-source` target. See
-    [Recovering the arXiv source for published papers](#recovering-the-arxiv-source-for-published-papers-doi-to-arxiv-backfill).
-    Lands in `integrity.py`; useful to any library, pinax or not.
-    *(Implemented.)*
-
-## Decisions and open questions
-
-Settled in discussion:
-
-- **`asset fetch` belongs to the `asset` resource family**.
-- **What to fetch defaults to metadata** — `pinax-fetch-policy`;
-  `--material` overrides the selection for one invocation.
-- **`ref import --fetch` is a convenience trigger** — it imports the reference, then
-  runs the same metadata-driven fetch policy for the new key.
-- **Canonical is the published PDF**, falling back to the preprint and its source.
-- **PDF-only e-prints** are handled gracefully (the source step is skipped).
-- **Operations preserve the pinax** — `combine` / `split` produce pinakes,
-  **plainly copying** materials into the outputs (no hardlinks); both stay
-  non-destructive, and you delete the source pinax to reclaim disk after a split.
-  Provenance travels as copied per-entry state.
-- **`pinax-files-dir` is constrained** — relative, never escaping the `.bib`'s directory.
-- **Metadata format stays `pynakes-meta`** for now; a TOML sidecar in the
-  `pinax-files-dir` is the planned home for corpus config when it outgrows flat scalars
-  (never TOML-in-`@comment{}`).
-
-Still open:
-
-1. **Default `pinax-fetch-policy`** — `bestpdf` (try published, fall back to preprint).
-   Whether `source` should be fetched by default alongside `bestpdf`.
-2. **Command-surface migration** — how `asset check` reports both legacy JabRef
-   `file` fields and `pinax-files-dir` materials without confusing plain `.bib`
-   users. Leaning: file-awareness is gated on `pinax-files-dir`, so a plain `.bib` sees
-   `asset check` exactly as today; a pinax adds a separate, clearly-labeled
-   materials section (presence / orphans / drift) while still validating any
-   legacy `file` descriptors it finds.
 
 ## Presence checks and stored hashes
 

@@ -1,6 +1,6 @@
 # JabRef compatibility
 
-pynakes is a `.bib`/`.bib`latex maintenance engine first. It interoperates
+pynakes is a BibTeX/BibLaTeX reference management engine first. It interoperates
 losslessly with JabRef — parsing and preserving JabRef's own
 metadata comments, understanding JabRef's value grammars, and keeping a
 JabRef-tracked file readable in JabRef — but that compatibility is a guarantee
@@ -16,8 +16,8 @@ Two structurally identical top-level comment namespaces can appear in a
 
 - `@comment{jabref-meta: key:value;}` — JabRef's own settings.
 - `@comment{pynakes-meta: key: value}` — pynakes' superset, for settings
-  JabRef cannot represent, and increasingly for pynakes' own *native* spelling
-  of a concept JabRef also has an encoding for.
+  JabRef cannot represent, and for pynakes' own *native* spelling of a concept
+  JabRef also has an encoding for.
 
 `pynakes-meta` is the source of truth for pynakes' own canonical schema;
 `jabref-meta` is a compatibility projection kept in sync so JabRef keeps
@@ -34,12 +34,12 @@ Domain modules (`normalize.py`, `lint.py`, `integrity.py`, the engine) call the
 fallback-aware accessors in `pynakes.metadata.jabref` (re-exported from
 `pynakes.metadata`) — never JabRef's literal key names. This is what keeps
 JabRef knowledge concentrated at one boundary instead of leaking into every
-module that cares about, say, the library's dialect.
+module that cares about, say, the bibliography's dialect.
 
 ## Native keys with a JabRef alias
 
-Concepts that used to be exposed only through JabRef's encoding now have a
-pynakes-native spelling. All are read native-first, JabRef-second:
+These concepts have a pynakes-native spelling and a JabRef encoding. All are
+read native-first, JabRef-second:
 
 | Native key (`pynakes-meta`) | JabRef equivalent (`jabref-meta`) | Accessor |
 | --- | --- | --- |
@@ -72,7 +72,7 @@ warning; re-setting the native key mirrors it back into `jabref-meta`.
 
 JabRef's `saveActions` has no pynakes-native equivalent; it stays a JabRef-only
 input that `normalize` consults directly (via `pynakes.metadata.jabref`) to
-seed author-normalization and DOI-cleanup defaults when a library configures
+seed author-normalization and DOI-cleanup defaults when a bibliography configures
 it. Absorbing `saveActions` into native `normalize-*` keys (and a symmetric
 "go-native" operation that strips `jabref-meta` when leaving JabRef entirely) is
 planned but not yet implemented.
@@ -89,14 +89,14 @@ decides where a new key is written:
 - A JabRef-native key goes to `jabref-meta` only when the file is already
   *JabRef-tracked* — i.e. it already carries at least one `jabref-meta` block.
   Otherwise it goes to `pynakes-meta` too, so a greenfield pynakes-native
-  library never gains a `jabref-meta` section it didn't ask for.
+  bibliography never gains a `jabref-meta` section it didn't ask for.
 
-A fresh `pynakes init` library is pynakes-native by default: its `dialect` and
+A fresh `pynakes init` bibliography is pynakes-native by default: its `dialect` and
 `key-pattern` are written to `pynakes-meta` and it carries no `jabref-meta`. Pass
 `init --jabref` to also emit the JabRef projection at creation time, or run
 `pynakes metadata adopt-jabref <file>` later to opt an existing pynakes-native
-library into JabRef tracking: it relocates any JabRef-native keys stranded in
-`pynakes-meta` and anchors a `databaseType` block, so the library works in
+bibliography into JabRef tracking: it relocates any JabRef-native keys stranded in
+`pynakes-meta` and anchors a `databaseType` block, so the bibliography works in
 JabRef and future JabRef-native keys route to `jabref-meta` from then on.
 Running it again once tracked is a no-op. See the
 [metadata usage guide](usage.md#metadata) for the CLI workflow.

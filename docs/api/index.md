@@ -167,7 +167,7 @@ if not result.success:
 `SaveResult` records the destination, optional backup path (`.bak`, or the next
 free `.bak.N`, so an earlier backup is never overwritten), and controlled
 error information. `load_bib` records the detected file encoding on the
-returned library.
+returned `BibFile`.
 
 ## Engine Facade
 
@@ -185,7 +185,7 @@ result = coll.commit()
 
 `Bibliography` owns the load → stage → preview → commit lifecycle for one `.bib` file.
 It keeps the file as the source of truth: staged operations mutate the in-memory
-library only, `preview()` returns the would-be file text, `diff()` returns a
+`BibFile` only, `preview()` returns the would-be file text, `diff()` returns a
 unified diff, and `commit()` writes atomically through the same validation path
 as the CLI. `reset()` discards staged edits and `reload(force=True)` re-reads
 from disk.
@@ -256,8 +256,8 @@ source_text, occurrences = rename_citation_key_in_tex(
 )
 ```
 
-`generate_key(entry, lib)` honors JabRef citation-key metadata in the library
-when present.
+`generate_key(entry, lib)` honors the bibliography's citation-key pattern
+(`key-pattern`, or JabRef's `keypatterndefault`) when present.
 
 ## JabRef Metadata
 
@@ -354,8 +354,8 @@ print(coll.diff())
 ```
 
 `import_reference()` auto-detects the identifier type, fetches metadata only (no
-PDFs), and — for arXiv — emits `@online` for BibLaTeX libraries and `@misc` for
-BibTeX ones per `databaseType`.
+PDFs), and — for arXiv — emits `@online` for BibLaTeX bibliographies and `@misc` for
+BibTeX ones, per the bibliography's `dialect` (or JabRef's `databaseType`).
 
 For lower-level workflows, `pynakes.importer.prepare_imported_reference`,
 `pynakes.importer.prepare_imported_entry`, and `pynakes.importer.render_entry`

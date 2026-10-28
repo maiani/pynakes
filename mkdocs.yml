@@ -44,7 +44,7 @@ nav:
   - Architecture: guides/architecture.md
   - Type Checking: guides/type-checking.md
   - JabRef Compatibility: guides/jabref-compatibility.md
-  - Pinax (corpus layer): guides/pinax.md
+  - Pinax: guides/pinax.md
   - API Reference:
       - Overview: api/index.md
       - Module Reference: api/reference.md

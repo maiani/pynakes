@@ -28,18 +28,15 @@ pynakes asset check refs.bib --json
 ```
 
 `inspect` reports entries, encoding, line endings, duplicates and metadata.
-`lint` diagnoses without modifying the library; `--strict` exits 1 for any
+`lint` diagnoses without modifying the bibliography; `--strict` exits 1 for any
 unsuppressed finding. Modifying commands accept `--dry-run --diff` to preview
 changes before writing. Backups are opt-in with `--backup`.
 
 The default normalization pass protects title capitalization, normalizes
 names, DOI fields and month macros. Journal titles are preserved unless the
 stored profile or `--journal-style` chooses a transformation. To abbreviate
-using your own local CSV tables:
-
-
-
-Save these small example tables beside `refs.bib` before running the recipe:
+using your own local CSV tables, save these small example tables beside
+`refs.bib` and run the recipe:
 
 ```csv title="journals.csv"
 title,abbreviation
@@ -69,7 +66,7 @@ pynakes ref import refs.bib arXiv:2301.00001 --fetch
 ```
 
 These invented identifiers illustrate syntax. `--key` assigns a key;
-`--key-source provider` uses the provider's key instead of the library's
+`--key-source provider` uses the provider's key instead of the bibliography's
 configured key pattern. `--fetch` downloads configured Pinax materials.
 See [Network and privacy](network-and-privacy.md) before sending unpublished
 identifiers or free-text references.
@@ -86,7 +83,6 @@ manifest reconciliation.
 ## Next steps
 
 - [Usage and selectors](usage.md)
-- [Generated command reference](command-reference.md)
-- [Compatibility policy](public-api.md)
+- [Command reference](command-reference.md)
+- [LLM & automation integration](llm-integration.md)
 - [API reference](../api/index.md)
-- [Installation and development checks](installation.md)

@@ -135,15 +135,15 @@ number of changed entries.
 
 #### State model: a thin handle over a file-derived buffer
 
-The lifecycle above follows directly from constraints #4 (the file is the source
-of truth) and #5 (determinism):
+The lifecycle above follows directly from two core invariants — the file is
+authoritative, and behavior is deterministic:
 
 - **Bibliography is a thin stateful *handle*** bundling `{path, lib, pristine
   snapshot, fingerprint, is_dirty}`. Its in-memory state is a derived buffer over
   the file, never an authoritative model.
 - **Rendering and diffing are derived from explicit snapshots.** Bibliography
   retains pristine text plus identity-aware entry/comment source spans, then
-  derives preview text and a diff from its staged library. Offset-based edits
+  derives preview text and a diff from its staged `BibFile`. Offset-based edits
   keep byte-identical duplicate blocks distinct.
 - **Litmus test for any state:** *if I delete it and re-read from disk, do I lose
   anything?* No → a safe derived buffer. Yes → a second source of truth, which is
@@ -250,7 +250,7 @@ BibFile/BibEntry instances, keeps duplicate keys, captures each entry's raw text
 collects top-level comments and declarations, detects line endings, and parses
 JabRef metadata blocks. It deliberately does not use a general BibTeX dependency:
 round-trip control is more important than normalizing an input into another
-library's data model.
+BibTeX library's data model.
 
 Parsing is conservative, not a formatter. Field values are represented as
 strings, unknown entry fields survive, and malformed structural input raises
@@ -281,7 +281,7 @@ a normal staged commit.
 `bibtex_writer.write_bib()` serializes a BibFile. Unmodified entries with
 `raw_content` are emitted verbatim; modified or source-less entries are
 reconstructed with their insertion field order. This is an **entry-level**
-round-trip guarantee. Direct whole-library serialization can reassemble top-level
+round-trip guarantee. Direct whole-file serialization can reassemble top-level
 constructs, so callers wanting the smallest possible file diff should use
 Bibliography.
 
@@ -292,7 +292,7 @@ Without a mark the file is UTF-8, or Latin-1 when it holds no UTF-8 multi-byte
 character at all. A file that is UTF-8 apart from a few stray bytes, or that
 contains a NUL byte without a mark (binary data, or UTF-16 without a mark), is
 refused with a `ParseError` naming the line rather than silently read as
-Latin-1 or as an empty library. `save_bib()`
+Latin-1 or as an empty bibliography. `save_bib()`
 and `save_text()` support backup creation, temporary-file writes, re-parse
 validation for BibTeX text, and replacement of the destination. They return
 `SaveResult` rather than exposing ordinary write failures as raw tracebacks to
@@ -345,15 +345,15 @@ See the [co-authorship guide](usage.md#coauthors) for report semantics and examp
 | journals.py | Exact title/ISSN mapping plus LTWA-style journal abbreviation/expansion. |
 | normalize.py | Policy orchestration over title, author, journal, DOI, and page-range operations. |
 | convert.py | Conservative BibTeX/BibLaTeX convention conversion. |
-| scrub.py | Private-content removal for a public release: the default private-field set, the library's own `scrub-*` policy, and the metadata/free-comment block classification. |
+| scrub.py | Private-content removal for a public release: the default private-field set, the bibliography's own `scrub-*` policy, and the metadata/free-comment block classification. |
 | files.py | Parsing and resolution/validation of BibLaTeX linked-file descriptors. |
-| usage.py | LaTeX/AUX citation extraction, library-usage analysis, tagging, and subset projection. |
+| usage.py | LaTeX/AUX citation extraction, used/unused analysis, TeX citation-key rewrites, and subset projection. |
 | lint.py | Local structural/semantic findings such as missing required fields, malformed DOI, groups, and duplicate keys. BibLaTeX required-field rules cite the official CTAN BibLaTeX manual, section 2.1 entry types and aliases, as their source of truth. |
 | dedupe.py | Duplicate-work clustering and conflict-first merge planning. |
 | integrity.py | Opt-in provider-backed verification and conservative enrichment; re-exports the preprint publication check. |
 | _integrity_common.py, _integrity_published.py | Integrity report types and shared field accessors; the preprint detection/promotion half of the integrity surface. |
 | entry_types.py | Which field holds a container title or eprint provenance, given the entry type and dialect. |
-| bounded.py | The bounded-read contract: field projection, character limits, and pagination whose cursors are bound to a library snapshot and a selection. |
+| bounded.py | The bounded-read contract: field projection, character limits, and pagination whose cursors are bound to a bibliography snapshot and a selection. |
 | entry_reader.py | Per-entry records for bounded reads: triage summary or field projection, plus the included materials and recorded provenance. |
 | saved_queries.py | Named `--where` expressions stored as `query-<name>` in `pynakes-meta`, validated with the shared parser and evaluated on demand. |
 | analysis.py | Public API for bibliography analysis: `analyze` composes descriptive reports from the entry store, groups, lint, linked files and Pinax; `coauthor_network` returns the full co-authorship graph. Exports both report types and the co-author configuration helpers. |
@@ -435,21 +435,17 @@ Bibliography lifecycle, CLI JSON/exit contracts, and regression fixtures. The
 critical tests are parse → edit → write → parse paths and staged bibliography
 diffs: they guard preservation, not merely semantic field values.
 
-Every behavioral change must add tests and update CHANGELOG.md. Before a change
-is complete, run:
-
-~~~bash
-pytest
-ruff check src tests
-ruff format --check src tests
-~~~
+Every behavioral change must add tests and update CHANGELOG.md. The checks a
+change must pass are listed under
+[Development checks](installation.md#development-checks);
+[Type checking](type-checking.md) explains the `ty` baseline.
 
 ## Deliberate non-goals and future boundaries
 
 The core does not own a database of record, GUI, cloud sync, PDF extraction,
-arbitrary shell execution, or LLM API calls. An MCP server is similarly a
-downstream transport concern: the CLI already provides a machine-readable, safe
-agent interface.
+arbitrary shell execution, or LLM API calls. An MCP server is a transport
+concern too: the planned MCP companion is a separate package that adapts the
+engine, and the CLI already provides a machine-readable, safe agent interface.
 
 Pinax mode is implemented: one `Bibliography` plus its `pinax-files-dir`
 of materials. The next planned extensions are `Library` (a declared set of
