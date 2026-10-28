@@ -13,7 +13,7 @@ import typer
 from pynakes import biblinks as link_ops
 from pynakes._engine_helpers import fingerprint
 from pynakes.cli_checks import CheckOutcome, _run_checks, strict_option
-from pynakes.cli_choices import LinkConstraint, LinkFlow
+from pynakes.cli_choices import LinkConstraint, LinkFlow, SyncDirection
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     _EXPECT_SHA256_OPTION,
@@ -271,9 +271,129 @@ def biblink_check(
     _run_checks([file], "biblink_check", _check_one, json_output, strict)
 
 
+def _expected_digests(values: list[str] | None, json_output: bool) -> dict[Path, str]:
+    """Parse ``--expect-linked-sha256 PATH=SHA256`` values, keyed by resolved path."""
+    expected: dict[Path, str] = {}
+    for value in values or []:
+        path, sep, digest = value.rpartition("=")
+        if not sep or not path:
+            _emit_error(
+                json_output, "InvalidInput", f"--expect-linked-sha256 needs PATH=SHA256: {value!r}"
+            )
+        expected[Path(path).resolve()] = digest
+    return expected
+
+
+def biblink_sync(
+    file: str | None = bib_file_argument(),
+    parents: bool = typer.Option(False, "--parents", help="Sync along FILE's parent links only"),
+    children: bool = typer.Option(False, "--children", help="Sync along FILE's child links only"),
+    direction: SyncDirection = typer.Option(
+        SyncDirection.DOWN,
+        "--direction",
+        help="down copies parents' values into children; up copies children's values "
+        "into parents. A link is followed only when its flow allows the direction",
+    ),
+    backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
+    expect_linked_sha256: list[str] | None = typer.Option(
+        None,
+        "--expect-linked-sha256",
+        metavar="PATH=SHA256",
+        help="Like --expect-sha256, for another file the sync writes; repeatable, one per "
+        "file, with the source_sha256 a --dry-run reported for it under files",
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff of every file"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Copy values along FILE's links, one step and one direction, to repair drift.
+
+    For each selected link (all of FILE's links unless `--parents` or
+    `--children` narrows them) whose flow allows the direction, the drifted
+    fields `biblink check` reports take the other end's value: the parent's
+    going down, the child's going up, including the entry type. Entries are
+    never added, removed or renamed; going down never deletes a field only the
+    child has, and going up leaves fields the parent inherits through crossref
+    or xdata. Two links proposing different values for one field are a conflict,
+    and that field is left alone. Every file written is previewed together and
+    written all or none.
+    """
+    file = _resolve_input_bib(file, json_output)
+    params = _params(dry_run, diff, json_output, backup)
+    both = not parents and not children
+    plan, origin, targets = link_ops.sync_links(
+        file, parents=parents or both, children=children or both, direction=str(direction.value)
+    )
+    _check_expected_sha256(file, origin, _with_expect(params, expect_sha256))
+    expected = _expected_digests(expect_linked_sha256, json_output)
+    for target in targets:
+        if target is origin:
+            continue
+        digest = expected.get(Path(str(target.path)).resolve())
+        _check_expected_sha256(str(target.path), target, _with_expect(params, digest))
+    files = [origin, *(target for target in targets if target is not origin)]
+    digests = [_source_sha256(coll) for coll in files]
+    diff_text = "\n".join(part for part in (coll.diff() for coll in files) if part)
+    if dry_run:
+        changed = [coll.is_modified for coll in files]
+    else:
+        try:
+            changed = link_ops.commit_together(files, backup=backup)
+        except ExternalModificationError as exc:
+            _emit_conflict(
+                json_output,
+                "ExternalModification",
+                str(exc),
+                file=str(exc.path),
+                options=_EXTERNAL_MODIFICATION_OPTIONS,
+            )
+    by_file: dict[str, list[dict[str, object]]] = {}
+    for change in plan.changes:
+        by_file.setdefault(change.file, []).append(change.to_dict())
+    entries = {(change.file, change.key) for change in plan.changes}
+    human = [
+        f"{_verb('sync', params)} {len(plan.changes)} value(s) {direction.value} along "
+        f"{file}'s links ({len(entries)} entr{'y' if len(entries) == 1 else 'ies'})."
+    ]
+    human.extend(
+        f"  {change.file}: {change.key} {change.field or 'type'} = {change.new}"
+        for change in plan.changes
+    )
+    human.extend(
+        f"  conflict: {c['file']} {c['key']} {c['field'] or 'type'}" for c in plan.conflicts
+    )
+    if plan.skipped:
+        human.append(f"  skipped: {len(plan.skipped)} (see --json for each reason)")
+    result = {
+        "status": "success",
+        "action": "biblink_sync",
+        "file": file,
+        "dry_run": dry_run,
+        "modified": any(changed),
+        "modified_entries": len(entries),
+        "warnings": [],
+        "source_sha256": digests[0],
+        "direction": direction.value,
+        "files": [
+            {
+                "file": str(coll.path),
+                "source_sha256": digest,
+                "modified": was_changed,
+                "changes": by_file.get(str(coll.path), []),
+            }
+            for coll, digest, was_changed in zip(files, digests, changed, strict=True)
+        ],
+        "conflicts": plan.conflicts,
+        "skipped": [skip.to_dict() for skip in plan.skipped],
+    }
+    _emit(json_output, result, human, diff_text, diff)
+
+
 def register(app: typer.Typer) -> None:
     """Register the ``biblink`` command family."""
     app.command("add")(_safe(biblink_add))
     app.command("remove")(_safe(biblink_remove))
     app.command("list")(_safe(biblink_list))
     app.command("check")(_safe(biblink_check))
+    app.command("sync")(_safe(biblink_sync))

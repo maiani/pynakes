@@ -203,6 +203,29 @@ Remove the link between FILE and OTHER from both bibliographies.
 | `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
+## biblink sync
+
+**Stability: stable**
+
+Copy values along FILE's links, one step and one direction, to repair drift.
+
+`pynakes biblink sync [FILE] [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `--parents` | boolean | no | false | — | Sync along FILE's parent links only |
+| `--children` | boolean | no | false | — | Sync along FILE's child links only |
+| `--direction` | choice | no | "down" | down, up | down copies parents' values into children; up copies children's values into parents. A link is followed only when its flow allows the direction |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
+| `--expect-linked-sha256` | list[string] | no | null | — | Like --expect-sha256, for another file the sync writes; repeatable, one per file, with the source_sha256 a --dry-run reported for it under files |
+| `--dry-run` | boolean | no | false | — | Show changes without writing |
+| `--diff` | boolean | no | false | — | Show a unified diff of every file |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
 ## capabilities
 
 **Stability: stable**

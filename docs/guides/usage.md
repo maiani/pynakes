@@ -1190,6 +1190,7 @@ pynakes biblink add refs.bib master.bib --dry-run --diff
 pynakes biblink add refs.bib master.bib
 pynakes biblink list master.bib
 pynakes biblink check refs.bib
+pynakes biblink sync refs.bib --dry-run --diff
 pynakes biblink remove refs.bib master.bib
 ```
 
@@ -1220,6 +1221,19 @@ does not hold.
 
 The link also records a flow (`down`, `up`, `both` or `none`, default `down`):
 which way a sync may move values. Declaring a link never copies anything.
+
+`biblink sync` repairs the drift `biblink check` reports, one step and one
+direction per run. `--direction down` (the default) copies the parent's value
+into each drifted field of the child, and the parent's entry type; `--direction
+up` copies the child's values into the parent. A link is followed only when
+its flow allows the direction and it is `field-subset`; `--parents` or
+`--children` narrows the run to those links of FILE. A sync never adds,
+removes or renames entries, going down never deletes a field only the child
+has, and going up leaves fields the parent inherits through `crossref` or
+`xdata`. When two links would set one field to different values, such as two
+parents that disagree, the field is reported under `conflicts` and left alone.
+Every file a run writes is in one preview and is written all or none; pass
+each other file's `source_sha256` back with `--expect-linked-sha256 PATH=SHA`.
 
 ## analyze
 

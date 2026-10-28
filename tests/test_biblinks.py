@@ -215,3 +215,85 @@ def test_link_list_and_lint_read_the_declarations(tmp_path: Path) -> None:
     ]
     bad = parse_bib("@comment{pynakes-meta:\nbiblink-parents: a.bib flow=sideways\n}\n")
     assert "invalid_metadata_value" in [issue.type for issue in lint(bad)]
+
+
+def _sync(file: Path, *args: str) -> dict:
+    code, data = _run("biblink", "sync", str(file), *args)
+    assert code == 0, data
+    return data
+
+
+def test_sync_down_repairs_the_child_and_never_deletes(tmp_path: Path) -> None:
+    drifted = CHAPTER.replace("Introductio", "Introductio in analysin").replace(
+        "  year = {1748},\n", "  year = {1748},\n  note = {Chapter two},\n"
+    )
+    child, master = _pair(tmp_path, drifted.replace("@inproceedings{Euler", "@book{Euler"))
+    _link(child, master)
+    before = master.read_bytes()
+    data = _sync(child)
+    changes = data["files"][0]["changes"]
+    assert {(c["key"], c["field"], c["new"]) for c in changes} == {
+        ("Euler1748", "title", "Introductio"),
+        ("Euler1748", None, "inproceedings"),
+    }
+    assert [s["field"] for s in data["skipped"] if s.get("field")] == ["note"]
+    assert master.read_bytes() == before
+    assert "note = {Chapter two}" in child.read_text()
+    assert _findings(child) == [("field_drift", "Euler1748", "note")]
+
+
+def test_sync_up_needs_the_flow_and_leaves_inherited_fields(tmp_path: Path) -> None:
+    drifted = CHAPTER.replace("Introductio", "Introductio in analysin").replace(
+        "{Acta Eruditorum}", "{Acta Eruditorum Lipsiae}"
+    )
+    child, master = _pair(tmp_path, drifted)
+    _link(child, master)
+    refused = _sync(child, "--direction", "up")
+    assert refused["modified"] is False
+    assert "flow=down does not allow a sync up" in refused["skipped"][0]["reason"]
+
+    _link(child, master, "--flow", "both")
+    data = _sync(child, "--direction", "up")
+    assert [(c["key"], c["field"]) for c in data["files"][1]["changes"]] == [("Euler1748", "title")]
+    assert "title = {Introductio in analysin}" in master.read_text()
+    inherited = [s for s in data["skipped"] if s.get("field") == "booktitle"]
+    assert inherited and "inherits" in inherited[0]["reason"]
+
+
+def test_two_parents_disagreeing_is_a_conflict_left_unwritten(tmp_path: Path) -> None:
+    child, master = _pair(tmp_path, CHAPTER.replace("Introductio", "Introductio in analysin"))
+    other = tmp_path / "other.bib"
+    other.write_text(
+        MASTER.replace("{Introductio}", "{Introductio, editio altera}"), encoding="utf-8"
+    )
+    _link(child, master)
+    _link(child, other)
+    data = _sync(child)
+    assert [(c["key"], c["field"]) for c in data["conflicts"]] == [("Euler1748", "title")]
+    assert "Introductio in analysin" in child.read_text()
+
+
+def test_sync_skips_key_subset_and_one_sided_links(tmp_path: Path) -> None:
+    child, master = _pair(tmp_path, CHAPTER.replace("Introductio", "Introductio in analysin"))
+    _link(child, master, "--constraint", "key-subset")
+    assert "key-subset" in _sync(child)["skipped"][0]["reason"]
+    _link(child, master)
+    master.write_text(MASTER, encoding="utf-8")
+    assert "does not declare the link alike" in _sync(child)["skipped"][0]["reason"]
+
+
+def test_sync_refuses_a_stale_digest_for_a_linked_file(tmp_path: Path) -> None:
+    child, master = _pair(tmp_path, CHAPTER.replace("Introductio", "Introductio in analysin"))
+    _link(child, master, "--flow", "both")
+    before = master.read_bytes()
+    code, data = _run(
+        "biblink",
+        "sync",
+        str(child),
+        "--direction",
+        "up",
+        "--expect-linked-sha256",
+        f"{master}={'0' * 64}",
+    )
+    assert code == 2 and data["error"] == "ExternalModification"
+    assert master.read_bytes() == before

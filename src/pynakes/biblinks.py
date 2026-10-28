@@ -41,7 +41,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
+from pynakes._text_utils import find_field_name
 from pynakes.bibtex_parser import ParseError
+from pynakes.editing import set_entry_field, set_entry_type
 from pynakes.engine import Bibliography, ExternalModificationError
 from pynakes.inheritance import resolve_entry_fields
 from pynakes.io import load_bib, save_text
@@ -519,3 +521,196 @@ def _bound(coll: Bibliography) -> Path:
     if coll.path is None:
         raise ValueError("A linked bibliography must be a file")
     return Path(coll.path)
+
+
+# --- sync along one link -------------------------------------------------------
+
+#: The flows that allow a sync in each direction.
+_ALLOWED_FLOWS = {"down": {"down", "both"}, "up": {"up", "both"}}
+
+
+@dataclass
+class SyncChange:
+    """One value a sync writes: ``field`` of ``key`` in ``file``, or its type when ``None``."""
+
+    file: str
+    key: str
+    field: str | None
+    old: str | None
+    new: str
+    source: str
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize the change for a JSON envelope."""
+        return {
+            "file": self.file,
+            "key": self.key,
+            "field": self.field,
+            "old": self.old,
+            "new": self.new,
+            "source": self.source,
+        }
+
+
+@dataclass
+class SyncSkip:
+    """Something a sync left alone, and why."""
+
+    reason: str
+    link: str
+    key: str | None = None
+    field: str | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize the skip, leaving out what does not apply."""
+        out: dict[str, object] = {"link": self.link, "reason": self.reason}
+        if self.key is not None:
+            out["key"] = self.key
+        if self.field is not None:
+            out["field"] = self.field
+        return out
+
+
+@dataclass
+class SyncPlan:
+    """What a sync along the selected links would write, skip and refuse."""
+
+    changes: list[SyncChange] = field(default_factory=list)
+    skipped: list[SyncSkip] = field(default_factory=list)
+    #: Fields two links would set to different values; none of them is written.
+    conflicts: list[dict[str, object]] = field(default_factory=list)
+
+
+def sync_links(
+    path: str | Path,
+    *,
+    parents: bool = True,
+    children: bool = True,
+    direction: str = "down",
+) -> tuple[SyncPlan, Bibliography, list[Bibliography]]:
+    """Stage a one-step sync along ``path``'s selected links, in one direction.
+
+    ``down`` copies the parent's value into each drifted field of the child, and
+    the parent's entry type where they differ; ``up`` copies the child's values
+    into the parent. A link is followed only when its flow allows the
+    direction, it is ``field-subset``, and the other end declares it back
+    alike. Entries are never added, removed or renamed, ``down`` never deletes
+    a field only the child has, and ``up`` leaves a field the parent inherits
+    through ``crossref``/``xdata``. Two links proposing different values for
+    one field are a conflict, and that field is left as it is.
+
+    Returns the plan, the opened bibliography for ``path``, and every opened
+    bibliography the plan edits, all staged and uncommitted.
+    """
+    if direction not in _ALLOWED_FLOWS:
+        raise ValueError(f"Unknown sync direction {direction!r}; expected down or up")
+    path = Path(path)
+    origin = Bibliography.open(path)
+    opened: dict[Path, Bibliography] = {path.resolve(): origin}
+    plan = SyncPlan()
+    proposals: dict[tuple[Path, str, str | None], list[SyncChange]] = {}
+
+    for declaration in declared_links(origin.lib):
+        if not (parents if declaration.role == "parent" else children):
+            continue
+        link = declaration.path
+        if declaration.flow not in _ALLOWED_FLOWS[direction]:
+            reason = f"flow={declaration.flow} does not allow a sync {direction}"
+            plan.skipped.append(SyncSkip(reason, link))
+            continue
+        if declaration.constraint != "field-subset":
+            reason = "a key-subset link has no field values to sync"
+            plan.skipped.append(SyncSkip(reason, link))
+            continue
+        other_path = declaration.resolve(path)
+        try:
+            other = opened.get(other_path.resolve()) or Bibliography.open(other_path)
+        except (OSError, ValueError, ParseError) as exc:
+            plan.skipped.append(SyncSkip(f"could not read {other_path}: {exc}", link))
+            continue
+        opened[other_path.resolve()] = other
+        back = find_declaration(
+            other.lib, relative_path(path, other_path), opposite(declaration.role)
+        )
+        if back is None or (back.constraint, back.flow) != (
+            declaration.constraint,
+            declaration.flow,
+        ):
+            reason = "the other end does not declare the link alike; repair it with biblink add"
+            plan.skipped.append(SyncSkip(reason, link))
+            continue
+        child, parent = (origin, other) if declaration.role == "parent" else (other, origin)
+        _, findings = check_constraint(child.lib, parent.lib, "field-subset")
+        for finding in findings:
+            change = _proposal(finding, child, parent, direction, link, plan)
+            if change is not None:
+                target = Path(change.file).resolve()
+                proposals.setdefault((target, change.key, change.field), []).append(change)
+
+    targets: dict[Path, Bibliography] = {}
+    for (target, key, field_name), changes in proposals.items():
+        values = {change.new for change in changes}
+        if len(values) > 1:
+            plan.conflicts.append(
+                {
+                    "file": changes[0].file,
+                    "key": key,
+                    "field": field_name,
+                    "values": [{"source": c.source, "value": c.new} for c in changes],
+                }
+            )
+            continue
+        change = changes[0]
+        _apply(opened[target], change)
+        plan.changes.append(change)
+        targets[target] = opened[target]
+    return plan, origin, list(targets.values())
+
+
+def _proposal(
+    finding: LinkFinding,
+    child: Bibliography,
+    parent: Bibliography,
+    direction: str,
+    link: str,
+    plan: SyncPlan,
+) -> SyncChange | None:
+    """Return the change ``finding`` calls for in ``direction``, or record why none."""
+    key, field_name = finding.key, finding.field
+    if finding.type in ("missing_key", "ambiguous_key") or key is None:
+        reason = (
+            "entries are not added by a sync"
+            if finding.type == "missing_key"
+            else "the key is ambiguous"
+        )
+        plan.skipped.append(SyncSkip(reason, link, key))
+        return None
+    source, target = (parent, child) if direction == "down" else (child, parent)
+    new = finding.parent_value if direction == "down" else finding.child_value
+    old = finding.child_value if direction == "down" else finding.parent_value
+    if finding.type == "type_mismatch":
+        assert new is not None
+        return SyncChange(str(target.path), key, None, old, new, str(source.path))
+    if direction == "down" and new is None:
+        reason = "only the child has this field, and a sync never deletes"
+        plan.skipped.append(SyncSkip(reason, link, key, field_name))
+        return None
+    parent_entry = parent.lib.entries.get(key)
+    if direction == "up" and parent_entry is not None and old is not None:
+        if field_name not in {name.lower() for name in parent_entry.fields}:
+            reason = "the parent inherits this field through crossref or xdata"
+            plan.skipped.append(SyncSkip(reason, link, key, field_name))
+            return None
+    assert new is not None
+    return SyncChange(str(target.path), key, field_name, old, new, str(source.path))
+
+
+def _apply(target: Bibliography, change: SyncChange) -> None:
+    entry = target.lib.entries.get(change.key)
+    if entry is None:
+        return
+    if change.field is None:
+        set_entry_type(entry, change.new)
+        return
+    name = find_field_name(entry.fields, change.field) or change.field
+    set_entry_field(entry, name, change.new)

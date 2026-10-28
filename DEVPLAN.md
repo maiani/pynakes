@@ -163,7 +163,7 @@ model dependency, or hidden network call is implied by this roadmap.
 
 | Release | Cohesive scope | Main dependency |
 | --- | --- | --- |
-| 0.9 | Settled command surface, linked bibliographies, documentation on Zensical | Existing reads and checks |
+| 0.9 | Settled command surface, bibliography links, documentation on Zensical | Existing reads and checks |
 | 0.10 | Library, Catalogue and cross-file analysis | Bounded reads and identity evidence |
 | 0.11 | Engine service layer and companion launchers | Library, Catalogue and the Bibliography lifecycle |
 | 0.12 | Project assembly and synchronization of linked bibliographies | Library, declared links and guarded writes |
@@ -202,79 +202,24 @@ version. MCP and editor releases remain independently versioned companions.
   correctness tests. Profile bulk source-span edits, index refreshes, and
   cross-file reconciliation when those paths show material cost.
 
-### v0.9 — A settled command surface, linked bibliographies and documentation
+### v0.9 — A settled command surface, bibliography links and documentation
 
 **Workflow:** declare and validate a manuscript bibliography's relationship to
 its source bibliography, on a command surface and documentation settled before
 Library and the service layer build on them.
 
-The surface cleanup, the field-report follow-ups, their fixes, the
+The surface cleanup, the field-report follow-ups, their fixes, bibliography
+links (`biblink add`, `remove`, `list`, `check` and one-step `sync`), the
 documentation consolidation, the move to Zensical and the "bibliography, not
 library" wording pass are done; see `[Unreleased]` in
-[CHANGELOG.md](CHANGELOG.md). What remains, one feature per commit:
+[CHANGELOG.md](CHANGELOG.md). What remains:
 
-1. **Bibliography links** ([below](#bibliography-links-declaration-and-validation)).
-   Declaration and validation are done (`biblink add`, `remove`, `list`,
-   `check`); the one-link downward sync stretch remains.
-2. **Release acceptance against the renamed surface.** Refresh
+1. **Release acceptance against the renamed surface.** Refresh
    [RELEASE.md](RELEASE.md) for 0.9.0 and rerun the agent evaluation suite, so
    agents are seen to reach the new names without first meeting the
    deprecation warnings.
 
-**Done when:** the linked-bibliography criteria below hold and the evaluation
-run is recorded.
-
-#### Bibliography links: declaration and validation
-
-Declaration and validation first; one-link downward sync is a stretch goal for
-this release, and the rest of synchronization belongs to v0.12.
-
-- Store reciprocal link declarations in both participating `.bib` files using
-  native metadata. Each endpoint records the other file, its parent/child role,
-  the agreed constraint and a sync flow (`down`, `up`, `both` or `none`, default
-  `down`), so adding synchronization never changes the format. Resolve stored relative paths from the declaring
-  file, not the current working directory. Links are independent of Library
-  membership and do not require an index or a particular project layout.
-- Offer two explicit constraints: **key subset** requires every child citation
-  key to exist in the parent; **field subset** additionally requires matching
-  entry types and matching values for every field present in the child. Fields
-  present only in the parent may be omitted by the child. Specify comparison
-  semantics for macros, inherited fields and textual representation before
-  implementation; expose the same policies through Python, CLI, metadata and
-  `capabilities` rather than hard-coding one manuscript workflow.
-- Support multiple independent links per bibliography, including multiple
-  parents, and a bibliography that is a child of one file and a parent of
-  another (master, thesis, chapter). Each declared constraint must hold separately; multiple parents do
-  not implicitly form a union. Siblings are discoverable through a shared
-  parent, with no implied equality or synchronization between siblings.
-- Creating, changing or removing a link is a coordinated metadata edit at both
-  endpoints, with previews and source fingerprints for both files. Preflight
-  both inputs before writing; define and test rollback/recovery for interrupted
-  or failed writes. Preserve unrelated metadata and entry source fidelity.
-- Checking from either endpoint is read-only. Report missing or mismatched
-  reciprocal declarations, inaccessible files, missing keys, field/type drift,
-  and duplicate-key ambiguity without silently choosing a matching entry.
-  Return file/key/field provenance and explicit incomplete-check status. Follow
-  only declared links within a documented traversal scope, terminate on cycles,
-  and never scan unrelated directories or repair declarations implicitly.
-- A parent role expresses a subset constraint, not ownership or authority over
-  edits. A declaration never propagates anything by itself: values move only
-  when a sync command runs, and only along the flow the link declares.
-- **Stretch: one-link downward sync.** `link sync FILE --parents | --children
-  | --all` updates the child's copies of the fields the field-subset check
-  reports as drifted, from the parent, along each selected link of FILE: its
-  parents, its children, or both. It reuses the drift report, previews every
-  touched file in one `--dry-run --diff`, guards each with its source digest,
-  and writes all or none. A child whose parents disagree on a field is a
-  reported conflict, never "last parent wins". Additions, deletions and key
-  renames do not propagate.
-
-**Done when:** either endpoint can discover and validate the same relationship;
-key-only and field-subset checks distinguish valid omissions from drift;
-multiple-parent and sibling cases have explicit semantics; moved/missing files,
-ambiguous keys, inconsistent declarations and cycles yield bounded, actionable
-reports; stale inputs and failed reciprocal edits cannot leave unreported
-partial changes. Tests exercise CLI/API parity and preservation of both files.
+**Done when:** the evaluation run is recorded and the release checks pass.
 
 ### v0.10 — Library discovery and indexed search
 
@@ -449,12 +394,12 @@ declared relationship to its master bibliography.
   rules. Prepare and validate outputs before mutation; never silently overwrite
   target materials or move originals. Report source-to-destination mappings,
   operation counts, skips and conflicts, guarded by input/output fingerprints.
-- Build on v0.9's reciprocal declarations and `link sync`: add `--recursive`
-  (follow declared links past the first, parents before children, as one
-  multi-file plan; cycles stop it) and upward flow for links declaring `up` or
-  `both`. Upward and two-way flow need a stored baseline of last-synced values
-  to tell which side changed a field, the same three-way comparison the merge
-  driver below uses. Define explicit synchronization policies for direction, field ownership/local overrides, additions, deletions
+- Build on v0.9's bibliography links and `biblink sync`, which moves values one
+  step and in one chosen direction per run. Add `--recursive` (follow declared
+  links past the first, parents before children, as one multi-file plan;
+  cycles stop it) and two-way sync for links declaring `both`, which needs a
+  stored baseline of last-synced values to tell which side changed a field,
+  the same three-way comparison the merge driver below uses. Define explicit synchronization policies for direction, field ownership/local overrides, additions, deletions
   and conflicts before offering updates. Support reviewed parent-to-child and
   child-to-parent changes where the selected policy permits them; neither role
   automatically wins. An omitted child field must not implicitly delete the

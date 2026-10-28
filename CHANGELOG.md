@@ -94,6 +94,14 @@ The forms deprecated in 0.8 are removed:
   inheritance applied. An unreadable other file makes the link incomplete,
   never agreeing; `--strict` gates. `biblink list` and `biblink remove`
   complete the family, and `capabilities` describes it under `biblinks`.
+- `biblink sync FILE` repairs that drift along FILE's links, one step and one
+  direction per run: `--direction down` (the default) copies the parent's
+  values and entry type into the child, `--direction up` the child's into the
+  parent, each only along links whose flow allows it. It never adds, removes
+  or renames entries, never deletes a field going down, and leaves inherited
+  fields going up; two links disagreeing on a field are reported as a conflict
+  and that field is left alone. All files are previewed and written together,
+  with `--expect-linked-sha256 PATH=SHA` guarding each one besides FILE.
 - `normalize` has an `encoding` step, between invisible-character removal and
   title protection, that converts accents and named characters to LaTeX or to
   Unicode. It is off unless `--encoding latex|unicode` or the

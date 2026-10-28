@@ -95,6 +95,7 @@ WRITES = {
     "query remove": ["query", "remove", "{bib}", "mechanics"],
     "biblink add": ["biblink", "add", "{bib}", "{dir}/other.bib"],
     "biblink remove": ["biblink", "remove", "{bib}", "{dir}/master.bib"],
+    "biblink sync": ["biblink", "sync", "{bib}"],
     "tex add": ["tex", "add", "{bib}", "appendix.tex"],
     "tex remove": ["tex", "remove", "{bib}", "paper.tex"],
     "tex clear": ["tex", "clear", "{bib}"],
@@ -121,7 +122,10 @@ def _library(tmp_path: Path) -> Path:
     bib.write_bytes(LIBRARY.encode("utf-8"))
     (tmp_path / "paper.tex").write_text(PAPER, encoding="utf-8")
     (tmp_path / "master.bib").write_text(
-        "@comment{pynakes-meta:\nbiblink-children: lib.bib constraint=field-subset flow=down\n}\n",
+        "@comment{pynakes-meta:\nbiblink-children: lib.bib constraint=field-subset flow=down\n}\n"
+        "\n@book{Newton1687,\n  author = {Isaac Newton},\n"
+        "  title = {Philosophiae Naturalis Principia Mathematica},\n"
+        "  year = {1687},\n  note = {Third edition},\n}\n",
         encoding="utf-8",
     )
     (tmp_path / "other.bib").write_text("@misc{Hooke1665, year = {1665}}\n", encoding="utf-8")

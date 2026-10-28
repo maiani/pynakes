@@ -34,6 +34,7 @@ NOT_ENTRY_SELECTABLE = {
     "keys repair": "key uniqueness is a property of the whole file",
     "biblink add": "edits both files' link metadata, not entries",
     "biblink remove": "edits both files' link metadata, not entries",
+    "biblink sync": "follows declared links; the drift report chooses the entries",
     "metadata adopt-jabref": "edits file metadata, not entries",
     "metadata remove": "edits file metadata, not entries",
     "metadata set": "edits file metadata, not entries",

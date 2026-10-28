@@ -649,7 +649,7 @@ def get_capabilities() -> dict:
             "'query \"NAME\"' (list, set, remove)",
             "biblink": "Declare a bibliography the child of another, in both files, and check "
             "that the link holds: keys, and under field-subset types and values "
-            "(add, remove, list, check)",
+            "(add, remove, list, check, sync)",
             "analyze": "Describe a bibliography with offline counts: types, years, "
             "authors, co-authors, venues, identifier and field coverage, groups, lint, "
             "materials",
@@ -688,7 +688,8 @@ def get_capabilities() -> dict:
             "source_modified": False,
         },
         "biblinks": {
-            "commands": "biblink add FILE PARENT | remove FILE OTHER | list FILE | check FILE",
+            "commands": "biblink add FILE PARENT | remove FILE OTHER | list FILE | check FILE"
+            " | sync FILE [--parents|--children] [--direction down|up]",
             "metadata": ["biblink-parents", "biblink-children"],
             "constraints": list(BIBLINK_CONSTRAINTS),
             "default_constraint": BIBLINK_DEFAULT_CONSTRAINT,
@@ -698,7 +699,12 @@ def get_capabilities() -> dict:
             "parent's fields with crossref/xdata inheritance applied",
             "not_compared": sorted(BIBLINK_LOCAL_FIELDS),
             "writes": "add/remove edit both files: one preview, --expect-sha256 and "
-            "--expect-other-sha256, both written or neither; other carries the second file",
+            "--expect-other-sha256, both written or neither; other carries the second file. "
+            "sync writes every file in one preview, all or none, guarded by --expect-sha256 "
+            "and --expect-linked-sha256 PATH=SHA per other file",
+            "sync": "One step and one direction per run, along links whose flow allows it: "
+            "drifted fields and entry types take the other end's value; entries are never "
+            "added, removed or renamed; conflicting values from two links are reported",
         },
         "field_encoding": {
             "command": "normalize FILE --only encoding --encoding latex|unicode "

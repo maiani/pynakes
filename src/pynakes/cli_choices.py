@@ -176,6 +176,13 @@ class LinkFlow(StrEnum):
     NONE = "none"
 
 
+class SyncDirection(StrEnum):
+    """Which way one ``biblink sync`` run copies values."""
+
+    DOWN = "down"
+    UP = "up"
+
+
 class TextEncoding(StrEnum):
     """normalize's encoding step: defer to the library, convert, or leave text alone."""
 
