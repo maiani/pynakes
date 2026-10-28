@@ -132,6 +132,19 @@ class AutoBibGroup(TyperGroup):
     ``{"status":"error",...}`` envelope (exit 1) when ``--json`` was requested.
     """
 
+    def list_commands(self, ctx: click.Context) -> list[str]:
+        """Return the subcommands to list, leaving out hidden deprecated forms.
+
+        A hidden form still runs (Click resolves it through ``get_command``),
+        but help and completion name only the current surface. Typer 0.26.0's
+        plain-text help does not skip hidden commands itself.
+        """
+        return [
+            name
+            for name in super().list_commands(ctx)
+            if not getattr(self.commands.get(name), "hidden", False)
+        ]
+
     def format_help(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
         """Render help, but enumerate each sub-group's subcommands inline.
 
