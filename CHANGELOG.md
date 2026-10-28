@@ -10,7 +10,7 @@ Use **Breaking changes** for incompatible behavior and migrations, and
 warning and earliest removal release). Additions and fixes use their usual
 sections. Historical releases retain their original headings.
 
-## [Unreleased]
+## [0.9.0] - 2026-10-28
 
 ### Breaking changes
 
