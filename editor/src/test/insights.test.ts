@@ -229,6 +229,8 @@ test("groupsByEntry inverts membership and sorts each entry's groups", () => {
     action: "groups_list",
     file: "refs.bib",
     groups: { Optics: ["Newton1687"], Mechanics: ["Newton1687"], Waves: ["Huygens1690"] },
+    tree: [],
+    undeclared: [],
   });
 
   assert.deepEqual(byEntry.Newton1687, ["Mechanics", "Optics"]);
@@ -468,6 +470,8 @@ test("citation keys named like Object.prototype members are ordinary keys", () =
     action: "groups_list",
     file: "refs.bib",
     groups: { Mechanics: ["constructor", "__proto__"] },
+    tree: [],
+    undeclared: [],
   });
   assert.deepEqual(byEntry.constructor, ["Mechanics"]);
   assert.deepEqual(Object.getOwnPropertyDescriptor(byEntry, "__proto__")?.value, ["Mechanics"]);

@@ -37,8 +37,8 @@ export interface GroupNode {
  * Build the display tree.
  *
  * Two independent sources are combined, because they genuinely can disagree:
- * `groups tree` reports the hierarchy the file's metadata *declares*, while
- * `groups list` reports the membership entries actually *claim*. A group that
+ * `groups list` reports the hierarchy the file's metadata *declares* (`tree`)
+ * and the membership entries actually *claim* (`groups`). A group that
  * only entries mention is surfaced rather than hidden — that mismatch is
  * something the reader wants to see, not something for the client to reconcile.
  */

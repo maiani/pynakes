@@ -9,15 +9,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runSearch } from "../library.js";
-import { groupsList, groupsTree, inspectBib } from "../pynakes.js";
+import { groupsList, inspectBib } from "../pynakes.js";
 import { command, engineSkipReason, previewThenApply, tempBib } from "./engine.js";
 
 const skip = engineSkipReason();
 
 async function treeNames(file: string): Promise<string[]> {
-  const tree = await groupsTree(command, file);
+  const tree = await groupsList(command, file);
   if (tree.status !== "success") {
-    assert.fail(`groups tree failed: ${JSON.stringify(tree)}`);
+    assert.fail(`groups list failed: ${JSON.stringify(tree)}`);
   }
   return tree.tree.map((node) => node.name);
 }

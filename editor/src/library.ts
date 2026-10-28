@@ -121,7 +121,7 @@ export async function readLibrary(
   if (schema.status === "success" && schema.source_sha256 !== inspected.source_sha256) {
     return { ok: false, error: { status: "error", error: "ExternalModification", message: "Bibliography changed while reading field schemas; refresh the view." } };
   }
-  const { groups_tree: tree, groups_list: list, lint } = inspected.insights;
+  const { groups_list: list, lint } = inspected.insights;
   const scan = neighbourPath ? inspected.insights.tex_scan : undefined;
   const assets = neighbourPath ? inspected.insights.asset_check : undefined;
 
@@ -129,10 +129,7 @@ export async function readLibrary(
   if (schema.status !== "success") warnings.push(`Field schema unavailable: ${schema.message}`);
   const membership = list.status === "success" ? list.groups : {};
   if (list.status === "error") {
-    warnings.push(`Group membership unavailable: ${list.message}`);
-  }
-  if (tree.status === "error") {
-    warnings.push(`Group hierarchy unavailable: ${tree.message}`);
+    warnings.push(`Groups unavailable: ${list.message}`);
   }
   if (lint.status === "error") {
     warnings.push(`Validation unavailable: ${lint.message}`);
@@ -158,7 +155,7 @@ export async function readLibrary(
         valueChoices: inspected.metadata_value_choices ?? {},
       },
       summary: summarize(inspected),
-      groups: buildGroupTree(tree.status === "success" ? tree.tree : [], membership),
+      groups: buildGroupTree(list.status === "success" ? list.tree : [], membership),
       groupsByEntry: list.status === "success" ? groupsByEntry(list) : {},
       lint: lint.status === "success" ? indexLint(lint) : null,
       citations: scan?.status === "success" ? indexCitations(scan) : null,
@@ -466,7 +463,7 @@ function runMutation(
       );
     case "groups":
       return batchOperations(command, filePath, mutation.keys.map((key) => ({
-        op: mutation.member ? "groups.add_entry" : "groups.remove_entry",
+        op: mutation.member ? "groups.assign" : "groups.unassign",
         key, group: mutation.group,
         ...(mutation.member ? { create: mutation.create ?? false } : {}),
       })), dryRun, expectSha256, cwd);
@@ -510,9 +507,9 @@ export type MutationOutcome =
       key?: string;
       /** The file's digest as this call read it; a preview's goes back on the write. */
       sourceSha256?: string;
-      /** Every group node a `groups remove-group` takes with it, as the engine named them. */
+      /** Every group node a `groups remove` takes with it, as the engine named them. */
       removedGroups?: string[];
-      /** Every entry a `groups rename-group --members` moves to the new name. */
+      /** Every entry a `groups rename --members` moves to the new name. */
       renamedMembers?: string[];
       /**
        * Every existing entry the engine's plan says this would remove, modify,

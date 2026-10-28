@@ -37,7 +37,6 @@ export interface MetadataNamespace {
 }
 
 export interface InspectInsights {
-  groups_tree: GroupsTreeEnvelope;
   groups_list: GroupsListEnvelope;
   lint: LintEnvelope;
   /** The `tex scan` envelope for the linked sources; absent from engines before 0.8. */
@@ -242,7 +241,7 @@ export function summarize(envelope: InspectSuccess): Summary {
 // Envelopes for the other engine reads and for the one write path.
 // ---------------------------------------------------------------------------
 
-/** One node of the declared group hierarchy, as `groups tree` reports it. */
+/** One node of the declared group hierarchy, as `groups list` reports it in `tree`. */
 export interface GroupsTreeNode {
   name: string;
   parent: string;
@@ -259,21 +258,16 @@ export interface GroupsTreeNode {
   entries: string[];
 }
 
-export interface GroupsTreeSuccess {
-  status: "success";
-  action: "groups_tree";
-  file: string;
-  tree: GroupsTreeNode[];
-}
-
-export type GroupsTreeEnvelope = GroupsTreeSuccess | InspectError;
-
 export interface GroupsListSuccess {
   status: "success";
   action: "groups_list";
   file: string;
   /** Group name to the citation keys that declare membership in it. */
   groups: Record<string, string[]>;
+  /** The hierarchy the file's metadata declares. */
+  tree: GroupsTreeNode[];
+  /** Groups that entries claim but the hierarchy never declares. */
+  undeclared: string[];
 }
 
 export type GroupsListEnvelope = GroupsListSuccess | InspectError;
@@ -573,12 +567,12 @@ export interface MutationSuccess {
    */
   key?: string;
   /**
-   * `groups remove-group`: every node the removal takes — the named group and
+   * `groups remove`: every node the removal takes — the named group and
    * all of its descendants — in tree order.
    */
   removed_groups?: string[];
   /**
-   * `groups rename-group --members`: the keys of the entries whose membership
+   * `groups rename --members`: the keys of the entries whose membership
    * moved to the new name, in file order. Empty without `--members`.
    */
   members_renamed?: string[];
@@ -630,7 +624,7 @@ export interface RefRemoveSuccess extends MutationSuccess {
   keep_files: boolean;
 }
 
-/** `groups add-entry` / `groups remove-entry`. */
+/** `groups assign` / `groups unassign`. */
 export interface GroupsEntrySuccess extends MutationSuccess {
   key: string;
   group: string;

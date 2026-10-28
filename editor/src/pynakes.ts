@@ -25,7 +25,6 @@ import type {
   DedupeCheckEnvelope,
   DedupeMergeEnvelope,
   GroupsListEnvelope,
-  GroupsTreeEnvelope,
   MutationEnvelope,
   InspectEnvelope,
   InspectError,
@@ -101,16 +100,10 @@ export function inspectLibrary(
   return runJson<InspectEnvelope>(command, args, cwd);
 }
 
-/** The declared group hierarchy from the file's metadata. */
-export function groupsTree(
-  command: PynakesCommand,
-  filePath: string,
-  cwd?: string,
-): Promise<GroupsTreeEnvelope> {
-  return runJson<GroupsTreeEnvelope>(command, ["groups", "tree", filePath], cwd);
-}
-
-/** Group membership as the entries themselves declare it. */
+/**
+ * Groups as the file's metadata declares them (`tree`) and as its entries
+ * claim them (`groups`), with the groups only entries mention (`undeclared`).
+ */
 export function groupsList(
   command: PynakesCommand,
   filePath: string,
@@ -278,7 +271,7 @@ export async function refEditBatch(
 export async function batchOperations(
   command: PynakesCommand,
   filePath: string,
-  operations: Array<RefEditOperation | { op: "groups.add_entry" | "groups.remove_entry"; key: string; group: string; create?: boolean }>,
+  operations: Array<RefEditOperation | { op: "groups.assign" | "groups.unassign"; key: string; group: string; create?: boolean }>,
   dryRun: boolean,
   expectSha256?: string,
   cwd?: string,
@@ -527,7 +520,7 @@ export function groupsEntryArgs(
   // a typo in a group the library already has is never silently a new one.
   const flags = member && create ? ["--create"] : [];
   return invocation(
-    ["groups", member ? "add-entry" : "remove-entry", filePath],
+    ["groups", member ? "assign" : "unassign", filePath],
     modifyingFlags(flags, dryRun, expectSha256),
     [key, group],
   );
@@ -552,7 +545,7 @@ export function groupsEntry(
 }
 
 /**
- * One edit to the declared group hierarchy — a node of `groups tree`, not an
+ * One edit to the declared group hierarchy — a node of the `groups list` tree, not an
  * entry's membership of one.
  *
  * Every rule about the tree is the engine's: whether a name is taken, whether a
@@ -579,31 +572,31 @@ export function groupTreeArgs(
   let operands: string[];
   switch (edit.op) {
     case "add":
-      subcommand = "add-group";
+      subcommand = "add";
       flags = edit.parent ? ["--parent", edit.parent] : [];
       operands = [edit.name];
       break;
     case "rename":
       // `--members` carries the group's entries along, so a renamed group keeps
       // its members instead of leaving them under a name nothing declares.
-      subcommand = "rename-group";
+      subcommand = "rename";
       flags = ["--members"];
       operands = [edit.name, edit.newName];
       break;
     case "move":
       // An empty parent is the engine's spelling of "top level", so it is
       // passed rather than omitted.
-      subcommand = "move-group";
+      subcommand = "update";
       flags = ["--parent", edit.parent];
       operands = [edit.name];
       break;
     case "remove":
-      subcommand = "remove-group";
+      subcommand = "remove";
       flags = [];
       operands = [edit.name];
       break;
     case "describe":
-      subcommand = "update-group";
+      subcommand = "update";
       flags = ["--description", edit.description];
       operands = [edit.name];
       break;

@@ -24,7 +24,7 @@ recorded in [AGENTS.md](../../AGENTS.md), and it has already been exercised:
 - `--expect-sha256` and the `source_sha256` it takes back, to guard a commit
   against a change made during its approval, rather than the client hashing the
   file itself;
-- `removed_groups` on `groups remove-group`, `rename-group --members` with its
+- `removed_groups` on `groups remove`, `rename --members` with its
   `members_renamed`, and `pinax_materials` on `keys rename`, so the approval
   dialogs name the subgroups, entries and material files a change takes along
   instead of the client walking the tree or working out which

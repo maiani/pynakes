@@ -180,7 +180,7 @@ test("a hierarchy edit previews and applies as the same groups command", () => {
   const move = { op: "move" as const, name: "Optics", parent: "" };
   assert.deepEqual(groupTreeArgs("refs.bib", move, true), [
     "groups",
-    "move-group",
+    "update",
     "refs.bib",
     // The top level is an explicit empty parent, never an omitted option.
     "--parent",
@@ -201,7 +201,7 @@ test("a hierarchy edit previews and applies as the same groups command", () => {
   ]);
   assert.deepEqual(groupTreeArgs("refs.bib", { op: "add", name: "Optics" }, true), [
     "groups",
-    "add-group",
+    "add",
     "refs.bib",
     "--dry-run",
     "--diff",
@@ -212,7 +212,7 @@ test("a hierarchy edit previews and applies as the same groups command", () => {
   // A rename always carries the group's members along.
   assert.deepEqual(
     groupTreeArgs("refs.bib", { op: "rename", name: "Optics", newName: "Light" }, true),
-    ["groups", "rename-group", "refs.bib", "--members", "--dry-run", "--diff", "--", "Optics", "Light"],
+    ["groups", "rename", "refs.bib", "--members", "--dry-run", "--diff", "--", "Optics", "Light"],
   );
   assert.ok(!groupTreeArgs("refs.bib", { op: "remove", name: "Optics" }, true).includes("--members"));
 });

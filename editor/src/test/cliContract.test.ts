@@ -28,7 +28,6 @@ import {
   dedupeMerge,
   groupsEntry,
   groupsList,
-  groupsTree,
   inspectBib,
   inspectLibrary,
   keysRename,
@@ -65,9 +64,6 @@ test("inspect/groups/lint/search return their documented envelope shape", { skip
   assert.equal(inspected.entries.length, 1);
   assert.equal(inspected.entries[0].key, "Smith2020");
 
-  const tree = await groupsTree(command, file);
-  assert.equal(tree.status, "success");
-
   const list = await groupsList(command, file);
   assert.equal(list.status, "success");
 
@@ -79,9 +75,11 @@ test("inspect/groups/lint/search return their documented envelope shape", { skip
   const combined = await inspectLibrary(command, file);
   assert.equal(combined.status, "success");
   if (combined.status === "success") {
-    // One process returns exactly what the separate commands would.
-    assert.deepEqual(combined.insights, {
-      groups_tree: tree,
+    // One process returns exactly what the separate commands would. The
+    // engine's deprecated `groups_tree` read is not one the view uses.
+    const reads: Record<string, unknown> = { ...combined.insights };
+    delete reads.groups_tree;
+    assert.deepEqual(reads, {
       groups_list: list,
       lint,
       tex_scan: scan,
@@ -314,7 +312,7 @@ test("a key rename approved against a file that moved is refused", { skip }, asy
 //
 // Argument *order* is what drifted before (`keys rename`), and these commands
 // each put the file in a different position: `ref add KEY FILE`,
-// `ref remove FILE KEY...`, `groups add-entry FILE KEY GROUP`. Nothing in the
+// `ref remove FILE KEY...`, `groups assign FILE KEY GROUP`. Nothing in the
 // TypeScript types can catch a wrong one, so each is run for real.
 
 test("ref add takes KEY then FILE, and writes the requested type", { skip }, async () => {
@@ -370,7 +368,7 @@ test("ref remove takes FILE then the keys, and honors --dry-run", { skip }, asyn
   assert.match(written, /@article\{Keep2020,/);
 });
 
-test("groups add-entry and remove-entry take FILE KEY GROUP", { skip }, async () => {
+test("groups assign and unassign take FILE KEY GROUP", { skip }, async () => {
   const file = tempBib("@article{Smith2020,\n  title = {A Paper}\n}\n");
 
   // An unknown group is refused unless the caller asks to create it.
@@ -380,7 +378,7 @@ test("groups add-entry and remove-entry take FILE KEY GROUP", { skip }, async ()
     command, file, "Smith2020", "Reviewed", true, false, undefined, undefined, true,
   );
   if (added.status !== "success") {
-    assert.fail(`groups add-entry failed: ${JSON.stringify(added)}`);
+    assert.fail(`groups assign failed: ${JSON.stringify(added)}`);
   }
   assert.match(fs.readFileSync(file, "utf-8"), /groups\s*=\s*\{Reviewed\}/);
 
@@ -469,9 +467,9 @@ test("dedupe merge without keys still merges every cluster", { skip }, async () 
 const HIERARCHY = "@book{Newton1687,\n  title = {Principia}\n}\n";
 
 async function treeNames(file: string): Promise<Array<[string, string]>> {
-  const tree = await groupsTree(command, file);
+  const tree = await groupsList(command, file);
   if (tree.status !== "success") {
-    assert.fail(`groups tree failed: ${JSON.stringify(tree)}`);
+    assert.fail(`groups list failed: ${JSON.stringify(tree)}`);
   }
   return tree.tree.map((node) => [node.name, node.parent]);
 }
@@ -505,13 +503,13 @@ test("the sidebar's hierarchy edits run add, rename, move and describe", { skip 
   assert.deepEqual((await treeNames(file))[1], ["Light", ""]);
 
   await previewThenApply(file, edit({ op: "describe", name: "Light", description: "Waves" }));
-  const described = await groupsTree(command, file);
+  const described = await groupsList(command, file);
   assert.equal(
     described.status === "success" && described.tree.find((n) => n.name === "Light")?.description,
     "Waves",
   );
   await previewThenApply(file, edit({ op: "describe", name: "Light", description: "" }));
-  const cleared = await groupsTree(command, file);
+  const cleared = await groupsList(command, file);
   assert.equal(
     cleared.status === "success" && cleared.tree.find((n) => n.name === "Light")?.description,
     "",

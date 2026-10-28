@@ -280,13 +280,13 @@ which is a different thing from an entry's membership of a group: **+** in its
 heading adds a top-level group, and each group's **⋯** button (or its context
 menu) offers adding a subgroup, renaming, moving under another group or to the
 top level, editing the description, and removing. These are the engine's
-`groups add-group`, `rename-group`, `move-group`, `update-group` and
-`remove-group`, through the same preview, approval and guarded write as
+`groups add`, `rename`, `update` and
+`remove`, through the same preview, approval and guarded write as
 everything above. The client knows none of the tree's rules: a name already
 taken is the engine's conflict, a move under the group's own descendant is the
 engine's refusal, and when a group is removed the approval dialog names every
 subgroup that goes with it, as the engine reported them. A rename carries the
-group's members along (`rename-group --members`): every entry filed under exactly
+group's members along (`rename --members`): every entry filed under exactly
 the old name is moved to the new one, the approval dialog says how many and
 which, as the engine's preview named them, and a sidebar filter on the group
 follows it. Removing a node leaves entries' memberships as they were, and the

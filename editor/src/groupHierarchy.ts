@@ -3,8 +3,8 @@
  *
  * A different operation from an entry's membership of a group (the detail
  * pane's chips): these add, rename, move, describe and remove the *nodes* of
- * `groups tree`, through `groups add-group`, `rename-group`, `move-group`,
- * `update-group` and `remove-group`. Each one is a `groupTree` mutation, so it
+ * `groups list`, through `groups add`, `rename`, `update` and
+ * `remove`. Each one is a `groupTree` mutation, so it
  * goes through exactly the path every other entry- or group-level change takes
  * — the engine's `--dry-run --diff`, the Staged diff pane, an approval dialog,
  * and the identical invocation guarded by `--expect-sha256`.

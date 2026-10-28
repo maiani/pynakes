@@ -22,6 +22,11 @@ release. Its version says nothing about which engine it runs.
 
 - Staged commits run the engine's top-level `batch` command, replacing the
   deprecated `corpus batch`, and expect its `batch` action.
+- Group edits use the engine's renamed `groups` subcommands (`add`, `rename`,
+  `update`, `remove`, `assign`, `unassign`) and batch operations
+  (`groups.assign`, `groups.unassign`). The sidebar reads the declared
+  hierarchy and the memberships from the one `groups list` report instead of
+  the deprecated `groups tree` read.
 - Refresh the whole view — inspection, groups, lint, citations, and material
   state — through one engine invocation that parses the bibliography once,
   reducing those reads from six processes to one. A separate `ref schema` read
