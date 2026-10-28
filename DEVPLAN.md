@@ -73,7 +73,7 @@ changes documented but not deprecated — until 1.0 pins it.
   that rewrite TeX citations) is a filesystem check, not a git read. No git
   library dependency.
 - No project-level config (`pynakes.toml`, `[tool.pynakes]`): the `.bib` carries
-  its own settings. The v0.9 library manifest does not change this: it lists
+  its own settings. The v0.10 library manifest does not change this: it lists
   members and the Catalogue location, never settings.
 - The library's key style is never inferred silently. `keys pattern` proposes
   a pattern, `metadata set` stores it, and `ref import` only warns. Keys
@@ -81,15 +81,19 @@ changes documented but not deprecated — until 1.0 pins it.
 - Progress for people goes to stderr as plain lines, so captured output keeps
   it. A `--json` run writes nothing to stderr, because agents often read
   `--json 2>&1` as one JSON document.
+- `normalize` owns value conventions (title protection, text encoding);
+  `fields` only edits fields. `keys usage` stays apart from `tex scan`: one
+  key's occurrences in the sources given, with no `.bib`, is a different
+  question from a used/unused/missing report for a whole bibliography.
 - Group-tree commands edit the hierarchy, not entries, unless asked:
   `rename-group --members` moves memberships, and `remove-group` keeps them.
 - Keep the shared public `pynakes.analysis` API and distinct CLI views: bounded
   summaries in `analyze`, full networks in `coauthors`. See the
   [analysis boundary](docs/guides/architecture.md#analysis-boundary) for ownership
-  and identity semantics; the v0.9 rollup must preserve them.
+  and identity semantics; the v0.10 rollup must preserve them.
 - BibLaTeX extended names (`family=..., given=...`) are not parsed yet. Add any
   future support to `authors.py` so all consumers share it. Identity corrections
-  remain ordinary reviewed edits or future v0.12 directives. Editors as
+  remain ordinary reviewed edits or future v0.13 directives. Editors as
   co-authors (with an explicit role choice), per-year pair counts beyond
   first/last year, and fractional counting remain unscheduled extensions.
 - The surface contract is enforced by `tests/test_contract.py`, read from the
@@ -159,16 +163,17 @@ model dependency, or hidden network call is implied by this roadmap.
 
 | Release | Cohesive scope | Main dependency |
 | --- | --- | --- |
-| 0.9 | Library, Catalogue, cross-file analysis and bibliography links | Bounded reads and identity evidence |
-| 0.10 | Engine service layer and companion launchers | Library, Catalogue and the Bibliography lifecycle |
-| 0.11 | Project assembly and synchronization of linked bibliographies | Library, declared links and guarded writes |
-| 0.12 | Curation: merges, directives and normalization | Existing editing and identity APIs |
-| 0.13 | Materials and acquisition: linking, extraction, ingestion and providers | Pinax, bounded reads and provider registry |
-| 0.14 | Evidence-linked research annotations | Material locations and hashes |
-| 0.15 | Resumable plans and execution receipts | Batch, acquisition and material operations |
+| 0.9 | Settled command surface, linked bibliographies, documentation on Zensical | Existing reads and checks |
+| 0.10 | Library, Catalogue and cross-file analysis | Bounded reads and identity evidence |
+| 0.11 | Engine service layer and companion launchers | Library, Catalogue and the Bibliography lifecycle |
+| 0.12 | Project assembly and synchronization of linked bibliographies | Library, declared links and guarded writes |
+| 0.13 | Curation: merges, directives and normalization | Existing editing and identity APIs |
+| 0.14 | Materials and acquisition: linking, extraction, ingestion and providers | Pinax, bounded reads and provider registry |
+| 0.15 | Evidence-linked research annotations | Material locations and hashes |
+| 0.16 | Resumable plans and execution receipts | Batch, acquisition and material operations |
 | 1.0 | Pin the exercised API and end-to-end contracts | Accepted workflows below |
 
-These are seven substantial feature releases before 1.0. Related features share
+These are eight substantial feature releases before 1.0. Related features share
 one release and acceptance workflow; implementation tasks do not each need a
 version. MCP and editor releases remain independently versioned companions.
 
@@ -197,124 +202,39 @@ version. MCP and editor releases remain independently versioned companions.
   correctness tests. Profile bulk source-span edits, index refreshes, and
   cross-file reconciliation when those paths show material cost.
 
-### v0.9 — Library discovery, indexed search and bibliography links
+### v0.9 — A settled command surface, linked bibliographies and documentation
 
-**Workflow:** find a paper across existing collections and inspect collection-wide
-coverage efficiently, without importing another copy; declare and validate a
-manuscript bibliography's relationship to its source library.
+**Workflow:** declare and validate a manuscript bibliography's relationship to
+its source bibliography, on a command surface and documentation settled before
+Library and the service layer build on them.
 
-- Introduce `Library` over explicitly selected `.bib` files or a declared root,
-  with collections, key lookup, search and cross-file identity reports. Settle
-  membership/configuration here; keep per-bibliography settings in the `.bib`.
-- Expose cross-file search and duplicate checks, retaining file/entry
-  provenance and exact versus probable matching. Repeated keys across files
-  do not establish work identity. Report unreadable members and changing inputs
-  without claiming a globally atomic filesystem snapshot.
-- Add a rebuildable `Catalogue` for bibliographic fields and abstracts, with
-  documented freshness and refresh behavior. Carry bounded reads, field-scoped
-  queries, match explanations and source locations into indexed search; retain
-  direct reads for recovery and comparison. Files remain authoritative.
-- Lift the 0.8 analysis into Library rollups. Distinguish entry occurrences from
-  identified works, reconcile per-file counts and expose partial-read failures.
-  The co-author network takes multiple files here: one work listed in two
-  files must link its authors once, so the rollup feeds `coauthor_network`
-  identified works (with their file/key provenance in `keys`), not raw entries.
-- Test index refresh, deletion, rename and corruption recovery; measure index
-  build/query/refresh cost and memory before making performance claims.
+The surface cleanup, the field-report follow-ups and their fixes are done; see
+`[Unreleased]` in [CHANGELOG.md](CHANGELOG.md). What remains, one feature per
+commit:
 
-**Done when:** source locations and ambiguity survive cross-file discovery;
-rollups reconcile; the index can be rebuilt without losing information; stale
-results have explicit semantics and representative queries show measured benefit.
+1. **Linked bibliographies** ([below](#linked-bibliographies-declaration-and-validation)).
+   Independent of Library membership, so they ship first.
+2. **Documentation on Zensical.** Move the site from MkDocs to Zensical. First
+   confirm it runs mkdocstrings (the API reference) and the pre-build hook
+   that generates the command reference, which a test checks; if either is
+   missing, settle a replacement before migrating. Keep `--strict`-equivalent
+   failure on broken links in CI.
+3. **"Bibliography", not "library", for one `.bib`** in help text and docs.
+   Wording only, with no contract change, and done before 0.10 gives "library"
+   its meaning.
+4. **Release acceptance against the renamed surface.** Refresh
+   [RELEASE.md](RELEASE.md) for 0.9.0 and rerun the agent evaluation suite, so
+   agents are seen to reach the new names without first meeting the
+   deprecation warnings.
 
-#### Order of work
-
-One feature per commit, each usable on the branch before the next starts.
-
-0. **Surface cleanup** ([below](#surface-cleanup)), before
-   `--library` and the `library` group are added to the surface, so v0.10's
-   adapters build against settled names.
-1. **`Library` reads**, built to the definition in
-   [the architecture guide](docs/guides/architecture.md#library-a-declared-set-of-bibliographies-planned):
-   membership, work identity and a Catalogue over member files that keep all
-   the data. A named library is a `<name>.library.toml` manifest with exactly
-   five keys: `pynakes-library` (format version), `name`, `members` (paths or
-   patterns, resolved from the manifest's folder), `exclude` and `catalogue`.
-   Any other key is an error, so settings cannot move into it. Several files
-   given to one command form an unnamed library. A file may belong to several
-   libraries; libraries do not nest. Build the Python API first — manifest
-   parsing, member resolution with unreadable members reported rather than
-   skipped, key lookup and search with file/entry provenance — then the
-   command surface (below).
-   Help and docs say "bibliography", not "library", where they mean one `.bib`;
-   this is wording only, with no contract change.
-2. **Cross-file identity and rollups.** Duplicate checks across members, exact
-   versus probable, reusing work matching; `analyze` and `coauthors` over a
-   `Library`, counting identified works rather than entry occurrences.
-3. **Linked bibliographies** (below). Independent of membership, so it may
-   follow phase 1 directly or run alongside phase 2.
-4. **Measure, then the `Catalogue`.** Extend `scripts/bench_scale.py` with
-   multi-file shapes, then index only what representative queries show
-   benefits from. Test refresh, deletion, rename and corruption recovery.
-
-#### Command surface: direction, not destination
-
-Agreed direction (2026-10-27); the end state stays open and is revisited as
-each phase lands:
-
-- **A library is an input, never a home for operations.** An operation
-  belongs to the library only if it needs what a library adds: membership,
-  cross-member work identity or the Catalogue. Commands that can read
-  several files also accept a library through a `--library` option naming a
-  manifest or member files, rather than gaining `library` twins: `search`,
-  `ref show`, `dedupe check`, `analyze`, `coauthors`, and the multi-file
-  writers below. Several positional files on `lint`, `verify` and
-  `dedupe check` keep meaning "check each file on its own"; they never
-  silently become a library.
-- **A small `library` group for the library itself:** creating a manifest,
-  showing how members resolved and which are unreadable, and later refreshing
-  the Catalogue. Writes still go to one `Bibliography`.
-- **No multi-file group.** `combine`, `split` and `batch` are top-level
-  commands (the `corpus` group that held them is deprecated until 0.10.0):
-  they use nothing a library adds. v0.11's `pick` follows the same rule: bare
-  source files, optionally given as a library.
-
-#### Surface cleanup
-
-Accepted 2026-10-27; retiring `corpus` and renaming the `groups` subcommands
-are done. Each change follows the beta
-promise: the old form keeps working in 0.9 with a structured `deprecated`
-warning and is removed in 0.10. `capabilities`, the contract tests, the
-generated command reference and every help text that names an old form change
-in the same commit.
-
-1. **`normalize` owns value conventions; `fields` only edits fields.**
-   `fields protect-title` already exists as `normalize`'s `titles` step:
-   `normalize --only titles --title-protection on --key K` does the same
-   thing. `fields encode` is the Unicode/LaTeX conversion that v0.12 plans to
-   add to `normalize`. Move both into `normalize`: encoding becomes a step
-   (`--encoding latex|unicode`, step name `encoding`), and its setting
-   `fields-encoding` becomes `normalize-encoding`, since settings are named
-   for the command that applies them. `lint` reports the old key until it is
-   removed. `fields` keeps `set`, `rename`, `move`, `append` and `clear`.
-2. **`ref find` becomes `ref lookup`.** `search` reads the local file;
-   `ref find` goes online to find the records a written-out reference
-   describes. The two names read as synonyms. "Lookup" says it asks an outside
-   index, and matches `lookup.py`. Key lookup across library members is
-   `ref show --library`, so the name is free.
-
-Help and docs saying "bibliography" for one `.bib` is wording only; it rides
-along with whichever commit touches each help text.
-
-Considered and kept: `keys usage` stays apart from `tex scan`. They answer
-different questions with different inputs — one key's occurrences in the
-sources given, with no `.bib`, versus a used/unused/missing report for a whole
-bibliography — and folding them would need a flag that changes both the
-required arguments and the output shape. `keys usage` sits beside
-`keys rename`, whose reach it checks.
+**Done when:** the linked-bibliography criteria below hold; the documentation
+builds strictly on Zensical with the API and command references generated; no
+help text or guide uses "library" for a single `.bib`; and the evaluation run is
+recorded.
 
 #### Linked bibliographies: declaration and validation
 
-Implement declaration and validation only; synchronization is a separate v0.11
+Implement declaration and validation only; synchronization is a separate v0.12
 workflow.
 
 - Store reciprocal link declarations in both participating `.bib` files using
@@ -354,16 +274,89 @@ ambiguous keys, inconsistent declarations and cycles yield bounded, actionable
 reports; stale inputs and failed reciprocal edits cannot leave unreported
 partial changes. Tests exercise CLI/API parity and preservation of both files.
 
-### v0.10 — Engine service layer and companions
+### v0.10 — Library discovery and indexed search
+
+**Workflow:** find a paper across existing collections and inspect collection-wide
+coverage efficiently, without importing another copy.
+
+- Introduce `Library` over explicitly selected `.bib` files or a declared root,
+  with collections, key lookup, search and cross-file identity reports. Settle
+  membership/configuration here; keep per-bibliography settings in the `.bib`.
+- Expose cross-file search and duplicate checks, retaining file/entry
+  provenance and exact versus probable matching. Repeated keys across files
+  do not establish work identity. Report unreadable members and changing inputs
+  without claiming a globally atomic filesystem snapshot.
+- Add a rebuildable `Catalogue` for bibliographic fields and abstracts, with
+  documented freshness and refresh behavior. Carry bounded reads, field-scoped
+  queries, match explanations and source locations into indexed search; retain
+  direct reads for recovery and comparison. Files remain authoritative.
+- Lift the 0.8 analysis into Library rollups. Distinguish entry occurrences from
+  identified works, reconcile per-file counts and expose partial-read failures.
+  The co-author network takes multiple files here: one work listed in two
+  files must link its authors once, so the rollup feeds `coauthor_network`
+  identified works (with their file/key provenance in `keys`), not raw entries.
+- Test index refresh, deletion, rename and corruption recovery; measure index
+  build/query/refresh cost and memory before making performance claims.
+
+**Done when:** source locations and ambiguity survive cross-file discovery;
+rollups reconcile; the index can be rebuilt without losing information; stale
+results have explicit semantics and representative queries show measured benefit.
+
+#### Order of work
+
+One feature per commit, each usable on the branch before the next starts.
+
+1. **`Library` reads**, built to the definition in
+   [the architecture guide](docs/guides/architecture.md#library-a-declared-set-of-bibliographies-planned):
+   membership, work identity and a Catalogue over member files that keep all
+   the data. A named library is a `<name>.library.toml` manifest with exactly
+   five keys: `pynakes-library` (format version), `name`, `members` (paths or
+   patterns, resolved from the manifest's folder), `exclude` and `catalogue`.
+   Any other key is an error, so settings cannot move into it. Several files
+   given to one command form an unnamed library. A file may belong to several
+   libraries; libraries do not nest. Build the Python API first — manifest
+   parsing, member resolution with unreadable members reported rather than
+   skipped, key lookup and search with file/entry provenance — then the
+   command surface (below).
+2. **Cross-file identity and rollups.** Duplicate checks across members, exact
+   versus probable, reusing work matching; `analyze` and `coauthors` over a
+   `Library`, counting identified works rather than entry occurrences.
+3. **Measure, then the `Catalogue`.** Extend `scripts/bench_scale.py` with
+   multi-file shapes, then index only what representative queries show
+   benefits from. Test refresh, deletion, rename and corruption recovery.
+
+#### Command surface: direction, not destination
+
+Agreed direction (2026-10-27); the end state stays open and is revisited as
+each phase lands:
+
+- **A library is an input, never a home for operations.** An operation
+  belongs to the library only if it needs what a library adds: membership,
+  cross-member work identity or the Catalogue. Commands that can read
+  several files also accept a library through a `--library` option naming a
+  manifest or member files, rather than gaining `library` twins: `search`,
+  `ref show`, `dedupe check`, `analyze`, `coauthors`, and the multi-file
+  writers below. Several positional files on `lint`, `verify` and
+  `dedupe check` keep meaning "check each file on its own"; they never
+  silently become a library.
+- **A small `library` group for the library itself:** creating a manifest,
+  showing how members resolved and which are unreadable, and later refreshing
+  the Catalogue. Writes still go to one `Bibliography`.
+- **No multi-file group.** `combine`, `split` and `batch` are top-level
+  commands (the `corpus` group that held them is deprecated until 0.10.0):
+  they use nothing a library adds. v0.12's `pick` follows the same rule: bare
+  source files, optionally given as a library.
+
+### v0.11 — Engine service layer and companions
 
 **Workflow:** keep a library open across many operations, so an interactive
 client pays for parsing and full-library checks once rather than on every
 action, and start the MCP companion and the library-scoped client from
 `pynakes` itself.
 
-Split from v0.9 on 2026-10-22: the service layer opens a `Library`, and the MCP
-companion is built against the Library/Catalogue contract, so both follow the
-release that settles that contract. The 2026-10 measurements also put
+The service layer opens a `Library`, and the MCP companion is built against
+the Library/Catalogue contract, so both follow the release that settles that
+contract. The 2026-10 measurements also put
 full-library work, not process startup, at most of a large refresh; what a
 session saves depends on recomputing only what an operation touched.
 
@@ -405,10 +398,10 @@ query and edit latency for representative library sizes is measured with
 #### MCP and editor integration
 
 Develop a query-only MCP companion as an adapter over the engine service layer,
-against the v0.9 Library/Catalogue contract, with bounded results and the same
+against the v0.10 Library/Catalogue contract, with bounded results and the same
 errors and provenance as the CLI. Derive its
 schemas from the engine and test adapter parity; declare an engine compatibility
-range. Add evidence reads after v0.13–v0.14. Companion publication does not gate
+range. Add evidence reads after v0.14–v0.15. Companion publication does not gate
 an otherwise complete engine release. The editor may read library-scoped data
 but remains the project-scoped client, with no bibliography logic of its own.
 
@@ -442,7 +435,7 @@ on `PATH`. Both are thin launchers, not the companions themselves:
   it is not mistaken for the project-scoped VS Code extension, which has its own
   entry point.
 
-### v0.11 — Project assembly and synchronization of linked bibliographies
+### v0.12 — Project assembly and synchronization of linked bibliographies
 
 **Workflow:** seed a project from existing collections and maintain an explicitly
 declared relationship to its master bibliography.
@@ -482,7 +475,7 @@ material copying until its recovery guarantees are tested. The merge driver
 never produces an unparseable file or drops an entry either side kept, and
 `git merge` reports every conflict it leaves.
 
-### v0.12 — Curation decisions and bibliographic consistency
+### v0.13 — Curation decisions and bibliographic consistency
 
 **Workflow:** resolve duplicate and metadata problems once, record deliberate
 exceptions, and have later maintenance respect those decisions.
@@ -499,7 +492,7 @@ exceptions, and have later maintenance respect those decisions.
 - Add field-level merge choices and provenance using existing identity evidence.
   Validate choices against source fingerprints; preserve materials and references
   and keep unresolved conflicts blocking. Extend this contract to annotations
-  when v0.14 introduces them.
+  when v0.15 introduces them.
 - Add `distinct-from`, `keep-key`, `no-fetch` and enrichment opt-outs to the
   directive grammar. Expose reasons, specify affected commands and explicit
   overrides, and handle renamed or missing targets.
@@ -515,7 +508,7 @@ exceptions, and have later maintenance respect those decisions.
 commands honor exceptions, journal data is distributable and tested, and
 normalization preserves untouched bytes with documented loss where applicable.
 
-### v0.13 — Material acquisition and source-linked extraction
+### v0.14 — Material acquisition and source-linked extraction
 
 **Workflow:** bring existing papers into a research library, identify their
 references, and retrieve passages tied to the exact material read.
@@ -550,7 +543,7 @@ passes offline fixtures and a separate access check. Record an explicit decision
 for every provider candidate; unavailable access defers that adapter, not the
 whole release. No stub or invented metadata counts as supported ingestion.
 
-### v0.14 — Evidence-linked research annotations
+### v0.15 — Evidence-linked research annotations
 
 **Workflow:** record “uses a Markov approximation” with its supporting passage,
 author, and review status, then find it after the citation key changes.
@@ -573,7 +566,7 @@ author, and review status, then find it after the citation key changes.
 changed sources invalidate anchors visibly; unreviewed interpretations cannot
 be mistaken for verbatim excerpts or human-reviewed records in the envelope.
 
-### v0.15 — Resumable plans and execution receipts
+### v0.16 — Resumable plans and execution receipts
 
 **Workflow:** resume a collection-maintenance job after interruption without
 repeating completed downloads or losing track of what changed.
@@ -610,9 +603,9 @@ existing deprecation promise throughout.
   compatibility/migration rules for persisted annotations and plans, and the
   limits of recovery across network and filesystem operations.
 - Review the outstanding editor interoperability issues before pinning affected
-  engine behavior. Complete the scheduled v0.9–v0.15 workflows before launch.
+  engine behavior. Complete the scheduled v0.9–v0.16 workflows before launch.
   Bimas and MCP publication are independent; provider candidates deferred from
-  v0.13 must have a documented disposition, not an implied implementation claim.
+  v0.14 must have a documented disposition, not an implied implementation claim.
 
 **Done when:** these workflows and API boundaries have recorded acceptance
 results, all applicable checks pass, compatibility and migration policies are
@@ -658,12 +651,12 @@ the other a library belonging to no project at all. See
 - **Material metadata writing** — `asset embed-xmp`: write an entry's
   bibliographic metadata into its linked PDF as XMP, making the file
   self-describing for sharing and archival, and the natural companion to
-  PDF ingestion in v0.13. This one modifies a material rather
+  PDF ingestion in v0.14. This one modifies a material rather
   than the `.bib`, so it needs the same preview-and-approve treatment as a
   bibliography edit and must never be implied by another command.
 - **Further material formats** — EPUB metadata extraction alongside PDF, as
   open-access monographs become common. Lower priority than PDF by usage, and
-  it shares the v0.13 extraction pipeline rather than duplicating it.
+  it shares the v0.14 extraction pipeline rather than duplicating it.
 - **Optional semantic retrieval** — RAG/embeddings and richer agent memory
   built on the source-linked extraction and annotation contracts above. Keep
   model-specific dependencies optional, results attributable, and semantic
