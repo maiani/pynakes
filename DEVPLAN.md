@@ -213,8 +213,9 @@ documentation consolidation, the move to Zensical and the "bibliography, not
 library" wording pass are done; see `[Unreleased]` in
 [CHANGELOG.md](CHANGELOG.md). What remains, one feature per commit:
 
-1. **Linked bibliographies** ([below](#linked-bibliographies-declaration-and-validation)).
-   Independent of Library membership, so they ship first.
+1. **Bibliography links** ([below](#bibliography-links-declaration-and-validation)).
+   Declaration and validation are done (`biblink add`, `remove`, `list`,
+   `check`); the one-link downward sync stretch remains.
 2. **Release acceptance against the renamed surface.** Refresh
    [RELEASE.md](RELEASE.md) for 0.9.0 and rerun the agent evaluation suite, so
    agents are seen to reach the new names without first meeting the
@@ -223,7 +224,7 @@ library" wording pass are done; see `[Unreleased]` in
 **Done when:** the linked-bibliography criteria below hold and the evaluation
 run is recorded.
 
-#### Linked bibliographies: declaration and validation
+#### Bibliography links: declaration and validation
 
 Declaration and validation first; one-link downward sync is a stretch goal for
 this release, and the rest of synchronization belongs to v0.12.

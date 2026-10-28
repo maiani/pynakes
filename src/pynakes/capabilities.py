@@ -9,6 +9,10 @@ from pynakes import __all__ as PUBLIC_API_EXPORTS
 from pynakes._cli_deprecations import DEPRECATIONS
 from pynakes.analysis import COAUTHOR_SCHEMA
 from pynakes.analysis import SECTIONS as ANALYSIS_SECTIONS
+from pynakes.biblinks import CONSTRAINTS as BIBLINK_CONSTRAINTS
+from pynakes.biblinks import DEFAULT_CONSTRAINT as BIBLINK_DEFAULT_CONSTRAINT
+from pynakes.biblinks import FLOWS as BIBLINK_FLOWS
+from pynakes.biblinks import LOCAL_FIELDS as BIBLINK_LOCAL_FIELDS
 from pynakes.cli_errors import catalogue_description
 from pynakes.entry_reader import INCLUDE_PARTS
 from pynakes.metadata.schema import SAVED_QUERY_PREFIX
@@ -329,6 +333,7 @@ COMMAND_GROUPS: dict[str, list[str]] = {
         "groups",
         "metadata",
         "tex",
+        "biblink",
     ],
     "Materials (pinax)": ["asset"],
     "Create": ["init", "scrub", "combine", "split"],
@@ -536,6 +541,7 @@ def get_capabilities() -> dict:
             "verify",
             "asset check",
             "dedupe check",
+            "biblink check",
             "asset fetch",
         ],
         "capabilities": [
@@ -639,7 +645,11 @@ def get_capabilities() -> dict:
             "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "
             "formats (selection export to native bib, CSL-JSON, RIS, MODS, EndNote, CSV)",
             "search": "Search entries by free text, phrases, or field-scoped terms",
-            "query": "Save, list, remove, and run named selector queries (list, set, remove, run)",
+            "query": "Save, list, and remove named selector queries, run with --where "
+            "'query \"NAME\"' (list, set, remove)",
+            "biblink": "Declare a bibliography the child of another, in both files, and check "
+            "that the link holds: keys, and under field-subset types and values "
+            "(add, remove, list, check)",
             "analyze": "Describe a bibliography with offline counts: types, years, "
             "authors, co-authors, venues, identifier and field coverage, groups, lint, "
             "materials",
@@ -676,6 +686,19 @@ def get_capabilities() -> dict:
             "interchange": "Selected physical entries only, with inherited fields resolved against the source",
             "report": ["selected_entries", "entry_count", "dependency_keys", "warnings", "content"],
             "source_modified": False,
+        },
+        "biblinks": {
+            "commands": "biblink add FILE PARENT | remove FILE OTHER | list FILE | check FILE",
+            "metadata": ["biblink-parents", "biblink-children"],
+            "constraints": list(BIBLINK_CONSTRAINTS),
+            "default_constraint": BIBLINK_DEFAULT_CONSTRAINT,
+            "flows": list(BIBLINK_FLOWS),
+            "comparison": "Resolved values (strings and # expanded, outer delimiters dropped, "
+            "whitespace collapsed; inner braces count); the child's own fields against the "
+            "parent's fields with crossref/xdata inheritance applied",
+            "not_compared": sorted(BIBLINK_LOCAL_FIELDS),
+            "writes": "add/remove edit both files: one preview, --expect-sha256 and "
+            "--expect-other-sha256, both written or neither; other carries the second file",
         },
         "field_encoding": {
             "command": "normalize FILE --only encoding --encoding latex|unicode "

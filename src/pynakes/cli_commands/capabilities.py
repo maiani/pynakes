@@ -42,6 +42,7 @@ class CapabilitySection(StrEnum):
 
     ANALYSIS = "analysis"
     ENTRY_FIELDS = "entry_fields"
+    BIBLINKS = "biblinks"
     FIELD_ENCODING = "field_encoding"
     SELECTION_EXPORT = "selection_export"
     GROUPS_SEPARATOR = "groups_separator"

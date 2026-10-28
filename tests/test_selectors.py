@@ -32,6 +32,8 @@ NOT_ENTRY_SELECTABLE = {
     "init": "creates a library",
     "keys rename": "names one entry positionally",
     "keys repair": "key uniqueness is a property of the whole file",
+    "biblink add": "edits both files' link metadata, not entries",
+    "biblink remove": "edits both files' link metadata, not entries",
     "metadata adopt-jabref": "edits file metadata, not entries",
     "metadata remove": "edits file metadata, not entries",
     "metadata set": "edits file metadata, not entries",

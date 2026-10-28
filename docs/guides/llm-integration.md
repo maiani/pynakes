@@ -111,6 +111,10 @@ commands and their semantics.
      --expect-sha256 9a6660d44e528fcd22a29a915bddea03a86d6587f6c708a39b19a5f734afb786
    ```
 
+   `biblink add` and `biblink remove` write two bibliographies: their envelope
+   reports the second file under `other`, with its own `source_sha256`, which
+   `--expect-other-sha256` takes back.
+
    `capabilities.write_precondition.commands` lists the commands that accept
    it. Every modifying command accepts it; use the generated inventory rather
    than maintaining a partial command list.

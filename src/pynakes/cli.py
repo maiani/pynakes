@@ -15,6 +15,7 @@ from pynakes.cli_commands import (
     analyze,
     asset_check,
     batch,
+    biblink,
     capabilities,
     coauthors,
     compare,
@@ -87,6 +88,10 @@ corpus_app = typer.Typer(
     help="Deprecated: use combine, split, and batch (removed in 0.10.0)", cls=AutoBibGroup
 )
 query_app = typer.Typer(help="Save, list, and remove named selector queries", cls=AutoBibGroup)
+biblink_app = typer.Typer(
+    help="Declare and check bibliography links: a bibliography's parents and children",
+    cls=AutoBibGroup,
+)
 
 
 def _version_callback(value: bool) -> None:
@@ -158,6 +163,9 @@ asset_check.register(asset_app)
 # query: named selector queries saved in pynakes-meta
 query.register(query_app)
 
+# biblink: declared parent/child links between bibliographies
+biblink.register(biblink_app)
+
 setops.register(app)
 batch.register(app)
 # corpus: the deprecated home of combine, split, and batch, hidden until 0.10.0
@@ -173,6 +181,7 @@ app.add_typer(metadata_app, name="metadata")
 app.add_typer(tex_app, name="tex")
 app.add_typer(asset_app, name="asset")
 app.add_typer(query_app, name="query")
+app.add_typer(biblink_app, name="biblink")
 app.add_typer(corpus_app, name="corpus", hidden=True)
 
 # --- Group top-level --help by nature ---------------------------------------

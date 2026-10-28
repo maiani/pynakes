@@ -32,6 +32,7 @@ MetadataCategory = Literal[
     "scrub",
     "queries",
     "analysis",
+    "biblinks",
     "unknown",
 ]
 
@@ -50,6 +51,7 @@ CATEGORY_PINAX: MetadataCategory = "pinax"
 CATEGORY_SCRUB: MetadataCategory = "scrub"
 CATEGORY_QUERIES: MetadataCategory = "queries"
 CATEGORY_ANALYSIS: MetadataCategory = "analysis"
+CATEGORY_BIBLINKS: MetadataCategory = "biblinks"
 CATEGORY_UNKNOWN: MetadataCategory = "unknown"
 
 #: Former ``pynakes-meta`` key names, mapped to the key that replaced them. They
@@ -125,6 +127,9 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     # Linked LaTeX sources that cite this library; consulted by the citation-key
     # commands so .tex edits stay consistent without re-specifying the files.
     "tex-sources": CATEGORY_USAGE,
+    # Bibliography links: the files this one draws from, and those drawing on it.
+    "biblink-parents": CATEGORY_BIBLINKS,
+    "biblink-children": CATEGORY_BIBLINKS,
     # Lint profile settings. ``lint-required-fields`` applies to every entry;
     # the entry-type suffix form adds requirements for one type.
     "lint-required-fields": CATEGORY_LINT,
@@ -240,6 +245,12 @@ def validate_metadata_value(key: str, value: str) -> None:
     """
     normalized_key = key.strip().lower()
     stripped = strip_meta_terminator(value)
+
+    if normalized_key in {"biblink-parents", "biblink-children"}:
+        from pynakes.biblinks import validate_link_value
+
+        validate_link_value(stripped, "parent" if normalized_key == "biblink-parents" else "child")
+        return
 
     # Dialect must be bibtex or biblatex (both the native and JabRef key).
     if normalized_key in {"dialect", "databasetype"}:

@@ -128,6 +128,81 @@ Apply a sequence of operations atomically (one preview, one commit).
 | `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
+## biblink add
+
+**Stability: stable**
+
+Declare FILE a child of PARENT, writing the link into both bibliographies.
+
+`pynakes biblink add [FILE] PARENT [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `PARENT` | string | yes | — | — | The parent bibliography this one draws from |
+| `--constraint` | choice | no | "field-subset" | field-subset, key-subset | What must hold: key-subset (every child key is in the parent) or field-subset (also the parent's type and values for every field the child has) |
+| `--flow` | choice | no | "down" | down, up, both, none | Which way a sync may move values: down (parent to child), up, both, or none |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
+| `--expect-other-sha256` | string | no | null | — | Like --expect-sha256, for the other bibliography of the link: refuse, writing nothing, unless its sha256 still equals the other.source_sha256 a --dry-run reported |
+| `--dry-run` | boolean | no | false | — | Show changes without writing |
+| `--diff` | boolean | no | false | — | Show a unified diff of both files |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## biblink check
+
+**Stability: stable**
+
+Validate every link this bibliography declares (read-only).
+
+`pynakes biblink check [FILE] [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `--strict` | boolean | no | false | — | Exit 1 when a link does not hold or could not be fully checked (for CI and pre-commit gating) |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## biblink list
+
+**Stability: stable**
+
+List the parents and children this bibliography declares.
+
+`pynakes biblink list [FILE] [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## biblink remove
+
+**Stability: stable**
+
+Remove the link between FILE and OTHER from both bibliographies.
+
+`pynakes biblink remove [FILE] OTHER [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `OTHER` | string | yes | — | — | The linked bibliography, parent or child |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
+| `--expect-other-sha256` | string | no | null | — | Like --expect-sha256, for the other bibliography of the link: refuse, writing nothing, unless its sha256 still equals the other.source_sha256 a --dry-run reported |
+| `--dry-run` | boolean | no | false | — | Show changes without writing |
+| `--diff` | boolean | no | false | — | Show a unified diff of both files |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
 ## capabilities
 
 **Stability: stable**
@@ -139,7 +214,7 @@ Show what pynakes can do: a compact index, or the details asked for.
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--command` | list[string] | no | null | — | Return the full schema of this command, e.g. 'ref show' (repeatable) |
-| `--section` | list[choice] | no | null | analysis, entry_fields, field_encoding, selection_export, groups_separator, batch_operations, bounded_reads, capabilities, citation_grammar, command_groups, commands, deprecations, error_codes, formatting, material_collection, predicate_grammar, python_api, saved_queries, search_query_grammar, work_matching, write_precondition | Return this section of the description, e.g. predicate_grammar (repeatable) |
+| `--section` | list[choice] | no | null | analysis, entry_fields, biblinks, field_encoding, selection_export, groups_separator, batch_operations, bounded_reads, capabilities, citation_grammar, command_groups, commands, deprecations, error_codes, formatting, material_collection, predicate_grammar, python_api, saved_queries, search_query_grammar, work_matching, write_precondition | Return this section of the description, e.g. predicate_grammar (repeatable) |
 | `--all` | boolean | no | false | — | Return the whole description (large: every command's schema) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |

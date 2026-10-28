@@ -222,6 +222,11 @@ class Bibliography(
         return compute_change_plan(self._pristine_text, self.lib)
 
     @property
+    def pristine_text(self) -> str:
+        """Return the text this bibliography was read from, or last committed."""
+        return self._pristine_text
+
+    @property
     def source_fingerprint(self) -> FileFingerprint | None:
         """Return the fingerprint of the file state this bibliography was read from.
 

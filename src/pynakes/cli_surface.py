@@ -43,6 +43,10 @@ STDIN_LIBRARY_COMMANDS = {("format",), ("normalize",), ("scrub",)}
 #: Arguments holding free text, which may legitimately end in ``.bib``.
 FREE_TEXT_ARGUMENTS = {"query", "value"}
 
+#: Operands that name a second bibliography on purpose (the other end of a
+#: link), so a ``.bib`` spelling there is not a misplaced leading FILE.
+OTHER_BIBLIOGRAPHY_ARGUMENTS = {"parent", "other"}
+
 #: Commands that create the library they name, so it is never auto-detected.
 NO_AUTODETECT_COMMANDS = {("init",)}
 
@@ -133,7 +137,9 @@ def _misplaced(
     """Return the position of an operand token that looks like a library, if any."""
     for position, token in enumerate(tokens):
         param = _argument_at(operands, position)
-        if param is not None and param.name in FREE_TEXT_ARGUMENTS:
+        if param is not None and (
+            param.name in FREE_TEXT_ARGUMENTS or param.name in OTHER_BIBLIOGRAPHY_ARGUMENTS
+        ):
             continue
         if looks_like_library(token, path):
             return position

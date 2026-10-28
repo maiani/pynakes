@@ -93,6 +93,8 @@ to find the operation module that owns a key.
 | `verify-published` | integrity | Boolean (default: `false`): `verify` also reports preprints with a published version; `--published/--no-published` overrides it | `verify` | — |
 | `enrich-published` | integrity | Boolean (default: `false`): `enrich` also promotes preprints; the lookups still need `--online` (offline, the pass is skipped with a warning); `--published/--no-published` overrides it | `enrich` | — |
 | `tex-sources` | usage | List of TeX files or directories, relative to the `.bib` file | `keys`, `tex scan` | — |
+| `biblink-parents` | biblinks | List of parent bibliographies: `PATH constraint=field-subset\|key-subset flow=down\|up\|both\|none`, the path relative to this file | `biblink` | — |
+| `biblink-children` | biblinks | List of child bibliographies, in the same form | `biblink` | — |
 | `groups-separator` | groups | `auto` (default), `comma`, or `semicolon`; auto detects bibliography-wide and refuses mixed punctuation | Group membership reads, edits, selectors, analysis and lint; global `--groups-separator` overrides | — |
 | `group-tree` | groups | Pipe-delimited group hierarchy; aliases JabRef's `grouping` (read native-first) — see [Grouping](#grouping) | `groups list`/`add`/`remove`/`rename`/`update` | `grouping` / `groupsTree` / `groups:N...` |
 | `scrub-fields` | scrub | List of extra field names/globs `scrub` removes, on top of its default private set | `scrub` | — |

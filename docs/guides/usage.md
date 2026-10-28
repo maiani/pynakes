@@ -1178,6 +1178,49 @@ every command that selects entries runs it, and a saved expression may itself
 refer to other saved queries. `ref show --where` returns the matches in file
 order with the same options as `ref show --key`.
 
+## biblink
+
+Bibliography links declare that a bibliography draws on another, typically a
+manuscript's bibliography (the child) and the master bibliography it is taken
+from (the parent), and check that it still does:
+
+```bash
+pynakes init master.bib
+pynakes biblink add refs.bib master.bib --dry-run --diff
+pynakes biblink add refs.bib master.bib
+pynakes biblink list master.bib
+pynakes biblink check refs.bib
+pynakes biblink remove refs.bib master.bib
+```
+
+`biblink add FILE PARENT` writes the link into both files, each naming the other
+relative to its own folder, in `biblink-parents` and `biblink-children`. One preview
+covers both files, `--expect-sha256` and `--expect-other-sha256` guard each,
+and both are written or neither. A bibliography may have several parents and
+several children, and be the child of one file and the parent of another.
+
+The link carries a constraint. `field-subset` (the default) requires every
+citation key of the child to exist in the parent with the parent's entry type
+and, for every field the child has, the parent's value; fields only the parent
+has may be left out. `key-subset` requires only the keys. Values are compared
+after `@string` and `#` expansion, without outer delimiters and with
+whitespace collapsed; inner braces count, since they protect capitalization.
+The child's own fields are compared with the parent's fields after `crossref`
+and `xdata` inheritance, because a copy often flattens a cross-reference.
+Fields that record a bibliography's own bookkeeping (`groups`, `file`, JabRef's
+`owner`, `timestamp` and similar) are not compared.
+
+`biblink check` reads only the links the named file declares, one step. It
+reports a link the other end does not declare back, or declares with a
+different constraint or flow; child keys missing from the parent; keys that
+appear more than once in either file, which it does not guess between; and,
+under `field-subset`, type and field drift. A link whose other file cannot be
+read is reported incomplete, never as holding. `--strict` exits 1 when a link
+does not hold.
+
+The link also records a flow (`down`, `up`, `both` or `none`, default `down`):
+which way a sync may move values. Declaring a link never copies anything.
+
 ## analyze
 
 Describe what a bibliography holds and how complete its records are:

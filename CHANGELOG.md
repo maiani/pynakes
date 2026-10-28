@@ -81,6 +81,19 @@ The forms deprecated in 0.8 are removed:
 
 ### Added
 
+- Bibliography links: `biblink add FILE PARENT` declares FILE a child of
+  PARENT in both files (`biblink-parents` / `biblink-children` in
+  `pynakes-meta`, each path relative to its own file), with a constraint
+  (`field-subset`, the default, or `key-subset`) and a sync flow (`down`,
+  `up`, `both` or `none`). One preview covers both files, `--expect-sha256`
+  and `--expect-other-sha256` guard each, and both are written or neither.
+  `biblink check` validates every link a bibliography declares, read-only:
+  that the other end declares it back alike, child keys missing from the
+  parent, keys too ambiguous to compare, and under `field-subset` type and
+  field drift, comparing resolved values against the parent's fields with
+  inheritance applied. An unreadable other file makes the link incomplete,
+  never agreeing; `--strict` gates. `biblink list` and `biblink remove`
+  complete the family, and `capabilities` describes it under `biblinks`.
 - `normalize` has an `encoding` step, between invisible-character removal and
   title protection, that converts accents and named characters to LaTeX or to
   Unicode. It is off unless `--encoding latex|unicode` or the

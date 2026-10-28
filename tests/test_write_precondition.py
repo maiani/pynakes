@@ -27,6 +27,7 @@ LIBRARY = (
     "  Optics||2||1||StaticGroup|||0|||\n"
     "tex-sources: paper.tex\n"
     "query-mechanics: group Mechanics\n"
+    "biblink-parents: master.bib constraint=field-subset flow=down\n"
     "}\n"
     "\n"
     "@book{Newton1687,\n"
@@ -92,6 +93,8 @@ WRITES = {
     "metadata adopt-jabref": ["metadata", "adopt-jabref", "{bib}"],
     "query set": ["query", "set", "{bib}", "early", "year < 1700"],
     "query remove": ["query", "remove", "{bib}", "mechanics"],
+    "biblink add": ["biblink", "add", "{bib}", "{dir}/other.bib"],
+    "biblink remove": ["biblink", "remove", "{bib}", "{dir}/master.bib"],
     "tex add": ["tex", "add", "{bib}", "appendix.tex"],
     "tex remove": ["tex", "remove", "{bib}", "paper.tex"],
     "tex clear": ["tex", "clear", "{bib}"],
@@ -117,6 +120,11 @@ def _library(tmp_path: Path) -> Path:
     bib = tmp_path / "lib.bib"
     bib.write_bytes(LIBRARY.encode("utf-8"))
     (tmp_path / "paper.tex").write_text(PAPER, encoding="utf-8")
+    (tmp_path / "master.bib").write_text(
+        "@comment{pynakes-meta:\nbiblink-children: lib.bib constraint=field-subset flow=down\n}\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "other.bib").write_text("@misc{Hooke1665, year = {1665}}\n", encoding="utf-8")
     return bib
 
 
@@ -125,7 +133,7 @@ def _digest(path: Path) -> str:
 
 
 def _invoke(args: list[str], bib: Path, *extra: str):
-    argv = [part.replace("{bib}", str(bib)) for part in args]
+    argv = [part.replace("{bib}", str(bib)).replace("{dir}", str(bib.parent)) for part in args]
     return runner.invoke(app, [*argv, *extra, "--json"])
 
 

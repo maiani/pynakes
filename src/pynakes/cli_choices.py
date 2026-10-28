@@ -160,6 +160,22 @@ class GroupsSeparator(StrEnum):
     SEMICOLON = "semicolon"
 
 
+class LinkConstraint(StrEnum):
+    """What must hold between a linked child and parent (``pynakes.links.CONSTRAINTS``)."""
+
+    FIELD_SUBSET = "field-subset"
+    KEY_SUBSET = "key-subset"
+
+
+class LinkFlow(StrEnum):
+    """Which way a sync may move values along a link (``pynakes.links.FLOWS``)."""
+
+    DOWN = "down"
+    UP = "up"
+    BOTH = "both"
+    NONE = "none"
+
+
 class TextEncoding(StrEnum):
     """normalize's encoding step: defer to the library, convert, or leave text alone."""
 
