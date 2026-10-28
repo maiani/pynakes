@@ -105,7 +105,7 @@ def scan(
     human.append(f"Unused:  {len(report.unused)}")
     human.append(f"Missing: {len(report.missing)}")
     for key in report.missing:
-        human.append(f"  - {key}  (cited but not in library)")
+        human.append(f"  - {key}  (cited but not in the bibliography)")
 
     result = {
         "status": "success",

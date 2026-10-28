@@ -189,7 +189,7 @@ def build_fetch_queue(
     if target is not None:
         entries = list(lib.entries.get_all(target))
         if not entries:
-            raise ValueError(f"No entry with key {target!r} in the library")
+            raise ValueError(f"No entry with key {target!r} in the bibliography")
         if len(entries) > 1:
             raise ValueError(f"Cannot fetch for duplicate key {target!r}")
         return [entries[0]]

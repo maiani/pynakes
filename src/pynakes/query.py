@@ -599,7 +599,7 @@ class _Parser:
     def _saved_query(self) -> Node:
         name = self._value("a saved query name")
         if self.saved is None:
-            raise ValueError(f"predicate 'query' needs a library to look up {name!r} in")
+            raise ValueError(f"predicate 'query' needs a bibliography to look up {name!r} in")
         folded = name.casefold()
         expression = self.saved.get(folded)
         if expression is None:

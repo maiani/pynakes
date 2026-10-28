@@ -314,7 +314,7 @@ def format_bibliography(
             json_output, "InvalidInput", "--out cannot be combined with --check or --recursive"
         )
     if to_stdout and json_output:
-        _emit_error(json_output, "InvalidInput", "--out - writes the library itself, not JSON")
+        _emit_error(json_output, "InvalidInput", "--out - writes the bibliography itself, not JSON")
     if file == "-" and not to_stdout:
         _emit_error(json_output, "InvalidInput", "stdin input (-) requires --out -")
     if recursive and expect_sha256 is not None:
@@ -450,7 +450,7 @@ def _write_copy(
         out,
         "format",
         coll.preview(),
-        [f"{_verb('write', params, 'Wrote')} the formatted library to {out}."],
+        [f"{_verb('write', params, 'Wrote')} the formatted bibliography to {out}."],
         file=resolved,
         previous_content=source_text,
         diff_label=resolved,

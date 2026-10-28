@@ -616,7 +616,7 @@ def regenerate_key(lib: BibFile, key: str) -> tuple[str, str] | None:
     validate_key(key)
     matches = lib.entries.get_all(key)
     if not matches:
-        raise ValueError(f"No entry with key {key!r} in the library")
+        raise ValueError(f"No entry with key {key!r} in the bibliography")
     if len(matches) > 1:
         raise ValueError(f"Cannot regenerate duplicated key {key!r}; repair duplicates first")
 
@@ -704,7 +704,7 @@ def rename_key(lib: BibFile, old: str, new: str) -> int:
     validate_key(new)
     matches = lib.entries.get_all(old)
     if not matches:
-        raise ValueError(f"No entry with key {old!r} in the library")
+        raise ValueError(f"No entry with key {old!r} in the bibliography")
     if len(matches) > 1:
         raise ValueError(f"Cannot rename duplicated key {old!r}; repair duplicates first")
     if old == new:

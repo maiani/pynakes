@@ -332,7 +332,7 @@ def keys_rename(
 
     matches = coll.lib.entries.get_all(old)
     if not matches:
-        _emit_error(json_output, "KeyNotFound", f"No entry with key {old!r} in the library")
+        _emit_error(json_output, "KeyNotFound", f"No entry with key {old!r} in the bibliography")
         return
     if len(matches) > 1:
         _emit_conflict(

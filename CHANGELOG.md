@@ -128,7 +128,7 @@ The forms deprecated in 0.8 are removed:
 
 ### Changed
 
-- Help text, `capabilities` descriptions and two usage messages say
+- Help text, `capabilities` descriptions and messages say
   "bibliography" where they mean one `.bib` file, keeping "library" for the
   planned multi-file Library. No command, option, key or error code changed.
 - `asset fetch` (and `ref import --fetch`) groups its human-readable report:

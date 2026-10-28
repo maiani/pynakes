@@ -153,7 +153,7 @@ _CONTEXT_HELP = (
 
 def _require_key(lib, key: str, json_output: bool) -> None:
     if key not in lib.entries:
-        _emit_error(json_output, "KeyNotFound", f"No entry with key {key!r} in the library")
+        _emit_error(json_output, "KeyNotFound", f"No entry with key {key!r} in the bibliography")
 
 
 def _group_exists(lib, name: str) -> bool:
