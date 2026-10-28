@@ -18,10 +18,22 @@ Developer-only: not part of the package. Two subcommands:
     calls beyond the reference, response size relative to the reference, and
     whether the library ended where the approved plan says.
 
-Neither subcommand runs a model or touches the network. Usage::
+``prepare`` and ``collect``
+    Run a blind evaluation without hand-built harnesses. ``prepare`` gives each
+    task a directory with a fresh fixture copy, a logging ``bin/pynakes``
+    wrapper bound to the engine under test (``--python``), the brief to hand an
+    isolated agent, and a ``review.json`` for the reviewer. The wrapper records
+    every call in full and applies the task's ``mutate`` steps after the first
+    successful preview, as the reference solution does. Once each agent has
+    written ``answer.md`` and the reviewer has filled ``review.json``,
+    ``collect`` builds every transcript, scores it, and writes ``summary.md``.
+
+No subcommand runs a model or touches the network. Usage::
 
     python scripts/agent_eval.py measure [--task ID ...] [--out report.json]
     python scripts/agent_eval.py score run.json [--baseline report.json]
+    python scripts/agent_eval.py prepare RUN_DIR [--python ENGINE_PY] [--task ID ...]
+    python scripts/agent_eval.py collect RUN_DIR [--baseline report.json]
 """
 
 from __future__ import annotations
@@ -32,6 +44,7 @@ import json
 import platform
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 from dataclasses import asdict, dataclass, field
@@ -259,6 +272,148 @@ def score(transcript: dict, baseline: dict | None = None, suite: Path = SUITE) -
     }
 
 
+# --- blind runs: prepare and collect ---------------------------------------------------
+
+_WRAPPER = """#!{python}
+# Logging wrapper written by agent_eval.py prepare: runs the engine under test
+# and records each call in full. Not part of the task an agent sees.
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent.parent
+LIBRARY = HERE / {library!r}
+MUTATIONS = {mutations!r}
+proc = subprocess.run([sys.executable, "-m", "pynakes", *sys.argv[1:]], capture_output=True)
+sys.stdout.buffer.write(proc.stdout)
+sys.stderr.buffer.write(proc.stderr)
+record = {{
+    "argv": sys.argv[1:],
+    "exit_code": proc.returncode,
+    "response_bytes": len(proc.stdout),
+    "stdout": proc.stdout.decode("utf-8", "replace"),
+    "stderr": proc.stderr.decode("utf-8", "replace"),
+}}
+with (HERE / "calls.jsonl").open("a", encoding="utf-8") as log:
+    log.write(json.dumps(record) + "\\n")
+flag = HERE / ".mutated"
+if MUTATIONS and proc.returncode == 0 and "--dry-run" in sys.argv and not flag.exists():
+    with LIBRARY.open("a", encoding="utf-8", newline="") as handle:
+        handle.write("".join(MUTATIONS))
+    flag.touch()
+sys.exit(proc.returncode)
+"""
+
+_BRIEF = """You are working with a BibTeX bibliography using the `pynakes` command-line tool.
+
+Task: {prompt}
+
+The bibliography is {library}. Run the tool only as {wrapper} from the shell;
+it is offline. Do not read or list any other file or directory, the pynakes
+source or documentation, or the internet: learn the tool from its own --help
+and capabilities output. When you are done, write your final answer to
+{answer} and reply with the same text.
+"""
+
+
+def prepare(
+    run_dir: Path, python: str, task_ids: list[str] | None = None, suite: Path = SUITE
+) -> list[Path]:
+    """Lay out one directory per task for a blind run; return the task directories."""
+    run_dir.mkdir(parents=True, exist_ok=True)
+    made: list[Path] = []
+    for task in load_tasks(suite):
+        if task_ids and task["id"] not in task_ids:
+            continue
+        task_dir = (run_dir / task["id"]).resolve()
+        if task_dir.exists():
+            raise FileExistsError(f"{task_dir} exists; prepare a fresh run directory")
+        (task_dir / "bin").mkdir(parents=True)
+        library = task_dir / task["fixture"]
+        shutil.copyfile(suite / "fixtures" / task["fixture"], library)
+        mutations = [step["mutate"]["append"] for step in task["reference"] if "mutate" in step]
+        wrapper = task_dir / "bin" / "pynakes"
+        wrapper.write_text(
+            _WRAPPER.format(python=python, library=library.name, mutations=mutations),
+            encoding="utf-8",
+        )
+        wrapper.chmod(0o755)
+        (task_dir / "brief.md").write_text(
+            _BRIEF.format(
+                prompt=task["prompt"],
+                library=library,
+                wrapper=wrapper,
+                answer=task_dir / "answer.md",
+            ),
+            encoding="utf-8",
+        )
+        review = {"keys": None, "reported_ambiguity": None, "unsupported_claims": None, "notes": ""}
+        (task_dir / "review.json").write_text(json.dumps(review, indent=2) + "\n", encoding="utf-8")
+        made.append(task_dir)
+    (run_dir / "run.json").write_text(
+        json.dumps({"python": python, "tasks": [path.name for path in made]}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return made
+
+
+def collect(
+    run_dir: Path, baseline: dict | None, run_meta: dict, suite: Path = SUITE
+) -> list[dict]:
+    """Build and score the transcript of every prepared task; return the scores."""
+    tasks = {task["id"]: task for task in load_tasks(suite)}
+    scores: list[dict] = []
+    for name in json.loads((run_dir / "run.json").read_text(encoding="utf-8"))["tasks"]:
+        task, task_dir = tasks[name], run_dir / name
+        log = task_dir / "calls.jsonl"
+        calls = (
+            [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+            if log.exists()
+            else []
+        )
+        answer_file = task_dir / "answer.md"
+        review = json.loads((task_dir / "review.json").read_text(encoding="utf-8"))
+        if review.get("keys") is None or review.get("unsupported_claims") is None:
+            raise ValueError(f"{task_dir / 'review.json'} is not filled in")
+        library = (task_dir / task["fixture"]).read_bytes()
+        transcript = {
+            "task": name,
+            **run_meta,
+            "prompt": task["prompt"],
+            "calls": calls,
+            "answer": {
+                "text": answer_file.read_text(encoding="utf-8") if answer_file.exists() else None,
+                "keys": review["keys"],
+                "reported_ambiguity": review["reported_ambiguity"],
+            },
+            "library_sha256_after": hashlib.sha256(library).hexdigest(),
+            "review": {
+                "unsupported_claims": review["unsupported_claims"],
+                "notes": review.get("notes", ""),
+            },
+        }
+        (run_dir / f"{name}.transcript.json").write_text(
+            json.dumps(transcript, indent=2) + "\n", encoding="utf-8"
+        )
+        result = score(transcript, baseline, suite)
+        (run_dir / f"{name}.score.json").write_text(
+            json.dumps(result, indent=2) + "\n", encoding="utf-8"
+        )
+        scores.append(result)
+    lines = [
+        "| Task | Calls | Response bytes | Correct | Uncertainty | Edits match plan | Unsupported claims |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    lines.extend(
+        f"| {s['task']} | {s['call_count']} | {s['response_bytes']:,} | {s['correct']} | "
+        f"{s['uncertainty_preserved']} | {s['edits_match_plan']} | {s['unsupported_claims']} |"
+        for s in scores
+    )
+    (run_dir / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return scores
+
+
 # --- command line ----------------------------------------------------------------------
 
 
@@ -271,7 +426,55 @@ def main(argv: list[str] | None = None) -> int:
     score_parser = sub.add_parser("score", help="Score a recorded agent run")
     score_parser.add_argument("transcript", type=Path)
     score_parser.add_argument("--baseline", type=Path, help="A measure report to compare with")
+    prepare_parser = sub.add_parser("prepare", help="Lay out a blind run, one directory per task")
+    prepare_parser.add_argument("run_dir", type=Path)
+    prepare_parser.add_argument(
+        "--python",
+        default=sys.executable,
+        help="Python of the engine under test (an installed wheel)",
+    )
+    prepare_parser.add_argument("--task", action="append", help="Prepare only this task")
+    collect_parser = sub.add_parser("collect", help="Build, score and summarize a blind run")
+    collect_parser.add_argument("run_dir", type=Path)
+    collect_parser.add_argument("--baseline", type=Path, help="A measure report to compare with")
+    collect_parser.add_argument(
+        "--agent", default="", help="Agent model and client, for the record"
+    )
+    collect_parser.add_argument("--conditions", default="", help="Run conditions, for the record")
+    collect_parser.add_argument(
+        "--wheel", type=Path, help="The evaluated wheel, hashed into the record"
+    )
     args = parser.parse_args(argv)
+
+    if args.command == "prepare":
+        for task_dir in prepare(args.run_dir, args.python, args.task):
+            sys.stdout.write(f"{task_dir / 'brief.md'}\n")
+        return 0
+    if args.command == "collect":
+        baseline = json.loads(args.baseline.read_text(encoding="utf-8")) if args.baseline else None
+        python = json.loads((args.run_dir / "run.json").read_text(encoding="utf-8"))["python"]
+
+        version = subprocess.run(
+            [python, "-c", "import pynakes; print(pynakes.__version__)"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        meta = {
+            "engine_version": version,
+            "wheel_sha256": hashlib.sha256(args.wheel.read_bytes()).hexdigest()
+            if args.wheel
+            else None,
+            "agent": args.agent,
+            "conditions": args.conditions,
+        }
+        scores = collect(args.run_dir, baseline, meta)
+        sys.stdout.write((args.run_dir / "summary.md").read_text(encoding="utf-8"))
+        passed = (
+            s["correct"] and s["uncertainty_preserved"] and s["edits_match_plan"] is not False
+            for s in scores
+        )
+        return 0 if all(passed) else 1
 
     if args.command == "measure":
         report = measure(args.task)

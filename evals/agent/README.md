@@ -17,7 +17,7 @@ private library or a bug report.
 - `fixtures/` — the libraries the tasks run against. Each run starts from a
   fresh copy.
 - `../../scripts/agent_eval.py` — `measure` runs the reference solutions;
-  `score` scores a recorded agent run.
+  `prepare` and `collect` run a blind evaluation; `score` scores one transcript.
 
 Initial tasks cover the cases the roadmap names first:
 
@@ -47,29 +47,42 @@ platform. The command exits 1 when a reference solution no longer passes, which
 means the engine changed under the task. `tests/test_agent_eval_suite.py` runs
 the same check in the regular test suite.
 
-## Recording an agent run
+## Running a blind evaluation
 
-Run the agent on a fresh copy of the task's fixture with only the task's
-`prompt`, then write a transcript:
+Evaluate an installed wheel, not the source tree, so the run tests what ships:
 
-```json
-{
-  "task": "ambiguous-reference",
-  "engine_version": "0.8.0",
-  "agent": {"model": "…", "client": "…", "settings": "…"},
-  "conditions": "fresh fixture copy, offline, no prior context",
-  "calls": [
-    {"argv": ["search", "lib.bib", "Introductio", "--json"], "exit_code": 0, "response_bytes": 1830}
-  ],
-  "answer": {"keys": ["Euler1748a", "Euler1748b"], "reported_ambiguity": true},
-  "library_sha256_after": "<sha256 of the library file after the run>",
-  "review": {"unsupported_claims": 0, "notes": "…"}
-}
+```bash
+python -m venv /tmp/eval-env && /tmp/eval-env/bin/pip install dist/pynakes-X.Y.Z-py3-none-any.whl
+/tmp/eval-env/bin/python scripts/agent_eval.py measure --out baseline.json
+python scripts/agent_eval.py prepare /tmp/eval-run --python /tmp/eval-env/bin/python
 ```
 
-`review.unsupported_claims` is filled in by the person reviewing the run: the
-number of statements in the agent's answer that its tool responses did not
-support. Everything else is recorded mechanically.
+`prepare` gives each task a directory outside the repository with a fresh copy
+of its fixture, a `bin/pynakes` wrapper around the engine under test, a
+`brief.md`, and an empty `review.json`. The wrapper records every call in full
+(argv, exit status, stdout, stderr) in `calls.jsonl`, and applies the task's
+`mutate` steps after the first successful preview, as the reference solution
+does.
+
+Give each task's `brief.md`, verbatim and nothing else, to a fresh isolated
+agent with shell access only: no parent conversation, repository or reference
+solutions. The brief asks the agent to write its final answer to `answer.md`.
+Run one task per agent.
+
+Then review each answer against the recorded responses and fill `review.json`:
+the keys the answer names, whether it reported ambiguity, and the number of
+statements the tool responses do not support. Finally:
+
+```bash
+python scripts/agent_eval.py collect /tmp/eval-run --baseline baseline.json \
+  --wheel dist/pynakes-X.Y.Z-py3-none-any.whl \
+  --agent "model and client" --conditions "fresh fixture, offline, one task per agent"
+```
+
+`collect` writes each `<task>.transcript.json` (calls, the verbatim answer, the
+reviewer's annotations, the library hash and the wheel hash) and
+`<task>.score.json`, and a `summary.md` table. Copy those with the baseline and
+a short README of the conditions into `runs/<date>-<agent>-<version>/`.
 
 ## Scoring
 
