@@ -68,6 +68,11 @@ The forms deprecated in 0.8 are removed:
 
 ### Added
 
+- `lint` reports `group_cycle`, a `correctness` error, for groups whose parents
+  lead back to themselves in the declared hierarchy, once per cycle and naming
+  its groups in order. Such a cycle has no root, so neither JabRef nor a tree
+  view can place those groups. The `groups` commands refuse to create one; this
+  catches a hand-edited `group-tree`.
 - `ref import` accepts `IDENTIFIER=KEY` to name an imported entry's citation
   key, on the command line or on a piped line, so a batch of identifiers can
   carry project-style keys in one call. The key follows the last `=` and

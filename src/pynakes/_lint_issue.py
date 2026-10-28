@@ -35,6 +35,7 @@ ISSUE_CATEGORIES: dict[str, LintCategory] = {
     "empty_key": "correctness",
     "missing_required_field": "correctness",
     "missing_reference_target": "correctness",
+    "group_cycle": "correctness",
     "undefined_string_reference": "correctness",
     "no_entries": "correctness",
     "citation_key_pattern_mismatch": "content",
@@ -70,6 +71,7 @@ NON_ENTRY_ISSUE_TYPES = frozenset(
         "invalid_metadata_value",
         "duplicate_metadata_block",
         "missing_tex_source",
+        "group_cycle",
     }
 )
 

@@ -384,6 +384,27 @@ def test_malformed_groups() -> None:
     assert "malformed_groups" in _types(lint(lib))
 
 
+def test_a_group_hierarchy_cycle_is_reported_once_as_an_error() -> None:
+    from pynakes import group_tree
+
+    lib = parse_bib("@book{Newton1704, title={Opticks}}\n")
+    for name, parent in (("Physics", ""), ("Optics", "Physics"), ("Lenses", "Optics")):
+        group_tree.add_node(lib, name, parent=parent)
+    nodes = group_tree.library_group_tree(lib) or []
+    next(node for node in nodes if node.name == "Physics").parent = "Lenses"
+    group_tree._write_tree(lib, nodes)
+
+    cycles = [issue for issue in lint(lib) if issue.type == "group_cycle"]
+    assert len(cycles) == 1
+    assert cycles[0].severity == "error"
+    assert cycles[0].category == "correctness"
+    assert "'Physics' -> 'Lenses' -> 'Optics' -> 'Physics'" in cycles[0].message
+
+    next(node for node in nodes if node.name == "Physics").parent = ""
+    group_tree._write_tree(lib, nodes)
+    assert not [issue for issue in lint(lib) if issue.type == "group_cycle"]
+
+
 def test_reference_to_a_missing_key_is_reported() -> None:
     lib = parse_bib(
         "@inproceedings{Gauss1801a, title={A Chapter}, crossref={Gauss1801x},"
