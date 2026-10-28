@@ -1,9 +1,12 @@
 # Engine v0.9.0 release preparation
 
-The engine candidate is **0.9.0 Beta**, prepared on 2026-10-28. The evaluated
-candidate is commit `b87bdae`. Since then, `b364a40` stops hidden commands
-appearing in help with the lowest supported typer, and later commits change
-only tooling and records. The editor is versioned on its own and follows engine
+The engine candidate is **0.9.0 Beta**, prepared on 2026-10-28. The blind
+evaluation ran on commit `b87bdae`. Engine changes since: hidden commands left
+out of help with the lowest supported typer; title protection of terms inside
+hyphenated compounds and of whole accented words, with all-caps titles left
+alone and reported by `lint`; unknown options reported as such; volume and
+edition in book summaries; and conflict options and the agent guide telling
+agents to stop and ask. Rebuild and rerun the checks on the release revision. The editor is versioned on its own and follows engine
 acceptance. The Python API remains experimental until 1.0. Preparation publishes nothing
 and creates no tag. The dated changelog section is a draft; update its date if
 publication happens later. The version comes from setuptools-scm and the
@@ -20,9 +23,10 @@ keep working, hidden, until 0.10.0.
 | Scope | Recorded result | Evidence |
 | --- | --- | --- |
 | Candidate source (`b87bdae`) | 3,425 tests, 93.62% coverage; Ruff, ty and the strict Zensical build pass | `.cache/release-0.9.0/source-tests.log` |
+| Source after the fixes | 3,436 tests pass | local run, 2026-10-28 |
 | Distributions | Wheel and sdist built as 0.9.0; `twine check --strict` and `check_release.py --tag v0.9.0` pass | `.cache/release-0.9.0/SHA256SUMS`, `build.log` |
 | Reference evaluation | All five reference solutions pass on the installed wheel (Python 3.12.14) | `evals/agent/runs/2026-10-28-claude-v090/baseline.json` |
-| Blind agent evaluation | Three of five tasks pass; `duplicate-conflict` and `concurrent-edit` fail edit authorization after a correctly reported refusal | [Run README](evals/agent/runs/2026-10-28-claude-v090/README.md) |
+| Blind agent evaluation | Three of five tasks pass; `duplicate-conflict` and `concurrent-edit` fail edit authorization after a correctly reported refusal. The conflict guidance has since changed; a rerun of those two tasks on the release revision is pending | [Run README](evals/agent/runs/2026-10-28-claude-v090/README.md) |
 | CI on the pushed branch | Every job passed except the lowest-dependency job, which failed two help-listing tests; fixed in `b364a40` and verified locally with typer 0.26.0, click 8.1.0 and rich 13.8.0 | PR #6 |
 | Installed-wheel suite | Not run locally; the release workflow runs it on every platform | — |
 | Real-bibliography smoke checks | Pending: the owner's step, on private libraries | — |
