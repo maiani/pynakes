@@ -34,7 +34,7 @@ the exact outcome and limitations. Rehearsal artifacts built from an uncommitted
 working tree must not be published.
 
 1. Run `pytest --cov --cov-fail-under=90`, `ruff check src tests`,
-   `ruff format --check src tests`, `ty check`, and `mkdocs build --strict`.
+   `ruff format --check src tests`, `ty check`, and `zensical build --strict`.
 2. Measure the five reference evaluation solutions with
    `python scripts/agent_eval.py measure --out .cache/release-0.8.0/agent-baseline.json`.
    Read [the evaluation review](evals/agent/REVIEW-0.8.md). Reference solutions

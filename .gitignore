@@ -20,8 +20,9 @@ venv/
 coverage.xml
 htmlcov/
 
-# mkdocs output
+# Documentation build output (zensical)
 /site
+/.cache
 
 # Pixi materializes its environments here; the lock file is committed.
 .pixi/

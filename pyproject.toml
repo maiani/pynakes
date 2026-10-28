@@ -63,9 +63,8 @@ dev = [
     "twine>=5.0.0",
 ]
 docs = [
-    "mkdocs>=1.6,<2",
-    "mkdocs-material>=9.5",
-    "mkdocstrings[python]>=0.26",
+    "zensical>=0.0.73,<0.1",
+    "mkdocstrings[python]>=1.0.8",
 ]
 
 [project.urls]

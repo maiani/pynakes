@@ -103,15 +103,19 @@ pytest --cov --cov-fail-under=90
 ruff check src tests         # lint
 ruff format --check src tests
 ty check                     # type-check
-mkdocs build --strict
-mkdocs serve                 # live-preview the docs at localhost:8000
+python scripts/command_reference.py  # regenerate the CLI reference page
+zensical build --strict
+zensical serve               # live-preview the docs at localhost:8000
 python -m build              # release artifact check
 python -m twine check dist/*
 ```
 
-The API reference is generated from docstrings by `mkdocstrings`
+The site is built with Zensical from `zensical.toml`. The API reference is
+generated from docstrings by `mkdocstrings`
 ([docs/api/reference.md](docs/api/reference.md)); keep public-module docstrings
-accurate rather than hand-maintaining a symbol list.
+accurate rather than hand-maintaining a symbol list. The command reference is
+generated from the live CLI by `scripts/command_reference.py`; rerun it after a
+CLI change (a test fails while the committed page is stale).
 
 For code changes, run the test suite, both Ruff checks, and ty before
 considering the change done. Changes under `editor/` run their own checks instead

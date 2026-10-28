@@ -36,7 +36,7 @@ See [uv’s tools guide](https://docs.astral.sh/uv/guides/tools/) for tool manag
 
 Clone the repository with its tags and install it in editable mode with the
 development and documentation tools (`pytest`, `ruff`, `ty`, `pre-commit`,
-`mkdocs`):
+`zensical`):
 
 ```bash
 git clone https://github.com/maiani/pynakes.git
@@ -53,7 +53,8 @@ ruff check src tests
 ruff format --check src tests
 ty check
 pytest --cov --cov-fail-under=90
-mkdocs build --strict
+python scripts/command_reference.py
+zensical build --strict
 ```
 
 Install local pre-commit hooks:

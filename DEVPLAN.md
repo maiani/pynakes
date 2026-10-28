@@ -209,25 +209,19 @@ its source bibliography, on a command surface and documentation settled before
 Library and the service layer build on them.
 
 The surface cleanup, the field-report follow-ups, their fixes, the
-documentation consolidation and the "bibliography, not library" wording pass
-are done; see `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md). What remains, one
-feature per commit:
+documentation consolidation, the move to Zensical and the "bibliography, not
+library" wording pass are done; see `[Unreleased]` in
+[CHANGELOG.md](CHANGELOG.md). What remains, one feature per commit:
 
 1. **Linked bibliographies** ([below](#linked-bibliographies-declaration-and-validation)).
    Independent of Library membership, so they ship first.
-2. **Documentation on Zensical.** Move the site from MkDocs to Zensical. First
-   confirm it runs mkdocstrings (the API reference) and the pre-build hook
-   that generates the command reference, which a test checks; if either is
-   missing, settle a replacement before migrating. Keep `--strict`-equivalent
-   failure on broken links in CI.
-3. **Release acceptance against the renamed surface.** Refresh
+2. **Release acceptance against the renamed surface.** Refresh
    [RELEASE.md](RELEASE.md) for 0.9.0 and rerun the agent evaluation suite, so
    agents are seen to reach the new names without first meeting the
    deprecation warnings.
 
-**Done when:** the linked-bibliography criteria below hold; the documentation
-builds strictly on Zensical with the API and command references generated; and
-the evaluation run is recorded.
+**Done when:** the linked-bibliography criteria below hold and the evaluation
+run is recorded.
 
 #### Linked bibliographies: declaration and validation
 

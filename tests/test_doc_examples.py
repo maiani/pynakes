@@ -58,7 +58,9 @@ def test_offline_shell_examples(document: str, tmp_path: Path, monkeypatch) -> N
 def test_generated_command_reference_is_current() -> None:
     expected = render_command_reference()
     actual = (ROOT / "docs/guides/command-reference.md").read_text(encoding="utf-8")
-    assert actual == expected, "Run mkdocs build --strict to regenerate the command reference"
+    assert actual == expected, (
+        "Run python scripts/command_reference.py to regenerate the command reference"
+    )
     for name, schema in command_schemas().items():
         assert f"## {name}\n" in actual
         assert schema["stability"] in {"stable", "experimental"}

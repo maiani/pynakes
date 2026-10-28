@@ -130,7 +130,7 @@ jobs:
         run: pytest tests/test_doc_examples.py
 
       - name: Build docs
-        run: mkdocs build --strict
+        run: zensical build --strict
 
   editor:
     name: Editor extension

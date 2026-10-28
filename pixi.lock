@@ -1751,9 +1751,8 @@ packages:
   - ruff>=0.16,<0.17 ; extra == 'dev'
   - build>=1.2.0 ; extra == 'dev'
   - twine>=5.0.0 ; extra == 'dev'
-  - mkdocs>=1.6,<2 ; extra == 'docs'
-  - mkdocs-material>=9.5 ; extra == 'docs'
-  - mkdocstrings[python]>=0.26 ; extra == 'docs'
+  - zensical>=0.0.73,<0.1 ; extra == 'docs'
+  - mkdocstrings[python]>=1.0.8 ; extra == 'docs'
   requires_python: '>=3.12'
 - pypi: https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl
   name: h11
