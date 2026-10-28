@@ -63,6 +63,15 @@ changes documented but not deprecated — until 1.0 pins it.
   them. A setting for one entry is a directive comment above it
   (`% pynakes: verb args -- reason`), never a `pynakes-*` field; a new
   directive adds a word to `ref directive`, not a command.
+- Git calls pynakes; pynakes does not call git. Git integration takes the form
+  of drivers git invokes with the file versions in hand (`.gitattributes`
+  `diff=`/`merge=`), so the engine still only sees files. No command reads
+  repository state implicitly: output never depends on a dirty tree, the index
+  or history, and the one planned exception, a revision-scoped selection, runs a
+  read-only `git` subprocess only when its flag is passed, as `--online` gates
+  the network. Locating the project boundary by a `.git` marker (key renames
+  that rewrite TeX citations) is a filesystem check, not a git read. No git
+  library dependency.
 - No project-level config (`pynakes.toml`, `[tool.pynakes]`): the `.bib` carries
   its own settings. The v0.9 library manifest does not change this: it lists
   members and the Catalogue location, never settings.
@@ -271,27 +280,14 @@ each phase lands:
 
 #### Surface cleanup
 
-Accepted 2026-10-27; retiring `corpus` is done. Each change follows the beta
+Accepted 2026-10-27; retiring `corpus` and renaming the `groups` subcommands
+are done. Each change follows the beta
 promise: the old form keeps working in 0.9 with a structured `deprecated`
 warning and is removed in 0.10. `capabilities`, the contract tests, the
 generated command reference and every help text that names an old form change
 in the same commit.
 
-1. **Name `groups` subcommands after the group they are already in.** Five
-   subcommands repeat it, three list overlapping things, and `move-group`
-   duplicates `update-group --parent`.
-
-   | Today | New |
-   | --- | --- |
-   | `groups tree`, `groups list` | `groups list`: the hierarchy; `--members` adds each group's keys (today's `list`) |
-   | `groups list-entries NAME` | `groups show NAME` (keeps `--exact`) |
-   | `groups add-group` / `remove-group` / `rename-group` | `groups add` / `remove` / `rename` |
-   | `groups move-group NAME --parent P` | `groups update NAME --parent P`; `move-group` is dropped |
-   | `groups update-group` | `groups update` |
-   | `groups add-entry KEY GROUP` / `remove-entry` | `groups assign KEY GROUP` / `unassign` (keeps `--create`) |
-
-   Ten subcommands become seven, and a node verb never needs a suffix.
-2. **`normalize` owns value conventions; `fields` only edits fields.**
+1. **`normalize` owns value conventions; `fields` only edits fields.**
    `fields protect-title` already exists as `normalize`'s `titles` step:
    `normalize --only titles --title-protection on --key K` does the same
    thing. `fields encode` is the Unicode/LaTeX conversion that v0.12 plans to
@@ -300,7 +296,7 @@ in the same commit.
    `fields-encoding` becomes `normalize-encoding`, since settings are named
    for the command that applies them. `lint` reports the old key until it is
    removed. `fields` keeps `set`, `rename`, `move`, `append` and `clear`.
-3. **`ref find` becomes `ref lookup`.** `search` reads the local file;
+2. **`ref find` becomes `ref lookup`.** `search` reads the local file;
    `ref find` goes online to find the records a written-out reference
    describes. The two names read as synonyms. "Lookup" says it asks an outside
    index, and matches `lookup.py`. Key lookup across library members is
@@ -468,11 +464,23 @@ declared relationship to its master bibliography.
   previews covering TeX references and materials. Check all participating files
   before applying and reuse transaction/recovery mechanisms. Validate the
   declared constraints after proposed updates and reject unresolved conflicts.
+- Reuse the entry-level three-way comparison as a git **merge driver**
+  (`*.bib merge=pynakes`). Merge by citation key and field: changes that do not
+  overlap resolve (two branches appending entries no longer conflict), untouched
+  entries keep their bytes, and genuine clashes, including one key added on
+  both sides with different content, are written as explicit conflicts instead
+  of a silent duplicate key. Any merge policy follows the three-forms rule.
+- Add an entry-level **diff driver** (`diff=pynakes`) so `git diff` and review
+  show added, removed and changed entries with their changed fields. Add a
+  revision-scoped selection (entries changed since a given revision) so CI and
+  pre-commit can gate only what a change touched.
 
 **Done when:** project assembly leaves sources intact; accepted copies and
 renames preserve declared relationships and references; conflicting mirror
 edits and interruptions cannot leave unreported partial changes. Do not expose
-material copying until its recovery guarantees are tested.
+material copying until its recovery guarantees are tested. The merge driver
+never produces an unparseable file or drops an entry either side kept, and
+`git merge` reports every conflict it leaves.
 
 ### v0.12 — Curation decisions and bibliographic consistency
 
@@ -690,6 +698,11 @@ rejected on fit, not on merit — several are the reason people choose those too
   second authoritative store would contradict the core invariant.
 - **Sync services and group libraries with permissions** (Zotero). Same reason:
   version control already provides history, merging, and sharing for plain text.
+- **Driving git** (auto-commit, staging, branching, undo through git history,
+  refusing to run on a dirty tree, metadata such as "date added" read from
+  `git blame`). These would make a command's effect or result depend on state
+  outside the file. pynakes supplies git drivers instead; see the standing
+  decisions.
 - **Word processor plugins** (both: Word, LibreOffice, Google Docs). Citation
   *rendering* against CSL styles is a different problem from bibliography
   maintenance, and it is already well served. pynakes stays on the `.bib` side
