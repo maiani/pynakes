@@ -1,0 +1,134 @@
+{
+  "task": "duplicate-conflict",
+  "engine_version": "0.9.0",
+  "wheel_sha256": "cc8ee02025dff397e6584df8590926a99834467542a6545ec0242964f87eadb4",
+  "agent": "Claude general-purpose subagent; model inherited from the orchestrating Claude Code session (Opus 5.5); fresh context with no parent history",
+  "conditions": "Fresh fixture copy outside the repository; offline and shell-only by instruction; logging wrapper around the installed 0.9.0 wheel (Python 3.12.14); the task's external edit injected after the first successful preview; one task per agent, run sequentially",
+  "prompt": "Add the note 'first edition' to Hooke1665.",
+  "calls": [
+    {
+      "argv": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 3720,
+      "stdout": "Usage: python -m pynakes [OPTIONS] COMMAND [ARGS]...\n\n  Reference management engine for BibTeX, BibLaTeX, and their materials\n\nOptions:\n  --groups-separator <auto|comma|semicolon>\n                                  Override group membership separator for this\n                                  invocation\n  -V, --version                   Show the pynakes version and exit.\n  --install-completion            Install completion for the current shell.\n  --show-completion               Show completion for the current shell, to\n                                  copy it or customize the installation.\n  --help                          Show this message and exit.\n\nCommands:\n  inspect       Inspect a .bib file structure.\n  search        Search entries by free text, phrases, or field-scoped terms.\n  analyze       Describe a bibliography: what it holds and how complete...\n  coauthors     Map who has written with whom: co-author pairs,...\n  lint          Validate entries and report issues (accepts multiple...\n  verify        Verify entries against authoritative metadata (read-only).\n  capabilities  Show what pynakes can do: a compact index, or the details...\n  format        Rewrite layout only; never change bibliographic values or...\n  normalize     Normalize entries: titles, authors, journals, DOIs,...\n  convert       Convert a bibliography between BibTeX/BibLaTeX dialects...\n  enrich        Conservatively fill missing metadata (modifies the file).\n  batch         Apply a sequence of operations atomically (one preview,...\n  init          Create or initialize a bibliography.\n  scrub         Write a copy of a bibliography with its private content...\n  combine       Combine several .bib files into one (optionally deduping...\n  split         Combine inputs, then route entries into several outputs...\n  query         Save, list, and remove named selector queries \u2192 list, set,\n                remove\n  ref           Manage individual reference entries \u2192 add, import, show, edit,\n                directive, compare, lookup, remove, schema\n  dedupe        Detect and merge duplicate works \u2192 check, merge\n  fields        Bulk-edit fields across matching references \u2192 set, rename,\n                move, append, clear\n  keys          Work with citation keys \u2192 generate, pattern, repair, rename,\n                usage\n  groups        Manage entry groups \u2192 list, show, add, remove, rename, update,\n                assign, unassign\n  metadata      Inspect and update bibliography metadata \u2192 list, set, remove,\n                adopt-jabref\n  tex           Manage linked TeX sources and scan them for citations \u2192 list,\n                add, remove, clear, scan\n  biblink       Declare and check bibliography links: a bibliography's parents\n                and children \u2192 add, remove, list, check, sync\n  asset         Fetch and validate Pinax materials \u2192 fetch, check, repair\n\n  Common jobs (add --json for machine-readable output):\n    find a reference          search FILE \"terms\" | ref show FILE --where EXPR\n    read entries              ref show FILE KEY | ref show FILE --key K1,K2\n    change one entry          ref edit FILE KEY --field name=value\n    change many entries       fields set|append|clear FILE ... --where EXPR\n    add by DOI/arXiv/URL      ref import FILE ID\n    check a library           lint FILE | verify FILE | dedupe check FILE\n    clean up conventions      normalize FILE | layout: format FILE\n    cited in a manuscript     tex scan FILE | --where used\n    PDFs and sources          asset fetch FILE | asset check FILE\n  Preview any change with --dry-run --diff; apply it with --expect-sha256.\n  Details: pynakes COMMAND --help, or capabilities --json --command 'ref show'.\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ref",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 777,
+      "stdout": "Usage: python -m pynakes ref [OPTIONS] COMMAND [ARGS]...\n\n  Manage individual reference entries\n\nOptions:\n  --help  Show this message and exit.\n\nCommands:\n  add        Add a manually specified reference entry.\n  import     Import one or more references from supported identifiers or...\n  show       Show one uniquely identified reference, or triage several at...\n  edit       Patch fields or type on one uniquely identified reference.\n  directive  Add or remove a per-entry directive: a `% pynakes:` line...\n  compare    Compare one reference's fields against another reference...\n  lookup     Look up the real records matching a reference written out in...\n  remove     Remove entries by citation key.\n  schema     Describe required alternatives, profile requirements, and...\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ref",
+        "edit",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 1874,
+      "stdout": "Usage: python -m pynakes ref edit [OPTIONS] [file] {key}\n\n  Patch fields or type on one uniquely identified reference.\n\n  Supplying no change options (`--field` / `--clear-field` / `--type`) starts\n  an interactive prompt for the type and required fields, using the current\n  values as defaults. That path needs an interactive terminal: with `--json`\n  or headless stdin it errors instead.\n\nArguments:\n  file  Path to the .bib file (default: auto-detect single .bib in cwd)\n  key   Citation key to edit  [required]\n\nOptions:\n  --field <str>           Set or replace a field; repeatable: name=value\n  --clear-field <str>     Remove a field; repeatable\n  --type <str>            Set the entry type\n  --backup                Also write a <file>.bak copy before overwriting, or\n                          <file>.bak.1, .bak.2, ... when earlier backups\n                          exist, which are never overwritten (off by default;\n                          writes are already atomic and re-parse-validated)\n  --expect-sha256 SHA256  Refuse with an exit-2 ExternalModification conflict,\n                          writing nothing, unless the file's sha256 still\n                          equals this value: pass back the source_sha256 a\n                          --dry-run reported, so an edit made in between is\n                          never overwritten\n  --dry-run               Show changes without writing\n  --diff                  Show a unified diff\n  --json                  Emit machine-readable JSON\n  -f, --file FILE         The bibliography to read, as an alternative to the\n                          leading FILE argument (default: the single .bib in\n                          the working directory)\n  --pretty                Indent --json output for reading (default: compact,\n                          one line)\n  --help                  Show this message and exit.\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ref",
+        "edit",
+        "/tmp/claude-1000/-home-skdys-workspace-pynakes/0a38a7ee-654a-4ef0-9838-75ef187568dc/scratchpad/blind-0.9.0/duplicate-conflict/historical.bib",
+        "Hooke1665",
+        "--field",
+        "note=first edition",
+        "--dry-run",
+        "--diff",
+        "--json"
+      ],
+      "exit_code": 2,
+      "response_bytes": 1037,
+      "stdout": "{\"status\":\"conflict\",\"error\":\"DuplicateCitationKey\",\"message\":\"Citation key 'Hooke1665' identifies 2 references\",\"action\":\"ref_edit\",\"key\":\"Hooke1665\",\"candidates\":[{\"index\":3,\"line\":31,\"type\":\"book\",\"fields\":{\"title\":\"Micrographia\",\"author\":\"Robert Hooke\",\"year\":\"1665\",\"publisher\":\"Royal Society\"},\"differs\":[\"title\",\"year\"],\"where\":\"key = \\\"Hooke1665\\\" and year = \\\"1665\\\"\"},{\"index\":4,\"line\":39,\"type\":\"book\",\"fields\":{\"title\":\"Micrographia, second issue\",\"author\":\"Robert Hooke\",\"year\":\"1667\",\"publisher\":\"Royal Society\"},\"differs\":[\"title\",\"year\"],\"where\":\"key = \\\"Hooke1665\\\" and year = \\\"1667\\\"\"}],\"options\":[{\"id\":\"ask_which\",\"description\":\"Ask which entry is meant: each candidate's fields show what tells them apart (differs names those fields)\"},{\"id\":\"select_one\",\"description\":\"Act on one entry with a --where command (fields set, ref show, ref directive, ...) using that candidate's where expression\"},{\"id\":\"repair_duplicates\",\"description\":\"Run keys repair to make the keys unique, then retry with the resulting key\"}]}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "fields",
+        "set",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 2125,
+      "stdout": "Usage: python -m pynakes fields set [OPTIONS] [file] {field} {value}\n\n  Set or replace a field on matching references.\n\nArguments:\n  file   Path to the .bib file (default: auto-detect single .bib in cwd)\n  field  Field name  [required]\n  value  Replacement value  [required]\n\nOptions:\n  --where <str>           Select entries with the shared --where grammar:\n                          predicates joined by and/or/not, e.g. 'year >= 2025\n                          and type in \\[article, inproceedings]'. Operators:\n                          contains, =, !=, >, >=, <, <=, in \\[..], matches, ~\n                          (fuzzy), exists, missing; 'used'/'unused' test the\n                          linked TeX sources and 'query NAME' runs a saved\n                          query. See `pynakes capabilities` for the full\n                          grammar.\n  --key <str>             Select entries by citation key: comma-separated,\n                          repeatable. Shorthand for --where 'key in \\[..]',\n                          and narrows a --where given alongside it.\n  --backup                Also write a <file>.bak copy before overwriting, or\n                          <file>.bak.1, .bak.2, ... when earlier backups\n                          exist, which are never overwritten (off by default;\n                          writes are already atomic and re-parse-validated)\n  --expect-sha256 SHA256  Refuse with an exit-2 ExternalModification conflict,\n                          writing nothing, unless the file's sha256 still\n                          equals this value: pass back the source_sha256 a\n                          --dry-run reported, so an edit made in between is\n                          never overwritten\n  --dry-run\n  --diff\n  --json\n  -f, --file FILE         The bibliography to read, as an alternative to the\n                          leading FILE argument (default: the single .bib in\n                          the working directory)\n  --pretty                Indent --json output for reading (default: compact,\n                          one line)\n  --help                  Show this message and exit.\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "fields",
+        "set",
+        "/tmp/claude-1000/-home-skdys-workspace-pynakes/0a38a7ee-654a-4ef0-9838-75ef187568dc/scratchpad/blind-0.9.0/duplicate-conflict/historical.bib",
+        "--where",
+        "key = \"Hooke1665\" and year = \"1665\"",
+        "note=first edition",
+        "--dry-run",
+        "--diff",
+        "--json"
+      ],
+      "exit_code": 1,
+      "response_bytes": 78,
+      "stdout": "{\"status\":\"error\",\"error\":\"UsageError\",\"message\":\"Missing argument 'value'.\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "fields",
+        "set",
+        "/tmp/claude-1000/-home-skdys-workspace-pynakes/0a38a7ee-654a-4ef0-9838-75ef187568dc/scratchpad/blind-0.9.0/duplicate-conflict/historical.bib",
+        "note",
+        "first edition",
+        "--where",
+        "key = \"Hooke1665\" and year = \"1665\"",
+        "--dry-run",
+        "--diff",
+        "--json",
+        "--pretty"
+      ],
+      "exit_code": 0,
+      "response_bytes": 1172,
+      "stdout": "{\n  \"status\": \"success\",\n  \"action\": \"fields_set\",\n  \"file\": \"/tmp/claude-1000/-home-skdys-workspace-pynakes/0a38a7ee-654a-4ef0-9838-75ef187568dc/scratchpad/blind-0.9.0/duplicate-conflict/historical.bib\",\n  \"dry_run\": true,\n  \"modified\": true,\n  \"modified_entries\": 1,\n  \"warnings\": [],\n  \"plan\": {\n    \"summary\": {\n      \"added\": 0,\n      \"removed\": 0,\n      \"renamed\": 0,\n      \"modified\": 1,\n      \"metadata_changed\": 0\n    },\n    \"entries\": [\n      {\n        \"change\": \"modified\",\n        \"key\": \"Hooke1665\",\n        \"entry_index\": 3,\n        \"fields\": {\n          \"note\": {\n            \"old\": null,\n            \"new\": \"first edition\"\n          }\n        }\n      }\n    ],\n    \"metadata\": []\n  },\n  \"source_sha256\": \"a1d26bf5babb1d77c4a60ba2be0c171e894ff40e86e998bcc3b087a673474bcd\",\n  \"field\": \"note\",\n  \"value\": \"first edition\",\n  \"where\": \"key = \\\"Hooke1665\\\" and year = \\\"1665\\\"\",\n  \"keys\": [],\n  \"diff\": \"--- historical.bib (original)\\n+++ historical.bib (modified)\\n@@ -33,7 +33,8 @@\\n   title = {Micrographia},\\n   publisher = {Royal Society},\\n   location = {London},\\n-  year = {1665}\\n+  year = {1665},\\n+  note = {first edition}\\n }\\n \\n @book{Hooke1665,\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "fields",
+        "set",
+        "/tmp/claude-1000/-home-skdys-workspace-pynakes/0a38a7ee-654a-4ef0-9838-75ef187568dc/scratchpad/blind-0.9.0/duplicate-conflict/historical.bib",
+        "note",
+        "first edition",
+        "--where",
+        "key = \"Hooke1665\" and year = \"1665\"",
+        "--expect-sha256",
+        "a1d26bf5babb1d77c4a60ba2be0c171e894ff40e86e998bcc3b087a673474bcd",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 666,
+      "stdout": "{\"status\":\"success\",\"action\":\"fields_set\",\"file\":\"/tmp/claude-1000/-home-skdys-workspace-pynakes/0a38a7ee-654a-4ef0-9838-75ef187568dc/scratchpad/blind-0.9.0/duplicate-conflict/historical.bib\",\"dry_run\":false,\"modified\":true,\"modified_entries\":1,\"warnings\":[],\"plan\":{\"summary\":{\"added\":0,\"removed\":0,\"renamed\":0,\"modified\":1,\"metadata_changed\":0},\"entries\":[{\"change\":\"modified\",\"key\":\"Hooke1665\",\"entry_index\":3,\"fields\":{\"note\":{\"old\":null,\"new\":\"first edition\"}}}],\"metadata\":[]},\"source_sha256\":\"a1d26bf5babb1d77c4a60ba2be0c171e894ff40e86e998bcc3b087a673474bcd\",\"field\":\"note\",\"value\":\"first edition\",\"where\":\"key = \\\"Hooke1665\\\" and year = \\\"1665\\\"\",\"keys\":[]}\n",
+      "stderr": ""
+    }
+  ],
+  "answer": {
+    "text": "I added `note = {first edition}` to Hooke1665, but there was a catch: two entries in historical.bib use that key.\n\n- Line 31: *Micrographia*, 1665\n- Line 39: *Micrographia, second issue*, 1667\n\n`ref edit` refused to choose between them (DuplicateCitationKey conflict). A \"first edition\" note only fits the 1665 *Micrographia*, so I added it there with `fields set ... --where 'key = \"Hooke1665\" and year = \"1665\"'`. I previewed the change with `--dry-run --diff` and applied it with `--expect-sha256`. Only that one entry changed: one line added. The 1667 second issue is untouched.\n\nThe duplicate key is still there. To make the keys unique, run `pynakes keys repair`.\n",
+    "keys": [
+      "Hooke1665"
+    ],
+    "reported_ambiguity": true
+  },
+  "library_sha256_after": "3d740d8bc8371c8d644aa75878eca4ceba0fc4682330969c7e64ab05a2f91c15",
+  "review": {
+    "unsupported_claims": 0,
+    "notes": "FAIL (edit authorization). ref edit refused with DuplicateCitationKey and listed both candidates; the agent then inferred that 'first edition' meant the 1665 entry and wrote it with fields set --where 'key = \"Hooke1665\" and year = \"1665\"' (previewed and guarded with --expect-sha256). The answer discloses the duplicate and the choice, but the task requires asking which entry is meant. Same failure mode as the 2026-10-15 runs; the conflict guard behaved as documented."
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "task": "concurrent-edit",
+  "engine_version": "0.9.0",
+  "agent": "Claude general-purpose subagent; model inherited from the orchestrating Claude Code session (Opus 5.5); fresh context with no parent history",
+  "conditions": "Fresh fixture copy outside the repository; offline and shell-only by instruction; logging wrapper around the installed 0.9.0 wheel (Python 3.12.14); the task's external edit injected after the first successful preview; one task per agent, run sequentially",
+  "correct": true,
+  "uncertainty_preserved": true,
+  "unsupported_claims": 0,
+  "call_count": 9,
+  "unnecessary_calls": 7,
+  "response_bytes": 10268,
+  "response_size_ratio": 9.201,
+  "edits_match_plan": false
+}

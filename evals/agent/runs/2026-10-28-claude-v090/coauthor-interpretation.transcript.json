@@ -1,0 +1,191 @@
+{
+  "task": "coauthor-interpretation",
+  "engine_version": "0.9.0",
+  "wheel_sha256": "cc8ee02025dff397e6584df8590926a99834467542a6545ec0242964f87eadb4",
+  "agent": "Claude general-purpose subagent; model inherited from the orchestrating Claude Code session (Opus 5.5); fresh context with no parent history",
+  "conditions": "Fresh fixture copy outside the repository; offline and shell-only by instruction; logging wrapper around the installed 0.9.0 wheel (Python 3.12.14); the task's external edit injected after the first successful preview; one task per agent, run sequentially",
+  "prompt": "Describe Alice Example\u2019s co-authorship neighbourhood in this bibliography, giving the supporting citation keys. Explain the counts, any identity uncertainty, and any excluded papers. Do not edit the library.",
+  "calls": [
+    {
+      "argv": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 3720,
+      "stdout": "Usage: python -m pynakes [OPTIONS] COMMAND [ARGS]...\n\n  Reference management engine for BibTeX, BibLaTeX, and their materials\n\nOptions:\n  --groups-separator <auto|comma|semicolon>\n                                  Override group membership separator for this\n                                  invocation\n  -V, --version                   Show the pynakes version and exit.\n  --install-completion            Install completion for the current shell.\n  --show-completion               Show completion for the current shell, to\n                                  copy it or customize the installation.\n  --help                          Show this message and exit.\n\nCommands:\n  inspect       Inspect a .bib file structure.\n  search        Search entries by free text, phrases, or field-scoped terms.\n  analyze       Describe a bibliography: what it holds and how complete...\n  coauthors     Map who has written with whom: co-author pairs,...\n  lint          Validate entries and report issues (accepts multiple...\n  verify        Verify entries against authoritative metadata (read-only).\n  capabilities  Show what pynakes can do: a compact index, or the details...\n  format        Rewrite layout only; never change bibliographic values or...\n  normalize     Normalize entries: titles, authors, journals, DOIs,...\n  convert       Convert a bibliography between BibTeX/BibLaTeX dialects...\n  enrich        Conservatively fill missing metadata (modifies the file).\n  batch         Apply a sequence of operations atomically (one preview,...\n  init          Create or initialize a bibliography.\n  scrub         Write a copy of a bibliography with its private content...\n  combine       Combine several .bib files into one (optionally deduping...\n  split         Combine inputs, then route entries into several outputs...\n  query         Save, list, and remove named selector queries \u2192 list, set,\n                remove\n  ref           Manage individual reference entries \u2192 add, import, show, edit,\n                directive, compare, lookup, remove, schema\n  dedupe        Detect and merge duplicate works \u2192 check, merge\n  fields        Bulk-edit fields across matching references \u2192 set, rename,\n                move, append, clear\n  keys          Work with citation keys \u2192 generate, pattern, repair, rename,\n                usage\n  groups        Manage entry groups \u2192 list, show, add, remove, rename, update,\n                assign, unassign\n  metadata      Inspect and update bibliography metadata \u2192 list, set, remove,\n                adopt-jabref\n  tex           Manage linked TeX sources and scan them for citations \u2192 list,\n                add, remove, clear, scan\n  biblink       Declare and check bibliography links: a bibliography's parents\n                and children \u2192 add, remove, list, check, sync\n  asset         Fetch and validate Pinax materials \u2192 fetch, check, repair\n\n  Common jobs (add --json for machine-readable output):\n    find a reference          search FILE \"terms\" | ref show FILE --where EXPR\n    read entries              ref show FILE KEY | ref show FILE --key K1,K2\n    change one entry          ref edit FILE KEY --field name=value\n    change many entries       fields set|append|clear FILE ... --where EXPR\n    add by DOI/arXiv/URL      ref import FILE ID\n    check a library           lint FILE | verify FILE | dedupe check FILE\n    clean up conventions      normalize FILE | layout: format FILE\n    cited in a manuscript     tex scan FILE | --where used\n    PDFs and sources          asset fetch FILE | asset check FILE\n  Preview any change with --dry-run --diff; apply it with --expect-sha256.\n  Details: pynakes COMMAND --help, or capabilities --json --command 'ref show'.\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "coauthors",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 3782,
+      "stdout": "Usage: python -m pynakes coauthors [OPTIONS] [file]\n\n  Map who has written with whom: co-author pairs, components, and name\n  variants.\n\n  Offline and descriptive, from the `author` field of the selected entries\n  (`--where`/`--key`; all entries by default, so `--where 'year >= 2020'`\n  slices by time). People are compared as `analyze`'s `authors` section\n  compares them, so the counts reconcile with it; names that may be one person\n  (`Smith, J.` and `Smith, John`) are listed as candidates, never merged.\n  `--focus` restricts the network to one person's co-authors and the pairs\n  among them. Entries listing more than `--max-authors` people (default 100)\n  count their authors but are not linked. `--to json|graphml|markdown` renders\n  a document, written with `--out`.\n\nArguments:\n  file  Path to the .bib file (default: auto-detect single .bib in cwd)\n\nOptions:\n  --focus <str>                 Show one person's co-authors and the pairs\n                                among them (repeatable: several names form one\n                                view, e.g. two spellings of the same person).\n                                Written like an author field: 'Isaac Newton'\n                                finds 'Newton, Isaac'\n  --where <str>                 Select entries with the shared --where\n                                grammar: predicates joined by and/or/not, e.g.\n                                'year >= 2025 and type in \\[article,\n                                inproceedings]'. Operators: contains, =, !=,\n                                >, >=, <, <=, in \\[..], matches, ~ (fuzzy),\n                                exists, missing; 'used'/'unused' test the\n                                linked TeX sources and 'query NAME' runs a\n                                saved query. See `pynakes capabilities` for\n                                the full grammar.\n  --key <str>                   Select entries by citation key: comma-\n                                separated, repeatable. Shorthand for --where\n                                'key in \\[..]', and narrows a --where given\n                                alongside it.\n  --max-authors <int>           Link only entries listing at most this many\n                                authors; 0 links every entry (default: the\n                                library's coauthors-max-authors setting, else\n                                100)\n  --to <json|graphml|markdown>  Render the network as a document: json (the\n                                documented schema), graphml, or markdown\n  --out <str>                   Write the --to document here instead of stdout\n                                (- for stdout)\n  --force                       Overwrite the output file if it already exists\n  --dry-run                     Report what --out would write without writing\n                                it\n  --diff                        Show a unified diff of the --out file\n  --json                        Emit machine-readable JSON\n  --backup                      Also write a <file>.bak copy before\n                                overwriting, or <file>.bak.1, .bak.2, ... when\n                                earlier backups exist, which are never\n                                overwritten (off by default; writes are\n                                already atomic and re-parse-validated)\n  -f, --file FILE               The bibliography to read, as an alternative to\n                                the leading FILE argument (default: the single\n                                .bib in the working directory)\n  --pretty                      Indent --json output for reading (default:\n                                compact, one line)\n  --help                        Show this message and exit.\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "coauthors",
+        "coauthors.bib",
+        "--focus",
+        "Alice Example",
+        "--json",
+        "--pretty"
+      ],
+      "exit_code": 0,
+      "response_bytes": 5797,
+      "stdout": "{\n  \"status\": \"success\",\n  \"action\": \"coauthors\",\n  \"file\": \"coauthors.bib\",\n  \"source_sha256\": \"eb93bc6818181bca25f45b56f6abca85f977f4bb265d9ac177a7178b33674fa8\",\n  \"warnings\": [\n    {\n      \"type\": \"conflicting_author_orcids\",\n      \"name\": \"Example, Alice\",\n      \"orcids\": [\n        \"0000-0001-5109-3700\",\n        \"0000-0002-1825-0097\"\n      ],\n      \"evidence\": [\n        {\n          \"key\": \"Pair1900\",\n          \"selection_index\": 0,\n          \"orcid\": \"0000-0002-1825-0097\"\n        },\n        {\n          \"key\": \"Large1903\",\n          \"selection_index\": 3,\n          \"orcid\": \"0000-0001-5109-3700\"\n        }\n      ],\n      \"message\": \"Example, Alice has multiple ORCID iDs; the name remains one node and may conflate different people. Review its annotated entries.\"\n    },\n    {\n      \"type\": \"large_author_lists\",\n      \"max_authors\": 3,\n      \"keys\": [\n        \"Large1903\"\n      ],\n      \"message\": \"1 entries list more than 3 authors and are not linked into the network (raise or disable the limit with --max-authors or coauthors-max-authors)\"\n    },\n    {\n      \"type\": \"focus_variants\",\n      \"name\": \"Example, Alice\",\n      \"variants\": [\n        \"Example, A.\"\n      ],\n      \"message\": \"Focus 'Example, Alice' has possible name variants (Example, A.); entries listing only those are not in this view unless each is also given as a focus name\"\n    }\n  ],\n  \"selection\": {\n    \"where\": null,\n    \"keys\": null,\n    \"entries\": 4\n  },\n  \"network\": {\n    \"schema\": \"pynakes.coauthors/1\",\n    \"max_authors\": 3,\n    \"summary\": {\n      \"authors\": 2,\n      \"pairs\": 1,\n      \"components\": 1,\n      \"largest_component\": 1,\n      \"isolated_authors\": 1,\n      \"variant_candidates\": 1\n    },\n    \"entries\": {\n      \"total\": 4,\n      \"with_authors\": 4,\n      \"without_authors\": 0,\n      \"single_author\": 0,\n      \"coauthored\": 4,\n      \"with_others\": 1,\n      \"over_max_authors\": 1\n    },\n    \"unlinked_keys\": [\n      \"Large1903\"\n    ],\n    \"focus\": [\n      {\n        \"requested\": \"Alice Example\",\n        \"name\": \"Example, Alice\"\n      }\n    ],\n    \"authors\": [\n      {\n        \"name\": \"Colleague, Beatrice\",\n        \"entries\": 2,\n        \"collaborators\": 2,\n        \"visible_collaborators\": 1,\n        \"coauthored_entries\": 2,\n        \"entries_with_others\": 1,\n        \"unlinked_entries\": 0,\n        \"first_year\": \"1900\",\n        \"last_year\": \"1901\",\n        \"undated\": 0,\n        \"component\": 0,\n        \"spellings\": [\n          \"Colleague, Beatrice\"\n        ],\n        \"orcids\": [],\n        \"focus\": false,\n        \"with_focus\": 1,\n        \"with_focus_keys\": [\n          \"Pair1900\"\n        ]\n      },\n      {\n        \"name\": \"Example, Alice\",\n        \"entries\": 2,\n        \"collaborators\": 1,\n        \"visible_collaborators\": 1,\n        \"coauthored_entries\": 2,\n        \"entries_with_others\": 0,\n        \"unlinked_entries\": 1,\n        \"first_year\": \"1900\",\n        \"last_year\": \"1903\",\n        \"undated\": 0,\n        \"component\": null,\n        \"spellings\": [\n          \"Example, Alice\"\n        ],\n        \"orcids\": [\n          \"0000-0001-5109-3700\",\n          \"0000-0002-1825-0097\"\n        ],\n        \"focus\": true,\n        \"with_focus\": 0,\n        \"with_focus_keys\": []\n      }\n    ],\n    \"pairs\": [\n      {\n        \"authors\": [\n          \"Colleague, Beatrice\",\n          \"Example, Alice\"\n        ],\n        \"entries\": 1,\n        \"first_year\": \"1900\",\n        \"last_year\": \"1900\",\n        \"undated\": 0,\n        \"keys\": [\n          \"Pair1900\"\n        ]\n      }\n    ],\n    \"components\": [\n      {\n        \"id\": 0,\n        \"size\": 1,\n        \"entries\": 2,\n        \"authors\": [\n          \"Colleague, Beatrice\"\n        ]\n      }\n    ],\n    \"variants\": [\n      {\n        \"names\": [\n          \"Example, A.\",\n          \"Example, Alice\"\n        ],\n        \"reasons\": [\n          \"initials\"\n        ],\n        \"evidence_against\": [],\n        \"entries\": [\n          {\n            \"name\": \"Example, A.\",\n            \"entries\": 1,\n            \"keys\": [\n              \"Variant1902\"\n            ]\n          },\n          {\n            \"name\": \"Example, Alice\",\n            \"entries\": 2,\n            \"keys\": [\n              \"Pair1900\",\n              \"Large1903\"\n            ]\n          }\n        ]\n      }\n    ],\n    \"warnings\": [\n      {\n        \"type\": \"conflicting_author_orcids\",\n        \"name\": \"Example, Alice\",\n        \"orcids\": [\n          \"0000-0001-5109-3700\",\n          \"0000-0002-1825-0097\"\n        ],\n        \"evidence\": [\n          {\n            \"key\": \"Pair1900\",\n            \"selection_index\": 0,\n            \"orcid\": \"0000-0002-1825-0097\"\n          },\n          {\n            \"key\": \"Large1903\",\n            \"selection_index\": 3,\n            \"orcid\": \"0000-0001-5109-3700\"\n          }\n        ],\n        \"message\": \"Example, Alice has multiple ORCID iDs; the name remains one node and may conflate different people. Review its annotated entries.\"\n      },\n      {\n        \"type\": \"large_author_lists\",\n        \"max_authors\": 3,\n        \"keys\": [\n          \"Large1903\"\n        ],\n        \"message\": \"1 entries list more than 3 authors and are not linked into the network (raise or disable the limit with --max-authors or coauthors-max-authors)\"\n      },\n      {\n        \"type\": \"focus_variants\",\n        \"name\": \"Example, Alice\",\n        \"variants\": [\n          \"Example, A.\"\n        ],\n        \"message\": \"Focus 'Example, Alice' has possible name variants (Example, A.); entries listing only those are not in this view unless each is also given as a focus name\"\n      }\n    ],\n    \"scope\": {\n      \"entries\": \"selection\",\n      \"author_counts_and_years\": \"selection\",\n      \"authors_and_pairs\": \"focus_neighborhood\",\n      \"components_and_isolates\": \"excluding_focus\",\n      \"component_entries\": \"selected linked entries incident to component members\",\n      \"warnings\": \"selection\"\n    }\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "coauthors.bib",
+        "--where",
+        "key exists",
+        "--json",
+        "--pretty"
+      ],
+      "exit_code": 0,
+      "response_bytes": 1401,
+      "stdout": "{\n  \"status\": \"success\",\n  \"action\": \"ref_show\",\n  \"file\": \"coauthors.bib\",\n  \"source_sha256\": \"eb93bc6818181bca25f45b56f6abca85f977f4bb265d9ac177a7178b33674fa8\",\n  \"warnings\": [],\n  \"where\": \"key exists\",\n  \"keys\": [],\n  \"resolved\": false,\n  \"abstract\": false,\n  \"bounds\": {\n    \"select\": null,\n    \"include\": [],\n    \"max_chars\": null,\n    \"limit\": null\n  },\n  \"count\": 4,\n  \"page\": {\n    \"offset\": 0,\n    \"limit\": null,\n    \"returned\": 4,\n    \"total\": 4,\n    \"complete\": true,\n    \"next_cursor\": null\n  },\n  \"entries\": [\n    {\n      \"key\": \"Pair1900\",\n      \"entry_type\": \"article\",\n      \"summary\": {\n        \"author\": \"Example, Alice and Colleague, Beatrice\",\n        \"year\": \"1900\"\n      },\n      \"truncated\": {}\n    },\n    {\n      \"key\": \"Outside1901\",\n      \"entry_type\": \"article\",\n      \"summary\": {\n        \"author\": \"Colleague, Beatrice and Outside, Clara and others\",\n        \"year\": \"1901\"\n      },\n      \"truncated\": {}\n    },\n    {\n      \"key\": \"Variant1902\",\n      \"entry_type\": \"article\",\n      \"summary\": {\n        \"author\": \"Example, A. and Different, Dora\",\n        \"year\": \"1902\"\n      },\n      \"truncated\": {}\n    },\n    {\n      \"key\": \"Large1903\",\n      \"entry_type\": \"article\",\n      \"summary\": {\n        \"author\": \"Example, Alice and Member, Eva and Member, Flora and Member, Grace\",\n        \"year\": \"1903\"\n      },\n      \"truncated\": {}\n    }\n  ],\n  \"retrieve_full\": null\n}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "metadata",
+        "list",
+        "coauthors.bib",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 433,
+      "stdout": "{\"status\":\"success\",\"action\":\"metadata_list\",\"file\":\"coauthors.bib\",\"source_sha256\":\"eb93bc6818181bca25f45b56f6abca85f977f4bb265d9ac177a7178b33674fa8\",\"metadata\":{\"values\":{},\"blocks\":[]},\"pynakes_metadata\":{\"values\":{\"coauthors-max-authors\":\"3\"},\"blocks\":[{\"key\":\"coauthors-max-authors\",\"value\":\"3\",\"raw_value\":\"3\",\"known\":true,\"category\":\"analysis\",\"namespace\":\"pynakes\"}]},\"effective\":{\"coauthors-max-authors\":\"3\"},\"warnings\":[]}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "coauthors.bib",
+        "--where",
+        "key exists",
+        "--include",
+        "fields"
+      ],
+      "exit_code": 1,
+      "response_bytes": 0,
+      "stdout": "",
+      "stderr": "InvalidInput: --include: Cannot include fields: expected materials, provenance\n"
+    },
+    {
+      "argv": [
+        "coauthors",
+        "coauthors.bib",
+        "--focus",
+        "Alice Example",
+        "--focus",
+        "Example, A.",
+        "--max-authors",
+        "0",
+        "--json"
+      ],
+      "exit_code": 0,
+      "response_bytes": 5524,
+      "stdout": "{\"status\":\"success\",\"action\":\"coauthors\",\"file\":\"coauthors.bib\",\"source_sha256\":\"eb93bc6818181bca25f45b56f6abca85f977f4bb265d9ac177a7178b33674fa8\",\"warnings\":[{\"type\":\"conflicting_author_orcids\",\"name\":\"Example, Alice\",\"orcids\":[\"0000-0001-5109-3700\",\"0000-0002-1825-0097\"],\"evidence\":[{\"key\":\"Pair1900\",\"selection_index\":0,\"orcid\":\"0000-0002-1825-0097\"},{\"key\":\"Large1903\",\"selection_index\":3,\"orcid\":\"0000-0001-5109-3700\"}],\"message\":\"Example, Alice has multiple ORCID iDs; the name remains one node and may conflate different people. Review its annotated entries.\"}],\"selection\":{\"where\":null,\"keys\":null,\"entries\":4},\"network\":{\"schema\":\"pynakes.coauthors/1\",\"max_authors\":0,\"summary\":{\"authors\":7,\"pairs\":8,\"components\":3,\"largest_component\":3,\"isolated_authors\":2,\"variant_candidates\":1},\"entries\":{\"total\":4,\"with_authors\":4,\"without_authors\":0,\"single_author\":0,\"coauthored\":4,\"with_others\":1,\"over_max_authors\":0},\"unlinked_keys\":[],\"focus\":[{\"requested\":\"Alice Example\",\"name\":\"Example, Alice\"},{\"requested\":\"Example, A.\",\"name\":\"Example, A.\"}],\"authors\":[{\"name\":\"Colleague, Beatrice\",\"entries\":2,\"collaborators\":2,\"visible_collaborators\":1,\"coauthored_entries\":2,\"entries_with_others\":1,\"unlinked_entries\":0,\"first_year\":\"1900\",\"last_year\":\"1901\",\"undated\":0,\"component\":1,\"spellings\":[\"Colleague, Beatrice\"],\"orcids\":[],\"focus\":false,\"with_focus\":1,\"with_focus_keys\":[\"Pair1900\"]},{\"name\":\"Example, Alice\",\"entries\":2,\"collaborators\":4,\"visible_collaborators\":4,\"coauthored_entries\":2,\"entries_with_others\":0,\"unlinked_entries\":0,\"first_year\":\"1900\",\"last_year\":\"1903\",\"undated\":0,\"component\":null,\"spellings\":[\"Example, Alice\"],\"orcids\":[\"0000-0001-5109-3700\",\"0000-0002-1825-0097\"],\"focus\":true,\"with_focus\":0,\"with_focus_keys\":[]},{\"name\":\"Different, Dora\",\"entries\":1,\"collaborators\":1,\"visible_collaborators\":1,\"coauthored_entries\":1,\"entries_with_others\":0,\"unlinked_entries\":0,\"first_year\":\"1902\",\"last_year\":\"1902\",\"undated\":0,\"component\":2,\"spellings\":[\"Different, Dora\"],\"orcids\":[],\"focus\":false,\"with_focus\":1,\"with_focus_keys\":[\"Variant1902\"]},{\"name\":\"Example, A.\",\"entries\":1,\"collaborators\":1,\"visible_collaborators\":1,\"coauthored_entries\":1,\"entries_with_others\":0,\"unlinked_entries\":0,\"first_year\":\"1902\",\"last_year\":\"1902\",\"undated\":0,\"component\":null,\"spellings\":[\"Example, A.\"],\"orcids\":[],\"focus\":true,\"with_focus\":0,\"with_focus_keys\":[]},{\"name\":\"Member, Eva\",\"entries\":1,\"collaborators\":3,\"visible_collaborators\":3,\"coauthored_entries\":1,\"entries_with_others\":0,\"unlinked_entries\":0,\"first_year\":\"1903\",\"last_year\":\"1903\",\"undated\":0,\"component\":0,\"spellings\":[\"Member, Eva\"],\"orcids\":[],\"focus\":false,\"with_focus\":1,\"with_focus_keys\":[\"Large1903\"]},{\"name\":\"Member, Flora\",\"entries\":1,\"collaborators\":3,\"visible_collaborators\":3,\"coauthored_entries\":1,\"entries_with_others\":0,\"unlinked_entries\":0,\"first_year\":\"1903\",\"last_year\":\"1903\",\"undated\":0,\"component\":0,\"spellings\":[\"Member, Flora\"],\"orcids\":[],\"focus\":false,\"with_focus\":1,\"with_focus_keys\":[\"Large1903\"]},{\"name\":\"Member, Grace\",\"entries\":1,\"collaborators\":3,\"visible_collaborators\":3,\"coauthored_entries\":1,\"entries_with_others\":0,\"unlinked_entries\":0,\"first_year\":\"1903\",\"last_year\":\"1903\",\"undated\":0,\"component\":0,\"spellings\":[\"Member, Grace\"],\"orcids\":[],\"focus\":false,\"with_focus\":1,\"with_focus_keys\":[\"Large1903\"]}],\"pairs\":[{\"authors\":[\"Colleague, Beatrice\",\"Example, Alice\"],\"entries\":1,\"first_year\":\"1900\",\"last_year\":\"1900\",\"undated\":0,\"keys\":[\"Pair1900\"]},{\"authors\":[\"Different, Dora\",\"Example, A.\"],\"entries\":1,\"first_year\":\"1902\",\"last_year\":\"1902\",\"undated\":0,\"keys\":[\"Variant1902\"]},{\"authors\":[\"Example, Alice\",\"Member, Eva\"],\"entries\":1,\"first_year\":\"1903\",\"last_year\":\"1903\",\"undated\":0,\"keys\":[\"Large1903\"]},{\"authors\":[\"Example, Alice\",\"Member, Flora\"],\"entries\":1,\"first_year\":\"1903\",\"last_year\":\"1903\",\"undated\":0,\"keys\":[\"Large1903\"]},{\"authors\":[\"Example, Alice\",\"Member, Grace\"],\"entries\":1,\"first_year\":\"1903\",\"last_year\":\"1903\",\"undated\":0,\"keys\":[\"Large1903\"]},{\"authors\":[\"Member, Eva\",\"Member, Flora\"],\"entries\":1,\"first_year\":\"1903\",\"last_year\":\"1903\",\"undated\":0,\"keys\":[\"Large1903\"]},{\"authors\":[\"Member, Eva\",\"Member, Grace\"],\"entries\":1,\"first_year\":\"1903\",\"last_year\":\"1903\",\"undated\":0,\"keys\":[\"Large1903\"]},{\"authors\":[\"Member, Flora\",\"Member, Grace\"],\"entries\":1,\"first_year\":\"1903\",\"last_year\":\"1903\",\"undated\":0,\"keys\":[\"Large1903\"]}],\"components\":[{\"id\":0,\"size\":3,\"entries\":1,\"authors\":[\"Member, Eva\",\"Member, Flora\",\"Member, Grace\"]},{\"id\":1,\"size\":1,\"entries\":2,\"authors\":[\"Colleague, Beatrice\"]},{\"id\":2,\"size\":1,\"entries\":1,\"authors\":[\"Different, Dora\"]}],\"variants\":[{\"names\":[\"Example, A.\",\"Example, Alice\"],\"reasons\":[\"initials\"],\"evidence_against\":[],\"entries\":[{\"name\":\"Example, A.\",\"entries\":1,\"keys\":[\"Variant1902\"]},{\"name\":\"Example, Alice\",\"entries\":2,\"keys\":[\"Pair1900\",\"Large1903\"]}]}],\"warnings\":[{\"type\":\"conflicting_author_orcids\",\"name\":\"Example, Alice\",\"orcids\":[\"0000-0001-5109-3700\",\"0000-0002-1825-0097\"],\"evidence\":[{\"key\":\"Pair1900\",\"selection_index\":0,\"orcid\":\"0000-0002-1825-0097\"},{\"key\":\"Large1903\",\"selection_index\":3,\"orcid\":\"0000-0001-5109-3700\"}],\"message\":\"Example, Alice has multiple ORCID iDs; the name remains one node and may conflate different people. Review its annotated entries.\"}],\"scope\":{\"entries\":\"selection\",\"author_counts_and_years\":\"selection\",\"authors_and_pairs\":\"focus_neighborhood\",\"components_and_isolates\":\"excluding_focus\",\"component_entries\":\"selected linked entries incident to component members\",\"warnings\":\"selection\"}}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "coauthors.bib",
+        "--key",
+        "Pair1900,Outside1901,Variant1902,Large1903",
+        "--select",
+        "all"
+      ],
+      "exit_code": 0,
+      "response_bytes": 169,
+      "stdout": "coauthors.bib: 4 entries.\n\n@article{Pair1900}\n  all  (none)\n\n@article{Outside1901}\n  all  (none)\n\n@article{Variant1902}\n  all  (none)\n\n@article{Large1903}\n  all  (none)\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "--help"
+      ],
+      "exit_code": 0,
+      "response_bytes": 3260,
+      "stdout": "Usage: python -m pynakes ref show [OPTIONS] [file] [key]\n\n  Show one uniquely identified reference, or triage several at once.\n\n  With a citation key this prints every stored field of that one reference.\n  With `--key k1,k2,...` it prints a compact summary of each requested\n  reference instead \u2014 title, creator, date, venue, and identifiers, plus the\n  abstract under `--abstract` \u2014 so a set of candidates can be scanned in one\n  call rather than one invocation per key. Both forms refuse to guess when a\n  key is duplicated, and the `--key` form reports every unknown key together.\n  `--where EXPR` summarizes every entry the selector matches, in file order \u2014\n  `--where 'query \"to-read\"'` runs a saved query, and `used`/`unused` test the\n  bibliography's linked TeX sources.\n\n  Bounded reads: `--select` returns only the named fields (the abstract among\n  them); `--include materials,provenance` adds the materials available for\n  each entry and the provenance the bibliography recorded; `--max-chars` cuts\n  long values and lists every cut under `truncated`. With `--key` or\n  `--where`, `--limit` pages the selection and `page.next_cursor` resumes it \u2014\n  a cursor is refused once the bibliography changes, so pages never silently\n  skip or repeat entries. Information the bibliography lacks is reported as\n  missing (`null`, `missing`, `missing_fields`), never as an omission.\n\nArguments:\n  file  Path to the .bib file (default: auto-detect single .bib in cwd)\n  key   Citation key to display\n\nOptions:\n  --key <str>        Summarize several references at once: comma-separated\n                     keys, repeatable\n  --where <str>      Summarize every reference this selector matches, in file\n                     order (the shared --where grammar, saved queries and\n                     used/unused included); narrowed by --key\n  --resolved         Include fields inherited through crossref/xdata\n  --abstract         Include each abstract in the --key summary\n  --select <str>     Return only these fields under 'fields': comma-separated,\n                     repeatable. A selected field the entry lacks is null and\n                     listed in missing_fields\n  --include <str>    Also report what the bibliography records outside the\n                     entry's fields: materials (Pinax files and file links),\n                     provenance (manifest records and directives). Comma-\n                     separated, repeatable\n  --max-chars <int>  Cut every returned text value to at most this many\n                     characters; each cut is listed under 'truncated'\n  --limit <int>      With --key or --where, return at most this many entries\n                     per page\n  --cursor <str>     Resume a paged read: pass page.next_cursor from the\n                     previous page. Refused when the bibliography changed\n                     since\n  --json             Emit machine-readable JSON\n  -f, --file FILE    The bibliography to read, as an alternative to the\n                     leading FILE argument (default: the single .bib in the\n                     working directory)\n  --pretty           Indent --json output for reading (default: compact, one\n                     line)\n  --help             Show this message and exit.\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "coauthors.bib",
+        "Pair1900"
+      ],
+      "exit_code": 0,
+      "response_bytes": 127,
+      "stdout": "@article{Pair1900}\n  author = Example, Alice and Colleague, Beatrice\n  author+an:orcid = 1=\"0000-0002-1825-0097\"\n  year = 1900\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "coauthors.bib",
+        "Large1903"
+      ],
+      "exit_code": 0,
+      "response_bytes": 156,
+      "stdout": "@article{Large1903}\n  author = Example, Alice and Member, Eva and Member, Flora and Member, Grace\n  author+an:orcid = 1=\"0000-0001-5109-3700\"\n  year = 1903\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "coauthors.bib",
+        "Variant1902"
+      ],
+      "exit_code": 0,
+      "response_bytes": 79,
+      "stdout": "@article{Variant1902}\n  author = Example, A. and Different, Dora\n  year = 1902\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ref",
+        "show",
+        "coauthors.bib",
+        "Outside1901"
+      ],
+      "exit_code": 0,
+      "response_bytes": 97,
+      "stdout": "@article{Outside1901}\n  author = Colleague, Beatrice and Outside, Clara and others\n  year = 1901\n",
+      "stderr": ""
+    }
+  ],
+  "answer": {
+    "text": "# Alice Example: co-authorship neighbourhood\n\nSource: `coauthors.bib`, 4 entries, read-only. I ran `pynakes coauthors --focus 'Alice Example'`. The bibliography sets `coauthors-max-authors = 3` in its metadata, so that limit applies.\n\n## What the default focused view shows\n\n- **Alice Example (`Example, Alice`)** appears in **2 entries**, from 1900 to 1903: **Pair1900** and **Large1903**.\n- In that view she has **exactly 1 linked co-author**:\n  - **Beatrice Colleague**: 1 shared paper, **Pair1900** (1900).\n- Summary counts: 2 authors (Alice and Beatrice), 1 pair, 1 component excluding Alice (Beatrice alone).\n- Beatrice's own counts: **2 entries** (Pair1900 and **Outside1901**) and **2 collaborators**, of which **1 is visible** in this view. The visible one is Alice. The hidden one is Clara Outside from Outside1901 (1901). That paper does not include Alice, so Clara is a second-degree contact, not Alice's co-author. Outside1901 also ends with \"and others\", so it names only part of its author list.\n\n## Excluded paper: Large1903\n\n- **Large1903** (1903) lists 4 authors: Alice plus Eva Member, Flora Member and Grace Member. That is more than the bibliography's limit of 3, so it counts toward Alice's entries (2) but is **not linked** into the network. Alice's `unlinked_entries` is 1.\n- With `--max-authors 0` (no limit), Alice has **4 co-authors**: Beatrice (Pair1900) and Eva, Flora and Grace Member (all Large1903).\n\n## Identity uncertainty\n\n1. **Conflicting ORCIDs under one name.** `Example, Alice` has ORCID **0000-0002-1825-0097** on **Pair1900** and ORCID **0000-0001-5109-3700** on **Large1903**. These come from `author+an:orcid` annotations. pynakes keeps the name as one node but warns that it may combine two different people. So the Beatrice link (Pair1900) and the Member trio (Large1903) may belong to different Alices.\n2. **Possible name variant `Example, A.`.** pynakes flags it as a candidate only, from initials, and never merges it. `Example, A.` appears on **Variant1902** (1902) with **Dora Different**. That paper is not in Alice's view unless you also pass `--focus 'Example, A.'`. If they are the same person, Dora Different becomes a further co-author. Variant1902 carries no ORCID, so the bibliography cannot settle it.\n\n## In short\n\n- **Confirmed** (default view, limit 3): Beatrice Colleague, from Pair1900.\n- **Excluded by the author limit**: Eva, Flora and Grace Member, from Large1903. That paper's ORCID also differs from Pair1900's.\n- **Only if `Example, A.` is Alice**: Dora Different, from Variant1902.\n- **Not a co-author**: Clara Outside, from Outside1901, who wrote only with Beatrice.\n\nThe library was not edited.\n",
+    "keys": [
+      "Pair1900",
+      "Outside1901",
+      "Variant1902",
+      "Large1903"
+    ],
+    "reported_ambiguity": true
+  },
+  "library_sha256_after": "eb93bc6818181bca25f45b56f6abca85f977f4bb265d9ac177a7178b33674fa8",
+  "review": {
+    "unsupported_claims": 0,
+    "notes": "Semantic review against the raw responses: the focused view's counts (2 entries 1900-1903, 1 visible co-author, 1 pair, 1 component excluding focus), Beatrice's 2 collaborators with 1 visible, the conflicting ORCIDs with their keys, Large1903 excluded by coauthors-max-authors 3 (unlinked_entries 1) and its 4 co-authors with --max-authors 0, the Example, A. candidate never merged, and Outside1901's truncated author list all match. Distinguishes selected from visible counts and keeps identity uncertainty explicit. Library unchanged."
+  }
+}
