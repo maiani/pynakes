@@ -251,3 +251,38 @@ class TestQueryFilter:
     def test_invalid_query_raises(self) -> None:
         with pytest.raises(ValueError):
             parse_query("this is not valid >< syntax")
+
+
+@pytest.mark.parametrize(
+    ("title", "terms", "protected"),
+    [
+        # A term inside a hyphenated compound is still the term.
+        ("Mach-Zehnder Interferometry", {"Mach", "Zehnder"}, "{Mach}-{Zehnder} Interferometry"),
+        ("two-Cooper-pair tunneling", {"Cooper"}, "two-{Cooper}-pair tunneling"),
+        # A Title Case compound is not taken for a proper name.
+        ("Self-Consistent Field Theory", set(), "Self-Consistent Field Theory"),
+        # A protected word that continues through an accent group is braced whole.
+        ('The Schr{\\"{o}}dinger Equation', {"Schr"}, 'The {Schr{\\"{o}}dinger} Equation'),
+        ("Landau{\\textendash}Zener", {"Landau", "Zener"}, "{Landau}{\\textendash}{Zener}"),
+        # A title in capitals throughout is left for a person to recase.
+        (
+            "HAMILTONIANO EFECTIVO DE UN CIRCUITO LC",
+            set(),
+            "HAMILTONIANO EFECTIVO DE UN CIRCUITO LC",
+        ),
+        ("LIGO Results", set(), "{LIGO} Results"),
+    ],
+)
+def test_title_protection_of_compounds_accents_and_all_caps_titles(
+    title: str, terms: set[str], protected: str
+) -> None:
+    from pynakes.fields import _protect_title_value
+
+    assert _protect_title_value(title, terms) == protected
+
+
+def test_lint_reports_an_all_caps_title() -> None:
+    from pynakes.lint import lint
+
+    lib = parse_bib("@article{Doe2021, title = {HAMILTONIANO EFECTIVO DE UN CIRCUITO LC}}\n")
+    assert [issue.type for issue in lint(lib) if issue.field == "title"] == ["title_all_caps"]

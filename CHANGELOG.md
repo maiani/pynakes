@@ -175,6 +175,17 @@ The forms deprecated in 0.8 are removed:
 
 ### Fixed
 
+- Title protection matches a protected term inside a hyphenated compound:
+  `Mach-Zehnder` with the terms `Mach` and `Zehnder` becomes
+  `{Mach}-{Zehnder}`, and `two-Cooper-pair` with `Cooper` becomes
+  `two-{Cooper}-pair`, where the whole compound used to be left unprotected.
+  A Title Case compound such as `Self-Consistent` is still not taken for a
+  proper name.
+- A protected word that continues through an accent group is braced whole,
+  `{Schr{\"{o}}dinger}` rather than `{Schr}{\"{o}}dinger`.
+- A title in capitals throughout is no longer braced word by word, which
+  locked it in capitals; title protection leaves it alone and `lint` reports
+  it as `title_all_caps` for recasing by hand.
 - `groups update --parent` (formerly `update-group --parent`) refuses a parent
   that is the group itself or one of its descendants, as `move-group` did,
   instead of writing a hierarchy with a cycle. It is an `InvalidInput` error and

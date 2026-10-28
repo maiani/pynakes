@@ -153,6 +153,14 @@ _INLINE_MATH_RE = re.compile(r"\$[^$]*\$")
 # Spans copied verbatim: a control sequence (``\LaTeX`` must not become
 # ``\{LaTeX}``) and a URL, whose case is significant but not a word's.
 _VERBATIM_RE = re.compile(r"\\(?:[A-Za-z]+|.)|(?:https?|ftp)://[^\s{}]+")
+# An accented letter written as a brace group (``{\"{o}}``, ``{\'e}``) and the
+# letters after it: the rest of a word such as ``Schr{\"{o}}dinger``.
+_ACCENT_GROUP = (
+    r"\{\\(?:[\"'`^~=.]\s*(?:\{\\?[A-Za-z]\}|\\?[A-Za-z])"
+    r"|[cvuHkrdbt](?:\s*\{\\?[A-Za-z]\}|\s+[A-Za-z])"
+    r"|(?:ss|ae|AE|oe|OE|aa|AA|[ijoOlL])(?![A-Za-z]))\s*\}"
+)
+_ACCENT_TAIL_RE = re.compile(rf"(?:{_ACCENT_GROUP}[A-Za-z]*)+")
 
 
 def _protect_token(token: str, terms: set[str]) -> bool:
@@ -185,14 +193,43 @@ def _protect_token(token: str, terms: set[str]) -> bool:
     return False
 
 
+def is_all_caps_title(value: str) -> bool:
+    """Return whether ``value`` is written in capitals throughout, over two words or more.
+
+    Such a title is shouted rather than cased: bracing each word as an acronym
+    would lock it in capitals, so protection leaves it for a person to recase.
+    Brace groups, control sequences and math are ignored.
+    """
+    plain = re.sub(r"\$[^$]*\$|\\[A-Za-z]+|\{[^{}]*\}", " ", value)
+    words = [word for word in re.findall(r"[^\W\d_]+", plain) if len(word) >= 2]
+    letters = [ch for word in words for ch in word]
+    return len(words) >= 2 and all(ch.isupper() for ch in letters)
+
+
+def _protect_compound_terms(token: str, terms: set[str]) -> str | None:
+    """Return ``token`` with each hyphen-joined part that is a term braced, or ``None``.
+
+    ``Mach-Zehnder`` with the terms ``Mach`` and ``Zehnder`` becomes
+    ``{Mach}-{Zehnder}``, and ``two-Cooper-pair`` with ``Cooper`` becomes
+    ``two-{Cooper}-pair``: a term inside a compound is still the term.
+    """
+    if "-" not in token or not terms:
+        return None
+    parts = token.split("-")
+    if not any(part in terms for part in parts):
+        return None
+    return "-".join(f"{{{part}}}" if part in terms else part for part in parts)
+
+
 def _protect_title_value(value: str, terms: set[str]) -> str:
     """Brace-protect capitalization-sensitive tokens outside existing braces.
 
     A value that still carries provider markup (MathML, HTML) is returned as
     it is: braces inserted between tags or inside an attribute would corrupt
-    it, and ``normalize`` converts the markup to LaTeX first.
+    it, and ``normalize`` converts the markup to LaTeX first. So is a title in
+    capitals throughout (:func:`is_all_caps_title`).
     """
-    if has_markup(value):
+    if has_markup(value) or is_all_caps_title(value):
         return value
     out: list[str] = []
     depth = 0
@@ -219,9 +256,17 @@ def _protect_title_value(value: str, terms: set[str]) -> str:
                 continue
             match = _TITLE_TOKEN_RE.match(value, i)
             if match and (i == 0 or not value[i - 1].isalnum()):
-                token = match.group(0)
-                out.append(f"{{{token}}}" if _protect_token(token, terms) else token)
-                i = match.end()
+                token, end = match.group(0), match.end()
+                if _protect_token(token, terms):
+                    # A word that continues through an accent group is braced
+                    # whole: ``{Schr{\"{o}}dinger}``, not ``{Schr}{\"{o}}dinger``.
+                    tail = _ACCENT_TAIL_RE.match(value, end)
+                    if tail:
+                        end = tail.end()
+                    out.append(f"{{{value[i:end]}}}")
+                else:
+                    out.append(_protect_compound_terms(token, terms) or token)
+                i = end
                 continue
 
         out.append(ch)

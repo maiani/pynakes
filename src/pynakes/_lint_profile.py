@@ -6,7 +6,7 @@ Public through :mod:`pynakes.lint`, which re-exports the non-underscore names.
 from dataclasses import dataclass
 
 from pynakes._lint_issue import IGNORABLE_NAMES, LintIssue
-from pynakes.fields import TITLE_FIELDS, title_capitalization_is_protected
+from pynakes.fields import TITLE_FIELDS, is_all_caps_title, title_capitalization_is_protected
 from pynakes.journals import (
     DEFAULT_JOURNAL_SOURCE,
     JOURNAL_FIELDS,
@@ -217,6 +217,19 @@ def _lint_consistency(
                     f"{normalized!r}",
                     key=entry.key,
                     field=normalized,
+                )
+            )
+    for field in profile.title_fields:
+        title = fields.get(field)
+        if title and is_all_caps_title(title):
+            issues.append(
+                LintIssue(
+                    "title_all_caps",
+                    "warning",
+                    f"Entry {entry.key!r} field {field!r} is in capitals throughout; recase it "
+                    "by hand (title protection leaves it alone rather than lock it in capitals)",
+                    key=entry.key,
+                    field=field,
                 )
             )
     if profile.protect_titles:
