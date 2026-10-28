@@ -157,7 +157,7 @@ schema does not yet cover them.
 | `blgFilePath` | library | Path to the `.blg` BibTeX log JabRef associates with the file |
 | `protectedFlag` | library | JabRef's "protect this library from external changes" flag |
 | `versionDBStructure` | library | JabRef's internal database-structure version marker |
-| `fileDirectory` / `fileDirectory-<library>` (prefix `fileDirectory`) | files | Per-library linked-file search path(s) |
+| `fileDirectory` / `fileDirectory-<user>` (prefix `fileDirectory`) | files | Linked-file search path(s): shared, or for one user (JabRef writes `<username>-<hostname>`) |
 | `fileDirectoryLatex` | files | Linked-file search path used when compiling with `\bibliography` |
 | `keywordSeparator` | groups | JabRef's declared keyword separator for the file; comma or escaped semicolon is read before inferring `groups` memberships, unless `groups-separator` overrides it |
 | `groupsVersion` | groups | Version marker JabRef writes alongside `grouping` |
