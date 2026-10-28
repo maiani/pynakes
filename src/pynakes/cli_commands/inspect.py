@@ -102,11 +102,14 @@ def inspect(
     if json_output:
         entries = []
         for entry in lib.entries.values():
-            record = {"key": entry.key, "type": entry.type, "fields": dict(entry.fields)}
+            fields = dict(entry.fields)
+            record = {"key": entry.key, "type": entry.type, "fields": fields}
+            view_fields = fields
             if resolved:
-                record["resolved_fields"] = lib.resolved_fields(entry)
+                view_fields = lib.resolved_fields(entry)
+                record["resolved_fields"] = view_fields
             if display:
-                record["display"] = _display_view(record.get("resolved_fields", record["fields"]))
+                record["display"] = _display_view(view_fields)
             if store is not None:
                 record.update(
                     store.annotation_for(

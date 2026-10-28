@@ -302,6 +302,14 @@ def fields_encode(
     )
 
 
+#: Value conventions belong to normalize; these run hidden until 0.10.0:
+#: (old name, callback, the form that replaces it).
+_DEPRECATED: tuple[tuple[str, Callable[..., None], str], ...] = (
+    ("encode", fields_encode, "normalize --encoding latex|unicode --encoding-field FIELD"),
+    ("protect-title", fields_protect_title, "normalize --only titles --title-protection on"),
+)
+
+
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
     app.command("set")(_safe(fields_set))
@@ -309,15 +317,7 @@ def register(app: typer.Typer) -> None:
     app.command("move")(_safe(fields_move))
     app.command("append")(_safe(fields_append))
     app.command("clear")(_safe(fields_clear))
-    # Value conventions belong to normalize; these run hidden until 0.10.0.
-    for name, fn, new in (
-        ("encode", fields_encode, "normalize --encoding latex|unicode --encoding-field FIELD"),
-        (
-            "protect-title",
-            fields_protect_title,
-            "normalize --only titles --title-protection on",
-        ),
-    ):
+    for name, fn, new in _DEPRECATED:
         alias = deprecated_alias(
             fn,
             old=f"fields {name}",

@@ -40,13 +40,17 @@ from __future__ import annotations
 import operator
 import re
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from difflib import SequenceMatcher
+from typing import TYPE_CHECKING
 
 from pynakes._calendar import month_name_to_int
 from pynakes._text_utils import _normalize_text, entry_year
 from pynakes.groups import entry_groups, library_groups_separator
 from pynakes.model import BibEntry, BibFile
+
+if TYPE_CHECKING:
+    from _typeshed import SupportsRichComparison
 
 __all__ = [
     "FUZZY_THRESHOLD",
@@ -76,7 +80,7 @@ _DATE_RE = re.compile(r"^(\d{4})(?:-(\d{1,2}))?(?:-(\d{1,2}))?$")
 _NUMBER_RE = re.compile(r"^-?\d+(?:\.\d+)?$")
 _YEAR_RE = re.compile(r"\d{4}")
 
-_ORDER_OPS: dict[str, Callable[[object, object], bool]] = {
+_ORDER_OPS: dict[str, Callable[[SupportsRichComparison, SupportsRichComparison], bool]] = {
     ">": operator.gt,
     ">=": operator.ge,
     "<": operator.lt,
@@ -277,6 +281,8 @@ class Comparison(Node):
     field: str
     op: str
     value: str | None = None
+    # Set by ``__post_init__`` for a ``matches`` predicate only.
+    _pattern: re.Pattern[str] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         """Precompile the pattern of a ``matches`` predicate."""
@@ -301,7 +307,7 @@ class Comparison(Node):
         if self.op == "contains":
             return needle.casefold() in value.casefold()
         if self.op == "matches":
-            return bool(self._pattern.search(value))  # type: ignore[attr-defined]
+            return bool(self._pattern.search(value))
         if self.op == "fuzzy":
             return fuzzy_score(value, needle) >= FUZZY_THRESHOLD
         if self.op in ("=", "=="):
@@ -644,9 +650,9 @@ class _Parser:
     def _in_set(self, field: str, *, negate: bool) -> Node:
         self._expect("[")
         values: list[str] = []
-        if self._peek() is not None and self._peek().kind != "]":  # type: ignore[union-attr]
+        if (token := self._peek()) is not None and token.kind != "]":
             values.append(self._value("a value"))
-            while self._peek() is not None and self._peek().kind == ",":  # type: ignore[union-attr]
+            while (token := self._peek()) is not None and token.kind == ",":
                 self.position += 1
                 values.append(self._value("a value"))
         self._expect("]")

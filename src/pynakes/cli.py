@@ -208,7 +208,7 @@ for _info in app.registered_groups:
 # Order so panels (and commands within them) render in taxonomy order. Leaf
 # commands sort before sub-groups within a shared panel, which reads naturally.
 app.registered_commands.sort(key=lambda info: _panel_sort_key(_command_name(info)))
-app.registered_groups.sort(key=lambda info: _panel_sort_key(info.name))
+app.registered_groups.sort(key=lambda info: _panel_sort_key(info.name or ""))
 
 # --- Command wiring ---------------------------------------------------------
 # Typer does not forward ``shell_complete`` from arguments, and the shared

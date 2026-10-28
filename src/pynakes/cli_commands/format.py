@@ -175,6 +175,7 @@ def _run_recursive(
             layout = _layout(coll.lib, overrides)
             coll.format(layout, bind_where_filter(coll, where, keys=keys))
             plan = coll.change_plan()
+            payload: dict[str, object]
             if check:
                 payload = _check_payload(str(path), coll, where, keys)
                 dirty += int(bool(payload["modified"]))
@@ -223,7 +224,9 @@ def _run_recursive(
         "file": str(files[0].parent) if files else ".",
         "dry_run": check or params.dry_run,
         "modified": bool(dirty if check else modified_count),
-        "modified_entries": sum(int(item.get("modified_entries", 0)) for item in results),
+        "modified_entries": sum(
+            count for item in results if isinstance(count := item.get("modified_entries", 0), int)
+        ),
         "warnings": [],
         "files": results,
         "summary": {
@@ -410,7 +413,7 @@ def format_bibliography(
     if check:
         payload = _check_payload(resolved, coll, where, selected_keys)
         payload["warnings"] = warnings
-        _emit(json_output, payload, [f"{resolved}: {payload['message'].lower()}"])
+        _emit(json_output, payload, [f"{resolved}: {str(payload['message']).lower()}"])
         if payload["modified"]:
             raise typer.Exit(code=1)
         return

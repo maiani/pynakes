@@ -20,35 +20,24 @@ exempts only the recorded rule families. The conditional `importlib_resources` f
 Python versions supply `importlib.resources`. Cross-platform ctypes names are
 handled by checking all platforms, rather than adding an exemption.
 
+Moving to ty 0.0.93 on 2026-10-28 added no diagnostics. Repairing annotations
+then shrank the baseline to 59 diagnostics in 12 modules. What remains is
+mostly CLI glue: `**details` envelopes passed to `_finish_mod`, Click
+subclasses typed against the click that typer vendors, and monkey-patched
+Typer hooks. The rest is the loosely typed source-layout segments and the
+injectable URL opener. None is an observed runtime failure.
+
 | Module | Outstanding diagnostics | Rule families |
 | --- | ---: | --- |
-| `_engine_helpers.py` | 8 | `invalid-argument-type`, `unresolved-attribute` |
-| `_integrity_published.py` | 2 | `invalid-argument-type`, `not-iterable` |
 | `bibtex_writer.py` | 10 | `invalid-argument-type`, `unresolved-attribute` |
-| `canonical.py` | 5 | `invalid-argument-type` |
-| `cli.py` | 3 | `invalid-argument-type`, `invalid-assignment` |
+| `cli.py` | 2 | `invalid-assignment` |
 | `cli_commands/dedupe.py` | 1 | `invalid-argument-type` |
-| `cli_commands/fetch.py` | 10 | `invalid-argument-type` |
-| `cli_commands/fields.py` | 1 | `call-non-callable` |
-| `cli_commands/format.py` | 3 | `invalid-argument-type`, `unresolved-attribute` |
 | `cli_commands/import_ref.py` | 2 | `invalid-argument-type` |
 | `cli_commands/init.py` | 2 | `invalid-argument-type` |
-| `cli_commands/inspect.py` | 1 | `invalid-argument-type` |
-| `cli_commands/integrity.py` | 7 | `invalid-argument-type` |
+| `cli_commands/integrity.py` | 4 | `invalid-argument-type` |
 | `cli_commands/keys.py` | 1 | `invalid-argument-type` |
 | `cli_commands/remove.py` | 2 | `invalid-argument-type` |
-| `cli_commands/search.py` | 1 | `unresolved-attribute` |
 | `cli_commands/setops.py` | 1 | `invalid-argument-type` |
-| `cli_commands/show.py` | 2 | `invalid-argument-type`, `unresolved-attribute` |
-| `cli_common.py` | 5 | `invalid-assignment`, `invalid-return-type`, `invalid-type-form` |
 | `cli_discovery.py` | 31 | `invalid-argument-type`, `invalid-assignment`, `invalid-attribute-access`, `invalid-method-override`, `unresolved-attribute` |
 | `cli_surface.py` | 1 | `invalid-assignment` |
-| `fetch.py` | 1 | `invalid-argument-type` |
-| `filestore.py` | 2 | `invalid-assignment`, `invalid-attribute-override` |
-| `formatters/_pages.py` | 1 | `unresolved-attribute` |
-| `interchange/_shared.py` | 1 | `unsupported-operator` |
-| `interchange/ris.py` | 4 | `invalid-argument-type`, `invalid-assignment` |
-| `model.py` | 3 | `invalid-argument-type`, `no-matching-overload` |
 | `providers/_http.py` | 2 | `invalid-context-manager` |
-| `providers/registry.py` | 1 | `unresolved-attribute` |
-| `query.py` | 4 | `invalid-assignment`, `unresolved-attribute` |

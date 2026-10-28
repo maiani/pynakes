@@ -4,6 +4,8 @@
 groups; ``assign`` and ``unassign`` file an entry under a group or take it out.
 """
 
+from collections.abc import Callable
+
 import typer
 
 from pynakes import group_tree as group_tree_ops
@@ -538,7 +540,7 @@ def groups_show(
 
 #: Forms deprecated in 0.9.0 and removed in 0.10.0: (old name, callback, new
 #: form, the action the old form keeps emitting). Hidden from ``--help``.
-_DEPRECATED = (
+_DEPRECATED: tuple[tuple[str, Callable[..., None], str, str], ...] = (
     ("tree", groups_tree, "groups list", "groups_tree"),
     ("list-entries", groups_show, "groups show", "groups_list_entries"),
     ("add-entry", groups_assign, "groups assign", "groups_add_entry"),

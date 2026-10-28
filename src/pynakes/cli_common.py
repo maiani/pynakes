@@ -9,7 +9,7 @@ from collections.abc import Callable, Iterable
 from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
-from typing import NoReturn, TypeVar
+from typing import Any, NoReturn, ParamSpec, TypeVar
 
 import click
 import typer
@@ -20,11 +20,12 @@ from pynakes.dedupe import DedupeConflictError
 from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography, ExternalModificationError
 from pynakes.io import SaveResult, save_text
-from pynakes.model import BibFile, QueryFilter
-from pynakes.query import And, InSet, parse_query
+from pynakes.model import BibFile
+from pynakes.query import And, InSet, Node, parse_query
 from pynakes.saved_queries import NoCitationSourcesError, compile_selector
 
-_F = TypeVar("_F", bound=Callable)
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
 
 # --- shared helpers --------------------------------------------------------
 
@@ -53,7 +54,7 @@ def is_auxiliary_bib_file(path: Path) -> bool:
     return _REVTEX_CONTROL_RE.search(head) is not None
 
 
-def bib_file_argument(help: str = BIB_FILE_HELP) -> typer.Argument:
+def bib_file_argument(help: str = BIB_FILE_HELP) -> Any:
     """Return the standard optional ``.bib`` positional argument."""
     return typer.Argument(None, help=help)
 
@@ -225,7 +226,9 @@ def deprecation_warning(old: str, new: str, *, removal: str, json_output: bool) 
     return {"type": "deprecated", "old": old, "new": new, "removal": removal, "message": message}
 
 
-def deprecated_alias(fn: _F, *, old: str, new: str, action: str, removal: str) -> _F:
+def deprecated_alias(
+    fn: Callable[_P, _R], *, old: str, new: str, action: str, removal: str
+) -> Callable[_P, _R]:
     """Return ``fn`` under its deprecated name ``old``, for one more minor release.
 
     The alias runs the same command with the same options. It reports the
@@ -235,7 +238,7 @@ def deprecated_alias(fn: _F, *, old: str, new: str, action: str, removal: str) -
     """
 
     @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
         json_output = bool(kwargs.get("json_output", False))
         warning = deprecation_warning(old, new, removal=removal, json_output=json_output)
         token = _DEPRECATED_ALIAS.set((action, warning))
@@ -244,7 +247,7 @@ def deprecated_alias(fn: _F, *, old: str, new: str, action: str, removal: str) -
         finally:
             _DEPRECATED_ALIAS.reset(token)
 
-    return wrapper  # type: ignore[return-value]
+    return wrapper
 
 
 def _entries(count: int) -> str:
@@ -270,7 +273,7 @@ KEY_HELP = (
 )
 
 
-def where_option(help: str = WHERE_HELP) -> typer.Option:
+def where_option(help: str = WHERE_HELP) -> Any:
     """Return the shared ``--where`` entry-selector option.
 
     Every entry-addressable command takes the same option with the same grammar
@@ -280,7 +283,7 @@ def where_option(help: str = WHERE_HELP) -> typer.Option:
     return typer.Option(None, "--where", help=help)
 
 
-def key_option(help: str = KEY_HELP) -> typer.Option:
+def key_option(help: str = KEY_HELP) -> Any:
     """Return the shared ``--key`` citation-key selector option.
 
     Selecting one known reference is the common case, and spelling it
@@ -303,7 +306,7 @@ def build_where_filter(
     *,
     keys: list[str] | None = None,
     cited_keys: Iterable[str] | None = None,
-) -> QueryFilter:
+) -> Node | None:
     """Compile the ``--where`` / ``--key`` selectors, or ``None`` when both are unset.
 
     The two compose: ``--key`` contributes a ``key in [...]`` membership test
@@ -330,7 +333,7 @@ def bind_where_filter(
     *,
     keys: list[str] | None = None,
     warnings: list[dict] | None = None,
-) -> QueryFilter:
+) -> Node | None:
     """Compile ``--where`` / ``--key`` against the opened library.
 
     Unlike :func:`build_where_filter`, this resolves what only the library
@@ -350,7 +353,7 @@ def library_where_filter(
     keys: list[str] | None = None,
     base_dir: Path | None = None,
     warnings: list[dict] | None = None,
-) -> QueryFilter:
+) -> Node | None:
     """:func:`bind_where_filter` for a library that is not an opened file.
 
     ``base_dir`` is where the library's relative ``tex-sources`` resolve from.
@@ -490,7 +493,11 @@ _CLICK_ERRORS: tuple[type[BaseException], ...] = tuple(
         click.ClickException,
         click.exceptions.Abort,
         typer.Abort,
-        *(cls for cls in typer.BadParameter.__mro__ if cls.__name__ == "ClickException"),
+        *(
+            cls
+            for cls in typer.BadParameter.__mro__
+            if cls.__name__ == "ClickException" and issubclass(cls, BaseException)
+        ),
     }
 )
 
@@ -531,7 +538,7 @@ def _require_written(json_output: bool, result: SaveResult, out: str, **extra) -
         )
 
 
-def _emit_dedupe_conflict(json_output: bool, exc: DedupeConflictError) -> None:
+def _emit_dedupe_conflict(json_output: bool, exc: DedupeConflictError) -> NoReturn:
     """Report conflicting duplicate works as an exit-2 conflict with options."""
     _emit_conflict(
         json_output,
@@ -558,7 +565,7 @@ _EXTERNAL_MODIFICATION_OPTIONS = [
 ]
 
 
-def _safe(fn: _F) -> _F:
+def _safe(fn: Callable[_P, _R]) -> Callable[_P, _R]:
     """Turn every failure into a structured error instead of a traceback.
 
     Honors the agent contract: a missing/unreadable file, malformed BibTeX, or
@@ -569,7 +576,7 @@ def _safe(fn: _F) -> _F:
     """
 
     @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
         json_output = bool(kwargs.get("json_output", False))
         try:
             return fn(*args, **kwargs)

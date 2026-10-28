@@ -32,8 +32,11 @@ from typing import Protocol
 class EntryLike(Protocol):
     """Structural type for the entry shape this module reads (duck-typed)."""
 
-    type: str
-    fields: Mapping[str, str]
+    @property
+    def type(self) -> str: ...
+
+    @property
+    def fields(self) -> Mapping[str, str]: ...
 
 
 Lookup = Callable[[str], EntryLike | None]

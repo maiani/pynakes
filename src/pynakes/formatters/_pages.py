@@ -55,4 +55,6 @@ def page_prefix(value: str) -> str:
 
     ``"L7"`` returns ``"L"``; a value with no non-digit prefix returns ``""``.
     """
-    return _LEADING_NON_DIGIT.match(value).group(0)
+    match = _LEADING_NON_DIGIT.match(value)
+    assert match is not None  # ``^\D*`` matches every string, if only emptily
+    return match.group(0)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from types import MappingProxyType
+from types import MappingProxyType, ModuleType
 
 from pynakes.providers.metadata import (
     acl_anthology,
@@ -57,7 +57,7 @@ def _load_doi(
     return doi.parse_bibtex(text, identifier, dialect=dialect)
 
 
-def _client_loader(module: object, **fixed: object) -> MetadataLoader:
+def _client_loader(module: ModuleType, **fixed: object) -> MetadataLoader:
     """Adapt any client exposing ``fetch_metadata(identifier, dialect, fetcher, **fixed)``.
 
     ``fixed`` supplies extra keyword arguments a client's ``fetch_metadata``
@@ -69,9 +69,7 @@ def _client_loader(module: object, **fixed: object) -> MetadataLoader:
     def load(
         identifier: str, dialect: str, fetcher: RawMetadataFetcher | None
     ) -> ReferenceMetadata:
-        return module.fetch_metadata(  # type: ignore[attr-defined]
-            identifier, dialect=dialect, fetcher=fetcher, **fixed
-        )
+        return module.fetch_metadata(identifier, dialect=dialect, fetcher=fetcher, **fixed)
 
     return load
 

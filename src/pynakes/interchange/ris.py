@@ -130,7 +130,7 @@ def export_ris(lib: BibFile) -> str:
 def _parse_ris_records(text: str) -> list[list[tuple[str, str]]]:
     """Split raw RIS text into a list of tag-value records."""
     records: list[list[tuple[str, str]]] = []
-    record: list[list[tuple[str, str]]] = []
+    record: list[tuple[str, str]] = []
     for raw in text.splitlines():
         line = raw.rstrip("\r")
         if len(line) >= 6 and line[2:6] == "  - ":

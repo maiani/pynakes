@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Literal
 from urllib.parse import quote
 
 from pynakes._fetch_attempts import (
@@ -33,6 +34,9 @@ from pynakes._fetch_attempts import (
 ARXIV_DOI_REASON = "the DOI is arXiv's own (10.48550/arXiv.*), which names the preprint"
 
 
+FetchAccess = Literal["open", "institutional"]
+
+
 @dataclass
 class PublishedCandidates:
     """The URLs to request for one DOI, and the lookups made to find them.
@@ -43,7 +47,7 @@ class PublishedCandidates:
     ``refusal`` is the reason an access refusal gave, when one did.
     """
 
-    urls: list[tuple[str, str]] = field(default_factory=list)
+    urls: list[tuple[str, FetchAccess]] = field(default_factory=list)
     attempts: list[dict] = field(default_factory=list)
     errors: list[Exception] = field(default_factory=list)
     refusal: str | None = None

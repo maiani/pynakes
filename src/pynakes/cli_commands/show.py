@@ -134,6 +134,7 @@ def show(
         )
         return
 
+    assert key is not None  # no --key/--where: the guard above required a key
     entry = unique_entry(coll, key, json_output, action="ref_show")
     if selection is not None or parts or max_chars is not None:
         _show_bounded_entry(
@@ -215,7 +216,8 @@ def _show_bounded_entry(
     truncated = record.get("truncated")
     truncated = truncated if isinstance(truncated, dict) else {}
     typer.echo(f"@{entry.type}{{{entry.key}}}")
-    for name, value in (record.get("fields") or {}).items():
+    fields = record.get("fields")
+    for name, value in (fields if isinstance(fields, dict) else {}).items():
         cut = "…" if f"fields.{name}" in truncated else ""
         typer.echo(f"  {name} = {'(none)' if value is None else value}{cut}")
     for name, value in included_lines(record):

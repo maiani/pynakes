@@ -12,7 +12,6 @@ import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
 
 from pynakes._fetch_attempts import (
     DiagnosedFetchError,
@@ -25,7 +24,7 @@ from pynakes._fetch_attempts import (
     redact_url,
     status_from_message,
 )
-from pynakes._fetch_published import ARXIV_DOI_REASON, resolve_candidates
+from pynakes._fetch_published import ARXIV_DOI_REASON, FetchAccess, resolve_candidates
 from pynakes._fetch_source import (
     MAX_SOURCE_BYTES,
     MAX_SOURCE_MEMBERS,
@@ -49,7 +48,6 @@ from pynakes.providers.repositories import arxiv
 FetchArxivBytes = Callable[[str], bytes]
 FetchPublishedPdfUrl = Callable[[str], str | None]
 UrlPdfValidator = Callable[[str], bool]
-FetchAccess = Literal["open", "institutional"]
 
 __all__ = [
     "MAX_SOURCE_BYTES",

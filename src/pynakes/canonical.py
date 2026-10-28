@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal, cast
+from typing import Literal, TypeVar
 
 from pynakes._canonical_order import _FIELD_ORDER
 from pynakes._canonical_wrap import _render_wrapped_entry
@@ -59,11 +59,13 @@ BlockOrder = Literal["preserve", "canonical"]
 EntryTypeCase = Literal["lower", "preserve"]
 WrapValues = Literal["off", "stable", "canonical"]
 
-ALIGNMENTS = ("compact", "equals")
-FIELD_ORDERS = ("preferred", "preserve", "alphabetical")
-BLOCK_ORDERS = ("preserve", "canonical")
-ENTRY_TYPE_CASES = ("lower", "preserve")
-WRAP_VALUE_MODES = ("off", "stable", "canonical")
+ALIGNMENTS: tuple[Alignment, ...] = ("compact", "equals")
+FIELD_ORDERS: tuple[FieldOrder, ...] = ("preferred", "preserve", "alphabetical")
+BLOCK_ORDERS: tuple[BlockOrder, ...] = ("preserve", "canonical")
+ENTRY_TYPE_CASES: tuple[EntryTypeCase, ...] = ("lower", "preserve")
+WRAP_VALUE_MODES: tuple[WrapValues, ...] = ("off", "stable", "canonical")
+
+_Choice = TypeVar("_Choice", bound=str)
 
 # ---------------------------------------------------------------------------
 # Layout configuration
@@ -141,13 +143,15 @@ def validate_format_input(lib: BibFile) -> list:
     return issues
 
 
-def _metadata_choice(lib: BibFile, key: str, default: str, choices: tuple[str, ...]) -> str:
+def _metadata_choice(
+    lib: BibFile, key: str, default: _Choice, choices: tuple[_Choice, ...]
+) -> _Choice:
     value = metadata_value(lib, key)
     if value is None:
         return default
     normalized = value.strip().lower()
     _validate_choice(key, normalized, choices)
-    return normalized
+    return next(choice for choice in choices if choice == normalized)
 
 
 def resolve_entry_type_case(lib: BibFile) -> EntryTypeCase:
@@ -157,10 +161,7 @@ def resolve_entry_type_case(lib: BibFile) -> EntryTypeCase:
     ``lower``, and ``lint`` reports a type exactly when ``format`` would recase
     it. Raises ``ValueError`` on a value outside :data:`ENTRY_TYPE_CASES`.
     """
-    return cast(
-        EntryTypeCase,
-        _metadata_choice(lib, "format-entry-type-case", "lower", ENTRY_TYPE_CASES),
-    )
+    return _metadata_choice(lib, "format-entry-type-case", "lower", ENTRY_TYPE_CASES)
 
 
 def layout_from_metadata(

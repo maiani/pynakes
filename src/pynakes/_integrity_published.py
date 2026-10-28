@@ -18,6 +18,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Collection
 from pathlib import Path
+from typing import Literal
 
 from pynakes._identifiers import is_arxiv_doi, normalize_arxiv, normalize_doi
 from pynakes._integrity_common import (
@@ -193,7 +194,11 @@ def check_published(
 
     # kind in {"noop", "done", "backfill", "arxiv"}. "done" entries were
     # already fully resolved (no network involved) during this first pass.
-    plan: list[tuple[str, object]] = []
+    plan: list[
+        tuple[Literal["noop", "done"], None]
+        | tuple[Literal["backfill"], str]
+        | tuple[Literal["arxiv"], tuple[str, str]]
+    ] = []
     backfill_positions: list[int] = []
     backfill_jobs: list[
         tuple[
@@ -281,18 +286,16 @@ def check_published(
     for index, entry in enumerate(entries, start=1):
         _emit_progress(progress, EntryProgressEvent(entry.key, index, entry_total))
         pos = index - 1
-        kind, data = plan[pos]
-        if kind in ("noop", "done"):
-            continue
-        if kind == "backfill":
+        step = plan[pos]
+        if step[0] == "backfill":
             _finish_doi_to_arxiv_backfill(
-                entry, data, backfill_by_pos[pos], report, apply=apply, dialect=dialect
+                entry, step[1], backfill_by_pos[pos], report, apply=apply, dialect=dialect
             )
-            continue
-        source, identifier = data
-        _finish_arxiv_check(
-            entry, source, identifier, arxiv_by_pos[pos], report, apply=apply, dialect=dialect
-        )
+        elif step[0] == "arxiv":
+            source, identifier = step[1]
+            _finish_arxiv_check(
+                entry, source, identifier, arxiv_by_pos[pos], report, apply=apply, dialect=dialect
+            )
     return report
 
 

@@ -600,7 +600,9 @@ class FileStore(PinaxManifest):
             removed.append(str(paths.preprint_source.relative_to(self.root)))
         if self.manifest_path.exists():
             manifest = self.read_manifest()
-            files: dict = manifest.get("files", {})
+            files = manifest["files"]
+            if not isinstance(files, dict):
+                raise TypeError("Pinax manifest 'files' must be a dict")
             if key in files:
                 del files[key]
                 manifest["files"] = files

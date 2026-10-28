@@ -149,7 +149,7 @@ def _common_entry_to_format(entry: BibEntry, spec: _EntryFormatSpec) -> list[str
     """Serialize *entry* to a list of tagged lines using *spec*."""
     fields = entry.fields
     lines = [spec.type_fmt % spec.type_map.get(entry.type.lower(), spec.default_type)]
-    if spec.export_key and entry.key.strip():
+    if spec.export_key and spec.key_fmt is not None and entry.key.strip():
         lines.append(spec.key_fmt % entry.key)
     for person in split_name_list(fields.get("author", "")):
         lines.append(spec.author_fmt % person_to_bibtex(split_person(person)))

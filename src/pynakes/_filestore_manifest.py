@@ -42,7 +42,9 @@ class PinaxManifest:
     """
 
     if TYPE_CHECKING:
-        root: Path
+
+        @property
+        def root(self) -> Path: ...
 
         def _require_real_bookkeeping(self) -> None: ...
         def _atomic_write(self, path: Path, data: bytes) -> None: ...

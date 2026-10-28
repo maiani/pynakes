@@ -3,10 +3,14 @@
 import re
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from pynakes._calendar import MONTH_ABBR_TO_NAME as COMMON_STRINGS
 from pynakes._text_utils import iter_toplevel_splits, strip_meta_terminator
 from pynakes.inheritance import Lookup, resolve_entry_fields
+
+if TYPE_CHECKING:
+    from _typeshed import SupportsRichComparison
 
 # A bare BibTeX string reference: an identifier with no surrounding braces or
 # quotes that may resolve to a @string definition.
@@ -403,7 +407,9 @@ class EntryStore:
         self._entries.remove(entry)
         self._index = None
 
-    def reorder(self, key: Callable[[BibEntry], object], *, reverse: bool = False) -> None:
+    def reorder(
+        self, key: "Callable[[BibEntry], SupportsRichComparison]", *, reverse: bool = False
+    ) -> None:
         """Stably reorder entries in place by ``key`` (duplicates preserved).
 
         A thin wrapper over ``list.sort`` so callers reorder the store without
