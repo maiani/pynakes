@@ -87,6 +87,30 @@ def _selector_hint(exc: click.UsageError) -> str | None:
     return None
 
 
+#: Options removed in 0.9.0, by command, with what does their job now.
+_REMOVED_OPTIONS: dict[tuple[str, str], str] = {
+    ("tex scan", "--out"): "removed in 0.9.0; export the cited entries with "
+    "combine FILE --where used --out OUT, or a public copy with scrub FILE --where used",
+    ("tex scan", "--group"): "removed in 0.9.0; use fields append FILE groups NAME --where used",
+    (
+        "tex scan",
+        "--keyword",
+    ): "removed in 0.9.0; use fields append FILE keywords WORD --where used",
+    ("format", "--entry-order"): "removed in 0.9.0; sort with normalize --sort-by",
+    ("search", "--in-field"): "removed in 0.9.0; use --in and --select",
+}
+
+
+def _removed_option_hint(exc: click.UsageError) -> str | None:
+    """Return what replaced an option this command no longer has, if it had one."""
+    option = getattr(exc, "option_name", None)
+    ctx = getattr(exc, "ctx", None)
+    if option is None or ctx is None:
+        return None
+    path = " ".join(ctx.command_path.split()[1:])
+    return _REMOVED_OPTIONS.get((path, option))
+
+
 def _annotate_usage_error(exc: click.UsageError) -> None:
     """Append selector advice to a usage error in place, when any applies.
 
@@ -94,7 +118,11 @@ def _annotate_usage_error(exc: click.UsageError) -> None:
     group — Click's own usage text for a human, and the JSON envelope — carry
     the same advice without either having to know about the other.
     """
-    hint = _selector_hint(exc)
+    removed = _removed_option_hint(exc)
+    if removed and getattr(exc, "possibilities", None):
+        # A near-miss suggestion beside the replacement is noise.
+        exc.possibilities = []  # type: ignore[attr-defined]
+    hint = removed or _selector_hint(exc)
     if hint and hint not in str(exc.message):
         exc.message = f"{exc.message} ({hint})"
 

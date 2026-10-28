@@ -213,3 +213,15 @@ def test_help_is_plain_through_a_pipe_and_maps_jobs_to_commands() -> None:
     assert "╭" not in output and "│" not in output
     assert "Common jobs" in output and "ref show FILE --where EXPR" in output
     assert "[cyan]" not in output
+
+
+def test_an_option_the_command_lacks_is_reported_as_such_with_its_replacement(
+    tmp_path: Path,
+) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@book{Newton1687, title = {Principia}}\n", encoding="utf-8")
+    result = runner.invoke(app, ["tex", "scan", str(bib), "--out", "cited.bib", "--json"])
+    payload = json.loads(result.output)
+    assert result.exit_code == 1
+    assert payload["message"].startswith("No such option: --out (removed in 0.9.0;")
+    assert "combine FILE --where used --out OUT" in payload["message"]

@@ -83,6 +83,21 @@ def _takes_value(param: click.Parameter) -> bool:
     return not (getattr(param, "is_flag", False) or getattr(param, "count", False))
 
 
+def _has_unknown_option(command: click.Command, tokens: list[str]) -> bool:
+    """Whether ``tokens`` name an option ``command`` does not have.
+
+    Click reports it as ``No such option``; guessing at the positionals first
+    would take the unknown option's value for an operand and blame that.
+    """
+    options = _option_table(command)
+    for token in tokens:
+        if token == "--":
+            return False
+        if token.startswith("-") and token != "-" and token.partition("=")[0] not in options:
+            return token not in {"--help", "-h"}
+    return False
+
+
 def _positional_indices(command: click.Command, tokens: list[str]) -> list[int]:
     """Return the indices of the positional tokens, skipping options and their values."""
     options = _option_table(command)
@@ -223,6 +238,8 @@ def place_library(
         return tokens
     operands = arguments[1:]
     tokens, file_values = _extract_file_option(tokens, command)
+    if _has_unknown_option(command, tokens):
+        return [*file_values[:1], *tokens]
     indices = _positional_indices(command, tokens)
     positional = [tokens[index] for index in indices]
 

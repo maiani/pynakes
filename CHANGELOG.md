@@ -175,6 +175,10 @@ The forms deprecated in 0.8 are removed:
 
 ### Fixed
 
+- An option a command does not have is reported as `No such option`, where the
+  positional check used to take its value for a misplaced bibliography
+  (`tex scan refs.bib --out cited.bib` blamed `cited.bib`). For the options
+  removed in 0.9.0 the message also names what replaced them.
 - Title protection matches a protected term inside a hyphenated compound:
   `Mach-Zehnder` with the terms `Mach` and `Zehnder` becomes
   `{Mach}-{Zehnder}`, and `two-Cooper-pair` with `Cooper` becomes
