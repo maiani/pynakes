@@ -89,3 +89,19 @@ def test_excerpt_handles_absent_values_and_rejects_a_negative_limit() -> None:
     assert abstract_excerpt("   ") == ""
     with pytest.raises(ValueError):
         abstract_excerpt("text", limit=-1)
+
+
+def test_summary_tells_apart_volumes_of_a_book_but_not_article_volumes() -> None:
+    book = _entry(
+        "@book{Euler1748b,\n  author = {Leonhard Euler},\n"
+        "  title = {Introductio in analysin infinitorum},\n  volume = {2},\n"
+        "  edition = {1},\n  publisher = {Bousquet},\n  year = {1748}\n}\n"
+    )
+    assert list(entry_summary(book)) == [
+        "title",
+        "author",
+        "year",
+        "publisher",
+        "volume",
+        "edition",
+    ]

@@ -225,7 +225,8 @@ fuzzy, its score, and the matching excerpt — enough to decide without reading
 each entry. Add `--abstract` when the excerpt is not enough to separate
 the candidates, then summarize the survivors with one
 `ref show --key k1,k2,… --abstract --json` call: each entry reports its
-`entry_type` and a `summary` of title, creator, date, venue, and identifiers,
+`entry_type` and a `summary` of title, creator, date, venue, volume and
+edition outside journals, and identifiers,
 with `abstract: null` where none is stored. Read a chosen entry in full with a
 single-key `ref show <key> --json`.
 

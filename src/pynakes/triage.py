@@ -32,6 +32,12 @@ VENUE_FIELDS = (
     "howpublished",
 )
 
+#: Fields that tell apart entries for one work, all included when present on an
+#: entry without a journal: two volumes or two editions of a book otherwise
+#: share every other summary field. An article's volume locates it in its
+#: journal instead, and is left out to keep the summary short.
+PART_FIELDS = ("volume", "edition")
+
 #: Identifier fields, all of which are included when present, because each one
 #: is a different way to resolve the same work.
 IDENTIFIER_FIELDS = ("doi", "eprint", "isbn", "url")
@@ -63,7 +69,8 @@ def entry_summary(
 
     The summary holds the title, the first present of
     ``author``/``editor``, the first present of ``year``/``date``, the first
-    present :data:`VENUE_FIELDS` entry, and every present
+    present :data:`VENUE_FIELDS` entry, every present :data:`PART_FIELDS`
+    entry unless the venue is a journal, and every present
     :data:`IDENTIFIER_FIELDS` entry, in that order. Fields the entry does not
     carry are omitted, and values are returned verbatim.
 
@@ -86,7 +93,8 @@ def entry_summary(
         if found is not None:
             summary[found[0]] = found[1]
 
-    for name in IDENTIFIER_FIELDS:
+    in_journal = "journal" in summary or "journaltitle" in summary
+    for name in (*(() if in_journal else PART_FIELDS), *IDENTIFIER_FIELDS):
         value = lookup.get(name)
         if value and value.strip():
             summary[name] = value
