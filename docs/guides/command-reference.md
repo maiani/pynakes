@@ -1061,23 +1061,6 @@ Patch fields or type on one uniquely identified reference.
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
-## ref find
-
-**Stability: stable**
-
-Find the real records matching a reference written out in prose.
-
-`pynakes ref find TEXT [OPTIONS]`
-
-| Parameter | Type | Required | Default | Choices | Description |
-| --- | --- | --- | --- | --- | --- |
-| `TEXT` | string | yes | — | — | A reference written out in prose: author, title, venue, year, in any order |
-| `--limit` | integer | no | 5 | — | Maximum candidates to return |
-| `--online` | boolean | no | false | — | Deprecated and ignored: running ref find is the consent to query the index |
-| `--cache-file` | string | no | null | — | Keep provider responses in a reusable cache file at this path (safe to delete or .gitignore). Omit it and nothing is written to disk: responses are reused for this run only |
-| `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
-
 ## ref import
 
 **Stability: stable**
@@ -1101,6 +1084,22 @@ Import one or more references from supported identifiers or URLs.
 | `--cache-file` | string | no | null | — | Keep provider responses in a reusable cache file at this path (safe to delete or .gitignore). Omit it and nothing is written to disk: responses are reused for this run only |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## ref lookup
+
+**Stability: stable**
+
+Look up the real records matching a reference written out in prose.
+
+`pynakes ref lookup TEXT [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `TEXT` | string | yes | — | — | A reference written out in prose: author, title, venue, year, in any order |
+| `--limit` | integer | no | 5 | — | Maximum candidates to return |
+| `--cache-file` | string | no | null | — | Keep provider responses in a reusable cache file at this path (safe to delete or .gitignore). Omit it and nothing is written to disk: responses are reused for this run only |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## ref remove

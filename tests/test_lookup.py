@@ -112,8 +112,8 @@ def test_find_reference_rejects_empty_text() -> None:
         find_reference("   ")
 
 
-def test_cli_goes_online_by_being_run_and_deprecates_online(monkeypatch) -> None:
-    """Like ref import and asset fetch, the command is the consent; --online only warns."""
+def test_ref_find_still_runs_hidden_and_points_to_ref_lookup(monkeypatch) -> None:
+    """The old name keeps its action; its ignored --online flag adds its own warning."""
     monkeypatch.setattr(
         lookup_ops.crossref, "search_works", lambda query, rows=5, cache_file=None: []
     )
@@ -122,11 +122,14 @@ def test_cli_goes_online_by_being_run_and_deprecates_online(monkeypatch) -> None
     flagged = runner.invoke(app, ["ref", "find", "some reference", "--online", "--json"])
 
     assert plain.exit_code == 0, plain.output
-    assert json.loads(plain.output)["warnings"] == []
+    data = json.loads(plain.output)
+    assert data["action"] == "ref_find"
+    assert [(w["old"], w["new"]) for w in data["warnings"]] == [("ref find", "ref lookup")]
     assert flagged.exit_code == 0, flagged.output
-    (warning,) = json.loads(flagged.output)["warnings"]
-    assert warning["type"] == "deprecated"
-    assert warning["old"] == "ref find --online"
+    olds = [w["old"] for w in json.loads(flagged.output)["warnings"]]
+    assert olds == ["ref find --online", "ref find"]
+    assert "find" not in runner.invoke(app, ["ref", "--help"]).output.split("Commands")[1]
+    assert "--online" not in runner.invoke(app, ["ref", "lookup", "--help"]).output
 
 
 def test_cli_reports_candidates_as_json(monkeypatch) -> None:
@@ -136,12 +139,12 @@ def test_cli_reports_candidates_as_json(monkeypatch) -> None:
         lambda query, rows=5, cache_file=None: [work(score=95.0)],
     )
 
-    result = runner.invoke(app, ["ref", "find", "Analytical Engines", "--json"])
+    result = runner.invoke(app, ["ref", "lookup", "Analytical Engines", "--json"])
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["status"] == "success"
-    assert data["action"] == "ref_find"
+    assert data["action"] == "ref_lookup"
     assert data["count"] == 1
     assert data["strong_count"] == 1
     assert data["candidates"][0]["doi"] == "10.5555/engines"
@@ -153,7 +156,7 @@ def test_cli_says_an_empty_result_is_evidence_not_proof(monkeypatch) -> None:
         lookup_ops.crossref, "search_works", lambda query, rows=5, cache_file=None: []
     )
 
-    result = runner.invoke(app, ["ref", "find", "Invented Work"])
+    result = runner.invoke(app, ["ref", "lookup", "Invented Work"])
 
     assert result.exit_code == 0, result.output
     assert "not proof" in result.output
@@ -166,7 +169,7 @@ def test_cli_warns_when_nothing_plainly_matches(monkeypatch) -> None:
         lambda query, rows=5, cache_file=None: [work(title="Something Adjacent", score=20.0)],
     )
 
-    result = runner.invoke(app, ["ref", "find", "Recursive Gradient Sharpening"])
+    result = runner.invoke(app, ["ref", "lookup", "Recursive Gradient Sharpening"])
 
     assert result.exit_code == 0, result.output
     assert "No candidate plainly matches" in result.output
@@ -178,7 +181,7 @@ def test_cli_reports_a_provider_failure_without_a_traceback(monkeypatch) -> None
 
     monkeypatch.setattr(lookup_ops.crossref, "search_works", boom)
 
-    result = runner.invoke(app, ["ref", "find", "anything", "--json"])
+    result = runner.invoke(app, ["ref", "lookup", "anything", "--json"])
 
     assert result.exit_code == 1
     assert json.loads(result.output)["error"] == "ProviderUnavailable"

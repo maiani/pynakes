@@ -106,7 +106,7 @@ _NETWORK_ACCESS = {
     "a command with an offline mode leaves it only with --online.",
     "by_running": [
         "ref import",
-        "ref find",
+        "ref lookup",
         "asset fetch",
         "ref add --fetch",
         "ref import --fetch",
@@ -613,9 +613,9 @@ def get_capabilities() -> dict:
             "init": "Create a new .bib library, optionally seeded with a metadata profile (--pinax for pinax mode)",
             "inspect": "Inspect a .bib file structure",
             "lint": "Validate entries and report issues",
-            "ref": "Create, show, edit, compare, find, import, and remove individual "
+            "ref": "Create, show, edit, compare, look up, import, and remove individual "
             "references, and set per-entry directives "
-            "(add, show, edit, directive, compare, find, import, remove)",
+            "(add, show, edit, directive, compare, lookup, import, remove)",
             "groups": "Manage entry groups and group hierarchy "
             "(list, show, add, remove, rename, update, assign, unassign)",
             "keys": "Generate, rename, repair citation keys, and look up "

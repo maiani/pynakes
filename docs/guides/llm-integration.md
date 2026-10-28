@@ -15,7 +15,7 @@ contract. For command-by-command tutorials, see the [usage guide](usage.md).
 ## Automation behavior
 
 - **Explicit network access.** A command whose purpose is a network request
-  goes online by being run: `ref import`, `ref find`, `asset fetch`, and
+  goes online by being run: `ref import`, `ref lookup`, `asset fetch`, and
   `--fetch` on `ref add` / `ref import`. A command with an offline mode leaves
   it only with `--online`: `verify`, `enrich`, `ref compare`. Nothing else
   makes a request; `capabilities` lists both groups under `network_access`.
@@ -187,7 +187,7 @@ the all-or-nothing guarantee rather than an exception to it.
   working-paper metadata resolution; give it several identifiers, or pipe them
   with `-`, when a whole list has to resolve. Write `IDENTIFIER=KEY` to choose
   an entry's citation key, so a batch needs no renaming afterwards.
-- Use `ref find "<reference text>"` when a reference arrives written
+- Use `ref lookup "<reference text>"` when a reference arrives written
   out rather than as an identifier, and you need to know whether it describes
   anything real before importing it. Read-only. It reports candidates with the
   index's own relevance score and marks those that plainly match; it never

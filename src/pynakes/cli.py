@@ -24,7 +24,6 @@ from pynakes.cli_commands import (
     edit,
     fetch,
     fields,
-    find,
     format,
     groups,
     import_ref,
@@ -33,6 +32,7 @@ from pynakes.cli_commands import (
     integrity,
     keys,
     lint,
+    lookup,
     metadata,
     normalize,
     query,
@@ -143,7 +143,7 @@ show.register(ref_app)
 edit.register(ref_app)
 directive.register(ref_app)
 compare.register(ref_app)
-find.register(ref_app)
+lookup.register(ref_app)
 remove.register(ref_app)
 schema.register(ref_app)
 

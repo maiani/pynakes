@@ -177,7 +177,7 @@ tests pass:
   round-trip fidelity.
 - Don't introduce time, randomness, or unstable ordering in core logic.
   Network access must remain explicit: a command whose purpose is a network
-  request (`ref import`, `ref find`, `asset fetch`, `ref ... --fetch`) goes
+  request (`ref import`, `ref lookup`, `asset fetch`, `ref ... --fetch`) goes
   online by being run; a command with an offline mode (`verify`, `enrich`,
   `ref compare`) leaves it only with `--online`. Everything else stays offline
   and performs no hidden network I/O.

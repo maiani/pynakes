@@ -10,7 +10,7 @@ requests. Files and bibliographies are not uploaded to an analytics service.
 | Invocation | Data sent | Recipients |
 | --- | --- | --- |
 | `ref import FILE IDENTIFIER...` | Supplied identifier or URL; a URL resolver may extract a DOI or another identifier before requesting metadata | The selected provider in [Import providers](import-providers.md), DOI resolver and redirected publisher where applicable |
-| `ref find REFERENCE` | The complete free-text reference, in Crossref's `query.bibliographic` URL parameter, plus result limit | `api.crossref.org` |
+| `ref lookup REFERENCE` | The complete free-text reference, in Crossref's `query.bibliographic` URL parameter, plus result limit | `api.crossref.org` |
 | `ref compare FILE KEY --online` | Selected entry's DOI or arXiv identifier | DOI resolver/publisher or arXiv |
 | `verify FILE --online` | Each selected entry's DOI or arXiv identifier used for comparison | DOI resolver/publisher and arXiv as applicable |
 | `enrich FILE --online` | Selected entries' DOI/arXiv identifiers; journal title selects the preferred provider locally | APS Harvest for recognized APS journals, DOI resolver/publisher as fallback, arXiv as applicable |
@@ -21,7 +21,7 @@ requests. Files and bibliographies are not uploaded to an analytics service.
 `--dry-run` prevents writes; it does **not** prevent network requests made to
 prepare a preview. One rule decides what authorizes a request. A command whose
 purpose is a network request is authorized by being run: `ref import`,
-`ref find`, `asset fetch`, and `--fetch` on add/import. A command with an
+`ref lookup`, `asset fetch`, and `--fetch` on add/import. A command with an
 offline mode leaves it only with `--online`: `ref compare`, `verify` and
 `enrich` contact no provider without it.
 

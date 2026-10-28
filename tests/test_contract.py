@@ -92,7 +92,7 @@ POSITIONALS: dict[str, tuple[tuple[str, bool, bool], ...]] = {
     "ref compare": (("file", False, False), ("key", True, False)),
     "ref directive": (("file", False, False), ("words", True, True)),
     "ref edit": (("file", False, False), ("key", True, False)),
-    "ref find": (("text", True, False),),
+    "ref lookup": (("text", True, False),),
     "ref import": (("file", False, False), ("identifiers", True, True)),
     "ref remove": (("file", False, False), ("citekeys", True, True)),
     "ref show": (("file", False, False), ("key", False, False)),
@@ -177,7 +177,7 @@ def test_every_writing_command_previews() -> None:
 # --- envelope schemas -------------------------------------------------------
 
 #: One offline invocation per command, and the envelope family it returns.
-#: ``ref find`` and ``ref import`` need the network; offline they return an
+#: ``ref lookup`` and ``ref import`` need the network; offline they return an
 #: error envelope, which is checked like any other.
 SAMPLES: dict[str, tuple[str, list[str]]] = {
     "analyze": ("read", ["analyze", "{bib}"]),
@@ -289,7 +289,7 @@ SAMPLES: dict[str, tuple[str, list[str]]] = {
         ["ref", "directive", "{bib}", "ignore", "missing_doi", "--key", "Brown2022", "--dry-run"],
     ),
     "ref edit": ("modify", ["ref", "edit", "{bib}", "Smith2020", "--field", "note=x", "--dry-run"]),
-    "ref find": ("error", ["ref", "find", "Newton, Principia, 1687"]),
+    "ref lookup": ("error", ["ref", "lookup", "Newton, Principia, 1687"]),
     "ref import": ("error", ["ref", "import", "{bib}", "not-an-identifier", "--dry-run"]),
     "ref remove": ("modify", ["ref", "remove", "{bib}", "White2024", "--dry-run"]),
     "ref show": ("read", ["ref", "show", "{bib}", "Smith2020"]),

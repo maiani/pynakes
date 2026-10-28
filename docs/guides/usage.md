@@ -588,9 +588,9 @@ finding is reported as `unused_entry_directive`, so a waiver does not outlive
 its reason unnoticed. Waived findings count toward the lint summary's
 `suppressed`.
 
-## find
+## lookup
 
-Find the real records matching a reference written out in prose.
+Look up the real records matching a reference written out in prose.
 
 ```
 3 candidate(s) from crossref:
@@ -608,9 +608,10 @@ can be checked: `ref import` either resolves it or does not. A reference written
 out as text carries no such claim, and this is how to ask whether one describes
 anything that exists. Read-only; import a candidate you accept by its DOI.
 
-Like `ref import` and `asset fetch`, `ref find` goes online by being run: it
-has no offline mode for `--online` to leave. The flag is deprecated, ignored,
-and removed in 0.10.0.
+Like `ref import` and `asset fetch`, `ref lookup` goes online by being run;
+`search` is its offline counterpart over the library itself. It was called
+`ref find` before 0.9.0; that name still runs, with a `deprecated` warning,
+until 0.10.0.
 `--limit` caps the candidates (5 by default), and `--cache-file` reuses answers
 across runs.
 
@@ -1335,7 +1336,7 @@ order.
 ### Caching provider responses
 
 Nothing is cached to disk unless you ask for it. Every command that can go
-online — `verify`, `enrich`, `ref compare`, `ref find`, `ref import`,
+online — `verify`, `enrich`, `ref compare`, `ref lookup`, `ref import`,
 `ref add --fetch`, `asset fetch` —
 accepts `--cache-file PATH`, and only that flag creates a cache. Without it, provider responses are not persisted. Modifying online commands
 can still write bibliography updates and downloaded materials.

@@ -40,11 +40,11 @@ DEPRECATIONS: list[dict] = [
     ),
     {
         "command": "ref find",
-        "old": "--online",
-        "new": "ref find",
+        "old": "ref find",
+        "new": "ref lookup",
         "removal": "0.10.0",
-        "note": "Commands that exist to make a network request go online by being run; "
-        "--online only lets a command with an offline mode leave it. ref find has none, "
-        "so the flag is ignored.",
+        "note": "search reads the library; ref lookup asks an outside index, and the "
+        "new name says so. ref find's --online flag was already ignored: a command "
+        "that exists to make a network request goes online by being run.",
     },
 ]

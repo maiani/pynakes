@@ -35,6 +35,10 @@ The forms deprecated in 0.8 are removed:
 
 ### Deprecated
 
+- `ref find` is now `ref lookup`, with the action `ref_lookup`: `search` reads
+  the library and `ref lookup` asks an outside index, and the two names read as
+  synonyms. `ref find` still runs, hidden, until 0.10.0 with a `deprecated`
+  warning and its `ref_find` action.
 - `ref find --online` is ignored and warns; it is removed in 0.10.0. One rule
   now decides network consent: a command whose purpose is a network request
   (`ref import`, `ref find`, `asset fetch`, `--fetch`) goes online by being
