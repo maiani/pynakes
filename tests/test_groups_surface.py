@@ -87,3 +87,19 @@ def test_deprecated_batch_operation_names_still_apply_and_warn(tmp_path: Path) -
         }
     ]
     assert data["modified_entries"] == 1
+
+
+def test_update_refuses_a_parent_that_would_make_a_cycle(tmp_path: Path) -> None:
+    library = _library(tmp_path)
+    assert (
+        runner.invoke(app, ["groups", "add", library, "Lenses", "--parent", "Optics"]).exit_code
+        == 0
+    )
+    before = Path(library).read_text(encoding="utf-8")
+    result = runner.invoke(
+        app, ["groups", "update", library, "Optics", "--parent", "Lenses", "--json"]
+    )
+    assert result.exit_code == 1
+    assert json.loads(result.output)["error"] == "InvalidInput"
+    assert "circular reference" in json.loads(result.output)["message"]
+    assert Path(library).read_text(encoding="utf-8") == before

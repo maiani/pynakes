@@ -498,7 +498,8 @@ def update_node(lib: BibFile, name: str, **kwargs) -> bool:
     ``expanded``, ``description``, ``group_type``, ``field``, ``expression``,
     ``case_sensitive``, ``separator``, ``search_flags``, ``entries``.
     Returns ``False`` when *name* is not found. Raises ``ValueError`` for a
-    text property with an unmatched brace, before anything changes.
+    text property with an unmatched brace, or a ``parent`` that is the node
+    itself or one of its descendants, before anything changes.
     """
     for key, value in kwargs.items():
         if isinstance(value, str):
@@ -509,6 +510,11 @@ def update_node(lib: BibFile, name: str, **kwargs) -> bool:
     node = _node_by_name(tree, name)
     if node is None:
         return False
+    parent = kwargs.get("parent")
+    if parent and parent.lower() in {n.lower() for n in _descendant_names(tree, node.name)}:
+        raise ValueError(
+            f"Moving group {name!r} under {parent!r} would create a circular reference"
+        )
     for key, value in kwargs.items():
         if hasattr(node, key):
             setattr(node, key, value)

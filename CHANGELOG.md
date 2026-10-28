@@ -118,6 +118,10 @@ The forms deprecated in 0.8 are removed:
 
 ### Fixed
 
+- `groups update --parent` (formerly `update-group --parent`) refuses a parent
+  that is the group itself or one of its descendants, as `move-group` did,
+  instead of writing a hierarchy with a cycle. It is an `InvalidInput` error and
+  nothing is written.
 - Editing a field that followed a braced value containing a `)`, such as
   `title = {Principia (third edition)}`, appended a second copy of the field
   instead of replacing the first, and each rerun added another. The field
