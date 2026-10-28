@@ -203,6 +203,12 @@ holds downloaded materials named by citation key:
 
 5. **Inspect instead of scanning.** `pynakes inspect --json {bibname}.bib`
    lists every entry and which of its materials exist.
+
+6. **Stop and ask when pynakes refuses.** A conflict (exit 2) means the
+   request was ambiguous or the file changed. After a `DuplicateCitationKey`
+   conflict, ask the user which candidate is meant before editing either. After
+   an `ExternalModification` conflict, preview again and ask for approval of the
+   new preview: an approval covers only the file as it was previewed.
 """
 
 

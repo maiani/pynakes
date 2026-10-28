@@ -149,6 +149,13 @@ The forms deprecated in 0.8 are removed:
 
 ### Changed
 
+- Conflicts say to stop and ask. The `DuplicateCitationKey` option
+  `select_one` now applies once the person has chosen a candidate, a batch
+  duplicate-key conflict offers `ask_which` first, and the
+  `ExternalModification` option `reload` asks for approval of the new preview
+  before applying it. The agent guide `init --agent-guide` writes gains the same
+  rule, which the blind evaluation of 0.9.0 found agents breaking. Option ids
+  are unchanged.
 - An entry's summary (`ref show --key`, duplicate-key candidates) includes
   `volume` and `edition` for entries outside a journal, so two volumes or
   editions of one book no longer look identical until each is read in full.

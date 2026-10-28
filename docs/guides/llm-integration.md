@@ -511,6 +511,14 @@ A conflict means nothing was written. A refused `--expect-sha256` is an
 passed) and `source_sha256` (what the file holds now); re-read the file and
 preview again rather than retrying with the new digest unreviewed.
 
+A conflict is the point to stop and ask the person you work for. After a
+`DuplicateCitationKey` conflict, ask which candidate is meant: each carries a
+`where` expression for acting on it once they have chosen, not a licence to
+choose. After an `ExternalModification` conflict, show the new preview and ask
+for approval again, even when its diff is identical: the earlier approval
+covered the earlier file. Blind evaluations of both cases are in
+`evals/agent/runs/`.
+
 Branch on `error`, not on message text. Discover the current code inventory
 from `capabilities.error_codes`.
 

@@ -560,7 +560,11 @@ def _emit_dedupe_conflict(json_output: bool, exc: DedupeConflictError) -> NoRetu
 
 
 _EXTERNAL_MODIFICATION_OPTIONS = [
-    {"id": "reload", "description": "Reload the file and retry the operation"},
+    {
+        "id": "reload",
+        "description": "Preview again against the file as it is now and ask for approval "
+        "of that preview before applying it: an approval covers only the state it was given for",
+    },
     {"id": "manual_review", "description": "Review the on-disk changes before retrying"},
 ]
 

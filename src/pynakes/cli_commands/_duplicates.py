@@ -22,8 +22,9 @@ DUPLICATE_KEY_OPTIONS = [
     },
     {
         "id": "select_one",
-        "description": "Act on one entry with a --where command (fields set, ref show, "
-        "ref directive, ...) using that candidate's where expression",
+        "description": "Once the person has chosen a candidate, act on that entry with a "
+        "--where command (fields set, ref show, ref directive, ...) using its where "
+        "expression; do not choose for them",
     },
     {
         "id": "repair_duplicates",

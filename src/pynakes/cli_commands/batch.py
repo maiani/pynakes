@@ -30,9 +30,13 @@ from pynakes.metadata import DuplicateMetadataError
 _CONFLICT_OPTIONS = {
     "DuplicateCitationKey": [
         {
+            "id": "ask_which",
+            "description": "Ask which entry is meant before revising the operation",
+        },
+        {
             "id": "repair_duplicates",
             "description": "Run keys repair first, then retry with the unique key",
-        }
+        },
     ],
     "CitationKeyConflict": [
         {"id": "choose_key", "description": "Revise the operation to use a different key"}
