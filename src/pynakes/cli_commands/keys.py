@@ -314,7 +314,7 @@ def keys_rename(
     sources: list[str] | None = typer.Argument(
         None,
         help="One or more .tex files or directories whose citations should be updated "
-        "(defaults to the library's 'tex-sources' metadata)",
+        "(defaults to the bibliography's 'tex-sources' metadata)",
     ),
     backup: bool = _BACKUP_OPTION,
     expect_sha256: str | None = _EXPECT_SHA256_OPTION,
@@ -441,7 +441,7 @@ def keys_usage(
     'tex-sources' metadata: it scans exactly the given directories or files,
     so a rename's blast radius can be checked over sources that were never
     registered with `tex add` — frozen snapshots, generated diffs, or any
-    other .tex the library does not track.
+    other .tex the bibliography does not track.
     """
     keys_ops.validate_key(key)
     matches, scanned = find_key_usages(key, sources)
@@ -472,11 +472,11 @@ def keys_pattern(
 ) -> None:
     """Show the stored citation-key pattern and the one existing keys follow.
 
-    Read-only. `configured` is the library's stored `key-pattern` (null when
+    Read-only. `configured` is the bibliography's stored `key-pattern` (null when
     none is stored, and generated keys then look like `Newton1687Philosophiae`).
     `inferred` is the common pattern most existing keys match, or null when no
     candidate matches more than half of them. Adopt it with
-    `metadata set FILE key-pattern PATTERN`, so new keys follow the library.
+    `metadata set FILE key-pattern PATTERN`, so new keys follow the bibliography.
     """
     from pynakes.metadata import library_key_pattern
 

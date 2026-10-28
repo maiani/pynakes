@@ -290,7 +290,7 @@ def format_bibliography(
     out: str | None = typer.Option(
         None,
         "--out",
-        help="Write the formatted library here instead of in place; - for stdout",
+        help="Write the formatted bibliography here instead of in place; - for stdout",
     ),
     force: bool = _FORCE_OPTION,
     recursive: bool = typer.Option(False, "--recursive", help="Format .bib files recursively"),

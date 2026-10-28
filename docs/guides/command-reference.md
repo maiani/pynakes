@@ -42,7 +42,7 @@ Describe a bibliography: what it holds and how complete its records are.
 | `--top` | integer | no | 10 | — | Length of the author and venue frequency lists and of the co-author top pairs and collaborators |
 | `--max-authors` | integer | no | null | — | Link only entries listing at most this many authors; 0 links every entry (default: the library's coauthors-max-authors setting, else 100) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## asset check
@@ -73,20 +73,20 @@ Download Pinax materials, optionally using existing institutional network access
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `TARGET` | string | no | — | — | Citation key to fetch (default: all entries with configured missing materials) |
-| `--material` | list[choice] | no | null | preprint, published, source, supplement, best-pdf | Material to fetch, repeatable; overrides the library's pinax-fetch-policy. best-pdf is the published PDF when open access, otherwise the preprint; supplement fetches one unambiguous supplementary PDF |
+| `--material` | list[choice] | no | null | preprint, published, source, supplement, best-pdf | Material to fetch, repeatable; overrides the bibliography's pinax-fetch-policy. best-pdf is the published PDF when open access, otherwise the preprint; supplement fetches one unambiguous supplementary PDF |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
 | `--dry-run` | boolean | no | false | — | Show what would be fetched without downloading |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--cache-file` | string | no | null | — | Keep provider responses in a reusable cache file at this path (safe to delete or .gitignore). Omit it and nothing is written to disk: responses are reused for this run only |
-| `--access` | choice | no | null | open, institutional | Publisher access context: open or institutional (uses existing network access); default: the library's pinax-fetch-access setting, else open |
-| `--discover, --no-discover` | boolean | no | null | — | When a preprint is needed and the entry has a DOI but no arXiv id, look one up (OpenAlex, then Semantic Scholar), check it against arXiv's record, and use and record a confirmed id (eprint, only when the entry has none); default: the library's pinax-discover-arxiv setting, else off |
+| `--access` | choice | no | null | open, institutional | Publisher access context: open or institutional (uses existing network access); default: the bibliography's pinax-fetch-access setting, else open |
+| `--discover, --no-discover` | boolean | no | null | — | When a preprint is needed and the entry has a DOI but no arXiv id, look one up (OpenAlex, then Semantic Scholar), check it against arXiv's record, and use and record a confirmed id (eprint, only when the entry has none); default: the bibliography's pinax-discover-arxiv setting, else off |
 | `--progress` | choice | no | "auto" | auto, jsonl, none | Progress while the run lasts: auto (a bar on a terminal, nothing with --json), jsonl (one JSON event per line on stderr, also with --json), or none |
 | `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing; 'used'/'unused' test the linked TeX sources and 'query NAME' runs a saved query. See `pynakes capabilities` for the full grammar. |
 | `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
 | `--strict` | boolean | no | false | — | Exit 1 when a requested material failed to download or was unavailable (materials already present pass) (for CI and pre-commit gating) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## asset repair
@@ -105,7 +105,7 @@ Reconcile the Pinax manifest with the material files that exist.
 | `--dry-run` | boolean | no | false | — | Report the repairs without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff of the manifest |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## batch
@@ -126,7 +126,7 @@ Apply a sequence of operations atomically (one preview, one commit).
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## capabilities
@@ -167,7 +167,7 @@ Map who has written with whom: co-author pairs, components, and name variants.
 | `--diff` | boolean | no | false | — | Show a unified diff of the --out file |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## combine
@@ -196,7 +196,7 @@ Combine several .bib files into one (optionally deduping by citation key).
 
 **Stability: stable**
 
-Convert a library between BibTeX/BibLaTeX dialects and interchange formats.
+Convert a bibliography between BibTeX/BibLaTeX dialects and interchange formats.
 
 `pynakes convert [FILE] [OPTIONS]`
 
@@ -210,11 +210,11 @@ Convert a library between BibTeX/BibLaTeX dialects and interchange formats.
 | `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
 | `--force` | boolean | no | false | — | Overwrite the output file if it already exists |
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
-| `--diff` | boolean | no | false | — | Show a unified diff of the library, or of the --out file |
+| `--diff` | boolean | no | false | — | Show a unified diff of the bibliography, or of the --out file |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## dedupe check
@@ -249,7 +249,7 @@ Conservatively merge duplicate works into their first entry.
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## enrich
@@ -264,7 +264,7 @@ Conservatively fill missing metadata (modifies the file).
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `--online` | boolean | no | false | — | Fetch DOI provider metadata; otherwise only local DOI URLs are used |
-| `--published, --no-published` | boolean | no | null | — | Also promote preprints to their published version, writing the published DOI/journal when one is available (requires --online); default: the library's enrich-published setting, else off |
+| `--published, --no-published` | boolean | no | null | — | Also promote preprints to their published version, writing the published DOI/journal when one is available (requires --online); default: the bibliography's enrich-published setting, else off |
 | `--only-field` | list[string] | no | null | — | Apply only updates to these fields (repeatable or comma-separated; 'type' for an entry-type change), e.g. --only-field eprint,archiveprefix after reviewing a --dry-run |
 | `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing; 'used'/'unused' test the linked TeX sources and 'query NAME' runs a saved query. See `pynakes capabilities` for the full grammar. |
 | `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
@@ -275,7 +275,7 @@ Conservatively fill missing metadata (modifies the file).
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## fields append
@@ -298,7 +298,7 @@ Append a value to a delimited field on matching references.
 | `--dry-run` | boolean | no | false | — |  |
 | `--diff` | boolean | no | false | — |  |
 | `--json` | boolean | no | false | — |  |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## fields clear
@@ -320,7 +320,7 @@ Remove a field from matching references.
 | `--dry-run` | boolean | no | false | — |  |
 | `--diff` | boolean | no | false | — |  |
 | `--json` | boolean | no | false | — |  |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## fields move
@@ -343,7 +343,7 @@ Move a field on matching references, without replacing the target.
 | `--dry-run` | boolean | no | false | — |  |
 | `--diff` | boolean | no | false | — |  |
 | `--json` | boolean | no | false | — |  |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## fields rename
@@ -366,7 +366,7 @@ Rename a field across matching references.
 | `--dry-run` | boolean | no | false | — |  |
 | `--diff` | boolean | no | false | — |  |
 | `--json` | boolean | no | false | — |  |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## fields set
@@ -389,7 +389,7 @@ Set or replace a field on matching references.
 | `--dry-run` | boolean | no | false | — |  |
 | `--diff` | boolean | no | false | — |  |
 | `--json` | boolean | no | false | — |  |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## format
@@ -415,7 +415,7 @@ Rewrite layout only; never change bibliographic values or conventions.
 | `--where` | string | no | null | — | Reformat only the entries matching this selector; the rest of the file stays byte-for-byte identical |
 | `--key` | list[string] | no | null | — | Reformat only these citation keys: comma-separated, repeatable. Narrows --where when both are given |
 | `--check` | boolean | no | false | — | Write nothing; exit 1 when layout changes are needed |
-| `--out` | string | no | null | — | Write the formatted library here instead of in place; - for stdout |
+| `--out` | string | no | null | — | Write the formatted bibliography here instead of in place; - for stdout |
 | `--force` | boolean | no | false | — | Overwrite the output file if it already exists |
 | `--recursive` | boolean | no | false | — | Format .bib files recursively |
 | `--dry-run` | boolean | no | false | — | Preview without writing |
@@ -423,7 +423,7 @@ Rewrite layout only; never change bibliographic values or conventions.
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups add
@@ -446,7 +446,7 @@ Add a group node to the hierarchy tree.
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups assign
@@ -462,13 +462,13 @@ Add an entry to a group.
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `KEY` | string | yes | — | — | Citation key to add |
 | `GROUP` | string | yes | — | — | Group name |
-| `--create` | boolean | no | false | — | Create the group if the library does not have it yet |
+| `--create` | boolean | no | false | — | Create the group if the bibliography does not have it yet |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups list
@@ -483,7 +483,7 @@ List the group hierarchy with each group's direct members.
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups remove
@@ -503,7 +503,7 @@ Remove a group node and all its descendants from the hierarchy.
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups rename
@@ -525,7 +525,7 @@ Rename a group node, updating parent references in child groups.
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups show
@@ -542,7 +542,7 @@ List entries belonging to a group (with descendant propagation by default).
 | `NAME` | string | yes | — | — | Group name |
 | `--exact` | boolean | no | false | — | Exact group match only (default: include descendants) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups unassign
@@ -563,7 +563,7 @@ Remove an entry from a group.
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## groups update
@@ -588,24 +588,24 @@ Update properties of a group node in the hierarchy.
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## init
 
 **Stability: stable**
 
-Create or initialize a .bib library.
+Create or initialize a bibliography.
 
 `pynakes init [FILE] [OPTIONS]`
 
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
-| `FILE` | string | no | — | — | Path to the .bib library (default: auto-detect single .bib in cwd with --pinax) |
-| `--dialect` | choice | no | null | biblatex, bibtex | Library dialect (sets the native 'dialect' key) |
+| `FILE` | string | no | — | — | Path to the bibliography (default: auto-detect single .bib in cwd with --pinax) |
+| `--dialect` | choice | no | null | biblatex, bibtex | Bibliography dialect (sets the native 'dialect' key) |
 | `--key-pattern` | string | no | null | — | Default citation-key pattern (sets the native 'key-pattern' key) |
-| `--jabref` | boolean | no | false | — | Also emit a JabRef metadata projection (databaseType, keypatterndefault) so the library opens JabRef-tracked, and keep JabRef's entry-type spelling (format-entry-type-case: preserve); by default a fresh library is pynakes-native only |
-| `--profile-from` | string | no | null | — | Copy the metadata profile from an existing .bib library |
+| `--jabref` | boolean | no | false | — | Also emit a JabRef metadata projection (databaseType, keypatterndefault) so the bibliography opens JabRef-tracked, and keep JabRef's entry-type spelling (format-entry-type-case: preserve); by default a fresh bibliography is pynakes-native only |
+| `--profile-from` | string | no | null | — | Copy the metadata profile from an existing bibliography |
 | `--pinax` | boolean | no | false | — | Seed pinax mode (pinax-files-dir, pinax-fetch-policy) |
 | `--agent-guide` | boolean | no | false | — | Write an AGENTS.md guide for LLM agents (requires --pinax) |
 | `--force` | boolean | no | false | — | Overwrite the target file if it already exists, and an AGENTS.md that pynakes did not write |
@@ -614,7 +614,7 @@ Create or initialize a .bib library.
 | `--dry-run` | boolean | no | false | — | Show what would be written without creating the file |
 | `--diff` | boolean | no | false | — | Show a unified diff of the new file |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## inspect
@@ -631,9 +631,9 @@ Inspect a .bib file structure.
 | `--resolved` | boolean | no | false | — | Include each entry's resolved fields (crossref/xdata inheritance applied) |
 | `--display` | boolean | no | false | — | Include each entry's LaTeX/brace-cleaned title fields and split, cleaned author/editor names |
 | `--insights` | boolean | no | false | — | Include group hierarchy, membership, lint, linked-TeX citations, and material state in JSON, all from the same snapshot |
-| `--origin` | string | no | null | — | Where the library is saved, when FILE is a copy of it (an editor's unsaved buffer): tex-sources, pinax-files-dir, and relative file links resolve from there |
+| `--origin` | string | no | null | — | Where the bibliography is saved, when FILE is a copy of it (an editor's unsaved buffer): tex-sources, pinax-files-dir, and relative file links resolve from there |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## keys generate
@@ -656,7 +656,7 @@ Derive citation keys from entry metadata and update linked TeX citations.
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## keys pattern
@@ -671,7 +671,7 @@ Show the stored citation-key pattern and the one existing keys follow.
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## keys rename
@@ -687,13 +687,13 @@ Rename one citation key to an explicit value and update TeX citations.
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `OLD` | string | yes | — | — | Existing citation key |
 | `NEW` | string | yes | — | — | New citation key |
-| `SOURCES` | list[string] | no | — | — | One or more .tex files or directories whose citations should be updated (defaults to the library's 'tex-sources' metadata) |
+| `SOURCES` | list[string] | no | — | — | One or more .tex files or directories whose citations should be updated (defaults to the bibliography's 'tex-sources' metadata) |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## keys repair
@@ -712,7 +712,7 @@ Rename duplicate citation keys so every key is unique.
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## keys usage
@@ -743,10 +743,10 @@ Validate entries and report issues (accepts multiple files for CI gating).
 | `FILES` | list[string] | yes | — | — | One or more .bib files |
 | `--strict` | boolean | no | false | — | Exit 1 when any finding is left after lint-ignore, --ignore, and ignore directives (for CI and pre-commit gating) |
 | `--category` | list[choice] | no | — | correctness, content, formatting, consistency, profile | Report only these categories (repeatable) |
-| `--ignore` | list[string] | no | — | — | Leave out a finding type (missing_doi) or a whole category (consistency); repeatable, and added to the library's lint-ignore setting |
+| `--ignore` | list[string] | no | — | — | Leave out a finding type (missing_doi) or a whole category (consistency); repeatable, and added to the bibliography's lint-ignore setting |
 | `--only` | list[string] | no | — | — | Report only these finding types (duplicate_key, missing_doi, ...): comma-separated, repeatable |
-| `--severity` | choice | no | null | error, warning, info | Report only findings at least this severe: error, warning, or info (all); default: the library's lint-severity setting, else info |
-| `--include-ignored` | boolean | no | false | — | Also report the findings the library's lint-ignore setting and ignore directives waive (they then count for --strict) |
+| `--severity` | choice | no | null | error, warning, info | Report only findings at least this severe: error, warning, or info (all); default: the bibliography's lint-severity setting, else info |
+| `--include-ignored` | boolean | no | false | — | Also report the findings the bibliography's lint-ignore setting and ignore directives waive (they then count for --strict) |
 | `--summary` | boolean | no | false | — | Report counts (by severity, category and type) without listing each finding; the omitted count is reported as issues_omitted |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
@@ -755,7 +755,7 @@ Validate entries and report issues (accepts multiple files for CI gating).
 
 **Stability: stable**
 
-Start maintaining a JabRef metadata projection for this library.
+Start maintaining a JabRef metadata projection for this bibliography.
 
 `pynakes metadata adopt-jabref [FILE] [OPTIONS]`
 
@@ -767,7 +767,7 @@ Start maintaining a JabRef metadata projection for this library.
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## metadata list
@@ -782,7 +782,7 @@ List top-level metadata blocks (both jabref-meta and pynakes-meta).
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## metadata remove
@@ -803,7 +803,7 @@ Remove one metadata block (jabref-meta or pynakes-meta).
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## metadata set
@@ -826,7 +826,7 @@ Set one top-level metadata block (jabref-meta or pynakes-meta).
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## normalize
@@ -855,7 +855,7 @@ Normalize entries: titles, authors, journals, DOIs, encoding, identifier case, o
 | `--invisible-characters` | choice | no | "metadata" | metadata, on, off | Remove characters that render as nothing (zero-width spaces, stray BOMs) |
 | `--encoding` | choice | no | "metadata" | metadata, latex, unicode, off | Convert accents and named characters in text fields to LaTeX or to Unicode (off unless set, here or in the normalize-encoding setting) |
 | `--encoding-field` | list[string] | no | null | — | Field the encoding step converts; can be repeated (default: the prose fields such as author, title, journal, note, abstract) |
-| `--key-generation` | choice | no | "metadata" | metadata, on, off | Regenerate citation keys from the library's key pattern |
+| `--key-generation` | choice | no | "metadata" | metadata, on, off | Regenerate citation keys from the bibliography's key pattern |
 | `--identifier-case` | choice | no | "metadata" | metadata, on, off | Lowercase entry types and field names |
 | `--metadata-formatting` | choice | no | "metadata" | metadata, on, off | Consolidate metadata layout: pynakes-meta top, jabref-meta bottom |
 | `--sort-by` | list[string] | no | null | — | Sort entries by a BibTeX field name; repeat for secondary keys (e.g. --sort-by author --sort-by year:desc). Use "citationkey" (or "key") for the citation key and append ":desc" for descending. "original" keeps the current order. Omit to follow the file's configured sort order. |
@@ -868,14 +868,14 @@ Normalize entries: titles, authors, journals, DOIs, encoding, identifier case, o
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
 | `--ignore-missing-tex` | boolean | no | false | — | Regenerate keys despite missing linked TeX sources; those sources are not rewritten |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## query list
 
 **Stability: stable**
 
-List the library's saved queries, and whether each still parses.
+List the bibliography's saved queries, and whether each still parses.
 
 `pynakes query list [FILE] [OPTIONS]`
 
@@ -883,14 +883,14 @@ List the library's saved queries, and whether each still parses.
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## query remove
 
 **Stability: stable**
 
-Remove a saved query from the library.
+Remove a saved query from the bibliography.
 
 `pynakes query remove [FILE] NAME [OPTIONS]`
 
@@ -903,14 +903,14 @@ Remove a saved query from the library.
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## query set
 
 **Stability: stable**
 
-Save a named selector query in the library, or replace one.
+Save a named selector query in the bibliography, or replace one.
 
 `pynakes query set [FILE] NAME EXPRESSION [OPTIONS]`
 
@@ -924,7 +924,7 @@ Save a named selector query in the library, or replace one.
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## ref add
@@ -948,7 +948,7 @@ Add a manually specified reference entry.
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## ref compare
@@ -967,7 +967,7 @@ Compare one reference's fields against another reference (read-only).
 | `--online` | boolean | no | false | — | Fetch DOI/arXiv provider metadata (required to compare against a remote record) |
 | `--cache-file` | string | no | null | — | Keep provider responses in a reusable cache file at this path (safe to delete or .gitignore). Omit it and nothing is written to disk: responses are reused for this run only |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## ref directive
@@ -991,7 +991,7 @@ Add or remove a per-entry directive: a `% pynakes:` line above each entry.
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## ref edit
@@ -1014,7 +1014,7 @@ Patch fields or type on one uniquely identified reference.
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## ref import
@@ -1030,7 +1030,7 @@ Import one or more references from supported identifiers or URLs.
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `IDENTIFIERS` | list[string] | yes | — | — | One or more DOIs, repository identifiers, or supported reference URLs. Append =KEY to name an entry's citation key (arXiv:2301.00001=Lovelace1843). Use "-" to read them from stdin, one per line |
 | `--key` | string | no | null | — | Citation key to use (only with a single identifier; for several, write each as IDENTIFIER=KEY) |
-| `--key-source` | choice | no | null | generated, provider | Citation key source when --key is absent: generated or provider; default: the library's import-key-source setting, else generated |
+| `--key-source` | choice | no | null | generated, provider | Citation key source when --key is absent: generated or provider; default: the bibliography's import-key-source setting, else generated |
 | `--allow-duplicate` | boolean | no | false | — | Import even if the reference already exists |
 | `--fetch` | boolean | no | false | — | After importing, fetch configured Pinax materials for the new entry |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
@@ -1039,7 +1039,7 @@ Import one or more references from supported identifiers or URLs.
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--cache-file` | string | no | null | — | Keep provider responses in a reusable cache file at this path (safe to delete or .gitignore). Omit it and nothing is written to disk: responses are reused for this run only |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## ref lookup
@@ -1076,7 +1076,7 @@ Remove entries by citation key.
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## ref schema
@@ -1091,9 +1091,9 @@ Describe required alternatives, profile requirements, and optional fields.
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `ENTRY_TYPE` | string | no | — | — | Entry type; omit for all known and existing types |
-| `--dialect` | choice | no | null | biblatex, bibtex | Override the library dialect |
+| `--dialect` | choice | no | null | biblatex, bibtex | Override the bibliography dialect |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## ref show
@@ -1113,19 +1113,19 @@ Show one uniquely identified reference, or triage several at once.
 | `--resolved` | boolean | no | false | — | Include fields inherited through crossref/xdata |
 | `--abstract` | boolean | no | false | — | Include each abstract in the --key summary |
 | `--select` | list[string] | no | null | — | Return only these fields under 'fields': comma-separated, repeatable. A selected field the entry lacks is null and listed in missing_fields |
-| `--include` | list[string] | no | null | — | Also report what the library records outside the entry's fields: materials (Pinax files and file links), provenance (manifest records and directives). Comma-separated, repeatable |
+| `--include` | list[string] | no | null | — | Also report what the bibliography records outside the entry's fields: materials (Pinax files and file links), provenance (manifest records and directives). Comma-separated, repeatable |
 | `--max-chars` | integer | no | null | — | Cut every returned text value to at most this many characters; each cut is listed under 'truncated' |
 | `--limit` | integer | no | null | — | With --key or --where, return at most this many entries per page |
-| `--cursor` | string | no | null | — | Resume a paged read: pass page.next_cursor from the previous page. Refused when the library changed since |
+| `--cursor` | string | no | null | — | Resume a paged read: pass page.next_cursor from the previous page. Refused when the bibliography changed since |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## scrub
 
 **Stability: stable**
 
-Write a copy of a library with its private content removed.
+Write a copy of a bibliography with its private content removed.
 
 `pynakes scrub [FILE] [OPTIONS]`
 
@@ -1145,7 +1145,7 @@ Write a copy of a library with its private content removed.
 | `--diff` | boolean | no | false | — | Show a unified diff of what was removed |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## search
@@ -1168,11 +1168,11 @@ Search entries by free text, phrases, or field-scoped terms.
 | `--fuzzy` | boolean | no | false | — | Also match near-misses (misspellings, inflections) by similarity |
 | `--abstract` | boolean | no | false | — | Print an excerpt of each result's abstract beneath the hit |
 | `--limit` | integer | no | null | — | Maximum number of matches per page |
-| `--cursor` | string | no | null | — | Resume a paged read: pass page.next_cursor from the previous page. Refused when the library changed since |
+| `--cursor` | string | no | null | — | Resume a paged read: pass page.next_cursor from the previous page. Refused when the bibliography changed since |
 | `--max-chars` | integer | no | null | — | Cut every returned text value to at most this many characters; each cut is listed under 'truncated' |
 | `--no-rank` | boolean | no | false | — | Keep raw file order instead of ranking by match strength |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## split
@@ -1203,7 +1203,7 @@ Combine inputs, then route entries into several outputs by predicate.
 
 **Stability: stable**
 
-Link one or more TeX source files or directories to this library.
+Link one or more TeX source files or directories to this bibliography.
 
 `pynakes tex add [FILE] PATHS... [OPTIONS]`
 
@@ -1216,14 +1216,14 @@ Link one or more TeX source files or directories to this library.
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## tex clear
 
 **Stability: stable**
 
-Unlink all TeX source files from this library.
+Unlink all TeX source files from this bibliography.
 
 `pynakes tex clear [FILE] [OPTIONS]`
 
@@ -1235,14 +1235,14 @@ Unlink all TeX source files from this library.
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## tex list
 
 **Stability: stable**
 
-List the TeX source files linked to this library.
+List the TeX source files linked to this bibliography.
 
 `pynakes tex list [FILE] [OPTIONS]`
 
@@ -1250,14 +1250,14 @@ List the TeX source files linked to this library.
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## tex remove
 
 **Stability: stable**
 
-Unlink one or more TeX source files or directories from this library.
+Unlink one or more TeX source files or directories from this bibliography.
 
 `pynakes tex remove [FILE] PATHS... [OPTIONS]`
 
@@ -1270,7 +1270,7 @@ Unlink one or more TeX source files or directories from this library.
 | `--dry-run` | boolean | no | false | — | Show changes without writing |
 | `--diff` | boolean | no | false | — | Show a unified diff |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## tex scan
@@ -1284,9 +1284,9 @@ Report which entries are used in LaTeX sources, and which citations are missing.
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
-| `SOURCES` | list[string] | no | — | — | One or more .tex/.aux files or directories to scan (defaults to the library's 'tex-sources' metadata) |
+| `SOURCES` | list[string] | no | — | — | One or more .tex/.aux files or directories to scan (defaults to the bibliography's 'tex-sources' metadata) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
-| `--file, -f` | string | no | null | — | The library to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
 ## verify
@@ -1301,7 +1301,7 @@ Verify entries against authoritative metadata (read-only).
 | --- | --- | --- | --- | --- | --- |
 | `FILES` | list[string] | yes | — | — | One or more .bib files |
 | `--online` | boolean | no | false | — | Fetch DOI provider metadata; otherwise only local checks run |
-| `--published, --no-published` | boolean | no | null | — | Also report preprints that now have a published version available (default: the library's verify-published setting, else off) (read-only; informational, does not affect --strict) |
+| `--published, --no-published` | boolean | no | null | — | Also report preprints that now have a published version available (default: the bibliography's verify-published setting, else off) (read-only; informational, does not affect --strict) |
 | `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing; 'used'/'unused' test the linked TeX sources and 'query NAME' runs a saved query. See `pynakes capabilities` for the full grammar. |
 | `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
 | `--cache-file` | string | no | null | — | Keep provider responses in a reusable cache file at this path (safe to delete or .gitignore). Omit it and nothing is written to disk: responses are reused for this run only |

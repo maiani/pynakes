@@ -70,7 +70,7 @@ def add(
     and required fields. That path needs an interactive terminal: with `--json`
     or headless stdin it errors instead, so supply the key (and `--field`) to
     add non-interactively. Use `--no-interactive` to generate an omitted key
-    from supplied fields and the library key pattern, with collision handling.
+    from supplied fields and the bibliography key pattern, with collision handling.
     """
     interactive = key is None if interactive is None else interactive
     if interactive:

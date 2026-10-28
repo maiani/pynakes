@@ -33,7 +33,7 @@ def query_list(
     file: str | None = bib_file_argument(),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """List the library's saved queries, and whether each still parses."""
+    """List the bibliography's saved queries, and whether each still parses."""
     file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
     expressions = saved_ops.saved_query_expressions(coll.lib)
@@ -70,10 +70,10 @@ def query_set(
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Save a named selector query in the library, or replace one.
+    """Save a named selector query in the bibliography, or replace one.
 
     The expression is validated with the shared `--where` grammar and stored as
-    a `query-NAME` line in `pynakes-meta`. The library keeps the query, not
+    a `query-NAME` line in `pynakes-meta`. The bibliography keeps the query, not
     its result, so `--where 'query "NAME"'` always reflects the entries as
     they are. An expression may refer to other saved queries the same way.
     """
@@ -142,7 +142,7 @@ def query_remove(
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Remove a saved query from the library."""
+    """Remove a saved query from the bibliography."""
     params = RunParams(
         dry_run=dry_run,
         diff=diff,

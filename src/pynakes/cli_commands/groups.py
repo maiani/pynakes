@@ -49,7 +49,7 @@ def groups_list(
 ) -> None:
     """List the group hierarchy with each group's direct members.
 
-    `tree` is the hierarchy the library's metadata declares; `groups` maps
+    `tree` is the hierarchy the bibliography's metadata declares; `groups` maps
     every group, declared or not, to its direct members; `undeclared` names the
     groups only entries mention. The two can disagree, and the report says so
     rather than reconciling them. `groups show NAME` lists one group's entries,
@@ -206,7 +206,7 @@ def groups_assign(
     key: str = typer.Argument(..., help="Citation key to add"),
     group: str = typer.Argument(..., help="Group name"),
     create: bool = typer.Option(
-        False, "--create", help="Create the group if the library does not have it yet"
+        False, "--create", help="Create the group if the bibliography does not have it yet"
     ),
     backup: bool = _BACKUP_OPTION,
     expect_sha256: str | None = _EXPECT_SHA256_OPTION,

@@ -91,7 +91,7 @@ _SEARCH_QUERY_GRAMMAR = {
         "query selects by predicate alone: search \"\" --where 'doi missing' is "
         "the read-only path for the selector grammar, returning matches in file "
         "order with no matched fields. An empty query without --where is "
-        "rejected rather than matching the whole library."
+        "rejected rather than matching the whole bibliography."
     ),
     "ranking": (
         "Results are ranked by relevance by default: key > title > author > "
@@ -125,19 +125,19 @@ _BOUNDED_READS = {
         "--select FIELDS": "return only these stored fields (abstract included): "
         "under 'fields' in place of 'summary' on ref show, as each "
         "match's 'fields' on search",
-        "--include PARTS": "ref show: add what the library records "
+        "--include PARTS": "ref show: add what the bibliography records "
         "outside the entry's fields, each part under its own key",
     },
     "page": {
         "keys": ["offset", "limit", "returned", "total", "complete", "next_cursor"],
         "order": "Deterministic for a snapshot: requested key order for ref show --key, "
         "file order for ref show --where, ranked or file order for search.",
-        "snapshot": "A cursor carries a digest of the library it was issued for and of "
-        "the selection. Against a changed library it is refused with the StaleCursor "
+        "snapshot": "A cursor carries a digest of the bibliography it was issued for and of "
+        "the selection. Against a changed bibliography it is refused with the StaleCursor "
         "conflict (exit 2); against another selection, with InvalidInput.",
     },
     "missing_vs_omitted": {
-        "missing": "The library has no value: a selected field is null and listed in "
+        "missing": "The bibliography has no value: a selected field is null and listed in "
         "missing_fields; an included part with nothing recorded is listed in missing.",
         "omitted": "A value exists but was left out: stored fields outside --select are "
         "listed in omitted_fields; values cut by --max-chars are listed in truncated "
@@ -202,9 +202,9 @@ _SAVED_QUERIES = {
     "ref show --where 'query \"NAME\"' reads its matches under the bounded-read "
     "contract. A saved expression may refer to other saved queries; a missing or "
     "circular reference is an InvalidInput error.",
-    "results": "The library stores the query, never its result: it is evaluated "
+    "results": "The bibliography stores the query, never its result: it is evaluated "
     "against the entries as they are now, in file order.",
-    "citations": "used/unused resolve against the library's tex-sources wherever "
+    "citations": "used/unused resolve against the bibliography's tex-sources wherever "
     "--where is evaluated (NoSources when none are linked).",
     "validation": "query set and metadata set validate the expression; lint reports "
     "a stored query that no longer parses (invalid_metadata_value).",
@@ -286,7 +286,7 @@ _ANALYSIS = {
     "sections": list(ANALYSIS_SECTIONS),
     "descriptive_only": True,
     "reconciles": {
-        "lint": "Equals lint's summary for the library (after lint-ignore and ignore directives).",
+        "lint": "Equals lint's summary for the bibliography (after lint-ignore and ignore directives).",
         "entries": "total counts physical entries, duplicate citation keys included; "
         "each per-entry section counts every entry once.",
         "coauthors": "coauthors.authors equals authors.distinct; single_author_entries + "
@@ -436,7 +436,7 @@ def _write_precondition(schemas: dict) -> dict:
         "envelope_key": "source_sha256",
         "conflict": "ExternalModification",
         "description": (
-            "Every envelope reports source_sha256, the digest of the library it read. "
+            "Every envelope reports source_sha256, the digest of the bibliography it read. "
             "Every modifying command accepts it back as --expect-sha256: if the file "
             "changed in between, the command exits 2 and writes nothing."
         ),
@@ -514,12 +514,12 @@ def get_capabilities() -> dict:
         },
         "positional_convention": {
             "library_first": (
-                "Every command that reads one library takes it as the leading FILE "
+                "Every command that reads one bibliography takes it as the leading FILE "
                 "argument, or as --file/-f, or not at all when the working directory "
                 "holds exactly one .bib file."
             ),
             "library_detection": (
-                "The leading positional is the library when it ends in .bib, or when "
+                "The leading positional is the bibliography when it ends in .bib, or when "
                 "the positionals fill every argument the command has; otherwise the "
                 "lone local .bib is used. A .bib-looking token in any other argument "
                 "is refused as a usage error."
@@ -611,7 +611,7 @@ def get_capabilities() -> dict:
         # ``--help`` panels). Mirrors the flat ``commands`` map below.
         "command_groups": {panel: list(names) for panel, names in COMMAND_GROUPS.items()},
         "commands": {
-            "init": "Create a new .bib library, optionally seeded with a metadata profile (--pinax for pinax mode)",
+            "init": "Create a new bibliography, optionally seeded with a metadata profile (--pinax for pinax mode)",
             "inspect": "Inspect a .bib file structure",
             "lint": "Validate entries and report issues",
             "ref": "Create, show, edit, compare, look up, import, and remove individual "
@@ -630,10 +630,10 @@ def get_capabilities() -> dict:
             "(--published also promotes preprints and backfills arXiv ids)",
             "tex": "Manage linked TeX sources and scan them for citations "
             "(list, add, remove, clear, scan)",
-            "metadata": "Inspect and update top-level library metadata "
+            "metadata": "Inspect and update top-level bibliography metadata "
             "(list, set, remove, adopt-jabref)",
             "normalize": "Normalize entries (titles, encoding, authors, journals, DOIs, "
-            "identifier case, ordering) per the library's configured settings",
+            "identifier case, ordering) per the bibliography's configured settings",
             "format": "Lint, then rewrite bibliography layout with portable profile settings "
             "and explicit policy overrides",
             "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "
@@ -672,7 +672,7 @@ def get_capabilities() -> dict:
         "material_collection": _MATERIAL_COLLECTION,
         "selection_export": {
             "command": "convert FILE --to bib|csl-json|ris|mods|endnote|csv --key K --where EXPR",
-            "native": "Preserves entry text, all strings, preambles and library metadata/comments; includes transitive referenced entries",
+            "native": "Preserves entry text, all strings, preambles and bibliography metadata/comments; includes transitive referenced entries",
             "interchange": "Selected physical entries only, with inherited fields resolved against the source",
             "report": ["selected_entries", "entry_count", "dependency_keys", "warnings", "content"],
             "source_modified": False,
@@ -689,9 +689,9 @@ def get_capabilities() -> dict:
         "entry_fields": {
             "schema": "pynakes.entry-fields.v1",
             "command": "ref schema FILE [ENTRY_TYPE] --json",
-            "creation": "ref add FILE --no-interactive --type TYPE --field name=value generates an omitted key from library patterns; explicit keys override generation",
+            "creation": "ref add FILE --no-interactive --type TYPE --field name=value generates an omitted key from bibliography patterns; explicit keys override generation",
             "required": "AND of groups; each group is an OR of accepted field names, shared with lint",
-            "profile_required": "Additional exact fields from the library lint profile",
+            "profile_required": "Additional exact fields from the bibliography lint profile",
             "optional": "Editing suggestions, not an exhaustive style whitelist",
             "other": "Existing fields outside required and optional lists; never discarded",
         },
@@ -701,7 +701,7 @@ def get_capabilities() -> dict:
             "flag": "--groups-separator (global, before the command)",
             "choices": ["auto", "comma", "semicolon"],
             "default": "auto",
-            "auto": "Library-wide detection; comma when no separator occurs; mixed punctuation requires an explicit choice",
+            "auto": "Bibliography-wide detection; comma when no separator occurs; mixed punctuation requires an explicit choice",
         },
         "deprecations": DEPRECATIONS,
         "saved_queries": _SAVED_QUERIES,

@@ -95,20 +95,20 @@ def scrub(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
     backup: bool = _BACKUP_OPTION,
 ) -> None:
-    """Write a copy of a library with its private content removed.
+    """Write a copy of a bibliography with its private content removed.
 
     Strips the private entry fields (bookkeeping, reading state, personal
     annotation, local file paths, group membership), every jabref-meta and
-    pynakes-meta block, and free comments — the content a working library
+    pynakes-meta block, and free comments — the content a working bibliography
     carries that does not belong in a `.bib` shipped with a preprint,
     submission bundle, or public repository. What counts as private is the
-    library's call: every kind has a `--keep-*` switch, `--drop-field` and
-    `--keep-field` adjust the field set, and a library can record its own
+    bibliography's call: every kind has a `--keep-*` switch, `--drop-field` and
+    `--keep-field` adjust the field set, and a bibliography can record its own
     policy in `scrub-fields`, `scrub-keep-fields`, `scrub-comments`, and
     `scrub-metadata` metadata.
 
     Everything not removed stays byte-for-byte identical, so `--diff` shows
-    exactly what left the library. `--where` / `--key` keep only the
+    exactly what left the bibliography. `--where` / `--key` keep only the
     selected entries, chosen before anything is scrubbed: `scrub refs.bib
     --where used --out public.bib` releases just the entries the linked TeX
     sources cite.

@@ -68,14 +68,14 @@ def inspect(
     origin: str | None = typer.Option(
         None,
         "--origin",
-        help="Where the library is saved, when FILE is a copy of it (an editor's unsaved "
+        help="Where the bibliography is saved, when FILE is a copy of it (an editor's unsaved "
         "buffer): tex-sources, pinax-files-dir, and relative file links resolve from there",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Inspect a .bib file structure.
 
-    The JSON form is the canonical structured read of a library: every entry
+    The JSON form is the canonical structured read of a bibliography: every entry
     with its fields, the `@string`/`@preamble`/comment declarations, both
     metadata namespaces, encoding, line ending, and duplicate keys. With
     `--resolved` each entry also carries its inherited (crossref/xdata) field
@@ -87,8 +87,8 @@ def inspect(
     entry's own fields. With `--insights`, JSON also includes independent
     group hierarchy, membership, lint, `tex scan`, and `asset check`
     envelopes computed from the same parsed snapshot, so a client draws a
-    library from one process and one parse. Supplementary failures do not
-    hide inspection. `--origin` names where the library really lives when
+    bibliography from one process and one parse. Supplementary failures do not
+    hide inspection. `--origin` names where the bibliography really lives when
     FILE is a copy, so its relative paths resolve as they would for the
     original.
     """

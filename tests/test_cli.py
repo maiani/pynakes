@@ -4694,7 +4694,7 @@ class TestAssetFetchLibraryTargeting:
         assert result.exit_code == 1
         payload = json.loads(result.output)
         assert payload["error"] == "UsageError"
-        assert "main.bib looks like a library" in payload["message"]
+        assert "main.bib looks like a bibliography" in payload["message"]
 
     def test_blank_key_means_every_entry(self, tmp_path: Path, monkeypatch) -> None:
         # An unset variable in a script ("$KEY") must not become a lookup for

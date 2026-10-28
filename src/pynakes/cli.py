@@ -78,7 +78,7 @@ groups_app = typer.Typer(help="Manage entry groups", cls=AutoBibGroup)
 keys_app = typer.Typer(help="Work with citation keys", cls=AutoBibGroup)
 fields_app = typer.Typer(help="Bulk-edit fields across matching references", cls=AutoBibGroup)
 dedupe_app = typer.Typer(help="Detect and merge duplicate works", cls=AutoBibGroup)
-metadata_app = typer.Typer(help="Inspect and update library metadata", cls=AutoBibGroup)
+metadata_app = typer.Typer(help="Inspect and update bibliography metadata", cls=AutoBibGroup)
 tex_app = typer.Typer(
     help="Manage linked TeX sources and scan them for citations", cls=AutoBibGroup
 )

@@ -61,13 +61,13 @@ def scan(
     sources: list[str] | None = typer.Argument(
         None,
         help="One or more .tex/.aux files or directories to scan "
-        "(defaults to the library's 'tex-sources' metadata)",
+        "(defaults to the bibliography's 'tex-sources' metadata)",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Report which entries are used in LaTeX sources, and which citations are missing.
 
-    The report reads the given sources, else the library's linked
+    The report reads the given sources, else the bibliography's linked
     `tex-sources`, and changes nothing. To act on the cited entries, select
     them with `--where used` wherever entries are selected: `combine FILE
     --where used --out cited.bib` exports them, and `fields append FILE

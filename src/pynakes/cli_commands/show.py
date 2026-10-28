@@ -69,16 +69,16 @@ def show(
     when a key is duplicated, and the `--key` form reports every unknown key
     together. `--where EXPR` summarizes every entry the selector matches, in
     file order — `--where 'query "to-read"'` runs a saved query, and
-    `used`/`unused` test the library's linked TeX sources.
+    `used`/`unused` test the bibliography's linked TeX sources.
 
     Bounded reads: `--select` returns only the named fields (the abstract
     among them); `--include materials,provenance` adds the materials
-    available for each entry and the provenance the library recorded;
+    available for each entry and the provenance the bibliography recorded;
     `--max-chars` cuts long values and lists every cut under `truncated`.
     With `--key` or `--where`, `--limit` pages the selection and
-    `page.next_cursor` resumes it — a cursor is refused once the library
+    `page.next_cursor` resumes it — a cursor is refused once the bibliography
     changes, so pages never silently skip or repeat entries. Information
-    the library lacks is reported as missing (`null`, `missing`,
+    the bibliography lacks is reported as missing (`null`, `missing`,
     `missing_fields`), never as an omission.
     """
     selecting = bool(keys) or where is not None

@@ -40,7 +40,7 @@ def include_option() -> Any:
     return typer.Option(
         None,
         "--include",
-        help="Also report what the library records outside the entry's fields: "
+        help="Also report what the bibliography records outside the entry's fields: "
         "materials (Pinax files and file links), provenance (manifest records and "
         "directives). Comma-separated, repeatable",
     )
@@ -75,7 +75,7 @@ def cursor_option() -> Any:
         None,
         "--cursor",
         help="Resume a paged read: pass page.next_cursor from the previous page. "
-        "Refused when the library changed since",
+        "Refused when the bibliography changed since",
     )
 
 

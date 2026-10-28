@@ -209,12 +209,12 @@ def _convert_to_pinax(
 
 def init(
     file: str | None = typer.Argument(
-        None, help="Path to the .bib library (default: auto-detect single .bib in cwd with --pinax)"
+        None, help="Path to the bibliography (default: auto-detect single .bib in cwd with --pinax)"
     ),
     dialect: Dialect | None = typer.Option(
         None,
         "--dialect",
-        help="Library dialect (sets the native 'dialect' key)",
+        help="Bibliography dialect (sets the native 'dialect' key)",
     ),
     key_pattern: str | None = typer.Option(
         None,
@@ -225,11 +225,11 @@ def init(
         False,
         "--jabref",
         help="Also emit a JabRef metadata projection (databaseType, keypatterndefault) so the "
-        "library opens JabRef-tracked, and keep JabRef's entry-type spelling "
-        "(format-entry-type-case: preserve); by default a fresh library is pynakes-native only",
+        "bibliography opens JabRef-tracked, and keep JabRef's entry-type spelling "
+        "(format-entry-type-case: preserve); by default a fresh bibliography is pynakes-native only",
     ),
     from_: str | None = typer.Option(
-        None, "--profile-from", help="Copy the metadata profile from an existing .bib library"
+        None, "--profile-from", help="Copy the metadata profile from an existing bibliography"
     ),
     pinax: bool = typer.Option(
         False, "--pinax", help="Seed pinax mode (pinax-files-dir, pinax-fetch-policy)"
@@ -255,15 +255,15 @@ def init(
         False, "--json", help="Emit machine-readable JSON", is_eager=True
     ),
 ) -> None:
-    """Create or initialize a .bib library.
+    """Create or initialize a bibliography.
 
     With no options it writes a sensible, pynakes-native default profile (the
     BibLaTeX dialect and pynakes' default citation-key pattern, as the native
     `dialect`/`key-pattern` keys in `pynakes-meta` — no `jabref-meta`
     unless requested). `--dialect` / `--key-pattern` override individual
-    settings; `--jabref` also emits the JabRef projection so the library opens
+    settings; `--jabref` also emits the JabRef projection so the bibliography opens
     JabRef-tracked, and sets `format-entry-type-case: preserve` so `format`
-    and `normalize` leave JabRef's `@Article` spelling alone; `--profile-from` replaces the defaults with another library's
+    and `normalize` leave JabRef's `@Article` spelling alone; `--profile-from` replaces the defaults with another bibliography's
     maintenance profile (its conventions, not its group tree or TeX-source
     list). `--pinax` seeds pinax mode and, when the file already exists,
     converts it in place; combined with `--profile-from` on an existing file, it

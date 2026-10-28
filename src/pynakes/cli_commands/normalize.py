@@ -136,7 +136,7 @@ def normalize(
         Switch.METADATA,
         "--key-generation",
         case_sensitive=False,
-        help="Regenerate citation keys from the library's key pattern",
+        help="Regenerate citation keys from the bibliography's key pattern",
     ),
     identifier_case: Switch = typer.Option(
         Switch.METADATA,
@@ -178,7 +178,7 @@ def normalize(
 ) -> None:
     """Normalize entries: titles, authors, journals, DOIs, encoding, identifier case, order.
 
-    Each step follows the library's configured settings (its normalization
+    Each step follows the bibliography's configured settings (its normalization
     metadata) unless overridden by a flag. `--only` runs just the named steps,
     and `--key` / `--where` just the selected entries; a selection leaves the
     whole file alone, so it neither re-sorts entries nor rearranges metadata.

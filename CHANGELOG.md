@@ -128,6 +128,9 @@ The forms deprecated in 0.8 are removed:
 
 ### Changed
 
+- Help text, `capabilities` descriptions and two usage messages say
+  "bibliography" where they mean one `.bib` file, keeping "library" for the
+  planned multi-file Library. No command, option, key or error code changed.
 - `asset fetch` (and `ref import --fetch`) groups its human-readable report:
   entries skipped or, in a dry run, planned for the same reason share one line
   that counts and names them, and the coverage line counts the entries still

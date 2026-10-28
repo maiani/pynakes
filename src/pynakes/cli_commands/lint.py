@@ -192,7 +192,7 @@ def lint(
         "--ignore",
         metavar="NAME",
         help="Leave out a finding type (missing_doi) or a whole category (consistency); "
-        "repeatable, and added to the library's lint-ignore setting",
+        "repeatable, and added to the bibliography's lint-ignore setting",
     ),
     only: list[str] = typer.Option(
         [],
@@ -205,12 +205,12 @@ def lint(
         None,
         "--severity",
         help="Report only findings at least this severe: error, warning, or info (all); "
-        "default: the library's lint-severity setting, else info",
+        "default: the bibliography's lint-severity setting, else info",
     ),
     include_ignored: bool = typer.Option(
         False,
         "--include-ignored",
-        help="Also report the findings the library's lint-ignore setting and ignore "
+        help="Also report the findings the bibliography's lint-ignore setting and ignore "
         "directives waive (they then count for --strict)",
     ),
     summary: bool = typer.Option(

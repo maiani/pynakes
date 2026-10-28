@@ -80,7 +80,7 @@ def fetch(
     material: list[Material] | None = typer.Option(
         None,
         "--material",
-        help="Material to fetch, repeatable; overrides the library's pinax-fetch-policy. "
+        help="Material to fetch, repeatable; overrides the bibliography's pinax-fetch-policy. "
         "best-pdf is the published PDF when open access, otherwise the preprint; "
         "supplement fetches one unambiguous supplementary PDF",
     ),
@@ -95,7 +95,7 @@ def fetch(
         None,
         "--access",
         help="Publisher access context: open or institutional (uses existing network access); "
-        "default: the library's pinax-fetch-access setting, else open",
+        "default: the bibliography's pinax-fetch-access setting, else open",
     ),
     discover: bool | None = typer.Option(
         None,
@@ -103,7 +103,7 @@ def fetch(
         help="When a preprint is needed and the entry has a DOI but no arXiv id, look one up "
         "(OpenAlex, then Semantic Scholar), check it against arXiv's record, and use and "
         "record a confirmed id (eprint, only when the entry has none); default: the "
-        "library's pinax-discover-arxiv setting, else off",
+        "bibliography's pinax-discover-arxiv setting, else off",
     ),
     progress_stream: ProgressStream = typer.Option(
         ProgressStream.AUTO,

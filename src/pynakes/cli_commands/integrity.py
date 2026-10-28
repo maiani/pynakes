@@ -137,7 +137,7 @@ def verify(
         None,
         "--published/--no-published",
         help="Also report preprints that now have a published version available "
-        "(default: the library's verify-published setting, else off) "
+        "(default: the bibliography's verify-published setting, else off) "
         "(read-only; informational, does not affect --strict)",
     ),
     where: str | None = where_option(),
@@ -151,7 +151,7 @@ def verify(
 
     Checks DOI-backed entries against provider metadata; with `--published` it
     also reports preprints that now have a published version available.
-    `--key` and `--where` verify only the selected entries of one library, so
+    `--key` and `--where` verify only the selected entries of one bibliography, so
     checking a handful of references never looks up the rest.
     """
     if (where is not None or key) and len(files) > 1:
@@ -181,7 +181,7 @@ def enrich(
         "--published/--no-published",
         help="Also promote preprints to their published version, writing the "
         "published DOI/journal when one is available (requires --online); default: "
-        "the library's enrich-published setting, else off",
+        "the bibliography's enrich-published setting, else off",
     ),
     only_field: list[str] | None = typer.Option(
         None,
@@ -207,7 +207,7 @@ def enrich(
     promotes preprints to their published version (writing the published
     DOI/journal), folding in the former `published --apply` operation.
     `--key` and `--where` limit it to the selected entries, so a lookup
-    for a handful of references never reaches the rest of the library.
+    for a handful of references never reaches the rest of the bibliography.
     `--only-field` applies a reviewed subset: preview with `--dry-run`, then
     apply only those fields with `--expect-sha256` set to the previewed
     `source_sha256`, so nothing changed in between.

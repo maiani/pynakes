@@ -71,13 +71,13 @@ def convert(
     force: bool = _FORCE_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     diff: bool = typer.Option(
-        False, "--diff", help="Show a unified diff of the library, or of the --out file"
+        False, "--diff", help="Show a unified diff of the bibliography, or of the --out file"
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
     backup: bool = _BACKUP_OPTION,
     expect_sha256: str | None = _EXPECT_SHA256_OPTION,
 ) -> None:
-    """Convert a library between BibTeX/BibLaTeX dialects and interchange formats."""
+    """Convert a bibliography between BibTeX/BibLaTeX dialects and interchange formats."""
     _convert(
         _resolve_input_bib(file, json_output),
         to.value if to is not None else None,

@@ -180,10 +180,10 @@ def asset_repair(
 ) -> None:
     """Reconcile the Pinax manifest with the material files that exist.
 
-    Drops manifest rows for keys the library no longer has and records for
+    Drops manifest rows for keys the bibliography no longer has and records for
     files that are gone, and records material files the manifest does not
     know (as manual additions). Without `--reclassify` only the manifest
-    changes: no material file and no byte of the library. `asset check`
+    changes: no material file and no byte of the bibliography. `asset check`
     reports the same drift.
 
     With `--reclassify`, each misclassified published PDF is renamed to the

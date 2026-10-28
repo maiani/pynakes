@@ -149,9 +149,9 @@ def metadata_adopt_jabref(
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Start maintaining a JabRef metadata projection for this library.
+    """Start maintaining a JabRef metadata projection for this bibliography.
 
-    pynakes-native libraries keep their settings in `pynakes-meta`. This writes
+    pynakes-native bibliographies keep their settings in `pynakes-meta`. This writes
     the equivalent `jabref-meta` blocks (relocating any JabRef-native keys and
     anchoring a `databaseType`) so that, from now on, pynakes also keeps
     `jabref-meta` in sync — the file works in JabRef without losing its pynakes

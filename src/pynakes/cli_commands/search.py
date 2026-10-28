@@ -105,7 +105,7 @@ def search(
 
     Results page like every bounded read: `--limit` caps a page,
     `page.next_cursor` resumes the same search with `--cursor` (refused once
-    the library changes), and `--max-chars` cuts long field values, listing
+    the bibliography changes), and `--max-chars` cuts long field values, listing
     each cut under the result's `truncated`.
     """
     check_bounds(limit, max_chars)

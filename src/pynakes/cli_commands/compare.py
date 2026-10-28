@@ -33,7 +33,7 @@ def compare(
 ) -> None:
     """Compare one reference's fields against another reference (read-only).
 
-    With `--with OTHER_KEY`, compares two entries already in the library —
+    With `--with OTHER_KEY`, compares two entries already in the bibliography —
     e.g. reviewing a candidate duplicate pair before merging. No network
     access. Without it, compares against a fetched DOI/arXiv remote record:
     prefers the entry's DOI (existing, or inferred from a local URL), falling

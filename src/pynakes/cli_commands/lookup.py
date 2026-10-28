@@ -28,7 +28,7 @@ def lookup(
 ) -> None:
     """Look up the real records matching a reference written out in prose.
 
-    Every other way into this library starts from an identifier, which is a
+    Every other way into this bibliography starts from an identifier, which is a
     claim that can be checked. A reference written out as text carries no such
     claim, and this is how to ask whether one describes anything that exists —
     the case that matters when references arrive already written out rather
@@ -40,7 +40,7 @@ def lookup(
     work also comes back empty. Import a candidate you accept by its DOI.
 
     Like `ref import` and `asset fetch`, it goes online by being run. `search`
-    is its offline counterpart over the library itself.
+    is its offline counterpart over the bibliography itself.
     """
     _lookup(text, limit, cache_file, json_output, [])
 

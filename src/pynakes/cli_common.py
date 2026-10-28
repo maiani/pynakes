@@ -99,7 +99,7 @@ def missing_bib_message(candidates: list[Path], skipped: Iterable[Path] = ()) ->
     if not candidates:
         if skipped_names:
             return (
-                "No library *.bib file found in current directory (skipped REVTeX-generated "
+                "No *.bib bibliography found in current directory (skipped REVTeX-generated "
                 f"{skipped_names}); specify one as an argument"
             )
         return "No *.bib file found in current directory; specify one as an argument"

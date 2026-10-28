@@ -50,9 +50,9 @@ def read_identifier_lines(text: str) -> list[str]:
 
 
 def key_pattern_warnings(coll: Bibliography, file: str) -> list[dict[str, object]]:
-    """Warn when generated keys would not follow the library's evident style.
+    """Warn when generated keys would not follow the bibliography's evident style.
 
-    Run before staging: the library's own keys are the evidence. Nothing is
+    Run before staging: the bibliography's own keys are the evidence. Nothing is
     reported when a ``key-pattern`` is stored or the keys follow the default.
     """
     from pynakes import keys as keys_ops
@@ -134,7 +134,7 @@ def import_reference(
         None,
         "--key-source",
         help="Citation key source when --key is absent: generated or provider; default: "
-        "the library's import-key-source setting, else generated",
+        "the bibliography's import-key-source setting, else generated",
     ),
     allow_duplicate: bool = typer.Option(
         False, "--allow-duplicate", help="Import even if the reference already exists"

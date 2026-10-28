@@ -33,7 +33,7 @@ FILES_ARGUMENT = "files"
 FILE_OPTION = ("--file", "-f")
 
 FILE_OPTION_HELP = (
-    "The library to read, as an alternative to the leading FILE argument "
+    "The bibliography to read, as an alternative to the leading FILE argument "
     "(default: the single .bib in the working directory)"
 )
 
@@ -151,7 +151,7 @@ def _misplaced_error(
     path: tuple[str, ...], operands: list[click.Parameter], token: str
 ) -> click.UsageError:
     return _usage_error(
-        f"{token} looks like a library, but `{command_line(path)}` takes the library "
+        f"{token} looks like a bibliography, but `{command_line(path)}` takes the bibliography "
         f"first: {_synopsis(path, operands)} (or name it with --file)"
     )
 

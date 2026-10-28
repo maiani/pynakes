@@ -48,7 +48,7 @@ def tex_list(
     file: str | None = bib_file_argument(),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """List the TeX source files linked to this library."""
+    """List the TeX source files linked to this bibliography."""
     file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
     sources = tex_sources_from_metadata(coll.lib, Path(file).parent)
@@ -83,7 +83,7 @@ def tex_add(
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Link one or more TeX source files or directories to this library."""
+    """Link one or more TeX source files or directories to this bibliography."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(
         dry_run=dry_run,
@@ -133,7 +133,7 @@ def tex_remove(
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Unlink one or more TeX source files or directories from this library."""
+    """Unlink one or more TeX source files or directories from this bibliography."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(
         dry_run=dry_run,
@@ -187,7 +187,7 @@ def tex_clear(
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Unlink all TeX source files from this library."""
+    """Unlink all TeX source files from this bibliography."""
     file = _resolve_input_bib(file, json_output)
     params = RunParams(
         dry_run=dry_run,

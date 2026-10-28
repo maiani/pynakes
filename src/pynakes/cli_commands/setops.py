@@ -141,7 +141,7 @@ def combine(
     """Combine several .bib files into one (optionally deduping by citation key).
 
     With `--where` the output keeps only the entries matching the shared
-    selector grammar, so combining a focused subset out of several libraries is
+    selector grammar, so combining a focused subset out of several bibliographies is
     one command rather than a combine-then-prune script.
     """
     params = RunParams(dry_run=dry_run, diff=diff, json_output=json_output, backup=backup)
@@ -317,9 +317,9 @@ def split(
 ) -> None:
     """Combine inputs, then route entries into several outputs by predicate.
 
-    Each output carries the source library's jabref-meta/pynakes-meta blocks
+    Each output carries the source bibliography's jabref-meta/pynakes-meta blocks
     (groups, save-order config, Pinax fetch settings) and copies any linked
-    Pinax materials, since a bucket is usually still a working library. Pass
+    Pinax materials, since a bucket is usually still a working bibliography. Pass
     `--minimal` for a bucket that's meant as a standalone snippet instead
     (e.g. one entry pulled out to hand to a collaborator): it drops those
     metadata blocks entirely and skips materials copying.

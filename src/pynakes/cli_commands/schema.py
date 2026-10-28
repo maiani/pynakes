@@ -20,7 +20,9 @@ def ref_schema(
     entry_type: str | None = typer.Argument(
         None, help="Entry type; omit for all known and existing types"
     ),
-    dialect: Dialect | None = typer.Option(None, "--dialect", help="Override the library dialect"),
+    dialect: Dialect | None = typer.Option(
+        None, "--dialect", help="Override the bibliography dialect"
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Describe required alternatives, profile requirements, and optional fields.

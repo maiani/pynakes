@@ -56,7 +56,7 @@ def test_operand_first_order_is_a_usage_error(
 ) -> None:
     message = _usage_error([*command, *operands, str(bib)])
 
-    assert "looks like a library" in message
+    assert "looks like a bibliography" in message
     assert f"pynakes {' '.join(command)} FILE" in message
     assert bib.read_bytes() == (FIXTURES / "simple.bib").read_bytes()
 
@@ -70,7 +70,7 @@ def test_library_named_twice_with_file_is_a_usage_error(bib: Path) -> None:
 def test_file_option_with_a_library_in_the_operand_slot_is_a_usage_error(bib: Path) -> None:
     message = _usage_error(["ref", "show", "--file", str(bib), str(bib)])
 
-    assert "looks like a library" in message
+    assert "looks like a bibliography" in message
 
 
 def test_short_file_flag_names_the_library_on_ref_add(bib: Path) -> None:
