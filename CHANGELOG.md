@@ -232,6 +232,21 @@ The forms deprecated in 0.8 are removed:
   cased new keys; existing keys are unchanged. The default profile's
   `[auth][year][veryshorttitle]` now gives `Newton1687Philosophiae`, but keeps
   a title's lowercase first word, which the built-in style capitalizes.
+- A relative `normalize-journal-table` or `normalize-ltwa-table` setting is
+  read from the `.bib`'s folder, as `tex-sources` is, by `normalize`, `lint`,
+  and the library style given to an imported entry (`ref import`). It was read
+  from the working directory, so the setting failed with `FileNotFound`
+  whenever the command ran from anywhere else, such as a project root. A
+  `--journal-table` or `--ltwa-table` option is still read as given.
+- A journal title that already reads as one of the spellings the tables list
+  is kept as written, by `normalize` and by `lint`'s `journal_style_mismatch`.
+  The tables' lookup ignores punctuation, so a listed abbreviation was
+  re-spelled as whichever list was loaded last: `Zh. Eksp. Teor. Fiz.`, which
+  `normalize` itself writes for the full title, became `Zh. Eksp. Teor. Fiz`
+  on the next run, and `Cancer Res.` became `Cancer Res`. Normalizing twice
+  changed 2,270 bundled titles; it now changes none apart from 63 whose
+  abbreviation is another journal's full title (`Endodoncia`). A spelling no
+  table lists is still replaced by the mapped one.
 
 ## [0.8.0] - 2026-10-22
 

@@ -12,6 +12,7 @@ Group-tree and key operations live in :mod:`pynakes._engine_groups` and
 from __future__ import annotations
 
 import copy
+import dataclasses
 from collections.abc import Callable, Collection, Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
@@ -323,6 +324,8 @@ class BibliographyOperations:
         source cannot be rewritten.
         """
         opts = options or normalize_ops.NormalizeOptions()
+        if opts.base_dir is None and self.path is not None:
+            opts = dataclasses.replace(opts, base_dir=self.path.parent)
         report = normalize_ops.normalize_library(self.lib, opts, keys=keys)
         self._consolidate_metadata = "metadata" not in report.skipped and (
             normalize_ops.resolve_format_metadata(self.lib, opts.format_metadata)
@@ -421,7 +424,9 @@ class BibliographyOperations:
                 key_source=importer_ops.library_key_source(self.lib, key_source),
                 allow_duplicate=allow_duplicate,
             )
-        apply_library_style(self.lib, entry)
+        apply_library_style(
+            self.lib, entry, base_dir=self.path.parent if self.path is not None else None
+        )
         self.lib.entries.add(entry)
         self._appended_entries.append(entry)
         return kind, entry

@@ -4,6 +4,7 @@ Public through :mod:`pynakes.lint`, which re-exports the non-underscore names.
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from pynakes._lint_issue import IGNORABLE_NAMES, LintIssue
 from pynakes.fields import TITLE_FIELDS, is_all_caps_title, title_capitalization_is_protected
@@ -12,6 +13,7 @@ from pynakes.journals import (
     JOURNAL_FIELDS,
     JournalSources,
     expected_journal_title,
+    resolve_table_path,
 )
 from pynakes.keys import (
     UnsupportedCitationKeyPatternError,
@@ -59,8 +61,12 @@ class LintProfile:
     protected_terms: tuple[str, ...] = ()
 
 
-def resolve_lint_profile(lib: BibFile) -> LintProfile:
-    """Resolve the same persisted normalization settings that lint can verify."""
+def resolve_lint_profile(lib: BibFile, base_dir: str | Path | None = None) -> LintProfile:
+    """Resolve the same persisted normalization settings that lint can verify.
+
+    ``base_dir`` (normally the ``.bib``'s folder) resolves relative journal and
+    LTWA table paths, as normalize does.
+    """
     journal_style = (metadata_value(lib, "normalize-journal-style") or "none").lower()
     journal_source = (
         metadata_value(lib, "normalize-journal-source") or DEFAULT_JOURNAL_SOURCE
@@ -76,8 +82,8 @@ def resolve_lint_profile(lib: BibFile) -> LintProfile:
     return LintProfile(
         journal_style=journal_style,
         journal_source=journal_source,
-        journal_table=metadata_value(lib, "normalize-journal-table"),
-        ltwa_table=metadata_value(lib, "normalize-ltwa-table"),
+        journal_table=resolve_table_path(metadata_value(lib, "normalize-journal-table"), base_dir),
+        ltwa_table=resolve_table_path(metadata_value(lib, "normalize-ltwa-table"), base_dir),
         # Normalization protects titles by default, but lint enforces only a
         # stored title preference. This keeps unprofiled libraries advisory.
         protect_titles=protect_titles,

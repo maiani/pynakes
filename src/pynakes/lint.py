@@ -229,7 +229,7 @@ def lint(lib: BibFile, base_dir: str | Path | None = None) -> list[LintIssue]:
     resolved.
     """
     issues: list[LintIssue] = []
-    profile = resolve_lint_profile(lib)
+    profile = resolve_lint_profile(lib, base_dir)
     journal_sources = None
     dialect = library_dialect(lib)
     try:

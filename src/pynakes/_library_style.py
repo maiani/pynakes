@@ -10,6 +10,7 @@ it, and no other entry is touched.
 """
 
 import copy
+from pathlib import Path
 
 from pynakes import normalize as normalize_ops
 from pynakes._normalize_steps import STEPS
@@ -57,17 +58,23 @@ def declares_layout(lib: BibFile) -> bool:
     )
 
 
-def apply_library_style(lib: BibFile, entry: BibEntry) -> list[str]:
+def apply_library_style(
+    lib: BibFile, entry: BibEntry, base_dir: str | Path | None = None
+) -> list[str]:
     """Normalize and lay out ``entry`` as ``lib`` declares; return the steps applied.
 
     ``entry`` is one ``lib`` does not hold yet, or has only just been given.
     ``"layout"`` in the result means the ``format-*`` settings were applied.
+    ``base_dir`` (normally the ``.bib``'s folder) resolves relative table paths
+    in the library's metadata.
     """
     view = copy.copy(lib)
     view.entries = EntryStore([entry])
     steps = declared_steps(lib)
     if steps:
-        normalize_ops.normalize_library(view, normalize_ops.NormalizeOptions(only=steps))
+        normalize_ops.normalize_library(
+            view, normalize_ops.NormalizeOptions(only=steps, base_dir=base_dir)
+        )
     if declares_layout(lib):
         format_selected_entries(view, layout_from_metadata(lib))
         # The laid-out text is now the entry's source; the writer emits it as is.

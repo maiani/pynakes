@@ -158,6 +158,11 @@ class JournalSources:
     title_mappings: dict[str, JournalMapping] = dataclass_field(default_factory=dict)
     abbreviated_mappings: dict[str, JournalMapping] = dataclass_field(default_factory=dict)
     issn_mappings: dict[str, JournalMapping] = dataclass_field(default_factory=dict)
+    #: Every spelling the tables list under a title or abbreviation key. Keys
+    #: ignore punctuation, so lists can disagree on, say, a final period; a
+    #: value that is already one of the listed spellings is kept as written.
+    title_spellings: dict[str, frozenset[str]] = dataclass_field(default_factory=dict)
+    abbreviated_spellings: dict[str, frozenset[str]] = dataclass_field(default_factory=dict)
     ltwa_words: dict[str, str] = dataclass_field(default_factory=lambda: dict(BUILTIN_LTWA_WORDS))
 
 
@@ -258,8 +263,17 @@ def unknown_journal_warnings(titles: list[str]) -> list[dict[str, str]]:
 
 def add_mapping(sources: JournalSources, mapping: JournalMapping) -> None:
     """Add a title/ISSN mapping. Later mappings for the same key win."""
-    sources.title_mappings[_journal_key(mapping.title)] = mapping
-    sources.abbreviated_mappings[_journal_key(mapping.abbreviated)] = mapping
+    title_key = _journal_key(mapping.title)
+    abbreviated_key = _journal_key(mapping.abbreviated)
+    sources.title_mappings[title_key] = mapping
+    sources.abbreviated_mappings[abbreviated_key] = mapping
+    # Rebound, never mutated: the bundled index is shared through a cache.
+    sources.title_spellings[title_key] = sources.title_spellings.get(title_key, frozenset()) | {
+        mapping.title
+    }
+    sources.abbreviated_spellings[abbreviated_key] = sources.abbreviated_spellings.get(
+        abbreviated_key, frozenset()
+    ) | {mapping.abbreviated}
     if mapping.issn:
         sources.issn_mappings[_issn_key(mapping.issn)] = mapping
 
@@ -283,6 +297,8 @@ def builtin_sources(journal_source: str = DEFAULT_JOURNAL_SOURCE) -> JournalSour
         sources.title_mappings.update(bundled.title_mappings)
         sources.abbreviated_mappings.update(bundled.abbreviated_mappings)
         sources.issn_mappings.update(bundled.issn_mappings)
+        sources.title_spellings.update(bundled.title_spellings)
+        sources.abbreviated_spellings.update(bundled.abbreviated_spellings)
     return sources
 
 
@@ -381,6 +397,18 @@ def load_ltwa_table(path: str | Path, sources: JournalSources | None = None) -> 
     return target
 
 
+def resolve_table_path(path: str | None, base_dir: str | Path | None) -> str | None:
+    """Resolve a journal or LTWA table named in library metadata.
+
+    A relative path is taken from ``base_dir`` (normally the ``.bib``'s folder),
+    as ``tex-sources`` is, so the setting works from any working directory. An
+    absolute path, or a missing ``base_dir``, leaves ``path`` unchanged.
+    """
+    if not path or base_dir is None or Path(path).is_absolute():
+        return path
+    return str(Path(base_dir) / path)
+
+
 def load_sources(
     journal_table: str | Path | None = None,
     ltwa_table: str | Path | None = None,
@@ -425,6 +453,8 @@ def _lookup_exact(title: str, entry: BibEntry, sources: JournalSources) -> tuple
     # already-abbreviated tokens and would decline the whole title.
     mapping = sources.abbreviated_mappings.get(key)
     if mapping:
+        if title in sources.abbreviated_spellings.get(key, ()):
+            return title, mapping.source
         return mapping.abbreviated, mapping.source
     return None
 
@@ -437,6 +467,8 @@ def _lookup_expansion(title: str, sources: JournalSources) -> tuple[str, str] | 
     # Already the full title: accept it as-is.
     mapping = sources.title_mappings.get(key)
     if mapping:
+        if title in sources.title_spellings.get(key, ()):
+            return title, mapping.source
         return mapping.title, mapping.source
     return None
 

@@ -635,3 +635,44 @@ def test_months_and_invisible_steps_have_a_setting_and_a_flag(
     assert operations()[step] == 0 and step in operations()["skipped"]
     # The flag overrides the setting in either direction.
     assert operations(flag, "on")[step] == 1
+
+
+def test_metadata_journal_table_resolves_from_the_bib_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from typer.testing import CliRunner
+
+    from pynakes._library_style import apply_library_style
+    from pynakes.cli import app
+    from pynakes.model import BibEntry
+
+    folder = tmp_path / "bibliography"
+    folder.mkdir()
+    (folder / "journals.csv").write_text(
+        "title,abbreviation\nRevista Boliviana de Fisica,Rev. Boliv. Fis.\n", encoding="utf-8"
+    )
+    bib = folder / "refs.bib"
+    meta = (
+        "@comment{pynakes-meta:\nnormalize-journal-style: abbreviated\n"
+        "normalize-journal-table: journals.csv\n}\n\n"
+    )
+    bib.write_text(
+        meta + "@article{A,\n  title = {T},\n  journal = {Revista Boliviana de Fisica}\n}\n",
+        encoding="utf-8",
+    )
+    # Run from elsewhere: the table is the library's, not the working directory's.
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["normalize", str(bib), "--only", "journals"])
+    assert result.exit_code == 0, result.output
+    assert "journal = {Rev. Boliv. Fis.}" in bib.read_text(encoding="utf-8")
+
+    result = runner.invoke(app, ["lint", str(bib), "--json"])
+    assert "journals.csv" not in result.output
+    assert "journal" not in json.dumps(json.loads(result.output)["summary"]["by_type"])
+
+    # A new entry joining the library gets the same table.
+    entry = BibEntry("article", "B", {"title": "U", "journal": "Revista Boliviana de Fisica"})
+    apply_library_style(parse_bib(bib.read_text(encoding="utf-8")), entry, base_dir=folder)
+    assert entry.fields["journal"] == "Rev. Boliv. Fis."

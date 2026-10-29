@@ -2,6 +2,7 @@
 
 from collections.abc import Collection
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from pynakes import authors as author_ops
 from pynakes import fields as field_ops
@@ -84,6 +85,10 @@ class NormalizeOptions:
     journal_source: str | None = None
     journal_table: str | None = None
     ltwa_table: str | None = None
+    #: Folder that resolves relative ``normalize-journal-table`` and
+    #: ``normalize-ltwa-table`` metadata (normally the ``.bib``'s folder).
+    #: Tables given as options are used as given.
+    base_dir: str | Path | None = None
     normalize_dois: bool | None = None
     normalize_pages: bool | None = None
     normalize_months: bool | None = None
@@ -540,8 +545,12 @@ def normalize_library(
             journal_ops.JOURNAL_SOURCES,
             journal_ops.DEFAULT_JOURNAL_SOURCE,
         )
-        journal_table = opts.journal_table or metadata_value(lib, "normalize-journal-table")
-        ltwa_table = opts.ltwa_table or metadata_value(lib, "normalize-ltwa-table")
+        journal_table = opts.journal_table or journal_ops.resolve_table_path(
+            metadata_value(lib, "normalize-journal-table"), opts.base_dir
+        )
+        ltwa_table = opts.ltwa_table or journal_ops.resolve_table_path(
+            metadata_value(lib, "normalize-ltwa-table"), opts.base_dir
+        )
         # The bundled tables hold 66,000 rows; load them only for a style that
         # reads them, as lint does.
         journal_sources = (

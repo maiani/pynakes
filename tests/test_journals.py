@@ -6,8 +6,10 @@ import pytest
 
 from pynakes.bibtex_parser import parse_bib
 from pynakes.journals import (
+    _journal_key,
     abbreviate_title_with_ltwa,
     builtin_sources,
+    expected_journal_title,
     load_journal_table,
     load_ltwa_table,
     load_sources,
@@ -279,3 +281,34 @@ def test_single_word_titles_are_left_unabbreviated_without_bundled_data() -> Non
     assert result.unknown == []
     assert lib.entries["A"].fields["journal"] == "Nature"
     assert lib.entries["B"].fields["journal"] == "Econometrica"
+
+
+def test_a_listed_spelling_is_kept_as_written() -> None:
+    # Lists disagree on punctuation the lookup key ignores: general gives
+    # "Zh. Eksp. Teor. Fiz.", geology_physics (loaded later) "Zh. Eksp. Teor. Fiz".
+    entry = parse_bib("@article{A, title = {T}}\n").entries["A"]
+    sources = builtin_sources()
+    full = "Zhurnal Eksperimental'noi i Teoreticheskoi Fiziki"
+    abbreviated = expected_journal_title(full, entry, "abbreviated", sources)
+    assert abbreviated == "Zh. Eksp. Teor. Fiz."
+    assert expected_journal_title(abbreviated, entry, "abbreviated", sources) == abbreviated
+    assert expected_journal_title("Cancer Res.", entry, "abbreviated", sources) == "Cancer Res."
+    # A spelling no list carries still takes the mapped one.
+    assert expected_journal_title("Phys Rev. Lett.", entry, "abbreviated", sources) == (
+        "Phys. Rev. Lett."
+    )
+
+
+def test_journal_style_is_idempotent_over_the_bundled_titles() -> None:
+    entry = parse_bib("@article{A, title = {T}}\n").entries["A"]
+    sources = builtin_sources()
+    # Left out: a result whose key is also the other kind of title, such as
+    # "Endodoncia", one journal's abbreviation and another's full title.
+    other_kind = {"abbreviated": sources.title_mappings, "full": sources.abbreviated_mappings}
+    for style in ("abbreviated", "full"):
+        for mapping in list(sources.title_mappings.values())[::7]:
+            once = expected_journal_title(mapping.title, entry, style, sources)
+            assert once is not None
+            if _journal_key(once) in other_kind[style]:
+                continue
+            assert expected_journal_title(once, entry, style, sources) == once, (style, mapping)
