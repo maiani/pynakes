@@ -146,6 +146,15 @@ The forms deprecated in 0.8 are removed:
 - `ref import` with several identifiers reports each one on stderr as it is
   looked up, as plain lines that captured output keeps. `--json` runs keep
   stderr silent.
+- `ref comment TEXT --key K` writes `% TEXT` directly above an entry, as a
+  comment attached to it: it moves with the entry, and `scrub` removes it with
+  the other comments. It holds remarks for the people keeping the bibliography
+  that do not belong in a `note` field, which bibliography styles print.
+  `--where` comments a selection, a comment already there is not repeated, and
+  `--remove` takes it out again. Text that cannot be a comment line is refused:
+  more than one line, an `@` (BibTeX would start an entry there), or a leading
+  `pynakes`, which reads as a directive. `Bibliography.add_entry_comment`,
+  `remove_entry_comment` and `entry_comments` are the Python API.
 
 ### Changed
 

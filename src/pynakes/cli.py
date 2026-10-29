@@ -18,6 +18,7 @@ from pynakes.cli_commands import (
     biblink,
     capabilities,
     coauthors,
+    comment,
     compare,
     convert,
     dedupe,
@@ -147,6 +148,7 @@ import_ref.register(ref_app)
 show.register(ref_app)
 edit.register(ref_app)
 directive.register(ref_app)
+comment.register(ref_app)
 compare.register(ref_app)
 lookup.register(ref_app)
 remove.register(ref_app)

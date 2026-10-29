@@ -1048,6 +1048,29 @@ Add a manually specified reference entry.
 | `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
+## ref comment
+
+**Stability: stable**
+
+Add or remove an entry comment: a `% TEXT` line directly above each entry.
+
+`pynakes ref comment [FILE] TEXT [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `TEXT` | string | yes | — | — | The comment, one line of free text |
+| `--key` | list[string] | no | null | — | The entries to comment: citation keys, comma-separated, repeatable |
+| `--where` | string | no | null | — | Comment every entry matching this selector |
+| `--remove` | boolean | no | false | — | Remove the entries' attached comments reading TEXT |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
+| `--dry-run` | boolean | no | false | — | Show changes without writing |
+| `--diff` | boolean | no | false | — | Show a unified diff |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
 ## ref compare
 
 **Stability: stable**

@@ -173,6 +173,9 @@ the all-or-nothing guarantee rather than an exception to it.
   finding a human has judged unfixable for one entry (a venue with no DOIs),
   rather than inventing a value to silence it. Record the reason; `lint`
   reports the waiver as `unused_entry_directive` once it no longer applies.
+- Use `ref comment "<text>" --key <key>` for a remark meant for the people
+  keeping the bibliography (how a value was checked, why an entry is there),
+  not a `note` field, which bibliography styles print. `scrub` removes it.
 - Use `ref compare <key> --online` to check one reference's DOI (or, absent a
   DOI, its arXiv id) against provider metadata, or `ref compare <key> --with
   <other-key>` to compare it against another entry already in the bibliography

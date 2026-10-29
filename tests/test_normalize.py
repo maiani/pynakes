@@ -649,7 +649,7 @@ def test_metadata_journal_table_resolves_from_the_bib_folder(
     folder = tmp_path / "bibliography"
     folder.mkdir()
     (folder / "journals.csv").write_text(
-        "title,abbreviation\nRevista Boliviana de Fisica,Rev. Boliv. Fis.\n", encoding="utf-8"
+        "title,abbreviation\nAnnals of Invented Results,Ann. Invent. Res.\n", encoding="utf-8"
     )
     bib = folder / "refs.bib"
     meta = (
@@ -657,7 +657,7 @@ def test_metadata_journal_table_resolves_from_the_bib_folder(
         "normalize-journal-table: journals.csv\n}\n\n"
     )
     bib.write_text(
-        meta + "@article{A,\n  title = {T},\n  journal = {Revista Boliviana de Fisica}\n}\n",
+        meta + "@article{A,\n  title = {T},\n  journal = {Annals of Invented Results}\n}\n",
         encoding="utf-8",
     )
     # Run from elsewhere: the table is the library's, not the working directory's.
@@ -666,13 +666,13 @@ def test_metadata_journal_table_resolves_from_the_bib_folder(
 
     result = runner.invoke(app, ["normalize", str(bib), "--only", "journals"])
     assert result.exit_code == 0, result.output
-    assert "journal = {Rev. Boliv. Fis.}" in bib.read_text(encoding="utf-8")
+    assert "journal = {Ann. Invent. Res.}" in bib.read_text(encoding="utf-8")
 
     result = runner.invoke(app, ["lint", str(bib), "--json"])
     assert "journals.csv" not in result.output
     assert "journal" not in json.dumps(json.loads(result.output)["summary"]["by_type"])
 
     # A new entry joining the library gets the same table.
-    entry = BibEntry("article", "B", {"title": "U", "journal": "Revista Boliviana de Fisica"})
+    entry = BibEntry("article", "B", {"title": "U", "journal": "Annals of Invented Results"})
     apply_library_style(parse_bib(bib.read_text(encoding="utf-8")), entry, base_dir=folder)
-    assert entry.fields["journal"] == "Rev. Boliv. Fis."
+    assert entry.fields["journal"] == "Ann. Invent. Res."

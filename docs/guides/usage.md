@@ -60,7 +60,7 @@ so there are no command-specific filter flags to learn.
 
 Accepted by [`ref show`](#show-and-edit), [`fields`](#fields), [`search`](#search), [`format`](#format),
 [`normalize`](#normalize), [`verify` and `enrich`](#verify-enrich), `keys generate`,
-`asset fetch`, `ref directive`, [`combine`](#combine),
+`asset fetch`, `ref directive`, `ref comment`, [`combine`](#combine),
 [`split`](#split) (`--route` rules), and the `fields.*` operations of
 `batch`. A `--key` that names no entry is a `KeyNotFound` error, and a
 selection that matches nothing writes nothing and warns `no_entries_selected`.
@@ -563,6 +563,26 @@ directive pynakes cannot act on is refused by `ref directive` and reported by
 finding is reported as `unused_entry_directive`, so a waiver does not outlive
 its reason unnoticed. Waived findings count toward the lint summary's
 `suppressed`.
+
+## Entry comments
+
+A remark about an entry that is for the people keeping the bibliography, not
+for readers of the paper, belongs in a comment above the entry rather than in a
+`note` field, which bibliography styles print:
+
+```bibtex
+% checked against the first edition
+@book{Newton1687,
+```
+
+`ref comment refs.bib "checked against the first edition" --key Newton1687`
+writes it, and `--remove` with the same text takes it out again; `--where`
+comments a whole selection. Like a directive, the comment is attached: it moves
+with the entry, and `scrub` removes it with the other comments unless
+`--keep-comments` is given. A comment the entry already carries is not
+repeated. The text is one line; it cannot contain `@`, which BibTeX would read
+as the start of an entry, or start with `pynakes`, which would read as a
+directive or metadata.
 
 ## lookup
 

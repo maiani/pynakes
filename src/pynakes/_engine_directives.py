@@ -1,20 +1,31 @@
-"""Staging per-entry directives (see :mod:`pynakes.directives`) on a Bibliography.
+"""Staging per-entry directives and comments on a Bibliography.
 
-A directive is a comment line directly above its entry. Adding one inserts a
-line at the start of the entry's source span; removing one deletes its comment
-slot; changing one rewrites the slot in place. No entry's own text changes, and
-nothing else in the file moves.
+A directive (see :mod:`pynakes.directives`) is a comment line directly above its
+entry; an entry comment is a ``%`` line there holding free text for people. Adding
+one inserts a line at the start of the entry's source span; removing one deletes
+its comment slot; changing a directive rewrites the slot in place. No entry's own
+text changes, and nothing else in the file moves.
 """
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
-from pynakes.directives import EntryDirective, directive_problem, entry_directives, format_directive
+from pynakes._entry_comments import attached_comment_indices
+from pynakes.directives import (
+    EntryDirective,
+    directive_problem,
+    entry_directives,
+    format_directive,
+    parse_directive,
+)
 from pynakes.model import BibEntry, BibFile
 
 if TYPE_CHECKING:
     from pynakes._engine_helpers import SourceSnapshot
+
+_COMMENT_BLOCK = re.compile(r"^@comment\s*[{(](.*)[})]\s*$", re.IGNORECASE | re.DOTALL)
 
 
 class BibliographyDirectives:
@@ -81,6 +92,50 @@ class BibliographyDirectives:
             changed += 1
         return changed
 
+    def entry_comments(self, key: str) -> list[tuple[int, str]]:
+        """Return ``(slot, text)`` for each free comment attached above entry ``key``.
+
+        Directives and metadata blocks are not free comments. The text drops the
+        ``%`` marker or the ``@comment`` wrapper and surrounding space.
+        """
+        entry = self._directive_entry(key)
+        result: list[tuple[int, str]] = []
+        for index in attached_comment_indices(self.lib).get(id(entry), []):
+            raw = self.lib.raw_comments[index]
+            if parse_directive(raw) is None:
+                result.append((index, _comment_text(raw)))
+        return result
+
+    def add_entry_comment(self, key: str, text: str) -> bool:
+        """Stage ``% text`` directly above entry ``key``, where it moves with the entry.
+
+        A comment already attached with the same text is not repeated. Returns
+        whether anything was staged. Raises ``ValueError`` for text that cannot be
+        a comment line, ``KeyError`` for an unknown key.
+        """
+        problem = comment_problem(text)
+        if problem is not None:
+            raise ValueError(problem)
+        text = text.strip()
+        if any(existing == text for _index, existing in self.entry_comments(key)):
+            return False
+        self._insert_directive(self._directive_entry(key), f"% {text}")
+        return True
+
+    def remove_entry_comment(self, key: str, text: str) -> int:
+        """Stage removal of entry ``key``'s attached comments reading ``text``.
+
+        Returns how many comment lines were removed.
+        """
+        text = text.strip()
+        removed = 0
+        for index, existing in self.entry_comments(key):
+            if existing == text:
+                self.lib.raw_comments[index] = ""
+                self._removed_comments.add(index)
+                removed += 1
+        return removed
+
     # --- internals -------------------------------------------------------
 
     def _directive_entry(self, key: str) -> BibEntry:
@@ -118,3 +173,28 @@ def _slot(directive: EntryDirective) -> int:
     if directive.comment_index is None:
         raise RuntimeError("directive has no comment slot")
     return directive.comment_index
+
+
+def comment_problem(text: str) -> str | None:
+    """Return why ``text`` cannot be an entry comment, or ``None`` when it can."""
+    body = text.strip()
+    if not body:
+        return "the comment text is empty"
+    if "\n" in body or "\r" in body:
+        return "the comment must be a single line"
+    if "@" in body:
+        # BibTeX reads no comment syntax between entries: an @ would start one.
+        return "the comment cannot contain '@', which BibTeX reads as the start of an entry"
+    if body.lower().startswith("pynakes"):
+        return (
+            "a comment starting with 'pynakes' reads as a directive or metadata; use ref directive"
+        )
+    return None
+
+
+def _comment_text(raw: str) -> str:
+    body = raw.strip()
+    if body.startswith("%"):
+        return body.lstrip("%").strip()
+    block = _COMMENT_BLOCK.match(body)
+    return block.group(1).strip() if block else body

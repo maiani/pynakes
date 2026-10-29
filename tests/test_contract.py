@@ -94,6 +94,7 @@ POSITIONALS: dict[str, tuple[tuple[str, bool, bool], ...]] = {
     "ref add": (("file", False, False), ("key", False, False)),
     "ref compare": (("file", False, False), ("key", True, False)),
     "ref directive": (("file", False, False), ("words", True, True)),
+    "ref comment": (("file", False, False), ("text", True, False)),
     "ref edit": (("file", False, False), ("key", True, False)),
     "ref lookup": (("text", True, False),),
     "ref import": (("file", False, False), ("identifiers", True, True)),
@@ -288,6 +289,10 @@ SAMPLES: dict[str, tuple[str, list[str]]] = {
     "ref directive": (
         "modify",
         ["ref", "directive", "{bib}", "ignore", "missing_doi", "--key", "Brown2022", "--dry-run"],
+    ),
+    "ref comment": (
+        "modify",
+        ["ref", "comment", "{bib}", "checked by hand", "--key", "Brown2022", "--dry-run"],
     ),
     "ref edit": ("modify", ["ref", "edit", "{bib}", "Smith2020", "--field", "note=x", "--dry-run"]),
     "ref lookup": ("error", ["ref", "lookup", "Newton, Principia, 1687"]),
