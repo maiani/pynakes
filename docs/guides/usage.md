@@ -338,6 +338,18 @@ present:
 Unsupported key-pattern markers or modifiers fail explicitly instead of
 silently generating an incorrect key.
 
+A fully braced institution author containing spaces is shortened using JabRef's
+institution rules: an inline abbreviation such as `({RS})` takes precedence;
+otherwise capitalized words supply initials when there are at least three,
+and are joined when fewer remain. `the`, `press`, and words ending in a dot
+are omitted. A university part supplies `Uni` plus its name, followed by
+school and department capitals. For example, `{Royal Society of London}`
+gives `RSL`.
+
+An empty pattern marker drops one adjacent punctuation separator. For example,
+`[auth]_[year]_[veryshorttitle]` gives `Newton_Principia` when the year is
+absent. This is a pynakes extension; JabRef keeps the separator.
+
 Markers cover authors (`auth`, `authors`, `authorIni`, `authIniN`, `authorsN`,
 `authorLast`, and `authN`), the equivalent editor family (`edtr`, `editors`,
 `editorIni`, `edtrIniN`, `editorsN`, `editorLast` — these read only the

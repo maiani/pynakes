@@ -24,6 +24,8 @@ from pynakes._lint_directives import entry_ignore_rules
 from pynakes._lint_issue import LintIssue
 from pynakes._text_utils import entry_year
 from pynakes.authors import ascii_fold as _ascii_fold
+from pynakes.authors import institution_key as _institution_key
+from pynakes.authors import institution_name as _institution_name
 from pynakes.authors import key_text as _key_text
 from pynakes.authors import last_name as _last_name
 from pynakes.authors import split_name_list as _split_name_list
@@ -124,7 +126,13 @@ def rewrite_key_references(lib: BibFile, renames: list[tuple[str, str]]) -> int:
 def _last_names_of(raw: str) -> tuple[str, ...]:
     # Pure in the name list's text, and key generation asks for the same
     # entry's names several times (exemption, pattern markers, fallback key).
-    return tuple(name for name in (_last_name(p) for p in _split_name_list(raw)) if name)
+    return tuple(name for name in (_key_name(p) for p in _split_name_list(raw)) if name)
+
+
+def _key_name(person: str) -> str:
+    """Return the name a key uses for one person or institution author."""
+    institution = _institution_name(person)
+    return _institution_key(institution) if institution is not None else _last_name(person)
 
 
 def _last_names_for(entry: BibEntry, field: str, fallback: str | None = None) -> list[str]:
@@ -490,15 +498,36 @@ def _sanitize_key(value: str) -> str:
 
 
 def generate_key_from_pattern(entry: BibEntry, pattern: str) -> str:
-    """Generate a citation key from a supported JabRef citation-key pattern."""
-    output = []
+    """Generate a citation key from a supported JabRef citation-key pattern.
+
+    A marker with nothing to give takes one separator with it, so a year-less
+    entry under ``[auth]_[year]_[veryshorttitle]`` gets ``Newton_Principia``
+    rather than ``Newton__Principia``: the separator before it when something
+    precedes, else the one after. JabRef keeps the separator.
+    """
+    literals: list[str] = []
+    values: list[str] = []
     last = 0
     for match in _PATTERN_MARKER_RE.finditer(pattern):
-        output.append(pattern[last : match.start()])
-        output.append(_resolve_marker(entry, match.group(1)))
+        literals.append(pattern[last : match.start()])
+        values.append(_resolve_marker(entry, match.group(1)))
         last = match.end()
-    output.append(pattern[last:])
+    literals.append(pattern[last:])
+    for index, value in enumerate(values):
+        if value:
+            continue
+        before, after = literals[index], literals[index + 1]
+        produced = "".join(literals[: index + 1]) + "".join(values[:index])
+        if _SEPARATOR_RE.fullmatch(before) and produced.strip(before):
+            literals[index] = ""
+        elif _SEPARATOR_RE.fullmatch(after):
+            literals[index + 1] = ""
+    output = [part for pair in zip(literals, [*values, ""]) for part in pair]
     return _sanitize_key("".join(output)) or generate_fallback_key(entry)
+
+
+#: Pattern text between markers that is only punctuation: a separator.
+_SEPARATOR_RE = re.compile(r"[^A-Za-z0-9]+")
 
 
 def generate_fallback_key(entry: BibEntry) -> str:

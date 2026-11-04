@@ -180,6 +180,14 @@ The forms deprecated in 0.8 are removed:
 
 ### Changed
 
+- Institution authors now use JabRef-style abbreviations in generated keys:
+  inline abbreviations take precedence, otherwise capitalized words supply
+  initials (or joined words for short names), with university, school and
+  department handling. `{Royal Society of London}` becomes `RSL`.
+- Empty key-pattern markers drop one adjacent punctuation separator, so a
+  missing year in `[auth]_[year]_[veryshorttitle]` gives `Newton_Principia`.
+  This is a pynakes extension to JabRef's pattern behavior.
+
 - The `pynakes-lint` pre-commit hook runs `lint --strict --severity warning`,
   so info findings no longer fail a commit; warnings and errors still do, as
   `init --agent-guide` already recommended. `lint --strict` itself is unchanged.

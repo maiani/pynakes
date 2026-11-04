@@ -190,6 +190,38 @@ class TestGenerateKey:
         # ("ErdHos", "vCech"), and \AA left its name ("AAngstrom").
         assert generate_key_from_pattern(_entry(author=author, title="T"), "[auth]") == expected
 
+    @pytest.mark.parametrize(
+        ("author", "expected"),
+        [
+            # Three or more kept words give their initials; "of" is lowercase.
+            ("{Royal Society of London for Improving Natural Knowledge}", "RSLINK"),
+            ("{Massachusetts Institute of Technology}", "MIT"),
+            # An abbreviation written into the name is used as it stands.
+            ("{The Attributed Graph Grammar System ({AGG})}", "AGG"),
+            # Fewer than three words are joined; "Press" is left out.
+            ("{Clarendon Press}", "Clarendon"),
+            ("{Department of Physics, University of Uppsala}", "UniUppsalaP"),
+            # A braced name without a space is a person, taken whole.
+            ("{Euclid}", "Euclid"),
+        ],
+    )
+    def test_an_institution_author_is_shortened_as_jabref_does(
+        self, author: str, expected: str
+    ) -> None:
+        assert generate_key_from_pattern(_entry(author=author, title="T"), "[auth]") == expected
+
+    def test_an_empty_marker_takes_one_separator_with_it(self) -> None:
+        pattern = "[auth]_[year]_[veryshorttitle]"
+        no_year = _entry(author="Newton, Isaac", title="Principia")
+        no_title = _entry(author="Newton, Isaac", year="1687")
+        no_author_or_year = _entry(editor="", title="Principia")
+
+        assert generate_key_from_pattern(no_year, pattern) == "Newton_Principia"
+        assert generate_key_from_pattern(no_title, pattern) == "Newton_1687"
+        assert generate_key_from_pattern(no_author_or_year, "[year]-[veryshorttitle]") == (
+            "Principia"
+        )
+
     def test_an_accented_title_word_stays_one_word(self) -> None:
         e = _entry(author="A", title=r"{\"U}ber die Schr{\"o}dinger Gleichung")
         assert generate_key_from_pattern(e, "[shorttitle]") == "UberdieSchrodinger"

@@ -68,6 +68,90 @@ def key_text(value: str) -> str:
     return ascii_fold(encode_text(value, "unicode")[0])
 
 
+_INLINE_ABBREVIATION_RE = re.compile(r"\(\{([A-Z]+)\}\)")
+_IGNORED_INSTITUTION_WORDS = {"press", "the"}
+
+
+def institution_name(person: str) -> str | None:
+    """Return the inside of a braced institution name, or ``None`` for a person.
+
+    As in JabRef, an author is an institution when the whole name is one
+    brace group containing a space: ``{Royal Society of London}``, not
+    ``{Euclid}`` or ``{van Gogh}, Vincent``.
+    """
+    person = person.strip()
+    if not (person.startswith("{") and person.endswith("}")):
+        return None
+    depth = 0
+    for index, char in enumerate(person):
+        depth += {"{": 1, "}": -1}.get(char, 0)
+        if depth == 0 and index < len(person) - 1:
+            return None  # the opening brace closes before the end
+    inner = person[1:-1]
+    return inner if any(char.isspace() for char in inner) else None
+
+
+def institution_key(name: str) -> str:
+    r"""Return the citation-key part for an institution author, following JabRef.
+
+    An abbreviation written into the name, ``{Royal Society ({RS})}``, is used
+    as it stands. Otherwise each comma-separated part keeps its capitalized
+    words, leaving out ``the``, ``press`` and words ending in a dot; a part of
+    three or more words gives their initials, a shorter one its words. A
+    university part becomes ``Uni`` plus its name, followed by the initials of
+    a school and of the department named before it:
+    ``{NIST Digital Library of Mathematical Functions}`` gives ``NDLMF``.
+    """
+    abbreviation = _INLINE_ABBREVIATION_RE.search(name)
+    if abbreviation:
+        return abbreviation.group(1)
+    parts = [part.strip() for part in key_text(name).split(",")]
+    university = school = department = rest = None
+    for index, part in enumerate(parts):
+        tokens = _institution_tokens(part)
+        lowered = [token.lower() for token in tokens]
+        if any(re.match(r"uni(v|b|$)", token) for token in lowered):
+            if university is None:
+                university = "Uni" + "".join(t for t in tokens if not t.lower().startswith("uni"))
+                if index > 0 and department is None:
+                    department = _capitals(_institution_tokens(parts[index - 1]))
+        elif len(parts) > 1 and "school" in lowered:
+            school = school or _capitals(tokens)
+        elif len(parts) > 1 and any(re.match(r"(d[ei]p|lab)", token) for token in lowered):
+            department = department or _capitals(tokens)
+        elif rest is None and tokens:
+            rest = "".join(t[0] for t in tokens) if len(tokens) >= 3 else "".join(tokens)
+    key = university if university is not None else (rest or "")
+    return key + (school or "") + (department if department and department != school else "")
+
+
+def _institution_tokens(part: str) -> list[str]:
+    """Return the words of one institution part that JabRef keeps for a key."""
+    words = re.split(r"[ \-_]", re.sub(r"\{[A-Z]+\}", "", part))
+    return [
+        word
+        for word in (re.sub(r"[{}]", "", word) for word in words)
+        if word.lower().startswith("uni")
+        or (
+            word
+            and word.lower() not in _IGNORED_INSTITUTION_WORDS
+            and not word.endswith(".")
+            and word[0].isupper()
+        )
+    ]
+
+
+def _capitals(tokens: list[str]) -> str:
+    """Return the capital letters of the words that are not institution keywords."""
+    kept = [
+        token
+        for token in tokens
+        if not re.match(r"d[ei]p", token, re.IGNORECASE)
+        and token.lower() not in {"school", "faculty"}
+    ]
+    return "".join(char for token in kept for char in token if char.isupper())
+
+
 AUTHOR_STYLES = {"jabref", "conservative", "bibtex", "biblatex", "none"}
 AUTHOR_STYLE_ALIASES = {
     "bibtex": "jabref",
