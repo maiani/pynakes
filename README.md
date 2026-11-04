@@ -122,8 +122,8 @@ are maintained separately.
 - [Architecture](https://github.com/maiani/pynakes/blob/main/docs/guides/architecture.md)
 
 The v0.10 development `Library` Python API adds direct cross-file lookup and
-search. Its CLI integration, work identity, rollups and rebuildable `Catalogue`
-remain planned. See the
+search, with `library add` routing new records to member bibliographies.
+General work-identity reports, rollups and a rebuildable `Catalogue` remain planned. See the
 [vision](https://github.com/maiani/pynakes/blob/main/docs/vision.md) and
 [development plan](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
 Release history is in the [changelog](https://github.com/maiani/pynakes/blob/main/CHANGELOG.md).

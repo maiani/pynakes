@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fnmatch
+import hashlib
 import os
 import stat
 import tomllib
@@ -10,6 +11,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
+
+from pynakes._library_routing import LibraryRouting, parse_routing
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,8 @@ class _Manifest:
     members: tuple[str, ...]
     exclude: tuple[str, ...]
     catalogue: Path | None
+    routing: LibraryRouting
+    sha256: str
 
 
 def _strings(data: dict, key: str) -> tuple[str, ...]:
@@ -54,9 +59,16 @@ def _read_manifest(path: str | Path) -> _Manifest:
     path = Path(path).absolute()
     if not path.name.endswith(".library.toml"):
         raise ValueError("Library manifest must be named <name>.library.toml")
-    with path.open("rb") as stream:
-        data = tomllib.load(stream)
-    unknown = data.keys() - {"pynakes-library", "name", "members", "exclude", "catalogue"}
+    raw = path.read_bytes()
+    data = tomllib.loads(raw.decode("utf-8"))
+    unknown = data.keys() - {
+        "pynakes-library",
+        "name",
+        "members",
+        "exclude",
+        "catalogue",
+        "routing",
+    }
     if unknown:
         raise ValueError(f"Unknown Library manifest keys: {', '.join(sorted(unknown))}")
     if type(data.get("pynakes-library")) is not int or data["pynakes-library"] != 1:
@@ -77,6 +89,8 @@ def _read_manifest(path: str | Path) -> _Manifest:
         members=_strings(data, "members"),
         exclude=_strings(data, "exclude"),
         catalogue=(path.parent / catalogue).absolute() if catalogue is not None else None,
+        routing=parse_routing(data.get("routing", {}), path.parent),
+        sha256=hashlib.sha256(raw).hexdigest(),
     )
 
 

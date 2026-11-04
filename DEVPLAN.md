@@ -246,15 +246,17 @@ results have explicit semantics and representative queries show measured benefit
 
 One feature per commit, each usable on the branch before the next starts.
 The direct-read Python foundation is described in the Unreleased changelog.
-The next slice is CLI integration; identity/rollups and the Catalogue follow.
+Routed additions now have a CLI; broader read integration, identity/rollups
+and the Catalogue follow.
 
 1. **`Library` reads**, built to the definition in
    [the architecture guide](docs/guides/architecture.md#library-a-declared-set-of-bibliographies):
    membership, work identity and a Catalogue over member files that keep all
-   the data. A named library is a `<name>.library.toml` manifest with exactly
-   five keys: `pynakes-library` (format version), `name`, `members` (paths or
+   the data. A named library is a `<name>.library.toml` manifest with membership
+   keys: `pynakes-library` (format version), `name`, `members` (paths or
    patterns, resolved from the manifest's folder), `exclude` and `catalogue`.
-   Any other key is an error, so settings cannot move into it. Several files
+   Its optional `routing` table owns cross-member placement policy. Other keys
+   are errors; per-bibliography formatting settings cannot move into it. Several files
    given to one command form an unnamed library. A file may belong to several
    libraries; libraries do not nest. Build the command surface below on the
    direct-read Python API, retaining its member diagnostics, occurrence

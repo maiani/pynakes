@@ -1,26 +1,40 @@
-"""Read-only discovery across explicitly declared bibliography members.
+"""Discovery and routed additions across explicitly declared bibliography members.
 
 ``Library.open()`` loads a versioned manifest; ``Library.from_files()`` loads
 explicit files. Both read member files once using the normal BibTeX reader.
 Lookup and search use that in-memory view until the caller opens it again.
-There is no index, background refresh, network access or cross-file mutation.
+Additions select one member and stage through Bibliography. There is no index,
+background refresh, network access or multi-file mutation.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 import stat
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from pynakes._library_add import LibraryAddition, LibraryRoutingError
 from pynakes._library_members import LibraryIssue, _read_manifest, _resolve_files, _resolve_members
+from pynakes._library_routing import LibraryRouting, RoutingDecision, RoutingRule
 from pynakes.bibtex_parser import ParseError
 from pynakes.io import _load_source
-from pynakes.model import BibFile
+from pynakes.model import BibEntry, BibFile
 from pynakes.search import SearchResult, _result_rank, _search_indexed
 
-__all__ = ["Library", "LibraryHit", "LibraryIssue", "LibraryRead"]
+__all__ = [
+    "Library",
+    "LibraryHit",
+    "LibraryIssue",
+    "LibraryRead",
+    "LibraryRouting",
+    "RoutingRule",
+    "RoutingDecision",
+    "LibraryRoutingError",
+    "LibraryAddition",
+]
 
 
 @dataclass(frozen=True)
@@ -124,10 +138,15 @@ class Library:
         manifest: Path | None = None,
         name: str | None = None,
         catalogue: Path | None = None,
+        routing: LibraryRouting | None = None,
+        manifest_sha256: str | None = None,
     ) -> None:
         self.members = members
         self.manifest = manifest
         self.name = name
+        self.routing = routing or LibraryRouting()
+        self.routing.validate_members(members)
+        self._manifest_sha256 = manifest_sha256
         # Reserved declaration only: no index is opened, created or refreshed.
         self.catalogue = catalogue
         diagnostics = list(issues)
@@ -170,7 +189,9 @@ class Library:
         """Read a ``<name>.library.toml`` and its selected members.
 
         Version 1 requires ``pynakes-library = 1`` and a ``members`` array.
-        Only ``name``, ``exclude`` and ``catalogue`` are additionally accepted.
+        Optional keys are ``name``, ``exclude``, ``catalogue`` and ``routing``.
+        Routing declares a fallback and named selector rules with integer
+        priorities; higher priorities win, equal-priority destinations conflict.
         Paths/patterns are relative to the manifest folder. Patterns use
         case-sensitive ``*``, ``?``, ``[]`` and recursive ``**`` components;
         hidden names are included, recursive directory symlinks are not.
@@ -183,8 +204,75 @@ class Library:
         spec = _read_manifest(manifest)
         members, issues = _resolve_members(spec.members, spec.path.parent, spec.exclude)
         return cls(
-            members, issues=issues, manifest=spec.path, name=spec.name, catalogue=spec.catalogue
+            members,
+            issues=issues,
+            manifest=spec.path,
+            name=spec.name,
+            catalogue=spec.catalogue,
+            routing=spec.routing,
+            manifest_sha256=spec.sha256,
         )
+
+    @property
+    def source_sha256(self) -> str:
+        """Fingerprint the held manifest and ordered member read results."""
+        data = {
+            "manifest": self._manifest_sha256,
+            "members": [str(path) for path in self.members],
+            "loaded": [(str(member.path), member.sha256) for member in self._loaded],
+            "issues": [issue.to_dict() for issue in self.issues],
+        }
+        return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
+
+    def _assert_current(self) -> None:
+        """Refuse stale routing or duplicate-check evidence before a write."""
+        from pynakes.engine import ExternalModificationError
+
+        path = self.manifest or next(iter(self.members), Path.cwd())
+        try:
+            current = (
+                Library.open(self.manifest) if self.manifest else Library.from_files(self.members)
+            )
+            same = self.source_sha256 == current.source_sha256
+        except (ValueError, OSError):
+            same = False
+        if not same:
+            raise ExternalModificationError(path)
+
+    def route(
+        self,
+        entry: BibEntry,
+        *,
+        destination: str | Path | None = None,
+    ) -> RoutingDecision:
+        """Preview one home, checking work/key candidates across every member.
+
+        Explicit destinations override rules, but never duplicate or incomplete
+        read checks. Relative destinations resolve from the manifest directory
+        (cwd for unnamed Libraries). No network or filesystem writes occur.
+        """
+        from pynakes._library_add import route
+
+        return route(self, entry, destination)
+
+    def stage_entry(
+        self,
+        entry: BibEntry,
+        *,
+        destination: str | Path | None = None,
+    ) -> LibraryAddition:
+        """Stage a uniquely routed new entry in one existing member.
+
+        Returns its decision and Bibliography for preview, diff, reset and
+        commit. Raises LibraryRoutingError for existing/uncertain work, routing
+        ties, absent fallback or incomplete reads. The commit rechecks every
+        member and the manifest; these checks are not a cross-file lock.
+        Entry fields are supplied metadata, with file paths interpreted from
+        the destination bibliography. This does not ingest or move materials.
+        """
+        from pynakes._library_add import stage_entry
+
+        return stage_entry(self, entry, destination)
 
     @classmethod
     def from_files(cls, files: Iterable[str | Path]) -> Library:

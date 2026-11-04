@@ -108,6 +108,7 @@ class Bibliography(
     _tex_rewrites: list[_tex_rewrite.TexRewrite] = field(default_factory=list)
     _after_commit: list[Callable[[], object]] = field(default_factory=list)
     _pdf_import_sources: list[tuple[Path, str]] = field(default_factory=list)
+    _commit_guards: list[Callable[[], None]] = field(default_factory=list)
 
     @classmethod
     def open(cls, path: str | Path) -> "Bibliography":
@@ -299,6 +300,8 @@ class Bibliography(
             raise ExternalModificationError(self.path)
 
         changed_entries = self.changed_entries_count()
+        for guard in self._commit_guards:
+            guard()
         if self._pdf_import_sources:
             from pynakes._pdf_evidence import file_digest
 
@@ -371,6 +374,7 @@ class Bibliography(
         self._tex_rewrites.clear()
         self._after_commit.clear()
         self._pdf_import_sources.clear()
+        self._commit_guards.clear()
 
     def reset(self) -> None:
         """Discard staged edits and restore the pristine in-memory library."""

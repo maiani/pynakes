@@ -12,7 +12,8 @@ Its foundation is deliberate: authoritative BibTeX/BibLaTeX files, preservation
 of untouched source, reviewable changes and explicit conflicts. The current
 Python API and CLI implement bibliography operations and optional Pinax material
 management. The v0.10 development `Library` API adds direct cross-file lookup and
-search. CLI integration, reconciliation, analysis rollups and a derived
+search, plus reviewed routing of new records to member bibliographies.
+Reconciliation, analysis rollups and a derived
 `Catalogue` remain planned. The roadmap separates those plans from implemented
 features.
 
@@ -60,6 +61,12 @@ BibTeX:
   (`--online`, `--fetch` stay explicit — a setting may choose *which* lookup a
   network command makes, never *whether* one is made); and the terms of a
   single search (`--in`, `--fuzzy`, `--case-sensitive`).
+- **Library placement has Library scope.** Membership and routing rules live
+  in the Library manifest, since they choose among bibliographies. They are
+  deliberately outside `pynakes-meta` and `metadata set`; the manifest is their
+  current editing surface. `library add --destination` and the Python
+  `destination=` parameter override placement for one addition. Formatting and
+  normalization preferences remain bibliography settings with all three forms.
 
 ## In JabRef's lineage
 

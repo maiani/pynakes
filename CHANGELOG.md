@@ -40,6 +40,14 @@ The compatibility forms deprecated in 0.9 are removed in v0.10:
 
 ### Added
 
+- Library manifests accept explicit routing rules and a fallback member. Higher
+  priorities win; conflicting destinations at the highest priority require
+  review. `Library.route`, `Library.stage_entry` and `library add` check existing
+  work across all members, explain placement, and stage one destination through
+  `Bibliography`. Manifest/member changes invalidate guarded writes and reviewed
+  previews. Routing does not copy or move PDFs; cross-member material relocation
+  remains planned.
+
 - `ref from-pdf` and `Bibliography.import_pdfs` inspect local PDFs with the
   optional PyMuPDF backend (`pynakes[pdf]`, AGPL/commercial terms), stage complete
   embedded BibTeX/XMP records, and optionally resolve title-corroborated DOI/arXiv
@@ -50,17 +58,16 @@ The compatibility forms deprecated in 0.9 are removed in v0.10:
   files in their reports. The first version has no OCR or managed material copies.
 
 - The Python `Library` API reads explicitly selected bibliographies or a
-  version-1 `<name>.library.toml` manifest. Manifests accept only membership,
-  exclusions, a name and a reserved Catalogue path; bibliography settings stay
+  version-1 `<name>.library.toml` manifest. Manifests accept membership,
+  exclusions, routing, a name and a reserved Catalogue path; bibliography settings stay
   in the `.bib` files. Key lookup and cross-file search preserve every matching
   occurrence, including duplicate keys, with file, entry index, source line and
   source-byte fingerprint. Search retains field scopes and match explanations
   and ranks across members before applying a result limit.
 - Library reads report missing, unreadable, malformed or changing members and
   unmatched patterns alongside usable results. A held Library is an in-memory
-  view; reopening reads current membership and bytes. This first v0.10 slice
-  is Python-only: CLI integration, cross-file work identity, analysis rollups
-  and the Catalogue remain planned.
+  view; reopening reads current membership and bytes. General cross-file work
+  identity reports, analysis rollups and the Catalogue remain planned.
 
 ### Fixed
 

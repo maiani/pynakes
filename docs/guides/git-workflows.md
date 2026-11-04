@@ -32,7 +32,8 @@ members = ["references.bib"]
 Relative membership paths survive a clone or move of this directory. A Library
 can later include more `.bib` files without changing the repository model.
 Avoid members outside the repository if the clone must contain every reference.
-The current Library API is Python-only; CLI writes still target individual
+`library add MANIFEST KEY` can select the destination through
+[Library routing](library-routing.md). Other CLI writes target individual
 bibliographies.
 
 ### What belongs in history

@@ -47,6 +47,7 @@ class ErrorCode(StrEnum):
     # --- conflicts (exit 2) ---
     EXTERNAL_MODIFICATION = "ExternalModification"
     PDF_IMPORT_CONFLICT = "PDFImportConflict"
+    LIBRARY_ROUTING_CONFLICT = "LibraryRoutingConflict"
     CITATION_KEY_CONFLICT = "CitationKeyConflict"
     DUPLICATE_CITATION_KEY = "DuplicateCitationKey"
     GROUP_CONFLICT = "GroupConflict"
@@ -73,6 +74,9 @@ class ErrorSpec:
 _E = ErrorCode
 
 CATALOGUE: dict[ErrorCode, ErrorSpec] = {
+    _E.LIBRARY_ROUTING_CONFLICT: ErrorSpec(
+        2, "A Library addition needs review of routing, existing works or citation keys."
+    ),
     _E.USAGE_ERROR: ErrorSpec(
         1,
         "The command line was malformed: an unknown option, a missing or extra argument, "

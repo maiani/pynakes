@@ -828,6 +828,29 @@ Scan TeX sources directly for \cite-family citations of one key.
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
+## library add
+
+**Stability: stable**
+
+Add supplied reference metadata to its routed Library member.
+
+`pynakes library add MANIFEST KEY [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `MANIFEST` | string | yes | — | — | Library .library.toml manifest |
+| `KEY` | string | yes | — | — | Citation key for the new reference |
+| `--type` | string | no | "article" | — | BibTeX/BibLaTeX entry type |
+| `--field` | list[string] | no | — | — | Field assignment, repeatable: name=value |
+| `--destination` | string | no | null | — | Override routing with a member path relative to the manifest |
+| `--expect-library-sha256` | string | no | null | — | Require the Library fingerprint from a preview |
+| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--dry-run` | boolean | no | false | — | Preview routing and addition without writing |
+| `--diff` | boolean | no | false | — | Show the destination bibliography diff |
+| `--json` | boolean | no | false | — | Emit the addition and routing evidence as JSON |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
 ## lint
 
 **Stability: stable**

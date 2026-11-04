@@ -101,8 +101,8 @@ catalogue = ".cache/research.sqlite"
 ```
 
 Then call `Library.open("research.library.toml")`. Only `pynakes-library` and
-`members` are required; the five keys above are the entire schema. Unknown keys
-are errors. All paths are relative to the manifest folder, independently of the
+`members` are required; the keys above plus an optional `routing` table form the schema. Unknown
+keys are errors. All paths are relative to the manifest folder, independently of the
 working directory. Per-bibliography settings remain in each `.bib`. The
 `catalogue` path is reserved: this API does not create or read an index.
 
@@ -127,8 +127,10 @@ includes their SHA-256, a zero-based entry index and a one-based source line.
 File checks detect common concurrent changes while loading and omit affected
 members; this is **not a globally atomic snapshot**. Reopen to refresh. Results
 are detached from the held entries, and these APIs never write the source files.
-Direct scans load all selected files into memory. CLI integration, identity
-reports, rollups and indexed/bounded search remain future v0.10 work.
+Direct scans load all selected files into memory. Identity reports, rollups and
+indexed/bounded search remain future v0.10 work. For routed additions through
+`Library.route`, `Library.stage_entry` and `library add`, see
+[Library routing](../guides/library-routing.md).
 
 ## Work-matching evidence
 

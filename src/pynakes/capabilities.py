@@ -338,6 +338,7 @@ COMMAND_GROUPS: dict[str, list[str]] = {
         "metadata",
         "tex",
         "biblink",
+        "library",
     ],
     "Materials (pinax)": ["asset"],
     "Create": ["init", "scrub", "combine", "split"],
@@ -423,7 +424,16 @@ def get_capabilities() -> dict:
                 "manifest_version": 1,
                 "freshness": "Direct-read view; reopen to refresh members and bytes.",
                 "partial_failures": "Every read report includes member issues and completeness.",
-                "cli_integration": False,
+                "cli_integration": True,
+                "commands": ["library add"],
+                "staging": ["route", "stage_entry"],
+                "routing": {
+                    "configuration": "Library manifest [routing] and [[routing.rules]]",
+                    "precedence": "Explicit destination, highest priority, fallback; ties conflict",
+                    "override": "library add --destination MEMBER / Library.stage_entry(destination=...)",
+                    "existing_work_check": "Across every member before routing; incomplete reads block additions",
+                    "write_guard": "Manifest and member bytes; --expect-library-sha256 guards a reviewed preview",
+                },
                 "work_identity": False,
                 "catalogue": False,
             },
@@ -572,6 +582,7 @@ def get_capabilities() -> dict:
             "search": "Search entries by free text, phrases, or field-scoped terms",
             "query": "Save, list, and remove named selector queries, run with --where "
             "'query \"NAME\"' (list, set, remove)",
+            "library": "Add references through manifest routing with Library-wide existing-work checks",
             "biblink": "Declare a bibliography the child of another, in both files, and check "
             "that the link holds: keys, and under field-subset types and values "
             "(add, remove, list, check, sync)",

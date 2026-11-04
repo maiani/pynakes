@@ -41,6 +41,7 @@ NOT_ENTRY_SELECTABLE = {
     "query remove": "edits a saved query, not entries",
     "query set": "edits a saved query, not entries",
     "ref add": "creates one entry",
+    "library add": "routes and creates one entry across declared members",
     "ref edit": "names one entry positionally",
     "ref import": "--key names the key to assign to the new entry",
     "ref from-pdf": "selects source documents; --key names a new entry",

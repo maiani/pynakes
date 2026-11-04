@@ -15,6 +15,7 @@ nav = [
   { "Network and Privacy" = "guides/network-and-privacy.md" },
   { "Import Providers" = "guides/import-providers.md" },
   { "PDF Import" = "guides/pdf-import.md" },
+    { "Library routing" = "guides/library-routing.md" },
   { "Metadata Reference" = "guides/metadata-reference.md" },
   { "Public API" = "guides/public-api.md" },
   { "LLM Integration" = "guides/llm-integration.md" },

@@ -38,6 +38,7 @@ def _flags(command: str) -> set[str]:
 
 #: Every command's positional arguments: (name, required, variadic), in order.
 POSITIONALS: dict[str, tuple[tuple[str, bool, bool], ...]] = {
+    "library add": (("manifest", True, False), ("key", True, False)),
     "analyze": (("file", False, False),),
     "asset check": (("files", True, True),),
     "asset fetch": (("file", False, False), ("target", False, False)),
@@ -183,6 +184,7 @@ def test_every_writing_command_previews() -> None:
 #: ``ref lookup`` and ``ref import`` need the network; offline they return an
 #: error envelope, which is checked like any other.
 SAMPLES: dict[str, tuple[str, list[str]]] = {
+    "library add": ("error", ["library", "add", "missing.library.toml", "Example1900"]),
     "analyze": ("read", ["analyze", "{bib}"]),
     "asset check": ("check", ["asset", "check", "{bib}"]),
     "asset fetch": ("modify", ["asset", "fetch", "{bib}", "White2024", "--dry-run"]),

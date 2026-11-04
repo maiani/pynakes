@@ -177,26 +177,28 @@ extra, never required by core.
 ### Library: a declared set of bibliographies
 
 The v0.10 development API implements membership, direct reads, key lookup and
-cross-file search in `pynakes.library`. Reports retain source locations,
+cross-file search and routed additions in `pynakes.library`. Reports retain source locations,
 duplicate-key occurrences and partial-read diagnostics. The
 [API guide](../api/index.md#reading-a-library-v010-development) documents the
-manifest and read semantics. Work identity, rollups, CLI integration and the
+manifest and read semantics. General work-identity reports, rollups and the
 Catalogue below describe the remaining design, not implemented features.
 
 A **library** is a set of bibliographies chosen to be searched and reconciled
 as one collection. Its members are `.bib` files, each with its Pinax when it
-has one. The library adds only three things: **membership**, **work identity
-across members**, and a derived, rebuildable **Catalogue**. Everything else
-stays in the members:
+has one. The library adds **membership** and **routing**, and is the scope for
+**work identity across members** and a future, rebuildable **Catalogue**.
+Reference data stays in the members:
 
-- **It owns no data.** Entries, settings and materials live in the member
-  files, which remain authoritative. Removing a library changes no `.bib`.
+- **Reference data stays in the members.** Entries, formatting settings and
+  Pinax materials remain authoritative there. The Library owns membership and
+  cross-member routing policy. Removing a library changes no `.bib`.
   Per-bibliography settings stay in each file's `pynakes-meta`.
 - **Membership is explicit:** listed files, or a declared root with a pattern.
   A library never scans directories it was not given.
-- **It is read-mostly.** Lookup, search, duplicate reports and rollups read
-  across members; an edit still goes to one `Bibliography`. Writes that span
-  members belong to project assembly and synchronization, not to the library.
+- **Writes select one member.** Lookup and search read across members. Routed
+  additions check all members for existing work, select a destination, and stage
+  through its `Bibliography`. Moving existing records or materials between
+  members and multi-file reconciliation remain separate, planned operations.
 - **Identity is its contribution.** Two entries in different members can be
   one work; a repeated citation key alone does not establish that. Reports
   keep each entry's file and key, and keep exact and probable matches apart.
@@ -205,9 +207,10 @@ A library is declared in two ways. A command given several member files forms
 an unnamed library for that call, which suits scripts and agents. A **library
 manifest**, a small TOML file, makes a named library that can be reopened: it
 lists the members (paths or patterns, resolved from the manifest's own
-folder), an optional name, and where the Catalogue lives. The manifest holds
-nothing else; defaults for import, normalization or formatting stay in each
-`.bib`, so the manifest never becomes project-level configuration.
+folder), an optional name, where the Catalogue lives, and optional placement
+rules in `routing`. [Routing](library-routing.md) is a Library policy because it
+selects among members; defaults for import, normalization and formatting stay
+in each `.bib`.
 
 Membership is recorded in the library, not in the members, so one file may
 belong to several libraries. Libraries do not nest. A single master `.bib` is a
@@ -456,8 +459,8 @@ engine, and the CLI already provides a machine-readable, safe agent interface.
 
 Pinax mode is implemented: one `Bibliography` plus its `pinax-files-dir`
 of materials. The v0.10 development `Library` API adds direct cross-file reads.
-Its CLI integration, work identity, rollups and derived, rebuildable `Catalogue`
-are still planned — see
+Routed additions are available through `library add`. General work-identity
+reports, rollups and the derived, rebuildable `Catalogue` are still planned — see
 [DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md) for the roadmap.
 
 - [API reference](../api/index.md)

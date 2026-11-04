@@ -4,7 +4,7 @@ The :class:`Bibliography` facade is the recommended entry point for applications
 it stages changes in memory, exposes previews and structured change plans, and
 commits through the same validated atomic-write path as the CLI. The lower-level
 model and parser/writer entry points exported here support in-memory workflows.
-The :class:`Library` facade provides read-only discovery across declared files.
+The :class:`Library` facade provides discovery and routed additions across declared files.
 """
 
 from pynakes.bibtex_parser import ParseError, parse_bib
