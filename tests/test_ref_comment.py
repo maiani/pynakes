@@ -33,19 +33,21 @@ REMARK = "checked against the first edition"
 
 def _open(tmp_path: Path, text: str) -> Bibliography:
     path = tmp_path / "refs.bib"
-    path.write_text(text, encoding="utf-8")
+    path.write_bytes(text.encode("utf-8"))
     return Bibliography.open(path)
 
 
-def test_adding_a_comment_inserts_one_line_and_nothing_else(tmp_path: Path) -> None:
-    source = NEWTON + "\n" + DARWIN
+@pytest.mark.parametrize("le", ["\n", "\r\n"])
+def test_adding_a_comment_inserts_one_line_and_nothing_else(tmp_path: Path, le: str) -> None:
+    source = (NEWTON + "\n" + DARWIN).replace("\n", le)
     coll = _open(tmp_path, source)
 
     assert coll.add_entry_comment("Darwin1858", REMARK)
 
-    expected = source.replace("@article{Darwin1858", f"% {REMARK}\n@article{{Darwin1858")
+    expected = source.replace("@article{Darwin1858", f"% {REMARK}{le}@article{{Darwin1858")
     assert coll.preview() == expected
     coll.commit()
+    assert (tmp_path / "refs.bib").read_bytes() == expected.encode("utf-8")
     reopened = Bibliography.open(tmp_path / "refs.bib")
     assert [text for _slot, text in reopened.entry_comments("Darwin1858")] == [REMARK]
     assert reopened.entry_comments("Newton1687") == []
@@ -53,13 +55,16 @@ def test_adding_a_comment_inserts_one_line_and_nothing_else(tmp_path: Path) -> N
     assert not reopened.add_entry_comment("Darwin1858", f"  {REMARK} ")
 
 
-def test_comments_and_directives_are_told_apart(tmp_path: Path) -> None:
-    source = "% pynakes: ignore missing_doi\n@comment{an older remark}\n" + NEWTON
+@pytest.mark.parametrize("le", ["\n", "\r\n"])
+def test_comments_and_directives_are_told_apart(tmp_path: Path, le: str) -> None:
+    source = ("% pynakes: ignore missing_doi\n@comment{an older remark}\n" + NEWTON).replace(
+        "\n", le
+    )
     coll = _open(tmp_path, source)
 
     assert [text for _slot, text in coll.entry_comments("Newton1687")] == ["an older remark"]
     assert coll.remove_entry_comment("Newton1687", "an older remark") == 1
-    assert coll.preview() == "% pynakes: ignore missing_doi\n" + NEWTON
+    assert coll.preview() == ("% pynakes: ignore missing_doi\n" + NEWTON).replace("\n", le)
     assert [d.verb for d in coll.entry_directives("Newton1687")] == ["ignore"]
 
 

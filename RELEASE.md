@@ -7,13 +7,13 @@ remains experimental until 1.0.
 
 ## Final review, 2026-11-04
 
-The reviewed engine revision is `813a9c3`; the release-preparation commit only
-updates the changelog date and release documentation. All five handoff tasks
+The reviewed engine revision is `813a9c3`; later release-preparation commits update
+the release documentation and portable test fixtures without changing engine code. All five handoff tasks
 are complete, each in its own commit. Review additionally fixed duplicate-key
 precedence during sorted insertion and cancellation of a newly staged addition,
 and extracted CLI helpers to keep every Python source module below 800 lines.
 
-- Source suite: **3,541 tests passed, 93.65% coverage**, on Python 3.15.
+- Source suite: **3,543 tests passed, 93.65% coverage**, on Python 3.15.
 - Ruff lint and format, ty, generated command-reference check and strict
   Zensical documentation build passed.
 - Editor: **172 tests passed**, with engine checks required; no editor release.
@@ -21,9 +21,14 @@ and extracted CLI helpers to keep every Python source module below 800 lines.
   version checks passed. Rehearsal artifacts are not publication artifacts.
 - Installed-wheel suite: **3,541 tests passed** in a fresh Python 3.12
   environment, with imports confirmed from `site-packages` and no checkout
-  `src/` available.
+  `src/` available. The expanded 12-case comment suite also passed against
+  this installed wheel after the portable-fixture correction.
 - All five reference agent-evaluation solutions passed on that installed wheel.
   This is deterministic engine validation, not a new blind-agent assessment.
+
+The first final CI run exposed two LF-only assertions in the comment tests:
+Windows correctly preserved the CRLF bytes the fixture had written. The tests
+now write explicit bytes and exercise both LF and CRLF on every platform.
 
 Local logs and artifacts are ignored under `.cache/release-0.9.0/`, including
 `final-source-tests.log`, `editor-tests.log`, `final-build.log`,
