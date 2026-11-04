@@ -49,75 +49,75 @@ def normalize(
         Switch.METADATA,
         "--title-protection",
         case_sensitive=False,
-        help="Brace-protect capitalization-sensitive title words",
+        help="Brace-protect capitalization-sensitive title words (setting: normalize-protect-titles)",
     ),
     title_field: list[str] | None = typer.Option(
         None,
         "--title-field",
-        help="Title-like field to brace-protect; can be repeated",
+        help="Title-like field to brace-protect; can be repeated (setting: normalize-title-fields)",
     ),
     term: list[str] | None = typer.Option(
         None,
         "--term",
-        help="Additional exact title term to brace-protect; can be repeated",
+        help="Additional exact title term to brace-protect; can be repeated (setting: normalize-protected-terms)",
     ),
     drop_field: list[str] | None = typer.Option(
         None,
         "--drop-field",
         help="Field to remove from every entry (e.g. abstract); can be repeated. "
-        "Off by default; combines with any normalize-drop-fields metadata key",
+        "Off by default; combines with the normalize-drop-fields setting",
     ),
     author_style: AuthorStyle = typer.Option(
         AuthorStyle.METADATA,
         "--author-style",
         case_sensitive=False,
-        help="Author-list style",
+        help="Author-list style (setting: normalize-author-style)",
     ),
     journal_style: JournalStyle = typer.Option(
         JournalStyle.METADATA,
         "--journal-style",
         case_sensitive=False,
-        help="Journal-name style (default: no change unless metadata sets it)",
+        help="Journal-name style (default: no change unless set; setting: normalize-journal-style)",
     ),
     journal_source: JournalSource = typer.Option(
         JournalSource.METADATA,
         "--journal-source",
         case_sensitive=False,
-        help="Base exact-mapping journal table, applied before --journal-table (default: jabref)",
+        help="Base exact-mapping journal table, applied before --journal-table (default: jabref; setting: normalize-journal-source)",
     ),
     journal_table: str | None = typer.Option(
         None,
         "--journal-table",
-        help="CSV/TSV with title, abbreviation, and optional ISSN mappings",
+        help="CSV/TSV with title, abbreviation, and optional ISSN mappings (setting: normalize-journal-table)",
     ),
     ltwa_table: str | None = typer.Option(
         None,
         "--ltwa-table",
-        help="CSV/TSV LTWA word abbreviation table",
+        help="CSV/TSV LTWA word abbreviation table (setting: normalize-ltwa-table)",
     ),
     doi_normalization: Switch = typer.Option(
         Switch.METADATA,
         "--doi-normalization",
         case_sensitive=False,
-        help="Strip DOI URL prefixes and labels down to the bare DOI",
+        help="Strip DOI URL prefixes and labels down to the bare DOI (setting: normalize-dois)",
     ),
     page_normalization: Switch = typer.Option(
         Switch.METADATA,
         "--pages",
         case_sensitive=False,
-        help="Rewrite page ranges to start--end",
+        help="Rewrite page ranges to start--end (setting: normalize-pages)",
     ),
     months: Switch = typer.Option(
         Switch.METADATA,
         "--months",
         case_sensitive=False,
-        help="Rewrite bare month names to BibTeX month macros (month = june -> jun)",
+        help="Rewrite bare month names to BibTeX month macros (month = june -> jun; setting: normalize-months)",
     ),
     invisible_characters: Switch = typer.Option(
         Switch.METADATA,
         "--invisible-characters",
         case_sensitive=False,
-        help="Remove characters that render as nothing (zero-width spaces, stray BOMs)",
+        help="Remove characters that render as nothing (zero-width spaces, stray BOMs; setting: normalize-invisible-characters)",
     ),
     encoding: TextEncoding = typer.Option(
         TextEncoding.METADATA,
@@ -130,25 +130,25 @@ def normalize(
         None,
         "--encoding-field",
         help="Field the encoding step converts; can be repeated (default: the prose "
-        "fields such as author, title, journal, note, abstract)",
+        "fields such as author, title, journal, note, abstract; setting: normalize-encoding-fields)",
     ),
     key_normalization: Switch = typer.Option(
         Switch.METADATA,
         "--key-generation",
         case_sensitive=False,
-        help="Regenerate citation keys from the bibliography's key pattern",
+        help="Regenerate citation keys from the bibliography's key pattern (setting: normalize-keys; pattern: key-pattern)",
     ),
     identifier_case: Switch = typer.Option(
         Switch.METADATA,
         "--identifier-case",
         case_sensitive=False,
-        help="Lowercase entry types and field names",
+        help="Lowercase entry types and field names (setting: normalize-identifier-case)",
     ),
     metadata_formatting: Switch = typer.Option(
         Switch.METADATA,
         "--metadata-formatting",
         case_sensitive=False,
-        help="Consolidate metadata layout: pynakes-meta top, jabref-meta bottom",
+        help="Consolidate metadata layout: pynakes-meta top, jabref-meta bottom (setting: normalize-format-metadata)",
     ),
     sort_by: list[str] | None = typer.Option(
         None,
@@ -156,7 +156,7 @@ def normalize(
         help="Sort entries by a BibTeX field name; repeat for secondary keys "
         '(e.g. --sort-by author --sort-by year:desc). Use "citationkey" (or "key") '
         'for the citation key and append ":desc" for descending. "original" keeps '
-        "the current order. Omit to follow the file's configured sort order.",
+        "the current order. Omit to follow the sort-order setting.",
     ),
     only: list[str] | None = typer.Option(
         None,

@@ -249,32 +249,43 @@ def _run_recursive(
 
 def format_bibliography(
     file: str | None = bib_file_argument("Path, directory with --recursive, or - for stdin"),
-    indent: str | None = typer.Option(None, "--indent", help="Field indentation string"),
+    indent: str | None = typer.Option(
+        None, "--indent", help="Field indentation string (setting: format-indent)"
+    ),
     alignment: AlignmentChoice | None = typer.Option(
-        None, "--alignment", help="Field/value alignment policy"
+        None,
+        "--alignment",
+        help="Field/value alignment policy (setting: format-alignment)",
     ),
     trailing_comma: bool | None = typer.Option(
-        None, "--trailing-comma/--no-trailing-comma", help="Comma after the last field"
+        None,
+        "--trailing-comma/--no-trailing-comma",
+        help="Comma after the last field (setting: format-trailing-comma)",
     ),
     blank_line_entries: bool | None = typer.Option(
-        None, "--blank-lines/--no-blank-lines", help="Blank line between entries"
+        None,
+        "--blank-lines/--no-blank-lines",
+        help="Blank line between entries (setting: format-blank-lines)",
     ),
     field_order: FieldOrderChoice | None = typer.Option(
-        None, "--field-order", help="Field ordering policy"
+        None, "--field-order", help="Field ordering policy (setting: format-field-order)"
     ),
     block_order: BlockOrderChoice | None = typer.Option(
-        None, "--block-order", help="Top-level block ordering policy"
+        None, "--block-order", help="Top-level block ordering policy (setting: format-block-order)"
     ),
     wrap_values: WrapValuesChoice | None = typer.Option(
-        None, "--wrap-values", help="Safe field-value wrapping policy"
+        None, "--wrap-values", help="Safe field-value wrapping policy (setting: format-wrap-values)"
     ),
     line_width: int | None = typer.Option(
-        None, "--line-width", min=20, help="Maximum line width for wrapped values"
+        None,
+        "--line-width",
+        min=20,
+        help="Maximum line width for wrapped values (setting: format-line-width)",
     ),
     entry_type_case: EntryTypeCaseChoice | None = typer.Option(
         None,
         "--entry-type-case",
-        help="Entry-type spelling: lowercase, or keep each entry's own (e.g. @Article)",
+        help="Entry-type spelling: lowercase, or keep each entry's own (e.g. @Article; setting: format-entry-type-case)",
     ),
     where: str | None = where_option(
         "Reformat only the entries matching this selector; the rest of the file "

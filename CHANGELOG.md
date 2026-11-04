@@ -210,6 +210,10 @@ The forms deprecated in 0.8 are removed:
   before the findings; `--summary` shows the same two lines. A listing of more
   than ten findings repeats the totals at the end, followed, when it includes
   info findings, by a pointer to `--severity warning` and `--summary`.
+- Each `normalize` and `format` option that a stored setting can also set names
+  that setting in its help, e.g. `--sort-by` names `sort-order` and `--indent`
+  names `format-indent`, where the help said only "the file's configured sort
+  order" or nothing.
 - When `lint` reports a `citation_key_pattern_mismatch`, it ends with how to
   keep a key chosen by hand: `ref directive ignore
   citation_key_pattern_mismatch --key KEY` exempts that entry from the check

@@ -500,15 +500,15 @@ Rewrite layout only; never change bibliographic values or conventions.
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path, directory with --recursive, or - for stdin |
-| `--indent` | string | no | null | — | Field indentation string |
-| `--alignment` | choice | no | null | compact, equals | Field/value alignment policy |
-| `--trailing-comma, --no-trailing-comma` | boolean | no | null | — | Comma after the last field |
-| `--blank-lines, --no-blank-lines` | boolean | no | null | — | Blank line between entries |
-| `--field-order` | choice | no | null | preferred, preserve, alphabetical | Field ordering policy |
-| `--block-order` | choice | no | null | preserve, canonical | Top-level block ordering policy |
-| `--wrap-values` | choice | no | null | off, stable, canonical | Safe field-value wrapping policy |
-| `--line-width` | integer | no | null | — | Maximum line width for wrapped values |
-| `--entry-type-case` | choice | no | null | lower, preserve | Entry-type spelling: lowercase, or keep each entry's own (e.g. @Article) |
+| `--indent` | string | no | null | — | Field indentation string (setting: format-indent) |
+| `--alignment` | choice | no | null | compact, equals | Field/value alignment policy (setting: format-alignment) |
+| `--trailing-comma, --no-trailing-comma` | boolean | no | null | — | Comma after the last field (setting: format-trailing-comma) |
+| `--blank-lines, --no-blank-lines` | boolean | no | null | — | Blank line between entries (setting: format-blank-lines) |
+| `--field-order` | choice | no | null | preferred, preserve, alphabetical | Field ordering policy (setting: format-field-order) |
+| `--block-order` | choice | no | null | preserve, canonical | Top-level block ordering policy (setting: format-block-order) |
+| `--wrap-values` | choice | no | null | off, stable, canonical | Safe field-value wrapping policy (setting: format-wrap-values) |
+| `--line-width` | integer | no | null | — | Maximum line width for wrapped values (setting: format-line-width) |
+| `--entry-type-case` | choice | no | null | lower, preserve | Entry-type spelling: lowercase, or keep each entry's own (e.g. @Article; setting: format-entry-type-case) |
 | `--where` | string | no | null | — | Reformat only the entries matching this selector; the rest of the file stays byte-for-byte identical |
 | `--key` | list[string] | no | null | — | Reformat only these citation keys: comma-separated, repeatable. Narrows --where when both are given |
 | `--check` | boolean | no | false | — | Write nothing; exit 1 when layout changes are needed |
@@ -938,25 +938,25 @@ Normalize entries: titles, authors, journals, DOIs, encoding, identifier case, o
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
-| `--title-protection` | choice | no | "metadata" | metadata, on, off | Brace-protect capitalization-sensitive title words |
-| `--title-field` | list[string] | no | null | — | Title-like field to brace-protect; can be repeated |
-| `--term` | list[string] | no | null | — | Additional exact title term to brace-protect; can be repeated |
-| `--drop-field` | list[string] | no | null | — | Field to remove from every entry (e.g. abstract); can be repeated. Off by default; combines with any normalize-drop-fields metadata key |
-| `--author-style` | choice | no | "metadata" | metadata, biblatex, bibtex, conservative, jabref, none | Author-list style |
-| `--journal-style` | choice | no | "metadata" | metadata, abbreviated, full, none | Journal-name style (default: no change unless metadata sets it) |
-| `--journal-source` | choice | no | "metadata" | metadata, jabref, none | Base exact-mapping journal table, applied before --journal-table (default: jabref) |
-| `--journal-table` | string | no | null | — | CSV/TSV with title, abbreviation, and optional ISSN mappings |
-| `--ltwa-table` | string | no | null | — | CSV/TSV LTWA word abbreviation table |
-| `--doi-normalization` | choice | no | "metadata" | metadata, on, off | Strip DOI URL prefixes and labels down to the bare DOI |
-| `--pages` | choice | no | "metadata" | metadata, on, off | Rewrite page ranges to start--end |
-| `--months` | choice | no | "metadata" | metadata, on, off | Rewrite bare month names to BibTeX month macros (month = june -> jun) |
-| `--invisible-characters` | choice | no | "metadata" | metadata, on, off | Remove characters that render as nothing (zero-width spaces, stray BOMs) |
+| `--title-protection` | choice | no | "metadata" | metadata, on, off | Brace-protect capitalization-sensitive title words (setting: normalize-protect-titles) |
+| `--title-field` | list[string] | no | null | — | Title-like field to brace-protect; can be repeated (setting: normalize-title-fields) |
+| `--term` | list[string] | no | null | — | Additional exact title term to brace-protect; can be repeated (setting: normalize-protected-terms) |
+| `--drop-field` | list[string] | no | null | — | Field to remove from every entry (e.g. abstract); can be repeated. Off by default; combines with the normalize-drop-fields setting |
+| `--author-style` | choice | no | "metadata" | metadata, biblatex, bibtex, conservative, jabref, none | Author-list style (setting: normalize-author-style) |
+| `--journal-style` | choice | no | "metadata" | metadata, abbreviated, full, none | Journal-name style (default: no change unless set; setting: normalize-journal-style) |
+| `--journal-source` | choice | no | "metadata" | metadata, jabref, none | Base exact-mapping journal table, applied before --journal-table (default: jabref; setting: normalize-journal-source) |
+| `--journal-table` | string | no | null | — | CSV/TSV with title, abbreviation, and optional ISSN mappings (setting: normalize-journal-table) |
+| `--ltwa-table` | string | no | null | — | CSV/TSV LTWA word abbreviation table (setting: normalize-ltwa-table) |
+| `--doi-normalization` | choice | no | "metadata" | metadata, on, off | Strip DOI URL prefixes and labels down to the bare DOI (setting: normalize-dois) |
+| `--pages` | choice | no | "metadata" | metadata, on, off | Rewrite page ranges to start--end (setting: normalize-pages) |
+| `--months` | choice | no | "metadata" | metadata, on, off | Rewrite bare month names to BibTeX month macros (month = june -> jun; setting: normalize-months) |
+| `--invisible-characters` | choice | no | "metadata" | metadata, on, off | Remove characters that render as nothing (zero-width spaces, stray BOMs; setting: normalize-invisible-characters) |
 | `--encoding` | choice | no | "metadata" | metadata, latex, unicode, off | Convert accents and named characters in text fields to LaTeX or to Unicode (off unless set, here or in the normalize-encoding setting) |
-| `--encoding-field` | list[string] | no | null | — | Field the encoding step converts; can be repeated (default: the prose fields such as author, title, journal, note, abstract) |
-| `--key-generation` | choice | no | "metadata" | metadata, on, off | Regenerate citation keys from the bibliography's key pattern |
-| `--identifier-case` | choice | no | "metadata" | metadata, on, off | Lowercase entry types and field names |
-| `--metadata-formatting` | choice | no | "metadata" | metadata, on, off | Consolidate metadata layout: pynakes-meta top, jabref-meta bottom |
-| `--sort-by` | list[string] | no | null | — | Sort entries by a BibTeX field name; repeat for secondary keys (e.g. --sort-by author --sort-by year:desc). Use "citationkey" (or "key") for the citation key and append ":desc" for descending. "original" keeps the current order. Omit to follow the file's configured sort order. |
+| `--encoding-field` | list[string] | no | null | — | Field the encoding step converts; can be repeated (default: the prose fields such as author, title, journal, note, abstract; setting: normalize-encoding-fields) |
+| `--key-generation` | choice | no | "metadata" | metadata, on, off | Regenerate citation keys from the bibliography's key pattern (setting: normalize-keys; pattern: key-pattern) |
+| `--identifier-case` | choice | no | "metadata" | metadata, on, off | Lowercase entry types and field names (setting: normalize-identifier-case) |
+| `--metadata-formatting` | choice | no | "metadata" | metadata, on, off | Consolidate metadata layout: pynakes-meta top, jabref-meta bottom (setting: normalize-format-metadata) |
+| `--sort-by` | list[string] | no | null | — | Sort entries by a BibTeX field name; repeat for secondary keys (e.g. --sort-by author --sort-by year:desc). Use "citationkey" (or "key") for the citation key and append ":desc" for descending. "original" keeps the current order. Omit to follow the sort-order setting. |
 | `--only` | list[string] | no | null | — | Run only these steps, comma-separated and repeatable: metadata, drop-fields, invisible-characters, encoding, titles, authors, dois, pages, journals, save-actions, months, identifier-case, sort, keys |
 | `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing; 'used'/'unused' test the linked TeX sources and 'query NAME' runs a saved query. See `pynakes capabilities` for the full grammar. |
 | `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
