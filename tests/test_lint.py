@@ -459,6 +459,21 @@ def test_field_consistency_flags_majority_field_missing_from_one_entry() -> None
     assert "3 of 4" in issues[0].message
 
 
+def test_field_consistency_spares_a_journal_whose_papers_all_lack_the_field() -> None:
+    # Most articles carry an issue number, but neither paper in Annalen does:
+    # that journal has none to give, so neither is flagged.
+    lib = parse_bib(
+        "@article{a1, author={A}, title={T1}, journal={J}, year={2020}, number={1}}\n"
+        "@article{a2, author={B}, title={T2}, journal={J}, year={2021}, number={2}}\n"
+        "@article{a3, author={C}, title={T3}, journal={J}, year={2022}, number={3}}\n"
+        "@article{a7, author={G}, title={T7}, journal={J}, year={2019}, number={4}}\n"
+        "@article{a4, author={D}, title={T4}, journal={Annalen}, year={2023}}\n"
+        "@article{a5, author={E}, title={T5}, journal={annalen}, year={2024}}\n"
+        "@article{a6, author={F}, title={T6}, journal={J}, year={2025}}\n"
+    )
+    assert _consistency(lint(lib)) == [("a6", "number")]
+
+
 def test_field_consistency_ignores_non_majority_and_universal_fields() -> None:
     # 'note' on exactly half (not a majority); 'year' on all (universal).
     lib = parse_bib(

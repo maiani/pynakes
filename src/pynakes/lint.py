@@ -64,6 +64,7 @@ from pynakes._markup import TITLE_LIKE_FIELDS, markup_to_latex
 from pynakes.bibtex_parser import parse_raw_string_definition
 from pynakes.canonical import EntryTypeCase, resolve_entry_type_case
 from pynakes.editing import raw_field_names, raw_field_values
+from pynakes.entry_types import container_title
 from pynakes.formatters import normalize_page_numbers
 from pynakes.identity import identity_class
 from pynakes.journals import (
@@ -441,8 +442,10 @@ def _lint_field_consistency(lib: BibFile, *, dialect: str = "bibtex") -> list[Li
     carry issue and publisher metadata by construction. A field is flagged only
     when a strict majority of the group carries it and this entry does not.
     Required fields, JabRef structural/management fields, and publisher
-    decoration whose absence is never a defect are excluded. Findings are
-    advisory ``info`` in the ``consistency`` category.
+    decoration whose absence is never a defect are excluded. A field is also
+    not expected of an entry when the other entries from its journal all lack
+    it: a journal without issue numbers leaves ``number`` out of every paper.
+    Findings are advisory ``info`` in the ``consistency`` category.
     """
     by_group: dict[tuple[str, str], list[BibEntry]] = {}
     for entry in lib.entries.values():
@@ -475,9 +478,21 @@ def _lint_field_consistency(lib: BibFile, *, dialect: str = "bibtex") -> list[Li
             and name not in _CONSISTENCY_DECORATION_FIELDS
         }
 
+        by_journal: dict[str, list[dict[str, str]]] = {}
+        for fields in resolved:
+            if journal := container_title(fields).casefold():
+                by_journal.setdefault(journal, []).append(fields)
+
         for entry, fields in zip(entries, resolved):
+            peers = [
+                other
+                for other in by_journal.get(container_title(fields).casefold(), [])
+                if other is not fields
+            ]
             for name in sorted(majority):
                 if fields.get(name, "").strip():
+                    continue
+                if peers and not any(other.get(name, "").strip() for other in peers):
                     continue
                 alternatives = _CONSISTENCY_ALTERNATIVES.get(name, frozenset())
                 if any(fields.get(alt, "").strip() for alt in alternatives):

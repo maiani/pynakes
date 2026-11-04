@@ -269,6 +269,10 @@ The forms deprecated in 0.8 are removed:
   changed 2,270 bundled titles; it now changes none apart from 63 whose
   abbreviation is another journal's full title (`Endodoncia`). A spelling no
   table lists is still replaced by the mapped one.
+- `lint`'s `inconsistent_field` no longer expects a field of an entry when the
+  other entries from the same journal all lack it too. A journal without issue
+  numbers left every one of its papers flagged for a missing `number`, because
+  most of the library's other articles have one.
 - `enrich` no longer counts an entry as not checked when APS Harvest refused
   its lookup but doi.org answered instead. That warning is now
   `preferred_provider_fallback`, with `checked: true` and the source used
