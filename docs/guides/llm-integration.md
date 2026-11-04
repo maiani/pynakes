@@ -43,7 +43,8 @@ pynakes capabilities --json
 ```
 
 Treat this output, rather than a copied command list, as the source of truth.
-It is a compact index (about 6 KB): exit codes and conventions, a one-line
+It opens with `start_here`, four rules for approaching a library, and is a
+compact index (about 6 KB): exit codes and conventions, a one-line
 summary of every command under `command_index`, and the names and sizes of the
 detailed sections under `sections`. Ask for details only when you need them:
 
@@ -72,6 +73,17 @@ pynakes capabilities --json --section predicate_grammar   # one section
   as regular-expression fragments valid in Python and ECMAScript, so a client
   recognizes exactly the citations the engine does.
 - `batch_operations`: the operation vocabulary accepted by `batch`.
+
+Then read the bibliography's own conventions before changing anything:
+
+```bash
+pynakes metadata list refs.bib --json
+```
+
+Its `pynakes-meta` settings (key pattern, journal style, sort order, layout)
+drive `normalize`, `format`, `lint` and key generation, so they are where a
+library's rules live. The help of each `normalize` and `format` option names
+the setting that also sets it.
 
 Use the schema to construct calls and `pynakes <command> --help` for a focused
 human-readable view. The [usage guide](usage.md) explains the individual
@@ -161,6 +173,23 @@ boundaries are deliberate:
 An operation that refuses — `ref.add` on a taken key, `dedupe.merge` on an
 irreconcilable cluster — aborts the whole batch with nothing written, which is
 the all-or-nothing guarantee rather than an exception to it.
+
+### Batch or the Python API
+
+Use `batch` for declarative edits: a list of operations that can be written
+down before running them, such as filing a hundred entries under their groups.
+It needs no Python environment, its operation format is a documented contract,
+and the operations file replays to the same result, which is why network steps
+stay out of it. A `groups.assign` with a misspelled group fails unless it says
+`"create": true`.
+
+Use the [Python API](../api/index.md) when the edits need logic: groups
+computed from titles, choices that depend on other fields, checks across
+entries before anything is written. Stage every change on one `Bibliography`,
+read `change_summary()` or `diff()`, and write once with `commit()`. Its
+`Bibliography` methods refuse what the CLI refuses (an unknown key, group or
+parent), but `capabilities` marks the API `experimental` (`--section
+python_api`), so prefer `batch` when either would do.
 
 ## Choosing the right operation
 

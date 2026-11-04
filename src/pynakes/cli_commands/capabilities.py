@@ -23,6 +23,7 @@ _INDEX_KEYS = (
     "tool",
     "version",
     "description",
+    "start_here",
     "network_access_is_explicit",
     "network_access",
     "supports_dry_run",

@@ -107,7 +107,10 @@ def fields_set(
     diff: bool = typer.Option(False, "--diff"),
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Set or replace a field on matching references."""
+    """Set or replace a field on matching references.
+
+    For many edits at once, use `pynakes batch`: one preview, one atomic write.
+    """
     file = _resolve_input_bib(file, json_output)
     params = RunParams(
         dry_run=dry_run,

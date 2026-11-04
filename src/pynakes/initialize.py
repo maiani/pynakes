@@ -184,7 +184,9 @@ holds downloaded materials named by citation key:
    or a supported URL). Without an identifier, use
    `pynakes ref add {bibname}.bib <citekey> --field name=value`. Remove one with
    `pynakes ref remove {bibname}.bib <citekey>`, which also removes its
-   materials. Preview any change with `--dry-run --diff`.
+   materials. Put several related edits in one
+   `pynakes batch {bibname}.bib --ops-file ops.json` call rather than one
+   command each. Preview any change with `--dry-run --diff`.
 
 2. **Fetch materials with `pynakes asset fetch {bibname}.bib`**, never by
    hand, so the manifest stays accurate. The `pinax-fetch-policy` setting

@@ -322,7 +322,10 @@ def keys_rename(
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Rename one citation key to an explicit value and update TeX citations."""
+    """Rename one citation key to an explicit value and update TeX citations.
+
+    For many edits at once, use `pynakes batch`: one preview, one atomic write.
+    """
     file = _resolve_input_bib(file, json_output)
     params = _params(dry_run, diff, json_output, backup, expect_sha256)
     coll = Bibliography.open(file)

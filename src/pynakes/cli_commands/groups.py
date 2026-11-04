@@ -246,6 +246,8 @@ def groups_assign(
 
     The group must already exist, so a mistyped name is an error rather than a
     new group; `--create` makes a new one.
+
+    For many edits at once, use `pynakes batch`: one preview, one atomic write.
     """
     file = _resolve_input_bib(file, json_output)
     params = RunParams(
@@ -268,7 +270,10 @@ def groups_unassign(
     diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """Remove an entry from a group."""
+    """Remove an entry from a group.
+
+    For many edits at once, use `pynakes batch`: one preview, one atomic write.
+    """
     file = _resolve_input_bib(file, json_output)
     params = RunParams(
         dry_run=dry_run,

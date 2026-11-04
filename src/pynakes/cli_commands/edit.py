@@ -42,6 +42,8 @@ def edit(
     starts an interactive prompt for the type and required fields, using the
     current values as defaults. That path needs an interactive terminal: with
     `--json` or headless stdin it errors instead.
+
+    For many edits at once, use `pynakes batch`: one preview, one atomic write.
     """
     interactive = not field and not clear_field and entry_type is None
     if interactive:

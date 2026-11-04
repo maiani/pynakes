@@ -61,6 +61,23 @@ _PREDICATE_GRAMMAR = {
     **WHERE_GRAMMAR,
 }
 
+#: How to approach a library, first in the index because agents read top down
+#: and reach for one command's --help before any guide.
+_START_HERE = [
+    "Read the bibliography's own conventions first: `metadata list FILE --json`. Its "
+    "pynakes-meta settings drive normalize, format, lint and key generation; normalize "
+    "and format name in each option's help the setting that also sets it.",
+    "Several related edits: one `batch FILE OPS.json` call, not one command per edit. It "
+    "previews them together with --dry-run, writes once atomically, and --expect-sha256 "
+    "refuses the write if the file changed since the preview. Operations: "
+    "--section batch_operations.",
+    "Edits that need logic (values computed from other fields, conditional choices, "
+    "checks across entries): the Python API, staged on one Bibliography, reviewed with "
+    "change_summary() or diff(), and written once with commit(). See --section python_api.",
+    "One edit or one read: the single command; `capabilities --command 'PATH'` gives its options.",
+]
+
+
 _SEARCH_QUERY_GRAMMAR = {
     "terms": "Whitespace-separated terms are ANDed.",
     "or": "A bare upper-case OR between terms makes them alternatives and binds tighter "
@@ -488,6 +505,7 @@ def get_capabilities() -> dict:
             "material management, with "
             "reviewable edits, structured JSON, and JabRef interoperability."
         ),
+        "start_here": _START_HERE,
         "network_access_is_explicit": True,
         "network_access": _NETWORK_ACCESS,
         "supports_dry_run": True,

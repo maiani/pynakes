@@ -231,6 +231,13 @@ The forms deprecated in 0.8 are removed:
   or `CLAUDE.md` (`agent_guide_pointer`), since agents load only the root
   guide by default. `render_agents_md` takes the library as an optional
   argument.
+- `capabilities --json` opens with `start_here`: read the bibliography's
+  settings first (`metadata list`), put several related edits in one `batch`,
+  use the Python API when edits need logic, and use the single command for one
+  edit. The help of `groups assign`, `groups unassign`, `fields set`,
+  `keys rename` and `ref edit` points to `batch` for many edits, as does rule 1
+  of the guide `init --agent-guide` writes. The LLM integration guide says when
+  to use `batch` and when the Python API.
 - `Bibliography.change_summary()` returns the staged changes as a few lines
   to read before `commit()`: counts, then one line per rename, addition and
   removal, one per set of changed fields naming its entries, and one per
