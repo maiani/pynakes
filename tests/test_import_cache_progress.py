@@ -83,6 +83,25 @@ def test_several_identifiers_report_progress_on_stderr(tmp_path: Path, calls: li
     assert "[1/2]" not in result.stdout
 
 
+def test_each_progress_line_names_what_the_identifier_became(
+    tmp_path: Path, calls: list[str]
+) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("", encoding="utf-8")
+    first = json.loads(
+        runner.invoke(app, ["ref", "import", str(bib), "10.5555/one", "--json"]).stdout
+    )
+    key = first["key"]
+    assert first["title"] == "Notes"
+
+    result = runner.invoke(app, ["ref", "import", str(bib), "10.5555/one", "10.5555/two"])
+
+    assert result.exit_code == 0, result.output
+    assert f"[1/2] 10.5555/one → skipped, already present as {key}" in result.stderr
+    assert "[2/2] 10.5555/two → " in result.stderr
+    assert result.stderr.rstrip().endswith("— Notes")
+
+
 def test_json_runs_keep_stderr_silent(tmp_path: Path, calls: list[str]) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text("", encoding="utf-8")

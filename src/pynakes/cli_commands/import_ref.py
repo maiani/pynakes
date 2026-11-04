@@ -280,7 +280,11 @@ def import_reference(
             return
 
     label = importer_ops.imported_entry_identifier(entry, kind)
-    human = [f"{_verb('import', params, 'Imported')} {kind} {label} as {entry.key}."]
+    title = entry.fields.get("title")
+    human = [
+        f"{_verb('import', params, 'Imported')} {kind} {label} as {entry.key}"
+        + (f" — {title}." if title else ".")
+    ]
     if fetch_report is not None:
         human.extend(
             fetch_report_lines(
@@ -297,6 +301,7 @@ def import_reference(
         "key": entry.key,
         "key_source": "user" if key else source,
         "entry_type": entry.type,
+        "title": title,
     }
     if fetch_report is not None:
         details["fetch"] = fetch_report
@@ -337,90 +342,26 @@ def _import_several(
     decide: the other identifiers still have to be resolved, and re-running with
     ``--allow-duplicate`` is the answer if a second copy really was wanted.
     """
-    # The importer pulls in provider and HTTP code; load it only to import.
-    from pynakes import importer as importer_ops
-
     results: list[dict[str, object]] = []
     warnings: list[dict[str, object]] = list(pattern_warnings)
     imported_entries: list[BibEntry] = []
-    imported = 0
     total = len(identifiers)
     for position, (identifier, key) in enumerate(identifiers, start=1):
+        result, warning, entry = _import_one(
+            coll, identifier, key, key_source, allow_duplicate, cache_file
+        )
+        results.append(result)
+        if warning is not None:
+            warnings.append(warning)
+        if entry is not None:
+            imported_entries.append(entry)
         if not params.json_output:
             # Plain lines rather than a transient bar, so a captured or piped
-            # stderr shows progress too; JSON runs keep stderr silent.
-            typer.echo(f"[{position}/{total}] {identifier}", err=True)
-        try:
-            kind, entry = coll.import_reference(
-                identifier,
-                key=key,
-                key_source=key_source,
-                allow_duplicate=allow_duplicate,
-                cache_file=cache_file,
-            )
-        except importer_ops.DuplicateReferenceError as exc:
-            results.append(
-                {
-                    "identifier": identifier,
-                    "status": "skipped",
-                    "reason": "duplicate",
-                    "existing_keys": exc.keys,
-                    "message": str(exc),
-                }
-            )
-            warnings.append(
-                {
-                    "type": "duplicate_reference",
-                    "identifier": identifier,
-                    "message": f"{identifier}: already present as {', '.join(exc.keys)}; skipped.",
-                }
-            )
-            continue
-        except importer_ops.CitationKeyConflictError as exc:
-            results.append(
-                {
-                    "identifier": identifier,
-                    "status": "failed",
-                    "reason": "key_conflict",
-                    "key": exc.key,
-                    "message": str(exc),
-                }
-            )
-            warnings.append(
-                {
-                    "type": "import_failed",
-                    "identifier": identifier,
-                    "message": f"{identifier}: {exc}; name another key.",
-                }
-            )
-            continue
-        except (
-            importer_ops.UnsupportedIdentifierError,
-            importer_ops.ReferenceImportError,
-            ValueError,
-        ) as exc:
-            results.append({"identifier": identifier, "status": "failed", "message": str(exc)})
-            warnings.append(
-                {
-                    "type": "import_failed",
-                    "identifier": identifier,
-                    "message": f"{identifier}: {exc}",
-                }
-            )
-            continue
-        imported += 1
-        imported_entries.append(entry)
-        results.append(
-            {
-                "identifier": importer_ops.imported_entry_identifier(entry, kind),
-                "status": "imported",
-                "identifier_type": kind,
-                "key": entry.key,
-                "key_source": "user" if key else key_source,
-                "entry_type": entry.type,
-                "doi": entry.fields.get("doi"),
-            }
-        )
+            # stderr shows progress too; JSON runs keep stderr silent. Each
+            # line names what the identifier became, so a mistyped one that
+            # resolved to an unrelated paper shows up before the diff does.
+            typer.echo(f"[{position}/{total}] {identifier} {_outcome(result)}", err=True)
+    imported = len(imported_entries)
 
     if imported == 0:
         _emit_error(
@@ -454,6 +395,96 @@ def _import_several(
         failed=failed,
         results=results,
     )
+
+
+def _import_one(
+    coll: Bibliography,
+    identifier: str,
+    key: str | None,
+    key_source: str,
+    allow_duplicate: bool,
+    cache_file: str | None,
+) -> tuple[dict[str, object], dict[str, object] | None, BibEntry | None]:
+    """Resolve one identifier of a batch: its result, its warning, and the staged entry."""
+    # The importer pulls in provider and HTTP code; load it only to import.
+    from pynakes import importer as importer_ops
+
+    try:
+        kind, entry = coll.import_reference(
+            identifier,
+            key=key,
+            key_source=key_source,
+            allow_duplicate=allow_duplicate,
+            cache_file=cache_file,
+        )
+    except importer_ops.DuplicateReferenceError as exc:
+        return (
+            {
+                "identifier": identifier,
+                "status": "skipped",
+                "reason": "duplicate",
+                "existing_keys": exc.keys,
+                "message": str(exc),
+            },
+            {
+                "type": "duplicate_reference",
+                "identifier": identifier,
+                "message": f"{identifier}: already present as {', '.join(exc.keys)}; skipped.",
+            },
+            None,
+        )
+    except importer_ops.CitationKeyConflictError as exc:
+        return (
+            {
+                "identifier": identifier,
+                "status": "failed",
+                "reason": "key_conflict",
+                "key": exc.key,
+                "message": str(exc),
+            },
+            {
+                "type": "import_failed",
+                "identifier": identifier,
+                "message": f"{identifier}: {exc}; name another key.",
+            },
+            None,
+        )
+    except (
+        importer_ops.UnsupportedIdentifierError,
+        importer_ops.ReferenceImportError,
+        ValueError,
+    ) as exc:
+        return (
+            {"identifier": identifier, "status": "failed", "message": str(exc)},
+            {"type": "import_failed", "identifier": identifier, "message": f"{identifier}: {exc}"},
+            None,
+        )
+    result: dict[str, object] = {
+        "identifier": importer_ops.imported_entry_identifier(entry, kind),
+        "status": "imported",
+        "identifier_type": kind,
+        "key": entry.key,
+        "key_source": "user" if key else key_source,
+        "entry_type": entry.type,
+        "doi": entry.fields.get("doi"),
+        "title": entry.fields.get("title"),
+    }
+    return result, None, entry
+
+
+def _outcome(result: dict[str, object]) -> str:
+    """Return the progress-line tail naming what one identifier became."""
+    if result["status"] == "imported":
+        title = result.get("title")
+        return f"→ {result['key']}" + (f" — {title}" if title else "")
+    if result["status"] == "skipped":
+        keys = result["existing_keys"]
+        return (
+            f"→ skipped, already present as {', '.join(map(str, keys))}"
+            if isinstance(keys, list)
+            else "→ skipped"
+        )
+    return f"→ failed: {result['message']}"
 
 
 def register(app: typer.Typer) -> None:

@@ -143,9 +143,12 @@ The forms deprecated in 0.8 are removed:
   The DOI and arXiv entries are shared with `enrich`. `Bibliography.import_reference`
   takes `cache_file`, and `pynakes.provider_cache.cache_scope` sets the cache
   for a block of provider calls.
-- `ref import` with several identifiers reports each one on stderr as it is
-  looked up, as plain lines that captured output keeps. `--json` runs keep
-  stderr silent.
+- `ref import` with several identifiers reports each one on stderr once it is
+  looked up, naming what it became: `[3/18] arXiv:… → Key — Title`, or that it
+  was skipped or failed. A mistyped identifier that resolves to an unrelated
+  paper shows there, before the diff. The lines are plain, so captured output
+  keeps them; `--json` runs keep stderr silent. Each imported result, and a
+  single import, also carries the entry's `title`.
 - `ref comment TEXT --key K` writes `% TEXT` directly above an entry, as a
   comment attached to it: it moves with the entry, and `scrub` removes it with
   the other comments. It holds remarks for the people keeping the bibliography
