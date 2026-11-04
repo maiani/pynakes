@@ -158,6 +158,10 @@ The forms deprecated in 0.8 are removed:
   more than one line, an `@` (BibTeX would start an entry there), or a leading
   `pynakes`, which reads as a directive. `Bibliography.add_entry_comment`,
   `remove_entry_comment` and `entry_comments` are the Python API.
+- `enrich --published` warns `key_year_stale` when a promotion changes the year
+  that the citation key spells (`Turing2023Machines` for a paper published in
+  2024), with a `suggested_key` and the `keys rename` command that also
+  updates TeX citations. Keys are still never renamed on their own.
 - `search` accepts `OR` between terms: `Newton OR Leibniz` finds either name,
   where it used to look for the word "OR" as a third required term and found
   nothing. `OR` binds tighter than the implicit AND, so `optics Newton OR

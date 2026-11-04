@@ -492,6 +492,21 @@ def test_published_promotion_replaces_arxiv_doi_but_keeps_eprint(monkeypatch) ->
     assert entry.fields["abstract"] == "Useful preprint abstract"
 
 
+def test_published_promotion_hints_at_a_key_that_keeps_the_preprint_year(monkeypatch) -> None:
+    monkeypatch.setattr(arxiv, "fetch_atom", lambda identifier: ARXIV_XML)
+    source = "@misc{{{key},\n  eprint = {{2301.00001}},\n  archiveprefix = {{arXiv}},\n  year = {{2023}}\n}}\n"
+    lib = parse_bib(source.format(key="Turing2023Machines") + source.format(key="Machines"))
+
+    report = check_published(lib, online=True, apply=True)
+
+    hints = [w for w in report.warnings if w["type"] == "key_year_stale"]
+    assert lib.entries["Turing2023Machines"].key == "Turing2023Machines"
+    assert [(w["key"], w["suggested_key"]) for w in hints] == [
+        ("Turing2023Machines", "Turing2024Machines")
+    ]
+    assert "keys rename Turing2023Machines Turing2024Machines" in hints[0]["message"]
+
+
 def test_check_published_promotes_preprint_with_existing_published_metadata() -> None:
     lib = parse_bib(
         "@misc{Preprint,\n"

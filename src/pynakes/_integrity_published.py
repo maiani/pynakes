@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Collection
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pynakes._identifiers import is_arxiv_doi, normalize_arxiv, normalize_doi
 from pynakes._integrity_common import (
@@ -426,11 +426,36 @@ def _apply_published_candidate(
             if set_entry_field(entry, field_name, value):
                 report.updates.append(FieldUpdate(entry.key, field_name, value))
     published_year = candidate.metadata.get("year", "").strip()
-    if published_year and _field_value(entry, "year").strip() != published_year:
+    preprint_year = _field_value(entry, "year").strip()
+    if published_year and preprint_year != published_year:
         if set_entry_field(entry, "year", published_year):
             report.updates.append(FieldUpdate(entry.key, "year", published_year))
+            if warning := _stale_key_year(entry.key, preprint_year, published_year):
+                report.warnings.append(warning)
     if len(report.updates) > before and entry.key not in report.promoted_keys:
         report.promoted_keys.append(entry.key)
+
+
+def _stale_key_year(key: str, old: str, new: str) -> dict[str, Any] | None:
+    """Return a hint when a citation key spells the preprint year a promotion replaced.
+
+    Keys are never renamed on their own: a key is cited from manuscripts, so
+    the hint names ``keys rename``, which updates those citations too.
+    """
+    if not old or key.count(old) != 1:
+        return None
+    suggested = key.replace(old, new)
+    return {
+        "type": "key_year_stale",
+        "key": key,
+        "year": new,
+        "key_year": old,
+        "suggested_key": suggested,
+        "message": (
+            f"{key} keeps the preprint year {old}; the published version is {new}. "
+            f"`pynakes keys rename {key} {suggested}` renames it and its TeX citations."
+        ),
+    }
 
 
 def _apply_arxiv_backfill_candidate(
