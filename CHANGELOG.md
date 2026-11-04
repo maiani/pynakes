@@ -214,6 +214,9 @@ The forms deprecated in 0.8 are removed:
   that setting in its help, e.g. `--sort-by` names `sort-order` and `--indent`
   names `format-indent`, where the help said only "the file's configured sort
   order" or nothing.
+- `scrub`'s summary says what happens to what it counts: `removed metadata: 1
+  block(s) — …`, or `would remove` with `--check` and `--dry-run`. The bare
+  `metadata: 1 block(s)` read as though the block were kept.
 - When `lint` reports a `citation_key_pattern_mismatch`, it ends with how to
   keep a key chosen by hand: `ref directive ignore
   citation_key_pattern_mismatch --key KEY` exempts that entry from the check

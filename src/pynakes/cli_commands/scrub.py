@@ -34,19 +34,24 @@ from pynakes.engine import Bibliography
 # --- scrub -----------------------------------------------------------------
 
 
-def _summary_lines(report: scrub_ops.ScrubReport) -> list[str]:
-    """Render the per-kind breakdown shared by the write and check outputs."""
+def _summary_lines(report: scrub_ops.ScrubReport, verb: str) -> list[str]:
+    """Render the per-kind breakdown shared by the write and check outputs.
+
+    Each line says what happens to the content it counts ("removed", or
+    "would remove" in a preview): a bare "metadata: 1 block" read as though
+    the block were kept.
+    """
     lines: list[str] = []
     if report.fields:
         named = ", ".join(f"{name} ({count})" for name, count in report.fields.items())
-        lines.append(f"  fields:   {named} — {report.entries} {_entries(report.entries)} touched")
+        lines.append(f"  {verb} fields: {named} — from {report.entries} {_entries(report.entries)}")
     elif not report.patterns:
-        lines.append("  fields:   off")
+        lines.append("  fields: none removed (field scrubbing is off)")
     if report.metadata_blocks:
         keys = ", ".join(report.metadata_keys)
-        lines.append(f"  metadata: {report.metadata_blocks} block(s) — {keys}")
+        lines.append(f"  {verb} metadata: {report.metadata_blocks} block(s) — {keys}")
     if report.comments:
-        lines.append(f"  comments: {report.comments} block(s)")
+        lines.append(f"  {verb} comments: {report.comments} block(s)")
     return lines
 
 
@@ -161,7 +166,7 @@ def scrub(
     content = coll.preview()
     human = [
         f"{_verb('scrub', params, 'Scrubbed')} {resolved} → {out}.",
-        *_summary_lines(report),
+        *_summary_lines(report, "would remove" if params.dry_run else "removed"),
     ]
     if selector is not None:
         human.append(
@@ -215,7 +220,7 @@ def _check_result(
         "removed": report.to_dict(),
         "message": message,
     }
-    human = [f"{resolved}: {message}", *_summary_lines(report)]
+    human = [f"{resolved}: {message}", *_summary_lines(report, "would remove")]
     _emit(params.json_output, payload, human)
     if not report.clean:
         raise typer.Exit(code=1)

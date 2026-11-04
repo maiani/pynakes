@@ -294,6 +294,19 @@ def test_cli_writes_a_scrubbed_copy_and_leaves_the_source_alone(tmp_path: Path) 
     assert "@book{euclid300bc," in out.read_text()
 
 
+def test_cli_summary_says_the_counted_content_is_removed(tmp_path: Path) -> None:
+    source = _bib(tmp_path, "library.bib", PRIVATE)
+    out = tmp_path / "public.bib"
+
+    written = runner.invoke(app, ["scrub", str(source), "--out", str(out)]).output
+    checked = runner.invoke(app, ["scrub", str(source), "--check"]).output
+
+    assert "  removed metadata: " in written
+    assert "  removed comments: 1 block(s)" in written
+    assert "  would remove metadata: " in checked
+    assert "  metadata: " not in written + checked
+
+
 def test_cli_copies_an_already_clean_library_unchanged(tmp_path: Path) -> None:
     source = _bib(tmp_path, "library.bib", CLEAN)
     out = tmp_path / "public.bib"
