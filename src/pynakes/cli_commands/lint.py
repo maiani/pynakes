@@ -120,15 +120,24 @@ def _lint_collection(
     if not issues:
         human = [f"{file}: no issues found."]
     else:
-        # The counts come first, so a long report opens with its shape.
+        # The counts come first, so a long report opens with its shape, and a
+        # long listing repeats them at the end, where a terminal leaves the eye.
+        totals = f"{len(issues)} issue(s): {errors} error(s), {warnings} warning(s), {infos} info."
         human = [
-            f"{len(issues)} issue(s): {errors} error(s), {warnings} warning(s), {infos} info.",
+            totals,
             "By category: "
             + ", ".join(f"{category} {count}" for category, count in by_category.items())
             + ".",
         ]
         if not summary_only:
             human.extend(f"  {_format_issue(issue)}" for issue in issues)
+            if len(issues) > _LONG_REPORT:
+                human.append(totals)
+                if infos:
+                    human.append(
+                        f"Pass --severity warning to leave out the {infos} info finding(s), "
+                        "or --summary for the counts alone."
+                    )
         human.extend(_fixer_hints(issues))
     if suppressed:
         human.append(
@@ -149,6 +158,10 @@ def _lint_collection(
             "suppressed": suppressed,
         },
     )
+
+
+#: A listing longer than this repeats its counts at the end, with a hint to narrow it.
+_LONG_REPORT = 10
 
 
 def _format_issue(issue: LintIssue) -> str:

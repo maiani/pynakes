@@ -196,7 +196,9 @@ The forms deprecated in 0.8 are removed:
   missing a PDF by reason, naming only keys no earlier line named. A skip or
   failure that tried downloads keeps its own line. The JSON is unchanged.
 - Human-readable `lint` output opens with its totals and a count per category,
-  before the findings; `--summary` shows the same two lines.
+  before the findings; `--summary` shows the same two lines. A listing of more
+  than ten findings repeats the totals at the end, followed, when it includes
+  info findings, by a pointer to `--severity warning` and `--summary`.
 - `init --agent-guide` ends the guide with a "Library conventions" section
   generated from the library: the stored citation-key pattern (or the one
   existing keys follow, proposed with the `metadata set` command but not

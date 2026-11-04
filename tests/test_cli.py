@@ -455,6 +455,27 @@ class TestInspectAndLint:
         first_finding = next(i for i, line in enumerate(lines) if line.startswith("  ["))
         assert totals < first_finding
 
+    def test_a_long_lint_listing_repeats_its_counts_at_the_end(self, tmp_path: Path) -> None:
+        def entries(count: int) -> str:
+            return "".join(
+                f"@article{{K{n},\n  author = {{Ada Lovelace}},\n  title = {{Notes {n}}},\n"
+                f"  journal = {{Notes}},\n  year = {{1843}}\n}}\n"
+                for n in range(count)
+            )
+
+        long_bib, short_bib = tmp_path / "long.bib", tmp_path / "short.bib"
+        long_bib.write_text(entries(12))
+        short_bib.write_text(entries(2))
+
+        lines = runner.invoke(app, ["lint", str(long_bib)]).output.splitlines()
+        short = runner.invoke(app, ["lint", str(short_bib)]).output
+
+        totals = [i for i, line in enumerate(lines) if " issue(s): " in line]
+        assert len(totals) == 2 and totals[0] == 0
+        assert lines[totals[1] + 1].startswith("Pass --severity warning to leave out the 12 info")
+        assert short.count(" issue(s): ") == 1
+        assert "--severity warning" not in short
+
     def test_auto_discovery_ignores_revtex_notes_bib(self, tmp_path: Path, monkeypatch) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text("@article{A,\n  title = {T}\n}\n")
