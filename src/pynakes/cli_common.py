@@ -201,11 +201,25 @@ def _with_warnings(human: list[str], warnings: list | None) -> list[str]:
     The envelope's ``warnings`` used to reach only ``--json``: human output
     printed at most a count, so a message such as normalize's list of
     regenerated keys was invisible without it. A warning a command already
-    spells out in its own lines is not repeated.
+    spells out in its own lines is not repeated. Warnings that share a
+    ``group`` text (the same provider refusal for many entries) become one line
+    naming their keys; ``--json`` keeps each one.
     """
     lines = list(human)
     shown = "\n".join(lines)
+    grouped: dict[str, list[dict]] = {}
     for warning in warnings or []:
+        if isinstance(warning, dict) and warning.get("group"):
+            grouped.setdefault(str(warning["group"]), []).append(warning)
+    for warning in warnings or []:
+        if isinstance(warning, dict) and warning.get("group"):
+            members = grouped.pop(str(warning["group"]), None)
+            if members is None:
+                continue
+            if len(members) > 1:
+                keys = ", ".join(str(member.get("key")) for member in members)
+                lines.append(f"  warning: {warning['group']}: {len(members)} entries ({keys})")
+                continue
         text = _warning_text(warning)
         if text and text not in shown:
             lines.append(f"  warning: {text}")

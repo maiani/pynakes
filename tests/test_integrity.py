@@ -1119,6 +1119,40 @@ def test_enrich_reports_throttled_lookups_as_not_checked(monkeypatch, tmp_path: 
     }
 
 
+def test_enrich_counts_an_aps_refusal_answered_by_doi_org_as_checked(
+    monkeypatch, tmp_path: Path
+) -> None:
+    def refused(*_args, **_kwargs):
+        error = ProviderFetchError("Server returned HTTP 401 for harvest.aps.org")
+        error.status = 401
+        raise error
+
+    monkeypatch.setattr(aps, "fetch_entry", refused)
+    monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
+    bib = tmp_path / "refs.bib"
+    bib.write_text(
+        "".join(
+            f"@article{{{key},\n  title = {{T}},\n  journal = {{Phys. Rev. B}},\n"
+            f"  doi = {{10.1103/{key}}}\n}}\n\n"
+            for key in ("First", "Second")
+        ),
+        encoding="utf-8",
+    )
+
+    data = json.loads(
+        runner.invoke(app, ["enrich", str(bib), "--online", "--dry-run", "--json"]).output
+    )
+    human = runner.invoke(app, ["enrich", str(bib), "--online", "--dry-run"]).output
+
+    assert {w["type"] for w in data["warnings"]} == {"preferred_provider_fallback"}
+    assert all(w["checked"] and w["fallback"] == "doi.org" for w in data["warnings"])
+    assert data["lookups"]["not_checked"] == []
+    assert "not checked" not in human and "None" not in human
+    assert (
+        "APS Harvest failed (HTTP 401); used doi.org metadata instead: 2 entries (First, Second)"
+    ) in human
+
+
 def test_enrich_only_field_applies_a_reviewed_subset(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(doi, "fetch_bibtex", lambda d: PROVIDER_BIBTEX)
     bib = tmp_path / "refs.bib"

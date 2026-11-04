@@ -256,6 +256,12 @@ The forms deprecated in 0.8 are removed:
   changed 2,270 bundled titles; it now changes none apart from 63 whose
   abbreviation is another journal's full title (`Endodoncia`). A spelling no
   table lists is still replaced by the mapped one.
+- `enrich` no longer counts an entry as not checked when APS Harvest refused
+  its lookup but doi.org answered instead. That warning is now
+  `preferred_provider_fallback`, with `checked: true` and the source used
+  (`fallback: "doi.org"`). Human output shows a run of identical refusals as
+  one line naming the entries, rather than one line each. The `not checked`
+  line no longer ends in `(None)` when nothing is worth retrying.
 
 ## [0.8.0] - 2026-10-22
 

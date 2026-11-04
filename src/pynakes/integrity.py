@@ -231,23 +231,21 @@ def _enrich_fetch_job(
 ) -> _EnrichFetchResult:
     normalized, journal, key, cache_file = args
     result = _EnrichFetchResult()
+    preferred_error: ProviderFetchError | None = None
     if preferred_metadata_provider(journal) == "aps":
         try:
             result.remote = aps_provider.fetch_entry(normalized, journal, cache_file=cache_file)
         except ProviderFetchError as exc:
-            result.warnings.append(
-                lookup_warning(
-                    "preferred_provider_unresolved",
-                    key,
-                    f"Could not fetch APS Harvest metadata for DOI {normalized!r}: {exc}",
-                    exc,
-                )
-            )
+            preferred_error = exc
     if result.remote is None:
         try:
             result.remote = fetch_doi_entry(normalized, cache_file=cache_file)
         except MetadataFetchError as exc:
             result.warnings.append(lookup_warning("doi_unresolved", key, str(exc), exc))
+    if preferred_error is not None:
+        result.warnings.insert(
+            0, _preferred_provider_warning(normalized, key, preferred_error, result)
+        )
     if result.remote is not None and crossref_provider.lacks_article_locator(result.remote.fields):
         try:
             work = crossref_provider.fetch_work_by_doi(normalized, cache_file=cache_file)
@@ -265,6 +263,36 @@ def _enrich_fetch_job(
                 )
             )
     return result
+
+
+def _preferred_provider_warning(
+    doi: str, key: str, exc: ProviderFetchError, result: _EnrichFetchResult
+) -> dict[str, Any]:
+    """Return the warning for an APS Harvest lookup that failed.
+
+    When doi.org answered instead, the entry *was* checked: the warning says
+    which source was used and carries ``checked: True``, so it is not counted
+    as "not checked". ``group`` lets human output collapse a run of identical
+    refusals (an unauthorized Harvest refuses every lookup) into one line.
+    """
+    if result.remote is None:
+        return lookup_warning(
+            "preferred_provider_unresolved",
+            key,
+            f"Could not fetch APS Harvest metadata for DOI {doi!r}: {exc}",
+            exc,
+        )
+    reason = f"HTTP {exc.status}" if exc.status else "request failed"
+    return {
+        "type": "preferred_provider_fallback",
+        "key": key,
+        "provider": "aps-harvest",
+        "fallback": "doi.org",
+        "status": exc.status,
+        "message": f"APS Harvest failed for DOI {doi!r} ({reason}); used doi.org metadata instead",
+        "group": f"APS Harvest failed ({reason}); used doi.org metadata instead",
+        "checked": True,
+    }
 
 
 def enrich_library(

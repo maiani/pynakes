@@ -333,9 +333,10 @@ def enrich(
             )
     lookups = _lookup_coverage(warnings, concurrency, cache_file)
     if lookups["not_checked"]:
+        retry = f" (retry with {lookups['retry']})" if lookups["retry"] else ""
         detail.append(
             f"  not checked: {len(lookups['not_checked'])} "
-            f"{_entries(len(lookups['not_checked']))} ({lookups['retry']})"
+            f"{_entries(len(lookups['not_checked']))}{retry}"
         )
     # Counted over every update this command applied, preprint work included, so
     # the dry-run summary matches both the diff below it and the JSON envelope.
