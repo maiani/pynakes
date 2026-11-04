@@ -43,6 +43,7 @@ NOT_ENTRY_SELECTABLE = {
     "ref add": "creates one entry",
     "ref edit": "names one entry positionally",
     "ref import": "--key names the key to assign to the new entry",
+    "ref from-pdf": "selects source documents; --key names a new entry",
     "ref remove": "names its entries positionally",
     "tex add": "edits the TeX source list, not entries",
     "tex clear": "edits the TeX source list, not entries",

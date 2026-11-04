@@ -43,6 +43,8 @@ with usage examples, see the [API overview](index.md).
 
 ::: pynakes.importer
 
+::: pynakes.pdf_import
+
 ::: pynakes.fields
 
 ::: pynakes.groups

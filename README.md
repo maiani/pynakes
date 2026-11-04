@@ -37,6 +37,9 @@ and JabRef interoperability keeps existing libraries usable across tools.
 - **References and materials together.** Pinax tracks PDFs, source bundles, and
   provenance. Materials can follow entries through citation-key changes and
   bibliography combine/split operations.
+  [PDF import](https://github.com/maiani/pynakes/blob/main/docs/guides/pdf-import.md)
+  creates references from local documents and links their unchanged originals
+  with the optional `pynakes[pdf]` extra (PyMuPDF, AGPL/commercial terms).
 - **Research reads.** Compare a set of papers through bounded, paged reads of
   their abstracts, materials, and recorded provenance; save selections as named
   queries; describe a bibliography's coverage with `analyze`; and map its co-author

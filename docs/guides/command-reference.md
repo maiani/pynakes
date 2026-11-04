@@ -1139,6 +1139,31 @@ Patch fields or type on one uniquely identified reference.
 | `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
+## ref from-pdf
+
+**Stability: stable**
+
+Import references from PDFs and link their unchanged originals.
+
+`pynakes ref from-pdf [FILE] PATHS... [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `PATHS` | list[string] | yes | — | — | PDF files or directories (immediate PDFs only) |
+| `--online` | boolean | no | false | — | Resolve DOI/arXiv candidates through metadata providers; never upload PDFs |
+| `--identifier` | string | no | null | — | Confirm a DOI/arXiv identifier for one PDF, including scans |
+| `--key` | string | no | null | — | Citation key for a single PDF |
+| `--key-source` | choice | no | null | generated, provider | Override import-key-source: generated or provider |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
+| `--dry-run` | boolean | no | false | — | Inspect and preview accepted imports without writing |
+| `--diff` | boolean | no | false | — | Show a unified bibliography diff |
+| `--cache-file` | string | no | null | — | Keep provider responses in a reusable cache file at this path (safe to delete or .gitignore). Omit it and nothing is written to disk: responses are reused for this run only |
+| `--json` | boolean | no | false | — | Emit per-file evidence and outcomes as JSON |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
 ## ref import
 
 **Stability: stable**

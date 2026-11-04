@@ -279,4 +279,5 @@ def test_capabilities_list_exactly_the_commands_that_accept_the_precondition() -
     assert described["option"] == "--expect-sha256"
     assert described["envelope_key"] == "source_sha256"
     assert described["conflict"] in catalogue_description()["conflict"]["codes"]
-    assert set(described["commands"]) == set(WRITES) | NETWORK_WRITES
+    # PDF writes have source-file precondition tests in test_pdf_import.py.
+    assert set(described["commands"]) == set(WRITES) | NETWORK_WRITES | {"ref from-pdf"}

@@ -470,10 +470,10 @@ references, and retrieve passages tied to the exact material read.
   indexed content search through these derived records. Return source locations
   for checking quotations, equations and methods. Source text is data, not
   executable instructions; distinguish excerpts from external interpretations.
-- Add `ref from-pdf`: embedded BibTeX/XMP, then extracted identifiers, then
-  explicitly requested provider resolution. Reuse extraction and retain
-  candidate evidence. Add offline `ref from-text` with recognized fields and
-  unresolved text; existing `ref find` remains the online lookup path.
+- Extend the initial PDF import with managed Pinax ingestion and broader
+  source-linked extraction, sharing the existing inspection evidence contract.
+  Add offline `ref from-text` with recognized fields and unresolved text;
+  existing `ref lookup` remains the online lookup path.
 - Extend the provider registry as one acquisition workstream: NASA ADS bibcodes,
   RePEc/IDEAS handles, MathSciNet review numbers, institutional URNs starting
   with DiVA, SciELO, and additional ISBN coverage (evaluate WorldCat first).

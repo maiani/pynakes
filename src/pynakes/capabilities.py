@@ -120,7 +120,7 @@ _NETWORK_ACCESS = {
         "ref add --fetch",
         "ref import --fetch",
     ],
-    "with_online": ["verify", "enrich", "ref compare"],
+    "with_online": ["verify", "enrich", "ref compare", "ref from-pdf"],
 }
 
 # The bounded-read contract shared by every multi-entry read.
@@ -510,6 +510,7 @@ def get_capabilities() -> dict:
             "normalize_dois",
             "normalize_pages",
             "import_reference",
+            "import_pdfs",
             "search_library",
             "bounded_reads",
             "include_materials_and_provenance",

@@ -12,9 +12,13 @@ Operation methods (field edits, key ops, normalization, import, …) live in
 from this module.
 """
 
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pynakes.pdf_import import PDFImportReport
 
 from pynakes import _tex_rewrite
 from pynakes import metadata as metadata_ops
@@ -103,6 +107,7 @@ class Bibliography(
     _format_layout: CanonicalLayout | None = None
     _tex_rewrites: list[_tex_rewrite.TexRewrite] = field(default_factory=list)
     _after_commit: list[Callable[[], object]] = field(default_factory=list)
+    _pdf_import_sources: list[tuple[Path, str]] = field(default_factory=list)
 
     @classmethod
     def open(cls, path: str | Path) -> "Bibliography":
@@ -184,6 +189,33 @@ class Bibliography(
         """
         if changed:
             self.preview()
+
+    def import_pdfs(
+        self,
+        paths: Sequence[str | Path],
+        *,
+        online: bool = False,
+        identifier: str | None = None,
+        key: str | None = None,
+        key_source: str | None = None,
+        cache_file: str | Path | None = None,
+    ) -> "PDFImportReport":
+        """Stage PDF references and original-file links; return a PDFImportReport.
+
+        See :func:`pynakes.pdf_import.import_pdfs` for evidence, matching and
+        partial-batch semantics. Requires the optional ``pdf`` dependency.
+        """
+        from pynakes.pdf_import import import_pdfs
+
+        return import_pdfs(
+            self,
+            paths,
+            online=online,
+            identifier=identifier,
+            key=key,
+            key_source=key_source,
+            cache_file=cache_file,
+        )
 
     # --- lifecycle -------------------------------------------------------
 
@@ -267,6 +299,16 @@ class Bibliography(
             raise ExternalModificationError(self.path)
 
         changed_entries = self.changed_entries_count()
+        if self._pdf_import_sources:
+            from pynakes._pdf_evidence import file_digest
+
+            for source, digest in self._pdf_import_sources:
+                try:
+                    unchanged = file_digest(source) == digest
+                except OSError:
+                    unchanged = False
+                if not unchanged:
+                    raise ExternalModificationError(source)
         diff_text = self.diff()
         new_text = self.preview()
         modified = new_text != self._pristine_text
@@ -328,6 +370,7 @@ class Bibliography(
         self._format_layout = None
         self._tex_rewrites.clear()
         self._after_commit.clear()
+        self._pdf_import_sources.clear()
 
     def reset(self) -> None:
         """Discard staged edits and restore the pristine in-memory library."""

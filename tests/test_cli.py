@@ -44,7 +44,10 @@ class TestTopLevelHelp:
         out = _plain_cli_output(result.output)
         # The group name sits in its own table column; the description column
         # ends with "→ <subcommands>".
-        assert "→ add, import, show, edit, directive, comment, compare, lookup, remove" in out
+        assert (
+            "→ add, import, from-pdf, show, edit, directive, comment, compare, lookup, remove"
+            in out
+        )
         assert "→ fetch, check, repair" in out
         assert "corpus" not in out
         assert "→ list, add, remove, clear, scan" in out

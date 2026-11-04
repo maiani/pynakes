@@ -40,6 +40,15 @@ The compatibility forms deprecated in 0.9 are removed in v0.10:
 
 ### Added
 
+- `ref from-pdf` and `Bibliography.import_pdfs` inspect local PDFs with the
+  optional PyMuPDF backend (`pynakes[pdf]`, AGPL/commercial terms), stage complete
+  embedded BibTeX/XMP records, and optionally resolve title-corroborated DOI/arXiv
+  candidates with `--online`. Per-file evidence and outcomes preserve ambiguity;
+  `--identifier` selects one document's identity explicitly. Imports link
+  unchanged originals, retain PDF variants, recognize repeated linked bytes,
+  and check source hashes again before commit. Mixed batches retain unresolved
+  files in their reports. The first version has no OCR or managed material copies.
+
 - The Python `Library` API reads explicitly selected bibliographies or a
   version-1 `<name>.library.toml` manifest. Manifests accept only membership,
   exclusions, a name and a reserved Catalogue path; bibliography settings stay

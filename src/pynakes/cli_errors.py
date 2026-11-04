@@ -41,10 +41,12 @@ class ErrorCode(StrEnum):
     INVALID_IDENTIFIER = "InvalidIdentifier"
     UNSUPPORTED_IDENTIFIER = "UnsupportedIdentifier"
     REFERENCE_IMPORT_ERROR = "ReferenceImportError"
+    PDF_IMPORT_ERROR = "PDFImportError"
     ONLINE_LOOKUP_REQUIRED = "OnlineLookupRequired"
     PROVIDER_UNAVAILABLE = "ProviderUnavailable"
     # --- conflicts (exit 2) ---
     EXTERNAL_MODIFICATION = "ExternalModification"
+    PDF_IMPORT_CONFLICT = "PDFImportConflict"
     CITATION_KEY_CONFLICT = "CitationKeyConflict"
     DUPLICATE_CITATION_KEY = "DuplicateCitationKey"
     GROUP_CONFLICT = "GroupConflict"
@@ -123,6 +125,8 @@ CATALOGUE: dict[ErrorCode, ErrorSpec] = {
     _E.REFERENCE_IMPORT_ERROR: ErrorSpec(
         1, "ref import: provider metadata could not be resolved or imported."
     ),
+    _E.PDF_IMPORT_ERROR: ErrorSpec(1, "ref from-pdf: no PDF was imported; see per-file outcomes."),
+    _E.PDF_IMPORT_CONFLICT: ErrorSpec(2, "ref from-pdf: conflicting candidates require review."),
     _E.ONLINE_LOOKUP_REQUIRED: ErrorSpec(
         1, "The command needs the network and --online was not given."
     ),

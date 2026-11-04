@@ -27,6 +27,7 @@ from pynakes.cli_commands import (
     fetch,
     fields,
     format,
+    from_pdf,
     groups,
     import_ref,
     init,
@@ -142,6 +143,7 @@ scrub.register(app)
 # ref: per-entry lifecycle
 add.register(ref_app)
 import_ref.register(ref_app)
+from_pdf.register(ref_app)
 show.register(ref_app)
 edit.register(ref_app)
 directive.register(ref_app)

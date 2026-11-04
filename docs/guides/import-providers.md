@@ -5,6 +5,9 @@ it to a canonical identifier, fetches metadata through the matching provider,
 and converts the response into normalized metadata before creating a
 bibliography entry.
 
+For existing local PDFs, use [`ref from-pdf`](pdf-import.md): offline embedded
+metadata inspection, optional online DOI/arXiv resolution, and original-file links.
+
 This page tracks both the current metadata-import surface and asset-fetch
 support. In the **Metadata import** column, **Covered** means that a user can
 pass the listed identifier or URL directly to `ref import`; **Partly covered**
