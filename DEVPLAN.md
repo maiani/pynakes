@@ -286,6 +286,30 @@ Zotero versions/platforms and unsupported capabilities explicitly. General
 Zotero writes, automatic recognition, annotation transfer, two-way sync, index
 performance and a GUI are not release prerequisites.
 
+#### Ingestion acceptance: references, not attachment labels
+
+A copied PDF is preserved material, not a recovered reference. Report separate
+counts for source occurrences, distinct stored bytes, identified works, accepted
+bibliographic records and pending review. An attachment filename or PDF document
+property must never silently become an accepted paper title.
+
+- Preserve the original filename as material provenance. Resolve the paper title
+  from attributable metadata corroborated by document evidence; keep conflicts
+  and weak PDF properties visible for review.
+- Create or match a bibliographic parent before presenting a PDF as an imported
+  reference. Validate title, creators, date, type and identifiers together. In
+  Zotero, distinguish parent metadata from the child attachment's display label;
+  in native Libraries, distinguish the owning entry from its Pinax materials.
+- Give unresolved files a separate review view with an explicit reason and next
+  action. A flat collection of filename-labelled attachments does not satisfy
+  the usable-Library gate, even when all byte copies are verified.
+- Test misleading filenames, generic/stale PDF titles, preprint/publication
+  variants, reference-list identifiers, repeated runs and manually edited labels.
+  Metadata resolution must not rename originals or overwrite user edits.
+- Demonstrate a complete accepted path: inspect, resolve, corroborate, match or
+  create the record, attach unchanged bytes, route or assign collections, verify
+  the visible title and persist the receipt. Report uncertain cases separately.
+
 #### Native sequence: PDF archive to managed Library
 
 Local import trials establish useful failure classes, not a general recovery
