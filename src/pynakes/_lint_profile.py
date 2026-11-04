@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pynakes._lint_issue import IGNORABLE_NAMES, LintIssue
+from pynakes.authors import NAME_FIELDS, is_all_caps_person, split_name_list
 from pynakes.fields import TITLE_FIELDS, is_all_caps_title, title_capitalization_is_protected
 from pynakes.journals import (
     DEFAULT_JOURNAL_SOURCE,
@@ -226,6 +227,22 @@ def _lint_consistency(
                     f"{normalized!r}",
                     key=entry.key,
                     field=normalized,
+                )
+            )
+    for field in NAME_FIELDS:
+        names = [
+            name for name in split_name_list(fields.get(field, "")) if is_all_caps_person(name)
+        ]
+        if names:
+            issues.append(
+                LintIssue(
+                    "author_all_caps",
+                    "warning",
+                    f"Entry {entry.key!r} field {field!r} has personal names in capitals "
+                    f"throughout: {'; '.join(names)}; recase by hand "
+                    "([auth:capitalize] only fixes the citation key)",
+                    key=entry.key,
+                    field=field,
                 )
             )
     for field in profile.title_fields:

@@ -81,6 +81,11 @@ The forms deprecated in 0.8 are removed:
 
 ### Added
 
+- Lint warns with `author_all_caps` when a personal name in `author` or `editor`
+  is entirely capitalized. Institution names and short initial/acronym tokens
+  are excluded. The warning asks for manual recasing and explains that
+  `[auth:capitalize]` changes only the citation key.
+
 - Opt-in `normalize --proper-nouns/--no-proper-nouns` (setting:
   `normalize-proper-nouns`) protects internal capitalized names in sentence-case
   titles, such as `On the theory of {Brownian} motion`. Title Case and sentence

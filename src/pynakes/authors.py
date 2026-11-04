@@ -91,6 +91,19 @@ def institution_name(person: str) -> str | None:
     return inner if any(char.isspace() for char in inner) else None
 
 
+def is_all_caps_person(person: str) -> bool:
+    """Whether a personal name is entirely capitalized, excluding short initials.
+
+    Fully braced institution names and names consisting only of tokens of at
+    most three letters are left alone. TeX accents are decoded before testing.
+    """
+    if institution_name(person) is not None:
+        return False
+    plain = encode_text(person, "unicode")[0]
+    words = re.findall(r"[^\W\d_]+", plain)
+    return any(len(word) >= 4 for word in words) and all(word.isupper() for word in words)
+
+
 def institution_key(name: str) -> str:
     r"""Return the citation-key part for an institution author, following JabRef.
 

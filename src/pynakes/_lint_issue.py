@@ -45,6 +45,7 @@ ISSUE_CATEGORIES: dict[str, LintCategory] = {
     "nonstandard_page_range": "content",
     "title_capitalization_unprotected": "content",
     "title_all_caps": "consistency",
+    "author_all_caps": "content",
     "title_markup": "content",
     "invisible_character": "content",
     "unknown_journal": "content",
@@ -132,6 +133,8 @@ class LintIssue:
     @property
     def fixer(self) -> str | None:
         """Return the command that resolves this finding, if any."""
+        if self.type == "author_all_caps":
+            return None  # recasing names needs human judgment
         return CATEGORY_FIXERS[self.category]
 
     def to_dict(self) -> dict[str, object]:
