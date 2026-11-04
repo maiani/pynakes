@@ -467,14 +467,35 @@ metadata and reports stay outside the software repository.
   review record. No claim of a complete archive import while pending items
   remain. Keep the source archive intact after the rehearsal.
 
-#### Next acquisition integration: optional Zotero bridge
+#### Backend abstraction investigation
+
+The [Library backend feasibility study](docs/design/library-backends.md) proposes
+a common read interface over our file-backed Library and an optional Zotero-backed
+Library. In the latter mode Zotero remains authoritative: users need not migrate
+their collection into `.bib` members or Pinax to select references for a project.
+This is a proposed extension of the current file-only Library definition, not an
+implemented backend or a settled public protocol.
+
+Start with a wrapper around existing reads, synthetic adapter fixtures and a
+disposable-profile compatibility experiment. This read-only investigation can
+precede managed PDF ingestion. Keep placement, native edits and material writes
+as distinct capabilities, and preserve existing Bibliography contracts.
+
+Zotero support is conditional. Test the exact client/API versions, completeness,
+unsynced edits, identity, concurrent paging and material access before claiming
+compatibility. Restrict support or drop the live backend if reliable behavior
+requires weakening core guarantees or depending on private APIs. Native Library
+development continues independently. The study gives acceptance and stopping
+criteria; no full reference-management framework or two-way sync is committed.
+
+#### Optional transfer: Zotero into the file-backed Library
 
 After the standalone migration gate passes, add explicit one-way acquisition
-from Zotero. Pynakes remains an independent Library engine: accepted member
-bibliographies, Pinax materials and persisted review records are authoritative.
-Zotero is an optional capture/source application, not a required backend or a
-thin client over those files. This adapter reuses the acquisition pipeline above
-and does not require the Catalogue or service layer.
+from Zotero if the compatibility gate passes. This is an optional transfer
+workflow, separate from using Zotero directly as the Library. For this workflow,
+accepted member bibliographies, Pinax materials and persisted review records are
+authoritative. Zotero is the capture/source application. The transfer reuses the
+acquisition pipeline above and does not require the Catalogue or service layer.
 
 - Start with selected items from the supported
   [Zotero local API](https://www.zotero.org/support/dev/web_api/v3/local_api).

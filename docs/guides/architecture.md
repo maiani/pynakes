@@ -176,6 +176,11 @@ extra, never required by core.
 
 ### Library: a declared set of bibliographies
 
+The definition below describes the implemented file-backed Library. A separate
+[backend feasibility study](../design/library-backends.md) investigates a shared
+read interface with optional Zotero-backed collections. It is a proposal with a
+compatibility gate, not an implemented extension of this API.
+
 The v0.10 development API implements membership, direct reads, key lookup and
 cross-file search and routed additions in `pynakes.library`. Reports retain source locations,
 duplicate-key occurrences and partial-read diagnostics. The
