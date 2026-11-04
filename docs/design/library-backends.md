@@ -1,11 +1,14 @@
-# Library backends: feasibility and proposed boundary
+# Library backends: accepted design
 
-Status: investigation and design proposal, 2026-11-04. No backend abstraction or
-Zotero adapter is implemented by this document. Existing `Library` behavior and
-CLI contracts remain unchanged. Zotero compatibility is optional and may be
-dropped if the acceptance experiment below fails.
+Status: design accepted, 2026-11-04; implementation pending. The accepted scope
+is a common Library read interface, backend-specific capabilities and authority,
+and preservation of existing Bibliography contracts. Exact method signatures,
+persisted schemas and the optional client dependency remain implementation
+decisions. No backend abstraction or Zotero adapter is implemented by this
+document. Zotero compatibility still depends on the experiment below and may be
+dropped if it fails.
 
-## Finding
+## Decision
 
 A common Library interface is feasible for discovery, record reads, work
 comparison, material discovery and selection into project bibliographies.
@@ -59,8 +62,11 @@ Four disposable offline probes confirmed the coupling:
 4. The provider URL validator refuses `127.0.0.1` without making a request.
 
 These are observations of current code, not a prototype of a Zotero backend.
-No live Zotero profile was accessed and no Zotero executable was found on PATH.
-API reliability remains unverified locally.
+The initial inspection found no Zotero executable on PATH. A subsequent check
+found the `org.zotero.Zotero` Flatpak at version 10.0.7 with shared networking,
+but no running Zotero instance; a host request to the local API root was refused.
+No library records or profile were accessed. Installation is now available for
+the experiment, but API reliability remains unverified locally.
 
 ## Zotero evidence and limits
 
@@ -103,7 +109,7 @@ it does not establish that the current read API is unreliable.
 [Release history](https://www.zotero.org/support/changelog),
 [developer changes](https://www.zotero.org/support/dev/zotero_10_for_developers)
 
-## Proposed layers
+## Accepted layers
 
 ```mermaid
 flowchart TD
@@ -144,7 +150,7 @@ pushdown only where equivalent results are established.
 | `MaterialRef` | Source material identity, owner relationship, media type, availability and known hashes with algorithms |
 | `ReadPage` | Items, next cursor, optional total, coverage, truncation, freshness and issues |
 
-Names are sketches, not exports. In particular:
+Method and record shapes are sketches, not exports. In particular:
 
 - A source occurrence, a bibliographic work, a citation key and a PDF hash are
   four different identities. Never use a DOI or a citation key as a universal
@@ -244,7 +250,8 @@ annotation handling.
   access is a separate, explicit network mode, never an automatic fallback.
 - Scope the vision's file-authority guarantee to `Bibliography` and the file
   backend. The shared invariant becomes: the selected backend is authoritative;
-  views and indexes are derived. Record this design change explicitly if adopted.
+  views and indexes are derived. This boundary is accepted in the vision; backend
+  implementation remains pending.
   Source mappings, accepted refresh baselines and authored decisions cannot be
   discarded as caches. Their versioned, exportable storage remains to be designed.
 - Keep `biblink` for reciprocal file relations. A source-to-project association

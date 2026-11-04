@@ -30,9 +30,30 @@ That choice pays off only if the files stay diff-friendly:
   re-quotes values behind your back.
 - **Surgical edits.** Field and key changes use localized source edits instead
   of reformatting the whole entry.
-- **The file is the single source of truth.** In-memory state is a derived
-  working view; there is no database or persistent sidecar of record. Any index
-  or cache is rebuildable and never competes with the files.
+- **The bibliography file is authoritative.** For `Bibliography` and the
+  file-backed Library, bibliographic records and settings live in `.bib` files.
+  In-memory views and indexes are derived and never compete with those files.
+
+## Library authority and backend choice
+
+The [accepted Library backend design](design/library-backends.md) separates the
+reference collection interface from its storage. The implemented Library is
+file-backed; the common interface and optional Zotero backend remain planned.
+Users choosing a Zotero-backed Library would keep their records and attachments
+in Zotero and select references into independent project bibliographies without
+first migrating the whole collection into `.bib` members or Pinax.
+
+The selected backend is authoritative. Common views and indexes are rebuildable;
+authored notes, accepted decisions and synchronization baselines are persistent
+records with explicit ownership, not disposable caches. Their new storage schemas
+must be settled before the corresponding writes ship. Backend-specific placement,
+mutation and material capabilities must not weaken Bibliography's source-fidelity
+guarantees.
+
+Zotero support is conditional on tested public API behavior. It may remain
+read-only, support a limited version range, or be dropped if compatibility would
+require unreliable operations or invasive exceptions in the engine. Native
+Library development remains independent.
 
 ## Reviewable automation
 
@@ -61,8 +82,8 @@ BibTeX:
   (`--online`, `--fetch` stay explicit — a setting may choose *which* lookup a
   network command makes, never *whether* one is made); and the terms of a
   single search (`--in`, `--fuzzy`, `--case-sensitive`).
-- **Library placement has Library scope.** Membership and routing rules live
-  in the Library manifest, since they choose among bibliographies. They are
+- **File-backed Library placement has Library scope.** Membership and routing
+  rules live in the Library manifest, since they choose among bibliographies. They are
   deliberately outside `pynakes-meta` and `metadata set`; the manifest is their
   current editing surface. `library add --destination` and the Python
   `destination=` parameter override placement for one addition. Formatting and

@@ -176,10 +176,14 @@ extra, never required by core.
 
 ### Library: a declared set of bibliographies
 
-The definition below describes the implemented file-backed Library. A separate
-[backend feasibility study](../design/library-backends.md) investigates a shared
-read interface with optional Zotero-backed collections. It is a proposal with a
-compatibility gate, not an implemented extension of this API.
+The definition below describes the implemented file-backed Library. The
+[accepted backend design](../design/library-backends.md) extends `Library` to a
+common read interface over backend-owned collections, initially wrapping these
+file-based reads. An optional Zotero backend must pass its compatibility gate.
+The selected backend remains authoritative; views and indexes are derived.
+Placement, edits and material writes are backend-specific capabilities.
+This abstraction is not implemented yet, and `Bibliography` retains its existing
+file lifecycle and source-fidelity contract.
 
 The v0.10 development API implements membership, direct reads, key lookup and
 cross-file search and routed additions in `pynakes.library`. Reports retain source locations,
@@ -188,8 +192,8 @@ duplicate-key occurrences and partial-read diagnostics. The
 manifest and read semantics. General work-identity reports, rollups and the
 Catalogue below describe the remaining design, not implemented features.
 
-A **library** is a set of bibliographies chosen to be searched and reconciled
-as one collection. Its members are `.bib` files, each with its Pinax when it
+A **file-backed library** is a set of bibliographies chosen to be searched and
+reconciled as one collection. Its members are `.bib` files, each with its Pinax when it
 has one. The library adds **membership** and **routing**, and is the scope for
 **work identity across members** and a future, rebuildable **Catalogue**.
 Reference data stays in the members:
