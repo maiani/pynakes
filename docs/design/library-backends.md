@@ -306,7 +306,10 @@ if operation requires direct database edits/private application APIs; or if
 maintenance requires invasive exceptions throughout core. Ordinary import/export
 can remain. Dropping compatibility must not block the native Library roadmap.
 
-Current conclusion: a common read abstraction is well supported by the code and
-documented API; live reliability and write compatibility still need the experiment.
-Recent fixed defects warrant testing, not an unsupported verdict about Zotero
-as a whole. A large generic management framework is not justified at this stage.
+Current conclusion: a common read abstraction is supported by the code, documented
+API and [initial Zotero 10.0.7 Linux checks](zotero-local-api-study.md). Bounded
+paging, local versions, stale-write rejection, partial batches, stored materials
+and restart persistence were exercised. Missing linked files require a filesystem
+availability check after URL resolution. A reusable adapter, complete conformance
+coverage and source-to-project refresh remain pending. Proceed with the bounded
+v0.10 integration; a large generic management framework is not justified.

@@ -105,7 +105,7 @@ changes documented but not deprecated — until 1.0 pins it.
 - Keep the shared public `pynakes.analysis` API and distinct CLI views: bounded
   summaries in `analyze`, full networks in `coauthors`. See the
   [analysis boundary](docs/guides/architecture.md#analysis-boundary) for ownership
-  and identity semantics; the v0.10 rollup must preserve them.
+  and identity semantics; future Library rollups must preserve them.
 - BibLaTeX extended names (`family=..., given=...`) are not parsed yet. Add any
   future support to `authors.py` so all consumers share it. Identity corrections
   remain ordinary reviewed edits or future v0.13 directives. Editors as
@@ -179,8 +179,8 @@ model dependency, or hidden network call is implied by this roadmap.
 | Release | Cohesive scope | Main dependency |
 | --- | --- | --- |
 | 0.9 | Settled command surface, bibliography links, documentation on Zensical | Existing reads and checks |
-| 0.10 | Library acquisition and discovery, then Catalogue and cross-file analysis | PDF evidence, routing, Pinax and bounded reads |
-| 0.11 | Engine service layer and companion launchers | Library, Catalogue and the Bibliography lifecycle |
+| 0.10 | Native PDF ingestion and Zotero-backed Library integration | PDF evidence, routing, Pinax and common bounded reads |
+| 0.11 | Library discovery, measured indexing and engine sessions | The two v0.10 Library workflows and Bibliography lifecycle |
 | 0.12 | Project assembly and synchronization of linked bibliographies | Library, declared links and guarded writes |
 | 0.13 | Curation: merges, directives and normalization | Existing editing and identity APIs |
 | 0.14 | Broader material linking, source-linked extraction and providers | Managed ingestion, Pinax and bounded reads |
@@ -188,13 +188,13 @@ model dependency, or hidden network call is implied by this roadmap.
 | 0.16 | Generalized resumable plans and execution receipts | Import recovery, batch and material operations |
 | 1.0 | Pin the exercised API and end-to-end contracts | Accepted workflows below |
 
-These milestones group related workflows; implementation tasks do not each
-need a version. The next implementation priority is the bounded Library import
-workflow below. Its local Pinax ingestion and import recovery move forward from
-the broader v0.14 and v0.16 work: a safe archive migration must not wait for a
-Catalogue, service or GUI. If acquisition and indexing make v0.10 too large,
-split that milestone and renumber successors before release. MCP and editor
-releases remain independently versioned companions.
+The two v0.10 goals are **native PDF ingestion** and **Zotero integration**.
+Prioritize the useful Zotero read/select/project workflow first, while developing
+native managed ingestion against the same identity, material and review contracts.
+Neither backend requires migrating into the other. The native import ledger and
+Pinax adoption move forward from v0.14/v0.16 because safe archive migration needs
+them now. Catalogue indexing, aggregate analysis, services and GUIs do not gate
+v0.10. MCP and editor releases remain independently versioned companions.
 
 #### Checks and evaluation throughout
 
@@ -233,72 +233,60 @@ assessment are recorded in [RELEASE.md](RELEASE.md). The final review includes
 institution-aware keys, sorted insertion, settings discovery, optional
 proper-name protection and all-capital author warnings.
 
-### v0.10 — Library acquisition, discovery and indexed search
+### v0.10 — Native PDF ingestion and Zotero integration
 
-**Workflow:** recover a local PDF archive into a private Library with reviewable
-metadata, one owning bibliography per accepted reference, and portable Pinax
-materials; then find works across members without importing another copy.
+**Workflows:** recover a local PDF archive into a private file-backed Library
+with reviewable metadata, routed bibliography ownership and portable Pinax
+materials; or use Zotero as the authoritative Library and select references into
+a project bibliography through pynakes. Both workflows are release goals.
 
-The direct-read Library, routing of supplied metadata, and initial single-bibliography
-PDF importer are implemented on the development branch; see
+The direct-read file Library, routing of supplied metadata, and initial
+single-bibliography PDF importer are implemented on the development branch; see
 [CHANGELOG.md](CHANGELOG.md), [Library routing](docs/guides/library-routing.md)
-and [PDF import](docs/guides/pdf-import.md). These are separate building blocks,
-not an end-to-end migration. The remaining work is:
+and [PDF import](docs/guides/pdf-import.md). The
+[backend design](docs/design/library-backends.md) is accepted and
+[initial live Zotero checks](docs/design/zotero-local-api-study.md) exercise public
+APIs; a production adapter and end-to-end native migration remain unimplemented.
 
-- Complete the staged acquisition sequence below, including material adoption,
-  per-source review state and interruption recovery before bulk writes.
-- Extend the direct-read `Library` with bounded CLI reads and general cross-file
-  identity reports. Keep per-bibliography settings in the `.bib` and placement
-  policy in the manifest.
-- Expose cross-file search and duplicate checks, retaining file/entry
-  provenance and exact versus probable matching. Repeated keys across files
-  do not establish work identity. Report unreadable members and changing inputs
-  without claiming a globally atomic filesystem snapshot.
-- Add a rebuildable `Catalogue` for bibliographic fields and abstracts, with
-  documented freshness and refresh behavior. Carry bounded reads, field-scoped
-  queries, match explanations and source locations into indexed search; retain
-  direct reads for recovery and comparison. Files remain authoritative.
-- Lift the 0.8 analysis into Library rollups. Distinguish entry occurrences from
-  identified works, reconcile per-file counts and expose partial-read failures.
-  The co-author network takes multiple files here: one work listed in two
-  files must link its authors once, so the rollup feeds `coauthor_network`
-  identified works (with their file/key provenance in `keys`), not raw entries.
-- Test index refresh, deletion, rename and corruption recovery; measure index
-  build/query/refresh cost and memory before making performance claims.
+#### Order of work and release gates
 
-**Done when:** the migration gate below passes; source locations and ambiguity
-survive cross-file discovery; rollups reconcile; the index can be rebuilt without
-losing information; stale results have explicit semantics and representative
-queries show measured benefit. Finishing direct reads or recovering candidate
-metadata alone does not satisfy this milestone.
+1. **Zotero-backed Library, first useful slice.** Wrap existing file reads behind
+   the common read boundary, then add an explicit local Zotero connection.
+   Preserve source-native records and instance-scoped identities/revisions;
+   provide bounded enumeration, record reads, collections and material discovery.
+   Test concurrent paging, disabled/unavailable access, unsupported versions and
+   missing files. No private database access or cloud fallback.
+2. **Selection into a project.** Use either backend to select supported records,
+   review conversion losses and stage a project `.bib` through `Bibliography`.
+   Keep project citation keys independent of source IDs. Persist source mapping
+   and accepted values so repeat selection is idempotent and refresh distinguishes
+   source changes from project edits. This bounded workflow moves forward from
+   v0.12; general project assembly and two-way synchronization remain later.
+   Zotero source reads do not require Pinax copies or write authorization.
+3. **Native PDF ingestion.** Complete the acquisition sequence below: evidence,
+   metadata review, variant-aware adoption, guarded routing, a durable ledger and
+   interruption recovery. Keep ambiguous/unidentified PDFs pending without
+   invented bibliography entries. Ship the native migration gate in this release.
+4. **Private archive rehearsal.** Use an explicitly authorized old PDF archive
+   to exercise both routes. First preserve PDFs in a dedicated Zotero review
+   collection, with stored-byte verification and source-occurrence receipts;
+   bibliographic recognition is a separate, reported outcome. Reuse locally
+   cached recovery evidence, preserving uncertain candidates. Exercise native
+   ingestion as its guarded operation becomes available. Private data and
+   credentials never enter the engine repository. This operational migration is
+   not proof that a reusable adapter or native ingestion feature has shipped.
 
-#### Order of work
+**Done when:** the Zotero read/select/project gate and native migration gate both
+pass with reproducible synthetic coverage and separately recorded live trials.
+Every selected archive source is accepted, explicitly excluded, duplicated by
+bytes, or durably pending with a reason. Verify hashes, repeat runs, stale-source
+handling and recovery. Unresolved metadata may remain; it must not be hidden by
+an attachment count or reported as completed reference recovery. State tested
+Zotero versions/platforms and unsupported capabilities explicitly. General
+Zotero writes, automatic recognition, annotation transfer, two-way sync, index
+performance and a GUI are not release prerequisites.
 
-Keep changes scoped and independently testable. Prioritize the acquisition
-sequence below, then finish bounded reads, identity/rollups and measured
-indexing. The read-side backlog is:
-
-1. **Bounded `Library` reads**, built to the definition in
-   [the architecture guide](docs/guides/architecture.md#library-a-declared-set-of-bibliographies):
-   membership, work identity and a Catalogue over member files that keep all
-   the data. A named library is a `<name>.library.toml` manifest with membership
-   keys: `pynakes-library` (format version), `name`, `members` (paths or
-   patterns, resolved from the manifest's folder), `exclude` and `catalogue`.
-   Its optional `routing` table owns cross-member placement policy. Other keys
-   are errors; per-bibliography formatting settings cannot move into it. Several files
-   given to one command form an unnamed library. A file may belong to several
-   libraries; libraries do not nest. Build the command surface below on the
-   direct-read Python API, retaining its member diagnostics, occurrence
-   provenance and explicit reopen-to-refresh semantics. Add bounded projection
-   and paging before exposing large collection reads to CLI clients.
-2. **Cross-file identity and rollups.** Duplicate checks across members, exact
-   versus probable, reusing work matching; `analyze` and `coauthors` over a
-   `Library`, counting identified works rather than entry occurrences.
-3. **Measure, then the `Catalogue`.** Extend `scripts/bench_scale.py` with
-   multi-file shapes, then index only what representative queries show
-   benefits from. Test refresh, deletion, rename and corruption recovery.
-
-#### Immediate sequence: PDF archive to managed Library
+#### Native sequence: PDF archive to managed Library
 
 Local import trials establish useful failure classes, not a general recovery
 rate. Keep their source inventories, extracted text, candidate bibliographies
@@ -478,8 +466,8 @@ schemas remain pending. Existing file-based APIs keep their current behavior.
 
 Start with a wrapper around existing reads, synthetic adapter fixtures and a
 disposable-profile compatibility experiment. This read-only implementation track
-can precede managed PDF ingestion. Keep placement, native edits and material writes
-as distinct capabilities, and preserve existing Bibliography contracts.
+is the first implementation priority within the two-goal v0.10 release. Keep
+placement, native edits and material writes as distinct capabilities, and preserve existing Bibliography contracts.
 
 Zotero support is conditional. Test the exact client/API versions, completeness,
 unsynced edits, identity, concurrent paging and material access before claiming
@@ -490,8 +478,8 @@ criteria; no full reference-management framework or two-way sync is committed.
 
 #### Optional transfer: Zotero into the file-backed Library
 
-After the standalone migration gate passes, add explicit one-way acquisition
-from Zotero if the compatibility gate passes. This is an optional transfer
+After both v0.10 gates pass, consider explicit one-way acquisition
+from Zotero as a subsequent workflow. This is an optional transfer
 workflow, separate from using Zotero directly as the Library. For this workflow,
 accepted member bibliographies, Pinax materials and persisted review records are
 authoritative. Zotero is the capture/source application. The transfer reuses the
@@ -543,8 +531,8 @@ links and entry comments; check both members and stores before writing. Preserve
 material identity and recover interrupted moves. A rule edit only changes future
 routing until an explicit repartition operation is requested. Shared storage
 independent of member keys needs its own design; the initial implementation must
-remain safe with separate roots. Project copies and synchronization remain the
-separate v0.12 workflow.
+remain safe with separate roots. The minimal project selection workflow belongs
+to v0.10; broader project copies and synchronization remain the separate v0.12 workflow.
 
 #### Command surface: direction, not destination
 
@@ -570,7 +558,7 @@ writes refine the boundary. The end state is revisited as each phase lands:
   they use nothing a library adds. v0.12's `pick` follows the same rule: bare
   source files, optionally given as a library.
 
-### v0.11 — Engine service layer and companions
+### v0.11 — Library discovery, indexing and engine sessions
 
 **Workflow:** keep a library open across many operations, so an interactive
 client pays for parsing and full-library checks once rather than on every
@@ -578,10 +566,25 @@ action, and start the MCP companion and the library-scoped client from
 `pynakes` itself.
 
 The service layer opens a `Library`, and the MCP companion is built against
-the Library/Catalogue contract, so both follow the release that settles that
-contract. The 2026-10 measurements also put
-full-library work, not process startup, at most of a large refresh; what a
+the Library read contract, so both follow the release that settles that
+contract. A Catalogue is an optional optimization, not a service prerequisite.
+The 2026-10 measurements also put full-library work, not process startup, at most
+of a large refresh; what a
 session saves depends on recomputing only what an operation touched.
+
+#### Discovery beyond the v0.10 minimum
+
+- Extend bounded Library search and cross-file identity reports, preserving
+  occurrence provenance, exact versus probable matches and partial-read errors.
+  Zotero collections remain overlapping memberships; native routing remains
+  single-owner placement. Define common query semantics before pushing filters
+  into either backend.
+- Lift bibliography analysis into Library rollups. Count identified works rather
+  than duplicate occurrences; retain all source locations and reconcile counts.
+- Measure multi-library read cost and memory before adding a rebuildable
+  `Catalogue`. Test freshness, deletion, rename and corruption recovery. The
+  selected backend remains authoritative; an index is derived. Direct reads and
+  service sessions must remain usable without this optimization.
 
 #### Engine service layer
 
@@ -621,7 +624,7 @@ query and edit latency for representative library sizes is measured with
 #### MCP and editor integration
 
 Develop a query-only MCP companion as an adapter over the engine service layer,
-against the v0.10 Library/Catalogue contract, with bounded results and the same
+against the v0.10 Library read contract, with bounded results and the same
 errors and provenance as the CLI. Derive its
 schemas from the engine and test adapter parity; declare an engine compatibility
 range. Add evidence reads after v0.14–v0.15. Companion publication does not gate
