@@ -31,6 +31,10 @@ def add_entry_ordered(lib: BibFile, entry: BibEntry) -> None:
             precedes = True  # stable ties
         if precedes:
             position = index + 1
+    # A duplicate key must never displace the record a citation already reads.
+    for index, other in enumerate(existing):
+        if other.key == entry.key:
+            position = max(position, index + 1)
     existing.insert(position, entry)
     lib.entries.set_order(existing)
 

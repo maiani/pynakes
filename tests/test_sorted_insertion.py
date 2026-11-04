@@ -85,3 +85,25 @@ def test_append_without_setting_preserves_no_final_newline():
     coll.add_entry("book", "A", {})
     assert list(parse_bib(coll.preview()).entries.keys()) == ["C", "A"]
     assert not coll.preview().endswith("\n")
+
+
+def test_allowed_duplicate_never_changes_the_first_record():
+    coll = Bibliography.from_text(
+        "@comment{pynakes-meta: sort-order:year;}\n@book{A,year={1900}}\n"
+    )
+    coll.add_entry("book", "A", {"year": "1800"}, allow_duplicate=True)
+    assert [e.fields["year"] for e in coll.entries.get_all("A")] == ["1900", "1800"]
+    assert [e.fields["year"] for e in parse_bib(coll.preview()).entries.get_all("A")] == [
+        "1900",
+        "1800",
+    ]
+
+
+def test_removing_an_added_entry_cancels_its_insertion():
+    source = "@comment{pynakes-meta: sort-order:key;}\n@book{C,title={Original}}\n"
+    coll = Bibliography.from_text(source)
+    added = coll.add_entry("book", "A", {})
+    coll.remove_entries([added])
+    assert coll.preview() == source
+    assert not coll.is_dirty
+    assert coll.change_plan()["summary"]["added"] == 0

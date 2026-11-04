@@ -282,6 +282,10 @@ The forms deprecated in 0.8 are removed:
 
 ### Fixed
 
+- Sorted insertion of an explicitly allowed duplicate key keeps the existing
+  record first, preserving which record a citation resolves to. Removing an
+  entry added in the same staged transaction cancels its insertion cleanly.
+
 - An option a command does not have is reported as `No such option`, where the
   positional check used to take its value for a misplaced bibliography
   (`tex scan refs.bib --out cited.bib` blamed `cited.bib`). For the options

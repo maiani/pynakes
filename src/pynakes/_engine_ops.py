@@ -596,7 +596,12 @@ class BibliographyOperations:
         self._remove_attached_comments(entries)
         for entry in entries:
             self.lib.entries.remove(entry)
-            self._removed_entries.append(entry)
+            if any(added is entry for added in self._appended_entries):
+                self._appended_entries = [
+                    added for added in self._appended_entries if added is not entry
+                ]
+            else:
+                self._removed_entries.append(entry)
         return len(entries)
 
     def _remove_attached_comments(self, entries: list[BibEntry]) -> None:
