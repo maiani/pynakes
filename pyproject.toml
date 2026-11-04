@@ -56,9 +56,9 @@ dev = [
     "pytest-cov>=4.1.0",
     "coverage>=7.10",
     "hypothesis>=6.100.0",
-    "ty==0.0.93",
+    "ty==0.0.95",
     "pyyaml>=6.0",
-    "ruff>=0.16,<0.17",
+    "ruff>=0.16,<0.18",
     "build>=1.2.0",
     "twine>=5.0.0",
 ]
