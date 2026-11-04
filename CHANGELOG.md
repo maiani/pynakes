@@ -279,6 +279,13 @@ The forms deprecated in 0.8 are removed:
   changed 2,270 bundled titles; it now changes none apart from 63 whose
   abbreviation is another journal's full title (`Endodoncia`). A spelling no
   table lists is still replaced by the mapped one.
+- Citation keys decode LaTeX accents before folding them to ASCII. An accent
+  command spelled with a letter left that letter in the key (`Pave{\v s}i{\'c}`
+  gave `Pavevsic`, `Erd{\H{o}}s` gave `ErdHos`), and `{\AA}` left its name
+  (`AAngstrom`); they now give `Pavesic`, `Erdos` and `Angstrom`. A title word
+  with an accent no longer splits at it, so `[shorttitle]` on
+  `Schr{\"o}dinger` keeps `Schrodinger` rather than `Schr`. Existing keys are
+  unchanged, but `lint` now expects the corrected key for such entries.
 - `lint`'s `inconsistent_field` no longer expects a field of an entry when the
   other entries from the same journal all lack it too. A journal without issue
   numbers left every one of its papers flagged for a missing `number`, because

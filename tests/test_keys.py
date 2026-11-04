@@ -172,6 +172,28 @@ class TestGenerateKey:
         )
         assert generate_key_from_pattern(e, "[authors]") == "SexampleOfooBar"
 
+    @pytest.mark.parametrize(
+        ("author", "expected"),
+        [
+            (r"Erd{\H{o}}s, Paul", "Erdos"),
+            (r"{\v{C}}ech, Eduard", "Cech"),
+            (r"Dvo\v r\'ak, Antonin", "Dvorak"),
+            (r"Gar{\c c}on, Jean", "Garcon"),
+            (r"{\AA}ngstr{\"o}m, Anders", "Angstrom"),
+            (r"Stra{\ss}er, Bea", "Strasser"),
+        ],
+    )
+    def test_latex_accent_commands_fold_without_leaking_letters(
+        self, author: str, expected: str
+    ) -> None:
+        # \H, \v, \c are spelled with letters; they used to stay in the key
+        # ("ErdHos", "vCech"), and \AA left its name ("AAngstrom").
+        assert generate_key_from_pattern(_entry(author=author, title="T"), "[auth]") == expected
+
+    def test_an_accented_title_word_stays_one_word(self) -> None:
+        e = _entry(author="A", title=r"{\"U}ber die Schr{\"o}dinger Gleichung")
+        assert generate_key_from_pattern(e, "[shorttitle]") == "UberdieSchrodinger"
+
     def test_von_particle_dropped_from_comma_form_last_name(self) -> None:
         # BibTeX "von Last, First" names: a leading lowercase particle
         # ("van den", "de la", "von") is not part of the last name.

@@ -24,6 +24,7 @@ from pynakes._lint_directives import entry_ignore_rules
 from pynakes._lint_issue import LintIssue
 from pynakes._text_utils import entry_year
 from pynakes.authors import ascii_fold as _ascii_fold
+from pynakes.authors import key_text as _key_text
 from pynakes.authors import last_name as _last_name
 from pynakes.authors import split_name_list as _split_name_list
 from pynakes.editing import rename_entry_key, set_entry_field
@@ -207,7 +208,10 @@ def _first_title_word(entry: BibEntry) -> str:
 
 
 def _words(value: str) -> list[str]:
-    return re.findall(r"[A-Za-z0-9]+", latex_to_plain_text(value))
+    # Decode accents before the markup goes (``\H{o}`` is not plain text's to
+    # keep), and fold what plain text produces, so ``Schr{\"o}dinger`` stays
+    # one word rather than splitting at its accent.
+    return re.findall(r"[A-Za-z0-9]+", _key_text(latex_to_plain_text(_key_text(value))))
 
 
 def _capitalize_word(word: str) -> str:

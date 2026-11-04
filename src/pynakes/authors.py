@@ -8,6 +8,7 @@ into individual people and extracting a person's last name; other modules
 import re
 import unicodedata
 
+from pynakes._field_encoding import encode_text
 from pynakes._text_utils import iter_toplevel_splits
 from pynakes.editing import set_entry_field
 from pynakes.model import BibFile
@@ -54,6 +55,17 @@ def ascii_fold(value: str) -> str:
         decomposed = unicodedata.normalize("NFKD", char)
         folded.append("".join(c for c in decomposed if not unicodedata.combining(c)))
     return "".join(folded)
+
+
+def key_text(value: str) -> str:
+    r"""Return ``value`` with LaTeX accents decoded, then folded to ASCII.
+
+    Citation keys are built from it, so ``Pave{\v s}i{\'c}`` must give
+    ``Pavesic``: an accent command spelled with a letter (``\v``, ``\H``,
+    ``\c``, ``\u``) would otherwise leave that letter in the key, and a
+    letter-like command (``\o``, ``\ss``, ``\AA``) its name.
+    """
+    return ascii_fold(encode_text(value, "unicode")[0])
 
 
 AUTHOR_STYLES = {"jabref", "conservative", "bibtex", "biblatex", "none"}
@@ -137,10 +149,10 @@ def last_name(person: str) -> str:
     Handles ``{Corporate Name}`` (taken whole), ``von Last, First`` (the part
     before the comma, minus a leading lowercase "von" particle like ``van
     den``), and ``First von Last`` (the final token). Accented Latin
-    characters are folded to ASCII (``Šmith`` → ``Smith``) rather than
-    dropped. Returns ``""`` if empty.
+    characters, including LaTeX accent commands, are folded to ASCII
+    (``Šmith`` and ``\v{S}mith`` → ``Smith``) rather than dropped. Returns ``""`` if empty.
     """
-    person = ascii_fold(person.strip())
+    person = key_text(person.strip())
     if person.startswith("{") and person.endswith("}"):
         return re.sub(r"[^A-Za-z]", "", person[1:-1])
     if "," in person:
