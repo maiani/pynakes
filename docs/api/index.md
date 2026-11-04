@@ -222,14 +222,26 @@ text = write_bib(lib)
 
 ## Groups
 
-```python
-from pynakes.groups import add_to_group, list_entries_in_group, list_groups, remove_from_group
+`Bibliography` checks group edits as the CLI does: a group must exist unless
+`create=True`, an unknown citation key or parent group raises `KeyError`, and
+`context` takes the CLI's names.
 
-groups = list_groups(lib)
-changed = add_to_group(lib, "Smith2020", "AI")
-members = list_entries_in_group(lib, "AI")
-changed = remove_from_group(lib, "Smith2020", "AI")
+```python
+from pynakes import Bibliography
+
+coll = Bibliography.open("refs.bib")
+coll.add_group_node("Learning", context="including")
+coll.add_group_node("AI", parent="Learning")
+changed = coll.add_to_group("Smith2020", "AI")
+changed = coll.add_to_group("Smith2020", "Surveys", create=True)  # a new group
+members = coll.list_entries_in_group_tree("Learning")  # descendants included
+print(coll.diff())
+coll.commit()
 ```
+
+The functions in `pynakes.groups` edit an entry's `groups` field on a parsed
+`BibFile` directly and check nothing, so a misspelled group name becomes a new
+group there.
 
 ## Citation Keys
 

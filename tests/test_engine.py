@@ -174,7 +174,7 @@ def test_volume_group_and_field_operations_mutate_in_memory_only(tmp_path: Path)
     bib.write_text(original, encoding="utf-8", newline="")
     coll = Bibliography.open(bib)
 
-    assert coll.add_to_group("Smith2020", "Read") == 1
+    assert coll.add_to_group("Smith2020", "Read", create=True) == 1
     assert coll.rename_field("journal", "journaltitle", where="type = article") == 1
 
     assert coll.is_dirty is True
@@ -183,13 +183,52 @@ def test_volume_group_and_field_operations_mutate_in_memory_only(tmp_path: Path)
     assert bib.read_text() == original
 
 
+def test_group_api_refuses_what_the_cli_refuses(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text((FIXTURES / "simple.bib").read_text(encoding="utf-8"), encoding="utf-8")
+    coll = Bibliography.open(bib)
+    coll.add_group_node("Optics")
+
+    with pytest.raises(KeyError, match="pass create=True"):
+        coll.add_to_group("Smith2020", "Opticks")  # a typo, not a new group
+    with pytest.raises(KeyError, match="No entry with citation key"):
+        coll.add_to_group("Smith2002", "Optics")
+    with pytest.raises(KeyError, match="Parent group 'Nowhere' not found"):
+        coll.add_group_node("Lenses", parent="Nowhere")
+    with pytest.raises(KeyError, match="Parent group"):
+        coll.move_group_node("Optics", "Nowhere")
+    with pytest.raises(KeyError):
+        coll.remove_from_group("Smith2020", "Opticks")
+    assert coll.is_dirty is True  # only the Optics node was staged
+    assert "groups" not in coll.entries["Smith2020"].fields
+
+    assert coll.add_to_group("Smith2020", "Optics") == 1
+
+
+def test_group_context_takes_the_cli_names(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text((FIXTURES / "simple.bib").read_text(encoding="utf-8"), encoding="utf-8")
+    coll = Bibliography.open(bib)
+
+    coll.add_group_node("Optics", context="refining")
+    coll.add_group_node("Lenses", parent="Optics", context=0)
+    coll.update_group_node("Lenses", context="including")
+
+    assert {node.name: node.context for node in coll.list_tree() or []} == {
+        "Optics": 1,
+        "Lenses": 2,
+    }
+    with pytest.raises(ValueError, match="independent, refining, including"):
+        coll.add_group_node("Prisms", context="union")
+
+
 def test_volume_preview_diff_commit_and_reset(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     original = (FIXTURES / "simple.bib").read_text(encoding="utf-8")
     bib.write_text(original, encoding="utf-8", newline="")
     coll = Bibliography.open(bib)
 
-    coll.add_to_group("Smith2020", "Read")
+    coll.add_to_group("Smith2020", "Read", create=True)
 
     assert coll.is_dirty is True
     assert coll.is_modified is True
@@ -200,7 +239,7 @@ def test_volume_preview_diff_commit_and_reset(tmp_path: Path) -> None:
     assert coll.is_dirty is False
     assert coll.preview() == original
 
-    coll.add_to_group("Smith2020", "Read")
+    coll.add_to_group("Smith2020", "Read", create=True)
     result = coll.commit()
 
     assert result.modified is True
@@ -285,7 +324,7 @@ def test_volume_commit_detects_external_modification(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text((FIXTURES / "simple.bib").read_text())
     coll = Bibliography.open(bib)
-    coll.add_to_group("Smith2020", "Read")
+    coll.add_to_group("Smith2020", "Read", create=True)
 
     bib.write_text(bib.read_text() + "\n@comment{external}\n")
 

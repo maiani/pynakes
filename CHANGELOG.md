@@ -231,6 +231,14 @@ The forms deprecated in 0.8 are removed:
   or `CLAUDE.md` (`agent_guide_pointer`), since agents load only the root
   guide by default. `render_agents_md` takes the library as an optional
   argument.
+- `Bibliography.add_to_group` refuses a group that does not exist unless
+  `create=True`, as `groups assign` requires `--create`; it used to create a
+  misspelled group silently. It and `remove_from_group` raise `KeyError` for an
+  unknown citation key instead of returning 0. `add_group_node`,
+  `move_group_node` and `update_group_node` raise `KeyError` for a parent group
+  that does not exist, rather than leave a node pointing at nothing. `context`
+  takes the CLI's names (`independent`, `refining`, `including`) as well as
+  JabRef's codes 0-2, and `add_group_node` defaults to `"including"`.
 
 ### Fixed
 

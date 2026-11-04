@@ -406,28 +406,61 @@ def _write_tree(lib: BibFile, nodes: list[GroupNode]) -> None:
         set_in_namespace(lib, "groupsversion", "3", "jabref")
 
 
+#: JabRef's hierarchical contexts by the names the CLI uses, as stored codes.
+GROUP_CONTEXTS = {"independent": 0, "refining": 1, "including": 2}
+
+
+def context_code(context: int | str) -> int:
+    """Return the stored code for ``context``: a name from :data:`GROUP_CONTEXTS`, or its code.
+
+    Raises:
+        ValueError: for any other value.
+    """
+    if isinstance(context, str):
+        code = GROUP_CONTEXTS.get(context.strip().lower())
+        if code is None:
+            raise ValueError(f"Group context {context!r} is not one of {', '.join(GROUP_CONTEXTS)}")
+        return code
+    if context not in GROUP_CONTEXTS.values():
+        raise ValueError(f"Group context {context!r} is not 0, 1 or 2")
+    return context
+
+
+def _require_parent(lib: BibFile, parent: str) -> None:
+    """Raise ``KeyError`` unless ``parent`` is empty (a root) or a group ``lib`` knows."""
+    if parent and parent not in known_group_names(lib):
+        raise KeyError(f"Parent group {parent!r} not found")
+
+
 def add_node(
     lib: BibFile,
     name: str,
     *,
     parent: str = "",
-    context: int = 2,
+    context: int | str = 2,
     color: str = "",
     expanded: bool = True,
 ) -> bool:
     """Add a group node to the tree.
 
-    Returns ``True`` if a new node was added, ``False`` if a node with the same
-    name already exists.
+    ``context`` is a name (``independent``, ``refining``, ``including``) or its
+    stored code. Returns ``True`` if a new node was added, ``False`` if a node
+    with the same name already exists.
+
+    Raises:
+        KeyError: if ``parent`` names no group, so a typo cannot leave a node
+            pointing at nothing.
+        ValueError: for an unknown context, an invalid color, or an unmatched
+            brace in the name.
     """
     check_balanced_braces(f"Group name {name!r}", name)
     check_group_color(color)
+    code = context_code(context)
+    _require_parent(lib, parent)
     tree = library_group_tree(lib) or []
     if _node_by_name(tree, name):
         return False
-    tree.append(
-        GroupNode(name=name, parent=parent, context=context, color=color, expanded=expanded)
-    )
+    tree.append(GroupNode(name=name, parent=parent, context=code, color=color, expanded=expanded))
     _write_tree(lib, tree)
     return True
 
@@ -477,8 +510,10 @@ def move_node(lib: BibFile, name: str, new_parent: str) -> bool:
     """Move a group node to a new parent.
 
     Pass ``new_parent=""`` to make it a root-level node.  Returns ``False`` if
-    *name* is not found or the move would create a circular reference.
+    *name* is not found or the move would create a circular reference, and
+    raises ``KeyError`` if *new_parent* names no group.
     """
+    _require_parent(lib, new_parent)
     tree = library_group_tree(lib) or []
     node = _node_by_name(tree, name)
     if node is None:
@@ -497,10 +532,16 @@ def update_node(lib: BibFile, name: str, **kwargs) -> bool:
     Acceptable keyword arguments: ``parent``, ``context``, ``color``,
     ``expanded``, ``description``, ``group_type``, ``field``, ``expression``,
     ``case_sensitive``, ``separator``, ``search_flags``, ``entries``.
-    Returns ``False`` when *name* is not found. Raises ``ValueError`` for a
-    text property with an unmatched brace, or a ``parent`` that is the node
-    itself or one of its descendants, before anything changes.
+    ``context`` takes a name or a code, as in :func:`add_node`. Returns
+    ``False`` when *name* is not found. Raises ``ValueError`` for a text
+    property with an unmatched brace, an unknown context, or a ``parent`` that
+    is the node itself or one of its descendants, and ``KeyError`` for a
+    ``parent`` that names no group, before anything changes.
     """
+    if "context" in kwargs:
+        kwargs["context"] = context_code(kwargs["context"])
+    if kwargs.get("parent"):
+        _require_parent(lib, kwargs["parent"])
     for key, value in kwargs.items():
         if isinstance(value, str):
             check_balanced_braces(f"Group {key} {value!r}", value)

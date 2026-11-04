@@ -251,7 +251,11 @@ def _apply_one(coll: Bibliography, op: str, params: dict) -> dict:
         _existing_key(coll, params["key"])
         if not params.get("create"):
             _existing_group(coll, params["group"])
-        return {"changed": coll.add_to_group(params["key"], params["group"])}
+        return {
+            "changed": coll.add_to_group(
+                params["key"], params["group"], create=bool(params.get("create"))
+            )
+        }
     if op == "groups.unassign":
         _existing_key(coll, params["key"])
         _existing_group(coll, params["group"])

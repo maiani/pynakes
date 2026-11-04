@@ -219,7 +219,7 @@ def _group_mod_entry(
         hint = "; create it with groups add, or pass --create" if add else ""
         _require_group(coll.lib, group, params.json_output, hint)
     if add:
-        action, count = "groups_assign", coll.add_to_group(key, group)
+        action, count = "groups_assign", coll.add_to_group(key, group, create=create)
         msg = (
             f"{_verb('add', params)} {key} to group {group!r} ({count} {_entries(count)} changed)."
         )

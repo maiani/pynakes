@@ -34,24 +34,47 @@ class BibliographyGroups:
         """Return entry keys that belong to ``group``."""
         return group_ops.list_entries_in_group(self.lib, group)
 
-    def add_to_group(self, key: str, group: str) -> int:
-        """Add every entry with ``key`` to ``group``.
+    def add_to_group(self, key: str, group: str, *, create: bool = False) -> int:
+        """Add every entry with ``key`` to ``group``; return how many changed.
 
-        When the library has a group-tree, the group is also registered as a node
-        so the new membership is visible to ``groups list`` and to
+        ``group`` must exist unless ``create`` is true, as with ``groups assign
+        --create``, so a mistyped name is an error rather than a new group.
+        When the library has a group-tree, a created group is also registered as
+        a node so the new membership is visible to ``groups list`` and to
         JabRef: an entry ``groups={X}`` with no ``X`` in the tree is an orphan
         membership, invisible everywhere the tree drives the view. Flat, tree-less
         libraries keep entry-field-only groups (surfaced by ``groups list``).
+
+        Raises:
+            KeyError: if no entry has ``key``, or ``group`` does not exist and
+                ``create`` is false.
         """
+        self._require_entry(key)
+        if not create:
+            self._require_group(group, hint="; pass create=True to make it")
         count = group_ops.add_to_group(self.lib, key, group)
         if count and group_tree_ops.list_tree(self.lib) is not None:
             group_tree_ops.add_node(self.lib, group)  # no-op if already a node
         return count
 
     def remove_from_group(self, key: str, group: str) -> int:
-        """Remove every entry with ``key`` from ``group``."""
+        """Remove every entry with ``key`` from ``group``; return how many changed.
+
+        Raises:
+            KeyError: if no entry has ``key`` or no group is named ``group``.
+        """
+        self._require_entry(key)
+        self._require_group(group)
         count = group_ops.remove_from_group(self.lib, key, group)
         return count
+
+    def _require_entry(self, key: str) -> None:
+        if not self.lib.entries.get_all(key):
+            raise KeyError(f"No entry with citation key {key!r}")
+
+    def _require_group(self, group: str, hint: str = "") -> None:
+        if group not in group_tree_ops.known_group_names(self.lib):
+            raise KeyError(f"Group {group!r} not found{hint}")
 
     def list_tree(self) -> list[group_tree_ops.GroupNode] | None:
         """Return the group hierarchy tree, or ``None`` if none defined."""
@@ -62,11 +85,19 @@ class BibliographyGroups:
         name: str,
         *,
         parent: str = "",
-        context: int = 2,
+        context: int | str = "including",
         color: str = "",
         expanded: bool = True,
     ) -> bool:
-        """Add a group node to the tree."""
+        """Add a group node to the tree; ``False`` if one with that name exists.
+
+        ``context`` is ``"independent"``, ``"refining"`` or ``"including"`` (or
+        JabRef's stored code 0, 1 or 2).
+
+        Raises:
+            KeyError: if ``parent`` names no group.
+            ValueError: for an unknown context or an invalid color or name.
+        """
         ok = group_tree_ops.add_node(
             self.lib, name, parent=parent, context=context, color=color, expanded=expanded
         )
@@ -95,7 +126,11 @@ class BibliographyGroups:
         return group_ops.rename_group_memberships(self.lib, old_name, new_name)
 
     def move_group_node(self, name: str, new_parent: str) -> bool:
-        """Move a group node to a new parent."""
+        """Move a group node to a new parent (``""`` for the root).
+
+        Raises:
+            KeyError: if ``new_parent`` names no group.
+        """
         ok = group_tree_ops.move_node(self.lib, name, new_parent)
         return ok
 
