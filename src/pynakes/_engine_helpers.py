@@ -331,6 +331,53 @@ def compute_change_plan(pristine_text: str, lib: BibFile) -> dict:
     }
 
 
+def render_change_plan(plan: dict) -> str:
+    """Return a change plan as a few lines a person can read before committing.
+
+    Modified entries with the same changed fields share a line, so a hundred
+    group assignments read as one ``groups on 100 entries: ...`` line rather
+    than a hundred dictionaries.
+    """
+    summary = plan["summary"]
+    counts = [
+        f"{summary[name]} {label}"
+        for name, label in (
+            ("added", "added"),
+            ("removed", "removed"),
+            ("renamed", "renamed"),
+            ("modified", "modified"),
+            ("metadata_changed", "setting(s) changed"),
+        )
+        if summary[name]
+    ]
+    if not counts:
+        return "No staged changes."
+    lines = [f"Staged: {', '.join(counts)}."]
+    by_fields: dict[str, list[str]] = {}
+    for item in plan["entries"]:
+        change = item["change"]
+        if change == "renamed":
+            lines.append(f"  renamed {item['from']} → {item['to']}")
+        elif change in {"added", "removed"}:
+            lines.append(f"  {change} {item['key']}")
+        else:
+            changed = sorted(item.get("fields", {}))
+            if "type" in item:
+                changed.insert(0, "entry type")
+            by_fields.setdefault(", ".join(changed), []).append(item["key"])
+    for fields, keys in by_fields.items():
+        lines.append(f"  {fields} on {len(keys)} {'entry' if len(keys) == 1 else 'entries'}: ")
+        lines[-1] += ", ".join(keys)
+    for item in plan["metadata"]:
+        new = item["new"]
+        if new is None:
+            lines.append(f"  setting {item['key']} removed")
+        else:
+            shown = new if len(new) <= 60 else new[:59] + "…"
+            lines.append(f"  setting {item['key']} = {shown}")
+    return "\n".join(lines)
+
+
 def _indexed_entries(lib: BibFile) -> list[tuple[tuple[str, int], int, BibEntry]]:
     """Return entries tagged by ``(key, occurrence)`` and absolute entry index."""
     counts: dict[str, int] = {}

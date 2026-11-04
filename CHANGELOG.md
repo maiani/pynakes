@@ -231,6 +231,10 @@ The forms deprecated in 0.8 are removed:
   or `CLAUDE.md` (`agent_guide_pointer`), since agents load only the root
   guide by default. `render_agents_md` takes the library as an optional
   argument.
+- `Bibliography.change_summary()` returns the staged changes as a few lines
+  to read before `commit()`: counts, then one line per rename, addition and
+  removal, one per set of changed fields naming its entries, and one per
+  setting. `change_plan()` stays the structured form.
 - `Bibliography.add_to_group` refuses a group that does not exist unless
   `create=True`, as `groups assign` requires `--create`; it used to create a
   misspelled group silently. It and `remove_from_group` raise `KeyError` for an

@@ -35,6 +35,7 @@ from pynakes._engine_helpers import (
     fingerprint,
     insert_metadata_comment,
     iter_changed_entries,
+    render_change_plan,
     snapshot_entries,
     snapshot_source_spans,
 )
@@ -220,6 +221,14 @@ class Bibliography(
             # skip re-parsing the pristine text, which dominates a read's cost.
             return empty_change_plan()
         return compute_change_plan(self._pristine_text, self.lib)
+
+    def change_summary(self) -> str:
+        """Return :meth:`change_plan` as a short text to read before :meth:`commit`.
+
+        One line of counts, then a line per rename, addition and removal, one
+        per set of changed fields naming its entries, and one per setting.
+        """
+        return render_change_plan(self.change_plan())
 
     @property
     def pristine_text(self) -> str:

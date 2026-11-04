@@ -205,6 +205,27 @@ def test_group_api_refuses_what_the_cli_refuses(tmp_path: Path) -> None:
     assert coll.add_to_group("Smith2020", "Optics") == 1
 
 
+def test_change_summary_reads_as_a_short_review(tmp_path: Path) -> None:
+    coll = Bibliography.from_text(
+        "@article{Newton1687, title={Principia}, year={1687}}\n"
+        "@article{Euler1748, title={Introductio}, year={1748}}\n"
+        "@article{Gauss1801, title={Disquisitiones}, year={1801}}\n"
+    )
+    assert coll.change_summary() == "No staged changes."
+
+    coll.add_group_node("Classics")
+    coll.add_to_group("Newton1687", "Classics")
+    coll.add_to_group("Euler1748", "Classics")
+    coll.rename_key("Gauss1801", "Gauss1801Disquisitiones")
+
+    assert coll.change_summary().splitlines() == [
+        "Staged: 1 renamed, 2 modified, 1 setting(s) changed.",
+        "  renamed Gauss1801 → Gauss1801Disquisitiones",
+        "  groups on 2 entries: Newton1687, Euler1748",
+        "  setting group-tree = Classics||2||1||StaticGroup|||0|||",
+    ]
+
+
 def test_group_context_takes_the_cli_names(tmp_path: Path) -> None:
     bib = tmp_path / "refs.bib"
     bib.write_text((FIXTURES / "simple.bib").read_text(encoding="utf-8"), encoding="utf-8")

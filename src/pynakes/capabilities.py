@@ -505,7 +505,7 @@ def get_capabilities() -> dict:
                 "Bibliography.from_text",
                 "Bibliography.from_bibfile",
             ],
-            "review": ["preview", "diff", "change_plan", "lint"],
+            "review": ["preview", "diff", "change_plan", "change_summary", "lint"],
             "persistence": ["commit", "reset", "reload", "externally_changed"],
             "transport_independent": True,
         },
