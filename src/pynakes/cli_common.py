@@ -14,6 +14,13 @@ from typing import Any, NoReturn, ParamSpec, TypeVar
 import click
 import typer
 
+from pynakes._cli_files import BIB_FILE_HELP as BIB_FILE_HELP
+from pynakes._cli_files import auxiliary_bib_files as auxiliary_bib_files
+from pynakes._cli_files import bib_candidates as bib_candidates
+from pynakes._cli_files import bib_file_argument as bib_file_argument
+from pynakes._cli_files import is_auxiliary_bib_file as is_auxiliary_bib_file
+from pynakes._cli_files import missing_bib_message as missing_bib_message
+from pynakes._cli_files import single_bib_file as single_bib_file
 from pynakes.bibtex_parser import ParseError
 from pynakes.cli_errors import spec_for
 from pynakes.dedupe import DedupeConflictError
@@ -28,83 +35,6 @@ _P = ParamSpec("_P")
 _R = TypeVar("_R")
 
 # --- shared helpers --------------------------------------------------------
-
-BIB_FILE_HELP = "Path to the .bib file (default: auto-detect single .bib in cwd)"
-
-
-# REVTeX 4.1/4.2 writes its footnotes and style options to ``<jobname>Notes.bib``,
-# opening it with ``@CONTROL{REVTEX41Control}`` / ``@CONTROL{REVTEX42Control}``.
-_REVTEX_CONTROL_RE = re.compile(rb"@\s*control\s*[{(]\s*revtex4", re.IGNORECASE)
-_REVTEX_SNIFF_BYTES = 4096
-
-
-def is_auxiliary_bib_file(path: Path) -> bool:
-    """Return whether *path* is a REVTeX-generated ``<jobname>Notes.bib``.
-
-    Both the name and REVTeX's ``@CONTROL`` entry near the top must match, so a
-    library the user named ``notes.bib`` or ``LectureNotes.bib`` is not one.
-    """
-    if not path.name.endswith("Notes.bib"):
-        return False
-    try:
-        with path.open("rb") as handle:
-            head = handle.read(_REVTEX_SNIFF_BYTES)
-    except OSError:
-        return False
-    return _REVTEX_CONTROL_RE.search(head) is not None
-
-
-def bib_file_argument(help: str = BIB_FILE_HELP) -> Any:
-    """Return the standard optional ``.bib`` positional argument."""
-    return typer.Argument(None, help=help)
-
-
-def bib_candidates(directory: Path) -> list[Path]:
-    """Return regular user-library ``.bib`` files in *directory*, name-sorted."""
-    return sorted(
-        (
-            path
-            for path in directory.iterdir()
-            if path.is_file() and path.suffix.lower() == ".bib" and not is_auxiliary_bib_file(path)
-        ),
-        key=lambda path: path.name.casefold(),
-    )
-
-
-def auxiliary_bib_files(directory: Path) -> list[Path]:
-    """Return the REVTeX-generated ``.bib`` files auto-detection skips, name-sorted."""
-    return sorted(
-        (
-            path
-            for path in directory.iterdir()
-            if path.is_file() and path.suffix.lower() == ".bib" and is_auxiliary_bib_file(path)
-        ),
-        key=lambda path: path.name.casefold(),
-    )
-
-
-def single_bib_file(directory: Path) -> Path | None:
-    """Return the only regular ``.bib`` file in *directory*, if there is one."""
-    candidates = bib_candidates(directory)
-    return candidates[0] if len(candidates) == 1 else None
-
-
-def missing_bib_message(candidates: list[Path], skipped: Iterable[Path] = ()) -> str:
-    """Return the standard omitted-library error message for *candidates*.
-
-    *skipped* names the REVTeX-generated files auto-detection passed over, so
-    a directory holding only one is not reported as holding no ``.bib`` at all.
-    """
-    skipped_names = ", ".join(path.name for path in skipped)
-    if not candidates:
-        if skipped_names:
-            return (
-                "No *.bib bibliography found in current directory (skipped REVTeX-generated "
-                f"{skipped_names}); specify one as an argument"
-            )
-        return "No *.bib file found in current directory; specify one as an argument"
-    names = "  ".join(path.name for path in candidates)
-    return f"Multiple *.bib files found; specify one as an argument:\n{names}"
 
 
 def _resolve_input_bib(file: str | None, json_output: bool) -> str:
