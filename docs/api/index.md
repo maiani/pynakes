@@ -71,6 +71,65 @@ directly. This keeps transport concerns outside the bibliography engine:
 The CLI and an MCP server can therefore remain thin adapters over the same
 in-process operations.
 
+## Reading a Library (v0.10 development)
+
+`Library` reads explicitly selected `.bib` files as one collection. It preserves
+entry occurrences; matching citation keys alone do not establish work identity.
+
+```python
+from pynakes import Library
+
+library = Library.from_files(["physics.bib", "history.bib"])
+report = library.search('title:Principia OR author:Newton', limit=20)
+for hit in report.results:
+    print(hit.file, hit.start_line, hit.entry_index, hit.entry.key)
+    print(hit.entry.matches)  # field, term, exact/fuzzy, score and excerpt
+print(report.total, report.truncated)
+print(report.issues)  # always inspect partial-read diagnostics
+
+occurrences = library.lookup("Newton1687")  # every exact, case-sensitive key match
+```
+
+For repeatable membership, save `research.library.toml`:
+
+```toml
+pynakes-library = 1
+name = "Research"
+members = ["physics.bib", "collections/**/*.bib"]
+exclude = ["**/draft.bib"]
+catalogue = ".cache/research.sqlite"
+```
+
+Then call `Library.open("research.library.toml")`. Only `pynakes-library` and
+`members` are required; the five keys above are the entire schema. Unknown keys
+are errors. All paths are relative to the manifest folder, independently of the
+working directory. Per-bibliography settings remain in each `.bib`. The
+`catalogue` path is reserved: this API does not create or read an index.
+
+Members follow declaration order, with each pattern sorted and resolved path
+aliases read once. Patterns are case-sensitive, include hidden names and support
+`*`, `?`, `[]` and recursive `**`. Recursive traversal does not follow directory
+symlinks; an explicitly named directory may be a symlink. Exclusions match whole
+relative paths; `**/draft.bib` excludes that name at any depth. Libraries cannot
+nest, and non-`.bib` members are reported as invalid.
+
+Each report includes resolved `members`, successfully read `loaded_members` and
+`issues`. `complete` means the declared scope was read without issues, while
+`truncated` means the result limit omitted matches. Unmatched patterns and read
+failures make a report incomplete. `total` counts matching occurrences before
+limiting, never distinct works. `search_in` restricts searched fields without
+projecting the returned fields; `case_sensitive` and `fuzzy` follow the ordinary
+search API. Results rank globally by matched field, then score, with member and
+entry order breaking ties.
+
+Lookup and search use the bytes held when the Library opened. Each occurrence
+includes their SHA-256, a zero-based entry index and a one-based source line.
+File checks detect common concurrent changes while loading and omit affected
+members; this is **not a globally atomic snapshot**. Reopen to refresh. Results
+are detached from the held entries, and these APIs never write the source files.
+Direct scans load all selected files into memory. CLI integration, identity
+reports, rollups and indexed/bounded search remain future v0.10 work.
+
 ## Work-matching evidence
 
 Pynakes represents what is known about two records without claiming a universal

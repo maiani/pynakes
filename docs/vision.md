@@ -11,9 +11,10 @@ should be able to do this through the same engine.
 Its foundation is deliberate: authoritative BibTeX/BibLaTeX files, preservation
 of untouched source, reviewable changes and explicit conflicts. The current
 Python API and CLI implement bibliography operations and optional Pinax material
-management. Library-wide search, reconciliation and analysis are the next planned
-step, through `Library` and a derived `Catalogue`. The roadmap separates those
-plans from what users can do today.
+management. The v0.10 development `Library` API adds direct cross-file lookup and
+search. CLI integration, reconciliation, analysis rollups and a derived
+`Catalogue` remain planned. The roadmap separates those plans from implemented
+features.
 
 ## Bibfiles in plain text, in git
 
@@ -84,8 +85,8 @@ CI, and agents — with no dependency on any application above it.
 
 The optional Pinax mode keeps that base intact while letting a bibliography own a
 `pinax-files-dir` of citation-key-addressed materials. No `pinax-files-dir` means no Pinax
-behavior. Cross-file work — a `Library` over many pinakes, a derived
-`Catalogue` index — is planned; see
+behavior. The v0.10 development `Library` API reads across member bibliographies;
+work identity, rollups and a derived `Catalogue` index remain planned; see
 [DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
 
 The name points past the single file. The *Pinakes* was Callimachus's catalog of

@@ -245,19 +245,21 @@ results have explicit semantics and representative queries show measured benefit
 #### Order of work
 
 One feature per commit, each usable on the branch before the next starts.
+The direct-read Python foundation is described in the Unreleased changelog.
+The next slice is CLI integration; identity/rollups and the Catalogue follow.
 
 1. **`Library` reads**, built to the definition in
-   [the architecture guide](docs/guides/architecture.md#library-a-declared-set-of-bibliographies-planned):
+   [the architecture guide](docs/guides/architecture.md#library-a-declared-set-of-bibliographies):
    membership, work identity and a Catalogue over member files that keep all
    the data. A named library is a `<name>.library.toml` manifest with exactly
    five keys: `pynakes-library` (format version), `name`, `members` (paths or
    patterns, resolved from the manifest's folder), `exclude` and `catalogue`.
    Any other key is an error, so settings cannot move into it. Several files
    given to one command form an unnamed library. A file may belong to several
-   libraries; libraries do not nest. Build the Python API first — manifest
-   parsing, member resolution with unreadable members reported rather than
-   skipped, key lookup and search with file/entry provenance — then the
-   command surface (below).
+   libraries; libraries do not nest. Build the command surface below on the
+   direct-read Python API, retaining its member diagnostics, occurrence
+   provenance and explicit reopen-to-refresh semantics. Add bounded projection
+   and paging before exposing large collection reads to CLI clients.
 2. **Cross-file identity and rollups.** Duplicate checks across members, exact
    versus probable, reusing work matching; `analyze` and `coauthors` over a
    `Library`, counting identified works rather than entry occurrences.

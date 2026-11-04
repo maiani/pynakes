@@ -19,6 +19,8 @@ with usage examples, see the [API overview](index.md).
 
 ::: pynakes.engine
 
+::: pynakes.library
+
 ::: pynakes.bibtex_parser
 
 ::: pynakes.bibtex_writer

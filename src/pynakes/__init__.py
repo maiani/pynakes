@@ -4,6 +4,7 @@ The :class:`Bibliography` facade is the recommended entry point for applications
 it stages changes in memory, exposes previews and structured change plans, and
 commits through the same validated atomic-write path as the CLI. The lower-level
 model and parser/writer entry points exported here support in-memory workflows.
+The :class:`Library` facade provides read-only discovery across declared files.
 """
 
 from pynakes.bibtex_parser import ParseError, parse_bib
@@ -24,6 +25,7 @@ from pynakes.identity import (
     evidence_from_entry,
 )
 from pynakes.io import SaveResult, load_bib, save_bib
+from pynakes.library import Library
 from pynakes.model import BibEntry, BibFile, EntryStore, QueryFilter
 
 __all__ = [
@@ -36,6 +38,7 @@ __all__ = [
     "ExternalModificationError",
     "FileFingerprint",
     "FormatLintError",
+    "Library",
     "ParseError",
     "QueryFilter",
     "SaveResult",

@@ -51,6 +51,11 @@ class TestGetCapabilities:
         assert "Bibliography" in api["public_exports"]
         assert "change_plan" in api["review"]
         assert "commit" in api["persistence"]
+        assert "Library" in api["public_exports"]
+        assert api["library"]["facade"] == "pynakes.Library"
+        assert api["library"]["reads"] == ["lookup", "search"]
+        assert api["library"]["cli_integration"] is False
+        assert api["library"]["catalogue"] is False
 
     def test_work_matching_contract_is_explicit(self) -> None:
         matching = get_capabilities()["work_matching"]

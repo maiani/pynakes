@@ -89,7 +89,7 @@ class SearchResult:
         }
 
 
-#: Relevance tiers for :func:`_rank_results`, strongest first. A result's rank
+#: Relevance tiers for :func:`_result_rank`, strongest first. A result's rank
 #: is the best (lowest) tier among its ``matched_fields``; fields not listed
 #: fall in the middle tier, below ``author`` and above the weak free-text
 #: fields ``groups``/``abstract``.
@@ -107,20 +107,11 @@ def _field_tier(field: str) -> int:
     return _DEFAULT_TIER
 
 
-def _rank_results(results: list[SearchResult]) -> list[SearchResult]:
-    """Stably sort matches by relevance: strongest matched field first.
-
-    Within a tier, a stronger match score wins, so an exact hit outranks a
-    fuzzy one on the same field. Remaining ties keep their relative order, so
-    this is a pure reordering of ``results`` — a no-op when every match has the
-    same best-matched-field tier and score.
-    """
-    return sorted(
-        results,
-        key=lambda result: (
-            min(_field_tier(field) for field in result.matched_fields),
-            -result.score,
-        ),
+def _result_rank(result: SearchResult) -> tuple[int, float]:
+    """Rank by strongest matching field, then score; callers preserve ties."""
+    return (
+        min((_field_tier(field) for field in result.matched_fields), default=_DEFAULT_TIER),
+        -result.score,
     )
 
 
@@ -225,6 +216,37 @@ def search_entries(
     instead (also lets ``limit`` short-circuit the scan once enough matches are
     found).
     """
+    return [
+        result
+        for _, result in _search_indexed(
+            lib,
+            query,
+            fields=fields,
+            search_in=search_in,
+            extra_fields=extra_fields,
+            where=where,
+            case_sensitive=case_sensitive,
+            fuzzy=fuzzy,
+            limit=limit,
+            rank=rank,
+        )
+    ]
+
+
+def _search_indexed(
+    lib: BibFile,
+    query: str,
+    *,
+    fields: Iterable[str] | None = None,
+    search_in: Iterable[str] | None = None,
+    extra_fields: Iterable[str] | None = None,
+    where: Callable[[BibEntry], bool] | None = None,
+    case_sensitive: bool = False,
+    fuzzy: bool = False,
+    limit: int | None = None,
+    rank: bool = True,
+) -> list[tuple[int, SearchResult]]:
+    """Search while retaining occurrence indices, including duplicate keys."""
     if limit is not None and limit < 0:
         raise ValueError("Search limit must be non-negative")
 
@@ -242,9 +264,11 @@ def search_entries(
     field_filter = {name.lower() for name in fields} if fields is not None else None
     match_filter = {name.lower() for name in search_in} if search_in is not None else field_filter
     always = {name.lower() for name in extra_fields or ()}
-    results: list[SearchResult] = []
+    results: list[tuple[int, SearchResult]] = []
+    if limit == 0:
+        return results
 
-    for entry in lib.entries.values():
+    for index, entry in enumerate(lib.entries.values()):
         if where is not None and not where(entry):
             continue
 
@@ -257,20 +281,23 @@ def search_entries(
             # Selected by predicate: nothing was matched, so nothing is explained.
             matched_fields, matches, score = [], (), 0.0
         results.append(
-            SearchResult(
-                key=entry.key,
-                type=entry.type,
-                matched_fields=matched_fields,
-                fields=_output_fields(entry, field_filter, always),
-                matches=matches,
-                score=score,
+            (
+                index,
+                SearchResult(
+                    key=entry.key,
+                    type=entry.type,
+                    matched_fields=matched_fields,
+                    fields=_output_fields(entry, field_filter, always),
+                    matches=matches,
+                    score=score,
+                ),
             )
         )
         if limit is not None and not rank and len(results) >= limit:
             break
 
     if rank:
-        results = _rank_results(results)
+        results.sort(key=lambda item: _result_rank(item[1]))
         if limit is not None:
             results = results[:limit]
 

@@ -118,8 +118,9 @@ are maintained separately.
 - [Git workflows and CI](https://github.com/maiani/pynakes/blob/main/docs/guides/git-workflows.md)
 - [Architecture](https://github.com/maiani/pynakes/blob/main/docs/guides/architecture.md)
 
-The planned `Library` and rebuildable `Catalogue` APIs extend this engine to
-collection-wide work; they are not implemented yet. See the
+The v0.10 development `Library` Python API adds direct cross-file lookup and
+search. Its CLI integration, work identity, rollups and rebuildable `Catalogue`
+remain planned. See the
 [vision](https://github.com/maiani/pynakes/blob/main/docs/vision.md) and
 [development plan](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md).
 Release history is in the [changelog](https://github.com/maiani/pynakes/blob/main/CHANGELOG.md).

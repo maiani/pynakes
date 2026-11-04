@@ -22,6 +22,7 @@ from pynakes.identity import (
     evidence_from_entry,
 )
 from pynakes.io import SaveResult, load_bib, save_bib
+from pynakes.library import Library
 from pynakes.model import BibEntry, BibFile, EntryStore, QueryFilter
 
 
@@ -64,6 +65,7 @@ def test_top_level_api_exports_curated_symbols() -> None:
         "ExternalModificationError": ExternalModificationError,
         "FileFingerprint": FileFingerprint,
         "FormatLintError": FormatLintError,
+        "Library": Library,
         "ParseError": ParseError,
         "QueryFilter": QueryFilter,
         "SaveResult": SaveResult,

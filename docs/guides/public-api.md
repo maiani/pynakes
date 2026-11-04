@@ -40,6 +40,7 @@ covered by a backward-compatibility guarantee.
 | Analysis and maintenance | `pynakes.dedupe`, `pynakes.files`, `pynakes.integrity`, `pynakes.lint`, `pynakes.metadata`, `pynakes.scrub`, `pynakes.usage` |
 | Selection and search | `pynakes.query`, `pynakes.search`, `pynakes.saved_queries` |
 | Research reads and analysis | `pynakes.bounded`, `pynakes.entry_reader`, `pynakes.analysis` |
+| Cross-file discovery | `pynakes.library` (v0.10 development: direct reads, lookup and search) |
 | Set operations (projections) | `pynakes.setops` |
 | Composition | `pynakes.batch` |
 | Introspection | `pynakes.capabilities` and `pynakes.__version__` |

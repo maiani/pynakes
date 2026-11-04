@@ -416,6 +416,17 @@ def get_capabilities() -> dict:
             "review": ["preview", "diff", "change_plan", "change_summary", "lint"],
             "persistence": ["commit", "reset", "reload", "externally_changed"],
             "transport_independent": True,
+            "library": {
+                "facade": "pynakes.Library",
+                "constructors": ["Library.open", "Library.from_files"],
+                "reads": ["lookup", "search"],
+                "manifest_version": 1,
+                "freshness": "Direct-read view; reopen to refresh members and bytes.",
+                "partial_failures": "Every read report includes member issues and completeness.",
+                "cli_integration": False,
+                "work_identity": False,
+                "catalogue": False,
+            },
         },
         # Two structurally identical metadata comment namespaces are read and
         # merged (pynakes-meta overrides jabref-meta). `metadata set` routes a

@@ -39,7 +39,7 @@ These constraints apply across operation modules, interfaces, and releases:
 
 ## Domain vocabulary and core concepts
 
-The model has three nested concepts: **entry** < **bibliography** < future
+The model has three nested concepts: **entry** < **bibliography** <
 **library**. A Pinax is not a fourth model layer; it is an optional mode of one
 Bibliography when `pynakes-meta` declares a `pinax-files-dir`.
 
@@ -51,7 +51,7 @@ Bibliography when `pynakes-meta` declares a `pinax-files-dir`.
 | Metadata block | MetadataBlock | One top-level metadata comment — `@comment{jabref-meta: ...}` or pynakes' superset `@comment{pynakes-meta: ...}` (tagged by `namespace`) — represented both structurally and as raw text. |
 | Bibliography (working unit) | Bibliography | A staged, reconciled handle over one `.bib` file — "a slice of references covering one aspect of a topic". Supports operations, preview, diff, commit, reset, reload, and external-change detection. |
 | Pinax mode | FileStore + fetch primitives | Optional mode of one Bibliography together with its `pinax-files-dir` of citation-key-addressed materials. Plain bibliographies have no Pinax behavior. Includes agent inspection, file checks/fixes, arXiv material fetch, provenance manifests, set-operation copying, and coordinated key-edit material moves. |
-| Library | — (planned) | A declared set of bibliographies searched and reconciled as one collection: membership, cross-member work identity, and a derived Catalogue, with no data of its own. See [Library](#library-a-declared-set-of-bibliographies-planned). Not implemented yet. |
+| Library | Library (v0.10 development) | A declared set of bibliographies with direct reads, key lookup and cross-file search. Work identity, rollups and a derived Catalogue remain planned. See [Library](#library-a-declared-set-of-bibliographies). |
 | Catalogue (index) | — (planned) | A derived, rebuildable search index over the Library (e.g. SQLite FTS). Never a competing source of truth; the Bibliographies are. Not implemented yet. |
 
 ### BibEntry: record plus preservation state
@@ -174,7 +174,14 @@ filesystem watcher is intentionally **not** in core: it is a background thread
 consumer's job. If a push helper ever earns its place it would ship as an opt-in
 extra, never required by core.
 
-### Library: a declared set of bibliographies (planned)
+### Library: a declared set of bibliographies
+
+The v0.10 development API implements membership, direct reads, key lookup and
+cross-file search in `pynakes.library`. Reports retain source locations,
+duplicate-key occurrences and partial-read diagnostics. The
+[API guide](../api/index.md#reading-a-library-v010-development) documents the
+manifest and read semantics. Work identity, rollups, CLI integration and the
+Catalogue below describe the remaining design, not implemented features.
 
 A **library** is a set of bibliographies chosen to be searched and reconciled
 as one collection. Its members are `.bib` files, each with its Pinax when it
@@ -448,9 +455,9 @@ concern too: the planned MCP companion is a separate package that adapts the
 engine, and the CLI already provides a machine-readable, safe agent interface.
 
 Pinax mode is implemented: one `Bibliography` plus its `pinax-files-dir`
-of materials. The next planned extensions are `Library` (a declared set of
-bibliographies with cross-file search and identity resolution) and `Catalogue`
-(a derived, rebuildable index). Those collection APIs are not implemented — see
+of materials. The v0.10 development `Library` API adds direct cross-file reads.
+Its CLI integration, work identity, rollups and derived, rebuildable `Catalogue`
+are still planned — see
 [DEVPLAN.md](https://github.com/maiani/pynakes/blob/main/DEVPLAN.md) for the roadmap.
 
 - [API reference](../api/index.md)

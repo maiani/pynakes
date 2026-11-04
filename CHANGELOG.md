@@ -10,6 +10,28 @@ Use **Breaking changes** for incompatible behavior and migrations, and
 warning and earliest removal release). Additions and fixes use their usual
 sections. Historical releases retain their original headings.
 
+## [Unreleased]
+
+### Added
+
+- The Python `Library` API reads explicitly selected bibliographies or a
+  version-1 `<name>.library.toml` manifest. Manifests accept only membership,
+  exclusions, a name and a reserved Catalogue path; bibliography settings stay
+  in the `.bib` files. Key lookup and cross-file search preserve every matching
+  occurrence, including duplicate keys, with file, entry index, source line and
+  source-byte fingerprint. Search retains field scopes and match explanations
+  and ranks across members before applying a result limit.
+- Library reads report missing, unreadable, malformed or changing members and
+  unmatched patterns alongside usable results. A held Library is an in-memory
+  view; reopening reads current membership and bytes. This first v0.10 slice
+  is Python-only: CLI integration, cross-file work identity, analysis rollups
+  and the Catalogue remain planned.
+
+### Fixed
+
+- Python `search_entries(..., limit=0, rank=False)` now returns no results,
+  consistent with ranked search, instead of returning the first match.
+
 ## [0.9.0] - 2026-11-04
 
 ### Breaking changes
