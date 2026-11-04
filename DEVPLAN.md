@@ -208,18 +208,11 @@ version. MCP and editor releases remain independently versioned companions.
 its source bibliography, on a command surface and documentation settled before
 Library and the service layer build on them.
 
-The surface cleanup, the field-report follow-ups, their fixes, bibliography
-links (`biblink add`, `remove`, `list`, `check` and one-step `sync`), the
-documentation consolidation, the move to Zensical and the "bibliography, not
-library" wording pass are done; see `[Unreleased]` in
-[CHANGELOG.md](CHANGELOG.md). What remains:
-
-1. **Release acceptance against the renamed surface.** Refresh
-   [RELEASE.md](RELEASE.md) for 0.9.0 and rerun the agent evaluation suite, so
-   agents are seen to reach the new names without first meeting the
-   deprecation warnings.
-
-**Done when:** the evaluation run is recorded and the release checks pass.
+The completed scope is recorded under `[0.9.0]` in
+[CHANGELOG.md](CHANGELOG.md). Release validation and the historical agent
+assessment are recorded in [RELEASE.md](RELEASE.md). The final review includes
+institution-aware keys, sorted insertion, settings discovery, optional
+proper-name protection and all-capital author warnings.
 
 ### v0.10 — Library discovery and indexed search
 

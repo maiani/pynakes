@@ -1,18 +1,45 @@
 # Engine v0.9.0 release preparation
 
-The engine candidate is **0.9.0 Beta**, prepared on 2026-10-28. The blind
-evaluation ran on commit `b87bdae`. Engine changes since: hidden commands left
-out of help with the lowest supported typer; title protection of terms inside
-hyphenated compounds and of whole accented words, with all-caps titles left
-alone and reported by `lint`; unknown options reported as such; volume and
-edition in book summaries; and conflict options and the agent guide telling
-agents to stop and ask. Rebuild and rerun the checks on the release revision. The editor is versioned on its own and follows engine
-acceptance. The Python API remains experimental until 1.0. Preparation publishes nothing
-and creates no tag. The dated changelog section is a draft; update its date if
-publication happens later. The version comes from setuptools-scm and the
-eventual `v0.9.0` tag.
+The engine release is **0.9.0 Beta**, authorized for publication on
+2026-11-04 after final review. The version comes from the `v0.9.0` tag.
+The editor is versioned separately and remains unpublished; the Python API
+remains experimental until 1.0.
 
-## Candidate evidence
+## Final review, 2026-11-04
+
+The reviewed engine revision is `813a9c3`; the release-preparation commit only
+updates the changelog date and release documentation. All five handoff tasks
+are complete, each in its own commit. Review additionally fixed duplicate-key
+precedence during sorted insertion and cancellation of a newly staged addition,
+and extracted CLI helpers to keep every Python source module below 800 lines.
+
+- Source suite: **3,541 tests passed, 93.65% coverage**, on Python 3.15.
+- Ruff lint and format, ty, generated command-reference check and strict
+  Zensical documentation build passed.
+- Editor: **172 tests passed**, with engine checks required; no editor release.
+- Clean-revision wheel and sdist built as 0.9.0; strict Twine and release
+  version checks passed. Rehearsal artifacts are not publication artifacts.
+- Installed-wheel suite: **3,541 tests passed** in a fresh Python 3.12
+  environment, with imports confirmed from `site-packages` and no checkout
+  `src/` available.
+- All five reference agent-evaluation solutions passed on that installed wheel.
+  This is deterministic engine validation, not a new blind-agent assessment.
+
+Local logs and artifacts are ignored under `.cache/release-0.9.0/`, including
+`final-source-tests.log`, `editor-tests.log`, `final-build.log`,
+`final-wheel-tests.log`, `final-reference-baseline.json` and `FINAL-SHA256SUMS`.
+The tagged workflow builds the distributions it publishes, retests the wheel
+on Linux, Windows and macOS, then publishes to PyPI and GitHub. Publication
+still requires successful CI on the exact release revision and verification
+of the published artifacts and a fresh PyPI installation.
+
+The historical blind evaluation below remains **3/5**; its two agent behavior
+failures have not been rerun in this review. The engine reports conflicts and
+preserves files, but agent adherence to the updated conflict guidance is not
+newly established. Private-library acceptance remains owner-run; this review
+uses the committed synthetic and historical fixtures.
+
+## Historical candidate evidence (2026-10-28)
 
 The scope is in [CHANGELOG.md](CHANGELOG.md): the settled command surface
 (`corpus` retired, `groups` renamed, `ref lookup`, encoding and title
