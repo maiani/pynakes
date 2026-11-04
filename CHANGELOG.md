@@ -209,6 +209,11 @@ The forms deprecated in 0.8 are removed:
   before the findings; `--summary` shows the same two lines. A listing of more
   than ten findings repeats the totals at the end, followed, when it includes
   info findings, by a pointer to `--severity warning` and `--summary`.
+- When `lint` reports a `citation_key_pattern_mismatch`, it ends with how to
+  keep a key chosen by hand: `ref directive ignore
+  citation_key_pattern_mismatch --key KEY` exempts that entry from the check
+  and from regeneration, where `lint-ignore` would switch the check off for
+  new entries too.
 - `init --agent-guide` ends the guide with a "Library conventions" section
   generated from the library: the stored citation-key pattern (or the one
   existing keys follow, proposed with the `metadata set` command but not

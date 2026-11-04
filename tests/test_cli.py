@@ -4793,6 +4793,17 @@ class TestLintCategories:
         result = runner.invoke(app, ["lint", str(bib)])
 
         assert "Run `pynakes normalize --key-generation on` to resolve 1 of them." in result.output
+        assert "ignore citation_key_pattern_mismatch --key KEY" in result.output
+
+        # Following the hint keeps the key and quiets the check for that entry alone.
+        marked = runner.invoke(
+            app,
+            ["ref", "directive", str(bib), "ignore", "citation_key_pattern_mismatch"]
+            + ["--key", "Old"],
+        )
+        assert marked.exit_code == 0, marked.output
+        after = runner.invoke(app, ["lint", str(bib), "--only", "citation_key_pattern_mismatch"])
+        assert "no issues found" in after.output
 
     def test_key_normalization_stops_with_actionable_error(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"

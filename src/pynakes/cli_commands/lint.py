@@ -184,10 +184,18 @@ def _fixer_hints(issues: list) -> list[str]:
                 else issue.fixer
             )
             counts[command] = counts.get(command, 0) + 1
-    return [
+    hints = [
         f"Run `pynakes {command}` to resolve {count} of them."
         for command, count in sorted(counts.items())
     ]
+    if any(issue.type == "citation_key_pattern_mismatch" for issue in issues):
+        # A key chosen by hand is often cited already; say how to keep it
+        # without switching the check off for every new entry too.
+        hints.append(
+            "To keep a key chosen by hand, mark its entry: `pynakes ref directive "
+            "ignore citation_key_pattern_mismatch --key KEY`; regeneration then keeps it too."
+        )
+    return hints
 
 
 def lint(
