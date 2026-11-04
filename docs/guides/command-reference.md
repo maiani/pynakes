@@ -1279,7 +1279,7 @@ Search entries by free text, phrases, or field-scoped terms.
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
-| `QUERY` | string | yes | — | — | Search query: words/phrases, optionally scoped as field:term or field:"phrase". Pass "" to select by --where alone |
+| `QUERY` | string | yes | — | — | Search query: words/phrases, optionally scoped as field:term or field:"phrase". Terms are ANDed; a bare OR between terms makes them alternatives. Pass "" to select by --where alone |
 | `--in` | list[string] | no | null | — | Search only these stored fields: comma-separated, repeatable. The citation key and entry type stay searchable |
 | `--select` | list[string] | no | null | — | Return only these fields under 'fields': comma-separated, repeatable. A selected field the entry lacks is null and listed in missing_fields |
 | `--where` | string | no | null | — | Select entries with the shared --where grammar: predicates joined by and/or/not, e.g. 'year >= 2025 and type in [article, inproceedings]'. Operators: contains, =, !=, >, >=, <, <=, in [..], matches, ~ (fuzzy), exists, missing; 'used'/'unused' test the linked TeX sources and 'query NAME' runs a saved query. See `pynakes capabilities` for the full grammar. |

@@ -320,7 +320,8 @@ presence/absence; see the [selector reference](../guides/usage.md#selecting-entr
 
 ## Search
 
-`search_entries` is read-only. Terms are ANDed, `field:term` scopes a term, and
+`search_entries` is read-only. Terms are ANDed, a bare `OR` makes neighbouring terms
+alternatives, `field:term` scopes a term, and
 `fuzzy=True` also accepts misspellings. Each result carries the fields it matched
 plus one `FieldMatch` per hit explaining it:
 

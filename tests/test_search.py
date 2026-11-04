@@ -95,6 +95,33 @@ def test_invalid_query_raises() -> None:
         parse_search_query('"unterminated')
 
 
+def test_or_makes_neighbouring_terms_alternatives() -> None:
+    lib = parse_bib(_LIB)
+
+    either = search_entries(lib, "Avery OR Blair", rank=False)
+    narrowed = search_entries(lib, "manual Avery OR Blair")
+
+    assert [result.key for result in either] == ["Alpha2024", "Beta2023"]
+    assert [result.key for result in narrowed] == ["Beta2023"]
+    assert search_entries(lib, "neural AND widgets") == search_entries(lib, "neural widgets")
+
+
+def test_or_parses_into_clauses_and_lower_case_or_is_a_word() -> None:
+    clauses = parse_search_query("optics author:Newton OR Huygens or")
+
+    assert [[(t.field, t.value) for t in clause] for clause in clauses] == [
+        [(None, "optics")],
+        [("author", "Newton"), (None, "Huygens")],
+        [(None, "or")],
+    ]
+
+
+@pytest.mark.parametrize("query", ["OR Newton", "Newton OR", "Newton OR AND Huygens"])
+def test_an_operator_without_a_term_on_each_side_is_refused(query: str) -> None:
+    with pytest.raises(ValueError, match="needs a term on each side"):
+        parse_search_query(query)
+
+
 _RANK_LIB = (
     "@article{Alpha2024,\n"
     "  title = {Small Libraries},\n"

@@ -1,7 +1,8 @@
 """Read-only search over entries in a parsed bibliography.
 
-Search is term-based: whitespace-separated terms are ANDed, quoted phrases stay
-together, and a ``field:`` prefix scopes a term. Matching is exact (substring)
+Search is term-based: whitespace-separated terms are ANDed, a bare ``OR``
+between terms makes them alternatives, quoted phrases stay together, and a
+``field:`` prefix scopes a term. Matching is exact (substring)
 by default and optionally fuzzy, and every hit is explained — which field, which
 term, exact or fuzzy, how strongly, and the surrounding text. Entry *selection*
 is a separate concern handled by the shared ``--where`` grammar in
@@ -66,7 +67,7 @@ class SearchResult:
 
     ``matched_fields`` names the fields that matched, in first-hit order;
     ``matches`` explains each hit individually, and ``score`` is the weakest
-    term score (every term must match, so the weakest one bounds the result).
+    clause score (every clause must match, so the weakest one bounds the result).
     """
 
     key: str
@@ -123,17 +124,28 @@ def _rank_results(results: list[SearchResult]) -> list[SearchResult]:
     )
 
 
-def parse_search_query(query: str) -> list[SearchTerm]:
-    """Parse a free-text search query.
+#: One AND-ed part of a query: the entry matches it when any alternative matches.
+SearchClause = tuple[SearchTerm, ...]
 
-    Terms are whitespace-separated and ANDed. Quoted phrases stay together.
-    Prefix a term with ``field:`` to search only that field, for example
-    ``title:learning`` or ``author:"Jane Example"``. The prefixes ``key:`` and
-    ``type:`` target citation keys and entry types. Escapes and quote handling
-    follow shell-like :mod:`shlex` rules.
+
+def parse_search_query(query: str) -> list[SearchClause]:
+    """Parse a free-text search query into AND-ed clauses of alternatives.
+
+    Terms are whitespace-separated and ANDed. A bare upper-case ``OR`` between
+    two terms makes them alternatives, and it binds tighter than the implicit
+    AND: ``quantum Newton OR Leibniz`` is ``quantum`` and (``Newton`` or
+    ``Leibniz``). A bare ``AND`` is accepted as the explicit form of the
+    default. Lower-case ``or`` and ``and`` stay ordinary words, since titles
+    contain them; matching ignores case, so they also find the capitalized
+    words. Quoted phrases stay together. Prefix a term with ``field:`` to
+    search only that field, for example ``title:learning`` or
+    ``author:"Jane Example"``. The prefixes ``key:`` and ``type:`` target
+    citation keys and entry types. Escapes and quote handling follow
+    shell-like :mod:`shlex` rules.
 
     Raises:
-        ValueError: if the query is empty or has malformed quoting.
+        ValueError: if the query is empty, has malformed quoting, or has an
+            ``OR``/``AND`` without a term on each side.
     """
     try:
         parts = shlex.split(query)
@@ -142,14 +154,31 @@ def parse_search_query(query: str) -> list[SearchTerm]:
     if not parts:
         raise ValueError("Search query must not be empty")
 
-    terms: list[SearchTerm] = []
+    clauses: list[list[SearchTerm]] = []
+    pending: str | None = None
     for part in parts:
+        if part in _OPERATORS:
+            if pending is not None or not clauses:
+                raise ValueError(f"Invalid search query: {part} needs a term on each side")
+            pending = part
+            continue
         field, sep, value = part.partition(":")
-        if sep and field and value:
-            terms.append(SearchTerm(value=value, field=field.lower()))
+        term = (
+            SearchTerm(value=value, field=field.lower())
+            if sep and field and value
+            else SearchTerm(value=part)
+        )
+        if pending == "OR":
+            clauses[-1].append(term)
         else:
-            terms.append(SearchTerm(value=part))
-    return terms
+            clauses.append([term])
+        pending = None
+    if pending is not None:
+        raise ValueError(f"Invalid search query: {pending} needs a term on each side")
+    return [tuple(clause) for clause in clauses]
+
+
+_OPERATORS = frozenset({"OR", "AND"})
 
 
 def search_entries(
@@ -165,7 +194,7 @@ def search_entries(
     limit: int | None = None,
     rank: bool = True,
 ) -> list[SearchResult]:
-    """Return entries whose searchable text matches all query terms.
+    """Return entries whose searchable text matches every query clause.
 
     Free terms search the citation key, entry type, and stored fields. Fielded
     terms search only their target. ``search_in`` restricts the stored fields
@@ -201,12 +230,12 @@ def search_entries(
 
     # An empty query is a predicate-only selection; on its own it would match
     # every entry, so it is only meaningful together with ``where``.
-    terms = parse_search_query(query) if query.strip() else []
-    if not terms and where is None:
+    clauses = parse_search_query(query) if query.strip() else []
+    if not clauses and where is None:
         raise ValueError("Search needs a query or a where predicate")
     # Relevance ranking compares matched fields, so it has no meaning without
     # query terms: a predicate-only selection is always returned in file order.
-    rank = rank and bool(terms)
+    rank = rank and bool(clauses)
 
     if fields is not None and search_in is not None:
         raise ValueError("Pass fields or search_in, not both")
@@ -219,8 +248,8 @@ def search_entries(
         if where is not None and not where(entry):
             continue
 
-        if terms:
-            match = _match_entry(entry, terms, match_filter, case_sensitive, fuzzy)
+        if clauses:
+            match = _match_entry(entry, clauses, match_filter, case_sensitive, fuzzy)
             if match is None:
                 continue
             matched_fields, matches, score = match
@@ -259,17 +288,25 @@ def _output_fields(
 
 def _match_entry(
     entry: BibEntry,
-    terms: list[SearchTerm],
+    clauses: list[SearchClause],
     field_filter: set[str] | None,
     case_sensitive: bool,
     fuzzy: bool,
 ) -> tuple[list[str], tuple[FieldMatch, ...], float] | None:
-    """Return the matched fields, their explanations, and the weakest term score."""
+    """Return the matched fields, their explanations, and the weakest clause score.
+
+    Every clause must match; within a clause, every alternative that matches is
+    explained, and the clause scores its strongest hit.
+    """
     matched: list[str] = []
     explanations: list[FieldMatch] = []
     score = 1.0
-    for term in terms:
-        hits = _term_matches(entry, term, field_filter, case_sensitive, fuzzy)
+    for clause in clauses:
+        hits = [
+            hit
+            for term in clause
+            for hit in _term_matches(entry, term, field_filter, case_sensitive, fuzzy)
+        ]
         if not hits:
             return None
         score = min(score, max(hit.score for hit in hits))

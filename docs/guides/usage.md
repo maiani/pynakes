@@ -1142,8 +1142,11 @@ index by default, details with `--command` or `--section`. See
 
 Search entries without modifying the bibliography.
 
-Terms are ANDed. Quoted phrases stay together. `field:term` scopes a term to a
-field; plain terms search the key, type, and stored fields.
+Terms are ANDed. A bare `OR` between terms makes them alternatives, and it
+binds tighter than the AND: `"optics Newton OR Huygens"` finds entries about
+optics by either author. Lower-case `or` is an ordinary word. Quoted phrases
+stay together. `field:term` scopes a term to a field; plain terms search the
+key, type, and stored fields.
 
 `--fuzzy` also accepts near-misses — misspellings and inflections — by
 normalized similarity, so a half-remembered title can still find its entry.
@@ -1153,7 +1156,7 @@ groups/abstract, then by score) with ties in file order; `--no-rank` restores
 plain file order. With `--json` each result explains itself: `matched_fields`
 names the fields that matched and `matches` lists one entry per hit with its
 `field`, `term`, `kind` (`exact` or `fuzzy`), `score`, and the matching
-`excerpt`. The result's `score` is the weakest term score, and `where_parsed`
+`excerpt`. The result's `score` is the weakest term score (for `OR` alternatives, the stronger one), and `where_parsed`
 echoes the parsed selector.
 
 Which entries are searched is a separate question from what matches: `--where`

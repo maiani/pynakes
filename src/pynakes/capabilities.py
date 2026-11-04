@@ -63,6 +63,9 @@ _PREDICATE_GRAMMAR = {
 
 _SEARCH_QUERY_GRAMMAR = {
     "terms": "Whitespace-separated terms are ANDed.",
+    "or": "A bare upper-case OR between terms makes them alternatives and binds tighter "
+    "than AND: 'quantum Newton OR Leibniz' is quantum and (Newton or Leibniz). A bare AND "
+    "is the explicit default; lower-case or/and are ordinary words.",
     "phrases": "Quoted phrases stay together.",
     "field_prefix": "field:term scopes a term to one field; key: and type: are special fields.",
     "search_in": "--in FIELDS scopes every unprefixed term to those stored fields "
@@ -73,6 +76,7 @@ _SEARCH_QUERY_GRAMMAR = {
         '"natural language"',
         "title:learning type:article",
         'author:"Jane Example"',
+        "author:Newton OR author:Leibniz",
     ],
     "matched_fields": (
         "Each result reports the field(s) it matched: key, type, or any stored "

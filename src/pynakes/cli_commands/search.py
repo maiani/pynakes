@@ -37,7 +37,8 @@ def search(
         ...,
         help=(
             "Search query: words/phrases, optionally scoped as field:term or "
-            'field:"phrase". Pass "" to select by --where alone'
+            'field:"phrase". Terms are ANDed; a bare OR between terms makes them '
+            'alternatives. Pass "" to select by --where alone'
         ),
     ),
     search_in: list[str] | None = typer.Option(
@@ -71,6 +72,10 @@ def search(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Search entries by free text, phrases, or field-scoped terms.
+
+    Terms are ANDed. A bare `OR` between terms makes them alternatives and
+    binds tighter than the AND: `optics Newton OR Huygens` is optics and
+    (Newton or Huygens). Lower-case `or` is an ordinary word.
 
     Each result is tagged with the field(s) that matched, e.g. \\[title] or
     \\[title, groups]: `key` and `type` for the citation key and entry

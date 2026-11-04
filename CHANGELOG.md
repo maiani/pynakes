@@ -158,6 +158,14 @@ The forms deprecated in 0.8 are removed:
   more than one line, an `@` (BibTeX would start an entry there), or a leading
   `pynakes`, which reads as a directive. `Bibliography.add_entry_comment`,
   `remove_entry_comment` and `entry_comments` are the Python API.
+- `search` accepts `OR` between terms: `Newton OR Leibniz` finds either name,
+  where it used to look for the word "OR" as a third required term and found
+  nothing. `OR` binds tighter than the implicit AND, so `optics Newton OR
+  Huygens` is optics and (Newton or Huygens). A bare `AND` is accepted as the
+  explicit default. Only a bare upper-case `OR` or `AND` is an operator;
+  lower-case `or` stays an ordinary word. An operator without a term on each
+  side is refused. `pynakes.search.parse_search_query` now returns AND-ed
+  clauses, each a tuple of alternative `SearchTerm`s.
 
 ### Changed
 
