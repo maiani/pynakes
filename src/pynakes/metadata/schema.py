@@ -94,6 +94,7 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     # Where `ref import` takes a new entry's key from: generated or provider.
     "import-key-source": CATEGORY_CITATION_KEY,
     "normalize-protect-titles": CATEGORY_NORMALIZATION,
+    "normalize-proper-nouns": CATEGORY_NORMALIZATION,
     "normalize-title-fields": CATEGORY_NORMALIZATION,
     "normalize-author-style": CATEGORY_NORMALIZATION,
     "normalize-journal-style": CATEGORY_NORMALIZATION,
@@ -196,6 +197,7 @@ _SETTING_CHOICES: dict[str, set[str]] = {
 }
 
 _BOOLEAN_KEYS = {
+    "normalize-proper-nouns",
     "pinax-discover-arxiv",
     "verify-published",
     "enrich-published",

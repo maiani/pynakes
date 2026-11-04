@@ -51,6 +51,11 @@ def normalize(
         case_sensitive=False,
         help="Brace-protect capitalization-sensitive title words (setting: normalize-protect-titles)",
     ),
+    proper_nouns: bool | None = typer.Option(
+        None,
+        "--proper-nouns/--no-proper-nouns",
+        help="Protect internal capitalized names in sentence-case titles (setting: normalize-proper-nouns; default: off)",
+    ),
     title_field: list[str] | None = typer.Option(
         None,
         "--title-field",
@@ -208,6 +213,7 @@ def normalize(
         selecting=where is not None or bool(key),
         explicit={
             "--title-protection": title_protection != "metadata",
+            "--proper-nouns": proper_nouns is not None,
             "--title-field": bool(title_field),
             "--term": bool(term),
             "--drop-field": bool(drop_field),
@@ -249,6 +255,7 @@ def normalize(
             sort_by,
         )
         options.only = steps
+        options.proper_nouns = proper_nouns
         options.normalize_months = _optional_bool(months)
         options.remove_invisible = _optional_bool(invisible_characters)
         options.encoding = str(encoding)
@@ -339,6 +346,7 @@ def normalize(
 #: The step each step-configuring flag belongs to.
 _FLAG_STEPS = {
     "--title-protection": "titles",
+    "--proper-nouns": "titles",
     "--title-field": "titles",
     "--term": "titles",
     "--drop-field": "drop_fields",

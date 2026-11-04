@@ -939,6 +939,7 @@ Normalize entries: titles, authors, journals, DOIs, encoding, identifier case, o
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `--title-protection` | choice | no | "metadata" | metadata, on, off | Brace-protect capitalization-sensitive title words (setting: normalize-protect-titles) |
+| `--proper-nouns, --no-proper-nouns` | boolean | no | null | — | Protect internal capitalized names in sentence-case titles (setting: normalize-proper-nouns; default: off) |
 | `--title-field` | list[string] | no | null | — | Title-like field to brace-protect; can be repeated (setting: normalize-title-fields) |
 | `--term` | list[string] | no | null | — | Additional exact title term to brace-protect; can be repeated (setting: normalize-protected-terms) |
 | `--drop-field` | list[string] | no | null | — | Field to remove from every entry (e.g. abstract); can be repeated. Off by default; combines with the normalize-drop-fields setting |

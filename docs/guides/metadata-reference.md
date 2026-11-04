@@ -60,6 +60,7 @@ to find the operation module that owns a key.
 | `import-key-source` | citation-key | `generated` (default) or `provider`: where `ref import` takes a new entry's key from; `--key-source` overrides it | `ref import` | — |
 | `key-pattern-<entrytype>` | citation-key | Per-entry-type key pattern; aliases JabRef's `keypattern_<entrytype>` (read native-first) | `keys`, `lint` | `keypattern_<entrytype>` |
 | `normalize-protect-titles` | normalization | Boolean (default: `true`); `--title-protection`; `lint` checks it when stored | `normalize`, `lint` | — |
+| `normalize-proper-nouns` | normalization | Boolean (default: `false`); `--proper-nouns/--no-proper-nouns` protects internal capitalized names in sentence-case titles; lint checks the same policy | `normalize`, `lint` | — |
 | `normalize-title-fields` | normalization | List of title-like fields to protect (default: `title,booktitle,maintitle,subtitle`); `--title-field` | `normalize`, `lint` | — |
 | `normalize-protected-terms` | normalization | List of case-sensitive terms | `normalize`, `lint` | — |
 | `normalize-drop-fields` | normalization | List of field names to remove from every entry; default none (off) | `normalize` | — |

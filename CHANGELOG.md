@@ -81,6 +81,12 @@ The forms deprecated in 0.8 are removed:
 
 ### Added
 
+- Opt-in `normalize --proper-nouns/--no-proper-nouns` (setting:
+  `normalize-proper-nouns`) protects internal capitalized names in sentence-case
+  titles, such as `On the theory of {Brownian} motion`. Title Case and sentence
+  starts are left alone. Lint checks the same policy when enabled, even without
+  a stored protected-term list.
+
 - `capabilities --section settings --json` lists every native metadata key and
   prefix, including its meaning, category, accepted values, default and CLI
   override. Key coverage and finite choices come from the metadata schema.

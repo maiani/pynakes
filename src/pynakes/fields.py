@@ -12,6 +12,7 @@ from typing import TypedDict
 
 from pynakes import query
 from pynakes._markup import TITLE_LIKE_FIELDS, has_markup, markup_to_latex
+from pynakes._sentence_names import protect_sentence_names
 from pynakes._text_utils import check_balanced_braces, find_field_name
 from pynakes.editing import (
     append_delimited_field,
@@ -221,7 +222,7 @@ def _protect_compound_terms(token: str, terms: set[str]) -> str | None:
     return "-".join(f"{{{part}}}" if part in terms else part for part in parts)
 
 
-def _protect_title_value(value: str, terms: set[str]) -> str:
+def _protect_title_value(value: str, terms: set[str], proper_nouns: bool = False) -> str:
     """Brace-protect capitalization-sensitive tokens outside existing braces.
 
     A value that still carries provider markup (MathML, HTML) is returned as
@@ -231,6 +232,8 @@ def _protect_title_value(value: str, terms: set[str]) -> str:
     """
     if has_markup(value) or is_all_caps_title(value):
         return value
+    if proper_nouns:
+        value = protect_sentence_names(value)
     out: list[str] = []
     depth = 0
     i = 0
@@ -275,14 +278,16 @@ def _protect_title_value(value: str, terms: set[str]) -> str:
     return "".join(out)
 
 
-def title_capitalization_is_protected(value: str, terms: list[str] | None = None) -> bool:
+def title_capitalization_is_protected(
+    value: str, terms: list[str] | None = None, *, proper_nouns: bool = False
+) -> bool:
     """Return whether ``value`` already meets pynakes' title-protection policy.
 
     This is the non-mutating counterpart to :func:`protect_title_capitalization`.
     Keeping the predicate next to the transformation ensures lint and normalize
     cannot drift apart over which tokens need brace protection.
     """
-    return _protect_title_value(value, set(terms or [])) == value
+    return _protect_title_value(value, set(terms or []), proper_nouns) == value
 
 
 def protect_title_capitalization(
@@ -290,13 +295,16 @@ def protect_title_capitalization(
     field: str = "title",
     where: QueryFilter = None,
     terms: list[str] | None = None,
+    *,
+    proper_nouns: bool = False,
 ) -> int:
     """Brace-protect capitalization-sensitive tokens in title-like fields.
 
     Existing brace groups are preserved and never nested again. By default, this
     protects all-uppercase acronyms, dotted acronyms, mixed-case technical names,
     and uppercase/digit tokens such as ``GPT-4``. ``terms`` can be used for
-    explicit case-sensitive matches.
+    explicit case-sensitive matches. ``proper_nouns`` also protects internal
+    capitalized words in predominantly sentence-case titles (off by default).
     """
     count = 0
     protected_terms = set(terms or [])
@@ -304,7 +312,7 @@ def protect_title_capitalization(
         if field not in entry.fields:
             continue
         old_value = entry.fields[field]
-        new_value = _protect_title_value(old_value, protected_terms)
+        new_value = _protect_title_value(old_value, protected_terms, proper_nouns)
         if set_entry_field(entry, field, new_value):
             count += 1
     return count

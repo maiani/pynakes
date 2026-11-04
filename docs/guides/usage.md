@@ -329,6 +329,15 @@ Existing entries are not reordered: in an unsorted file the new entry follows
 the last entry sorting before or equal to it. An absent or `original` sort order
 keeps append behavior. Set the existing `sort-order` to `original` to opt out.
 
+`normalize --proper-nouns` enables a conservative proper-name heuristic:
+`On the theory of Brownian motion` becomes `On the theory of {Brownian} motion`.
+The first word must be capitalized and most remaining non-stopword words must
+be lowercase. Title Case, existing braces, math, commands, URLs and starts after
+`:`, `.`, `?` or `!` are left alone. This heuristic can miss names or protect a
+word that is not a name; review its diff. Store `normalize-proper-nouns: true`
+to share the policy with lint and imports, or use `--no-proper-nouns` to override
+it. Title protection must also be enabled.
+
 ## keys
 
 Generate, rename and repair citation keys, and report key patterns and

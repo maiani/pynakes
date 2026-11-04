@@ -40,6 +40,8 @@ _SAVE_ACTION_STEPS = {"normalize_names": "authors", "clean_up_doi": "dois"}
 def declared_steps(lib: BibFile) -> list[str]:
     """Return the per-entry normalize steps ``lib`` configures, in run order."""
     declared = {step for step, key in _STEP_KEYS.items() if metadata_value(lib, key) is not None}
+    if metadata_value(lib, "normalize-proper-nouns") is not None:
+        declared.add("titles")
     save_actions = library_save_actions(lib)
     if save_actions is not None and save_actions.enabled:
         declared.add("save_actions")

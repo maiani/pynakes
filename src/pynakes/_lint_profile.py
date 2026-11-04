@@ -57,6 +57,7 @@ class LintProfile:
     journal_table: str | None = None
     ltwa_table: str | None = None
     protect_titles: bool = False
+    proper_nouns: bool = False
     title_fields: tuple[str, ...] = TITLE_FIELDS
     protected_terms: tuple[str, ...] = ()
 
@@ -75,9 +76,10 @@ def resolve_lint_profile(lib: BibFile, base_dir: str | Path | None = None) -> Li
         metadata_list(metadata_value(lib, "normalize-title-fields")) or LintProfile.title_fields
     )
     protected_terms = metadata_list(metadata_value(lib, "normalize-protected-terms"))
+    proper_nouns = metadata_bool(metadata_value(lib, "normalize-proper-nouns"), False)
     protect_titles = metadata_bool(
         metadata_value(lib, "normalize-protect-titles"),
-        bool(protected_terms),
+        bool(protected_terms) or proper_nouns,
     )
     return LintProfile(
         journal_style=journal_style,
@@ -87,6 +89,7 @@ def resolve_lint_profile(lib: BibFile, base_dir: str | Path | None = None) -> Li
         # Normalization protects titles by default, but lint enforces only a
         # stored title preference. This keeps unprofiled libraries advisory.
         protect_titles=protect_titles,
+        proper_nouns=proper_nouns,
         title_fields=tuple(field.lower() for field in title_fields),
         protected_terms=protected_terms,
     )
@@ -242,7 +245,7 @@ def _lint_consistency(
         for field in profile.title_fields:
             title = fields.get(field)
             if title and not title_capitalization_is_protected(
-                title, list(profile.protected_terms)
+                title, list(profile.protected_terms), proper_nouns=profile.proper_nouns
             ):
                 issues.append(
                     LintIssue(

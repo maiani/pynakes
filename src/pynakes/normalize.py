@@ -77,6 +77,7 @@ class NormalizeOptions:
     """
 
     protect_titles: bool | None = None
+    proper_nouns: bool | None = None
     title_fields: list[str] | None = None
     protected_terms: list[str] | None = None
     drop_fields: list[str] | None = None
@@ -496,7 +497,12 @@ def normalize_library(
     elif _resolve_bool(lib, opts.protect_titles, "protect-titles", True):
         terms = _resolve_terms(lib, opts.protected_terms)
         for field in _resolve_title_fields(lib, opts.title_fields):
-            changed = field_ops.protect_title_capitalization(selection, field=field, terms=terms)
+            changed = field_ops.protect_title_capitalization(
+                selection,
+                field=field,
+                terms=terms,
+                proper_nouns=_resolve_bool(lib, opts.proper_nouns, "proper-nouns", False),
+            )
             if changed:
                 result.title_fields[field] = changed
     else:
