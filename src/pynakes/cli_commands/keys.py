@@ -505,6 +505,12 @@ def keys_pattern(
             f"  No common pattern matches most existing keys "
             f"(closest: {best}, {matched} of {inference.checked} entries)."
         )
+    if inference.skipped:
+        count = len(inference.skipped)
+        human.append(
+            f"  Not counted: {count} {_entries(count)} with no author, editor or title "
+            f"to build a key from ({', '.join(inference.skipped)})."
+        )
     if suggestion:
         human.append(f"  To adopt it: {suggestion}")
     result = {

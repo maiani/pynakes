@@ -75,7 +75,20 @@ def test_entries_with_nothing_to_build_a_key_from_are_not_counted() -> None:
     inference = infer_key_pattern(parse_bib(source))
 
     assert inference.checked == 3
+    assert inference.skipped == ["SM"]
     assert inference.pattern == "[auth:lower][year]"
+
+
+def test_keys_pattern_names_the_entries_it_did_not_count(tmp_path: Path) -> None:
+    bib = tmp_path / "refs.bib"
+    source = _library(["newton1687", "euler1748", "gauss1801"]) + "@misc{SM, note={See below}}\n"
+    bib.write_text(source, encoding="utf-8")
+
+    result = runner.invoke(app, ["keys", "pattern", str(bib)])
+
+    assert "(3 of 3 entries)" in result.output
+    assert "Not counted: 1 entry with no author, editor or title" in result.output
+    assert "(SM)" in result.output
 
 
 def test_keys_pattern_reports_and_suggests(tmp_path: Path) -> None:

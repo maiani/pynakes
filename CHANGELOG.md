@@ -132,7 +132,8 @@ The forms deprecated in 0.8 are removed:
   nothing from a small or mixed library. `ref import` warns with
   `key_pattern_unset` when it generates keys for a library that stores no
   pattern but follows another one. `pynakes.keys.infer_key_pattern` exposes
-  the inference.
+  the inference. Entries with no author, editor or title are not counted, and
+  the report names them (`skipped` in the JSON).
 - `ref import` warns with `published_version_available` when an imported
   arXiv preprint already names a published DOI, listing the keys and the
   `enrich --published --online --key` command that promotes them. A batch

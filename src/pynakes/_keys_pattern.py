@@ -53,14 +53,16 @@ class KeyPatternInference:
 
     ``pattern`` is the inferred pattern, or ``None`` when no candidate matched
     a clear majority. ``checked`` counts the entries with an author, editor
-    or title to build a key from; ``candidates`` lists every candidate with
-    the number of those entries whose key it matches, best first.
+    or title to build a key from, and ``skipped`` names the others, whose keys
+    no pattern describes; ``candidates`` lists every candidate with the number
+    of checked entries whose key it matches, best first.
     """
 
     pattern: str | None
     matched: int
     checked: int
     candidates: list[tuple[str, int]] = field(default_factory=list)
+    skipped: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, object]:
         """Return the JSON shape commands report."""
@@ -68,6 +70,7 @@ class KeyPatternInference:
             "pattern": self.pattern,
             "matched": self.matched,
             "checked": self.checked,
+            "skipped": list(self.skipped),
             "candidates": [
                 {"pattern": pattern, "matched": matched} for pattern, matched in self.candidates
             ],
@@ -88,6 +91,7 @@ def infer_key_pattern(lib: BibFile) -> KeyPatternInference:
     from pynakes.keys import _lacks_key_material, generate_key_from_pattern
 
     entries = [entry for entry in lib.entries.values() if not _lacks_key_material(entry)]
+    skipped = [entry.key for entry in lib.entries.values() if _lacks_key_material(entry)]
     scores: list[tuple[str, int]] = []
     for pattern in CANDIDATE_PATTERNS:
         matched = sum(
@@ -103,4 +107,5 @@ def infer_key_pattern(lib: BibFile) -> KeyPatternInference:
         matched=best_matched if inferred else 0,
         checked=len(entries),
         candidates=ranked,
+        skipped=skipped,
     )
