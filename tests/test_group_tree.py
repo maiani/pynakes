@@ -1025,8 +1025,7 @@ def test_groups_cli_human_views_and_tree_lifecycle(tmp_path: Path) -> None:
 
     shown = runner.invoke(app, ["groups", "list", str(bib)])
     assert shown.exit_code == 0, shown.output
-    assert "+ Physics [8a8a8aff]" in shown.output
-    assert "  + Symmetry" in shown.output
+    assert "Physics [8a8a8aff] (0)\n└─ Symmetry (0)" in shown.output
 
     listed = runner.invoke(app, ["groups", "list", str(bib)])
     assert listed.exit_code == 0, listed.output

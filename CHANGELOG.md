@@ -162,6 +162,12 @@ The forms deprecated in 0.8 are removed:
   that the citation key spells (`Turing2023Machines` for a paper published in
   2024), with a `suggested_key` and the `keys rename` command that also
   updates TeX citations. Keys are still never renamed on their own.
+- `groups list` draws the hierarchy as a tree with branch lines. A group's
+  count now includes its subgroups' entries, each entry once, with the direct
+  count beside it when the two differ (`Light (2; 0 direct)`). Member keys
+  moved off the group line, where a large group made one very long line;
+  `--entries` lists them beneath each group. The JabRef expanded/collapsed
+  marker is no longer shown. The JSON is unchanged.
 - `search` accepts `OR` between terms: `Newton OR Leibniz` finds either name,
   where it used to look for the word "OR" as a third required term and found
   nothing. `OR` binds tighter than the implicit AND, so `optics Newton OR

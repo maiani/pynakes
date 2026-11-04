@@ -4,6 +4,7 @@
 groups; ``assign`` and ``unassign`` file an entry under a group or take it out.
 """
 
+import textwrap
 from collections.abc import Callable
 
 import typer
@@ -45,15 +46,22 @@ def groups_list_report(lib) -> dict:
 
 def groups_list(
     file: str | None = bib_file_argument(),
+    entries: bool = typer.Option(
+        False, "--entries", help="List each group's direct members beneath it"
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
-    """List the group hierarchy with each group's direct members.
+    """List the group hierarchy as a tree, with how many entries each group holds.
 
-    `tree` is the hierarchy the bibliography's metadata declares; `groups` maps
-    every group, declared or not, to its direct members; `undeclared` names the
-    groups only entries mention. The two can disagree, and the report says so
-    rather than reconciling them. `groups show NAME` lists one group's entries,
-    descendants included.
+    A group's count includes its subgroups' entries, each entry once, and says
+    how many are filed directly under it when that differs: `Optics (3; 1
+    direct)`. `--entries` lists the direct members beneath each group.
+
+    With `--json`, `tree` is the hierarchy the bibliography's metadata
+    declares; `groups` maps every group, declared or not, to its direct
+    members; `undeclared` names the groups only entries mention. The two can
+    disagree, and the report says so rather than reconciling them. `groups show
+    NAME` lists one group's entries, descendants included.
     """
     file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
@@ -72,37 +80,57 @@ def groups_list(
         )
         return
 
-    members = report["groups"]
-    tree = group_tree_ops.list_tree(coll.lib) or []
-    undeclared = report["undeclared"]
-    if not members:
+    if not report["groups"]:
         typer.echo(f"{file}: no groups found.")
         return
+    for line in _tree_lines(coll.lib, report, entries=entries):
+        typer.echo(line)
 
-    def line(prefix: str, name: str, color: str = "") -> str:
-        keys = members.get(name, [])
-        listed = f": {', '.join(keys)}" if keys else ""
-        return f"{prefix}{name}{color} ({len(keys)}){listed}"
 
-    def show(parent: str, prefix: str, seen: set[str]) -> None:
-        for node in tree:
-            if node.parent == parent and node.name not in seen:
-                seen.add(node.name)
-                color = f" [{node.color}]" if node.color else ""
-                typer.echo(line(f"{prefix}{'+' if node.expanded else '-'} ", node.name, color))
-                show(node.name, prefix + "  ", seen)
-
+def _tree_lines(lib, report: dict, *, entries: bool) -> list[str]:
+    """Render ``groups list`` as a tree drawn with box characters."""
+    members: dict[str, list[str]] = report["groups"]
+    tree = group_tree_ops.list_tree(lib) or []
+    children: dict[str, list] = {}
+    for node in tree:
+        children.setdefault(node.parent, []).append(node)
+    lines: list[str] = []
     shown: set[str] = set()
-    show("", "", shown)
+
+    def label(name: str, color: str = "", total: int | None = None) -> str:
+        direct = len(members.get(name, []))
+        total = direct if total is None else total
+        count = f"{total}; {direct} direct" if total != direct else str(total)
+        tag = f" [{color}]" if color else ""
+        return f"{name}{tag} ({count})"
+
+    def keys(name: str, prefix: str) -> None:
+        if entries and members.get(name):
+            wrapped = textwrap.wrap(", ".join(members[name]), width=max(40, 88 - len(prefix)))
+            lines.extend(f"{prefix}{chunk}" for chunk in wrapped)
+
+    def show(node, head: str, cont: str) -> None:
+        shown.add(node.name)
+        total = len(group_tree_ops.list_entries_in_group_tree(lib, node.name))
+        lines.append(head + label(node.name, node.color or "", total))
+        kids = [kid for kid in children.get(node.name, []) if kid.name not in shown]
+        keys(node.name, cont + ("│  " if kids else "   "))
+        for index, kid in enumerate(kids):
+            last = index == len(kids) - 1
+            show(kid, cont + ("└─ " if last else "├─ "), cont + ("   " if last else "│  "))
+
+    for root in children.get("", []):
+        show(root, "", "")
     # A node whose parent is missing or part of a cycle is still listed.
     for node in tree:
         if node.name not in shown:
-            shown.add(node.name)
-            typer.echo(line("- ", node.name))
-    if undeclared:
-        typer.echo("Not declared in the hierarchy:")
-        for name in undeclared:
-            typer.echo(line("  ", name))
+            show(node, "", "")
+    if report["undeclared"]:
+        lines.append("Not declared in the hierarchy:")
+        for name in report["undeclared"]:
+            lines.append(f"  {label(name)}")
+            keys(name, "     ")
+    return lines
 
 
 def groups_tree(

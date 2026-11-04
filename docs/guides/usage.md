@@ -280,9 +280,20 @@ metadata.
 tree nodes — so a flat-only group is never hidden by the presence of a tree, and
 a member-less tree node still appears. Its JSON carries `groups` (each group's
 direct members), `tree` (the declared hierarchy) and `undeclared` (groups only
-entries mention); the human view prints the hierarchy with each group's direct
-members. It does not expand tree descendants. Use `groups show` for
-descendant-inclusive membership, or `--exact` to restrict it to direct members.
+entries mention). The human view draws the hierarchy as a tree. Each count
+includes the subgroups' entries, each entry once, and gives the direct count
+when it differs; `--entries` lists each group's direct members beneath it:
+
+```text
+Light (2; 0 direct)
+├─ Optics (2)
+│     Huygens1690, Newton1704
+└─ Colour (1)
+      Newton1704
+```
+
+Use `groups show` for one group's descendant-inclusive membership, or `--exact`
+to restrict it to direct members.
 
 A group name that matches neither a tree node nor a flat tag is a `KeyNotFound`
 error rather than an empty result, so a typo is distinguishable from a group

@@ -572,13 +572,14 @@ Add an entry to a group.
 
 **Stability: stable**
 
-List the group hierarchy with each group's direct members.
+List the group hierarchy as a tree, with how many entries each group holds.
 
 `pynakes groups list [FILE] [OPTIONS]`
 
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `--entries` | boolean | no | false | — | List each group's direct members beneath it |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |

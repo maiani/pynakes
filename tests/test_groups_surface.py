@@ -40,8 +40,35 @@ def test_list_reports_declared_tree_memberships_and_undeclared_groups(tmp_path: 
     assert data["undeclared"] == ["Waves"]
 
     human = runner.invoke(app, ["groups", "list", _library(tmp_path)]).output
-    assert "Optics (2): Huygens1690, Newton1704" in human
-    assert "Not declared in the hierarchy:\n  Waves (1): Huygens1690" in human
+    assert human == "Optics (2)\nNot declared in the hierarchy:\n  Waves (1)\n"
+
+    listed = runner.invoke(app, ["groups", "list", _library(tmp_path), "--entries"]).output
+    assert listed == (
+        "Optics (2)\n   Huygens1690, Newton1704\n"
+        "Not declared in the hierarchy:\n  Waves (1)\n     Huygens1690\n"
+    )
+
+
+def test_list_draws_the_tree_with_counts_that_include_subgroups(tmp_path: Path) -> None:
+    bib = _library(tmp_path)
+    for args in (
+        ["groups", "add", bib, "Light"],
+        ["groups", "update", bib, "Optics", "--parent", "Light"],
+        ["groups", "add", bib, "Colour", "--parent", "Light"],
+        ["groups", "assign", bib, "Newton1704", "Colour"],
+    ):
+        assert runner.invoke(app, args).exit_code == 0, args
+
+    lines = runner.invoke(app, ["groups", "list", bib, "--entries"]).output.splitlines()
+
+    assert lines[:6] == [
+        "Light (2; 0 direct)",
+        "├─ Optics (2)",
+        "│     Huygens1690, Newton1704",
+        "└─ Colour (1)",
+        "      Newton1704",
+        "Not declared in the hierarchy:",
+    ]
 
 
 @pytest.mark.parametrize(
