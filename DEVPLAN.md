@@ -6,10 +6,12 @@ research library throughout its life: reference acquisition and curation,
 material provenance, project bibliographies, manuscript citation maintenance,
 and public release copies.
 
-The current foundation is one authoritative `Bibliography` (`.bib`), optional
-Pinax materials, bounded research reads, and explicit operations across files.
-The next releases extend that foundation to `Library`, a rebuildable
-`Catalogue`, a long-lived engine service, and source-linked evidence.
+The current foundation is authoritative `Bibliography` (`.bib`) files, optional
+Pinax materials, bounded research reads, and a direct-read `Library` with guarded
+routing of supplied records. Initial PDF recovery links external originals;
+joining recovery, routing and managed material ingestion is the immediate gap.
+A rebuildable `Catalogue`, a long-lived engine service, and source-linked
+evidence build on these contracts.
 Applications for capture, reading, graphical interaction,
 and sync consume the same engine; they share its parser, data model and review
 contract. Planned integrations are tracked here without being advertised as
@@ -72,9 +74,22 @@ changes documented but not deprecated — until 1.0 pins it.
   the network. Locating the project boundary by a `.git` marker (key renames
   that rewrite TeX citations) is a filesystem check, not a git read. No git
   library dependency.
-- No project-level config (`pynakes.toml`, `[tool.pynakes]`): the `.bib` carries
-  its own settings. The v0.10 library manifest does not change this: it lists
-  members and the Catalogue location, never settings.
+- No project-level config (`pynakes.toml`, `[tool.pynakes]`): each `.bib` carries
+  its own formatting and operation settings. The Library manifest declares
+  membership, an optional Catalogue location and cross-member routing policy.
+  Routing belongs to the Library; it is not another bibliography setting.
+- A personal Library and a project bibliography have separate ownership and
+  lifetimes. Shared project copies need explicit selection and synchronization;
+  they do not inherit private notes, paths or materials automatically.
+- New Library additions have one owning member. Transversal collections such as
+  books can take priority over subject collections; groups, keywords and search
+  express overlapping interests. Existing duplicate occurrences remain readable
+  and diagnosable. Routing never silently repartitions existing members.
+- PDFs belong to the Library as Pinax materials when managed ingestion is
+  requested. Initially, each member owns a distinct relative Pinax root beneath
+  the Library directory. Several bibliographies must not independently mutate
+  one shared store. Cross-member relocation needs a separate identity and
+  recovery contract before it can move references and their materials.
 - The library's key style is never inferred silently. `keys pattern` proposes
   a pattern, `metadata set` stores it, and `ref import` only warns. Keys
   change only after the pattern is stored.
@@ -86,7 +101,7 @@ changes documented but not deprecated — until 1.0 pins it.
   key's occurrences in the sources given, with no `.bib`, is a different
   question from a used/unused/missing report for a whole bibliography.
 - Group-tree commands edit the hierarchy, not entries, unless asked:
-  `rename-group --members` moves memberships, and `remove-group` keeps them.
+  `groups rename --members` moves memberships, and `groups remove` keeps them.
 - Keep the shared public `pynakes.analysis` API and distinct CLI views: bounded
   summaries in `analyze`, full networks in `coauthors`. See the
   [analysis boundary](docs/guides/architecture.md#analysis-boundary) for ownership
@@ -164,18 +179,22 @@ model dependency, or hidden network call is implied by this roadmap.
 | Release | Cohesive scope | Main dependency |
 | --- | --- | --- |
 | 0.9 | Settled command surface, bibliography links, documentation on Zensical | Existing reads and checks |
-| 0.10 | Library, Catalogue and cross-file analysis | Bounded reads and identity evidence |
+| 0.10 | Library acquisition and discovery, then Catalogue and cross-file analysis | PDF evidence, routing, Pinax and bounded reads |
 | 0.11 | Engine service layer and companion launchers | Library, Catalogue and the Bibliography lifecycle |
 | 0.12 | Project assembly and synchronization of linked bibliographies | Library, declared links and guarded writes |
 | 0.13 | Curation: merges, directives and normalization | Existing editing and identity APIs |
-| 0.14 | Materials and acquisition: linking, extraction, ingestion and providers | Pinax, bounded reads and provider registry |
+| 0.14 | Broader material linking, source-linked extraction and providers | Managed ingestion, Pinax and bounded reads |
 | 0.15 | Evidence-linked research annotations | Material locations and hashes |
-| 0.16 | Resumable plans and execution receipts | Batch, acquisition and material operations |
+| 0.16 | Generalized resumable plans and execution receipts | Import recovery, batch and material operations |
 | 1.0 | Pin the exercised API and end-to-end contracts | Accepted workflows below |
 
-These are eight substantial feature releases before 1.0. Related features share
-one release and acceptance workflow; implementation tasks do not each need a
-version. MCP and editor releases remain independently versioned companions.
+These milestones group related workflows; implementation tasks do not each
+need a version. The next implementation priority is the bounded Library import
+workflow below. Its local Pinax ingestion and import recovery move forward from
+the broader v0.14 and v0.16 work: a safe archive migration must not wait for a
+Catalogue, service or GUI. If acquisition and indexing make v0.10 too large,
+split that milestone and renumber successors before release. MCP and editor
+releases remain independently versioned companions.
 
 #### Checks and evaluation throughout
 
@@ -214,14 +233,23 @@ assessment are recorded in [RELEASE.md](RELEASE.md). The final review includes
 institution-aware keys, sorted insertion, settings discovery, optional
 proper-name protection and all-capital author warnings.
 
-### v0.10 — Library discovery and indexed search
+### v0.10 — Library acquisition, discovery and indexed search
 
-**Workflow:** find a paper across existing collections and inspect collection-wide
-coverage efficiently, without importing another copy.
+**Workflow:** recover a local PDF archive into a private Library with reviewable
+metadata, one owning bibliography per accepted reference, and portable Pinax
+materials; then find works across members without importing another copy.
 
-- Introduce `Library` over explicitly selected `.bib` files or a declared root,
-  with collections, key lookup, search and cross-file identity reports. Settle
-  membership/configuration here; keep per-bibliography settings in the `.bib`.
+The direct-read Library, routing of supplied metadata, and initial single-bibliography
+PDF importer are implemented on the development branch; see
+[CHANGELOG.md](CHANGELOG.md), [Library routing](docs/guides/library-routing.md)
+and [PDF import](docs/guides/pdf-import.md). These are separate building blocks,
+not an end-to-end migration. The remaining work is:
+
+- Complete the staged acquisition sequence below, including material adoption,
+  per-source review state and interruption recovery before bulk writes.
+- Extend the direct-read `Library` with bounded CLI reads and general cross-file
+  identity reports. Keep per-bibliography settings in the `.bib` and placement
+  policy in the manifest.
 - Expose cross-file search and duplicate checks, retaining file/entry
   provenance and exact versus probable matching. Repeated keys across files
   do not establish work identity. Report unreadable members and changing inputs
@@ -238,18 +266,19 @@ coverage efficiently, without importing another copy.
 - Test index refresh, deletion, rename and corruption recovery; measure index
   build/query/refresh cost and memory before making performance claims.
 
-**Done when:** source locations and ambiguity survive cross-file discovery;
-rollups reconcile; the index can be rebuilt without losing information; stale
-results have explicit semantics and representative queries show measured benefit.
+**Done when:** the migration gate below passes; source locations and ambiguity
+survive cross-file discovery; rollups reconcile; the index can be rebuilt without
+losing information; stale results have explicit semantics and representative
+queries show measured benefit. Finishing direct reads or recovering candidate
+metadata alone does not satisfy this milestone.
 
 #### Order of work
 
-One feature per commit, each usable on the branch before the next starts.
-The direct-read Python foundation is described in the Unreleased changelog.
-Routed additions now have a CLI; broader read integration, identity/rollups
-and the Catalogue follow.
+Keep changes scoped and independently testable. Prioritize the acquisition
+sequence below, then finish bounded reads, identity/rollups and measured
+indexing. The read-side backlog is:
 
-1. **`Library` reads**, built to the definition in
+1. **Bounded `Library` reads**, built to the definition in
    [the architecture guide](docs/guides/architecture.md#library-a-declared-set-of-bibliographies):
    membership, work identity and a Catalogue over member files that keep all
    the data. A named library is a `<name>.library.toml` manifest with membership
@@ -269,23 +298,206 @@ and the Catalogue follow.
    multi-file shapes, then index only what representative queries show
    benefits from. Test refresh, deletion, rename and corruption recovery.
 
+#### Immediate sequence: PDF archive to managed Library
+
+Local import trials establish useful failure classes, not a general recovery
+rate. Keep their source inventories, extracted text, candidate bibliographies
+and provider caches in the private Library. Public tests use invented fixtures
+and recorded synthetic provider responses. Preserve the existing PDF command's
+external-link workflow while adding managed ingestion explicitly. Each new API
+and CLI option must follow the setting/override conventions in `AGENTS.md`;
+routing policy stays in the manifest. Keep capabilities, error codes and the
+generated command reference synchronized as each slice ships.
+
+The engine backlog is:
+
+| Gap | Required outcome |
+| --- | --- |
+| Unrelated identifiers on cover sheets or reference pages | Attribute identity evidence to the document; retain competing candidates for review |
+| Mathematical and typographic title differences | Compare equivalent representations without relaxing identity checks broadly |
+| Complete-looking embedded metadata with weak values | Validate type, names and dates; offer attributable field choices |
+| Books with identifiers beyond the opening pages | Bounded front-matter inspection and ISBN/edition evidence |
+| Recovered records still linked to external files | Guarded routing plus portable Pinax copies and provenance |
+| Failed, unidentified or interrupted imports | Persistent accounting and safe retry without fabricated records |
+
+**1. Improve document identity evidence.** Extend the inspection evidence model
+before changing acceptance rules.
+
+- Retain page and available block/region locations for candidate identifiers and
+  titles. Distinguish the document's citation/title block from publisher
+  recommendations, reference lists and other embedded works. Do not assume
+  everything before an abstract describes the document itself.
+- Keep included and rejected evidence with reasons. Multiple supported works,
+  contradictory metadata or failed competing lookups still require review;
+  neither the first DOI nor a provider's successful response establishes identity.
+- Add comparison-only normalization for Unicode/LaTeX mathematical notation,
+  ligatures, spacing and line-break hyphenation. Preserve original title fields
+  and evidence. Do not solve mismatches by globally lowering a similarity cutoff.
+- **Gate:** invented positive fixtures cover equivalent mathematical titles and
+  layout variations; negative fixtures cover similar titles, recommendations,
+  reference-list identifiers and genuinely different works. Every automatic
+  choice has inspectable supporting locations; uncertain cases stay unwritten.
+
+**2. Recover and review metadata, including books.** Build on existing providers
+and lookup rather than introducing another resolution stack.
+
+- Separate field presence from metadata quality. Validate embedded author/editor
+  structure, publication dates and entry type; preserve questionable values as
+  evidence instead of guessing author splits or treating PDF creation dates as
+  publication dates. A successful lint run is not identity certification.
+- Provide explicit provider comparison/enrichment for embedded records. Online
+  mode currently accepts complete-looking embedded records before resolving
+  identifiers; new review behavior must expose disagreements and chosen field
+  provenance without silently replacing existing metadata.
+- Add bounded front-matter inspection beyond the initial two-page window, with
+  documented page/text/time/size budgets and structured limit failures. Measure
+  peak memory; an input-size limit and timeout are not a hard memory bound. Extract
+  and checksum ISBNs, reuse the existing ISBN resolver, and distinguish editions,
+  volumes and print/electronic identifiers. Several ISBNs need evidence or a
+  reviewed choice, not a first-match rule.
+- Connect existing title/reference lookup as an explicitly requested online
+  fallback. Preview the query and candidate evidence: sending title/author text
+  is a different disclosure from identifier-only lookup. No filename guessing or
+  page-count rule may silently classify a document as a book.
+- **Gate:** book fixtures place identifiers after page two and include conflicting
+  editions and irrelevant ISBNs. Metadata disagreements remain reviewable; an
+  accepted book type triggers the transversal book rule before subject rules.
+  OCR and repair of corrupt originals remain optional later work, not migration
+  prerequisites. Password, unreadable-file and resource-limit failures remain
+  distinguishable and leave the source untouched.
+
+**3. Settle material adoption and variant identity.** This is a prerequisite for
+copying any accepted PDF into Pinax, independent of recovery quality.
+
+- Distinguish source occurrence, byte identity (SHA-256), bibliographic work and
+  material role. Identical bytes can be recognized without merging distinct
+  work records; different bytes for one work must remain distinguishable.
+- Define an explicit unclassified role and multiple variants within a role.
+  An annotated PDF must not overwrite an unannotated copy, or vice versa. Keep
+  published/preprint distinctions and unresolved work relationships explicit.
+  Decide the manifest/addressing schema and migration of existing Pinax layouts
+  before exposing it; retain citation-key lookup as the public entry point.
+- Implement general local-file adoption using Pinax's write/provenance helpers.
+  Copy unchanged bytes by default, check source and destination hashes, record
+  provenance, detect collisions and recognize an already-adopted artifact.
+  Never rename, delete, repair or rewrite the external original implicitly.
+- Use distinct member-owned stores and relative attachment links. Define key
+  rename behavior for all variants and manifest records. A shared Library store
+  or member-to-member move is a subsequent operation, not an assumption hidden
+  inside import.
+- **Gate:** test repeated bytes, multiple annotated variants, unknown roles,
+  missing roots, destination collisions and key renames. Accepted materials
+  retain their original hashes and are addressable after relocating the entire
+  Library. Preserving embedded annotation bytes is required now; extracting
+  annotations into the v0.15 model is separate work.
+
+**4. Compose a guarded Library acquisition operation.** Reuse PDF inspection,
+provider resolution, Library routing and Bibliography staging. Settle the Python
+entry point and CLI spelling before exposing them; do not duplicate bibliography
+logic in a migration script or client.
+
+- Produce one reviewable plan with source hashes, identity evidence, metadata
+  choices, generated keys, destination and routing reasons, bibliography diffs,
+  material copies and provenance changes. Stage only candidates whose identity,
+  metadata choices and destination are sufficiently resolved.
+- Check work/key collisions across all members and other accepted records in
+  the same batch. For an existing work, offer attachment to its current owner;
+  do not add a second entry just because new routing rules choose another file.
+  Probable matches and conflicting identifiers need review before attachment.
+- Apply the selected member's key, dialect and normalization settings. Explicit
+  destination overrides and priority ties keep the existing routing semantics.
+  An inbox fallback applies to an identified reference without a matching route;
+  it must not turn an unidentified PDF into invented bibliographic metadata.
+- Recheck source PDFs, manifest/rules, membership, destination and relevant
+  existing materials against the reviewed plan before mutation. Incomplete
+  Library reads block uniqueness-dependent writes. A preview must not create
+  destination files, Pinax directories or provenance records.
+- Define the commit unit and recovery protocol for bibliography, material bytes
+  and Pinax manifest writes. Prepare outputs before mutation, with rollback or
+  a durable recovery journal for interruption. Several filesystem renames are
+  not a globally atomic transaction. Report completed and pending units honestly.
+- **Gate:** fixture imports route books and unmatched articles to separate
+  members, attach variants to existing owners and reject duplicate/stale plans.
+  Failure injection at each write boundary proves recovery without lost bytes,
+  dangling accepted links or unreported partial changes. Retrying completed
+  units produces no duplicate entries, copies or provenance records.
+
+**5. Persist a minimal import ledger and review queue.** Ship this with managed
+Library ingestion; v0.16 generalizes it to other operations.
+
+- Inventory every selected source, including unsupported formats, with its hash
+  and extraction/version information. Record candidates, resolution evidence,
+  explicit selections, routing reasons, plan fingerprints and resulting
+  bibliography/material hashes. Non-PDF files stay accounted for and are never
+  executed. Do not require a fake citation key to retain an unresolved source.
+- Distinguish candidate recovery, review acceptance and committed ingestion in
+  reports. Track pending, ambiguous, failed, already-present and committed
+  outcomes separately, with reasons and actions available to the reviewer.
+- Resume from verified receipts and current hashes. Changed source bytes,
+  metadata choices, rules or members invalidate affected plans; retain previous
+  evidence without applying stale decisions. Make extraction/provider caches
+  disposable, while explicit decisions and write receipts remain authoritative.
+- Preserve offline operation and explicit network scope. Cached responses may
+  be reused with provenance; uncached lookups require the requested online mode.
+  Retry must not silently widen the selected sources, queries or providers.
+- **Gate:** interrupt and resume a mixed batch, modify a source and a routing rule,
+  remove a cache, and retry failures. Every source remains accounted for; no
+  completed write repeats and no stale selection applies. Persisted formats are
+  versioned and documented, with private paths/text excluded from public exports.
+
+**6. Rehearse migration and restoration.** Run deterministic synthetic end-to-end
+fixtures first, then separately authorized private trials. Real inventories,
+metadata and reports stay outside the software repository.
+
+- Start with a reviewed cohort covering each failure class and material role;
+  expand only after the preceding gates pass. Keep live provider availability
+  checks separate from reproducible correctness tests, and do not extrapolate a
+  diagnostic sample into a collection-wide success rate.
+- Reconcile all selected sources against committed materials, byte duplicates,
+  explicit exclusions and outstanding review/failure items. Check bibliography
+  links, Pinax manifests, hashes, routing reasons and unchanged source originals.
+  A fully accounted-for batch can still have unresolved work; report both facts.
+- Restore a Git-managed Library at a different root with the original archive
+  unavailable. Demonstrate working relative links for restored PDF bytes and
+  explicit missing-material diagnostics for a metadata-only clone. Document
+  ordinary Git, optional LFS and external material backup choices without
+  making the engine stage, commit, configure remotes or push anything.
+- **Migration gate:** accepted references have one owner and intact, attributable
+  materials; retries and restoration work; every unresolved source has a durable
+  review record. No claim of a complete archive import while pending items
+  remain. Keep the source archive intact after the rehearsal.
+
+#### Subsequent Library material moves
+
+After ingestion is reliable, add a reviewed move between member bibliographies.
+Preview the destination key and settings, material/variant mappings, provenance,
+links and entry comments; check both members and stores before writing. Preserve
+material identity and recover interrupted moves. A rule edit only changes future
+routing until an explicit repartition operation is requested. Shared storage
+independent of member keys needs its own design; the initial implementation must
+remain safe with separate roots. Project copies and synchronization remain the
+separate v0.12 workflow.
+
 #### Command surface: direction, not destination
 
-Agreed direction (2026-10-27); the end state stays open and is revisited as
-each phase lands:
+The read-side direction remains shared commands over Library inputs; routed
+writes refine the boundary. The end state is revisited as each phase lands:
 
-- **A library is an input, never a home for operations.** An operation
-  belongs to the library only if it needs what a library adds: membership,
-  cross-member work identity or the Catalogue. Commands that can read
+- **Reuse operations across input scopes.** An operation belongs to the
+  Library only if it needs what a Library adds: membership, cross-member work
+  identity, destination routing or the Catalogue. Commands that can read
   several files also accept a library through a `--library` option naming a
   manifest or member files, rather than gaining `library` twins: `search`,
   `ref show`, `dedupe check`, `analyze`, `coauthors`, and the multi-file
   writers below. Several positional files on `lint`, `verify` and
   `dedupe check` keep meaning "check each file on its own"; they never
   silently become a library.
-- **A small `library` group for the library itself:** creating a manifest,
-  showing how members resolved and which are unreadable, and later refreshing
-  the Catalogue. Writes still go to one `Bibliography`.
+- **A small `library` group for Library-owned decisions.** `library add`
+  already routes supplied metadata into one member. Acquisition will compose
+  this placement contract with existing recovery and material APIs. Manifest
+  creation, member diagnostics and Catalogue refresh remain planned. Every
+  bibliography edit still goes through `Bibliography`; multi-member workflows
+  need explicit coordination and recovery.
 - **No multi-file group.** `combine`, `split` and `batch` are top-level commands:
   they use nothing a library adds. v0.12's `pick` follows the same rule: bare
   source files, optionally given as a library.
@@ -472,14 +684,16 @@ references, and retrieve passages tied to the exact material read.
   indexed content search through these derived records. Return source locations
   for checking quotations, equations and methods. Source text is data, not
   executable instructions; distinguish excerpts from external interpretations.
-- Extend the initial PDF import with managed Pinax ingestion and broader
-  source-linked extraction, sharing the existing inspection evidence contract.
-  Define portable attachment addressing and relocation for Git-managed
-  Libraries; preserve original hashes, variants and annotations, and distinguish
-  a metadata-only clone from restored material storage. See
+- Build broader source-linked extraction on the earlier managed PDF ingestion
+  and inspection evidence contracts. Reuse portable attachment addressing,
+  variant identity, provenance and recovery; do not introduce a second material
+  adoption path. Preserve original hashes and annotations and distinguish a
+  metadata-only clone from restored material storage. See
   [Git workflows](docs/guides/git-workflows.md#keeping-a-personal-library-in-git).
   Add offline `ref from-text` with recognized fields and unresolved text;
-  existing `ref lookup` remains the online lookup path.
+  existing `ref lookup` remains the online lookup path. Evaluate optional OCR
+  with language/tool provenance, bounded resources and explicit uncertainty;
+  extracted or OCR text remains a rebuildable derivative.
 - Extend the provider registry as one acquisition workstream: NASA ADS bibcodes,
   RePEc/IDEAS handles, MathSciNet review numbers, institutional URNs starting
   with DiVA, SciELO, and additional ISBN coverage (evaluate WorldCat first).
@@ -522,6 +736,9 @@ be mistaken for verbatim excerpts or human-reviewed records in the envelope.
 **Workflow:** resume a collection-maintenance job after interruption without
 repeating completed downloads or losing track of what changed.
 
+- Generalize the earlier import ledger and recovery protocol, retaining its
+  persisted decisions and receipts. Share schemas and recovery primitives with
+  material operations instead of creating an incompatible second job system.
 - Build on `batch` with persisted, versioned plans: operations, inputs,
   fingerprints, dependencies, permitted network steps, and expected outputs.
   Keep deterministic bibliography batches atomic within their existing scope.
@@ -550,6 +767,9 @@ existing deprecation promise throughout.
 
 - Exercise complete workflows for acquisition, curation, project assembly,
   manuscript citation maintenance, evidence retrieval, and public release.
+  Include an interrupted archive import into routed member bibliographies,
+  restoration with materials at another filesystem root, and a project export
+  that preserves the personal Library's private/shared boundary.
 - Document which records are authoritative and which are rebuildable, the
   compatibility/migration rules for persisted annotations and plans, and the
   limits of recovery across network and filesystem operations.
@@ -602,7 +822,7 @@ the other a library belonging to no project at all. See
 - **Material metadata writing** — `asset embed-xmp`: write an entry's
   bibliographic metadata into its linked PDF as XMP, making the file
   self-describing for sharing and archival, and the natural companion to
-  PDF ingestion in v0.14. This one modifies a material rather
+  managed PDF ingestion. This one modifies a material rather
   than the `.bib`, so it needs the same preview-and-approve treatment as a
   bibliography edit and must never be implied by another command.
 - **Further material formats** — EPUB metadata extraction alongside PDF, as
