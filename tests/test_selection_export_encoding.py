@@ -110,9 +110,9 @@ def test_latex_encoding_preserves_math_and_reports_unsupported():
 
 
 def test_field_encoding_selection_metadata_and_surgical_edits(tmp_path):
-    source = "@comment{pynakes-meta: fields-encoding:latex;}\n@misc{A,\n  title = {Café},\n  note = {Untouched}\n}\n@misc{B, title={Café}}\n"
+    source = "@comment{pynakes-meta: normalize-encoding:latex;}\n@misc{A,\n  title = {Café},\n  note = {Untouched}\n}\n@misc{B, title={Café}}\n"
     lib = parse_bib(source)
-    report = encode_field(lib, "title", where=lambda e: e.key == "A")
+    report = encode_field(lib, "title", to="latex", where=lambda e: e.key == "A")
     assert report["changed_entries"] == 1
     assert lib.entries["B"].raw_content == parse_bib(source).entries["B"].raw_content
     assert "  note = {Untouched}" in write_bib(lib)
@@ -122,14 +122,24 @@ def test_field_encoding_selection_metadata_and_surgical_edits(tmp_path):
     )
     bib = tmp_path / "refs.bib"
     bib.write_text(source)
-    args = ["fields", "encode", str(bib), "title", "--key", "A", "--json"]
+    args = [
+        "normalize",
+        str(bib),
+        "--only",
+        "encoding",
+        "--encoding-field",
+        "title",
+        "--key",
+        "A",
+        "--json",
+    ]
     preview = runner.invoke(app, [*args, "--dry-run", "--diff"])
     assert preview.exit_code == 0, preview.output
     assert json.loads(preview.output)["modified_entries"] == 1
     assert bib.read_text() == source
     applied = runner.invoke(app, args)
     assert applied.exit_code == 0, applied.output
-    override = runner.invoke(app, [*args, "--to", "unicode"])
+    override = runner.invoke(app, [*args, "--encoding", "unicode"])
     assert override.exit_code == 0, override.output
 
 
@@ -138,7 +148,9 @@ def test_encoding_requires_direction_and_invalid_setting_refused(tmp_path):
         encode_field(parse_bib("@misc{A, title={One}}"), "title")
     bib = tmp_path / "refs.bib"
     bib.write_text("@misc{A, title={One}}")
-    result = runner.invoke(app, ["metadata", "set", str(bib), "fields-encoding", "bad", "--json"])
+    result = runner.invoke(
+        app, ["metadata", "set", str(bib), "normalize-encoding", "bad", "--json"]
+    )
     assert result.exit_code == 1
 
 

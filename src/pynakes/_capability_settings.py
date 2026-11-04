@@ -3,7 +3,6 @@
 from pynakes.canonical import CanonicalLayout
 from pynakes.fields import TITLE_FIELDS
 from pynakes.metadata.schema import (
-    DEPRECATED_METADATA_KEYS,
     PYNAKES_EXACT_KEYS,
     PYNAKES_PREFIX_KEYS,
     metadata_value_choices,
@@ -24,12 +23,6 @@ _DETAILS: dict[str, tuple[str, object, str, str | None]] = {
         "bibtex (init creates biblatex)",
         "choice",
         "init --dialect",
-    ),
-    "fields-encoding": (
-        "Legacy fields encode target; normalize does not read it.",
-        None,
-        "choice",
-        "fields encode --to",
     ),
     "sort-order": (
         "Entry ordering for normalize and new references.",
@@ -312,6 +305,4 @@ def settings_catalogue() -> dict[str, dict]:
             "cli_override": override,
             "prefix": key in PYNAKES_PREFIX_KEYS,
         }
-        if key in DEPRECATED_METADATA_KEYS:
-            result[key]["deprecated"] = DEPRECATED_METADATA_KEYS[key]
     return dict(sorted(result.items()))

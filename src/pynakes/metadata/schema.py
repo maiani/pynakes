@@ -64,17 +64,11 @@ RENAMED_METADATA_KEYS: dict[str, str] = {
     "ltwa-table": "normalize-ltwa-table",
 }
 
-#: Keys still read until their removal release, mapped to what replaces them.
-#: ``lint`` reports each as ``deprecated_metadata_key``.
-DEPRECATED_METADATA_KEYS: dict[str, str] = {
-    "fields-encoding": "it is read only by the deprecated `fields encode`; set "
-    "normalize-encoding (latex, unicode or off) for normalize's encoding step, which "
-    "does not read the old key",
-}
-
 #: Retired ``pynakes-meta`` keys with no one-to-one replacement, mapped to what
 #: to do instead. They are no longer read; ``lint`` says so and points the way.
 RETIRED_METADATA_KEYS: dict[str, str] = {
+    "fields-encoding": "set normalize-encoding (latex, unicode or off) explicitly for "
+    "normalize; the old key is not migrated automatically",
     "format-entry-order": "format keeps the entry order it is given; sort with "
     "`normalize --sort-by` or the sort-order setting",
 }
@@ -84,7 +78,6 @@ RETIRED_METADATA_KEYS: dict[str, str] = {
 PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     # Native library dialect, aliasing JabRef's ``databaseType``.
     "dialect": CATEGORY_LIBRARY,
-    "fields-encoding": CATEGORY_NORMALIZATION,
     "normalize-encoding": CATEGORY_NORMALIZATION,
     "normalize-encoding-fields": CATEGORY_NORMALIZATION,
     # Native entry sort order, aliasing JabRef's ``saveOrderConfig``.
@@ -188,7 +181,6 @@ _FORMAT_CHOICES = {
 #: Choice-valued settings outside the ``format-*`` family: the value a command's
 #: flag of the same meaning accepts.
 _SETTING_CHOICES: dict[str, set[str]] = {
-    "fields-encoding": {"latex", "unicode"},
     "normalize-encoding": {"latex", "unicode", "off"},
     "groups-separator": {"auto", "comma", "semicolon"},
     "pinax-fetch-access": {"open", "institutional"},

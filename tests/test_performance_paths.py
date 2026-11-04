@@ -100,14 +100,6 @@ def test_insights_match_individual_reads_and_open_once(tmp_path, monkeypatch):
         result = runner.invoke(app, [*command, str(path), "--json"])
         assert result.exit_code == 0, result.output
         expected[name] = json.loads(result.output)
-    # The deprecated groups tree read stays in the insights until 0.10.0: the
-    # list's tree, under its old action.
-    listed = expected["groups_list"]
-    expected["groups_tree"] = {
-        **{key: listed[key] for key in ("status", "file", "source_sha256", "warnings")},
-        "action": "groups_tree",
-        "tree": listed["tree"],
-    }
     opened = []
     original = Bibliography.open
 
@@ -137,7 +129,8 @@ def test_insights_failure_keeps_inspection(tmp_path, monkeypatch):
     data = json.loads(result.output)
     assert data["entries"][0]["key"] == "Newton1687"
     assert data["insights"]["lint"]["error"] == "InvalidInput"
-    assert data["insights"]["groups_tree"]["status"] == "success"
+    assert data["insights"]["groups_list"]["status"] == "success"
+    assert "groups_tree" not in data["insights"]
 
 
 def test_origin_resolves_a_copy_against_the_original(tmp_path):

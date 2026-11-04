@@ -29,7 +29,6 @@ from pynakes.cli_common import (
     _safe,
     _source_sha256,
     _verb,
-    deprecated_alias,
     key_option,
     library_where_filter,
     parse_key_selector,
@@ -452,12 +451,3 @@ def register(app: typer.Typer) -> None:
     """Register the ``combine`` and ``split`` commands."""
     app.command()(_safe(combine))
     app.command()(_safe(split))
-
-
-def register_deprecated(corpus_app: typer.Typer) -> None:
-    """Register ``corpus combine`` and ``corpus split``, deprecated until 0.10.0."""
-    for name, fn in (("combine", combine), ("split", split)):
-        alias = deprecated_alias(
-            fn, old=f"corpus {name}", new=name, action=f"corpus_{name}", removal="0.10.0"
-        )
-        corpus_app.command(name)(_safe(alias))

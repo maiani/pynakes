@@ -8,7 +8,6 @@ from collections.abc import Callable
 
 import typer
 
-from pynakes.cli_choices import FieldEncoding
 from pynakes.cli_common import (
     _BACKUP_OPTION,
     _EXPECT_SHA256_OPTION,
@@ -20,13 +19,11 @@ from pynakes.cli_common import (
     _verb,
     bib_file_argument,
     bind_where_filter,
-    deprecated_alias,
     key_option,
     parse_key_selector,
     where_option,
 )
 from pynakes.engine import Bibliography
-from pynakes.fields import encode_field
 from pynakes.model import QueryFilter
 
 # --- fields ----------------------------------------------------------------
@@ -42,23 +39,12 @@ def _run_field_op(
     *,
     where: str | None,
     key: list[str] | None,
-    list_values: str | None = None,
 ) -> None:
-    """Run one field operation on the ``--where``/``--key`` selection and report it.
-
-    ``list_values`` names a field whose new value is listed per changed entry,
-    for an operation whose result cannot be predicted from the command line
-    alone (title protection decides token by token).
-    """
+    """Run one field operation on the ``--where``/``--key`` selection and report it."""
     coll = Bibliography.open(file)
     warnings: list[dict] = []
     count = op(coll, bind_where_filter(coll, where, keys=key, warnings=warnings))
     human = [f"{verb} ({count} {_entries(count)} changed)."]
-    if list_values is not None:
-        for change in coll.change_plan()["entries"]:
-            value = change.get("fields", {}).get(list_values)
-            if change["change"] == "modified" and value is not None:
-                human.append(f"  {change['key']}: {value['new']}")
     _finish_mod(file, action, coll, params, human, warnings=warnings, **details)
 
 
@@ -229,90 +215,6 @@ def fields_clear(
     )
 
 
-def fields_protect_title(
-    file: str | None = bib_file_argument(),
-    title_field: str = typer.Option("title", "--title-field", help="Title-like field to protect"),
-    term: list[str] | None = typer.Option(
-        None, "--term", help="Additional exact term to brace-protect"
-    ),
-    where: str | None = where_option(),
-    key: list[str] | None = key_option(),
-    backup: bool = _BACKUP_OPTION,
-    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
-    dry_run: bool = typer.Option(False, "--dry-run"),
-    diff: bool = typer.Option(False, "--diff"),
-    json_output: bool = typer.Option(False, "--json"),
-) -> None:
-    """Brace-protect capitalization-sensitive tokens in title-like fields."""
-    file = _resolve_input_bib(file, json_output)
-    params = RunParams(
-        dry_run=dry_run,
-        diff=diff,
-        json_output=json_output,
-        backup=backup,
-        expect_sha256=expect_sha256,
-    )
-    terms = term or []
-    _run_field_op(
-        file,
-        "fields_protect_title",
-        lambda coll, flt: coll.protect_title(title_field, flt, terms),
-        params,
-        {"field": title_field, "terms": terms, "where": where, "keys": parse_key_selector(key)},
-        f"{_verb('protect', params, 'Protected')} capitalization in field {title_field!r}",
-        where=where,
-        key=key,
-        list_values=title_field,
-    )
-
-
-def fields_encode(
-    file: str | None = bib_file_argument(),
-    field: str = typer.Argument(..., help="Text field to convert"),
-    to: FieldEncoding | None = typer.Option(
-        None, "--to", help="Text encoding; defaults to fields-encoding metadata"
-    ),
-    where: str | None = where_option(),
-    key: list[str] | None = key_option(),
-    backup: bool = _BACKUP_OPTION,
-    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
-    dry_run: bool = typer.Option(False, "--dry-run"),
-    diff: bool = typer.Option(False, "--diff"),
-    json_output: bool = typer.Option(False, "--json"),
-) -> None:
-    """Convert supported text accents, preserving math and capitalization braces."""
-    file = _resolve_input_bib(file, json_output)
-    params = RunParams(
-        dry_run=dry_run,
-        diff=diff,
-        json_output=json_output,
-        backup=backup,
-        expect_sha256=expect_sha256,
-    )
-    coll = Bibliography.open(file)
-    warnings: list[dict] = []
-    predicate = bind_where_filter(coll, where, keys=key, warnings=warnings)
-    report = encode_field(coll.lib, field, to=to, where=predicate)
-    _finish_mod(
-        file,
-        "fields_encode",
-        coll,
-        params,
-        [f"{_verb('convert', params)} {report['changed_entries']} entries to {report['to']}."],
-        warnings=warnings + report["warnings"],
-        field=field,
-        to=report["to"],
-    )
-
-
-#: Value conventions belong to normalize; these run hidden until 0.10.0:
-#: (old name, callback, the form that replaces it).
-_DEPRECATED: tuple[tuple[str, Callable[..., None], str], ...] = (
-    ("encode", fields_encode, "normalize --encoding latex|unicode --encoding-field FIELD"),
-    ("protect-title", fields_protect_title, "normalize --only titles --title-protection on"),
-)
-
-
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
     app.command("set")(_safe(fields_set))
@@ -320,12 +222,3 @@ def register(app: typer.Typer) -> None:
     app.command("move")(_safe(fields_move))
     app.command("append")(_safe(fields_append))
     app.command("clear")(_safe(fields_clear))
-    for name, fn, new in _DEPRECATED:
-        alias = deprecated_alias(
-            fn,
-            old=f"fields {name}",
-            new=new,
-            action=f"fields_{name.replace('-', '_')}",
-            removal="0.10.0",
-        )
-        app.command(name, hidden=True)(_safe(alias))

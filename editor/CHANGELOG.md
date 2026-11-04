@@ -20,6 +20,9 @@ release. Its version says nothing about which engine it runs.
 
 ### Changed
 
+- Engine contract tests now require the v0.10 inspection shape, with the group
+  tree under `groups_list.tree` and no retired `groups_tree` insight.
+
 - Staged commits run the engine's top-level `batch` command, replacing the
   deprecated `corpus batch`, and expect its `batch` action.
 - Group edits use the engine's renamed `groups` subcommands (`add`, `rename`,

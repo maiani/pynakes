@@ -1,29 +1,12 @@
-"""Findings about ``pynakes-meta`` key names: removed, renamed, or deprecated."""
+"""Findings about ``pynakes-meta`` key names: removed or renamed."""
 
 from pynakes._lint_issue import LintIssue
 from pynakes.metadata.schema import (
-    DEPRECATED_METADATA_KEYS,
     RENAMED_METADATA_KEYS,
     RETIRED_METADATA_KEYS,
     validate_metadata_value,
 )
 from pynakes.model import MetadataBlock
-
-
-def deprecated_metadata_key_issue(block: MetadataBlock) -> LintIssue | None:
-    """Report a key that still works but is deprecated, naming what replaces it."""
-    replacement = DEPRECATED_METADATA_KEYS.get(block.key.lower())
-    if replacement is None:
-        return None
-    return LintIssue(
-        "deprecated_metadata_key",
-        "warning",
-        f"Metadata key {block.key!r} in pynakes-meta is deprecated and is removed in "
-        f"0.10.0: {replacement}",
-        key=block.key,
-        field=block.key,
-        line=block.start_line,
-    )
 
 
 def unknown_metadata_key_issues(block: MetadataBlock) -> list[LintIssue]:

@@ -104,9 +104,6 @@ OPERATION_SPECS: dict[str, OperationSpec] = {
     ),
     "fields.append": OperationSpec(("field", "value"), ("where",), "Append to a delimited field"),
     "fields.clear": OperationSpec(("field",), ("where",), "Remove a field"),
-    "fields.protect_title": OperationSpec(
-        (), ("field", "where", "terms"), "Brace-protect title case"
-    ),
     "groups.assign": OperationSpec(
         ("key", "group"), ("create",), "Add an entry to a group (create: make a new group)"
     ),
@@ -154,32 +151,6 @@ OPERATION_SPECS: dict[str, OperationSpec] = {
         (), ("keys",), "Merge duplicate clusters, or only those containing the given keys"
     ),
 }
-
-
-#: Operation names deprecated in 0.9.0, still accepted until their removal
-#: release, mapped to the operation that replaced them.
-DEPRECATED_OPERATIONS: dict[str, str] = {
-    "groups.add_entry": "groups.assign",
-    "groups.remove_entry": "groups.unassign",
-}
-#: Operations deprecated in 0.9.0 that keep their own parameters until removal,
-#: mapped to the operation that does their job.
-SUPERSEDED_OPERATIONS: dict[str, str] = {
-    "fields.protect_title": "normalize",
-}
-_DEPRECATED_OPERATIONS_REMOVAL = "0.10.0"
-
-
-def _deprecated_operation_warning(old: str, new: str) -> dict:
-    removal = _DEPRECATED_OPERATIONS_REMOVAL
-    return {
-        "type": "deprecated",
-        "old": old,
-        "new": new,
-        "removal": removal,
-        "message": f"batch operation {old} is deprecated and will be removed in {removal}; "
-        f"use {new}",
-    }
 
 
 def _validate(spec: OperationSpec, params: dict, index: int, op: str) -> None:
@@ -238,15 +209,6 @@ def _apply_one(coll: Bibliography, op: str, params: dict) -> dict:
         return {"changed": coll.append_field(params["field"], params["value"], params.get("where"))}
     if op == "fields.clear":
         return {"changed": coll.clear_field(params["field"], params.get("where"))}
-    if op == "fields.protect_title":
-        field = params.get("field", "title")
-        where = coll._where(params.get("where"))
-        selected = [entry for entry in coll.lib.entries.values() if where is None or where(entry)]
-        changed = coll.protect_title(field=field, where=where, terms=params.get("terms"))
-        result: dict[str, object] = {"changed": changed}
-        if selected and not any(field in entry.fields for entry in selected):
-            result["warnings"] = [f"No matching entries had field {field!r}"]
-        return result
     if op == "groups.assign":
         _existing_key(coll, params["key"])
         if not params.get("create"):
@@ -335,32 +297,21 @@ def apply_operations(coll: Bibliography, operations: list[dict]) -> list[dict]:
         if not isinstance(raw, dict) or "op" not in raw:
             raise BatchError(index, "?", "each operation needs an 'op' field")
         op = raw["op"]
-        name = DEPRECATED_OPERATIONS.get(op, op)
-        spec = OPERATION_SPECS.get(name)
+        spec = OPERATION_SPECS.get(op)
         if spec is None:
             raise BatchError(index, op, "unknown operation")
         params = {k: v for k, v in raw.items() if k != "op"}
         _validate(spec, params, index, op)
         try:
-            result = _apply_one(coll, name, params)
+            result = _apply_one(coll, op, params)
         except _Refused as exc:
             raise BatchError(index, op, str(exc), code=exc.code) from exc
-        replacement = DEPRECATED_OPERATIONS.get(op) or SUPERSEDED_OPERATIONS.get(op)
-        if replacement is not None:
-            result["warnings"] = [
-                *result.get("warnings", []),
-                _deprecated_operation_warning(op, replacement),
-            ]
         results.append({"op": op, "result": result})
     return results
 
 
 def operation_catalog() -> dict:
-    """Describe the supported batch operations (for ``capabilities``).
-
-    A deprecated name is listed with ``deprecated`` naming its replacement and
-    removal release, and the same parameters.
-    """
+    """Describe the supported batch operations (for ``capabilities``)."""
     catalog: dict[str, dict] = {
         name: {
             "required": list(spec.required),
@@ -369,11 +320,4 @@ def operation_catalog() -> dict:
         }
         for name, spec in OPERATION_SPECS.items()
     }
-    for old, new in DEPRECATED_OPERATIONS.items():
-        catalog[old] = {
-            **catalog[new],
-            "deprecated": {"new": new, "removal": _DEPRECATED_OPERATIONS_REMOVAL},
-        }
-    for old, new in SUPERSEDED_OPERATIONS.items():
-        catalog[old]["deprecated"] = {"new": new, "removal": _DEPRECATED_OPERATIONS_REMOVAL}
     return catalog

@@ -21,7 +21,6 @@ from pynakes.cli_common import (
     _safe,
     _verb,
     bib_file_argument,
-    deprecated_alias,
 )
 from pynakes.engine import Bibliography
 from pynakes.metadata import DuplicateMetadataError
@@ -110,14 +109,6 @@ def batch(
         coll,
         params,
         [f"{_verb('apply', params, 'Applied')} {len(op_results)} operation(s);"],
-        # A deprecated operation name is the caller's to fix, so it surfaces
-        # in the envelope's warnings, not only in that operation's result.
-        warnings=[
-            warning
-            for item in op_results
-            for warning in item["result"].get("warnings", [])
-            if isinstance(warning, dict) and warning.get("type") == "deprecated"
-        ],
         operations=op_results,
     )
 
@@ -125,11 +116,3 @@ def batch(
 def register(app: typer.Typer) -> None:
     """Register the ``batch`` command."""
     app.command()(_safe(batch))
-
-
-def register_deprecated(corpus_app: typer.Typer) -> None:
-    """Register ``corpus batch``, deprecated until 0.10.0."""
-    alias = deprecated_alias(
-        batch, old="corpus batch", new="batch", action="corpus_batch", removal="0.10.0"
-    )
-    corpus_app.command("batch")(_safe(alias))

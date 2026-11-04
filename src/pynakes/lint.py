@@ -49,7 +49,7 @@ from pynakes._lint_issue import (
     unknown_ignore_names,
     unknown_issue_types,
 )
-from pynakes._lint_metadata_keys import deprecated_metadata_key_issue, unknown_metadata_key_issues
+from pynakes._lint_metadata_keys import unknown_metadata_key_issues
 from pynakes._lint_profile import (
     PROFILE_ISSUE_TYPES,
     LintProfile,
@@ -369,8 +369,6 @@ def _lint_metadata(lib: BibFile) -> list[LintIssue]:
                 issues.extend(unknown_metadata_key_issues(block))
             continue
 
-        if block.namespace == "pynakes" and (deprecated := deprecated_metadata_key_issue(block)):
-            issues.append(deprecated)
         try:
             validate_metadata_value(block.key, block.value)
         except ValueError as exc:

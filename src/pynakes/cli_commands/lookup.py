@@ -8,8 +8,6 @@ from pynakes.cli_common import (
     _emit_error,
     _emit_json,
     _safe,
-    deprecated_alias,
-    deprecation_warning,
 )
 from pynakes.providers._http import ProviderFetchError
 
@@ -42,36 +40,6 @@ def lookup(
     Like `ref import` and `asset fetch`, it goes online by being run. `search`
     is its offline counterpart over the bibliography itself.
     """
-    _lookup(text, limit, cache_file, json_output, [])
-
-
-def find(
-    text: str = _TEXT_ARGUMENT,
-    limit: int = _LIMIT_OPTION,
-    online: bool = typer.Option(
-        False,
-        "--online",
-        help="Deprecated and ignored: running the command is the consent to query the index",
-    ),
-    cache_file: str | None = _CACHE_FILE_OPTION,
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
-) -> None:
-    """Deprecated name of `ref lookup`, removed in 0.10.0."""
-    warnings = (
-        [
-            deprecation_warning(
-                "ref find --online", "ref lookup", removal="0.10.0", json_output=json_output
-            )
-        ]
-        if online
-        else []
-    )
-    _lookup(text, limit, cache_file, json_output, warnings)
-
-
-def _lookup(
-    text: str, limit: int, cache_file: str | None, json_output: bool, warnings: list[dict]
-) -> None:
     try:
         report = lookup_ops.find_reference(text, rows=limit, cache_file=cache_file)
     except ValueError as exc:
@@ -83,7 +51,7 @@ def _lookup(
 
     if json_output:
         _emit_json(
-            {"status": "success", "action": "ref_lookup", "warnings": warnings, **report.to_dict()}
+            {"status": "success", "action": "ref_lookup", "warnings": [], **report.to_dict()}
         )
         return
 
@@ -112,9 +80,5 @@ def _lookup(
 
 
 def register(app: typer.Typer) -> None:
-    """Register ``ref lookup``, and ``ref find`` hidden until 0.10.0."""
+    """Register ``ref lookup``."""
     app.command("lookup")(_safe(lookup))
-    alias = deprecated_alias(
-        find, old="ref find", new="ref lookup", action="ref_find", removal="0.10.0"
-    )
-    app.command("find", hidden=True)(_safe(alias))

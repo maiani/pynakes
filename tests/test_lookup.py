@@ -112,26 +112,6 @@ def test_find_reference_rejects_empty_text() -> None:
         find_reference("   ")
 
 
-def test_ref_find_still_runs_hidden_and_points_to_ref_lookup(monkeypatch) -> None:
-    """The old name keeps its action; its ignored --online flag adds its own warning."""
-    monkeypatch.setattr(
-        lookup_ops.crossref, "search_works", lambda query, rows=5, cache_file=None: []
-    )
-
-    plain = runner.invoke(app, ["ref", "find", "some reference", "--json"])
-    flagged = runner.invoke(app, ["ref", "find", "some reference", "--online", "--json"])
-
-    assert plain.exit_code == 0, plain.output
-    data = json.loads(plain.output)
-    assert data["action"] == "ref_find"
-    assert [(w["old"], w["new"]) for w in data["warnings"]] == [("ref find", "ref lookup")]
-    assert flagged.exit_code == 0, flagged.output
-    olds = [w["old"] for w in json.loads(flagged.output)["warnings"]]
-    assert olds == ["ref find --online", "ref find"]
-    assert "find" not in runner.invoke(app, ["ref", "--help"]).output.split("Commands")[1]
-    assert "--online" not in runner.invoke(app, ["ref", "lookup", "--help"]).output
-
-
 def test_cli_reports_candidates_as_json(monkeypatch) -> None:
     monkeypatch.setattr(
         lookup_ops.crossref,

@@ -386,17 +386,15 @@ def encode_field(
 ) -> FieldEncodingReport:
     """Convert one selected field between supported LaTeX text and Unicode.
 
-    Explicit ``to`` overrides ``fields-encoding`` metadata. A direction must
-    be supplied by one of those forms. Math, unknown commands and capitalization
+    Supply ``to="latex"`` or ``to="unicode"`` explicitly. Math, unknown commands and capitalization
     braces are preserved; unsupported text is retained and reported. No promise
     of complete TeX rendering or ASCII-only output is made.
     """
     from pynakes._field_encoding import encode_text
-    from pynakes.metadata import metadata_value
 
-    target = (to or metadata_value(lib, "fields-encoding") or "").lower()
+    target = (to or "").lower()
     if target not in {"latex", "unicode"}:
-        raise ValueError("Choose --to latex|unicode or set fields-encoding metadata")
+        raise ValueError('Choose to="latex" or to="unicode"')
     count = 0
     warnings: list[dict] = []
     for entry in _selected(lib, where):

@@ -468,7 +468,7 @@ def normalize_library(
 
     # Before title protection, so the braces it adds are the ones a converted
     # value keeps. Off unless asked: which encoding a library wants is its own
-    # choice, and the deprecated ``fields-encoding`` setting is not read here.
+    # choice, and the removed ``fields-encoding`` setting is not read here.
     if runs("encoding"):
         target = _resolve_choice(lib, opts.encoding, "encoding", {"latex", "unicode", "off"}, "off")
         if target == "off":

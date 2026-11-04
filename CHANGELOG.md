@@ -12,6 +12,32 @@ sections. Historical releases retain their original headings.
 
 ## [Unreleased]
 
+### Breaking changes
+
+The compatibility forms deprecated in 0.9 are removed in v0.10:
+
+- `corpus combine`, `corpus split` and `corpus batch`: use the top-level
+  `combine`, `split` and `batch` commands and their matching actions.
+- `groups tree` and `groups list-entries`: use `groups list` and `groups show`.
+  The `add-group`, `remove-group`, `rename-group`, `update-group`, `add-entry`
+  and `remove-entry` subcommands become `add`, `remove`, `rename`, `update`,
+  `assign` and `unassign`. Use `groups update --parent` instead of `move-group`.
+  `inspect --insights` no longer includes `groups_tree`; the tree is already
+  available in `groups_list.tree`.
+- `ref find`, including its ignored `--online` flag: use `ref lookup`, which
+  goes online when invoked and emits `ref_lookup`.
+- `fields encode` and `fields protect-title`: use `normalize --only encoding
+  --encoding latex|unicode --encoding-field FIELD` and `normalize --only titles
+  --title-protection on`, respectively.
+- Batch operations `groups.add_entry`, `groups.remove_entry` and
+  `fields.protect_title`: use `groups.assign`, `groups.unassign` and
+  `normalize` with `only: ["titles"]` and `protect_titles: true`.
+- `fields-encoding` metadata is no longer read or advertised. It is preserved
+  in existing files and reported as `unknown_metadata_key` with a migration
+  hint; set `normalize-encoding` explicitly if conversion is wanted. The
+  `deprecated_metadata_key` finding is retired. Python `encode_field()` now
+  requires an explicit `to="latex"` or `to="unicode"` value.
+
 ### Added
 
 - The Python `Library` API reads explicitly selected bibliographies or a

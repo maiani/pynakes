@@ -1414,7 +1414,7 @@ def test_groups_list_entries_cli_known_empty_group_succeeds(tmp_path: Path) -> N
 
 
 # ---------------------------------------------------------------------------
-# Fix 5: `groups tree --json` uses an explicit `to_dict()`, not `__dict__`
+# Fix 5: `groups list --json` uses an explicit `to_dict()`, not `__dict__`
 # ---------------------------------------------------------------------------
 
 
@@ -1438,8 +1438,8 @@ def test_group_node_to_dict_matches_dunder_dict() -> None:
     assert node.to_dict() == node.__dict__
 
 
-def test_groups_tree_cli_json_keys_unchanged(tmp_path: Path) -> None:
-    """`groups tree --json` must emit the exact same per-node keys as the old
+def test_groups_list_tree_json_keys_unchanged(tmp_path: Path) -> None:
+    """`groups list --json` must emit the exact same per-node keys as the old
     ``n.__dict__`` serialization (only the mechanism changed, not the contract)."""
     bib = tmp_path / "refs.bib"
     bib.write_text("@article{Euclid300BCE,\n  title = {On the Ratios of Straight Lines}\n}\n")

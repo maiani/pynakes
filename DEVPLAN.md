@@ -284,8 +284,7 @@ each phase lands:
 - **A small `library` group for the library itself:** creating a manifest,
   showing how members resolved and which are unreadable, and later refreshing
   the Catalogue. Writes still go to one `Bibliography`.
-- **No multi-file group.** `combine`, `split` and `batch` are top-level
-  commands (the `corpus` group that held them is deprecated until 0.10.0):
+- **No multi-file group.** `combine`, `split` and `batch` are top-level commands:
   they use nothing a library adds. v0.12's `pick` follows the same rule: bare
   source files, optionally given as a library.
 

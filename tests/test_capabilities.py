@@ -252,7 +252,7 @@ def test_settings_cover_schema_and_live_overrides() -> None:
         if key in metadata_value_choices():
             assert row["choices"] == metadata_value_choices()[key]
         override = row["cli_override"]
-        if override and not override.startswith("--") and key != "fields-encoding":
+        if override and not override.startswith("--"):
             command, flag = override.rsplit(" ", 1)
             assert any(
                 flag in option["flags"] for option in caps["command_schemas"][command]["options"]

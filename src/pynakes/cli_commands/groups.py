@@ -5,7 +5,6 @@ groups; ``assign`` and ``unassign`` file an entry under a group or take it out.
 """
 
 import textwrap
-from collections.abc import Callable
 
 import typer
 
@@ -25,7 +24,6 @@ from pynakes.cli_common import (
     _source_sha256,
     _verb,
     bib_file_argument,
-    deprecated_alias,
 )
 from pynakes.engine import Bibliography
 
@@ -133,46 +131,6 @@ def _tree_lines(lib, report: dict, *, entries: bool) -> list[str]:
     return lines
 
 
-def groups_tree(
-    file: str | None = bib_file_argument(),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
-) -> None:
-    """Show the group hierarchy tree."""
-    file = _resolve_input_bib(file, json_output)
-    coll = Bibliography.open(file)
-    tree = group_tree_ops.list_tree(coll.lib)
-
-    if json_output:
-        _emit_json(
-            {
-                "status": "success",
-                "action": "groups_tree",
-                "file": file,
-                "source_sha256": _source_sha256(coll),
-                "warnings": [],
-                "tree": [n.to_dict() for n in tree] if tree else [],
-            }
-        )
-        return
-
-    if tree is None:
-        typer.echo(f"{file}: no group tree defined.")
-        return
-
-    def _show(nodes, prefix="", parent=""):
-        lines = []
-        for n in nodes:
-            if n.parent == parent:
-                color = f" [{n.color}]" if n.color else ""
-                expanded = "+" if n.expanded else "-"
-                lines.append(f"{prefix}{expanded} {n.name}{color}")
-                lines.extend(_show(nodes, prefix + "  ", n.name))
-        return lines
-
-    for line in _show(tree):
-        typer.echo(line)
-
-
 _CONTEXT_HELP = (
     "How the group's membership relates to its parent's: independent, "
     "refining (intersection), or including (union)"
@@ -212,7 +170,7 @@ def _group_mod_entry(
     add: bool,
     create: bool = False,
 ) -> None:
-    """Shared implementation for add-entry and remove-entry."""
+    """Shared implementation for assign and unassign."""
     coll = Bibliography.open(file)
     _require_key(coll.lib, key, params.json_output)
     if not (add and create):
@@ -427,43 +385,6 @@ def groups_rename(
     )
 
 
-def groups_move_group(
-    file: str | None = bib_file_argument(),
-    name: str = typer.Argument(..., help="Group name to move"),
-    parent: str = typer.Option("", "--parent", help="New parent group name"),
-    backup: bool = _BACKUP_OPTION,
-    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
-    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
-) -> None:
-    """Move a group node to a new parent (empty string for root-level)."""
-    file = _resolve_input_bib(file, json_output)
-    params = RunParams(
-        dry_run=dry_run,
-        diff=diff,
-        json_output=json_output,
-        backup=backup,
-        expect_sha256=expect_sha256,
-    )
-    coll = Bibliography.open(file)
-    tree = coll.list_tree() or []
-    if not any(node.name == name for node in tree):
-        _emit_error(json_output, "KeyNotFound", f"Group {name!r} not found in the tree", group=name)
-    if parent:
-        _require_group(coll.lib, parent, json_output)
-    ok = coll.move_group_node(name, parent)
-    if not ok:
-        _emit_error(
-            json_output,
-            "InvalidInput",
-            f"Moving group {name!r} under {parent!r} would create a circular reference",
-        )
-    action = "groups_move_group"
-    msg = f"{_verb('move', params)} group {name!r} to parent {parent!r}."
-    _finish_mod(file, action, coll, params, [msg], group=name, parent=parent)
-
-
 def groups_update(
     file: str | None = bib_file_argument(),
     name: str = typer.Argument(..., help="Group name to update"),
@@ -571,21 +492,6 @@ def groups_show(
     typer.echo(f"{name}{desc}: {', '.join(entries) if entries else '(no entries)'}")
 
 
-#: Forms deprecated in 0.9.0 and removed in 0.10.0: (old name, callback, new
-#: form, the action the old form keeps emitting). Hidden from ``--help``.
-_DEPRECATED: tuple[tuple[str, Callable[..., None], str, str], ...] = (
-    ("tree", groups_tree, "groups list", "groups_tree"),
-    ("list-entries", groups_show, "groups show", "groups_list_entries"),
-    ("add-entry", groups_assign, "groups assign", "groups_add_entry"),
-    ("remove-entry", groups_unassign, "groups unassign", "groups_remove_entry"),
-    ("add-group", groups_add, "groups add", "groups_add_group"),
-    ("remove-group", groups_remove, "groups remove", "groups_remove_group"),
-    ("rename-group", groups_rename, "groups rename", "groups_rename_group"),
-    ("move-group", groups_move_group, "groups update --parent", "groups_move_group"),
-    ("update-group", groups_update, "groups update", "groups_update_group"),
-)
-
-
 def register(app: typer.Typer) -> None:
     """Register this command family on its Typer application."""
     app.command("list")(_safe(groups_list))
@@ -596,6 +502,3 @@ def register(app: typer.Typer) -> None:
     app.command("update")(_safe(groups_update))
     app.command("assign")(_safe(groups_assign))
     app.command("unassign")(_safe(groups_unassign))
-    for old, fn, new, action in _DEPRECATED:
-        alias = deprecated_alias(fn, old=f"groups {old}", new=new, action=action, removal="0.10.0")
-        app.command(old, hidden=True)(_safe(alias))

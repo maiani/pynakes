@@ -55,31 +55,16 @@ def test_encoding_fields_and_setting_are_honoured(tmp_path: Path) -> None:
     assert data["operations"]["encoded_fields"] == {"title": 1}
 
 
-def test_the_deprecated_fields_encoding_setting_is_not_read_and_lint_says_so(
+def test_the_removed_fields_encoding_setting_is_not_read_and_lint_says_so(
     tmp_path: Path,
 ) -> None:
     prefix = "@comment{pynakes-meta:\nfields-encoding: latex\n}\n\n"
     library = _library(tmp_path, prefix)
     assert "encoding" in _normalize(library)["operations"]["skipped"]
     findings = lint(parse_bib(prefix + LIBRARY))
-    assert [issue.key for issue in findings if issue.type == "deprecated_metadata_key"] == [
+    assert [issue.key for issue in findings if issue.type == "unknown_metadata_key"] == [
         "fields-encoding"
     ]
-
-
-def test_fields_encode_and_protect_title_run_hidden_and_point_to_normalize(
-    tmp_path: Path,
-) -> None:
-    library = _library(tmp_path)
-    for args, action in (
-        (["encode", library, "title", "--to", "latex"], "fields_encode"),
-        (["protect-title", library], "fields_protect_title"),
-    ):
-        result = runner.invoke(app, ["fields", *args, "--dry-run", "--json"])
-        assert result.exit_code == 0, result.output
-        data = json.loads(result.output)
-        assert data["action"] == action
-        assert data["warnings"][-1]["new"].startswith("normalize")
 
 
 def test_batch_normalize_takes_a_selection_and_steps(tmp_path: Path) -> None:

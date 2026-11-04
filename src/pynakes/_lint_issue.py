@@ -57,7 +57,6 @@ ISSUE_CATEGORIES: dict[str, LintCategory] = {
     "invalid_profile_setting": "profile",
     "missing_profile_required_field": "profile",
     "unknown_metadata_key": "correctness",
-    "deprecated_metadata_key": "correctness",
     "invalid_metadata_value": "correctness",
     "duplicate_metadata_block": "correctness",
     "missing_tex_source": "correctness",
@@ -71,7 +70,6 @@ ISSUE_CATEGORIES: dict[str, LintCategory] = {
 NON_ENTRY_ISSUE_TYPES = frozenset(
     {
         "unknown_metadata_key",
-        "deprecated_metadata_key",
         "invalid_metadata_value",
         "duplicate_metadata_block",
         "missing_tex_source",

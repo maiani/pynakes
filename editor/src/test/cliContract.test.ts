@@ -75,11 +75,8 @@ test("inspect/groups/lint/search return their documented envelope shape", { skip
   const combined = await inspectLibrary(command, file);
   assert.equal(combined.status, "success");
   if (combined.status === "success") {
-    // One process returns exactly what the separate commands would. The
-    // engine's deprecated `groups_tree` read is not one the view uses.
-    const reads: Record<string, unknown> = { ...combined.insights };
-    delete reads.groups_tree;
-    assert.deepEqual(reads, {
+    // One process returns exactly what the separate commands would.
+    assert.deepEqual(combined.insights, {
       groups_list: list,
       lint,
       tex_scan: scan,

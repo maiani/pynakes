@@ -3011,7 +3011,17 @@ class TestFieldsCommand:
 
         result = runner.invoke(
             app,
-            ["fields", "protect-title", str(bib), "--dry-run", "--diff", "--json"],
+            [
+                "normalize",
+                str(bib),
+                "--only",
+                "titles",
+                "--title-protection",
+                "on",
+                "--dry-run",
+                "--diff",
+                "--json",
+            ],
         )
 
         assert result.exit_code == 0, result.output
@@ -3020,18 +3030,30 @@ class TestFieldsCommand:
         assert "title = {{DNA} repair with {eBay}}" in data["diff"]
         assert bib.read_text() == original
 
-    def test_protect_title_dry_run_lists_each_changed_value(self, tmp_path: Path) -> None:
+    def test_protect_title_dry_run_diff_contains_changed_values(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
         bib.write_text(
             "@article{A,\n  title = {DNA repair with eBay}\n}\n"
             "@article{B,\n  title = {plain words}\n}\n"
         )
 
-        result = runner.invoke(app, ["fields", "protect-title", str(bib), "--dry-run"])
+        result = runner.invoke(
+            app,
+            [
+                "normalize",
+                str(bib),
+                "--only",
+                "titles",
+                "--title-protection",
+                "on",
+                "--dry-run",
+                "--diff",
+            ],
+        )
 
         assert result.exit_code == 0, result.output
-        assert "  A: {DNA} repair with {eBay}" in result.output
-        assert "  B:" not in result.output
+        assert "title = {{DNA} repair with {eBay}}" in result.output
+        assert "+  title = {plain words}" not in result.output
 
     def test_protect_title_writes_with_explicit_term(self, tmp_path: Path) -> None:
         bib = tmp_path / "refs.bib"
@@ -3046,9 +3068,12 @@ class TestFieldsCommand:
         result = runner.invoke(
             app,
             [
-                "fields",
-                "protect-title",
+                "normalize",
                 str(bib),
+                "--only",
+                "titles",
+                "--title-protection",
+                "on",
                 "--title-field",
                 "booktitle",
                 "--term",

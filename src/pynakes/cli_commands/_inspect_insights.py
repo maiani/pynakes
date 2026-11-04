@@ -8,7 +8,6 @@ the envelope its own command would emit, and fails on its own.
 from collections.abc import Callable
 from pathlib import Path
 
-from pynakes import group_tree
 from pynakes.bibtex_parser import ParseError
 from pynakes.cli_checks import _file_result, error_code_for
 from pynakes.cli_commands.asset_check import asset_check_collection
@@ -44,12 +43,6 @@ def inspect_insights(
             return _error_envelope(exc)
 
     return {
-        "groups_tree": report(
-            "groups_tree",
-            lambda: {
-                "tree": [node.to_dict() for node in group_tree.list_tree(coll.lib) or []],
-            },
-        ),
         "groups_list": report("groups_list", lambda: groups_list_report(coll.lib)),
         "lint": report(
             "lint", lambda: _file_result(_lint_collection(coll, file, location=where), False)

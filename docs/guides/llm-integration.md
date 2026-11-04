@@ -596,13 +596,14 @@ must not silently replace them.
 ### Shared inspection reports
 
 `inspect refs.bib --display --insights --json` includes an `insights` object
-with `groups_tree`, `groups_list`, and `lint` envelopes equivalent to their
-individual commands (lint is advisory, with `strict: false`). All use the same
+with `groups_list`, `lint`, `tex_scan` and `asset_check` envelopes equivalent to
+their individual commands (lint is advisory, with `strict: false`). The group
+hierarchy is in `groups_list.tree`. All use the same
 parsed bibliography and source fingerprint. Each supplementary read can return
 an error envelope independently while inspection succeeds. The option adds data
-only to JSON output; ordinary inspection is unchanged. TeX and material checks
-remain separate, allowing clients to check a saved bibliography's neighbouring
-files while inspecting an unsaved buffer through a temporary file.
+only to JSON output; ordinary inspection is unchanged. Pass `--origin` when
+inspecting an unsaved buffer through a temporary file so linked TeX sources and
+materials resolve relative to the saved bibliography.
 
 
 ## Entry editing contracts

@@ -65,11 +65,6 @@ def _warning_object(warning: object) -> dict:
 #: Whether ``--json`` output is indented for reading (``--pretty``). Set by the
 #: option's callback on every invocation, so it never leaks between commands.
 _PRETTY_JSON: ContextVar[bool] = ContextVar("pynakes_pretty_json", default=False)
-#: Set while a deprecated alias runs: the old ``action`` its envelope keeps and
-#: the ``deprecated`` warning it carries. See :func:`deprecated_alias`.
-_DEPRECATED_ALIAS: ContextVar[tuple[str, dict] | None] = ContextVar(
-    "pynakes_deprecated_alias", default=None
-)
 
 
 def set_pretty_json(pretty: bool) -> None:
@@ -84,12 +79,6 @@ def _emit_json(payload: dict) -> None:
     The envelope is compact — one line, no padding — because its usual reader
     is a program or an agent paying per token; ``--pretty`` indents it.
     """
-    alias = _DEPRECATED_ALIAS.get()
-    if alias is not None and "warnings" in payload:
-        old_action, warning = alias
-        if "action" in payload:
-            payload["action"] = old_action
-        payload["warnings"] = [*(payload["warnings"] or []), warning]
     if "warnings" in payload:
         payload["warnings"] = [_warning_object(w) for w in payload["warnings"] or []]
     if _PRETTY_JSON.get():
@@ -154,44 +143,6 @@ def _with_warnings(human: list[str], warnings: list | None) -> list[str]:
         if text and text not in shown:
             lines.append(f"  warning: {text}")
     return lines
-
-
-def deprecation_warning(old: str, new: str, *, removal: str, json_output: bool) -> dict:
-    """Return the structured warning for a deprecated form, echoing it outside ``--json``.
-
-    The beta contract: an old form keeps working for one minor release and says
-    so with ``{"type": "deprecated", "old": ..., "new": ...}``, plus the release
-    that removes it. Outside ``--json`` the notice goes to stderr, so stdout
-    stays the command's own output.
-    """
-    message = f"{old} is deprecated and will be removed in {removal}; use {new}"
-    if not json_output:
-        typer.echo(f"warning: {message}", err=True)
-    return {"type": "deprecated", "old": old, "new": new, "removal": removal, "message": message}
-
-
-def deprecated_alias(
-    fn: Callable[_P, _R], *, old: str, new: str, action: str, removal: str
-) -> Callable[_P, _R]:
-    """Return ``fn`` under its deprecated name ``old``, for one more minor release.
-
-    The alias runs the same command with the same options. It reports the
-    ``deprecated`` warning (to stderr outside ``--json``, in ``warnings``
-    inside it) and keeps the ``action`` value the old form always emitted, so a
-    caller that matches on it keeps working until ``removal``.
-    """
-
-    @functools.wraps(fn)
-    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
-        json_output = bool(kwargs.get("json_output", False))
-        warning = deprecation_warning(old, new, removal=removal, json_output=json_output)
-        token = _DEPRECATED_ALIAS.set((action, warning))
-        try:
-            return fn(*args, **kwargs)
-        finally:
-            _DEPRECATED_ALIAS.reset(token)
-
-    return wrapper
 
 
 def _entries(count: int) -> str:

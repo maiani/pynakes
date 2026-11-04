@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from pynakes.bibtex_parser import parse_bib
@@ -155,45 +154,6 @@ def _write(dir_: Path, name: str, content: str) -> str:
     path = dir_ / name
     path.write_text(content)
     return str(path)
-
-
-@pytest.mark.parametrize("command", ["combine", "split", "batch"])
-def test_corpus_forms_still_run_with_their_old_action(tmp_path: Path, command: str) -> None:
-    a = _write(tmp_path, "1.bib", A)
-    out = str(tmp_path / "out.bib")
-    tail = {
-        "combine": [a, _write(tmp_path, "2.bib", B), "--out", out],
-        "split": [a, "--route", f"{out}=*"],
-        "batch": [a, "--ops", "[]"],
-    }[command]
-    result = runner.invoke(app, ["corpus", command, *tail, "--dry-run", "--json"])
-    assert result.exit_code == 0, result.output
-    data = json.loads(result.output)
-    assert data["action"] == f"corpus_{command}"
-    deprecated = [w for w in data["warnings"] if w["type"] == "deprecated"]
-    assert deprecated == [
-        {
-            "type": "deprecated",
-            "old": f"corpus {command}",
-            "new": command,
-            "removal": "0.10.0",
-            "message": f"corpus {command} is deprecated and will be removed in 0.10.0; "
-            f"use {command}",
-        }
-    ]
-
-    human = runner.invoke(app, ["corpus", command, *tail, "--dry-run"])
-    assert f"corpus {command} is deprecated" in human.stderr
-
-
-def test_corpus_is_hidden_and_described_as_deprecated() -> None:
-    from pynakes.capabilities import get_capabilities
-
-    assert "corpus" not in runner.invoke(app, ["--help"]).output
-    caps = get_capabilities()
-    assert not any(name.startswith("corpus") for name in caps["command_schemas"])
-    old = {d["old"] for d in caps["deprecations"]}
-    assert {"corpus combine", "corpus split", "corpus batch"} <= old
 
 
 def test_cli_combine_writes_combined_file(tmp_path: Path) -> None:
