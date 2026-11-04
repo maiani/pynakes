@@ -228,3 +228,32 @@ class TestStableTypeNames:
         ]:
             assert _stable_type(param(click81)) == expected, click81
             assert _stable_type(param(current)) == expected, current
+
+
+def test_settings_cover_schema_and_live_overrides() -> None:
+    from pynakes.metadata.schema import (
+        PYNAKES_EXACT_KEYS,
+        PYNAKES_PREFIX_KEYS,
+        metadata_value_choices,
+    )
+
+    caps = get_capabilities()
+    settings = caps["settings"]
+    assert set(settings) == set(PYNAKES_EXACT_KEYS) | set(PYNAKES_PREFIX_KEYS)
+    for key, row in settings.items():
+        assert row["meaning"] and row["format"]
+        assert "default" in row
+        assert row["category"] == (PYNAKES_EXACT_KEYS | PYNAKES_PREFIX_KEYS)[key]
+        if key in metadata_value_choices():
+            assert row["choices"] == metadata_value_choices()[key]
+        override = row["cli_override"]
+        if override and not override.startswith("--") and key != "fields-encoding":
+            command, flag = override.rsplit(" ", 1)
+            assert any(
+                flag in option["flags"] for option in caps["command_schemas"][command]["options"]
+            )
+    assert settings["format-indent"]["default"] == 2
+    assert settings["normalize-keys"]["default"] is False
+    result = runner.invoke(app, ["capabilities", "--section", "settings", "--json"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["settings"] == settings

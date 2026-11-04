@@ -81,6 +81,10 @@ The forms deprecated in 0.8 are removed:
 
 ### Added
 
+- `capabilities --section settings --json` lists every native metadata key and
+  prefix, including its meaning, category, accepted values, default and CLI
+  override. Key coverage and finite choices come from the metadata schema.
+
 - Bibliography links: `biblink add FILE PARENT` declares FILE a child of
   PARENT in both files (`biblink-parents` / `biblink-children` in
   `pynakes-meta`, each path relative to its own file), with a constraint

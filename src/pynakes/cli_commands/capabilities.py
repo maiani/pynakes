@@ -41,6 +41,7 @@ _INDEX_KEYS = (
 class CapabilitySection(StrEnum):
     """``capabilities --section``: one detailed part of the description."""
 
+    SETTINGS = "settings"
     ANALYSIS = "analysis"
     ENTRY_FIELDS = "entry_fields"
     BIBLINKS = "biblinks"
@@ -118,6 +119,14 @@ def capabilities(
         else:
             payload.update(_index(caps))
         _emit_json(payload)
+        return
+    if command or section or everything:
+        selected = (
+            caps
+            if everything
+            else _selected(caps, command or [], [item.value for item in section or []])
+        )
+        typer.echo(json.dumps(selected, indent=2, ensure_ascii=False))
         return
     typer.echo(f"{caps['tool']} v{caps['version']}")
     descriptions = caps["commands"]

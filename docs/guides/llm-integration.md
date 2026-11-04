@@ -659,3 +659,9 @@ separate discovered publication metadata from metadata already recorded.
 `by_status` reconciles with `checked`; lookup failures appear in warnings.
 An `unparsed_journal_reference` warning preserves an unrecognized citation string
 for review rather than treating it as a journal title.
+
+Use `pynakes capabilities --section settings --json` to discover every
+`pynakes-meta` key and key prefix, its category, meaning, accepted values or
+format, default, and CLI override where available. These defaults describe an
+unconfigured library; read `metadata list FILE --json` for its stored settings.
+JabRef aliases and save actions may provide fallback values.

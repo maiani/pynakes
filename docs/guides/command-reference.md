@@ -237,7 +237,7 @@ Show what pynakes can do: a compact index, or the details asked for.
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--command` | list[string] | no | null | — | Return the full schema of this command, e.g. 'ref show' (repeatable) |
-| `--section` | list[choice] | no | null | analysis, entry_fields, biblinks, field_encoding, selection_export, groups_separator, batch_operations, bounded_reads, capabilities, citation_grammar, command_groups, commands, deprecations, error_codes, formatting, material_collection, predicate_grammar, python_api, saved_queries, search_query_grammar, work_matching, write_precondition | Return this section of the description, e.g. predicate_grammar (repeatable) |
+| `--section` | list[choice] | no | null | settings, analysis, entry_fields, biblinks, field_encoding, selection_export, groups_separator, batch_operations, bounded_reads, capabilities, citation_grammar, command_groups, commands, deprecations, error_codes, formatting, material_collection, predicate_grammar, python_api, saved_queries, search_query_grammar, work_matching, write_precondition | Return this section of the description, e.g. predicate_grammar (repeatable) |
 | `--all` | boolean | no | false | — | Return the whole description (large: every command's schema) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |

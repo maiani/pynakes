@@ -6,6 +6,7 @@ the tool rather than guessing. Update this when commands are added or removed.
 
 import pynakes
 from pynakes import __all__ as PUBLIC_API_EXPORTS
+from pynakes._capability_settings import settings_catalogue
 from pynakes._cli_deprecations import DEPRECATIONS
 from pynakes.analysis import COAUTHOR_SCHEMA
 from pynakes.analysis import SECTIONS as ANALYSIS_SECTIONS
@@ -66,7 +67,8 @@ _PREDICATE_GRAMMAR = {
 _START_HERE = [
     "Read the bibliography's own conventions first: `metadata list FILE --json`. Its "
     "pynakes-meta settings drive normalize, format, lint and key generation; normalize "
-    "and format name in each option's help the setting that also sets it.",
+    "and format name in each option's help the setting that also sets it. "
+    "`capabilities --section settings --json` lists every setting, default and override.",
     "Several related edits: one `batch FILE OPS.json` call, not one command per edit. It "
     "previews them together with --dry-run, writes once atomically, and --expect-sha256 "
     "refuses the write if the file changed since the preview. Operations: "
@@ -506,6 +508,7 @@ def get_capabilities() -> dict:
             "reviewable edits, structured JSON, and JabRef interoperability."
         ),
         "start_here": _START_HERE,
+        "settings": settings_catalogue(),
         "network_access_is_explicit": True,
         "network_access": _NETWORK_ACCESS,
         "supports_dry_run": True,
