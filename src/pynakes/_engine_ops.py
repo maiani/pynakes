@@ -27,6 +27,7 @@ from pynakes import keys as key_ops
 from pynakes import metadata as metadata_ops
 from pynakes import normalize as normalize_ops
 from pynakes import scrub as scrub_ops
+from pynakes._engine_insert import add_entry_ordered
 from pynakes._entry_comments import attached_comment_indices
 from pynakes._library_style import apply_library_style
 from pynakes.canonical import CanonicalLayout, format_selected_entries, validate_format_input
@@ -427,7 +428,7 @@ class BibliographyOperations:
         apply_library_style(
             self.lib, entry, base_dir=self.path.parent if self.path is not None else None
         )
-        self.lib.entries.add(entry)
+        add_entry_ordered(self.lib, entry)
         self._appended_entries.append(entry)
         return kind, entry
 
@@ -439,7 +440,7 @@ class BibliographyOperations:
         *,
         allow_duplicate: bool = False,
     ) -> BibEntry:
-        """Append an entry; a missing key uses the library pattern and a unique suffix."""
+        """Insert in the declared sort order; a missing key uses the library pattern."""
         if key is None:
             candidate = key_ops.generate_key(
                 BibEntry(key="", type=entry_type, fields=fields), self.lib
@@ -456,7 +457,7 @@ class BibliographyOperations:
         for name, value in fields.items():
             field_ops.check_field_value(name, value)
         entry = BibEntry(key=key, type=entry_type, fields=dict(fields), modified=True)
-        self.lib.entries.add(entry)
+        add_entry_ordered(self.lib, entry)
         self._appended_entries.append(entry)
         return entry
 

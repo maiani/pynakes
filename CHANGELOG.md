@@ -180,6 +180,12 @@ The forms deprecated in 0.8 are removed:
 
 ### Changed
 
+- `ref add`, `ref import` and batch `ref.add` insert new entries using the
+  library's declared `sort-order` (including JabRef's save order). Existing
+  entries and their attached comments retain their exact source. In an unsorted
+  file, insertion follows the last entry sorting before or equal to the new
+  entry; absent or `original` order keeps appending.
+
 - Institution authors now use JabRef-style abbreviations in generated keys:
   inline abbreviations take precedence, otherwise capitalized words supply
   initials (or joined words for short names), with university, school and

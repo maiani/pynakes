@@ -322,6 +322,13 @@ options it reports no modification instead of claiming an update.
 See [Metadata Reference](metadata-reference.md#grouping) for the tree's node
 schema and native format.
 
+
+New entries from `ref add`, `ref import`, and batch `ref.add` follow the library's
+`sort-order` setting (or JabRef save order). Equal values retain insertion order.
+Existing entries are not reordered: in an unsorted file the new entry follows
+the last entry sorting before or equal to it. An absent or `original` sort order
+keeps append behavior. Set the existing `sort-order` to `original` to opt out.
+
 ## keys
 
 Generate, rename and repair citation keys, and report key patterns and

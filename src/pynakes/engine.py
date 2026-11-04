@@ -27,7 +27,6 @@ from pynakes._engine_helpers import (
     SourceSnapshot,
     SourceSpan,
     SpanEdit,
-    append_entry_text,
     apply_span_edits,
     block_removal_span,
     compute_change_plan,
@@ -39,6 +38,7 @@ from pynakes._engine_helpers import (
     snapshot_entries,
     snapshot_source_spans,
 )
+from pynakes._engine_insert import insert_added_entries
 from pynakes._engine_keys import BibliographyKeys
 from pynakes._engine_materials import BibliographyMaterials
 from pynakes._engine_ops import BibliographyOperations
@@ -489,16 +489,7 @@ class Bibliography(
         for comment in comment_insertions:
             text = insert_metadata_comment(text, comment, self.lib.line_ending)
 
-        for entry in self._appended_entries:
-            text = append_entry_text(
-                text,
-                write_bib(BibFile(entries=[entry], line_ending=self.lib.line_ending)).rstrip(
-                    "\r\n"
-                ),
-                self.lib.line_ending,
-                self.lib.metadata_blocks,
-            )
-        return text
+        return insert_added_entries(text, self.lib, self._appended_entries)
 
     def _changed_entry_count(self) -> int:
         count = 0
