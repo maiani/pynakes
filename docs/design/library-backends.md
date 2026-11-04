@@ -1,12 +1,10 @@
 # Library backends: accepted design
 
-Status: design accepted, 2026-11-04; implementation pending. The accepted scope
-is a common Library read interface, backend-specific capabilities and authority,
-and preservation of existing Bibliography contracts. Exact method signatures,
-persisted schemas and the optional client dependency remain implementation
-decisions. No backend abstraction or Zotero adapter is implemented by this
-document. Zotero compatibility still depends on the experiment below and may be
-dropped if it fails.
+Status: design accepted, 2026-11-04. The initial common read boundary, native
+wrapper and read-only Zotero backend with guarded project selection/refresh are
+implemented. See the [usage guide](../guides/zotero.md) for concrete signatures,
+limits and tested versions. This document retains the original investigation;
+its dated observations below are not the current implementation inventory.
 
 ## Decision
 
@@ -290,7 +288,11 @@ Evaluate the maintained [Pyzotero client](https://pyzotero.readthedocs.io/en/lat
 before writing a transport: it documents local reads and writes. Audit pagination,
 timeouts, retries, credential handling and source-version scope against our
 contract. Keep it optional and inside the adapter; its classes and exceptions
-must not become the engine's public data model. No dependency is selected yet.
+must not become the engine's public data model. The initial adapter uses the existing `httpx` dependency: the required surface
+is a small GET-only subset, with streaming byte limits, no redirects/retries, and
+explicit instance guards. Pyzotero was evaluated against its documented local
+API; wrapping its broader client would still require enforcing these boundaries.
+No Pyzotero dependency is added.
 
 **Proceed** only if supported public APIs meet the required behavior without
 weakening source fidelity, conflict detection or explicit I/O. Measure scan cost,
@@ -310,6 +312,7 @@ Current conclusion: a common read abstraction is supported by the code, document
 API and [initial Zotero 10.0.7 Linux checks](zotero-local-api-study.md). Bounded
 paging, local versions, stale-write rejection, partial batches, stored materials
 and restart persistence were exercised. Missing linked files require a filesystem
-availability check after URL resolution. A reusable adapter, complete conformance
-coverage and source-to-project refresh remain pending. Proceed with the bounded
-v0.10 integration; a large generic management framework is not justified.
+availability check after URL resolution. The initial read adapter and source-to-project refresh now have synthetic
+regression coverage and a live read/select trial. General mutation and broader
+version/platform support remain outside this slice. A large generic management
+framework is not justified.

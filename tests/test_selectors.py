@@ -19,6 +19,7 @@ runner = CliRunner()
 
 #: Modifying commands without the full selector, and why they cannot take one.
 NOT_ENTRY_SELECTABLE = {
+    "zotero select": "selects a source item; --key names its independent project key",
     "asset repair": "reconciles the manifest, never an entry",
     "batch": "each operation names its own entries",
     "split": "routes entries with its own --route predicates",

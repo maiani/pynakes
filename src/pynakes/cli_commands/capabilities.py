@@ -64,6 +64,7 @@ class CapabilitySection(StrEnum):
     SEARCH_QUERY_GRAMMAR = "search_query_grammar"
     WORK_MATCHING = "work_matching"
     WRITE_PRECONDITION = "write_precondition"
+    ZOTERO = "zotero"
 
 
 def _index(caps: dict) -> dict:

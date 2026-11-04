@@ -57,7 +57,9 @@ def insert_added_entries(text: str, lib: BibFile, added: list[BibEntry]) -> str:
     le = lib.line_ending
     for entry in lib.entries.values():
         if id(entry) in added_ids:
-            pending.append(write_bib(BibFile(entries=[entry], line_ending=le)).rstrip("\r\n"))
+            single = BibFile(entries=[entry], line_ending=le)
+            single._entry_comments = {id(entry): lib._entry_comments.get(id(entry), ())}
+            pending.append(write_bib(single).rstrip("\r\n"))
             continue
         anchor = next(anchors)
         if pending:

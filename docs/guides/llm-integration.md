@@ -191,6 +191,16 @@ read `change_summary()` or `diff()`, and write once with `commit()`. Its
 parent), but `capabilities` marks the API `experimental` (`--section
 python_api`), so prefer `batch` when either would do.
 
+## Zotero-backed Library
+
+The explicit `zotero` family reads a running local Zotero 10 personal Library.
+Use `scan` and its cursor for bounded discovery, `show` for a selected reference,
+and `select PROJECT.bib --item KEY --dry-run --diff --json` to review a project
+selection or refresh. Source writes and cloud fallback are unsupported.
+`select` uses the usual modification envelope; the read commands return
+source-scoped records rather than fabricated bibliography paths. See the
+[Zotero guide](zotero.md) for freshness, conversion and privacy limits.
+
 ## Choosing the right operation
 
 - Use `ref show <key>` to read one uniquely keyed reference, and

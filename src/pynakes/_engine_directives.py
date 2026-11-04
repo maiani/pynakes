@@ -36,6 +36,7 @@ class BibliographyDirectives:
         _removed_comments: set[int]
         _source_snapshot: SourceSnapshot
         _directive_insertions: list[tuple[BibEntry, str]]
+        _appended_entries: list[BibEntry]
 
     def entry_directives(self, key: str) -> list[EntryDirective]:
         """Return the directives attached above the unique entry ``key``."""
@@ -148,6 +149,10 @@ class BibliographyDirectives:
 
     def _insert_directive(self, entry: BibEntry, line: str) -> None:
         if self._source_snapshot.entries.get(id(entry)) is None:
+            if any(added is entry for added in self._appended_entries):
+                carried = self.lib._entry_comments.get(id(entry), ())
+                self.lib._entry_comments[id(entry)] = (*carried, line)
+                return
             raise RuntimeError("directives can only be added to a library read from its source")
         self._directive_insertions.append((entry, line))
 

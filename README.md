@@ -15,8 +15,10 @@ and CLI.
 
 Acquire and curate references, compare and enrich records, organize groups,
 track citations in manuscripts, and optionally manage PDFs and source bundles
-through **Pinax**, addressed by citation key. The `.bib` remains authoritative,
-and JabRef interoperability keeps existing libraries usable across tools.
+through **Pinax**, addressed by citation key. Native Libraries keep `.bib` files
+authoritative; an optional [Zotero backend](docs/guides/zotero.md) keeps Zotero
+authoritative and selects references into independent project bibliographies.
+JabRef interoperability keeps existing files usable across tools.
 
 > **Status:** the engine is **Beta**. Its CLI, JSON envelope, and error codes
 > follow the

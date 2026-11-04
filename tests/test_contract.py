@@ -12,6 +12,7 @@ import shutil
 from collections import defaultdict
 from pathlib import Path
 
+import httpx
 import pytest
 import typer.main
 from typer.testing import CliRunner
@@ -38,6 +39,12 @@ def _flags(command: str) -> set[str]:
 
 #: Every command's positional arguments: (name, required, variadic), in order.
 POSITIONALS: dict[str, tuple[tuple[str, bool, bool], ...]] = {
+    "zotero status": (),
+    "zotero scan": (),
+    "zotero show": (("item", True, False),),
+    "zotero collections": (),
+    "zotero materials": (("item", True, False),),
+    "zotero select": (("file", False, False),),
     "library add": (("manifest", True, False), ("key", True, False)),
     "analyze": (("file", False, False),),
     "asset check": (("files", True, True),),
@@ -184,6 +191,15 @@ def test_every_writing_command_previews() -> None:
 #: ``ref lookup`` and ``ref import`` need the network; offline they return an
 #: error envelope, which is checked like any other.
 SAMPLES: dict[str, tuple[str, list[str]]] = {
+    "zotero status": ("read", ["zotero", "status"]),
+    "zotero scan": ("read", ["zotero", "scan"]),
+    "zotero show": ("read", ["zotero", "show", "ABCDEFGH"]),
+    "zotero collections": ("read", ["zotero", "collections"]),
+    "zotero materials": ("read", ["zotero", "materials", "ABCDEFGH"]),
+    "zotero select": (
+        "modify",
+        ["zotero", "select", "{bib}", "--item", "ABCDEFGH", "--key", "Newton1687", "--dry-run"],
+    ),
     "library add": ("error", ["library", "add", "missing.library.toml", "Example1900"]),
     "analyze": ("read", ["analyze", "{bib}"]),
     "asset check": ("check", ["asset", "check", "{bib}"]),
@@ -332,7 +348,15 @@ FAMILY_KEYS = {
 }
 
 #: Read-only commands that read no library, so report no digest of one.
-NO_LIBRARY_READ = {"capabilities", "keys usage"}
+NO_LIBRARY_READ = {
+    "capabilities",
+    "keys usage",
+    "zotero status",
+    "zotero scan",
+    "zotero show",
+    "zotero collections",
+    "zotero materials",
+}
 
 
 def _library(tmp_path: Path) -> dict[str, str]:
@@ -372,7 +396,18 @@ def test_every_command_has_an_envelope_sample() -> None:
 
 
 @pytest.mark.parametrize("command", sorted(SAMPLES))
-def test_envelope_schema(command: str, tmp_path: Path) -> None:
+def test_envelope_schema(command: str, tmp_path: Path, monkeypatch) -> None:
+    if command.startswith("zotero "):
+        from pynakes.cli_commands import zotero as commands
+        from pynakes.zotero import ZoteroLibraryBackend
+        from tests.zotero_fixtures import LocalAPI
+
+        api = LocalAPI()
+        monkeypatch.setattr(
+            commands,
+            "ZoteroLibraryBackend",
+            lambda **kw: ZoteroLibraryBackend(transport=httpx.MockTransport(api), **kw),
+        )
     family, argv = SAMPLES[command]
     paths = _library(tmp_path)
 

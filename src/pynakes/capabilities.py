@@ -121,6 +121,7 @@ _NETWORK_ACCESS = {
         "ref import --fetch",
     ],
     "with_online": ["verify", "enrich", "ref compare", "ref from-pdf"],
+    "local_ipc_by_running": ["zotero"],
 }
 
 # The bounded-read contract shared by every multi-entry read.
@@ -339,6 +340,7 @@ COMMAND_GROUPS: dict[str, list[str]] = {
         "tex",
         "biblink",
         "library",
+        "zotero",
     ],
     "Materials (pinax)": ["asset"],
     "Create": ["init", "scrub", "combine", "split"],
@@ -398,6 +400,25 @@ def get_capabilities() -> dict:
         "start_here": _START_HERE,
         "settings": settings_catalogue(),
         "network_access_is_explicit": True,
+        "zotero": {
+            "transport": "Explicit loopback only; Zotero 10 API 3; no cloud fallback",
+            "source_writes": False,
+            "authorization_required": False,
+            "reads": [
+                "zotero status",
+                "zotero scan",
+                "zotero show",
+                "zotero collections",
+                "zotero materials",
+            ],
+            "project_selection": "zotero select: atomic bibliography and attached source baselines; three-way refresh",
+            "python_backends": [
+                "pynakes.library_backend.BibTeXLibraryBackend",
+                "pynakes.zotero.ZoteroLibraryBackend",
+            ],
+            "private_native_expansion": "zotero show --native",
+            "materials": "Metadata reads; explicit Python material_path resolution; no byte copying",
+        },
         "network_access": _NETWORK_ACCESS,
         "supports_dry_run": True,
         "supports_json_output": True,
@@ -583,6 +604,7 @@ def get_capabilities() -> dict:
             "query": "Save, list, and remove named selector queries, run with --where "
             "'query \"NAME\"' (list, set, remove)",
             "library": "Add references through manifest routing with Library-wide existing-work checks",
+            "zotero": "Read the local Zotero Library and select or refresh project references; no source writes",
             "biblink": "Declare a bibliography the child of another, in both files, and check "
             "that the link holds: keys, and under field-subset types and values "
             "(add, remove, list, check, sync)",

@@ -246,23 +246,22 @@ single-bibliography PDF importer are implemented on the development branch; see
 and [PDF import](docs/guides/pdf-import.md). The
 [backend design](docs/design/library-backends.md) is accepted and
 [initial live Zotero checks](docs/design/zotero-local-api-study.md) exercise public
-APIs; a production adapter and end-to-end native migration remain unimplemented.
+APIs. The bounded read-only backend and guarded project selection/refresh are
+implemented; see [Zotero integration](docs/guides/zotero.md) and the changelog.
+End-to-end native migration remains unimplemented.
 
 #### Order of work and release gates
 
-1. **Zotero-backed Library, first useful slice.** Wrap existing file reads behind
-   the common read boundary, then add an explicit local Zotero connection.
-   Preserve source-native records and instance-scoped identities/revisions;
-   provide bounded enumeration, record reads, collections and material discovery.
-   Test concurrent paging, disabled/unavailable access, unsupported versions and
-   missing files. No private database access or cloud fallback.
-2. **Selection into a project.** Use either backend to select supported records,
-   review conversion losses and stage a project `.bib` through `Bibliography`.
-   Keep project citation keys independent of source IDs. Persist source mapping
-   and accepted values so repeat selection is idempotent and refresh distinguishes
-   source changes from project edits. This bounded workflow moves forward from
-   v0.12; general project assembly and two-way synchronization remain later.
-   Zotero source reads do not require Pinax copies or write authorization.
+1. **Maintain the Zotero read/select gate.** Keep the synthetic transport and
+   project-refresh checks passing. Repeat live acceptance on newly supported
+   Zotero versions/platforms before widening support beyond Zotero 10/API 3.
+   Cover bounded enumeration, instance/revision changes, disabled access,
+   missing materials and three-way project refresh. See the guide for the
+   implemented scope and explicit unsupported capabilities.
+2. **Extend only from demonstrated needs.** Group libraries, richer citation
+   projections, cross-instance rebinding and a persistent connection registry
+   require their own reviewable contracts. Keep source writes, two-way sync and
+   general project assembly outside this first release gate.
 3. **Native PDF ingestion.** Complete the acquisition sequence below: evidence,
    metadata review, variant-aware adoption, guarded routing, a durable ledger and
    interruption recovery. Keep ambiguous/unidentified PDFs pending without
@@ -485,13 +484,13 @@ The [accepted Library backend design](docs/design/library-backends.md) defines
 a common read interface over our file-backed Library and an optional Zotero-backed
 Library. In the latter mode Zotero remains authoritative: users need not migrate
 their collection into `.bib` members or Pinax to select references for a project.
-The architecture is agreed; implementation, exact public signatures and persisted
-schemas remain pending. Existing file-based APIs keep their current behavior.
+The initial read protocol, native wrapper, Zotero adapter and project binding
+schema are implemented; see the [Zotero guide](docs/guides/zotero.md). Existing
+file-based APIs keep their current behavior.
 
-Start with a wrapper around existing reads, synthetic adapter fixtures and a
-disposable-profile compatibility experiment. This read-only implementation track
-is the first implementation priority within the two-goal v0.10 release. Keep
-placement, native edits and material writes as distinct capabilities, and preserve existing Bibliography contracts.
+Extend the synthetic adapter fixtures and live compatibility checks as support
+expands. Keep placement, native edits and material writes as distinct
+capabilities, and preserve existing Bibliography contracts.
 
 Zotero support is conditional. Test the exact client/API versions, completeness,
 unsynced edits, identity, concurrent paging and material access before claiming

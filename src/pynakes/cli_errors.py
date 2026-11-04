@@ -23,6 +23,7 @@ class ErrorCode(StrEnum):
     # --- errors (exit 1) ---
     USAGE_ERROR = "UsageError"
     INVALID_INPUT = "InvalidInput"
+    SOURCE_ERROR = "SourceError"
     FILE_NOT_FOUND = "FileNotFound"
     FILE_EXISTS = "FileExists"
     OUTPUT_IS_INPUT = "OutputIsInput"
@@ -45,6 +46,7 @@ class ErrorCode(StrEnum):
     ONLINE_LOOKUP_REQUIRED = "OnlineLookupRequired"
     PROVIDER_UNAVAILABLE = "ProviderUnavailable"
     # --- conflicts (exit 2) ---
+    SOURCE_CHANGED = "SourceChanged"
     EXTERNAL_MODIFICATION = "ExternalModification"
     PDF_IMPORT_CONFLICT = "PDFImportConflict"
     LIBRARY_ROUTING_CONFLICT = "LibraryRoutingConflict"
@@ -74,6 +76,12 @@ class ErrorSpec:
 _E = ErrorCode
 
 CATALOGUE: dict[ErrorCode, ErrorSpec] = {
+    _E.SOURCE_ERROR: ErrorSpec(
+        1, "A Library source is unavailable, missing, malformed or unsupported."
+    ),
+    _E.SOURCE_CHANGED: ErrorSpec(
+        2, "Source freshness or project/source edits require reconciliation."
+    ),
     _E.LIBRARY_ROUTING_CONFLICT: ErrorSpec(
         2, "A Library addition needs review of routing, existing works or citation keys."
     ),

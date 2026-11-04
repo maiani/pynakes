@@ -16,6 +16,7 @@ nav = [
   { "Import Providers" = "guides/import-providers.md" },
   { "PDF Import" = "guides/pdf-import.md" },
     { "Library routing" = "guides/library-routing.md" },
+    { "Zotero Library" = "guides/zotero.md" },
   { "Metadata Reference" = "guides/metadata-reference.md" },
   { "Public API" = "guides/public-api.md" },
   { "LLM Integration" = "guides/llm-integration.md" },

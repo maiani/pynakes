@@ -115,7 +115,7 @@ WRITES = {
 
 #: Modifying commands that accept the precondition but reach the network (or,
 #: offline, have nothing to write), so the table above cannot exercise them.
-NETWORK_WRITES = {"ref import", "asset fetch", "enrich"}
+NETWORK_WRITES = {"ref import", "asset fetch", "enrich", "zotero select"}
 
 
 def _library(tmp_path: Path) -> Path:

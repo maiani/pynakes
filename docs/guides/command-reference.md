@@ -237,7 +237,7 @@ Show what pynakes can do: a compact index, or the details asked for.
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--command` | list[string] | no | null | — | Return the full schema of this command, e.g. 'ref show' (repeatable) |
-| `--section` | list[choice] | no | null | settings, analysis, entry_fields, biblinks, field_encoding, selection_export, groups_separator, batch_operations, bounded_reads, capabilities, citation_grammar, command_groups, commands, deprecations, error_codes, formatting, material_collection, predicate_grammar, python_api, saved_queries, search_query_grammar, work_matching, write_precondition | Return this section of the description, e.g. predicate_grammar (repeatable) |
+| `--section` | list[choice] | no | null | settings, analysis, entry_fields, biblinks, field_encoding, selection_export, groups_separator, batch_operations, bounded_reads, capabilities, citation_grammar, command_groups, commands, deprecations, error_codes, formatting, material_collection, predicate_grammar, python_api, saved_queries, search_query_grammar, work_matching, write_precondition, zotero | Return this section of the description, e.g. predicate_grammar (repeatable) |
 | `--all` | boolean | no | false | — | Return the whole description (large: every command's schema) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
@@ -1478,4 +1478,107 @@ Verify entries against authoritative metadata (read-only).
 | `--concurrency, -j` | integer | no | 8 | — | Number of provider lookups to run at once during an --online pass (result ordering and applied updates are unaffected) |
 | `--strict` | boolean | no | false | — | Exit 1 when verification finds warnings or errors (for CI and pre-commit gating) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## zotero collections
+
+**Stability: stable**
+
+Read a bounded page of collection names and parent relationships.
+
+`pynakes zotero collections [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--port` | integer | no | 23119 | — |  |
+| `--limit` | integer | no | 50 | — |  |
+| `--cursor` | string | no | null | — |  |
+| `--json` | boolean | no | false | — |  |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## zotero materials
+
+**Stability: stable**
+
+List attachment metadata without resolving paths or fetching bytes.
+
+`pynakes zotero materials ITEM [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `ITEM` | string | yes | — | — |  |
+| `--port` | integer | no | 23119 | — |  |
+| `--limit` | integer | no | 50 | — |  |
+| `--cursor` | string | no | null | — |  |
+| `--json` | boolean | no | false | — |  |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## zotero scan
+
+**Stability: stable**
+
+Read one bounded source page; optional --where filters its citation projection.
+
+`pynakes zotero scan [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--port` | integer | no | 23119 | — |  |
+| `--limit` | integer | no | 50 | — |  |
+| `--cursor` | string | no | null | — |  |
+| `--where` | string | no | null | — |  |
+| `--json` | boolean | no | false | — |  |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## zotero select
+
+**Stability: stable**
+
+Stage or refresh one reference in a project; never write to Zotero.
+
+`pynakes zotero select [FILE] [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Existing project bibliography |
+| `--item` | string | yes | null | — | Source Zotero item key |
+| `--key` | string | no | null | — | Independent project citation key |
+| `--port` | integer | no | 23119 | — |  |
+| `--expect-revision` | string | no | null | — | Source revision digest from a reviewed preview |
+| `--dry-run` | boolean | no | false | — |  |
+| `--diff` | boolean | no | false | — |  |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
+| `--json` | boolean | no | false | — |  |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## zotero show
+
+**Stability: stable**
+
+Read a reference; private native fields are an explicit expansion.
+
+`pynakes zotero show ITEM [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `ITEM` | string | yes | — | — | Zotero item key |
+| `--port` | integer | no | 23119 | — |  |
+| `--native` | boolean | no | false | — | Include native metadata, including private fields |
+| `--json` | boolean | no | false | — |  |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## zotero status
+
+**Stability: stable**
+
+Describe the explicitly selected local Zotero source (no authorization).
+
+`pynakes zotero status [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--port` | integer | no | 23119 | — | Local Zotero port |
+| `--json` | boolean | no | false | — |  |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |

@@ -107,3 +107,11 @@ with usage examples, see the [API overview](index.md).
 ::: pynakes.search
 
 ::: pynakes.triage
+
+## Library backends and project selection
+
+::: pynakes.library_backend
+
+::: pynakes.zotero
+
+::: pynakes.project_selection

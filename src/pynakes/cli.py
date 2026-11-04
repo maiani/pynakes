@@ -48,6 +48,7 @@ from pynakes.cli_commands import (
     show,
     tex,
     tex_scan,
+    zotero,
 )
 from pynakes.cli_completion import _bibfile_completer, _metadata_key_completer
 from pynakes.cli_completion import _citekey_completer as _complete_fn
@@ -88,6 +89,7 @@ tex_app = typer.Typer(
 )
 asset_app = typer.Typer(help="Fetch and validate Pinax materials", cls=AutoBibGroup)
 query_app = typer.Typer(help="Save, list, and remove named selector queries", cls=AutoBibGroup)
+zotero_app = typer.Typer(help="Read local Zotero and select project references", cls=AutoBibGroup)
 library_app = typer.Typer(help="Route additions across Library members", cls=AutoBibGroup)
 biblink_app = typer.Typer(
     help="Declare and check bibliography links: a bibliography's parents and children",
@@ -169,6 +171,7 @@ query.register(query_app)
 # biblink: declared parent/child links between bibliographies
 biblink.register(biblink_app)
 library.register(library_app)
+zotero.register(zotero_app)
 
 setops.register(app)
 batch.register(app)
@@ -185,6 +188,7 @@ app.add_typer(asset_app, name="asset")
 app.add_typer(query_app, name="query")
 app.add_typer(biblink_app, name="biblink")
 app.add_typer(library_app, name="library")
+app.add_typer(zotero_app, name="zotero")
 
 # --- Group top-level --help by nature ---------------------------------------
 # The taxonomy lives once in capabilities.COMMAND_GROUPS (shared with the

@@ -40,6 +40,15 @@ The compatibility forms deprecated in 0.9 are removed in v0.10:
 
 ### Added
 
+- Read-only Zotero 10 local Library backend with bounded, revision-checked reads,
+  explicit native expansion, collection and attachment discovery, and local file
+  resolution. The `zotero` CLI selects references into independent project files
+  and refreshes them with persisted baselines and three-way conflict detection.
+  No cloud fallback, source writes or authorization dialog is required.
+- Source-neutral `LibraryBackend` read protocol and `BibTeXLibraryBackend` wrapper
+  preserve existing native Library APIs and duplicate-key occurrence identity.
+  Project selection commits attached provenance atomically with new entries.
+
 - Library manifests accept explicit routing rules and a fallback member. Higher
   priorities win; conflicting destinations at the highest priority require
   review. `Library.route`, `Library.stage_entry` and `library add` check existing

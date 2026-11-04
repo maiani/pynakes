@@ -27,6 +27,7 @@ from pynakes.dedupe import DedupeConflictError
 from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography, ExternalModificationError
 from pynakes.io import SaveResult, save_text
+from pynakes.library_backend import SourceChanged, SourceError
 from pynakes.model import BibFile
 from pynakes.query import And, InSet, Node, parse_query
 from pynakes.saved_queries import NoCitationSourcesError, compile_selector
@@ -500,6 +501,20 @@ def _safe(fn: Callable[_P, _R]) -> Callable[_P, _R]:
             _emit_error(json_output, "InvalidInput", str(exc))
         except NoCitationSourcesError as exc:
             _emit_error(json_output, "NoSources", str(exc))
+        except SourceChanged as exc:
+            _emit_conflict(
+                json_output,
+                "SourceChanged",
+                str(exc),
+                options=[
+                    {
+                        "id": "review",
+                        "description": "Re-read source and target; review the differences",
+                    }
+                ],
+            )
+        except SourceError as exc:
+            _emit_error(json_output, "SourceError", str(exc))
         except ValueError as exc:
             # By convention, operation modules raise ValueError to signal
             # invalid user-supplied data (bad field name, malformed key, etc.).
