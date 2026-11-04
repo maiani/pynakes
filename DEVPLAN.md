@@ -467,6 +467,53 @@ metadata and reports stay outside the software repository.
   review record. No claim of a complete archive import while pending items
   remain. Keep the source archive intact after the rehearsal.
 
+#### Next acquisition integration: optional Zotero bridge
+
+After the standalone migration gate passes, add explicit one-way acquisition
+from Zotero. Pynakes remains an independent Library engine: accepted member
+bibliographies, Pinax materials and persisted review records are authoritative.
+Zotero is an optional capture/source application, not a required backend or a
+thin client over those files. This adapter reuses the acquisition pipeline above
+and does not require the Catalogue or service layer.
+
+- Start with selected items from the supported
+  [Zotero local API](https://www.zotero.org/support/dev/web_api/v3/local_api).
+  Declare and test supported client/API versions; report unavailable clients or
+  disabled access explicitly. Keep source access read-only, with no direct
+  SQLite manipulation, cloud-sync requirement or background polling.
+- Map metadata into the existing staged review, identity checks and routing.
+  Preserve source library/item identity, instance context where applicable,
+  versions and the last accepted source values independently of citation keys.
+  Repeated imports recognize previously accepted items; source changes produce
+  reviewed proposals rather than overwriting local edits. Source deletion does
+  not delete a Library entry or its materials.
+- Treat Zotero collections as overlapping memberships, not automatic ownership
+  of member files. Preview tag/collection mappings; explicit Library rules still
+  choose one home. Report unsupported fields and item types without silently
+  claiming lossless conversion. Notes and other private content need explicit
+  selection and a documented destination.
+- Adopt selected attachments through the same guarded Pinax copy operation,
+  preserving originals and variants. Missing or unavailable files remain visible
+  in the review queue. Zotero stores its own annotations separately from PDF
+  bytes: preserve them through an explicit supported export or structured import,
+  or report them as not transferred. Copying the original PDF alone must not be
+  reported as complete annotation migration. See
+  [Zotero annotation storage](https://www.zotero.org/support/kb/annotations_in_database).
+- Keep optional Better BibTeX exports as source snapshots outside authoritative
+  member files. Its [automatic export](https://retorque.re/zotero-better-bibtex/exporting/auto/)
+  rewrites an export from Zotero; it is not a merge of edits made in both tools.
+- **Gate:** synthetic fixtures cover repeat import, changed source metadata plus
+  local edits, citation-key changes, overlapping collections, duplicate works,
+  missing attachments and annotations. Accepted items remain usable with Zotero
+  unavailable; unsupported or omitted content is accounted for. Validate API
+  compatibility separately against a disposable local Zotero library.
+
+Two-way synchronization is deferred and unscheduled. It needs a separate design
+for field ownership, synchronization baselines, conflicts, deletions and material
+or annotation changes. The first bridge never writes back to Zotero. Reusing its
+capture workflow does not commit pynakes to implementing a browser extension,
+reader, mobile application or hosted synchronization service.
+
 #### Subsequent Library material moves
 
 After ingestion is reliable, add a reviewed move between member bibliographies.
@@ -874,7 +921,8 @@ rejected on fit, not on merit — several are the reason people choose those too
 - **Browser extension with site translators** (Zotero's several thousand
   publisher scrapers). This is genuinely Zotero's strongest feature and it
   requires a browser runtime plus a scraper corpus maintained per publisher.
-  `ref import` covers the identifier- and URL-addressable path instead.
+  `ref import` covers the identifier- and URL-addressable path; the planned
+  optional Zotero bridge imports selected records captured through its ecosystem.
 - **Reading and annotation UI** (Zotero: PDF/EPUB reader, highlights, notes,
   read-aloud, reflowable view) and **mobile applications**. A different product
   category; nothing about them belongs in a bib-file engine.
