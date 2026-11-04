@@ -472,6 +472,10 @@ references, and retrieve passages tied to the exact material read.
   executable instructions; distinguish excerpts from external interpretations.
 - Extend the initial PDF import with managed Pinax ingestion and broader
   source-linked extraction, sharing the existing inspection evidence contract.
+  Define portable attachment addressing and relocation for Git-managed
+  Libraries; preserve original hashes, variants and annotations, and distinguish
+  a metadata-only clone from restored material storage. See
+  [Git workflows](docs/guides/git-workflows.md#keeping-a-personal-library-in-git).
   Add offline `ref from-text` with recognized fields and unresolved text;
   existing `ref lookup` remains the online lookup path.
 - Extend the provider registry as one acquisition workstream: NASA ADS bibcodes,

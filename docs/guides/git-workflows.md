@@ -5,6 +5,96 @@ formatter gates source code. Its read-only checks are deterministic, offline,
 and report through stable exit codes, so they drop straight into
 [pre-commit](https://pre-commit.com/) and CI.
 
+## Keeping a personal Library in Git
+
+A Library can be a private Git repository containing its manifest, member
+bibliographies and research notes. Git versions the authoritative files;
+`Library` reads them using the same API as an ordinary directory. No Git
+backend or database export is needed. A `Bibliography.commit()` saves staged
+file edits; it does **not** create a Git commit.
+
+A minimal layout is:
+
+```text
+research-library/
+  research.library.toml
+  references.bib
+  notes/
+  imports/
+```
+
+```toml
+pynakes-library = 1
+name = "Personal research library"
+members = ["references.bib"]
+```
+
+Relative membership paths survive a clone or move of this directory. A Library
+can later include more `.bib` files without changing the repository model.
+Avoid members outside the repository if the clone must contain every reference.
+The current Library API is Python-only; CLI writes still target individual
+bibliographies.
+
+### What belongs in history
+
+| Content | Treatment |
+| --- | --- |
+| Library manifest and member `.bib` files | Track: these define the collection and reference records. |
+| Authored notes and reviewed import reports | Track in the private repository when their history matters. |
+| Pinax provenance (`.pinax/manifest.json`) | Track deliberately if using Pinax; it can contain original sources and checksums that cannot be reconstructed from the PDF alone. |
+| Catalogue, provider caches and extracted search indexes | Keep outside history by default; a Catalogue is still planned, and derived data should be rebuildable. |
+| `.bib.bak`, `.bib.bak.N` and `.pinax/tmp/` | Ignore: local backups and in-flight writes. |
+| PDFs, annotations and other materials | Choose a storage/backup policy explicitly; tracking references does not preserve their linked bytes. |
+
+For example, an initial repository using separately stored materials can ignore:
+
+```gitignore
+/.cache/
+/.pynakes-cache/
+/catalogue/
+*.bib.bak
+*.bib.bak.*
+**/.pinax/tmp/
+```
+
+Add a material-directory exclusion only if its files are stored and backed up
+elsewhere. Do not ignore a whole Pinax directory inadvertently: decide whether
+to retain its provenance manifest separately from the material bytes. A
+recoverable download URL does not preserve local annotations or revised files.
+
+### Review and merge
+
+Preview engine operations, apply accepted changes, then review `git diff` and
+make a scoped Git commit. Keep routine field edits separate from whole-file
+formatting: the engine preserves untouched source, which keeps diffs small and
+reduces overlapping edits.
+
+Git's text merge does not understand work identity. A clean merge may still
+introduce duplicate keys, duplicate works or inconsistent identifiers. After
+merging, use the offline lint and duplicate checks below. Resolve Git conflicts
+before asking the engine to edit affected files; check `git diff --name-only
+--diff-filter=U` and `git diff --check`. Reopen held `Bibliography` and `Library`
+objects after switching branches or merging so they read the new bytes.
+
+Project bibliographies remain independently owned files. Exchange selected,
+reviewed records rather than publishing the personal Library's entire Git
+history. Git synchronization and Library-to-project reconciliation solve
+different problems; the latter remains planned.
+
+### Current attachment portability limit
+
+The initial [PDF importer](pdf-import.md) links original PDFs using absolute
+paths. A clone preserves those links as text but does not locate or restore the
+PDFs on another machine. Existing relative file links and relative Pinax roots
+can work when their directory layout is preserved, but PDF import does not yet
+offer managed ingestion or a portable attachment-path policy.
+
+The next integration work is to define that policy in the engine, including
+source hashes, variant/annotation preservation, relocation and missing-material
+diagnostics. Clients can then offer Git review and synchronization around the
+same files without making Git a requirement for reference management. No
+automatic Git commits, pulls, pushes or semantic merge driver are implemented.
+
 ## The gate primitive: `--strict`
 
 By default a check command always exits `0` — it *reports* and never fails a
