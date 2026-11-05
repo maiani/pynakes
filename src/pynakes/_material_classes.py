@@ -22,8 +22,8 @@ import re
 import zlib
 from collections.abc import Iterable
 
-from pynakes._fetch_attempts import is_preprint_host
 from pynakes._identifiers import is_arxiv_doi
+from pynakes._material_urls import is_preprint_host
 from pynakes.filestore import FileStore
 from pynakes.model import BibEntry
 

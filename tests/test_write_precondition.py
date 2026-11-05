@@ -16,7 +16,7 @@ from typer.testing import CliRunner
 
 from pynakes.capabilities import get_capabilities
 from pynakes.cli import app
-from pynakes.cli_errors import catalogue_description
+from pynakes.cli._errors import catalogue_description
 from pynakes.engine import Bibliography
 
 runner = CliRunner()

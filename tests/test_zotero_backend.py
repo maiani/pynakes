@@ -258,7 +258,7 @@ def test_invalid_connection_options(kwargs):
 
 def test_cli_reads_select_and_error_envelopes(local, tmp_path, monkeypatch):
     api, _ = local
-    from pynakes.cli_commands import zotero as commands
+    from pynakes.cli.commands import zotero as commands
 
     monkeypatch.setattr(
         commands,
@@ -297,7 +297,7 @@ def test_cli_reads_select_and_error_envelopes(local, tmp_path, monkeypatch):
 
 def test_cli_review_and_resolve_refresh(local, tmp_path, monkeypatch):
     from pynakes import Bibliography
-    from pynakes.cli_commands import zotero as commands
+    from pynakes.cli.commands import zotero as commands
     from pynakes.editing import set_entry_field
 
     api, _ = local
@@ -363,7 +363,7 @@ def test_cli_review_and_resolve_refresh(local, tmp_path, monkeypatch):
 
 
 def test_human_collection_paging(local, monkeypatch):
-    from pynakes.cli_commands import zotero as commands
+    from pynakes.cli.commands import zotero as commands
 
     api, _ = local
     monkeypatch.setattr(
@@ -407,7 +407,7 @@ def test_projection_reports_unsupported_roles_types_and_converts_markup(local):
 
 
 def test_cli_target_precondition_before_connecting(tmp_path, monkeypatch):
-    from pynakes.cli_commands import zotero as commands
+    from pynakes.cli.commands import zotero as commands
 
     def unexpected(**kwargs):
         raise AssertionError("No source request should be made")

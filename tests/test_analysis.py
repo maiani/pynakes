@@ -8,7 +8,7 @@ from typer.testing import CliRunner
 
 from pynakes.analysis import SECTIONS, analyze
 from pynakes.cli import app
-from pynakes.cli_choices import AnalysisSection
+from pynakes.cli._choices import AnalysisSection
 from pynakes.engine import Bibliography
 from pynakes.filestore import FileStore
 

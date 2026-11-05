@@ -3,7 +3,7 @@
 Any operation that walks every entry in a library once — online verify/enrich,
 a future lint or dedupe pass over a large file — can report progress with this
 single event shape rather than defining its own. Contrast with
-:mod:`pynakes.fetch_progress`, whose ``FetchProgressEvent`` also tracks
+:mod:`pynakes.fetch.progress`, whose ``FetchProgressEvent`` also tracks
 per-artifact byte counts and multiple event kinds; that richer shape stays
 specific to Pinax material fetching.
 """

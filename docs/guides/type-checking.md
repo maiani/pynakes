@@ -32,8 +32,8 @@ The remaining overrides cover a few kinds of code:
 
 | Modules | What remains |
 | --- | --- |
-| `cli.py`, `cli_surface.py`, `cli_discovery.py` | Click subclasses typed against the Click that Typer vendors, and monkey-patched Typer hooks. |
-| `cli_commands/` (`dedupe`, `import_ref`, `init`, `integrity`, `keys`, `remove`, `setops`) | `**details` envelopes passed to `_finish_mod`, which ty cannot match to its keyword parameters. |
+| `cli/_app.py`, `cli/_surface.py`, `cli/_discovery.py` | Click subclasses typed against the Click that Typer vendors, and monkey-patched Typer hooks. |
+| `cli/commands/` (`dedupe`, `import_ref`, `init`, `integrity`, `keys`, `remove`, `setops`) | `**details` envelopes passed to `_finish_mod`, which ty cannot match to its keyword parameters. |
 | `bibtex_writer.py` | The loosely typed source-layout segments the writer reassembles. |
 | `providers/_http.py` | The injectable `urlopen`-style opener, used as a context manager. |
 

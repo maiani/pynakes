@@ -11,7 +11,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from pynakes.cli_commands._rich_progress import RichFetchProgress
+from pynakes.cli.commands._rich_progress import RichFetchProgress
 from pynakes.fetch import (
     ArxivFetchError,
     ArxivSourceUnavailableError,
@@ -25,7 +25,7 @@ from pynakes.fetch import (
     fetch_published_pdf,
     openalex_oa_pdf_url,
 )
-from pynakes.fetch_progress import FetchProgressEvent
+from pynakes.fetch.progress import FetchProgressEvent
 from pynakes.filestore import FileStore
 
 
@@ -726,7 +726,7 @@ def _gzip_bytes(payload: bytes, *, name: bytes | None, extra: bytes = b"") -> by
 def test_dry_run_lines_say_what_would_happen_rather_than_skipped() -> None:
     # "Skipped X (would fetch)" makes two contradictory claims at once; over a
     # long queue it is unskimmable.
-    from pynakes.cli_commands._fetch_report import fetch_report_lines
+    from pynakes.cli.commands._fetch_report import fetch_report_lines
 
     report = {
         "fetched": [],
@@ -745,7 +745,7 @@ def test_dry_run_lines_say_what_would_happen_rather_than_skipped() -> None:
 
 
 def test_report_lines_group_entries_by_reason_and_coverage_counts_them() -> None:
-    from pynakes.cli_commands._fetch_report import fetch_report_lines
+    from pynakes.cli.commands._fetch_report import fetch_report_lines
 
     report = {
         "fetched": [],
@@ -790,7 +790,7 @@ def test_report_lines_group_entries_by_reason_and_coverage_counts_them() -> None
 def test_tar_source_over_the_size_limit_is_refused_before_extraction(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("pynakes._fetch_source.MAX_SOURCE_BYTES", 1024)
+    monkeypatch.setattr("pynakes.fetch._source.MAX_SOURCE_BYTES", 1024)
     target = tmp_path / "src"
 
     with pytest.raises(ArxivFetchError, match="unpacks to more than"):
@@ -802,7 +802,7 @@ def test_tar_source_over_the_size_limit_is_refused_before_extraction(
 def test_tar_source_with_too_many_members_is_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("pynakes._fetch_source.MAX_SOURCE_MEMBERS", 3)
+    monkeypatch.setattr("pynakes.fetch._source.MAX_SOURCE_MEMBERS", 3)
     files = {f"part{i}.tex": b"x" for i in range(5)}
 
     with pytest.raises(ArxivFetchError, match="members"):
@@ -812,7 +812,7 @@ def test_tar_source_with_too_many_members_is_refused(
 def test_single_file_source_over_the_size_limit_is_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("pynakes._fetch_source.MAX_SOURCE_BYTES", 1024)
+    monkeypatch.setattr("pynakes.fetch._source.MAX_SOURCE_BYTES", 1024)
     target = tmp_path / "src"
 
     with pytest.raises(ArxivFetchError, match="unpacks to more than"):
@@ -830,8 +830,8 @@ def test_truncated_single_file_source_is_an_arxiv_error(tmp_path: Path) -> None:
 
 def test_fetch_progress_tracks_the_entry_queue() -> None:
     # A long run of skipped entries used to show nothing until the end.
-    from pynakes.cli_commands._rich_progress import RichFetchProgress
-    from pynakes.fetch_progress import FetchProgressEvent
+    from pynakes.cli.commands._rich_progress import RichFetchProgress
+    from pynakes.fetch.progress import FetchProgressEvent
 
     progress = RichFetchProgress()
     progress(FetchProgressEvent(kind="entry", key="Euler1748", entry_index=1, entry_total=3))

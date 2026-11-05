@@ -642,8 +642,8 @@ def test_metadata_journal_table_resolves_from_the_bib_folder(
 ) -> None:
     from typer.testing import CliRunner
 
-    from pynakes._library_style import apply_library_style
     from pynakes.cli import app
+    from pynakes.engine._entry_style import apply_library_style
     from pynakes.model import BibEntry
 
     folder = tmp_path / "bibliography"

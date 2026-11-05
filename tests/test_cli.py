@@ -280,7 +280,7 @@ class TestFormatCommand:
 
 
 def test_verb_past_tense_handles_verbs_not_ending_in_e() -> None:
-    from pynakes.cli_common import RunParams, _verb
+    from pynakes.cli._common import RunParams, _verb
 
     params = RunParams(dry_run=False, diff=False, json_output=False, backup=False)
     # Trailing "e" takes "d"; otherwise "ed" is appended (the former "add" →

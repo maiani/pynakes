@@ -21,7 +21,7 @@ from pynakes.editing import remove_entry_field, set_entry_field, set_entry_type
 from pynakes.engine import Bibliography
 from pynakes.fields import check_field_value
 from pynakes.identity import compare_work_evidence, evidence_from_entry
-from pynakes.library_backend import (
+from pynakes.library.backends.base import (
     ItemRef,
     LibraryBackend,
     ReferenceView,

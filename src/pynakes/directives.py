@@ -30,7 +30,7 @@ import re
 from dataclasses import dataclass
 
 from pynakes._entry_comments import attached_comment_indices
-from pynakes._lint_issue import unknown_ignore_names
+from pynakes.lint._issue import unknown_ignore_names
 from pynakes.model import BibFile
 
 __all__ = [

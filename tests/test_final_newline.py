@@ -9,11 +9,11 @@ from pathlib import Path
 
 import pytest
 
-from pynakes._engine_helpers import append_entry_text
 from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.editing import set_entry_field
 from pynakes.engine import Bibliography
+from pynakes.engine._helpers import append_entry_text
 from pynakes.io import load_bib, save_bib
 from pynakes.model import BibEntry, BibFile
 

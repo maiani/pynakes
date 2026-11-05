@@ -10,9 +10,9 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from pynakes._cli_reference import render_command_reference
 from pynakes.capabilities import command_schemas
 from pynakes.cli import app
+from pynakes.cli._reference import render_command_reference
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCUMENTS = ["README.md", "docs/guides/quickstart.md", "docs/guides/usage.md"]

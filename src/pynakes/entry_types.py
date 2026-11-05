@@ -158,8 +158,8 @@ def entry_field_schema(
     ``other`` and ``known_type`` false. No bibliography data is modified.
     """
     from pynakes._entry_schema import optional_field_suggestions
-    from pynakes._lint_profile import profile_required_fields
-    from pynakes._lint_required import required_field_rules
+    from pynakes.lint._profile import profile_required_fields
+    from pynakes.lint._required import required_field_rules
     from pynakes.metadata import library_dialect
 
     resolved = (dialect or (library_dialect(lib) if lib is not None else "bibtex")).strip().lower()

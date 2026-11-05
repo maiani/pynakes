@@ -11,8 +11,8 @@ policy, not schema, and belongs on the JabRef side instead.
 
 from typing import Literal
 
-from pynakes._lint_issue import unknown_ignore_names
 from pynakes._text_utils import strip_meta_terminator
+from pynakes.lint._issue import unknown_ignore_names
 from pynakes.metadata.core import metadata_list, metadata_value
 from pynakes.model import BibFile
 

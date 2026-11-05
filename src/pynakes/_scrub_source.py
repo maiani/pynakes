@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Protocol, cast
 if TYPE_CHECKING:
     from pynakes.scrub import ScrubOptions, ScrubReport
 
-from pynakes._engine_source import SourceSpan, SpanEdit, _source_block_raw
+from pynakes.engine._source import SourceSpan, SpanEdit, _source_block_raw
 from pynakes.model import BibFile
 
 # Recognizable local paths only: ordinary bibliographic notes stay intact.

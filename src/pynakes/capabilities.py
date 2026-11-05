@@ -6,18 +6,18 @@ the tool rather than guessing. Update this when commands are added or removed.
 
 import pynakes
 from pynakes import __all__ as PUBLIC_API_EXPORTS
-from pynakes._capability_cli import _command_schema as _command_schema
-from pynakes._capability_cli import _stable_type as _stable_type
-from pynakes._capability_cli import command_schemas as command_schemas
 from pynakes._capability_settings import settings_catalogue
-from pynakes._cli_deprecations import DEPRECATIONS
 from pynakes.analysis import COAUTHOR_SCHEMA
 from pynakes.analysis import SECTIONS as ANALYSIS_SECTIONS
 from pynakes.biblinks import CONSTRAINTS as BIBLINK_CONSTRAINTS
 from pynakes.biblinks import DEFAULT_CONSTRAINT as BIBLINK_DEFAULT_CONSTRAINT
 from pynakes.biblinks import FLOWS as BIBLINK_FLOWS
 from pynakes.biblinks import LOCAL_FIELDS as BIBLINK_LOCAL_FIELDS
-from pynakes.cli_errors import catalogue_description
+from pynakes.cli._deprecations import DEPRECATIONS
+from pynakes.cli._errors import catalogue_description
+from pynakes.cli._schema import _command_schema as _command_schema
+from pynakes.cli._schema import _stable_type as _stable_type
+from pynakes.cli._schema import command_schemas as command_schemas
 from pynakes.entry_reader import INCLUDE_PARTS
 from pynakes.metadata.schema import SAVED_QUERY_PREFIX
 from pynakes.normalize import ENCODING_FIELDS
@@ -310,7 +310,7 @@ _ANALYSIS = {
 
 
 # Single source of truth for how commands are grouped by nature, shared by the
-# CLI ``--help`` panels (``cli.py`` reads this for ``rich_help_panel``) and the
+# CLI ``--help`` panels (``cli._app`` reads this for ``rich_help_panel``) and the
 # ``command_groups`` field of the capability description. Ordered: panels render
 # in this order, and the commands within each panel in this order. Every
 # top-level command/group must appear in exactly one panel — guarded by tests.

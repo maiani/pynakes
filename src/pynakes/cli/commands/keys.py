@@ -1,0 +1,538 @@
+"""CLI command registration for pynakes.
+
+This module keeps command callbacks separate from application assembly while
+retaining the stable CLI contract.
+"""
+
+from pathlib import Path
+
+import typer
+
+from pynakes import _tex_rewrite
+from pynakes import keys as keys_ops
+from pynakes.cli._common import (
+    _BACKUP_OPTION,
+    _EXPECT_SHA256_OPTION,
+    RunParams,
+    _check_expected_sha256,
+    _emit,
+    _emit_conflict,
+    _emit_error,
+    _entries,
+    _finish_mod,
+    _resolve_input_bib,
+    _safe,
+    _source_sha256,
+    _verb,
+    bib_file_argument,
+    key_option,
+    select_keys,
+    where_option,
+)
+from pynakes.cli.commands._duplicates import duplicate_candidates
+from pynakes.diff import generate_diff
+from pynakes.engine import Bibliography, ExternalModificationError
+from pynakes.usage import (
+    extract_keys_from_tex,
+    find_key_usages,
+    iter_tex_files,
+    resolve_existing_tex_sources,
+    tex_sources_from_metadata,
+)
+
+# --- keys ------------------------------------------------------------------
+
+
+def _params(
+    dry_run: bool, diff: bool, json_output: bool, backup: bool, expect_sha256: str | None
+) -> RunParams:
+    return RunParams(
+        dry_run=dry_run,
+        diff=diff,
+        json_output=json_output,
+        backup=backup,
+        expect_sha256=expect_sha256,
+    )
+
+
+def _material_move_lines(materials: list[dict], params: RunParams) -> list[str]:
+    """Render the same material plan for generate, repair and rename."""
+    return [
+        f"  {_verb('move', params)} {item['source_path']} -> {item['target_path']}"
+        for item in materials
+    ]
+
+
+def _rename_payload(renames: list[tuple[str, str]]) -> dict:
+    return {"renames": [{"old": o, "new": n} for o, n in renames]}
+
+
+def _no_tex_sources(json_output: bool) -> None:
+    _emit_error(
+        json_output,
+        "NoSources",
+        "No .tex files found in the provided sources or the library's 'tex-sources' metadata",
+    )
+
+
+def _rewrite_tex_sources(
+    file: str,
+    coll: Bibliography,
+    params: RunParams,
+    renames: list[tuple[str, str]],
+    json_output: bool,
+    sources: list[str] | None = None,
+) -> tuple[list[dict], list[str], int, list[dict]]:
+    """Stage linked TeX citation rewrites for already-staged citation-key renames.
+
+    With no TeX sources configured (no argument and no ``tex-sources`` metadata)
+    there is simply nothing to update, so this returns a zero-update success —
+    a fresh library with no manuscript linked is a normal case, not an error.
+    Explicitly-provided sources that resolve to no ``.tex`` files remain an error.
+
+    Returns ``(source_changes, source_diff_parts, total_source_occurrences, warnings)``.
+    """
+    if not renames:
+        return [], [], 0, []
+
+    resolved_sources = (
+        list(sources) if sources else tex_sources_from_metadata(coll.lib, Path(file).parent)
+    )
+    if not resolved_sources:
+        return [], [], 0, []
+
+    warnings: list[dict] = []
+    if not sources:
+        resolved_sources, warnings = resolve_existing_tex_sources(resolved_sources)
+
+    tex_files = iter_tex_files(resolved_sources)
+    if not tex_files:
+        _no_tex_sources(json_output)
+    if not sources:
+        _tex_rewrite.require_inside_project(tex_files, Path(file))
+
+    if not params.dry_run and coll.externally_changed():
+        if coll.path is None:
+            raise ValueError("key operation requires a bound .bib file")
+        raise ExternalModificationError(coll.path)
+
+    rewrites = [_tex_rewrite.plan_tex_rewrite(path, renames) for path in tex_files]
+    source_changes = []
+    source_diff_parts = []
+    for rewrite in rewrites:
+        if rewrite.modified:
+            source_diff_parts.append(
+                generate_diff(rewrite.before, rewrite.after, rewrite.path.name)
+            )
+        source_changes.append(
+            {
+                "path": str(rewrite.path),
+                "modified": rewrite.modified,
+                "occurrences": rewrite.occurrences,
+            }
+        )
+    # Written by the commit, after the .bib, so a failure cannot split them.
+    coll.stage_tex_rewrites(rewrites)
+    total_source_occurrences = sum(rewrite.occurrences for rewrite in rewrites)
+    return source_changes, source_diff_parts, total_source_occurrences, warnings
+
+
+def keys_generate(
+    file: str | None = bib_file_argument(),
+    key: str | None = typer.Argument(None, help="Citation key to regenerate"),
+    all_entries: bool = typer.Option(
+        False,
+        "--all",
+        help="Regenerate every citation key instead of one selected key",
+    ),
+    where: str | None = where_option(),
+    key_selector: list[str] | None = key_option(),
+    backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Derive citation keys from entry metadata and update linked TeX citations.
+
+    Name one key, select several with `--key` / `--where`, or pass `--all`.
+    """
+    selecting = where is not None or bool(key_selector)
+    if sum((all_entries, key is not None, selecting)) != 1:
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            "Provide one citation key, select entries with --key/--where, "
+            "or pass --all to regenerate every key",
+        )
+    file = _resolve_input_bib(file, json_output)
+    params = _params(dry_run, diff, json_output, backup, expect_sha256)
+    coll = Bibliography.open(file)
+    duplicated: list[str] = []
+    selection_warnings: list[dict] = []
+    selected = select_keys(
+        coll, where, key_selector, json_output, "keys_generate", warnings=selection_warnings
+    )
+    if selected is not None:
+        renames, duplicated = coll.generate_selected_keys(selected)
+    elif key is None:
+        renames = coll.generate_keys()
+    else:
+        rename = coll.generate_key(key)
+        renames = [rename] if rename is not None else []
+    if key is None:
+        human = [f"{_verb('rename', params)} {len(renames)} {_entries(len(renames))}."]
+    elif renames:
+        human = [
+            f"{_verb('normalize', params)} citation key {renames[0][0]!r} to {renames[0][1]!r}."
+        ]
+    else:
+        human = [f"Citation key {key!r} already matches the preferred pattern."]
+    pinax_materials = coll.planned_pinax_renames()
+    human += [f"  {old} -> {new}" for old, new in renames]
+    human += _material_move_lines(pinax_materials, params)
+    source_changes, source_diff_parts, total_source_occurrences, source_warnings = (
+        _rewrite_tex_sources(
+            file,
+            coll,
+            params,
+            renames,
+            json_output,
+        )
+    )
+    source_warnings = [
+        *(
+            {"type": "duplicate_key", "key": name, "message": f"Left duplicated key {name!r}"}
+            for name in duplicated
+        ),
+        *(
+            [{"type": "no_entries_selected", "message": "No entry matched the selection"}]
+            if selected == []
+            else []
+        ),
+        *source_warnings,
+    ]
+    for w in source_warnings:
+        human.append(f"  {w['message']}")
+    if source_changes:
+        human.append(f"  TeX citations changed={total_source_occurrences}")
+    if params.diff:
+        bib_diff = coll.diff()
+        diff_text = "\n".join(part for part in [bib_diff, *source_diff_parts] if part)
+    else:
+        diff_text = None
+    _finish_mod(
+        file,
+        "keys_generate",
+        coll,
+        params,
+        human,
+        diff_text=diff_text,
+        warnings=[*selection_warnings, *source_warnings],
+        **({"key": key} if key is not None else {}),
+        source_occurrences=total_source_occurrences,
+        sources=source_changes,
+        pinax_materials=pinax_materials,
+        **_rename_payload(renames),
+    )
+
+
+def keys_repair(
+    file: str | None = bib_file_argument(),
+    backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Rename duplicate citation keys so every key is unique."""
+    params = _params(dry_run, diff, json_output, backup, expect_sha256)
+    file = _resolve_input_bib(file, json_output)
+    coll = Bibliography.open(file)
+    renames = coll.repair_keys()
+    human = [f"{_verb('repair', params)} {len(renames)} duplicate key(s)."]
+    pinax_materials = coll.planned_pinax_renames()
+    human += [f"  {old} -> {new}" for old, new in renames]
+    human += _material_move_lines(pinax_materials, params)
+
+    # A repaired key still exists on the first (kept) entry, so a TeX
+    # `\cite{key}` is now ambiguous rather than simply renamed — rewriting it
+    # would be a guess. Instead, warn when a linked source cites a repaired key.
+    warnings = _repaired_citation_warnings(coll.lib, file, renames)
+    for w in warnings:
+        if w["type"] == "missing_tex_source":
+            human.append(f"  {w['message']}")
+    ambiguous = [w for w in warnings if w["type"] == "ambiguous_citation"]
+    if ambiguous:
+        human.append(f"  {len(ambiguous)} citation(s) now ambiguous in linked TeX sources.")
+
+    _finish_mod(
+        file,
+        "keys_repair",
+        coll,
+        params,
+        human,
+        warnings=warnings,
+        pinax_materials=pinax_materials,
+        **_rename_payload(renames),
+    )
+
+
+def _repaired_citation_warnings(lib, file: str, renames: list[tuple[str, str]]) -> list[dict]:
+    """Flag linked-TeX citations of keys that ``keys repair`` made ambiguous."""
+    if not renames:
+        return []
+    sources = tex_sources_from_metadata(lib, Path(file).parent)
+    if not sources:
+        return []
+    repaired = {old for old, _ in renames}
+    sources, warnings = resolve_existing_tex_sources(sources)
+    for path in iter_tex_files(sources):
+        try:
+            cited = set(extract_keys_from_tex(path.read_text(encoding="utf-8", errors="replace")))
+        except OSError:
+            continue
+        for key in sorted(repaired & cited):
+            warnings.append(
+                {
+                    "type": "ambiguous_citation",
+                    "message": (
+                        f"{path.name} cites {key!r}, which was duplicated and repaired; "
+                        "review the citation and point it at the intended entry"
+                    ),
+                    "key": key,
+                    "source": str(path),
+                }
+            )
+    return warnings
+
+
+def keys_rename(
+    file: str | None = bib_file_argument(),
+    old: str = typer.Argument(..., help="Existing citation key"),
+    new: str = typer.Argument(..., help="New citation key"),
+    sources: list[str] | None = typer.Argument(
+        None,
+        help="One or more .tex files or directories whose citations should be updated "
+        "(defaults to the bibliography's 'tex-sources' metadata)",
+    ),
+    backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Rename one citation key to an explicit value and update TeX citations.
+
+    For many edits at once, use `pynakes batch`: one preview, one atomic write.
+    """
+    file = _resolve_input_bib(file, json_output)
+    params = _params(dry_run, diff, json_output, backup, expect_sha256)
+    coll = Bibliography.open(file)
+    _check_expected_sha256(file, coll, params)
+    keys_ops.validate_key(old)
+    keys_ops.validate_key(new)
+
+    matches = coll.lib.entries.get_all(old)
+    if not matches:
+        _emit_error(json_output, "KeyNotFound", f"No entry with key {old!r} in the bibliography")
+        return
+    if len(matches) > 1:
+        _emit_conflict(
+            json_output,
+            "DuplicateCitationKey",
+            f"Cannot rename duplicated key {old!r}; repair duplicates first",
+            key=old,
+            count=len(matches),
+            candidates=duplicate_candidates(coll.lib, old),
+            options=[
+                {
+                    "id": "repair_duplicates",
+                    "description": "Run keys repair first, then retry with the unique key",
+                }
+            ],
+        )
+        return
+    if old != new and new in coll.lib.entries:
+        _emit_conflict(
+            json_output,
+            "CitationKeyConflict",
+            f"Cannot rename {old!r} to {new!r}: target key already exists",
+            key=new,
+            options=[
+                {"id": "choose_key", "description": "Retry with a different new key"},
+                {
+                    "id": "repair_duplicates",
+                    "description": "Run keys repair if the target is duplicated",
+                },
+            ],
+        )
+        return
+
+    coll.rename_key(old, new)
+    # Counts the renamed entry and every entry whose crossref/xdata followed it.
+    bib_changed = coll.changed_entries_count()
+    # The material files that move with the key, which no diff of the .bib
+    # shows. Planned before any TeX is staged, so a move that the commit would
+    # refuse (its target exists) stops a dry run just as it stops the write.
+    pinax_materials = coll.planned_pinax_renames()
+    source_changes, source_diff_parts, total_source_occurrences, source_warnings = (
+        _rewrite_tex_sources(
+            file,
+            coll,
+            params,
+            [(old, new)],
+            json_output,
+            list(sources) if sources else None,
+        )
+    )
+
+    human = [
+        f"{_verb('rename', params)} citation key {old!r} to {new!r}.",
+        f"  bib entries changed={bib_changed}, TeX citations changed={total_source_occurrences}",
+    ]
+    human += _material_move_lines(pinax_materials, params)
+
+    # A rename with no TeX sources configured succeeds (a fresh library has no
+    # manuscript yet); warn so the caller knows no \cite keys were rewritten.
+    warnings: list[dict] = source_warnings
+    for w in source_warnings:
+        human.append(f"  {w['message']}")
+    if bib_changed and not source_changes:
+        warnings.append(
+            {
+                "type": "no_tex_sources",
+                "message": (
+                    "Renamed the citation key but updated no manuscript citations: no "
+                    "TeX sources are configured. Pass a .tex file/dir or set 'tex-sources' "
+                    "metadata to rewrite \\cite keys."
+                ),
+            }
+        )
+        human.append(f"  {warnings[0]['message']}")
+
+    if params.diff:
+        bib_diff = coll.diff()
+        diff_text = "\n".join(part for part in [bib_diff, *source_diff_parts] if part)
+    else:
+        diff_text = None
+
+    _finish_mod(
+        file,
+        "keys_rename",
+        coll,
+        params,
+        human,
+        diff_text=diff_text,
+        warnings=warnings,
+        old=old,
+        new=new,
+        source_occurrences=total_source_occurrences,
+        sources=source_changes,
+        pinax_materials=pinax_materials,
+    )
+
+
+def keys_usage(
+    key: str = typer.Argument(..., help="Citation key to search for"),
+    sources: list[str] = typer.Argument(..., help="One or more .tex files or directories to scan"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Scan TeX sources directly for \\cite-family citations of one key.
+
+    Unlike `tex scan`, this takes no .bib file and never consults
+    'tex-sources' metadata: it scans exactly the given directories or files,
+    so a rename's blast radius can be checked over sources that were never
+    registered with `tex add` — frozen snapshots, generated diffs, or any
+    other .tex the bibliography does not track.
+    """
+    keys_ops.validate_key(key)
+    matches, scanned = find_key_usages(key, sources)
+
+    human = [f"Scanned {len(scanned)} .tex file(s) for citations of {key!r}."]
+    if matches:
+        for m in matches:
+            human.append(f"  {m.path}:{m.line}: {m.text}")
+    else:
+        human.append("  No citations found.")
+
+    result = {
+        "status": "success",
+        "action": "keys_usage",
+        "warnings": [],
+        "key": key,
+        "sources": list(sources),
+        "scanned": scanned,
+        "count": len(matches),
+        "matches": [m.to_dict() for m in matches],
+    }
+    _emit(json_output, result, human)
+
+
+def keys_pattern(
+    file: str | None = bib_file_argument(),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Show the stored citation-key pattern and the one existing keys follow.
+
+    Read-only. `configured` is the bibliography's stored `key-pattern` (null when
+    none is stored, and generated keys then look like `Newton1687Philosophiae`).
+    `inferred` is the common pattern most existing keys match, or null when no
+    candidate matches more than half of them. Adopt it with
+    `metadata set FILE key-pattern PATTERN`, so new keys follow the bibliography.
+    """
+    from pynakes.metadata import library_key_pattern
+
+    file = _resolve_input_bib(file, json_output)
+    coll = Bibliography.open(file)
+    lib = coll.lib
+    configured = library_key_pattern(lib, "")
+    inference = keys_ops.infer_key_pattern(lib)
+    suggestion = (
+        f"pynakes metadata set {file} key-pattern '{inference.pattern}'"
+        if configured is None and inference.pattern
+        else None
+    )
+    if configured is None:
+        human = [f"{file}: no key-pattern stored; generated keys use pynakes' default style."]
+    else:
+        human = [f"{file}: key-pattern is {configured}."]
+    if inference.pattern:
+        human.append(
+            f"  Existing keys follow {inference.pattern} "
+            f"({inference.matched} of {inference.checked} entries)."
+        )
+    elif inference.candidates:
+        best, matched = inference.candidates[0]
+        human.append(
+            f"  No common pattern matches most existing keys "
+            f"(closest: {best}, {matched} of {inference.checked} entries)."
+        )
+    if inference.skipped:
+        count = len(inference.skipped)
+        human.append(
+            f"  Not counted: {count} {_entries(count)} with no author, editor or title "
+            f"to build a key from ({', '.join(inference.skipped)})."
+        )
+    if suggestion:
+        human.append(f"  To adopt it: {suggestion}")
+    result = {
+        "status": "success",
+        "action": "keys_pattern",
+        "warnings": [],
+        "file": file,
+        "source_sha256": _source_sha256(coll),
+        "configured": configured,
+        "inferred": inference.to_dict(),
+        "suggestion": suggestion,
+    }
+    _emit(json_output, result, human)
+
+
+def register(app: typer.Typer) -> None:
+    """Register this command family on its Typer application."""
+    app.command("generate")(_safe(keys_generate))
+    app.command("pattern")(_safe(keys_pattern))
+    app.command("repair")(_safe(keys_repair))
+    app.command("rename")(_safe(keys_rename))
+    app.command("usage")(_safe(keys_usage))

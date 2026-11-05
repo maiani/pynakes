@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 
-import pynakes
+from pynakes._version import package_version
 from pynakes.provider_cache import open_cache
 from pynakes.providers._network import DEFAULT_DEADLINE, MAX_METADATA_BYTES, validate_url
 
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 def user_agent() -> str:
     """Return the User-Agent every provider request sends."""
-    return f"pynakes/{pynakes.__version__} (+https://github.com/maiani/pynakes)"
+    return f"pynakes/{package_version()} (+https://github.com/maiani/pynakes)"
 
 
 DownloadProgress = Callable[[int, int | None], None]

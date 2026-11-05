@@ -7,7 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from pynakes.cli import app
-from pynakes.cli_common import is_auxiliary_bib_file
+from pynakes.cli._common import is_auxiliary_bib_file
 
 runner = CliRunner()
 

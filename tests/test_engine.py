@@ -5,11 +5,11 @@ from pathlib import Path
 import pytest
 
 from pynakes import metadata as metadata_ops
-from pynakes._engine_helpers import SourceSnapshot, SourceSpan
 from pynakes.bibtex_parser import parse_bib
 from pynakes.bibtex_writer import write_bib
 from pynakes.editing import set_entry_field
 from pynakes.engine import Bibliography, ExternalModificationError
+from pynakes.engine._helpers import SourceSnapshot, SourceSpan
 from pynakes.normalize import NormalizeOptions
 
 FIXTURES = Path(__file__).parent / "fixtures"

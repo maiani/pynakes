@@ -138,47 +138,47 @@ invalid-argument-type = "ignore"
 unresolved-attribute = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/pynakes/cli.py"]
+include = ["src/pynakes/cli/_app.py"]
 [tool.ty.overrides.rules]
 invalid-assignment = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/pynakes/cli_commands/dedupe.py"]
+include = ["src/pynakes/cli/commands/dedupe.py"]
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/pynakes/cli_commands/import_ref.py"]
+include = ["src/pynakes/cli/commands/import_ref.py"]
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/pynakes/cli_commands/init.py"]
+include = ["src/pynakes/cli/commands/init.py"]
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/pynakes/cli_commands/integrity.py"]
+include = ["src/pynakes/cli/commands/integrity.py"]
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/pynakes/cli_commands/keys.py"]
+include = ["src/pynakes/cli/commands/keys.py"]
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/pynakes/cli_commands/remove.py"]
+include = ["src/pynakes/cli/commands/remove.py"]
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/pynakes/cli_commands/setops.py"]
+include = ["src/pynakes/cli/commands/setops.py"]
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/pynakes/cli_discovery.py"]
+include = ["src/pynakes/cli/_discovery.py"]
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
 invalid-assignment = "ignore"
@@ -187,7 +187,7 @@ invalid-method-override = "ignore"
 unresolved-attribute = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/pynakes/cli_surface.py"]
+include = ["src/pynakes/cli/_surface.py"]
 [tool.ty.overrides.rules]
 invalid-assignment = "ignore"
 

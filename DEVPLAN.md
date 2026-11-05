@@ -115,7 +115,7 @@ changes documented but not deprecated — until 1.0 pins it.
   live command tree; tests read option choices from `capabilities --json`,
   never from rendered `--help`.
 - The ty baseline (`[[tool.ty.overrides]]` in `pyproject.toml`) only shrinks.
-  No module exceeds 800 lines; `fetch.py`, `normalize.py` and `lint.py` are
+  No module exceeds 800 lines; `fetch/__init__.py`, `normalize.py` and `lint/_checks.py` are
   near it and must be split before substantial additions.
 - Actions are referenced by major version tag, not commit SHA. The release
   workflow's TestPyPI option needs a `testpypi` environment and a trusted

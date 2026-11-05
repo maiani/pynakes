@@ -115,7 +115,7 @@ def test_insights_match_individual_reads_and_open_once(tmp_path, monkeypatch):
 
 
 def test_insights_failure_keeps_inspection(tmp_path, monkeypatch):
-    from pynakes.cli_commands import _inspect_insights
+    from pynakes.cli.commands import _inspect_insights
 
     path = tmp_path / "library.bib"
     path.write_text("@book{Newton1687,title={Principia}}")

@@ -123,7 +123,7 @@ def test_an_unexpected_failure_is_reported_as_internal_error(
     def broken(*_args, **_kwargs):
         raise KeyError("boom")
 
-    monkeypatch.setattr("pynakes.cli_commands.inspect.Bibliography.open", broken)
+    monkeypatch.setattr("pynakes.cli.commands.inspect.Bibliography.open", broken)
 
     result = runner.invoke(app, ["inspect", str(bib), "--json"])
 

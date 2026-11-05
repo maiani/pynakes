@@ -182,8 +182,10 @@ common read interface over backend-owned collections, initially wrapping these
 file-based reads. An optional Zotero backend must pass its compatibility gate.
 The selected backend remains authoritative; views and indexes are derived.
 Placement, edits and material writes are backend-specific capabilities.
-This abstraction is not implemented yet, and `Bibliography` retains its existing
-file lifecycle and source-fidelity contract.
+The common read protocol and native/Zotero adapters are implemented in
+`library/backends/`; `Bibliography` retains its existing file lifecycle and
+source-fidelity contract. See the [Zotero guide](zotero.md) for supported reads
+and guarded project selection.
 
 The v0.10 development API implements membership, direct reads, key lookup and
 cross-file search and routed additions in `pynakes.library`. Reports retain source locations,
@@ -241,7 +243,7 @@ A library is distinct from neighbouring concepts:
 CLI / external callers
           |
           v
-Bibliography lifecycle facade (engine.py)
+Bibliography lifecycle facade (engine/)
           |
           v
 Domain operations (groups, keys, fields, dedupe, integrity, ...)
@@ -259,6 +261,50 @@ depend on the model and editing helpers, not on CLI behavior. Bibliography
 delegates to those modules rather than duplicating transformation rules — which
 is also the proof the boundary is correct: a downstream consumer can drive the
 same `open → op → diff/commit` flow the CLI does.
+
+### Package boundaries
+
+`engine/`, `analysis/`, `lint/`, `filestore/`, `fetch/` and `library/` group each domain's
+implementation with its private helpers. Existing imports such as
+`from pynakes.engine import Bibliography` and `from pynakes.analysis import analyze`
+remain supported. Small foundational modules (`model`, `editing`, `identity`,
+parser/writer and I/O) stay directly under `pynakes`.
+
+`library/backends/base.py` owns source-neutral records, the read protocol,
+pagination and query filtering. `bibtex.py` adapts the native Library;
+`zotero.py` implements explicit local API reads, with citation conversion in
+`_zotero_projection.py`. The contracts do not import either adapter. The root
+`library_backend.py` and `zotero.py` modules retain compatibility exports.
+`project_selection.py` remains separate: it coordinates a backend read and an
+independently owned bibliography transaction.
+
+`lint/__init__.py` loads the validation engine on first public API access.
+This lets metadata schemas, directives and key operations use the lightweight
+finding definitions without a parser/metadata/lint import cycle. Within the
+engine, `_entry_style.py` applies a destination bibliography's settings to an
+inserted entry; it is not multi-file Library policy.
+
+`cli/` owns the application assembly, shared envelopes/errors, argument discovery,
+completion and command-schema introspection. Callbacks live in `cli/commands/`.
+The `pynakes.cli:app` entry point remains supported; importing infrastructure such
+as `cli._errors` does not construct the app or register command callbacks.
+`capabilities` consumes CLI introspection deliberately; domain operation packages
+never import the CLI.
+
+`fetch/` owns material acquisition, candidate discovery, request diagnostics,
+archive extraction and progress events. Pinax remains filesystem-only:
+`_material_urls.py` contains the offline host classification and URL-redaction
+rules shared by fetch and stored provenance. Storage no longer imports download
+helpers for those rules. Provider transport reads `_version.package_version()`
+instead of importing the public package facade; the same lazy, cached lookup
+backs `pynakes.__version__`.
+
+`tests/test_import_boundaries.py` checks the installed package or checkout for
+cycles in declared eager imports, domain-to-CLI dependencies, and upward
+storage/backend-contract dependencies. Function-local and dynamic imports are
+outside that static audit; fresh-process import tests and workflow tests cover
+actual initialization. These checks establish concrete boundaries without
+claiming that every runtime dependency is statically known.
 
 ## Parsing, preservation, and writing
 
@@ -331,7 +377,7 @@ summary and a separate `coauthors` command for full networks, ego views and
 exports. The latter name identifies the relationship being inspected without
 implying general author editing or unrelated graph types.
 
-Both reports use `_analysis_people.py` for author interpretation: normalized
+Both reports use `analysis/_people.py` for author interpretation: normalized
 `Last, First`, compared brace-, space- and case-insensitively, with `others`
 recorded as truncation rather than a person. Their author counts must reconcile.
 Variant names and conflicting ORCIDs are review evidence, never instructions to
@@ -358,8 +404,8 @@ See the [co-authorship guide](usage.md#coauthors) for report semantics and examp
 | providers/records.py, providers/registry.py | The provider-neutral `ReferenceMetadata` boundary and explicit deterministic import-provider selection. |
 | providers/metadata/, providers/repositories/ | External-service implementations grouped by role; callers import providers from these role-specific packages directly. |
 | providers/url_resolvers/ | Ordered declarative identifier, repository, publisher, and catalogue URL recognition. Ordinary publisher URL-to-DOI patterns are table entries rather than standalone clients; recognition is offline, so any lookup a resolved identifier needs belongs to its provider. |
-| filestore.py | Pinax material paths, presence scanning, orphan/drift detection and repair, provenance manifests (the `PinaxManifest` mixin in `_filestore_manifest.py`), material copying, and atomic writes inside a configured `pinax-files-dir`. |
-| fetch.py | arXiv material URL construction, injectable PDF/source byte fetchers, safe source archive extraction, and FileStore installation. |
+| filestore/ | Pinax material paths, presence scanning, orphan/drift detection and repair, provenance manifests (the `PinaxManifest` mixin in `filestore/_manifest.py`), material copying, and atomic writes inside a configured `pinax-files-dir`. |
+| fetch/ | arXiv material URL construction, injectable PDF/source byte fetchers, safe source archive extraction, and FileStore installation. |
 | metadata/ (core.py, schema.py, jabref.py, _jabref_groups.py) | Structured top-level metadata, layered by dependency direction: `core` is the namespace-neutral comment engine (parse/format/set/remove/consolidate); `schema` is pynakes' own canonical key registry and native reads, JabRef-unaware; `jabref` is the compatibility adapter — JabRef's key tables and value grammars, the JabRef group parsers/serializers (`parse_jabref_grouping`, `format_jabref_grouping`, `parse_jabref_groups_lines`, implemented in `_jabref_groups` and re-exported by `jabref`), owner/namespace arbitration, and fallback-aware accessors (`library_dialect`, `library_sort_order`). Domain code depends on `schema`'s concepts through `jabref`'s accessors, never on JabRef's literal keys. See the [JabRef compatibility guide](jabref-compatibility.md). |
 | journals.py | Exact title/ISSN mapping plus LTWA-style journal abbreviation/expansion. |
 | normalize.py | Policy orchestration over title, author, journal, DOI, and page-range operations. |
@@ -367,7 +413,7 @@ See the [co-authorship guide](usage.md#coauthors) for report semantics and examp
 | scrub.py | Private-content removal for a public release: the default private-field set, the bibliography's own `scrub-*` policy, and the metadata/free-comment block classification. |
 | files.py | Parsing and resolution/validation of BibLaTeX linked-file descriptors. |
 | usage.py | LaTeX/AUX citation extraction, used/unused analysis, TeX citation-key rewrites, and subset projection. |
-| lint.py | Local structural/semantic findings such as missing required fields, malformed DOI, groups, and duplicate keys. BibLaTeX required-field rules cite the official CTAN BibLaTeX manual, section 2.1 entry types and aliases, as their source of truth. |
+| lint/ | Local structural/semantic findings such as missing required fields, malformed DOI, groups, and duplicate keys. BibLaTeX required-field rules cite the official CTAN BibLaTeX manual, section 2.1 entry types and aliases, as their source of truth. |
 | dedupe.py | Duplicate-work clustering and conflict-first merge planning. |
 | integrity.py | Opt-in provider-backed verification and conservative enrichment; re-exports the preprint publication check. |
 | _integrity_common.py, _integrity_published.py | Integrity report types and shared field accessors; the preprint detection/promotion half of the integrity surface. |
@@ -375,10 +421,10 @@ See the [co-authorship guide](usage.md#coauthors) for report semantics and examp
 | bounded.py | The bounded-read contract: field projection, character limits, and pagination whose cursors are bound to a bibliography snapshot and a selection. |
 | entry_reader.py | Per-entry records for bounded reads: triage summary or field projection, plus the included materials and recorded provenance. |
 | saved_queries.py | Named `--where` expressions stored as `query-<name>` in `pynakes-meta`, validated with the shared parser and evaluated on demand. |
-| analysis.py | Public API for bibliography analysis: `analyze` composes descriptive reports from the entry store, groups, lint, linked files and Pinax; `coauthor_network` returns the full co-authorship graph. Exports both report types and the co-author configuration helpers. |
-| _analysis_coauthors.py | Private graph implementation behind `analysis.coauthor_network`: pairs, components, ego views, and name-variant candidates (`_coauthor_variants.py`), rendered as JSON, GraphML or Markdown (`_coauthor_render.py`); shares author interpretation through `_analysis_people.py`. |
+| analysis/ | Public API for bibliography analysis: `analyze` composes descriptive reports from the entry store, groups, lint, linked files and Pinax; `coauthor_network` returns the full co-authorship graph. Exports both report types and the co-author configuration helpers. |
+| analysis/_coauthors.py | Private graph implementation behind `analysis.coauthor_network`: pairs, components, ego views, and name-variant candidates (`analysis/_variants.py`), rendered as JSON, GraphML or Markdown (`analysis/_render.py`); shares author interpretation through `analysis/_people.py`. |
 | diff.py | Unified diff generation. |
-| cli.py, cli_common.py, cli_commands/ | Thin Typer application assembly, shared JSON/error/check plumbing, and one command module per command family. |
+| cli/ (_app.py, _common.py, commands/) | Thin Typer application assembly, shared JSON/error/check plumbing, and one command module per command family. |
 | capabilities.py | Machine-readable declaration of the implemented CLI surface. |
 
 ### Result and report objects
@@ -427,7 +473,7 @@ primitives contact providers. Integrity workflows require an explicit
 downloads require the explicit `asset fetch` command or
 `ref add` / `ref import --fetch`.
 Plain `.bib` maintenance never fetches materials. Network parsing lives in the
-provider implementations; `importer.py`, `integrity.py`, and `fetch.py`
+provider implementations; `importer.py`, `integrity.py`, and `fetch/`
 translate provider failures into their domain errors. Tests mock or fixture
 this boundary so the normal suite never relies on external availability.
 

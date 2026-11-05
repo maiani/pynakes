@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from pynakes import _atomic
-from pynakes._filestore_atomic import _atomic_write_bytes
+from pynakes.filestore._atomic import _atomic_write_bytes
 from pynakes.io import save_text
 from pynakes.provider_cache import _atomic_write_text
 
@@ -110,7 +110,7 @@ def test_a_failed_file_sync_fails_the_write_and_keeps_the_original(
 
 
 def test_source_tree_is_synced_before_install(tmp_path: Path, events: list[str]) -> None:
-    from pynakes._filestore_atomic import _atomic_replace_dir
+    from pynakes.filestore._atomic import _atomic_replace_dir
 
     source = tmp_path / "source"
     source.mkdir()

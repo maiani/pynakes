@@ -20,7 +20,7 @@ from typer.testing import CliRunner
 import pynakes
 from pynakes.capabilities import command_schemas, get_capabilities
 from pynakes.cli import app
-from pynakes.cli_errors import CATALOGUE, ErrorCode
+from pynakes.cli._errors import CATALOGUE, ErrorCode
 
 runner = CliRunner()
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -146,7 +146,7 @@ def test_a_single_library_command_takes_it_first_and_as_file() -> None:
 #: Spellings deliberately carrying more than one shape, and why.
 FLAG_SHAPE_EXCEPTIONS = {
     # The key to assign on `ref import`; the keys to act on everywhere else
-    # (see `pynakes.cli_common.key_option`).
+    # (see `pynakes.cli._common.key_option`).
     "--key": 2,
 }
 
@@ -398,7 +398,7 @@ def test_every_command_has_an_envelope_sample() -> None:
 @pytest.mark.parametrize("command", sorted(SAMPLES))
 def test_envelope_schema(command: str, tmp_path: Path, monkeypatch) -> None:
     if command.startswith("zotero "):
-        from pynakes.cli_commands import zotero as commands
+        from pynakes.cli.commands import zotero as commands
         from pynakes.zotero import ZoteroLibraryBackend
         from tests.zotero_fixtures import LocalAPI
 
@@ -449,7 +449,7 @@ def _emitted_codes() -> tuple[set[str], set[str]]:
     literals: set[str] = set()
     members: set[str] = set()
     for path in SRC.rglob("*.py"):
-        if path.name == "cli_errors.py":
+        if path == SRC / "cli" / "_errors.py":
             continue
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if isinstance(node, ast.Call):

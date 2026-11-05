@@ -10,10 +10,10 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from pynakes._engine_fetch import build_fetch_queue
 from pynakes.bibtex_parser import parse_bib
 from pynakes.capabilities import get_capabilities
 from pynakes.cli import app
+from pynakes.engine._fetch import build_fetch_queue
 
 runner = CliRunner()
 

@@ -19,8 +19,8 @@ runner = CliRunner()
 @pytest.fixture
 def terminal(monkeypatch) -> None:
     """Make the under-specified commands believe stdin is a terminal."""
-    monkeypatch.setattr("pynakes.cli_commands.add.stdin_is_interactive", lambda: True)
-    monkeypatch.setattr("pynakes.cli_commands.edit.stdin_is_interactive", lambda: True)
+    monkeypatch.setattr("pynakes.cli.commands.add.stdin_is_interactive", lambda: True)
+    monkeypatch.setattr("pynakes.cli.commands.edit.stdin_is_interactive", lambda: True)
 
 
 def test_bare_ref_add_starts_with_key_prompt_and_blank_generates_key(

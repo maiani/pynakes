@@ -8,7 +8,7 @@ Run it before building the documentation: ``python scripts/command_reference.py`
 import sys
 from pathlib import Path
 
-from pynakes._cli_reference import render_command_reference
+from pynakes.cli._reference import render_command_reference
 
 TARGET = Path(__file__).resolve().parents[1] / "docs" / "guides" / "command-reference.md"
 

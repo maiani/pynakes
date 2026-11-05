@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 from pynakes import integrity, provider_cache
 from pynakes.bibtex_parser import parse_bib
 from pynakes.cli import app
-from pynakes.cli_commands._rich_progress import RichIntegrityProgress
+from pynakes.cli.commands._rich_progress import RichIntegrityProgress
 from pynakes.identity import entry_arxiv_id
 from pynakes.integrity import (
     _map_concurrently,

@@ -7,7 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from pynakes.cli import app
-from pynakes.cli_errors import CATALOGUE
+from pynakes.cli._errors import CATALOGUE
 from pynakes.io import encode_text
 
 runner = CliRunner()
@@ -136,7 +136,7 @@ def test_invalid_option_values_are_json_errors(tmp_path, command):
 
 
 def test_closed_stdout_does_not_attempt_a_second_error_envelope(tmp_path, monkeypatch):
-    import pynakes.cli_common as common
+    import pynakes.cli._common as common
 
     bib = tmp_path / "refs.bib"
     bib.write_text(LIBRARY, encoding="utf-8")

@@ -88,6 +88,21 @@ The compatibility forms deprecated in 0.9 are removed in v0.10:
   view; reopening reads current membership and bytes. General cross-file work
   identity reports, analysis rollups and the Catalogue remain planned.
 
+### Changed
+
+- Grouped the engine, analysis, lint, Pinax filestore, fetch and native Library into
+  packages with their private helpers. Existing public import paths remain
+  supported. Library read contracts, native reads and Zotero reads now live in
+  separate `library.backends` modules; `library_backend` and `zotero` retain
+  compatibility exports. Project selection remains a separate coordinator.
+- Consolidated CLI assembly, callbacks and infrastructure under `cli/`, preserving
+  the `pynakes.cli:app` console entry point. CLI infrastructure imports do not
+  construct the application. Private CLI implementation paths have moved.
+- Separated shared offline material URL rules from download orchestration, so
+  Pinax storage does not depend on acquisition. Provider transport and the public
+  version attribute share a lazy version lookup without an upward facade import.
+  Import-boundary tests guard these dependencies and declared eager-import cycles.
+
 ### Fixed
 
 - Python `search_entries(..., limit=0, rank=False)` now returns no results,

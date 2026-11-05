@@ -255,8 +255,8 @@ if bib.files:  # truthy ⇔ this bibliography is a pinax
 ```
 
 The mechanics stay out of the text engine: path computation, scanning, and moves
-live in `filestore.py` (pure filesystem, no bib semantics); downloading lives in
-`fetch.py` (network, with injectable fetchers like `importer.py`). `engine.py`
+live in `filestore/` (pure filesystem, no bib semantics); downloading lives in
+`fetch/` (network, with injectable fetchers like `importer.py`). `engine/`
 holds only an optional `FileStore` and the coordinating methods; the `.bib`
 text-rendering path does not involve them, so round-trip fidelity is
 unaffected.

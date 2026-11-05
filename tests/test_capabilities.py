@@ -201,7 +201,7 @@ class TestCapabilitiesCommand:
         assert data == get_capabilities()
 
     def test_section_choices_are_every_detailed_section(self) -> None:
-        from pynakes.cli_commands.capabilities import _INDEX_KEYS, CapabilitySection
+        from pynakes.cli.commands.capabilities import _INDEX_KEYS, CapabilitySection
 
         detailed = set(get_capabilities()) - set(_INDEX_KEYS) - {"command_schemas"}
         assert {section.value for section in CapabilitySection} == detailed

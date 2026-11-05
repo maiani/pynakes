@@ -14,8 +14,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pynakes._engine_insert import add_entry_ordered
-from pynakes._library_style import apply_library_style
 from pynakes._pdf_evidence import (
     PDFDependencyError,
     PDFInspection,
@@ -26,6 +24,8 @@ from pynakes._pdf_evidence import (
 )
 from pynakes.convert import convert
 from pynakes.editing import rename_entry_key, set_entry_field
+from pynakes.engine._entry_style import apply_library_style
+from pynakes.engine._insert import add_entry_ordered
 from pynakes.fields import check_field_value
 from pynakes.files import parse_file_field, resolve_linked_file
 from pynakes.identity import (

@@ -30,12 +30,15 @@ src/pynakes/
   bibtex_writer.py    write_bib() — raw_content for unmodified, reconstruct for modified
   io.py               load_bib / save_bib / save_text / save_plain_text (atomic writes)
   editing.py          surgical raw-text field/key edits + entry-level helpers
-  engine.py           Bibliography lifecycle: open, stage, preview/diff, commit, reload
-  _engine_*.py        focused Bibliography operation mixins/helpers
+  engine/             Bibliography lifecycle and focused operation mixins/helpers
+    __init__.py       public Bibliography facade: open, stage, preview/diff, commit
+    _entry_style.py   destination bibliography style for inserted entries
   canonical.py        explicit, whole-file canonical layout formatting
   _canonical_*.py     its field-order table and opt-in value wrapping
-  groups.py group_tree.py keys.py fields.py files.py lint.py
-  _lint_*.py          lint's issue type, categories, and profile checks
+  groups.py group_tree.py keys.py fields.py files.py
+  lint/               public lint API; finding types, profile and structural checks
+    __init__.py       lazy exports keep shared definitions independent of checks
+    _checks.py        lint orchestration and entry checks
   _entry_comments.py  comments attached above an entry, which move with it
   authors.py journals.py normalize.py
   importer.py         resolve + import references by DOI / arXiv id or supported URL
@@ -44,25 +47,40 @@ src/pynakes/
   entry_reader.py    per-entry records: summary, fields, research context
   saved_queries.py    named --where expressions stored as query-<name> metadata
   biblinks.py         bibliography links: declarations, checks, two-file edits
-  analysis.py         public bibliography analysis API (`analyze` and `coauthors`)
-  _analysis_coauthors.py  co-author network, ego views, name-variant candidates
-  _coauthor_*.py      its variant detection and GraphML/Markdown rendering
+  analysis/           public analysis API (`analyze` and `coauthors`)
+    _coauthors.py     co-author network, ego views, name-variant candidates
+    _people.py _variants.py _render.py  shared names, variants and rendering
   integrity.py        verify / enrich / published (opt-in --online lookups)
   _integrity_*.py     integrity report types and the published-check half
   entry_types.py      container/eprint field naming per entry type + dialect
   metadata/           jabref-meta + pynakes-meta parsing, schemas, safe updates
-  filestore.py        Pinax paths, manifests, validation, and material transactions
-  _filestore_*.py     the provenance manifest mixin and atomic filesystem helpers
-  fetch.py providers/ explicit network-backed material and metadata providers
+  filestore/          Pinax paths, manifests, validation, and material transactions
+    _manifest.py _atomic.py  provenance manifest and atomic filesystem helpers
+  library/            native Library, membership, routing and staged additions
+    backends/base.py  source-neutral records, protocol, paging and query filtering
+    backends/bibtex.py  read adapter over the native Library
+    backends/zotero.py  bounded read-only local Zotero adapter
+    backends/_zotero_projection.py  citation projection and omission reports
+  library_backend.py zotero.py  compatibility exports for existing public imports
+  project_selection.py  guarded exchange into independent project bibliographies
+  fetch/              download orchestration, discovery, attempts and safe extraction
+    progress.py       fetch progress events; fetch_progress.py preserves old imports
+  _material_urls.py   offline URL classification/redaction shared with Pinax
+  _version.py         lazy distribution version without importing the public facade
+  providers/          explicit network-backed material and metadata providers
   interchange/       CSL-JSON, RIS, MODS, EndNote, and CSV codecs
-  cli_commands/       command callbacks grouped by concern
+  cli/                CLI entry point and infrastructure
+    _app.py           Typer application assembly; public entry point remains cli:app
+    commands/         command callbacks grouped by concern
+    _common.py        shared envelopes, preconditions and modification finishing
+    _errors.py        error-code catalogue (status + exit code per code)
+    _surface.py _discovery.py _files.py  arguments and bibliography discovery
+    _schema.py _reference.py  command introspection and generated reference
+    _choices.py _checks.py _completion.py _deprecations.py
   usage.py            cited-entry detection/tagging and TeX citation-key rewrites
   scrub.py            private-content removal for a public release copy
   capabilities.py     machine-readable capability description
-  batch.py setops.py diff.py cli.py cli_common.py cli_discovery.py
-  cli_surface.py      library-first positionals, --file, and every deprecated form
-  cli_errors.py       the error-code catalogue (status + exit code per code)
-  cli_choices.py cli_checks.py cli_completion.py   option choices, gates, completion
+  batch.py setops.py diff.py capabilities.py
 tests/                pytest suite, conformance fixtures, and CLI workflow tests
 evals/agent/          agent evaluation tasks and fixtures (run by scripts/agent_eval.py)
 editor/               VS Code extension companion (TypeScript, own toolchain)
@@ -94,6 +112,19 @@ here, and the `corpus` command group was retired for that reason. Until Bimas st
 developed concurrently in this repository; a second client is what would justify
 splitting them apart. See
 [docs/vision.md](docs/vision.md#graphical-clients-and-their-scope).
+
+The `engine`, `analysis`, `lint`, `filestore`, `fetch` and `library` packages retain their
+existing public import paths. Keep private helpers with their owning package.
+Library adapters depend on `library.backends.base`; the native adapter alone
+imports the concrete `Library`. Project selection stays outside the backends
+because it coordinates a source read with a bibliography transaction. Keep
+`lint/__init__.py` lightweight: metadata and key operations use its private
+finding/directive definitions before the full lint engine can be imported.
+`cli/__init__.py` also stays lightweight so capability/error-schema consumers do
+not assemble the command tree. Domain packages must not depend on the CLI;
+Pinax storage must not depend on downloads or provider clients. Shared offline
+material URL semantics live below both. `tests/test_import_boundaries.py` guards
+these boundaries and declared eager imports against cycles.
 
 ## Setup & checks
 
@@ -147,7 +178,7 @@ tests pass:
    `status, action, file, dry_run, modified, modified_entries, warnings` (+
    command-specific keys, + `diff` when `--diff`). Errors → exit 1
    (`{"status":"error",...}`); conflicts → exit 2 with `options`. New commands
-   go through the shared `_finish_mod` / `_safe` helpers in `cli_common.py`. The
+   go through the shared `_finish_mod` / `_safe` helpers in `cli/_common.py`. The
    contract is documented in
    [docs/guides/llm-integration.md](docs/guides/llm-integration.md) and guarded
    by tests in `tests/test_cli.py`.
@@ -159,7 +190,7 @@ tests pass:
 - Python ≥ 3.12, type hints throughout. Ruff line length 100 (E501 ignored).
 - CLI: top-level transforms/checks plus Typer resource families (`ref`,
   `groups`, `keys`, `fields`, `dedupe`, `metadata`, `tex`, `asset`, `query`).
-  Command callbacks live in `cli_commands/`; operation modules stay independently
+  Command callbacks live in `cli/commands/`; operation modules stay independently
   unit-testable. Keep `capabilities` synchronized with the live command surface.
 - Every behaviour-shaping option has three forms: a CLI flag / Python API
   parameter, a `pynakes-meta` setting, and that setting editable through

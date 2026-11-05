@@ -67,12 +67,9 @@ def __getattr__(name: str) -> str:
     would otherwise pay at startup whether or not it reports a version.
     """
     if name == "__version__":
-        from importlib.metadata import PackageNotFoundError, version
+        from pynakes._version import package_version
 
-        try:
-            value = version("pynakes")
-        except PackageNotFoundError:  # running from a source tree that isn't installed
-            value = "0.0.0+unknown"
+        value = package_version()
         globals()["__version__"] = value
         return value
     raise AttributeError(f"module 'pynakes' has no attribute {name!r}")

@@ -876,10 +876,10 @@ def test_custom_biblatex_entry_type_and_field_names_produce_no_errors() -> None:
 
 
 def _lint_source_nodes() -> list[ast.AST]:
-    """Every AST node of lint.py and the _lint_* modules beside it."""
+    """Every AST node in the lint package, including private checks."""
     # The imported module's location, so a wheel install works too.
     package = Path(lint_module.__file__).parent
-    sources = [package / "lint.py", *sorted(package.glob("_lint_*.py"))]
+    sources = sorted(package.rglob("*.py"))
     return [
         node
         for source in sources
@@ -888,7 +888,7 @@ def _lint_source_nodes() -> list[ast.AST]:
 
 
 def test_every_emitted_issue_type_has_a_category() -> None:
-    # Parses lint.py and its _lint_* modules so a newly added check cannot
+    # Parses the lint package so a newly added check cannot
     # silently inherit the correctness fallback: every type must be mapped.
     emitted = {
         node.args[0].value

@@ -20,8 +20,6 @@ from collections.abc import Callable, Collection
 
 from pynakes._keys_pattern import KeyPatternInference as KeyPatternInference
 from pynakes._keys_pattern import infer_key_pattern as infer_key_pattern
-from pynakes._lint_directives import entry_ignore_rules
-from pynakes._lint_issue import LintIssue
 from pynakes._text_utils import entry_year
 from pynakes.authors import ascii_fold as _ascii_fold
 from pynakes.authors import institution_key as _institution_key
@@ -37,6 +35,8 @@ from pynakes.formatters import (
     latex_to_plain_text,
     page_prefix,
 )
+from pynakes.lint._directives import entry_ignore_rules
+from pynakes.lint._issue import LintIssue
 from pynakes.metadata import library_key_pattern
 from pynakes.model import BibEntry, BibFile
 

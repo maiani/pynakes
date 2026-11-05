@@ -1,0 +1,269 @@
+"""`asset check` verifies linked files and Pinax materials; `asset repair` reconciles drift."""
+
+from pathlib import Path
+from typing import Any
+
+import typer
+
+from pynakes import files as files_ops
+from pynakes._material_classes import misclassified_published
+from pynakes.cli._checks import CheckOutcome, _run_checks, strict_option
+from pynakes.cli._common import (
+    _emit,
+    _emit_error,
+    _resolve_input_bib,
+    _safe,
+    _source_sha256,
+    bib_file_argument,
+)
+from pynakes.diff import generate_diff
+from pynakes.engine import Bibliography
+from pynakes.filestore import FileStore, FileStoreScan
+
+# --- files -----------------------------------------------------------------
+
+
+def _files_check_one(file: str, root: list[str] | None) -> CheckOutcome:
+    return asset_check_collection(Bibliography.open(file), file, root)
+
+
+def asset_check_collection(
+    coll: Bibliography,
+    file: str,
+    root: list[str] | None = None,
+    location: str | Path | None = None,
+) -> CheckOutcome:
+    """Build the `asset check` report for an already opened bibliography.
+
+    ``location`` is where the library lives (default ``file``): relative
+    ``file`` links and ``pinax-files-dir`` resolve from it, so a copy of the
+    library reports the materials of the original.
+    """
+    lib = coll.lib
+    where = location if location is not None else file
+    report = files_ops.check_linked_files(lib, where, root)
+    store = FileStore.from_metadata(lib, where)
+    pinax = store.scan_entries(lib.entries.values()) if store is not None else None
+    misclassified = (
+        misclassified_published(store, lib.entries.values()) if store is not None else []
+    )
+    result = {
+        "status": "success",
+        "action": "asset_check",
+        "file": file,
+        "source_sha256": _source_sha256(coll),
+        "warnings": [],
+        **report.to_dict(),
+    }
+    coverage = _coverage(report, pinax, misclassified)
+    result["coverage"] = coverage
+    if pinax is not None:
+        result["pinax"] = pinax.to_dict()
+        result["misclassified"] = misclassified
+    human = [
+        f"{file}: checked {report.checked} linked file(s); "
+        f"ok={report.ok}, missing={report.missing}, "
+        f"wrong_type={report.wrong_type}, unresolved={report.unresolved}."
+    ]
+    human += [
+        f"  [{issue.status}] {issue.entry_key}[{issue.index}]: {issue.path}"
+        for issue in report.issues
+    ]
+    pinax_bad = 0
+    if pinax is not None:
+        pinax_bad = len(pinax.orphans) + len(pinax.drift) + len(misclassified)
+        materials = coverage["materials"]
+        human.append(
+            f"  pinax: {materials['with_pdf']} of {materials['entries']} entries have a PDF; "
+            f"orphans={len(pinax.orphans)}, drift={len(pinax.drift)}, "
+            f"misclassified={len(misclassified)}."
+        )
+        human += [
+            f"    [misclassified] {item['key']}: stored as published, evidence "
+            f"{', '.join(e['type'] for e in item['evidence'])}; "
+            "`asset repair --reclassify` moves it to the preprint path"
+            for item in misclassified
+        ]
+        human += [
+            f"    [orphan] {orphan.key}:{orphan.kind}: {orphan.path}" for orphan in pinax.orphans
+        ]
+        human += [
+            f"    [drift] {item['key']}:{item['kind']}: {item['reason']}" for item in pinax.drift
+        ]
+    bad = report.missing + report.wrong_type + report.unresolved + pinax_bad
+    return CheckOutcome(
+        result=result,
+        human=human,
+        failed=bad > 0,
+        summary={
+            "checked": report.checked,
+            "ok": report.ok,
+            "missing": report.missing,
+            "wrong_type": report.wrong_type,
+            "unresolved": report.unresolved,
+            "pinax_orphans": len(pinax.orphans) if pinax is not None else 0,
+            "pinax_drift": len(pinax.drift) if pinax is not None else 0,
+            "pinax_misclassified": len(misclassified),
+        },
+    )
+
+
+def _coverage(
+    report: files_ops.FileCheckReport, pinax: FileStoreScan | None, misclassified: list[dict]
+) -> dict[str, Any]:
+    """Keep the two questions apart: linked ``file`` fields, and Pinax material coverage.
+
+    The top-level ``checked``/``ok``/``missing`` counts concern ``file``-field
+    links only; ``materials`` answers how many entries have a PDF in Pinax,
+    and which do not (``null`` without a Pinax directory).
+    """
+    linked = {
+        "checked": report.checked,
+        "ok": report.ok,
+        "missing": report.missing,
+        "wrong_type": report.wrong_type,
+        "unresolved": report.unresolved,
+    }
+    if pinax is None:
+        return {"linked_files": linked, "materials": None}
+    with_pdf = [item for item in pinax.entries if item.published_pdf or item.preprint_pdf]
+    return {
+        "linked_files": linked,
+        "materials": {
+            "entries": len(pinax.entries),
+            "with_pdf": len(with_pdf),
+            "with_any": sum(1 for item in pinax.entries if item.any_present),
+            "without_pdf": [
+                item.key for item in pinax.entries if not (item.published_pdf or item.preprint_pdf)
+            ],
+            "misclassified": len(misclassified),
+        },
+    }
+
+
+def files_check(
+    files: list[str] = typer.Argument(..., help="One or more .bib files"),
+    root: list[str] | None = typer.Option(
+        None,
+        "--root",
+        help="Additional directory to resolve relative linked-file paths; can be repeated",
+    ),
+    strict: bool = strict_option("a linked file is missing, unresolved, or the wrong type"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Validate linked-file references (accepts multiple files for CI gating)."""
+    _run_checks(
+        files,
+        "asset_check",
+        lambda f: _files_check_one(f, root),
+        json_output,
+        strict,
+    )
+
+
+def asset_repair(
+    file: str | None = bib_file_argument(),
+    backup: bool = typer.Option(
+        False,
+        "--backup",
+        help="Also write manifest.json.bak (or the next free .bak.N) before reconciling",
+    ),
+    reclassify: bool = typer.Option(
+        False,
+        "--reclassify",
+        help="Also move each published PDF that `asset check` reports as misclassified "
+        "(a preprint, on recorded evidence) to the preprint path, with its manifest record",
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Report the repairs without writing"),
+    diff: bool = typer.Option(False, "--diff", help="Show a unified diff of the manifest"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Reconcile the Pinax manifest with the material files that exist.
+
+    Drops manifest rows for keys the bibliography no longer has and records for
+    files that are gone, and records material files the manifest does not
+    know (as manual additions). Without `--reclassify` only the manifest
+    changes: no material file and no byte of the bibliography. `asset check`
+    reports the same drift.
+
+    With `--reclassify`, each misclassified published PDF is renamed to the
+    preprint path and its manifest record moves with it. One whose preprint
+    path is taken is reported as a conflict and left alone.
+    """
+    file = _resolve_input_bib(file, json_output)
+    coll = Bibliography.open(file)
+    store = FileStore.from_metadata(coll.lib, file)
+    if store is None:
+        _emit_error(
+            json_output,
+            "InvalidInput",
+            f"{file} has no Pinax (no pinax-files-dir); run `pynakes init --pinax` first",
+            action="asset_repair",
+        )
+    path = store.manifest_path
+    before = path.read_text(encoding="utf-8") if path.is_file() else ""
+    reclassified = _reclassify(store, coll, dry_run, backup) if reclassify else []
+    manifest, fixed = store.reconcile_manifest(
+        entry.key for entry in coll.lib.entries.values() if entry.key.strip()
+    )
+    current = path.read_text(encoding="utf-8") if path.is_file() else ""
+    after = store.manifest_text(manifest) if fixed else current
+    if fixed and not dry_run:
+        store.write_manifest(manifest, backup=backup and not reclassified)
+    verb = "would repair" if dry_run else "repaired"
+    human = [f"{file}: {verb} {len(fixed)} Pinax manifest item(s)."]
+    human += [f"  [{item['action']}] {item['key']}:{item['kind']}" for item in fixed]
+    if reclassify:
+        human.append(f"{file}: {len(reclassified)} misclassified published PDF(s).")
+        human += [
+            f"  [{item['action']}] {item['key']}: published_pdf -> preprint_pdf"
+            for item in reclassified
+        ]
+    result = {
+        "status": "success",
+        "action": "asset_repair",
+        "file": file,
+        "dry_run": dry_run,
+        "modified": bool(fixed) and not dry_run,
+        "modified_entries": 0,
+        "warnings": [],
+        "source_sha256": _source_sha256(coll),
+        "fixed": fixed,
+    }
+    if reclassify:
+        result["reclassified"] = reclassified
+        result["modified"] = result["modified"] or (
+            not dry_run and any(item["action"] == "moved" for item in reclassified)
+        )
+    _emit(json_output, result, human, generate_diff(before, after, str(path)), diff)
+
+
+def _reclassify(store: FileStore, coll: Bibliography, dry_run: bool, backup: bool) -> list[dict]:
+    """Move each misclassified published PDF to the preprint path; report every finding.
+
+    ``action`` is ``moved`` (``would_move`` in a dry run) or ``conflict`` when
+    the preprint path is taken. A manifest backup, when asked for, is written
+    once, before the first move.
+    """
+    findings = misclassified_published(store, coll.lib.entries.values())
+    if dry_run or not findings:
+        for item in findings:
+            item["action"] = "would_move" if item["action"] == "move" else item["action"]
+        return findings
+    if backup and store.manifest_path.is_file():
+        store.write_manifest(store.read_manifest(), backup=True)
+    for item in findings:
+        if item["action"] != "move":
+            continue
+        store.reclassify_material(
+            item["key"], "published_pdf", "preprint_pdf", evidence=item["evidence"]
+        )
+        item["action"] = "moved"
+        item["path"] = str(Path(store.paths_for(item["key"]).preprint_pdf))
+    return findings
+
+
+def register(app: typer.Typer) -> None:
+    """Register this command family on its Typer application."""
+    app.command("check")(_safe(files_check))
+    app.command("repair")(_safe(asset_repair))

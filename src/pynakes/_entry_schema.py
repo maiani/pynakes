@@ -1,11 +1,11 @@
 """Field suggestions for entry creation, not an exhaustive style data model.
 
-Required fields remain owned by ``_lint_required``. These optional suggestions
+Required fields remain owned by ``lint._required``. These optional suggestions
 cover common editing fields from the BibTeX and BibLaTeX entry types; unknown
 fields are always retained. Custom bibliography styles may use other fields.
 """
 
-from pynakes._lint_required import _BIBLATEX_REQUIREMENT_ALIASES
+from pynakes.lint._required import _BIBLATEX_REQUIREMENT_ALIASES
 
 _BIBTEX = {
     "article": "volume number pages month note",

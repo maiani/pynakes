@@ -8,7 +8,7 @@ an argument already given on the command line from one still open.
 from typer.main import get_command
 
 from pynakes.cli import app
-from pynakes.cli_discovery import AutoBibGroup
+from pynakes.cli._discovery import AutoBibGroup
 
 
 def _rename_context(args: list[str]):

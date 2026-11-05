@@ -5,9 +5,9 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from pynakes._library_style import declared_steps
 from pynakes.bibtex_parser import parse_bib
 from pynakes.cli import app
+from pynakes.engine._entry_style import declared_steps
 
 runner = CliRunner()
 

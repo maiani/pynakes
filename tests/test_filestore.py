@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from pynakes._filestore_atomic import _process_alive, _remove_path
 from pynakes.bibtex_parser import parse_bib
 from pynakes.engine import Bibliography
 from pynakes.filestore import FileStore, resolve_files_dir
+from pynakes.filestore._atomic import _process_alive, _remove_path
 
 
 def test_resolve_files_dir_uses_default_for_empty_value(tmp_path: Path) -> None:
@@ -583,7 +583,7 @@ def test_scratch_sweep_leaves_entries_that_are_not_pid_directories(tmp_path: Pat
 
 
 def test_windows_liveness_probe_never_signals(monkeypatch: pytest.MonkeyPatch) -> None:
-    import pynakes._filestore_atomic as atomic
+    import pynakes.filestore._atomic as atomic
 
     def fail_kill(*_args):
         raise AssertionError("os.kill(pid, 0) sends CTRL_C_EVENT on Windows")

@@ -85,7 +85,7 @@ trailing semicolon when the source had one. Use
 
 A name beginning with `_` is private. Private names, private helpers, and
 implementation modules not listed above (`editing`, `formatters`, `cli`,
-`cli_common`, and `cli_commands`) may change in any release. Consumers should
+`cli._common`, and `cli.commands`) may change in any release. Consumers should
 not import them or rely on their current behavior.
 
 This rule lets the public modules expose ordinary, readable operation names

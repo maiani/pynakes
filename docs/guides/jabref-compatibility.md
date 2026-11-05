@@ -30,7 +30,7 @@ working with the file. Internally, this split is implemented as the
 | `pynakes.metadata.schema` | pynakes' own key registry and the *pure* native reads for keys that also have a JabRef counterpart. Never imports JabRef's vocabulary. |
 | `pynakes.metadata.jabref` | JabRef's key vocabulary and value grammars (`saveActions`, `saveOrderConfig`, `databaseType`), the JabRef group parsers/serializers (`parse_jabref_grouping`, `format_jabref_grouping`, `parse_jabref_groups_lines`), the owner/namespace arbitration, and the fallback-aware accessors domain code should call. |
 
-Domain modules (`normalize.py`, `lint.py`, `integrity.py`, the engine) call the
+Domain modules (`normalize.py`, `lint/`, `integrity.py`, the engine) call the
 fallback-aware accessors in `pynakes.metadata.jabref` (re-exported from
 `pynakes.metadata`) — never JabRef's literal key names. This is what keeps
 JabRef knowledge concentrated at one boundary instead of leaking into every

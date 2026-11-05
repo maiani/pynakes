@@ -14,13 +14,7 @@ import httpx
 import pytest
 from typer.testing import CliRunner
 
-from pynakes._fetch_attempts import (
-    aps_pdf_url,
-    attempt_record,
-    candidate_urls,
-    describe_attempts,
-    redact_url,
-)
+from pynakes._material_urls import redact_url
 from pynakes.cli import app
 from pynakes.fetch import (
     ArxivFetchError,
@@ -29,6 +23,12 @@ from pynakes.fetch import (
     download_published_material,
     download_supplement_material,
     fetch_arxiv_pdf,
+)
+from pynakes.fetch._attempts import (
+    aps_pdf_url,
+    attempt_record,
+    candidate_urls,
+    describe_attempts,
 )
 from pynakes.filestore import FileStore
 from pynakes.providers._http import fetch_bytes

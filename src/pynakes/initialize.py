@@ -80,7 +80,7 @@ def default_profile() -> list[ProfileEntry]:
     A fresh library is pynakes-native: the dialect and citation-key pattern are
     written as pynakes' own ``dialect``/``key-pattern`` keys in ``pynakes-meta``,
     so a pynakes-only workflow never gains a ``jabref-meta`` section it did not
-    ask for. Pass ``--jabref`` to :func:`pynakes.cli_commands.init.init` (or run
+    ask for. Pass ``--jabref`` to :func:`pynakes.cli.commands.init.init` (or run
     ``metadata adopt-jabref`` later) to also emit the JabRef projection.
     """
     return [

@@ -8,11 +8,11 @@ from pathlib import Path
 
 import pytest
 
-from pynakes._fetch_discovery import discover_arxiv_id
-from pynakes.cli_commands.fetch import _JsonLinesProgress
+from pynakes.cli.commands.fetch import _JsonLinesProgress
 from pynakes.engine import Bibliography
 from pynakes.fetch import PublishedPdfFetchError
-from pynakes.fetch_progress import FetchProgressEvent
+from pynakes.fetch._discovery import discover_arxiv_id
+from pynakes.fetch.progress import FetchProgressEvent
 from pynakes.metadata import FetchPolicy
 from pynakes.providers._http import RETRY_LISTENER, ProviderRateLimitedError
 from pynakes.providers.repositories.arxiv import ArxivRecord
