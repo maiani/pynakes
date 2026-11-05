@@ -20,7 +20,8 @@ contract. This page is the authority for that contract; the
   goes online by being run: `ref import`, `ref lookup`, `asset fetch`, and
   `--fetch` on `ref add` / `ref import`. A command with an offline mode leaves
   it only with `--online`: `verify`, `enrich`, `ref compare`. Nothing else
-  makes a request; `capabilities` lists both groups under `network_access`.
+  makes a remote request; the `zotero` family uses explicit loopback IPC.
+  `capabilities` lists these modes under `network_access`.
 - **Reviewable edits.** Modifying commands support `--dry-run` and `--diff`,
   including `asset repair`, whose diff is of the Pinax manifest it reconciles.
 - **Structured output.** Use `--json`; do not parse human-readable output.
@@ -197,8 +198,19 @@ The explicit `zotero` family reads a running local Zotero 10 personal Library.
 Use `scan` and its cursor for bounded discovery, `show` for a selected reference,
 and `select PROJECT.bib --item KEY --dry-run --diff --json` to review a project
 selection or refresh. Source writes and cloud fallback are unsupported.
+`scan --collection KEY --where EXPR` filters a bounded page of direct collection
+members; continue through empty pages while `next_cursor` is present.
 `select` uses the usual modification envelope; the read commands return
-source-scoped records rather than fabricated bibliography paths. See the
+source-scoped records rather than fabricated bibliography paths. Divergent refresh
+edits return exit 2 with `conflicts` (field, accepted source/project values and
+current source/project values), `source_revision_digest`, and the target
+`source_sha256`. After review, repeat `select` with one `--resolve FIELD=source`
+or `--resolve FIELD=project` per conflict, plus `--expect-revision` and
+`--expect-sha256`. Both preconditions are required; unknown/nonconflicting decisions
+are rejected. `@type` selects entry type; null field values represent absence.
+Successful selection reports `changes` and `resolutions` alongside the standard
+envelope. Decisions accept the current difference, not a permanent overwrite
+preference. See the
 [Zotero guide](zotero.md) for freshness, conversion and privacy limits.
 
 ## Choosing the right operation

@@ -11,6 +11,7 @@ import json
 import math
 import re
 from dataclasses import asdict, dataclass
+from functools import partial
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
@@ -29,6 +30,7 @@ from pynakes.library_backend import (
     SourceUnsupported,
     _next_cursor,
     _page_start,
+    _search_page,
 )
 
 
@@ -129,7 +131,9 @@ class ZoteroLibraryBackend:
                     raise SourceUnsupported(
                         "Requires Zotero 10 local API 3 with identity/schema headers"
                     )
-                if self._server and (server != self._server or schema != self._schema):
+                if self._server and (
+                    server != self._server or schema != self._schema or version != self._version
+                ):
                     raise SourceChanged("Zotero instance or schema changed; reconnect explicitly")
                 self._server, self._schema, self._version = server, schema, version
                 raw = bytearray()
@@ -216,6 +220,8 @@ class ZoteroLibraryBackend:
         keys = [x.get("key") for x in raw]
         if any(not isinstance(k, str) or not re.fullmatch(r"[A-Z0-9]{8}", k) for k in keys):
             raise SourceUnavailable("Malformed Zotero record key")
+        if any(x["data"].get("key", x["key"]) != x["key"] for x in raw):
+            raise SourceUnavailable("Inconsistent Zotero record identity")
         if len(set(keys)) != len(keys):
             raise SourceUnavailable("Duplicate Zotero record in page")
         total_text = h.get("Total-Results", "")
@@ -227,8 +233,29 @@ class ZoteroLibraryBackend:
         self._check_revision(revision)
         return raw, revision, _next_cursor(start, len(raw), total, revision, request), total
 
-    def scan(self, *, limit: int = 50, cursor: str | None = None) -> ReadPage[ReferenceView]:
-        raw, revision, following, total = self._page("users/0/items", limit, cursor)
+    def scan(
+        self,
+        *,
+        limit: int = 50,
+        cursor: str | None = None,
+        collection: str | None = None,
+        where: str | None = None,
+    ) -> ReadPage[ReferenceView]:
+        """Read library items or direct collection members, optionally filtered.
+
+        Collection membership is not recursive. Filters apply to each bounded
+        citation page; follow the cursor even when a filtered page is empty.
+        """
+        path = (
+            f"users/0/collections/{self._key(collection)}/items"
+            if collection is not None
+            else "users/0/items"
+        )
+        if where is not None:
+            return _search_page(
+                partial(self.scan, collection=collection), where, limit=limit, cursor=cursor
+            )
+        raw, revision, following, total = self._page(path, limit, cursor)
         items = tuple(
             project(x["data"], self.item_ref(x["key"]), revision, native=False)
             for x in raw
@@ -248,6 +275,7 @@ class ZoteroLibraryBackend:
             not isinstance(raw, dict)
             or not isinstance(raw.get("data"), dict)
             or raw.get("key") != key
+            or raw["data"].get("key", key) != key
         ):
             raise SourceUnavailable("Malformed Zotero item")
         if raw["data"].get("itemType") in ("note", "attachment", "annotation"):
@@ -261,6 +289,14 @@ class ZoteroLibraryBackend:
         raw, revision, following, total = self._page("users/0/collections", limit, cursor)
         if any(not isinstance(x["data"].get("name"), str) for x in raw):
             raise SourceUnavailable("Malformed Zotero collection")
+        for row in raw:
+            parent = row["data"].get("parentCollection")
+            if (
+                parent is not None
+                and parent is not False
+                and (not isinstance(parent, str) or not re.fullmatch(r"[A-Z0-9]{8}", parent))
+            ):
+                raise SourceUnavailable("Malformed Zotero collection parent")
         items = tuple(
             CollectionRef(
                 self.item_ref(x["key"]),
@@ -276,6 +312,15 @@ class ZoteroLibraryBackend:
     ) -> ReadPage[MaterialRef]:
         key = self._check_ref(ref)
         raw, revision, following, total = self._page(f"users/0/items/{key}/children", limit, cursor)
+        for row in raw:
+            data = row["data"]
+            if data.get("parentItem") != key:
+                raise SourceUnavailable("Inconsistent Zotero child ownership")
+            if any(
+                not isinstance(data.get(name, ""), str)
+                for name in ("itemType", "title", "contentType", "linkMode")
+            ):
+                raise SourceUnavailable("Malformed Zotero material metadata")
         items = tuple(
             MaterialRef(
                 self.item_ref(x["key"]),

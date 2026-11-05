@@ -80,6 +80,77 @@ def test_filtered_cursor_binds_query(local):
     assert len(page.items) == 1 and page.next_cursor is None
 
 
+def test_collection_scan_query_and_cursor_scope(local):
+    api, b = local
+    first = b.scan(collection="DEFGHJKL", limit=1)
+    assert first.source_total == 2 and first.items[0].ref.key == "ABCDEFGH"
+    last = b.scan(collection="DEFGHJKL", limit=1, cursor=first.next_cursor)
+    assert last.items == () and last.skipped == 1 and last.next_cursor is None
+    with pytest.raises(ValueError):
+        b.scan(collection="EFGHJKLM", limit=1, cursor=first.next_cursor)
+    with pytest.raises(ValueError):
+        b.scan(limit=1, cursor=first.next_cursor)
+    page = b.scan(collection="DEFGHJKL", limit=1, where="year > 1800")
+    assert not page.items and page.next_cursor
+    with pytest.raises(ValueError):
+        b.scan(collection="EFGHJKLM", limit=1, where="year > 1800", cursor=page.next_cursor)
+    last = b.scan(collection="DEFGHJKL", limit=1, where="year > 1800", cursor=page.next_cursor)
+    assert not last.items and last.next_cursor is None
+    assert b.scan(collection="EFGHJKLM").source_total == 0
+    with pytest.raises(SourceMissing):
+        b.scan(collection="ZZZZZZZZ")
+    calls = len(api.calls)
+    with pytest.raises(ValueError):
+        b.scan(collection="../items")
+    assert len(api.calls) == calls
+    api.revision += 1
+    with pytest.raises(StaleCursorError):
+        b.scan(collection="DEFGHJKL", limit=1, cursor=first.next_cursor)
+
+
+@pytest.mark.parametrize("fault", ["identity", "type", "parent", "material", "ownership"])
+def test_malformed_records_and_materials(local, fault):
+    api, b = local
+    if fault == "identity":
+        api.items[0]["data"]["key"] = "ZZZZZZZZ"
+        with pytest.raises(SourceUnavailable):
+            b.get(b.item_ref("ABCDEFGH"))
+    elif fault == "type":
+        api.items[0]["data"].pop("itemType")
+    elif fault == "parent":
+        api.collections[0]["data"]["parentCollection"] = {"invalid": True}
+        with pytest.raises(SourceUnavailable):
+            b.collections()
+        return
+    else:
+
+        def override(request, headers):
+            if request.url.path.endswith("children"):
+                data = dict(api.items[1]["data"])
+                data["title" if fault == "material" else "parentItem"] = ["bad"]
+                return httpx.Response(
+                    200,
+                    headers={**headers, "Total-Results": "1"},
+                    json=[{"key": "BCDEFGHJ", "data": data}],
+                )
+            return None
+
+        api.override = override
+        with pytest.raises(SourceUnavailable):
+            b.materials(b.item_ref("ABCDEFGH"))
+        return
+    with pytest.raises(SourceUnavailable):
+        b.scan()
+
+
+def test_application_upgrade_requires_reconnect(local):
+    api, b = local
+    b.describe()
+    api.version = "10.0.8"
+    with pytest.raises(SourceChanged):
+        b.scan()
+
+
 def test_collections_materials_and_local_path(local, tmp_path):
     api, b = local
     assert b.collections().items[0].name == "History"
@@ -201,6 +272,7 @@ def test_cli_reads_select_and_error_envelopes(local, tmp_path, monkeypatch):
         ["show", "ABCDEFGH", "--native"],
         ["collections"],
         ["materials", "ABCDEFGH"],
+        ["scan", "--collection", "DEFGHJKL", "--where", "year < 1800"],
     ]:
         result = runner.invoke(app, ["zotero", *args, "--json"])
         assert result.exit_code == 0, result.output
@@ -221,6 +293,86 @@ def test_cli_reads_select_and_error_envelopes(local, tmp_path, monkeypatch):
     api.version = "99"
     error = runner.invoke(app, ["zotero", "scan", "--json"])
     assert error.exit_code == 1 and "Traceback" not in error.output
+
+
+def test_cli_review_and_resolve_refresh(local, tmp_path, monkeypatch):
+    from pynakes import Bibliography
+    from pynakes.cli_commands import zotero as commands
+    from pynakes.editing import set_entry_field
+
+    api, _ = local
+    monkeypatch.setattr(
+        commands,
+        "ZoteroLibraryBackend",
+        lambda **kw: ZoteroLibraryBackend(transport=httpx.MockTransport(api), **kw),
+    )
+    path = tmp_path / "project.bib"
+    path.write_text("", encoding="utf-8")
+    runner = CliRunner()
+    args = ["zotero", "select", str(path), "--item", "ABCDEFGH", "--key", "Newton", "--json"]
+    assert runner.invoke(app, args).exit_code == 0
+    bib = Bibliography.open(path)
+    set_entry_field(bib.entries["Newton"], "title", "Project title")
+    bib.commit()
+    api.items[0]["data"]["title"] = "Source title"
+    api.revision += 1
+    before = path.read_bytes()
+    result = runner.invoke(app, args + ["--dry-run", "--diff"])
+    assert result.exit_code == 2, result.output
+    conflict = json.loads(result.output)
+    assert conflict["conflicts"] == [
+        {
+            "field": "title",
+            "baseline_source": "Principia",
+            "baseline_project": "Principia",
+            "source": "Source title",
+            "project": "Project title",
+        }
+    ]
+    assert path.read_bytes() == before
+    decision = ["--resolve", "title=project"]
+    assert runner.invoke(app, args + decision).exit_code == 1
+    guarded = (
+        args
+        + decision
+        + [
+            "--expect-revision",
+            conflict["source_revision_digest"],
+            "--expect-sha256",
+            conflict["source_sha256"],
+        ]
+    )
+    for invalid in ["title=invalid", "title", "=project"]:
+        result = runner.invoke(app, args + ["--resolve", invalid])
+        assert result.exit_code == 1 and "Traceback" not in result.output
+    assert runner.invoke(app, guarded + decision).exit_code == 1
+    preview = runner.invoke(app, guarded + ["--dry-run", "--diff"])
+    assert preview.exit_code == 0, preview.output
+    assert json.loads(preview.output)["resolutions"] == {"title": "project"}
+    assert path.read_bytes() == before
+    api.revision += 1
+    assert runner.invoke(app, guarded).exit_code == 2
+    api.revision -= 1
+    path.write_bytes(before + b"% External edit\n")
+    assert runner.invoke(app, guarded).exit_code == 2
+    path.write_bytes(before)
+    applied = runner.invoke(app, guarded)
+    assert applied.exit_code == 0, applied.output
+    assert Bibliography.open(path).entries["Newton"].fields["title"] == "Project title"
+    assert not json.loads(runner.invoke(app, args).output)["modified"]
+
+
+def test_human_collection_paging(local, monkeypatch):
+    from pynakes.cli_commands import zotero as commands
+
+    api, _ = local
+    monkeypatch.setattr(
+        commands,
+        "ZoteroLibraryBackend",
+        lambda **kw: ZoteroLibraryBackend(transport=httpx.MockTransport(api), **kw),
+    )
+    result = CliRunner().invoke(app, ["zotero", "collections", "--limit", "1"])
+    assert result.exit_code == 0 and "Next cursor:" in result.output
 
 
 def test_projection_reports_unsupported_roles_types_and_converts_markup(local):

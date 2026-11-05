@@ -237,8 +237,9 @@ proper-name protection and all-capital author warnings.
 
 **Workflows:** recover a local PDF archive into a private file-backed Library
 with reviewable metadata, routed bibliography ownership and portable Pinax
-materials; or use Zotero as the authoritative Library and select references into
-a project bibliography through pynakes. Both workflows are release goals.
+materials; or use Zotero as the authoritative Library, start a project
+bibliography from a Zotero collection or search, and keep it refreshed through
+pynakes. Both workflows are release goals.
 
 The direct-read file Library, routing of supplied metadata, and initial
 single-bibliography PDF importer are implemented on the development branch; see
@@ -248,6 +249,8 @@ and [PDF import](docs/guides/pdf-import.md). The
 [initial live Zotero checks](docs/design/zotero-local-api-study.md) exercise public
 APIs. The bounded read-only backend and guarded project selection/refresh are
 implemented; see [Zotero integration](docs/guides/zotero.md) and the changelog.
+The read/select/refresh workflow includes direct collection browsing, local
+page queries, structured field conflicts and guarded per-field reconciliation.
 End-to-end native migration remains unimplemented.
 
 #### Order of work and release gates
@@ -258,15 +261,18 @@ End-to-end native migration remains unimplemented.
    Cover bounded enumeration, instance/revision changes, disabled access,
    missing materials and three-way project refresh. See the guide for the
    implemented scope and explicit unsupported capabilities.
-2. **Extend only from demonstrated needs.** Group libraries, richer citation
+2. **Zotero project setup.** Complete the
+   [setup sequence below](#zotero-project-setup): batch and collection
+   selection, one-call search and whole-file refresh.
+3. **Extend only from demonstrated needs.** Group libraries, richer citation
    projections, cross-instance rebinding and a persistent connection registry
    require their own reviewable contracts. Keep source writes, two-way sync and
-   general project assembly outside this first release gate.
-3. **Native PDF ingestion.** Complete the acquisition sequence below: evidence,
+   multi-source project assembly (v0.12 `pick`) outside this release gate.
+4. **Native PDF ingestion.** Complete the acquisition sequence below: evidence,
    metadata review, variant-aware adoption, guarded routing, a durable ledger and
    interruption recovery. Keep ambiguous/unidentified PDFs pending without
    invented bibliography entries. Ship the native migration gate in this release.
-4. **Private archive rehearsal.** Use an explicitly authorized old PDF archive
+5. **Private archive rehearsal.** Use an explicitly authorized old PDF archive
    to exercise both routes. First preserve PDFs in a dedicated Zotero review
    collection, with stored-byte verification and source-occurrence receipts;
    bibliographic recognition is a separate, reported outcome. Reuse locally
@@ -277,13 +283,67 @@ End-to-end native migration remains unimplemented.
 
 **Done when:** the Zotero read/select/project gate and native migration gate both
 pass with reproducible synthetic coverage and separately recorded live trials.
-Every selected archive source is accepted, explicitly excluded, duplicated by
-bytes, or durably pending with a reason. Verify hashes, repeat runs, stale-source
+Setting up a project from one Zotero collection takes at most four calls from
+`init` to an applied selection, and refreshing every binding takes one, as
+recorded by an agent evaluation task. Every selected archive source is
+accepted, explicitly excluded, duplicated by bytes, or durably pending with a
+reason. Verify hashes, repeat runs, stale-source
 handling and recovery. Unresolved metadata may remain; it must not be hidden by
 an attachment count or reported as completed reference recovery. State tested
 Zotero versions/platforms and unsupported capabilities explicitly. General
 Zotero writes, automatic recognition, annotation transfer, two-way sync, index
 performance and a GUI are not release prerequisites.
+
+#### Zotero project setup
+
+**Workflow:** start a new project bibliography from Zotero and keep it current.
+Today this takes one `zotero scan` call per page of at most 100 items to find
+references and one `zotero select` per reference, each with its own connection,
+parse and commit. Target sequence:
+
+```bash
+pynakes init paper.bib --dialect biblatex   # dialect/key pattern shape projection
+pynakes zotero collections --json           # find the project collection
+pynakes zotero select paper.bib --collection ABCD1234 --dry-run --diff --json
+pynakes zotero select paper.bib --collection ABCD1234 \
+    --expect-revision SOURCE_DIGEST --expect-sha256 PROJECT_DIGEST --json
+```
+
+1. **Batch selection.** `select` accepts repeatable `--item` and
+   `--collection KEY` (direct members, as in `scan --collection`). A batch is
+   one plan, one diff, one source revision and one commit. Report every conflict
+   and reconciliation finding together, by item, instead of stopping at the
+   first; any unresolved one refuses the whole batch. Scope `--resolve`
+   decisions by item within a batch. Two source items matching one work are a
+   reconciliation finding, not two entries. Generalize `prepare_selection`,
+   which requires a pristine Bibliography, into a multi-item planner over the
+   `LibraryBackend` protocol, so the file-backed Library gains the same batch
+   and v0.12 `pick` reuses it.
+2. **Collection hierarchy — decide.** Either select subcollections with an
+   explicit `--recursive`, or report omitted subcollections. Never include them
+   silently.
+3. **Search in one call.** Give `--where` an explicit scan budget: one call
+   pages internally and returns matches, a completeness flag and a continuation
+   cursor, keeping the existing grammar. Separately, expose Zotero quick search
+   as an explicitly native read (for example `zotero search TEXT` in
+   title/creator/year mode), optionally refined locally by `--where`. Never
+   substitute it for `--where`, per the backend design. The local API study did
+   not cover search parameters; verify `q`/`qmode` live before shipping.
+4. **Refresh every binding.** `zotero refresh FILE` refreshes all
+   `pynakes-source-v1` bindings in one plan and reports per-entry conflicts for
+   the existing `--resolve` flow. Bindings to another source instance are
+   reported, not refreshed.
+5. **Citation key source — decide.** Selection uses the project key pattern.
+   Many Zotero LaTeX users cite Better BibTeX keys, usually stored as a
+   `Citation Key:` line in `Extra`, which the projection does not interpret. If
+   a source-provided key may be used instead, it is a behaviour setting with all
+   three forms (flag, `pynakes-meta` key, `metadata set`); the project pattern
+   stays the default, and project keys remain independent after selection.
+6. **File creation stays in `init`.** `select` on a missing file fails with a
+   pointer to `init`.
+
+Mapping collections to groups and copying attachments into the project remain
+v0.12 `pick` work.
 
 #### Ingestion acceptance: references, not attachment labels
 
@@ -691,6 +751,8 @@ declared relationship to its master bibliography.
 
 - Add `pick` with source/entry selection, a destination preview, explicit
   group preservation/stripping/mapping, and destination identity/key checks.
+  Reuse v0.10's multi-item selection planner over the `LibraryBackend`
+  protocol rather than a second implementation.
   A single-entry `ref import --from` alias can share this implementation.
 - Support explicit material copying with collision, missing-file and rollback
   rules. Prepare and validate outputs before mutation; never silently overwrite

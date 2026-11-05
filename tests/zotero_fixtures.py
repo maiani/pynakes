@@ -21,6 +21,7 @@ class LocalAPI:
                     ],
                     "extra": "private memo",
                     "tags": [{"tag": "reading"}],
+                    "collections": ["DEFGHJKL"],
                 },
             },
             {
@@ -31,6 +32,7 @@ class LocalAPI:
                     "title": "Scan",
                     "contentType": "application/pdf",
                     "linkMode": "imported_file",
+                    "collections": ["DEFGHJKL"],
                 },
             },
             {
@@ -45,6 +47,10 @@ class LocalAPI:
             },
         ]
         self.override = None
+        self.collections = [
+            {"key": "DEFGHJKL", "data": {"name": "History", "parentCollection": False}},
+            {"key": "EFGHJKLM", "data": {"name": "Books", "parentCollection": "DEFGHJKL"}},
+        ]
         self.location = "file:///absent/scan.pdf"
         self.change_after_page = False
 
@@ -73,9 +79,15 @@ class LocalAPI:
             return httpx.Response(302, headers={**headers, "Location": self.location})
         if "limit" in request.url.params:
             if path.endswith("collections"):
-                rows = [{"key": "DEFGHJKL", "data": {"name": "History", "parentCollection": False}}]
+                rows = self.collections
             elif path.endswith("children"):
-                rows = [self.items[1]]
+                owner = path.split("/")[-2]
+                rows = [x for x in self.items if x["data"].get("parentItem") == owner]
+            elif "/collections/" in path:
+                collection = path.split("/")[-2]
+                if collection not in {x["key"] for x in self.collections}:
+                    return httpx.Response(404, headers=headers)
+                rows = [x for x in self.items if collection in x["data"].get("collections", [])]
             else:
                 rows = self.items
             start = int(request.url.params.get("start", 0))

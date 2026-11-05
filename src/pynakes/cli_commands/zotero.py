@@ -10,14 +10,16 @@ from pynakes.cli_common import (
     RunParams,
     _check_expected_sha256,
     _emit,
+    _emit_conflict,
     _finish_mod,
     _resolve_input_bib,
     _safe,
+    _source_sha256,
     bib_file_argument,
 )
 from pynakes.engine import Bibliography
-from pynakes.library_backend import SourceChanged, search_page
-from pynakes.project_selection import prepare_selection
+from pynakes.library_backend import SourceChanged
+from pynakes.project_selection import SelectionConflict, prepare_selection
 from pynakes.zotero import ZoteroLibraryBackend
 
 
@@ -40,6 +42,9 @@ def scan(
     limit: int = typer.Option(50, min=1, max=100),
     cursor: str | None = typer.Option(None),
     where: str | None = typer.Option(None),
+    collection: str | None = typer.Option(
+        None, help="Direct members of this Zotero collection key"
+    ),
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
     """Read one bounded source page; optional --where filters its citation projection.
@@ -48,11 +53,7 @@ def scan(
     Notes, annotations and standalone PDFs are counted as skipped, not papers.
     """
     with ZoteroLibraryBackend(port=port) as backend:
-        page = (
-            search_page(backend, where, limit=limit, cursor=cursor)
-            if where
-            else backend.scan(limit=limit, cursor=cursor)
-        )
+        page = backend.scan(limit=limit, cursor=cursor, where=where, collection=collection)
         _emit(
             json_output,
             {"status": "success", "warnings": [], "action": "zotero_scan", **page.to_dict()},
@@ -96,7 +97,8 @@ def collections(
         _emit(
             json_output,
             {"status": "success", "warnings": [], "action": "zotero_collections", **page.to_dict()},
-            [f"{r.ref.key}: {r.name}" for r in page.items],
+            [f"{r.ref.key}: {r.name}" for r in page.items]
+            + ([f"Next cursor: {page.next_cursor}"] if page.next_cursor else []),
         )
 
 
@@ -113,7 +115,8 @@ def materials(
         _emit(
             json_output,
             {"status": "success", "warnings": [], "action": "zotero_materials", **page.to_dict()},
-            [f"{r.ref.key}: {r.title} ({r.media_type})" for r in page.items],
+            [f"{r.ref.key}: {r.title} ({r.media_type})" for r in page.items]
+            + ([f"Next cursor: {page.next_cursor}"] if page.next_cursor else []),
         )
 
 
@@ -125,6 +128,11 @@ def select(
     expect_revision: str | None = typer.Option(
         None, help="Source revision digest from a reviewed preview"
     ),
+    resolve: list[str] | None = typer.Option(
+        None,
+        "--resolve",
+        help="Reviewed FIELD=source|project decision; repeatable; @type selects entry type. Requires both preconditions",
+    ),
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
     backup: bool = _BACKUP_OPTION,
@@ -134,8 +142,21 @@ def select(
     """Stage or refresh one reference in a project; never write to Zotero.
 
     Persists source and target baselines in an attached comment. Same-field
-    conflicts require review. Does not copy PDFs, private notes or annotations.
+    conflicts report values for review. Resolve each with --resolve and both
+    --expect-revision and --expect-sha256. Does not copy PDFs or private notes.
     """
+    from typing import Literal
+
+    resolutions: dict[str, Literal["source", "project"]] = {}
+    for value in resolve or []:
+        field, separator, choice = value.partition("=")
+        if not separator or not field or choice not in ("source", "project"):
+            raise ValueError("Use --resolve FIELD=source or FIELD=project")
+        if field in resolutions:
+            raise ValueError("Repeated conflict decision for " + field)
+        resolutions[field] = "source" if choice == "source" else "project"
+    if resolutions and (expect_revision is None or expect_sha256 is None):
+        raise ValueError("--resolve requires --expect-revision and --expect-sha256 from review")
     file = _resolve_input_bib(file, json_output)
     coll = Bibliography.open(file)
     params = RunParams(
@@ -147,10 +168,39 @@ def select(
     )
     _check_expected_sha256(file, coll, params)
     with ZoteroLibraryBackend(port=port) as backend:
-        plan = prepare_selection(backend, backend.item_ref(item), coll, key=key)
+        ref = backend.item_ref(item)
+        expected = None
+        if expect_revision is not None:
+            expected = backend.get(ref).revision
+            if expect_revision != expected.digest:
+                raise SourceChanged("Zotero differs from the reviewed source revision")
+        try:
+            plan = prepare_selection(
+                backend, ref, coll, key=key, resolutions=resolutions, expected_revision=expected
+            )
+        except SelectionConflict as exc:
+            if not exc.conflicts or exc.source_revision is None:
+                raise
+            _emit_conflict(
+                json_output,
+                "SourceChanged",
+                str(exc),
+                file=file,
+                key=key,
+                source_ref=ref.to_dict(),
+                source_sha256=_source_sha256(coll),
+                source_revision=asdict(exc.source_revision),
+                source_revision_digest=exc.source_revision.digest,
+                conflicts=[asdict(c) for c in exc.conflicts],
+                options=[
+                    {
+                        "id": choice,
+                        "description": f"Review each field; use --resolve FIELD={choice} with both preconditions",
+                    }
+                    for choice in ("source", "project")
+                ],
+            )
         revision = plan.reference.revision
-        if expect_revision is not None and expect_revision != revision.digest:
-            raise SourceChanged("Zotero differs from the reviewed source revision")
         _finish_mod(
             file,
             "zotero_select",
@@ -162,6 +212,8 @@ def select(
             source_revision=asdict(revision),
             source_revision_digest=revision.digest,
             key=plan.key,
+            changes=list(plan.changes),
+            resolutions=resolutions,
         )
 
 

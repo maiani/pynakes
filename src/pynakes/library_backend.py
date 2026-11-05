@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from typing import Generic, Protocol, TypeVar
 
@@ -270,6 +271,17 @@ def search_page(
     until no cursor remains to exhaust the source. No Zotero quick-search pushdown
     or implicit full-library scan occurs.
     """
+    return _search_page(backend.scan, where, limit=limit, cursor=cursor)
+
+
+def _search_page(
+    scan: Callable[..., ReadPage[ReferenceView]],
+    where: str,
+    *,
+    limit: int,
+    cursor: str | None,
+) -> ReadPage[ReferenceView]:
+    """Filter a scoped scan, retaining its own cursor and freshness contract."""
     from pynakes.query import parse_query
 
     predicate = parse_query(where)
@@ -285,7 +297,7 @@ def search_page(
             scan_cursor = decoded["cursor"]
         except (ValueError, KeyError, TypeError) as exc:
             raise ValueError("Invalid search cursor or changed query") from exc
-    page = backend.scan(limit=limit, cursor=scan_cursor)
+    page = scan(limit=limit, cursor=scan_cursor)
     next_cursor = (
         base64.b64encode(
             json.dumps({"query": query_digest, "cursor": page.next_cursor}).encode()

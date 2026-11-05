@@ -92,6 +92,118 @@ def test_local_only_edits_do_not_advance_baseline(project):
     assert path.read_bytes() == before
 
 
+@pytest.mark.parametrize("choice", ["source", "project"])
+def test_reviewed_conflict_resolution_and_future_edits(project, choice):
+    path, source = project
+    bib = select(path, source, "Local")
+    set_entry_field(bib.entries["Local"], "title", "Project title")
+    bib.commit()
+    source.update(title="Source title", year="1687")
+    before = path.read_bytes()
+    bib = Bibliography.open(path)
+    with pytest.raises(SelectionConflict) as error:
+        prepare_selection(source, source.record.ref, bib)
+    conflict = error.value.conflicts[0]
+    assert (conflict.field, conflict.baseline_source, conflict.baseline_project) == (
+        "title",
+        "Principia",
+        "Principia",
+    )
+    assert (conflict.source, conflict.project) == ("Source title", "Project title")
+    assert path.read_bytes() == before and not bib.is_modified
+    prepare_selection(
+        source,
+        source.record.ref,
+        bib,
+        resolutions={"title": choice},
+        expected_revision=error.value.source_revision,
+    )
+    bib.commit()
+    assert bib.entries["Local"].fields["title"] == (
+        "Source title" if choice == "source" else "Project title"
+    )
+    accepted = path.read_bytes()
+    select(path, source)
+    assert path.read_bytes() == accepted
+    # A decision accepts this difference, not an enduring preference.
+    set_entry_field(bib.entries["Local"], "title", "Another project edit")
+    bib.commit()
+    source.update(title="Another source edit", year="1687")
+    with pytest.raises(SelectionConflict, match="title"):
+        select(path, source)
+
+
+@pytest.mark.parametrize("choice", ["source", "project"])
+def test_reviewed_deletion_and_type_resolution(project, choice):
+    from pynakes.editing import set_entry_type
+
+    path, source = project
+    bib = select(path, source, "Local")
+    set_entry_field(bib.entries["Local"], "year", "1688")
+    set_entry_type(bib.entries["Local"], "misc")
+    bib.commit()
+    source.update(title="Principia")
+    source.record = replace(source.record, entry_type="article")
+    bib = Bibliography.open(path)
+    with pytest.raises(SelectionConflict) as error:
+        prepare_selection(source, source.record.ref, bib)
+    assert {c.field for c in error.value.conflicts} == {"year", "@type"}
+    assert error.value.conflicts[0].source is None
+    # Partial decisions never partially stage changes.
+    with pytest.raises(SelectionConflict):
+        prepare_selection(
+            source,
+            source.record.ref,
+            bib,
+            resolutions={"year": choice},
+            expected_revision=source.record.revision,
+        )
+    assert not bib.is_modified
+    prepare_selection(
+        source,
+        source.record.ref,
+        bib,
+        resolutions={"year": choice, "@type": choice},
+        expected_revision=source.record.revision,
+    )
+    bib.commit()
+    assert bib.entries["Local"].type == ("article" if choice == "source" else "misc")
+    assert bib.entries["Local"].fields.get("year") == (None if choice == "source" else "1688")
+    before = path.read_bytes()
+    select(path, source)
+    assert path.read_bytes() == before
+
+
+def test_resolution_guards_and_nonconflicting_decisions(project):
+    path, source = project
+    bib = select(path, source, "Local")
+    before = path.read_bytes()
+    with pytest.raises(ValueError, match="reviewed source revision"):
+        prepare_selection(source, source.record.ref, bib, resolutions={"title": "source"})
+    with pytest.raises(ValueError, match="source or project"):
+        prepare_selection(source, source.record.ref, bib, resolutions={"title": "invalid"})
+    with pytest.raises(SelectionConflict, match="do not match"):
+        prepare_selection(
+            source,
+            source.record.ref,
+            bib,
+            resolutions={"titel": "source"},
+            expected_revision=source.record.revision,
+        )
+    assert not bib.is_modified and path.read_bytes() == before
+    revision = source.record.revision
+    source.update(title="Changed", year="1687")
+    with pytest.raises(SourceChanged):
+        prepare_selection(
+            source,
+            source.record.ref,
+            bib,
+            resolutions={"title": "source"},
+            expected_revision=revision,
+        )
+    assert not bib.is_modified and path.read_bytes() == before
+
+
 def test_source_deletions_and_same_edit(project):
     path, source = project
     bib = select(path, source, "Local")

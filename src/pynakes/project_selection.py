@@ -12,7 +12,9 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
+from typing import Literal
 
 from pynakes.convert import convert
 from pynakes.editing import remove_entry_field, set_entry_field, set_entry_type
@@ -23,6 +25,7 @@ from pynakes.library_backend import (
     ItemRef,
     LibraryBackend,
     ReferenceView,
+    Revision,
     SourceChanged,
     SourceUnsupported,
 )
@@ -35,6 +38,28 @@ _MAPPING = 1
 
 class SelectionConflict(SourceChanged):
     """The project/source requires an explicit reconciliation decision."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        conflicts: tuple[SelectionFieldConflict, ...] = (),
+        source_revision: Revision | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.conflicts = conflicts
+        self.source_revision = source_revision
+
+
+@dataclass(frozen=True)
+class SelectionFieldConflict:
+    """One divergent field; ``None`` means absent and ``@type`` is entry type."""
+
+    field: str
+    baseline_source: str | None
+    baseline_project: str | None
+    source: str | None
+    project: str | None
 
 
 @dataclass(frozen=True)
@@ -93,7 +118,13 @@ def _binding(ref: ItemRef, source_type: str, source: dict, target_type: str, tar
 
 
 def prepare_selection(
-    backend: LibraryBackend, ref: ItemRef, bibliography: Bibliography, *, key: str | None = None
+    backend: LibraryBackend,
+    ref: ItemRef,
+    bibliography: Bibliography,
+    *,
+    key: str | None = None,
+    resolutions: Mapping[str, Literal["source", "project"]] | None = None,
+    expected_revision: Revision | None = None,
 ) -> SelectionPlan:
     """Stage one source reference, or three-way refresh its existing binding.
 
@@ -104,7 +135,21 @@ def prepare_selection(
     operation. Local-only fields and project citation keys remain independent.
     Unknown source data is reported via ``issues``, never treated as absent data
     that should delete an arbitrary project field.
+
+    Resolve reviewed conflicts with ``resolutions={"title": "project"}`` (or
+    ``"source"``); use ``@type`` for the entry type. Decisions require the
+    conflict's ``expected_revision`` and apply only to currently conflicting
+    fields. Accepted source and project baselines advance together, so keeping
+    a deliberate project difference is idempotent. Future divergent edits still
+    require review. These are one-operation decisions, not persistent policies.
     """
+    resolutions = dict(resolutions or {})
+    if any(
+        not isinstance(k, str) or v not in ("source", "project") for k, v in resolutions.items()
+    ):
+        raise ValueError("Resolutions must map field names to source or project")
+    if resolutions and expected_revision is None:
+        raise ValueError("Conflict decisions require the reviewed source revision")
     if bibliography.preview() != bibliography.pristine_text:
         raise SelectionConflict(
             "Select into a pristine Bibliography; commit or reset staged changes first"
@@ -113,7 +158,7 @@ def prepare_selection(
         raise SelectionConflict("Project contains duplicate citation keys")
     if bibliography.path is not None and bibliography._fingerprint is None:
         raise SelectionConflict("Open the project file with Bibliography.open for guarded writes")
-    record = backend.get(ref)
+    record = backend.get(ref, expected_revision=expected_revision)
     if record.entry_type is None:
         raise SourceUnsupported("Source item has no supported citation projection")
     projected = BibEntry(key="", type=record.entry_type, fields=dict(record.fields))
@@ -154,8 +199,9 @@ def prepare_selection(
         desired = dict(entry.fields)
         accepted_target = dict(baseline["target_fields"])
         accepted_type = baseline["target_type"]
-        conflicts = []
-        for field in set(baseline["source_fields"]) | set(incoming):
+        conflicts: list[SelectionFieldConflict] = []
+        used_resolutions = set()
+        for field in sorted(set(baseline["source_fields"]) | set(incoming)):
             before = baseline["source_fields"].get(field)
             after = incoming.get(field)
             if before == after:
@@ -163,35 +209,64 @@ def prepare_selection(
             local = entry.fields.get(field)
             accepted = baseline["target_fields"].get(field)
             if local != accepted and local != after:
-                conflicts.append(field)
-                continue
-            if after is None:
+                decision = resolutions.get(field)
+                if decision is None:
+                    conflicts.append(SelectionFieldConflict(field, before, accepted, after, local))
+                    continue
+                used_resolutions.add(field)
+                chosen = local if decision == "project" else after
+            else:
+                chosen = after
+            if chosen is None:
                 desired.pop(field, None)
             else:
-                desired[field] = after
-            if after is None:
+                desired[field] = chosen
+            if chosen is None:
                 accepted_target.pop(field, None)
             else:
-                accepted_target[field] = after
+                accepted_target[field] = chosen
             changes.append(field)
         desired_type = entry.type
         if record.entry_type != baseline["source_type"]:
             if entry.type not in (baseline["target_type"], record.entry_type):
-                conflicts.append("type")
+                decision = resolutions.get("@type")
+                if decision is None:
+                    conflicts.append(
+                        SelectionFieldConflict(
+                            "@type",
+                            baseline["source_type"],
+                            baseline["target_type"],
+                            record.entry_type,
+                            entry.type,
+                        )
+                    )
+                else:
+                    used_resolutions.add("@type")
+                    desired_type = entry.type if decision == "project" else record.entry_type
+                    accepted_type = desired_type
+                    changes.append("type")
             else:
                 desired_type = record.entry_type
                 accepted_type = record.entry_type
                 changes.append("type")
         if conflicts:
             raise SelectionConflict(
-                "Conflicting source/project edits: " + ", ".join(sorted(conflicts))
+                "Conflicting source/project edits: " + ", ".join(c.field for c in conflicts),
+                conflicts=tuple(conflicts),
+                source_revision=record.revision,
             )
-        for field in set(entry.fields) - set(desired):
+        if unused := set(resolutions) - used_resolutions:
+            raise SelectionConflict(
+                "Decisions do not match current conflicts: " + ", ".join(sorted(unused))
+            )
+        for field in sorted(set(entry.fields) - set(desired)):
             remove_entry_field(entry, field)
         for field, value in desired.items():
             set_entry_field(entry, field, value)
         set_entry_type(entry, desired_type)
     else:
+        if resolutions:
+            raise SelectionConflict("Conflict decisions require an existing source binding")
         candidate = BibEntry(key=key or "", type=record.entry_type, fields=incoming)
         evidence = evidence_from_entry(candidate)
         for existing in bibliography.entries.values():

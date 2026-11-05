@@ -18,6 +18,7 @@ pynakes zotero status --json
 pynakes zotero scan --limit 20 --json
 pynakes zotero show ABCDEFGH --json
 pynakes zotero collections --json
+pynakes zotero scan --collection DEFGHJKL --where 'year < 1900' --json
 pynakes zotero materials ABCDEFGH --json
 
 # The project file must already exist; the key belongs to the project.
@@ -37,6 +38,37 @@ to different fields merge. Divergent changes to the same field, including
 source deletions, return a conflict (exit 2) without writing. A repeat with no
 source changes is idempotent. A potentially matching unbound project record
 requires reconciliation rather than being silently adopted or duplicated.
+
+### Resolve a refresh conflict
+
+A conflicting `select` returns `conflicts`: each record names a `field` and
+shows `baseline_source`, `baseline_project`, `source` and `project` values.
+`null` means a deleted/absent field; `@type` denotes the entry type, separately
+from a citation field named `type`. The response includes the current source
+revision digest and target `source_sha256`, so a decision can be tied to the
+exact pair reviewed. No fields or baselines are written on conflict.
+
+After reviewing those values, choose each conflicting field explicitly:
+
+```bash
+pynakes zotero select project.bib --item ABCDEFGH \
+  --resolve title=project --resolve year=source \
+  --expect-revision SOURCE_DIGEST --expect-sha256 PROJECT_DIGEST \
+  --dry-run --diff --json
+# Apply the same command without --dry-run after reviewing the diff.
+```
+
+Replace both digest placeholders with the values from the conflict response.
+`source` accepts the incoming value (including deletion); `project` retains the
+local value. All conflicts must be resolved together. Decisions for fields that
+are no longer conflicting are rejected, as are duplicate decisions and stale
+source/target preconditions. Both preconditions are mandatory with `--resolve`.
+
+Accepted source and target baselines advance together. Repeating ordinary
+`select` then leaves the accepted difference unchanged. This is a decision about
+one change, not a permanent preference: a later source-only change can refresh
+the field, while a later divergent source/project edit requires another review.
+Use ordinary `select` after applying; do not replay the old resolution flags.
 
 A `% pynakes-source-v1: ...` comment immediately above the entry stores source
 identity and accepted source/target fields as base64 JSON. It is **not encrypted**.
@@ -68,20 +100,31 @@ citation projection page. It does not mean Zotero quick search, relevance rankin
 or a global match count. Its cursor binds the query and page size as well as the
 source revision. Queries see projected citation fields, not native tags or notes.
 
+`scan --collection KEY` reads direct members of one collection, including any
+non-reference members in the scanned/skipped counts. It does not recursively
+include subcollections. Combine it with `--where`; cursors bind both the
+collection and query. A missing collection is an explicit source error, whereas
+an empty collection returns an empty completed page. Collection IDs come from
+`collections`, whose `parent` field describes the hierarchy. Human-readable
+collection and material pages print their next cursor as well as JSON output.
+
 Requests go only to `127.0.0.1` (default port 23119, override with `--port`). No
 redirects, ambient HTTP proxies, cloud fallback or retries are used. The Python
 API exposes a response byte limit (default 4 MiB) and timeout (default 10 seconds).
 Oversized or malformed responses fail explicitly. These transport/read budgets,
-port, cursor, native expansion and search terms are invocation parameters, not
+port, cursor, collection selection, native expansion and search terms are invocation parameters, not
 bibliography editing policies or Zotero settings.
 
 Cursors and guarded selection bind the entire application instance, API/schema,
 projection version and observed library revision. Each read checks the library
 revision before and after; project commit checks it again. This detects edits
 while paging and refuses stale reads. It is optimistic checking, not a distributed
-transaction or an atomic snapshot of a running application. An application restart
-or changed instance requires a fresh connection and reviewed selection; automatic
-rebinding across instances is deliberately unsupported.
+transaction or an atomic snapshot of a running application. Zotero's server ID
+identifies its database and persists across ordinary restarts. Restarting the
+same database does not itself invalidate a binding. A changed instance or schema
+requires a fresh connection; automatic rebinding across instances is deliberately
+unsupported. An application version change during a connection also requires
+reconnecting. See the [local API's server identity contract](https://www.zotero.org/support/dev/web_api/v3/local_api#server_id).
 
 ## Python API
 
@@ -112,6 +155,14 @@ diagnostics. Its IDs are snapshot-scoped file/hash/index occurrences: reopen
 on change, and explicitly reconcile identities rather than guessing across
 reordered or edited files. File-backed reads still load the existing native
 Library; this is not a new index or bounded-memory file parser.
+
+Zotero's `scan(collection="DEFGHJKL", where="year < 1900", limit=20)` exposes
+the same bounded collection/query behavior as the CLI. For refresh conflicts,
+catch `SelectionConflict` from `pynakes.project_selection` and inspect its
+`conflicts` and `source_revision`. Call `prepare_selection` again on the same
+unchanged target with `resolutions={"title": "project"}` and
+`expected_revision=conflict.source_revision`, preview, then commit. The ordinary
+target fingerprint and source commit guard remain active.
 
 Zotero additionally exposes `collections()`, `materials(ref)` and
 `material_path(material)`. Collection reads give names and hierarchy; memberships

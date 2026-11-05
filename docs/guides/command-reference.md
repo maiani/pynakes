@@ -1527,6 +1527,7 @@ Read one bounded source page; optional --where filters its citation projection.
 | `--limit` | integer | no | 50 | — |  |
 | `--cursor` | string | no | null | — |  |
 | `--where` | string | no | null | — |  |
+| `--collection` | string | no | null | — | Direct members of this Zotero collection key |
 | `--json` | boolean | no | false | — |  |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
@@ -1545,6 +1546,7 @@ Stage or refresh one reference in a project; never write to Zotero.
 | `--key` | string | no | null | — | Independent project citation key |
 | `--port` | integer | no | 23119 | — |  |
 | `--expect-revision` | string | no | null | — | Source revision digest from a reviewed preview |
+| `--resolve` | list[string] | no | null | — | Reviewed FIELD=source&#124;project decision; repeatable; @type selects entry type. Requires both preconditions |
 | `--dry-run` | boolean | no | false | — |  |
 | `--diff` | boolean | no | false | — |  |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |

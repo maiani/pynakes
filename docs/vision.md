@@ -77,7 +77,9 @@ BibTeX:
   profile therefore reproduces its behaviour from the file alone, and any run
   can override it in either direction. Three things are deliberately not
   settings: how one run is carried out (`--json`, `--dry-run`, `--diff`,
-  paging, the `--where`/`--key` selection, output paths, one-off views such as
+  paging, the `--where`/`--key`/Zotero `--collection` selection, output paths,
+  per-field Zotero `--resolve` decisions tied to reviewed source/target revisions,
+  one-off views such as
   `analyze --section` or `convert --to`); whether the network is used
   (`--online`, `--fetch` stay explicit — a setting may choose *which* lookup a
   network command makes, never *whether* one is made); and the terms of a

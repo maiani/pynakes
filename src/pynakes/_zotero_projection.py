@@ -63,6 +63,8 @@ _ADMIN = {
 
 
 def project(data: dict, ref: ItemRef, revision: Revision, *, native: bool) -> ReferenceView:
+    if not isinstance(data.get("itemType"), str) or not data["itemType"]:
+        raise SourceUnavailable("Missing Zotero item type")
     textual = set(_FIELDS) | {
         "itemType",
         "date",

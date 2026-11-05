@@ -40,6 +40,16 @@ The compatibility forms deprecated in 0.9 are removed in v0.10:
 
 ### Added
 
+- Zotero collection browsing with `zotero scan --collection KEY`, composable with
+  bounded `--where` queries and cursors scoped to the collection. Refresh conflicts
+  expose accepted and current values; `zotero select --resolve FIELD=source|project`
+  records reviewed field/type decisions with mandatory source and project
+  preconditions. Accepted differences remain idempotent without becoming permanent
+  overwrite policies. The Python API exposes the same scoped reads and decisions.
+- Zotero collection/material text output now includes continuation cursors.
+  Malformed record identities, missing item types, invalid collection parents and
+  inconsistent attachment ownership fail explicitly. Application upgrades during
+  an open connection require reconnection.
 - Read-only Zotero 10 local Library backend with bounded, revision-checked reads,
   explicit native expansion, collection and attachment discovery, and local file
   resolution. The `zotero` CLI selects references into independent project files

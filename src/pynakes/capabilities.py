@@ -412,6 +412,13 @@ def get_capabilities() -> dict:
                 "zotero materials",
             ],
             "project_selection": "zotero select: atomic bibliography and attached source baselines; three-way refresh",
+            "collection_scan": "zotero scan --collection KEY: direct members, with bounded --where filtering",
+            "conflict_resolution": {
+                "command": "zotero select --resolve FIELD=source|project",
+                "entry_type_field": "@type",
+                "requires": ["--expect-revision", "--expect-sha256"],
+                "scope": "One reviewed conflict; accepted source/project baselines are persisted",
+            },
             "python_backends": [
                 "pynakes.library_backend.BibTeXLibraryBackend",
                 "pynakes.zotero.ZoteroLibraryBackend",
