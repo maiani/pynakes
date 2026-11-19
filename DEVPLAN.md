@@ -138,12 +138,9 @@ repository being edited, not library-scoped exploration (see
   and the extension evolve together in this repository, so an engine gap and
   its client consumer land in one reviewable change. A second client is what
   would justify splitting them apart.
-- **Bundled-engine packaging gate** — Typer 0.29 introduces Pydantic's compiled
-  runtime. The engine supports it, but `editor/scripts/vendor-engine.mjs` still
-  assumes universal pure-Python dependencies. Before distributing a new VSIX,
-  replace that assumption with an explicit platform/Python-runtime strategy and
-  validate the bundle on each supported target. This packaging migration is
-  deferred; source-based extension tests do not establish bundle portability.
+- **Bundle release validation** — exercise the packaged native runtime on every
+  supported OS/Python combination before distribution. Cross-platform downloads
+  and source-based tests alone do not establish bundle portability.
 - **Open after the 0.1.0 audit** (not gating the alpha):
   - *Opening materials with the system handler:* a `file`-field path is handed
     to the OS; on Windows an executable named by an untrusted `.bib` could run.

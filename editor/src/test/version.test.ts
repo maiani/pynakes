@@ -5,7 +5,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { compareVersions, extractVersion, isNewerThan, parseVersion } from "../version.js";
+import { compareVersions, extractVersion, isNewerThan, parseVersion } from "../core/version.js";
 
 test("orders plain releases by numeric segment, not lexically", () => {
   assert.equal(compareVersions("0.6.0", "0.5.1"), 1);

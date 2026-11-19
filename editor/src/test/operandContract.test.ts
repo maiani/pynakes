@@ -8,8 +8,8 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { runSearch } from "../library.js";
-import { groupsList, inspectBib } from "../pynakes.js";
+import { runSearch } from "../core/library.js";
+import { groupsList, inspectBib } from "../engine/pynakes.js";
 import { command, engineSkipReason, previewThenApply, tempBib } from "./engine.js";
 
 const skip = engineSkipReason();

@@ -56,7 +56,7 @@ import {
   refRemove,
   searchBib,
   texAdd,
-} from "./pynakes";
+} from "../engine/pynakes";
 
 /** Everything the view needs about a bibliography. */
 export interface LibraryRead {
@@ -189,16 +189,7 @@ export async function runSearch(
   };
 }
 
-/** Said when a write was refused because the file moved under its approved preview. */
-export const FILE_MOVED_MESSAGE =
-  "The file changed while this change was awaiting approval, so nothing was written. " +
-  "Review the current state and apply again.";
-
-/** Said when the engine's preview carried no digest to make the write conditional on. */
-export const NO_FINGERPRINT_MESSAGE =
-  "Nothing was written: the engine did not report the file's fingerprint, so the write " +
-  "could not be guarded against a concurrent change. Update pynakes, or let the " +
-  "extension use its bundled engine.";
+export { FILE_MOVED_MESSAGE, NO_FINGERPRINT_MESSAGE } from "./writeErrors";
 
 /** What the engine reports it would change in one staged entry. */
 export interface PreviewEntry {

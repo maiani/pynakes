@@ -28,8 +28,8 @@ import {
   triedText,
   type AssetFetchEnvelope,
   type AssetFetchSuccess,
-} from "../fetchPlan.js";
-import { PynakesCancelledError, assetFetch, assetFetchArgs } from "../pynakes.js";
+} from "../core/fetchPlan.js";
+import { PynakesCancelledError, assetFetch, assetFetchArgs } from "../engine/pynakes.js";
 import { command, engineSkipReason, tempBib } from "./engine.js";
 
 const skip = engineSkipReason();

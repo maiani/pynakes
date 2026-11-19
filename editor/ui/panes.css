@@ -12,17 +12,17 @@
   width: 100%;
   margin: 0;
   padding: 2px 4px;
-  color: var(--vscode-input-foreground);
-  background-color: var(--vscode-input-background);
-  border: 1px solid var(--vscode-input-border, transparent);
+  color: var(--pynakes-input-foreground);
+  background-color: var(--pynakes-input-background);
+  border: 1px solid var(--pynakes-input-border, transparent);
   border-radius: 2px;
-  font-family: var(--vscode-editor-font-family);
+  font-family: var(--pynakes-editor-font-family);
   font-size: 1.05em;
   font-weight: 600;
 }
 
 .detail-key:focus {
-  outline: 1px solid var(--vscode-focusBorder);
+  outline: 1px solid var(--pynakes-focusBorder);
   outline-offset: -1px;
 }
 
@@ -38,18 +38,18 @@
 }
 
 .detail-at {
-  color: var(--vscode-descriptionForeground);
-  font-family: var(--vscode-editor-font-family);
+  color: var(--pynakes-descriptionForeground);
+  font-family: var(--pynakes-editor-font-family);
 }
 
 .detail-type {
   width: 12em;
   padding: 1px 4px;
-  color: var(--vscode-input-foreground);
-  background-color: var(--vscode-input-background);
-  border: 1px solid var(--vscode-input-border, transparent);
+  color: var(--pynakes-input-foreground);
+  background-color: var(--pynakes-input-background);
+  border: 1px solid var(--pynakes-input-border, transparent);
   border-radius: 2px;
-  font-family: var(--vscode-editor-font-family);
+  font-family: var(--pynakes-editor-font-family);
   font-size: inherit;
 }
 
@@ -76,8 +76,8 @@
 
 .field-name {
   grid-area: name;
-  color: var(--vscode-descriptionForeground);
-  font-family: var(--vscode-editor-font-family);
+  color: var(--pynakes-descriptionForeground);
+  font-family: var(--pynakes-editor-font-family);
   font-size: 0.85em;
 }
 
@@ -92,42 +92,42 @@
   grid-area: value;
   width: 100%;
   padding: 3px 6px;
-  color: var(--vscode-input-foreground);
-  background-color: var(--vscode-input-background);
-  border: 1px solid var(--vscode-input-border, transparent);
+  color: var(--pynakes-input-foreground);
+  background-color: var(--pynakes-input-background);
+  border: 1px solid var(--pynakes-input-border, transparent);
   border-radius: 2px;
-  font-family: var(--vscode-editor-font-family);
+  font-family: var(--pynakes-editor-font-family);
   font-size: 0.92em;
   resize: vertical;
 }
 
 .field-value:focus {
-  outline: 1px solid var(--vscode-focusBorder);
+  outline: 1px solid var(--pynakes-focusBorder);
   outline-offset: -1px;
 }
 
 .field-row.staged .field-name {
-  color: var(--vscode-gitDecoration-modifiedResourceForeground, var(--vscode-charts-blue, #3794ff));
+  color: var(--pynakes-gitDecoration-modifiedResourceForeground, var(--pynakes-charts-blue, #3794ff));
   font-weight: 600;
 }
 
 .field-row.staged .field-value {
-  border-color: var(--vscode-gitDecoration-modifiedResourceForeground, var(--vscode-charts-blue, #3794ff));
+  border-color: var(--pynakes-gitDecoration-modifiedResourceForeground, var(--pynakes-charts-blue, #3794ff));
 }
 
 .field-row.cleared .field-name {
   text-decoration: line-through;
-  color: var(--vscode-gitDecoration-deletedResourceForeground, var(--vscode-errorForeground, #f14c4c));
+  color: var(--pynakes-gitDecoration-deletedResourceForeground, var(--pynakes-errorForeground, #f14c4c));
 }
 
 .field-cleared-note {
   grid-area: value;
-  color: var(--vscode-gitDecoration-deletedResourceForeground, var(--vscode-errorForeground, #f14c4c));
+  color: var(--pynakes-gitDecoration-deletedResourceForeground, var(--pynakes-errorForeground, #f14c4c));
   font-size: 0.9em;
 }
 
 .detail-type.staged {
-  border-color: var(--vscode-gitDecoration-modifiedResourceForeground, var(--vscode-charts-blue, #3794ff));
+  border-color: var(--pynakes-gitDecoration-modifiedResourceForeground, var(--pynakes-charts-blue, #3794ff));
 }
 
 .add-field {
@@ -148,11 +148,11 @@
 
 .add-field input {
   padding: 3px 6px;
-  color: var(--vscode-input-foreground);
-  background-color: var(--vscode-input-background);
-  border: 1px solid var(--vscode-input-border, transparent);
+  color: var(--pynakes-input-foreground);
+  background-color: var(--pynakes-input-background);
+  border: 1px solid var(--pynakes-input-border, transparent);
   border-radius: 2px;
-  font-family: var(--vscode-editor-font-family);
+  font-family: var(--pynakes-editor-font-family);
   font-size: 0.9em;
 }
 
@@ -162,7 +162,7 @@
 
 .detail-section h3 {
   margin: 0 0 4px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
   font-size: 0.85em;
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -178,8 +178,8 @@
 .chip {
   padding: 0 6px;
   border-radius: 8px;
-  background-color: var(--vscode-badge-background);
-  color: var(--vscode-badge-foreground);
+  background-color: var(--pynakes-badge-background);
+  color: var(--pynakes-badge-foreground);
   font-size: 0.85em;
 }
 
@@ -189,15 +189,15 @@
 }
 
 .finding-error {
-  color: var(--vscode-errorForeground, #f14c4c);
+  color: var(--pynakes-errorForeground, #f14c4c);
 }
 
 .finding-warning {
-  color: var(--vscode-editorWarning-foreground, #cca700);
+  color: var(--pynakes-editorWarning-foreground, #cca700);
 }
 
 .finding-info {
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
 }
 
 /* Panes --------------------------------------------------------- */
@@ -240,7 +240,7 @@
 
 .tab {
   padding: 3px 10px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
   background: none;
   border: none;
   border-bottom: 1px solid transparent;
@@ -250,8 +250,8 @@
 }
 
 .tab.active {
-  color: var(--vscode-foreground);
-  border-bottom-color: var(--vscode-focusBorder);
+  color: var(--pynakes-foreground);
+  border-bottom-color: var(--pynakes-focusBorder);
 }
 
 .pane-body {
@@ -269,7 +269,7 @@
 .finding-group h4,
 .diff-group h4 {
   margin: 6px 0 3px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
   font-size: 0.85em;
   font-weight: 600;
   text-transform: uppercase;
@@ -277,7 +277,7 @@
 }
 
 .diff-group h4 {
-  font-family: var(--vscode-editor-font-family);
+  font-family: var(--pynakes-editor-font-family);
   text-transform: none;
   letter-spacing: 0;
 }
@@ -297,18 +297,18 @@
 
 .finding-file {
   flex: 0 0 auto;
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
   font-style: italic;
 }
 
 .finding-message {
   flex: 1 1 auto;
-  color: var(--vscode-foreground);
+  color: var(--pynakes-foreground);
 }
 
 .diff-warning {
   margin: 2px 0;
-  color: var(--vscode-editorWarning-foreground, #cca700);
+  color: var(--pynakes-editorWarning-foreground, #cca700);
   font-size: 0.9em;
 }
 
@@ -316,26 +316,26 @@
   margin: 0;
   padding: 6px 8px;
   overflow-x: auto;
-  background-color: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.1));
-  font-family: var(--vscode-editor-font-family);
+  background-color: var(--pynakes-textCodeBlock-background, rgba(128, 128, 128, 0.1));
+  font-family: var(--pynakes-editor-font-family);
   font-size: 0.9em;
   line-height: 1.4;
 }
 
 .diff-add {
-  color: var(--vscode-gitDecoration-addedResourceForeground, #487e02);
+  color: var(--pynakes-gitDecoration-addedResourceForeground, #487e02);
 }
 
 .diff-del {
-  color: var(--vscode-gitDecoration-deletedResourceForeground, #f14c4c);
+  color: var(--pynakes-gitDecoration-deletedResourceForeground, #f14c4c);
 }
 
 .diff-hunk {
-  color: var(--vscode-textLink-foreground);
+  color: var(--pynakes-textLink-foreground);
 }
 
 .diff-file {
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
 }
 
 /* Compare ------------------------------------------------------- */
@@ -355,23 +355,23 @@
   gap: 8px;
   min-width: 640px;
   padding: 6px 0;
-  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+  border-bottom: 1px solid var(--pynakes-panel-border, rgba(128, 128, 128, 0.2));
   font-size: 0.92em;
 }
 
 .compare-header {
   padding-bottom: 4px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
   font-size: 0.8em;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  border-bottom: 1px solid var(--pynakes-panel-border, rgba(128, 128, 128, 0.35));
 }
 
 .compare-field-name {
   padding-top: 4px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
   font-weight: 600;
   word-break: break-word;
 }
@@ -380,13 +380,13 @@
   padding: 3px 6px;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
-  background-color: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.1));
+  background-color: var(--pynakes-textCodeBlock-background, rgba(128, 128, 128, 0.1));
   border: 1px solid transparent;
   border-radius: 2px;
 }
 
 .compare-value.compare-missing {
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
   background: none;
   font-style: italic;
 }
@@ -396,21 +396,21 @@
 }
 
 .compare-value.compare-selectable:hover {
-  border-color: var(--vscode-panel-border, rgba(128, 128, 128, 0.5));
+  border-color: var(--pynakes-panel-border, rgba(128, 128, 128, 0.5));
 }
 
 .compare-value.compare-selected {
-  border-color: var(--vscode-focusBorder);
+  border-color: var(--pynakes-focusBorder);
 }
 
 .diff-word-add {
   border-radius: 2px;
-  background-color: var(--vscode-diffEditor-insertedTextBackground, rgba(72, 126, 2, 0.25));
+  background-color: var(--pynakes-diffEditor-insertedTextBackground, rgba(72, 126, 2, 0.25));
 }
 
 .diff-word-del {
   border-radius: 2px;
-  background-color: var(--vscode-diffEditor-removedTextBackground, rgba(241, 76, 76, 0.2));
+  background-color: var(--pynakes-diffEditor-removedTextBackground, rgba(241, 76, 76, 0.2));
   text-decoration: line-through;
 }
 
@@ -424,9 +424,9 @@
   width: 100%;
   min-height: 1.8em;
   padding: 3px 6px;
-  color: var(--vscode-input-foreground);
-  background-color: var(--vscode-input-background);
-  border: 1px solid var(--vscode-input-border, transparent);
+  color: var(--pynakes-input-foreground);
+  background-color: var(--pynakes-input-background);
+  border: 1px solid var(--pynakes-input-border, transparent);
   border-radius: 2px;
   font-family: inherit;
   font-size: inherit;
@@ -434,7 +434,7 @@
 }
 
 .compare-merged-value:focus {
-  outline: 1px solid var(--vscode-focusBorder);
+  outline: 1px solid var(--pynakes-focusBorder);
   outline-offset: -1px;
 }
 
@@ -445,28 +445,28 @@
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
-  background-color: var(--vscode-editorWidget-background, var(--vscode-sideBar-background));
+  border-top: 1px solid var(--pynakes-panel-border, rgba(128, 128, 128, 0.35));
+  background-color: var(--pynakes-editorWidget-background, var(--pynakes-sideBar-background));
 }
 
 .commit-summary {
   flex: 1 1 auto;
-  color: var(--vscode-gitDecoration-modifiedResourceForeground, var(--vscode-foreground));
+  color: var(--pynakes-gitDecoration-modifiedResourceForeground, var(--pynakes-foreground));
 }
 
 
 /* Citation and material state: per-row markers, and the detail-pane lists. */
 .uncited-mark {
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
   opacity: 0.7;
 }
 
 .material-mark {
-  color: var(--vscode-charts-blue, var(--vscode-textLink-foreground));
+  color: var(--pynakes-charts-blue, var(--pynakes-textLink-foreground));
 }
 
 .material-mark.material-broken {
-  color: var(--vscode-editorWarning-foreground);
+  color: var(--pynakes-editorWarning-foreground);
 }
 
 .material,
@@ -478,19 +478,19 @@
 }
 
 .material-note {
-  color: var(--vscode-editorWarning-foreground);
+  color: var(--pynakes-editorWarning-foreground);
   font-size: 0.9em;
 }
 
 /* The other way to open a material: quieter than the material itself. */
 .link-button.material-alt {
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
   font-family: inherit;
   font-size: 0.9em;
 }
 
 .link-button.material-alt:hover {
-  color: var(--vscode-textLink-foreground);
+  color: var(--pynakes-textLink-foreground);
 }
 
 .material-fetch {
@@ -498,8 +498,8 @@
 }
 
 .citation-macro {
-  color: var(--vscode-descriptionForeground);
-  font-family: var(--vscode-editor-font-family);
+  color: var(--pynakes-descriptionForeground);
+  font-family: var(--pynakes-editor-font-family);
   font-size: 0.9em;
 }
 
@@ -509,7 +509,7 @@
   background: none;
   border: none;
   padding: 0;
-  color: var(--vscode-textLink-foreground);
+  color: var(--pynakes-textLink-foreground);
   cursor: pointer;
   font: inherit;
   text-align: left;
@@ -520,7 +520,7 @@
 }
 
 .link-button:disabled {
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
   cursor: default;
 }
 
@@ -529,7 +529,7 @@
 .dup-cluster {
   margin-bottom: 14px;
   padding-bottom: 10px;
-  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+  border-bottom: 1px solid var(--pynakes-panel-border, rgba(128, 128, 128, 0.25));
 }
 
 .dup-cluster:last-child {
@@ -546,14 +546,14 @@
 .dup-reason {
   padding: 0 6px;
   border-radius: 8px;
-  background-color: var(--vscode-badge-background);
-  color: var(--vscode-badge-foreground);
+  background-color: var(--pynakes-badge-background);
+  color: var(--pynakes-badge-foreground);
   font-size: 0.85em;
 }
 
 .dup-identity {
-  color: var(--vscode-descriptionForeground);
-  font-family: var(--vscode-editor-font-family, monospace);
+  color: var(--pynakes-descriptionForeground);
+  font-family: var(--pynakes-editor-font-family, monospace);
   overflow-wrap: anywhere;
 }
 
@@ -566,7 +566,7 @@
 
 .dup-entry .dup-key {
   flex: 0 0 auto;
-  font-family: var(--vscode-editor-font-family, monospace);
+  font-family: var(--pynakes-editor-font-family, monospace);
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -578,11 +578,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
 }
 
 .dup-survivor {
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
   font-size: 0.9em;
 }
 
@@ -624,13 +624,13 @@
 .metadata-form input:not([type="checkbox"]),
 .metadata-form select,
 .metadata-form textarea {
-  color: var(--vscode-input-foreground);
-  background: var(--vscode-input-background);
-  border: 1px solid var(--vscode-input-border, transparent);
+  color: var(--pynakes-input-foreground);
+  background: var(--pynakes-input-background);
+  border: 1px solid var(--pynakes-input-border, transparent);
   font: inherit;
   padding: 5px;
 }
-.metadata-form textarea { font-family: var(--vscode-editor-font-family, monospace); }
+.metadata-form textarea { font-family: var(--pynakes-editor-font-family, monospace); }
 
 .metadata-value { flex-basis: 100%; }
 .metadata-value label { align-items: start; }

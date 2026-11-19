@@ -1,9 +1,9 @@
 /**
  * The staged-edit model: what the user has changed but not yet committed.
  *
- * Pure and `vscode`-free so it can be unit tested. Staging lives in the
- * extension rather than the webview because a webview is disposed when its tab
- * is hidden, and pending changes to a file must not evaporate with it.
+ * Pure and host-independent. A bibliography session owns this state rather
+ * than an individual view, so pending changes survive the view being hidden
+ * or disposed. Hosts retain one session for each open document.
  *
  * Every staged field remembers the value it was edited *against*. That base is
  * what makes a safe commit possible: the `batch --dry-run` preview
@@ -13,7 +13,7 @@
  */
 
 import type { RefEditPlanEntry } from "./model";
-import type { RefEditRequest } from "./pynakes";
+import type { RefEditRequest } from "../engine/pynakes";
 import { own, record } from "./records";
 
 /** One field's pending change. */

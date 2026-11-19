@@ -195,6 +195,40 @@ jobs:
           python -P editor/engine/pynakes_launcher.py \
             inspect tests/fixtures/biblatex_sample.bib --json > /dev/null
 
+      - name: Check native wheel selection
+        env:
+          PYTHONPATH: editor/engine
+        run: python -m unittest discover -s editor/scripts -p 'test_bundle_*.py'
+
+      - name: Save bundled engine for platform checks
+        uses: actions/upload-artifact@v7
+        with:
+          name: editor-engine
+          path: editor/engine/
+
+  editor-runtime:
+    name: Bundled engine (${{ matrix.os }}, Python ${{ matrix.python }})
+    needs: editor
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-15-intel, macos-latest]
+        python: ["3.12", "3.13", "3.14", "3.15"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: editor-engine
+          path: editor/engine/
+      - name: Run isolated bundle without installed engine dependencies
+        run: |
+          python -I -S editor/engine/pynakes_launcher.py --version
+          python -I -S editor/engine/pynakes_launcher.py inspect tests/fixtures/biblatex_sample.bib --json
+
   package:
     name: Distribution
     runs-on: ubuntu-latest

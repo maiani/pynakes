@@ -13,7 +13,7 @@ import {
   hasCustomViewer,
   planMaterialOpen,
   type MaterialOpenFacts,
-} from "../materialOpener.js";
+} from "../vscode/materialOpener.js";
 
 const file: MaterialOpenFacts = {
   setting: undefined,
@@ -149,7 +149,7 @@ Object.assign(require("vscode") as Record<string, unknown>, {
 });
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { openMaterial, doubleClickEntry } = require("../navigation.js") as typeof import("../navigation.js");
+const { openMaterial, doubleClickEntry } = require("../vscode/navigation.js") as typeof import("../vscode/navigation.js");
 
 function reset(): void {
   calls.length = 0;
@@ -228,7 +228,7 @@ test("a directory is revealed, and an unreported path is refused", async () => {
 });
 
 const entryDocument = { uri: uriOf("/lib/refs.bib") } as unknown as import("vscode").TextDocument;
-const pdfIndex = (paths: string[]): import("../insights").MaterialIndex => ({
+const pdfIndex = (paths: string[]): import("../core/insights").MaterialIndex => ({
   byKey: { Newton1687: paths.map((path) => ({
     path, kind: "pdf", label: path, present: true, origin: "file",
   })) },

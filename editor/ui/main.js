@@ -205,8 +205,8 @@ window.PV = window.PV || {};
     PV.renderDocks();
   }
 
-  window.addEventListener("message", (event) => {
-    const message = event.data;
+  window.PynakesHost.onMessage((message) => {
+    if (!message || typeof message.type !== "string") return;
     const s = PV.state;
     const staleSearch =
       typeof message.seq === "number" && message.seq !== searchSeq;

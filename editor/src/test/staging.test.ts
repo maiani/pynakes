@@ -12,7 +12,7 @@ import {
   refImportArgs,
   refRemoveArgs,
   searchArgs,
-} from "../pynakes.js";
+} from "../engine/pynakes.js";
 import {
   diffHeading,
   discardEntry,
@@ -24,7 +24,7 @@ import {
   stagedCount,
   toRequests,
   unstageField,
-} from "../staging.js";
+} from "../core/staging.js";
 
 test("staging a change records the value it was made against", () => {
   const state = stageField(emptyStaging(), "Newton1687", "year", "1686", "1687");

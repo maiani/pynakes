@@ -14,8 +14,8 @@ import {
   lintDiagnostics,
   type CitationIndex,
   type LintIndex,
-} from "./insights";
-import type { LintSeverity } from "./model";
+} from "../core/insights";
+import type { LintSeverity } from "../core/model";
 
 /** Engine finding severities onto VS Code's diagnostic scale. */
 const DIAGNOSTIC_SEVERITY: Record<LintSeverity, vscode.DiagnosticSeverity> = {

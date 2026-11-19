@@ -14,7 +14,7 @@ import {
   formatNames,
   summarize,
   toRows,
-} from "../model.js";
+} from "../core/model.js";
 
 function envelope(overrides: Partial<InspectSuccess> = {}): InspectSuccess {
   return {

@@ -29,14 +29,12 @@
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { PynakesUnavailableError, describeCommand, engineVersion } from "./pynakes";
-import { isNewerThan, parseVersion } from "./version";
+import { PynakesUnavailableError, describeCommand, engineVersion } from "../engine/pynakes";
+import { isNewerThan, parseVersion } from "../core/version";
 
 /** A resolved invocation: an executable plus any arguments that precede the subcommand. */
-export interface PynakesCommand {
-  executable: string;
-  leadingArgs: string[];
-}
+export type { PynakesCommand } from "../engine/command";
+import type { PynakesCommand } from "../engine/command";
 
 /** Identifies this extension, for locating the vendored engine on disk. */
 const EXTENSION_ID = "pynakes.pynakes-vscode";
@@ -44,8 +42,8 @@ const EXTENSION_ID = "pynakes.pynakes-vscode";
 /** Directory inside the extension holding the vendored engine. */
 const ENGINE_DIRECTORY = "engine";
 
-/** Keeps the working directory off `sys.path`; see the launcher's docstring. */
-const ISOLATION_FLAG = "-P";
+/** Exclude ambient packages, Python environment overrides and the working directory. */
+const ISOLATION_FLAGS = ["-I", "-S"];
 
 /** Where the engine came from, for display and diagnostics. */
 export type EngineSource = "setting" | "bundled" | "installed";
@@ -162,7 +160,7 @@ async function selectEngine(
     if (!bundled) {
       throw new PynakesUnavailableError(
         "the bundled pynakes engine",
-        "pynakes.engine is set to 'bundled', but no Python 3.12+ interpreter could run it.",
+        "pynakes.engine is set to 'bundled', but no compatible CPython 3.12–3.15 interpreter could run it.",
       );
     }
     return { ...bundled, reason: `Using the bundled engine ${bundled.version} (forced).` };
@@ -216,13 +214,13 @@ async function selectEngine(
       installedVersion,
       reason:
         `Using the installed engine ${installedVersion}; the bundled engine could not run ` +
-        "because no Python 3.12+ interpreter was found.",
+        "because no compatible CPython 3.12–3.15 interpreter was found.",
     };
   }
 
   throw new PynakesUnavailableError(
     "pynakes",
-    "No pynakes engine is available: the bundled engine needs a Python 3.12+ interpreter, " +
+    "No pynakes engine is available: the bundled engine needs a compatible CPython 3.12–3.15 interpreter, " +
       "and no installed pynakes was found on PATH.",
   );
 }
@@ -252,7 +250,7 @@ async function probeBundled(cwd: string | undefined): Promise<EngineCandidate | 
   for (const interpreter of await interpreterCandidates(cwd)) {
     const command: PynakesCommand = {
       executable: interpreter.executable,
-      leadingArgs: [...interpreter.leadingArgs, ISOLATION_FLAG, manifest.launcher],
+      leadingArgs: [...interpreter.leadingArgs, ...ISOLATION_FLAGS, manifest.launcher],
     };
     const version = await engineVersion(command, cwd);
     if (version && parseVersion(version)) {

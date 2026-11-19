@@ -10,7 +10,7 @@
 
 import * as path from "node:path";
 import * as vscode from "vscode";
-import type { CitationIndex, MaterialIndex } from "./insights";
+import type { CitationIndex, MaterialIndex } from "../core/insights";
 import { customEditorsOf, hasCustomViewer, planMaterialOpen } from "./materialOpener";
 
 /**

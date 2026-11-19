@@ -43,7 +43,7 @@ than the values trimmed here.
 
 The engine supplies display values through `inspect --display`: cleaned titles
 and split name lists are separate from the raw fields used for editing.
-`src/model.ts` and `src/insights.ts` project engine output into table rows,
+`src/core/model.ts` and `src/core/insights.ts` project engine output into table rows,
 group trees, and findings; they do not implement bibliography semantics.
 
 ## Project scope
@@ -68,3 +68,42 @@ never owns or curates them.
 Until Bimas starts, the CLI and this extension are developed together in this
 repository. A second client is the trigger for splitting anything out, so
 `editor/` should not be extracted before then.
+
+## Shared application boundary
+
+`src/core/` holds host-independent projections and application operations:
+reading a bibliography, staging changes, building previews, conflict checks,
+and fetch plans. `src/engine/` is the Node CLI adapter; it receives an executable
+contract and never discovers VS Code settings. Neither imports `vscode/`.
+
+`ui/` is the shared browser interface. Its only host API is
+`window.PynakesHost`: `postMessage(message)`, `getState()`, `setState(state)` and
+`onMessage(handler)` (returning an unsubscribe function). State storage is
+scoped to a view. Messages keep the existing request/response protocol; the host
+owns routing and lifecycle. `core/shell.ts` accepts resource URLs, a nonce, CSP
+source, and optional bridge/theme assets. It does not construct host URIs.
+The default theme works on its own; `media/vscode.css` maps UI tokens to VS Code
+colors, and `media/vscode.js` alone acquires the webview API.
+
+`core/session.ts` owns pending field/type edits and their transaction lifecycle.
+Each document has one `BibliographySession`, shared by all its views. It exposes
+staging methods, detached snapshots, preview and commit. Its `SessionHost` port
+supplies buffer previews, preparation of a writable target, approval, messages
+and refresh. The prepared target binds one source and engine for preview and
+commit; the session passes the preview's fingerprint back for the guarded write.
+There are no filesystem, process, VS Code or browser dependencies in this module.
+
+The session checks staged base values before approval. A change to staging while
+reconciliation, preview or approval is pending invalidates that apply attempt.
+Only one apply can run per session. During the actual engine write, further
+staging changes are explicitly refused; they are never silently cleared by a
+successful earlier write. Stale preview results and errors are suppressed.
+
+`src/vscode/` supplies document ownership, dirty-buffer mirrors, dialogs, engine
+discovery, navigation and diagnostics. `vscode/stagedCommit.ts` adapts these
+capabilities to the shared session; it does not decide transaction order.
+Entry/group mutations and material-fetch orchestration still live in their
+existing host modules and are not part of the staged-edit session yet.
+A future host needs its own lifecycle and routing adapter. No standalone app
+or Electron dependency is introduced yet. Boundary tests prevent shared code from importing the host,
+and the shared UI smoke tests run with a generic in-memory bridge.

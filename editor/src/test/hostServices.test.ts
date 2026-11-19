@@ -76,10 +76,10 @@ Object.assign(require("vscode") as Record<string, unknown>, {
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { resolveEngine, resetEngineDiscovery } =
-  require("../engineDiscovery.js") as typeof import("../engineDiscovery.js");
-const { FindingsPublisher } = require("../diagnostics.js") as typeof import("../diagnostics.js");
-const { escapeMarkdown } = require("../statusBar.js") as typeof import("../statusBar.js");
-const { indexCitations } = require("../insights.js") as typeof import("../insights.js");
+  require("../vscode/engineDiscovery.js") as typeof import("../vscode/engineDiscovery.js");
+const { FindingsPublisher } = require("../vscode/diagnostics.js") as typeof import("../vscode/diagnostics.js");
+const { escapeMarkdown } = require("../vscode/statusBar.js") as typeof import("../vscode/statusBar.js");
+const { indexCitations } = require("../core/insights.js") as typeof import("../core/insights.js");
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 test(

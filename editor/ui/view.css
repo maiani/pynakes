@@ -1,7 +1,6 @@
 /*
- * Styling is expressed entirely through VS Code theme variables so the view
- * matches whatever theme the user runs, light or dark, without a palette of
- * its own. The one exception is a group's colour, which is data from the file.
+ * Styling uses shared UI tokens. The host may override the default palette
+ * through its theme adapter. The one exception is a group's colour, which is data from the file.
  */
 
 * {
@@ -18,10 +17,10 @@ body {
 body {
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
-  color: var(--vscode-foreground);
-  background-color: var(--vscode-editor-background);
-  font-family: var(--vscode-font-family);
-  font-size: var(--vscode-font-size);
+  color: var(--pynakes-foreground);
+  background-color: var(--pynakes-editor-background);
+  font-family: var(--pynakes-font-family);
+  font-size: var(--pynakes-font-size);
 }
 
 /* Each child keeps its own row. A hidden banner or notice takes no grid slot,
@@ -50,16 +49,16 @@ body {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  border-bottom: 1px solid var(--pynakes-panel-border, rgba(128, 128, 128, 0.35));
 }
 
 .filter {
   flex: 2 1 0;
   min-width: 0;
   padding: 4px 8px;
-  color: var(--vscode-input-foreground);
-  background-color: var(--vscode-input-background);
-  border: 1px solid var(--vscode-input-border, transparent);
+  color: var(--pynakes-input-foreground);
+  background-color: var(--pynakes-input-background);
+  border: 1px solid var(--pynakes-input-border, transparent);
   border-radius: 2px;
   font-family: inherit;
   font-size: inherit;
@@ -67,12 +66,12 @@ body {
 
 .filter.where {
   flex: 1 1 0;
-  font-family: var(--vscode-editor-font-family);
+  font-family: var(--pynakes-editor-font-family);
   font-size: 0.92em;
 }
 
 .filter:focus {
-  outline: 1px solid var(--vscode-focusBorder);
+  outline: 1px solid var(--pynakes-focusBorder);
   outline-offset: -1px;
 }
 
@@ -81,14 +80,14 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
   white-space: nowrap;
   cursor: pointer;
 }
 
 .counts {
   flex: 0 0 auto;
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -105,9 +104,9 @@ body {
 .button {
   flex: 0 0 auto;
   padding: 3px 11px;
-  color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
-  background-color: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
-  border: 1px solid var(--vscode-contrastBorder, var(--vscode-panel-border, transparent));
+  color: var(--pynakes-button-secondaryForeground, var(--pynakes-button-foreground));
+  background-color: var(--pynakes-button-secondaryBackground, var(--pynakes-button-background));
+  border: 1px solid var(--pynakes-contrastBorder, var(--pynakes-panel-border, transparent));
   border-radius: 2px;
   font-family: inherit;
   font-size: inherit;
@@ -115,22 +114,22 @@ body {
 }
 
 .button:hover {
-  background-color: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground));
+  background-color: var(--pynakes-button-secondaryHoverBackground, var(--pynakes-button-hoverBackground));
 }
 
 .button.primary {
-  color: var(--vscode-button-foreground);
-  background-color: var(--vscode-button-background);
+  color: var(--pynakes-button-foreground);
+  background-color: var(--pynakes-button-background);
 }
 
 .button.primary:hover {
-  background-color: var(--vscode-button-hoverBackground);
+  background-color: var(--pynakes-button-hoverBackground);
 }
 
 .button:focus-visible,
 .icon-button:focus-visible,
 .link-button:focus-visible {
-  outline: 1px solid var(--vscode-focusBorder);
+  outline: 1px solid var(--pynakes-focusBorder);
   outline-offset: 2px;
 }
 
@@ -138,7 +137,7 @@ body {
   min-width: 24px;
   min-height: 24px;
   padding: 3px 7px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
   background: none;
   border: none;
   border-radius: 3px;
@@ -149,8 +148,8 @@ body {
 }
 
 .icon-button:hover {
-  color: var(--vscode-foreground);
-  background-color: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+  color: var(--pynakes-foreground);
+  background-color: var(--pynakes-toolbar-hoverBackground, var(--pynakes-list-hoverBackground));
 }
 
 /* Collapse/expand toggles for the groups column and the bottom panel: a
@@ -170,8 +169,8 @@ body {
 }
 
 .collapse-toggle:hover {
-  color: var(--vscode-foreground);
-  background-color: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+  color: var(--pynakes-foreground);
+  background-color: var(--pynakes-toolbar-hoverBackground, var(--pynakes-list-hoverBackground));
   text-decoration: none;
 }
 
@@ -191,43 +190,43 @@ body {
   align-items: flex-start;
   gap: 6px;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
-  background-color: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.08));
-  border-left: 3px solid var(--vscode-errorForeground, #f14c4c);
+  border-bottom: 1px solid var(--pynakes-panel-border, rgba(128, 128, 128, 0.35));
+  background-color: var(--pynakes-inputValidation-errorBackground, rgba(255, 0, 0, 0.08));
+  border-left: 3px solid var(--pynakes-errorForeground, #f14c4c);
 }
 
 .banner strong {
-  color: var(--vscode-errorForeground, #f14c4c);
+  color: var(--pynakes-errorForeground, #f14c4c);
 }
 
 .banner p {
   margin: 0;
   white-space: pre-wrap;
-  font-family: var(--vscode-editor-font-family);
+  font-family: var(--pynakes-editor-font-family);
   font-size: 0.92em;
-  color: var(--vscode-foreground);
+  color: var(--pynakes-foreground);
 }
 
 .notice {
   padding: 5px 12px;
-  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  border-bottom: 1px solid var(--pynakes-panel-border, rgba(128, 128, 128, 0.35));
   font-size: 0.95em;
 }
 
 .notice-success {
-  color: var(--vscode-testing-iconPassed, var(--vscode-foreground));
+  color: var(--pynakes-testing-iconPassed, var(--pynakes-foreground));
 }
 
 .notice-warning {
-  color: var(--vscode-editorWarning-foreground, var(--vscode-foreground));
+  color: var(--pynakes-editorWarning-foreground, var(--pynakes-foreground));
 }
 
 .notice-error {
-  color: var(--vscode-errorForeground, #f14c4c);
+  color: var(--pynakes-errorForeground, #f14c4c);
 }
 
 .notice-info {
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
 }
 
 /* Layout ----------------------------------------------------------------- */
@@ -243,7 +242,7 @@ body {
   min-width: 0;
   padding: 6px 0 10px;
   overflow: auto;
-  background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  background-color: var(--pynakes-sideBar-background, var(--pynakes-editor-background));
 }
 
 .sidebar.collapsed {
@@ -278,7 +277,7 @@ body {
 
 .right-dock {
   flex: 0 0 clamp(250px, 28%, 380px);
-  background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  background-color: var(--pynakes-sideBar-background, var(--pynakes-editor-background));
 }
 
 /*
@@ -309,11 +308,11 @@ body {
   flex: 0 0 4px;
   min-width: 0;
   cursor: col-resize;
-  background-color: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  background-color: var(--pynakes-panel-border, rgba(128, 128, 128, 0.35));
 }
 
 .pane-splitter:hover {
-  background-color: var(--vscode-focusBorder);
+  background-color: var(--pynakes-focusBorder);
 }
 
 .pane-splitter-horizontal {
@@ -352,7 +351,7 @@ body.resizing-row * {
   align-items: center;
   justify-content: space-between;
   padding: 2px 6px 6px 10px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
   font-size: 0.85em;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -378,17 +377,17 @@ body.resizing-row * {
 }
 
 .group-row:hover {
-  background-color: var(--vscode-list-hoverBackground);
+  background-color: var(--pynakes-list-hoverBackground);
 }
 
 .group-row:focus-visible {
-  outline: 1px solid var(--vscode-focusBorder);
+  outline: 1px solid var(--pynakes-focusBorder);
   outline-offset: -1px;
 }
 
 .group-row.selected {
-  color: var(--vscode-list-activeSelectionForeground);
-  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--pynakes-list-activeSelectionForeground);
+  background-color: var(--pynakes-list-activeSelectionBackground);
 }
 
 .twisty {
@@ -421,12 +420,12 @@ body.resizing-row * {
 
 .group-name.undeclared {
   font-style: italic;
-  color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
+  color: var(--pynakes-editorWarning-foreground, var(--pynakes-descriptionForeground));
 }
 
 .group-count {
   flex: 0 0 auto;
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
   font-variant-numeric: tabular-nums;
   font-size: 0.85em;
 }
@@ -474,9 +473,9 @@ body.resizing-row * {
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
-  color: var(--vscode-foreground);
-  background-color: var(--vscode-editor-background);
-  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  color: var(--pynakes-foreground);
+  background-color: var(--pynakes-editor-background);
+  border-bottom: 1px solid var(--pynakes-panel-border, rgba(128, 128, 128, 0.35));
   user-select: none;
 }
 
@@ -493,7 +492,7 @@ body.resizing-row * {
 }
 
 .col-resize:hover {
-  background-color: var(--vscode-focusBorder);
+  background-color: var(--pynakes-focusBorder);
 }
 
 /* Keep the resize cursor while dragging, even outside the handle. */
@@ -508,17 +507,17 @@ body.resizing * {
 }
 
 .entries th:hover:not(.col-status) {
-  background-color: var(--vscode-list-hoverBackground);
+  background-color: var(--pynakes-list-hoverBackground);
 }
 
 .entries th:focus-visible {
-  outline: 1px solid var(--vscode-focusBorder);
+  outline: 1px solid var(--pynakes-focusBorder);
   outline-offset: -2px;
 }
 
 .entries th.sorted span::after {
   content: " ^";
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
 }
 
 .entries th.sorted.descending span::after {
@@ -530,20 +529,28 @@ body.resizing * {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border-bottom: 1px solid var(--vscode-editorGroup-border, rgba(128, 128, 128, 0.14));
+  border-bottom: 1px solid var(--pynakes-editorGroup-border, rgba(128, 128, 128, 0.14));
 }
 
 .entries tbody tr {
   cursor: default;
 }
 
+/* Stripe the displayed order, so sorting and filtering keep the pattern intact.
+   Hover and selection below take precedence over either row shade. */
+.entries tbody tr:nth-child(even) {
+  background-color: color-mix(
+    in srgb, var(--pynakes-foreground) 5%, var(--pynakes-editor-background)
+  );
+}
+
 .entries tbody tr:hover {
-  background-color: var(--vscode-list-hoverBackground);
+  background-color: var(--pynakes-list-hoverBackground);
 }
 
 .entries tbody tr.selected {
-  color: var(--vscode-list-activeSelectionForeground);
-  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--pynakes-list-activeSelectionForeground);
+  background-color: var(--pynakes-list-activeSelectionBackground);
 }
 
 .col-status {
@@ -558,7 +565,7 @@ body.resizing * {
 
 .col-key {
   width: 16%;
-  font-family: var(--vscode-editor-font-family);
+  font-family: var(--pynakes-editor-font-family);
 }
 
 .col-author {
@@ -579,7 +586,7 @@ body.resizing * {
 }
 
 .staged-dot {
-  color: var(--vscode-gitDecoration-modifiedResourceForeground, var(--vscode-charts-blue, #3794ff));
+  color: var(--pynakes-gitDecoration-modifiedResourceForeground, var(--pynakes-charts-blue, #3794ff));
   font-size: 0.8em;
 }
 
@@ -589,15 +596,15 @@ body.resizing * {
 }
 
 .severity-error {
-  color: var(--vscode-errorForeground, #f14c4c);
+  color: var(--pynakes-errorForeground, #f14c4c);
 }
 
 .severity-warning {
-  color: var(--vscode-editorWarning-foreground, #cca700);
+  color: var(--pynakes-editorWarning-foreground, #cca700);
 }
 
 .severity-info {
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
 }
 
 .type-badge {
@@ -607,8 +614,8 @@ body.resizing * {
   overflow: hidden;
   text-overflow: ellipsis;
   border-radius: 8px;
-  color: var(--vscode-badge-foreground);
-  background-color: var(--vscode-badge-background);
+  color: var(--pynakes-badge-foreground);
+  background-color: var(--pynakes-badge-background);
   font-size: 0.85em;
 }
 
@@ -616,21 +623,33 @@ body.resizing * {
   margin-left: 6px;
   padding: 0 5px;
   border-radius: 8px;
-  color: var(--vscode-inputValidation-warningForeground, var(--vscode-foreground));
-  background-color: var(--vscode-inputValidation-warningBackground, rgba(255, 204, 0, 0.2));
-  border: 1px solid var(--vscode-inputValidation-warningBorder, transparent);
-  font-family: var(--vscode-font-family);
+  color: var(--pynakes-inputValidation-warningForeground, var(--pynakes-foreground));
+  background-color: var(--pynakes-inputValidation-warningBackground, rgba(255, 204, 0, 0.2));
+  border: 1px solid var(--pynakes-inputValidation-warningBorder, transparent);
+  font-family: var(--pynakes-font-family);
   font-size: 0.8em;
 }
 
 .empty,
 .hint {
   margin: 16px 12px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--pynakes-descriptionForeground);
 }
 
 .group-row.drop-target {
-  outline: 2px solid var(--vscode-focusBorder);
+  outline: 2px solid var(--pynakes-focusBorder);
   outline-offset: -2px;
-  background: var(--vscode-list-dropBackground);
+  background: var(--pynakes-list-dropBackground);
+}
+
+/* Keep search and actions reachable when the editor is split into narrow columns. */
+.toolbar { flex-wrap: wrap; }
+#query, #where { min-width: min(180px, 100%); }
+button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--pynakes-focusBorder);
+  outline-offset: 2px;
+}
+@media (max-width: 620px) {
+  .toolbar .toolbar-actions { margin-left: 0; }
+  #query, #where { flex-basis: 100%; }
 }

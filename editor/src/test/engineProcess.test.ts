@@ -17,8 +17,8 @@ import {
   PynakesCancelledError,
   PynakesUnavailableError,
   run,
-} from "../engineProcess.js";
-import type { PynakesCommand } from "../pynakes.js";
+} from "../engine/engineProcess.js";
+import type { PynakesCommand } from "../engine/pynakes.js";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pynakes-process-"));
 

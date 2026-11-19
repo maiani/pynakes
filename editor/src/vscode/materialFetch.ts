@@ -28,10 +28,10 @@ import {
   nothingToFetch,
   planFetch,
   runFetch,
-} from "./fetchPlan";
-import { NO_FINGERPRINT_MESSAGE } from "./library";
+} from "../core/fetchPlan";
+import { NO_FINGERPRINT_MESSAGE } from "../core/library";
 import { reportRefusal, type MutationHost } from "./mutations";
-import { PynakesCancelledError, type AssetFetchRequest } from "./pynakes";
+import { PynakesCancelledError, type AssetFetchRequest } from "../engine/pynakes";
 
 /** Ask which material to fetch; `undefined` when the pick was dismissed. */
 async function pickMaterial(key: string | undefined): Promise<{ material?: string } | undefined> {

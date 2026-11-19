@@ -1,0 +1,46 @@
+/* Standalone defaults; hosts may override these UI tokens. */
+:root {
+  --pynakes-badge-background: #e5ebf2;
+  --pynakes-badge-foreground: #202830;
+  --pynakes-button-background: #245dba;
+  --pynakes-button-foreground: #ffffff;
+  --pynakes-button-hoverBackground: #194d9e;
+  --pynakes-button-secondaryBackground: #e5ebf2;
+  --pynakes-button-secondaryForeground: #202830;
+  --pynakes-button-secondaryHoverBackground: #d7e0eb;
+  --pynakes-charts-blue: #245dba;
+  --pynakes-contrastBorder: transparent;
+  --pynakes-descriptionForeground: #5f6b76;
+  --pynakes-diffEditor-insertedTextBackground: #ddf4e4;
+  --pynakes-diffEditor-removedTextBackground: #fbe3e3;
+  --pynakes-editor-background: #ffffff;
+  --pynakes-editor-font-family: ui-monospace, monospace;
+  --pynakes-editorGroup-border: #e5ebf2;
+  --pynakes-editorWarning-foreground: #805600;
+  --pynakes-editorWidget-background: #f5f7fa;
+  --pynakes-errorForeground: #b32828;
+  --pynakes-focusBorder: #245dba;
+  --pynakes-font-family: system-ui, sans-serif;
+  --pynakes-font-size: 13px;
+  --pynakes-foreground: #202830;
+  --pynakes-gitDecoration-addedResourceForeground: #23753d;
+  --pynakes-gitDecoration-deletedResourceForeground: #b32828;
+  --pynakes-gitDecoration-modifiedResourceForeground: #805600;
+  --pynakes-input-background: #ffffff;
+  --pynakes-input-border: #b8c3cf;
+  --pynakes-input-foreground: #202830;
+  --pynakes-inputValidation-errorBackground: #fbe3e3;
+  --pynakes-inputValidation-warningBackground: #fff3d1;
+  --pynakes-inputValidation-warningBorder: #cf9a32;
+  --pynakes-inputValidation-warningForeground: #805600;
+  --pynakes-list-activeSelectionBackground: #dbe9ff;
+  --pynakes-list-activeSelectionForeground: #202830;
+  --pynakes-list-dropBackground: #e5ebf2;
+  --pynakes-list-hoverBackground: #eef3f8;
+  --pynakes-panel-border: #d1d9e2;
+  --pynakes-sideBar-background: #f5f7fa;
+  --pynakes-testing-iconPassed: #23753d;
+  --pynakes-textCodeBlock-background: #e5ebf2;
+  --pynakes-textLink-foreground: #245dba;
+  --pynakes-toolbar-hoverBackground: #e5ebf2;
+}

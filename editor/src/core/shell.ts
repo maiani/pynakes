@@ -1,13 +1,4 @@
-/** The static webview shell: markup, CSP, and resource URIs. */
-
-import { randomBytes } from "node:crypto";
-import * as vscode from "vscode";
-
-/** Fresh unguessable nonce per load, so the CSP can allow exactly our scripts. */
-function nonce(): string {
-  return randomBytes(24).toString("base64url");
-}
-
+/** Host-independent bibliography UI shell. Resource URLs and CSP are supplied by the host. */
 const COLUMNS: Array<{ id: string; label: string; className: string }> = [
   { id: "type", label: "Type", className: "col-type" },
   { id: "key", label: "Citation key", className: "col-key" },
@@ -38,15 +29,22 @@ const SCRIPTS = [
 ];
 
 /** Build the full HTML document for one bibliography view. */
-export function renderShell(webview: vscode.Webview, extensionUri: vscode.Uri): string {
-  const asset = (...parts: string[]): vscode.Uri =>
-    webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, ...parts));
+export interface ShellHost {
+  asset(...parts: string[]): string;
+  cspSource: string;
+  nonce: string;
+  bridgeScripts?: string[];
+  themeStyles?: string[];
+}
+
+export function renderShell(host: ShellHost): string {
+  const { asset } = host;
   // Two stylesheets, loaded in this order: the base, layout, sidebar and
   // table, then the panes.
-  const styles = ["view.css", "panes.css"]
-    .map((name) => `<link href="${asset("media", name)}" rel="stylesheet">`)
-    .join("\n");
-  const token = nonce();
+  const styles = ["theme.css", "view.css", "panes.css"]
+    .map((name) => `<link href="${asset("ui", name)}" rel="stylesheet">`)
+    .join("\n") + (host.themeStyles ?? []).map(url => `<link href="${url}" rel="stylesheet">`).join("\n");
+  const token = host.nonce;
   // `unsafe-inline` covers style *properties* set through the CSSOM: the group
   // sidebar indents by depth and paints each group's declared colour. Values are
   // assigned via `element.style.x`, which rejects anything malformed, so file
@@ -54,9 +52,9 @@ export function renderShell(webview: vscode.Webview, extensionUri: vscode.Uri): 
   // bibliography data. Scripts remain nonce-only.
   const csp = [
     "default-src 'none'",
-    `style-src ${webview.cspSource} 'unsafe-inline'`,
-    `font-src ${webview.cspSource}`,
-    `img-src ${webview.cspSource} data:`,
+    `style-src ${host.cspSource} 'unsafe-inline'`,
+    `font-src ${host.cspSource}`,
+    `img-src ${host.cspSource} data:`,
     `script-src 'nonce-${token}'`,
   ].join("; ");
 
@@ -66,8 +64,8 @@ export function renderShell(webview: vscode.Webview, extensionUri: vscode.Uri): 
       ` aria-sort="none"><span>${column.label}</span></th>`,
   ).join("");
 
-  const scripts = SCRIPTS.map(
-    (name) => `<script nonce="${token}" src="${asset("media", name)}"></script>`,
+  const scripts = (host.bridgeScripts ?? []).map(url => `<script nonce="${token}" src="${url}"></script>`).join("\n") + SCRIPTS.map(
+    (name) => `<script nonce="${token}" src="${asset("ui", name)}"></script>`,
   ).join("\n");
 
   return `<!DOCTYPE html>
@@ -84,7 +82,7 @@ ${styles}
   <input id="query" class="filter" type="search" spellcheck="false"
          placeholder="Search entries — words, phrases, field:term" aria-label="Search query">
   <input id="where" class="filter where" type="text" spellcheck="false"
-         placeholder="--where 'year >= 2020 and doi missing'" aria-label="Where predicate">
+         placeholder="Filter: year >= 2020 and doi missing" aria-label="Where predicate">
   <label class="toggle" title="Also match misspellings and inflections by similarity">
     <input id="fuzzy" type="checkbox"> fuzzy
   </label>

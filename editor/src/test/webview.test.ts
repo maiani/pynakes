@@ -24,7 +24,7 @@ import {
   previewMutation,
   readLibrary,
   type Mutation,
-} from "../library.js";
+} from "../core/library.js";
 import {
   diffHeading,
   discardEntry,
@@ -34,7 +34,7 @@ import {
   stageType,
   toRequests,
   unstageField,
-} from "../staging.js";
+} from "../core/staging.js";
 import { command, engineSkipReason, previewThenApply, repoRoot, tempBib } from "./engine.js";
 
 const skip = engineSkipReason();
@@ -42,15 +42,7 @@ const skip = engineSkipReason();
 const editorRoot = path.join(repoRoot, "editor");
 const fixtures = path.join(repoRoot, "tests", "fixtures");
 
-// `webview.ts` builds resource URIs through `vscode.Uri.joinPath`; the test
-// stub for `vscode` is empty, so give it just that before the shell is built.
-(require("vscode") as Record<string, unknown>).Uri = {
-  joinPath: (base: { fsPath: string }, ...parts: string[]) => ({
-    fsPath: path.join(base.fsPath, ...parts),
-  }),
-};
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { renderShell } = require("../webview.js") as typeof import("../webview.js");
+import { renderShell } from "../core/shell.js";
 
 type Message = Record<string, unknown> & { type: string };
 
@@ -70,13 +62,9 @@ function openView(): View {
   virtualConsole.on("jsdomError", (error) => errors.push(error.stack ?? error.message));
   virtualConsole.on("error", (...args: unknown[]) => errors.push(args.map(String).join(" ")));
 
-  const html = renderShell(
-    {
-      cspSource: "test:",
-      asWebviewUri: (uri: { fsPath: string }) => `test:${path.relative(editorRoot, uri.fsPath)}`,
-    } as never,
-    { fsPath: editorRoot } as never,
-  );
+  const html = renderShell({
+    asset: (...parts) => `test:${parts.join("/")}`, cspSource: "test:", nonce: "test-nonce",
+  });
   // Scripts are not fetched: each is evaluated in the shell's order, as the
   // webview would load them.
   const dom = new JSDOM(html, { runScripts: "outside-only", pretendToBeVisual: true, virtualConsole });
@@ -85,13 +73,14 @@ function openView(): View {
   window.HTMLElement.prototype.scrollIntoView = () => {};
   let state: unknown;
   Object.assign(window, {
-    acquireVsCodeApi: () => ({
+    PynakesHost: {
       postMessage: (message: Message) => outbox.push(message),
       getState: () => state,
       setState: (next: unknown) => {
         state = next;
       },
-    }),
+      onMessage: (handler: (message: Message) => void) => window.addEventListener("message", event => handler(event.data)),
+    },
   });
   for (const match of html.matchAll(/<script nonce="[^"]+" src="test:([^"]+)"><\/script>/g)) {
     window.eval(fs.readFileSync(path.join(editorRoot, match[1]), "utf-8"));
@@ -846,7 +835,7 @@ test("entry fields use engine schema sections and offer selection actions", { sk
 test("new metadata offers namespace keys and custom names from the engine catalogue", { skip }, async () => {
   const { view } = await opened("simple.bib");
   const style = view.document.createElement("style");
-  style.textContent = fs.readFileSync(path.join(editorRoot, "media/panes.css"), "utf-8");
+  style.textContent = fs.readFileSync(path.join(editorRoot, "ui/panes.css"), "utf-8");
   view.document.head.appendChild(style);
   click(view, '.tab[data-pane="metadata"]');
   const button = (text: string) => [...view.document.querySelectorAll<HTMLButtonElement>(".pane-content button")].find((button) => button.textContent === text)!;
@@ -897,4 +886,15 @@ test("missing metadata catalogue gives recovery instructions", { skip }, async (
   assert.match(hint.textContent!, /Reload the VS Code window/);
   assert.match(hint.textContent!, /bundled engine/);
   assertHealthy(view, "after missing catalogue explanation");
+});
+
+
+test("malformed host messages leave the shared view usable", () => {
+  const view = openView();
+  for (const data of [null, undefined, "noise", {}, { type: 42 }]) {
+    view.window.dispatchEvent(new view.window.MessageEvent("message", { data }));
+  }
+  assert.deepEqual(view.errors, []);
+  assert.ok(view.document.querySelector("#query"));
+  view.window.close();
 });

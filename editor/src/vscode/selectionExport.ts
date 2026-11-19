@@ -1,7 +1,7 @@
 /** Selection exports use the engine's codecs and dependency rules. */
 import * as vscode from "vscode";
 import type { MutationHost } from "./mutations";
-import { exportSelection, type SelectionFormat } from "./pynakes";
+import { exportSelection, type SelectionFormat } from "../engine/pynakes";
 
 export async function promptExport(host: MutationHost, keys: string[], copy: boolean): Promise<void> {
   if (!keys.length) return;

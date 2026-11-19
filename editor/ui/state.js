@@ -12,8 +12,8 @@ window.PV = window.PV || {};
 (function (PV) {
   "use strict";
 
-  const vscode = acquireVsCodeApi();
-  PV.post = (message) => vscode.postMessage(message);
+  const host = window.PynakesHost;
+  PV.post = (message) => host.postMessage(message);
 
   /**
    * The value `map` holds under `key` itself, never one inherited.
@@ -43,7 +43,7 @@ window.PV = window.PV || {};
     return button;
   };
 
-  const persisted = vscode.getState() || {};
+  const persisted = host.getState() || {};
 
   PV.state = {
     rows: [],
@@ -127,7 +127,7 @@ window.PV = window.PV || {};
 
   PV.persist = () => {
     const s = PV.state;
-    vscode.setState({
+    host.setState({
       query: s.search.query,
       where: s.search.where,
       fuzzy: s.search.fuzzy,

@@ -14,11 +14,11 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { PynakesCommand } from "./engineDiscovery";
+import type { PynakesCommand } from "./command";
 import { END_OF_OPTIONS, run, runJson } from "./engineProcess";
-import { extractVersion } from "./version";
-import type { CitationGrammar } from "./citeContext";
-import type { AssetFetchEnvelope } from "./fetchPlan";
+import { extractVersion } from "../core/version";
+import type { CitationGrammar } from "../core/citeContext";
+import type { AssetFetchEnvelope } from "../core/fetchPlan";
 import type {
   AssetCheckEnvelope,
   BatchEnvelope,
@@ -34,13 +34,13 @@ import type {
   RefEditOperation,
   SearchEnvelope,
   TexScanEnvelope,
-} from "./model";
+} from "../core/model";
 
 export type CitationGrammarEnvelope =
   | { status: "success"; action: "capabilities"; citation_grammar: CitationGrammar }
   | InspectError;
 
-export type { PynakesCommand } from "./engineDiscovery";
+export type { PynakesCommand } from "./command";
 export {
   PynakesCancelledError,
   PynakesProtocolError,

@@ -39,15 +39,15 @@ import {
   refRemove,
   searchBib,
   texScan,
-} from "../pynakes.js";
+} from "../engine/pynakes.js";
 import {
   type Mutation,
   applyMutation,
   commitEdits,
   previewEdits,
   previewMutation,
-} from "../library.js";
-import { findCitationContext } from "../citeContext.js";
+} from "../core/library.js";
+import { findCitationContext } from "../core/citeContext.js";
 import { command, engineSkipReason, previewThenApply, tempBib } from "./engine.js";
 
 const skip = engineSkipReason();

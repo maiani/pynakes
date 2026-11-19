@@ -9,7 +9,7 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
-import type { PynakesCommand } from "./engineDiscovery";
+import type { PynakesCommand } from "./command";
 
 /** End of options: every token after it is an operand, however it begins. */
 export const END_OF_OPTIONS = "--";

@@ -13,8 +13,10 @@ Changes go through the engine’s validation and diff review before writing.
 
 ## Get started
 
-You need Python 3.12 or newer. The packaged extension includes the pynakes
-engine; a separate pynakes installation is not required.
+The bundled engine supports standard CPython 3.12–3.15 on Linux x64 (glibc),
+macOS x64/ARM64, and Windows x64. A separate pynakes installation is not required.
+Other interpreter/platform combinations can use an installed engine via the
+[engine settings](docs/configuration.md).
 
 Until publication, build and install a VSIX using the
 [development guide](docs/development.md). Then open a `.bib` file with

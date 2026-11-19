@@ -41,10 +41,10 @@ Object.assign(require("vscode") as Record<string, unknown>, {
 
 // Loaded after the stand-ins, so the modules see them.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { runMutation } = require("../mutations.js") as typeof import("../mutations.js");
+const { runMutation } = require("../vscode/mutations.js") as typeof import("../vscode/mutations.js");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { renameKey } = require("../keyRename.js") as typeof import("../keyRename.js");
-type MutationHost = import("../mutations.js").MutationHost;
+const { renameKey } = require("../vscode/keyRename.js") as typeof import("../vscode/keyRename.js");
+type MutationHost = import("../vscode/mutations.js").MutationHost;
 
 /** A host over one file, recording what it posts; `staged` are keys with pending edits. */
 function hostFor(file: string, staged: string[] = []) {

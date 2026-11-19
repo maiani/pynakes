@@ -1,3 +1,4 @@
+import type { ViewMessage } from "../core/protocol";
 import { promptExport } from "./selectionExport";
 /**
  * The bibliography view, registered as a custom editor for `.bib` files.
@@ -6,7 +7,7 @@ import { promptExport } from "./selectionExport";
  * the text buffer stays the source of truth, external edits arrive as change
  * events, and nothing here caches file content.
  *
- * Staged edits live here rather than in the webview, because a webview is
+ * One shared edit session is retained per document, because a webview is
  * disposed whenever its tab is hidden and pending changes must survive that.
  *
  * This module is the glue: it reads, renders, and routes the webview's
@@ -34,10 +35,10 @@ import {
   type TempMirror,
 } from "./documentAccess";
 import { resetEngineDiscovery, resolveEngine, type ResolvedEngine } from "./engineDiscovery";
-import { promptGroupAction, promptNewGroup, type GroupActionRequest } from "./groupHierarchy";
+import { promptGroupAction, promptNewGroup } from "./groupHierarchy";
 import { renameKey } from "./keyRename";
 import { promptFetch } from "./materialFetch";
-import { compareEntry, readLibrary, runSearch, type LibraryRead, type Mutation } from "./library";
+import { compareEntry, readLibrary, runSearch, type LibraryRead } from "../core/library";
 import {
   promptAdd,
   promptGroup,
@@ -45,21 +46,14 @@ import {
   reportDuplicates,
   runMutation,
 } from "./mutations";
-import type { MaterialIndex } from "./insights";
+import type { MaterialIndex } from "../core/insights";
 import {
   collectOpenablePaths, doubleClickEntry, openCitation, openMaterial, revealEntry,
 } from "./navigation";
-import { type PynakesCommand, describeCommand } from "./pynakes";
-import { commitStaged, previewStaged, type StagingHost } from "./stagedCommit";
-import {
-  discardEntry,
-  emptyStaging,
-  stageField,
-  stageType,
-  stagedCount,
-  unstageField,
-  type StagingState,
-} from "./staging";
+import { type PynakesCommand, describeCommand } from "../engine/pynakes";
+import { sessionHost, type StagingHost } from "./stagedCommit";
+import { BibliographySession, SessionBusyError } from "../core/session";
+import { stagedCount, type StagingState } from "../core/staging";
 import { EngineStatusBar } from "./statusBar";
 import { renderShell } from "./webview";
 
@@ -75,37 +69,8 @@ interface MirrorContext {
 }
 
 /** Messages the webview sends. */
-interface ViewMessage {
-  type?: string;
-  key?: string;
-  keys?: string[];
-  member?: boolean;
-  field?: string;
-  value?: string | null;
-  /** The value a staged change was made against; null when the field was absent. */
-  base?: string | null;
-  entryType?: string;
-  /** The requested new citation key, for `renameKey`. */
-  newKey?: string;
-  query?: string;
-  where?: string;
-  fuzzy?: boolean;
-  /** Which search this is, echoed back so a late answer to an older one is ignored. */
-  seq?: number;
-  /** Absolute path, for `openMaterial` and `openCitation`. */
-  path?: string;
-  /** Where a material should open, for `openMaterial`; absent means the setting. */
-  opener?: string;
-  /** One-based position within that file, for `openCitation`. */
-  line?: number;
-  column?: number;
-  /** The entry- or group-level change requested, for `mutate`. */
-  mutation?: Mutation;
-  /** Group names the view already knows about, for `promptGroup` and the group actions. */
-  groups?: string[];
-  /** The group node a sidebar action was invoked on, for `groupActions`. */
-  group?: GroupActionRequest;
-}
+// Shared message payloads are independent of document ownership.
+
 
 export class BibliographyEditorProvider implements vscode.CustomTextEditorProvider {
   public static readonly viewType = "pynakes.bibliography";
@@ -114,7 +79,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
   private readonly liveViews = new Set<() => void>();
 
   /** Pending edits per document, surviving webview disposal. */
-  private readonly staging = new Map<string, StagingState>();
+  private readonly sessions = new Map<string, BibliographySession>();
 
   private readonly findings = new FindingsPublisher();
 
@@ -188,7 +153,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
   ): Promise<void> {
     panel.webview.options = {
       enableScripts: true,
-      localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, "media")],
+      localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, "media"), vscode.Uri.joinPath(this.context.extensionUri, "ui")],
     };
     panel.webview.html = renderShell(panel.webview, this.context.extensionUri);
 
@@ -235,7 +200,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
       // once it is gone they could never apply, so they go with it.
       vscode.workspace.onDidCloseTextDocument((closed) => {
         if (closed.uri.toString() === document.uri.toString()) {
-          this.staging.delete(document.uri.toString());
+          this.sessions.delete(document.uri.toString());
           this.findings.clear(document);
         }
       }),
@@ -243,7 +208,9 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         // Every handler reports its own failures; this catches what escapes
         // one, so nothing becomes an unhandled rejection.
         this.handleMessage(document, panel, message).catch((error: unknown) =>
-          this.post(panel, { ...describeFailure(error), type: "actionError" }),
+          this.post(panel, error instanceof SessionBusyError
+            ? { type: "actionError", message: error.message }
+            : { ...describeFailure(error), type: "actionError" }),
         );
       }),
       // The item describes one bibliography, so it follows the active tab.
@@ -284,7 +251,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
     document: vscode.TextDocument,
     panel: vscode.WebviewPanel,
     body: (ctx: MirrorContext) => Promise<void>,
-    reportFailure?: (failure: Record<string, unknown>) => Record<string, unknown>,
+    reportFailure?: (failure: Record<string, unknown>) => Record<string, unknown> | undefined,
     superseded: () => boolean = () => false,
   ): Promise<void> {
     let mirror: TempMirror | undefined;
@@ -307,7 +274,8 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         this.post(panel, describeFailure(error));
         return;
       }
-      this.post(panel, reportFailure(describeFailure(error)));
+      const failure = reportFailure(describeFailure(error));
+      if (failure) this.post(panel, failure);
     } finally {
       await mirror?.release().catch(() => undefined);
     }
@@ -384,14 +352,18 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
 
   // -- staging --------------------------------------------------------------
 
-  private stagingFor(document: vscode.TextDocument): StagingState {
+  private sessionFor(document: vscode.TextDocument): BibliographySession {
     const id = document.uri.toString();
-    let state = this.staging.get(id);
-    if (!state) {
-      state = emptyStaging();
-      this.staging.set(id, state);
+    let session = this.sessions.get(id);
+    if (!session) {
+      session = new BibliographySession();
+      this.sessions.set(id, session);
     }
-    return state;
+    return session;
+  }
+
+  private stagingFor(document: vscode.TextDocument): StagingState {
+    return this.sessionFor(document).snapshot();
   }
 
   /**
@@ -402,10 +374,11 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
    * show them — not only the view that made the change.
    */
   private postStaging(document: vscode.TextDocument, panel: vscode.WebviewPanel): void {
+    const staging = this.stagingFor(document);
     const message = {
       type: "staging",
-      staging: this.stagingFor(document),
-      counts: stagedCount(this.stagingFor(document)),
+      staging,
+      counts: stagedCount(staging),
     };
     const panels = this.panelsByDocument.get(document.uri.toString()) ?? new Set([panel]);
     for (const view of panels) {
@@ -431,8 +404,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         return;
       case "stageField":
         if (message.key && message.field) {
-          stageField(
-            this.stagingFor(document),
+          this.sessionFor(document).stageField(
             message.key,
             message.field,
             message.value ?? null,
@@ -443,31 +415,31 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
         return;
       case "unstageField":
         if (message.key && message.field) {
-          unstageField(this.stagingFor(document), message.key, message.field);
+          this.sessionFor(document).unstageField(message.key, message.field);
           this.postStaging(document, panel);
         }
         return;
       case "stageType":
         if (message.key && message.value && typeof message.base === "string") {
-          stageType(this.stagingFor(document), message.key, message.value, message.base);
+          this.sessionFor(document).stageType(message.key, message.value, message.base);
           this.postStaging(document, panel);
         }
         return;
       case "discardEntry":
         if (message.key) {
-          discardEntry(this.stagingFor(document), message.key);
+          this.sessionFor(document).discardEntry(message.key);
           this.postStaging(document, panel);
         }
         return;
       case "discardAll":
-        this.staging.set(document.uri.toString(), emptyStaging());
+        this.sessionFor(document).discardAll();
         this.postStaging(document, panel);
         return;
       case "preview":
-        await previewStaged(host());
+        await this.sessionFor(document).preview(sessionHost(host()));
         return;
       case "commit":
-        await commitStaged(host());
+        await this.sessionFor(document).commit(sessionHost(host()));
         return;
       case "compareRemote":
         if (message.key) {
@@ -692,9 +664,7 @@ export class BibliographyEditorProvider implements vscode.CustomTextEditorProvid
     return {
       document,
       post: (message) => this.post(panel, message),
-      stagedKeys: () => new Set(Object.keys(this.stagingFor(document).entries)),
-      staging: () => this.stagingFor(document),
-      resetStaging: () => this.staging.set(document.uri.toString(), emptyStaging()),
+      stagedKeys: () => this.sessionFor(document).stagedKeys(),
       postStaging: () => this.postStaging(document, panel),
       reconcileBuffer: () => reconcileBuffer(document),
       workingDirectory: () => workingDirectory(document),

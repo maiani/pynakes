@@ -20,7 +20,7 @@ import {
   type MutationConflict,
   type MutationSuccess,
 } from "./model";
-import { assetFetch, type AssetFetchRequest, type PynakesCommand } from "./pynakes";
+import { assetFetch, type AssetFetchRequest, type PynakesCommand } from "../engine/pynakes";
 
 // ---------------------------------------------------------------------------
 // The envelope.

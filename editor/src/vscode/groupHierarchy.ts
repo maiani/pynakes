@@ -17,15 +17,11 @@
 
 import * as vscode from "vscode";
 import { runMutation, type MutationHost } from "./mutations";
-import type { GroupTreeEdit } from "./pynakes";
+import type { GroupTreeEdit } from "../engine/pynakes";
 
 /** The node a sidebar action was invoked on, as the view's last read described it. */
-export interface GroupActionRequest {
-  name: string;
-  /** Referenced by entries but absent from the declared hierarchy. */
-  undeclared?: boolean;
-  description?: string;
-}
+export type { GroupActionRequest } from "../core/protocol";
+import type { GroupActionRequest } from "../core/protocol";
 
 interface ActionItem extends vscode.QuickPickItem {
   action: "addChild" | "rename" | "move" | "describe" | "remove" | "declare";

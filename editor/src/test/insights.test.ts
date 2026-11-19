@@ -13,14 +13,14 @@ import {
   isCited,
   lintDiagnostics,
   worseSeverity,
-} from "../insights.js";
-import type { GroupNode } from "../insights.js";
+} from "../core/insights.js";
+import type { GroupNode } from "../core/insights.js";
 import type {
   AssetCheckSuccess,
   GroupsTreeNode,
   LintSuccess,
   TexScanSuccess,
-} from "../model.js";
+} from "../core/model.js";
 
 function node(name: string, parent = "", extra: Partial<GroupsTreeNode> = {}): GroupsTreeNode {
   return {

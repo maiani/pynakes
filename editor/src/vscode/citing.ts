@@ -17,11 +17,11 @@ import {
   isCitationMacro,
   planCitationInsertion,
   type CitationGrammar,
-} from "./citeContext";
+} from "../core/citeContext";
 import { resolveEngine } from "./engineDiscovery";
-import type { CitationIndex } from "./insights";
-import type { EntryRow } from "./model";
-import { citationGrammar, describeCommand } from "./pynakes";
+import type { CitationIndex } from "../core/insights";
+import type { EntryRow } from "../core/model";
+import { citationGrammar, describeCommand } from "../engine/pynakes";
 
 /** Documents treated as TeX sources: by language mode, or by extension when none is set. */
 const TEX_LANGUAGES = new Set(["latex", "tex", "plaintex", "context", "latex-expl3", "doctex"]);

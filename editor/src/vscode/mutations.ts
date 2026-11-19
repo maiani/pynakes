@@ -24,8 +24,8 @@ import {
   previewMutation,
   type Mutation,
   type MutationOutcome,
-} from "./library";
-import { refSchema, type GroupTreeEdit, type PynakesCommand } from "./pynakes";
+} from "../core/library";
+import { refSchema, type GroupTreeEdit, type PynakesCommand } from "../engine/pynakes";
 
 /** What a mutation needs from the view it runs in. */
 export interface MutationHost {
@@ -45,7 +45,7 @@ export interface MutationHost {
   /** Run a read against the buffer, mirrored when it has unsaved changes. */
   withMirror(
     body: (ctx: { command: PynakesCommand; cwd?: string; source: string }) => Promise<void>,
-    reportFailure?: (failure: Record<string, unknown>) => Record<string, unknown>,
+    reportFailure?: (failure: Record<string, unknown>) => Record<string, unknown> | undefined,
   ): Promise<void>;
 }
 
@@ -282,7 +282,7 @@ function approvalTitle(label: string, mutation: Mutation, preview: PreviewedMuta
  * input state the extension would have to mirror.
  */
 export async function promptAdd(host: MutationHost): Promise<void> {
-  let request: import("./pynakes").RefAddRequest | undefined;
+  let request: import("../engine/pynakes").RefAddRequest | undefined;
   await host.withMirror(async ({ command, source, cwd }) => {
     const response = await refSchema(command, source, cwd);
     if (response.status !== "success") throw new Error(response.message);

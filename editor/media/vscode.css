@@ -1,0 +1,46 @@
+/* Translate the host theme into the shared UI palette. */
+:root {
+  --pynakes-badge-background: var(--vscode-badge-background, #e5ebf2);
+  --pynakes-badge-foreground: var(--vscode-badge-foreground, #202830);
+  --pynakes-button-background: var(--vscode-button-background, #245dba);
+  --pynakes-button-foreground: var(--vscode-button-foreground, #ffffff);
+  --pynakes-button-hoverBackground: var(--vscode-button-hoverBackground, #194d9e);
+  --pynakes-button-secondaryBackground: var(--vscode-button-secondaryBackground, #e5ebf2);
+  --pynakes-button-secondaryForeground: var(--vscode-button-secondaryForeground, #202830);
+  --pynakes-button-secondaryHoverBackground: var(--vscode-button-secondaryHoverBackground, #d7e0eb);
+  --pynakes-charts-blue: var(--vscode-charts-blue, #245dba);
+  --pynakes-contrastBorder: var(--vscode-contrastBorder, transparent);
+  --pynakes-descriptionForeground: var(--vscode-descriptionForeground, #5f6b76);
+  --pynakes-diffEditor-insertedTextBackground: var(--vscode-diffEditor-insertedTextBackground, #ddf4e4);
+  --pynakes-diffEditor-removedTextBackground: var(--vscode-diffEditor-removedTextBackground, #fbe3e3);
+  --pynakes-editor-background: var(--vscode-editor-background, #ffffff);
+  --pynakes-editor-font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+  --pynakes-editorGroup-border: var(--vscode-editorGroup-border, #e5ebf2);
+  --pynakes-editorWarning-foreground: var(--vscode-editorWarning-foreground, #805600);
+  --pynakes-editorWidget-background: var(--vscode-editorWidget-background, #f5f7fa);
+  --pynakes-errorForeground: var(--vscode-errorForeground, #b32828);
+  --pynakes-focusBorder: var(--vscode-focusBorder, #245dba);
+  --pynakes-font-family: var(--vscode-font-family, system-ui, sans-serif);
+  --pynakes-font-size: var(--vscode-font-size, 13px);
+  --pynakes-foreground: var(--vscode-foreground, #202830);
+  --pynakes-gitDecoration-addedResourceForeground: var(--vscode-gitDecoration-addedResourceForeground, #23753d);
+  --pynakes-gitDecoration-deletedResourceForeground: var(--vscode-gitDecoration-deletedResourceForeground, #b32828);
+  --pynakes-gitDecoration-modifiedResourceForeground: var(--vscode-gitDecoration-modifiedResourceForeground, #805600);
+  --pynakes-input-background: var(--vscode-input-background, #ffffff);
+  --pynakes-input-border: var(--vscode-input-border, #b8c3cf);
+  --pynakes-input-foreground: var(--vscode-input-foreground, #202830);
+  --pynakes-inputValidation-errorBackground: var(--vscode-inputValidation-errorBackground, #fbe3e3);
+  --pynakes-inputValidation-warningBackground: var(--vscode-inputValidation-warningBackground, #fff3d1);
+  --pynakes-inputValidation-warningBorder: var(--vscode-inputValidation-warningBorder, #cf9a32);
+  --pynakes-inputValidation-warningForeground: var(--vscode-inputValidation-warningForeground, #805600);
+  --pynakes-list-activeSelectionBackground: var(--vscode-list-activeSelectionBackground, #dbe9ff);
+  --pynakes-list-activeSelectionForeground: var(--vscode-list-activeSelectionForeground, #202830);
+  --pynakes-list-dropBackground: var(--vscode-list-dropBackground, #e5ebf2);
+  --pynakes-list-hoverBackground: var(--vscode-list-hoverBackground, #eef3f8);
+  --pynakes-panel-border: var(--vscode-panel-border, #d1d9e2);
+  --pynakes-sideBar-background: var(--vscode-sideBar-background, #f5f7fa);
+  --pynakes-testing-iconPassed: var(--vscode-testing-iconPassed, #23753d);
+  --pynakes-textCodeBlock-background: var(--vscode-textCodeBlock-background, #e5ebf2);
+  --pynakes-textLink-foreground: var(--vscode-textLink-foreground, #245dba);
+  --pynakes-toolbar-hoverBackground: var(--vscode-toolbar-hoverBackground, #e5ebf2);
+}

@@ -38,7 +38,7 @@ The packaged extension is written to **`editor/pynakes-vscode-<version>.vsix`**,
 in the editor directory; `vsce` prints its absolute path when it finishes. Install it
 by hand with `code --install-extension editor/pynakes-vscode-<version>.vsix`, or
 let `pixi run install-extension` resolve the filename for you. Pixi pins Python
-to 3.12 to match CI, so a bundle built locally is the bundle CI proves.
+to 3.12 to match CI, for dependency resolution; native runtime selection is checked separately in CI.
 
 Most tests pin the pure modules (`model.ts`, `insights.ts`, `staging.ts`,
 `version.ts`, the material-opening decision). The rest run the real engine from
@@ -55,35 +55,17 @@ to the engine's own suite.
 
 ```
 src/
-  extension.ts           activation: registers the editor and commands
-  bibliographyEditor.ts  the custom editor: buffer sync, reads, message routing
-  documentAccess.ts      mirror, working directory, settings, buffer reconciliation
-  stagedCommit.ts        previews and commits the staged field edits
-  keyRename.ts           renames one citation key, as a previewed mutation
-  mutations.ts           entry-level changes: preview, approve, guarded write
-  groupHierarchy.ts      sidebar prompts for editing the group hierarchy
-  materialFetch.ts       fetching materials: plan, approve, cancellable run
-  fetchPlan.ts           the asset fetch envelope, and what the dialogs say about it
-  navigation.ts          opens sources, citations, and materials
-  citing.ts              cites entries in TeX editors: insert, complete, offer to link
-  citeContext.ts         citation key lists in TeX text, by the engine's citation grammar
-  materialOpener.ts      where a material opens: in VS Code or with the system
-  diagnostics.ts         findings and undefined citations as native diagnostics
-  statusBar.ts           the engine/file status bar item
-  library.ts             composes the engine reads; runs preview and commit
-  pynakes.ts             builds every engine invocation
-  engineProcess.ts       the only module that spawns the engine; stops whole trees
-  engineDiscovery.ts     which engine to run, and why
-  version.ts             PEP 440 parsing and comparison
-  model.ts               engine envelope types + projection to table rows
-  insights.ts            group-tree and lint projections
-  staging.ts             pending edits, and the conflict check that guards a commit
-  records.ts             own-property lookups for maps keyed by the file's text
-  webview.ts             webview HTML shell, CSP, resource URIs
+  extension.ts           stable activation entry point
+  core/                  shared projections, reads, edit sessions, fetch plans, HTML shell
+  engine/                Node CLI transport, arguments, and executable contract
+  vscode/                document ownership, dialogs, navigation, discovery, diagnostics
+  test/                  shared UI, engine contracts and host integration checks
+ui/                      shared browser scripts, styles and default theme
+media/                   VS Code messaging and theme adapters, extension icon
 scripts/
-  vendor-engine.mjs      builds the bundled engine
-media/                   webview client: state, table, groups, detail, compare,
-                         duplicates, libraryPanels, panels, layout, main
+  vendor-engine.mjs      staged engine build and isolated smoke test
+  bundle_runtime.py      downloads the supported native wheel variants
+  pynakes_launcher.py    offline wheel selection and isolated entry point
 ```
 
 The view is a `CustomTextEditorProvider` rather than a standalone webview so VS
@@ -113,8 +95,8 @@ commit is one `batch` write, however many entries it covers.
 Use `npm run package:prerelease` for the 0.1.0 alpha. It sets the VSIX's
 prerelease marker and runs the same vendoring/compilation steps as `package`.
 When the engine is ready for the coordinated release, set
-`SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PYNAKES=0.7.0` for the package command
-so the bundle identifies itself as the final Beta version. Local RC bundles
+`SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PYNAKES` to the intended release version
+for the package command; do not reuse an earlier release number. Local RC bundles
 are validation artifacts. The extension keeps its own
 0.1.0 version. See [the release checklist](../../RELEASE.md).
 
@@ -127,3 +109,24 @@ The field editor also reads `ref schema`; its digest must match `inspect` before
 rendering. New entries use `ref add --no-interactive` rather than creating and
 renaming a placeholder. Rebuild the bundled engine after changes to these
 contracts; testing against a different installed engine is not equivalent.
+
+### Native runtime support
+
+One VSIX contains shared pure Python dependencies and 16 Pydantic Core wheels:
+standard CPython 3.12–3.15 for Linux x64/glibc, macOS x64, macOS ARM64 and
+Windows x64. Wheel tags select both the ABI and platform, including macOS/glibc
+minimum versions. Free-threaded Python, PyPy, musl Linux and other architectures
+are not bundled; use a separately installed engine there. There is no runtime
+download or pip install.
+
+The build uses `pip download --only-binary` for every target and fails if a
+variant is missing or another unclassified native dependency appears. It also
+includes Windows' conditional Colorama dependency when built on another OS.
+The launcher uses `-I -S` to exclude ambient packages and `PYTHONPATH`. A failed
+build leaves the previous bundle intact. `engine/native.json` records the exact
+wheels shipped. Packaging tests run with
+`python -m unittest discover -s scripts -p 'test_bundle_*.py'` (requires packaging).
+
+Run the packaged launcher with `--version` and `inspect <fixture> --json` on
+each supported OS/Python combination before release. Cross-downloading a wheel
+is not proof that it executes on that target.

@@ -9,7 +9,7 @@
 
 import * as path from "node:path";
 import * as vscode from "vscode";
-import type { Summary } from "./model";
+import type { Summary } from "../core/model";
 
 /** What the status bar item reports about one open bibliography. */
 export interface StatusDetails {

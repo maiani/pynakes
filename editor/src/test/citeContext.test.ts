@@ -7,7 +7,7 @@ import {
   isCitationMacro,
   planCitationInsertion,
   type CitationGrammar,
-} from "../citeContext.js";
+} from "../core/citeContext.js";
 
 /**
  * The grammar as `capabilities --section citation_grammar` publishes it;

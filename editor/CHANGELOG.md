@@ -15,10 +15,31 @@ release. Its version says nothing about which engine it runs.
 
 ### Fixed
 
+- Invalidate staged Apply when pending edits change during reconciliation or
+  approval, refuse duplicate Apply requests, and suppress stale previews.
+  Edits attempted during an active write are explicitly refused.
+
+- Bundle Pydantic Core for CPython 3.12–3.15 on the four supported platform
+  targets, select by wheel tags, and isolate the launcher from ambient packages.
+  Failed builds preserve the last working bundle.
+- Keep search and toolbar actions reachable in narrow editor columns, provide
+  visible keyboard focus, and ignore malformed incoming view messages.
+
 - Keep the metadata key text field hidden unless **Custom key…** is selected;
   form layout styles no longer override its hidden state.
 
 ### Changed
+
+- Use subtle alternating row backgrounds in the reference list, derived from
+  the active theme, while preserving hover and selection highlights.
+
+- Move staged-edit ownership, preview, base-conflict checks and guarded commit
+  coordination into a host-independent bibliography session. VS Code supplies
+  document reconciliation, engine access and approval dialogs through an adapter.
+
+- Separate shared models, staging, engine transport and browser UI from VS Code
+  adapters. The UI uses a host messaging/state bridge and theme tokens; its
+  smoke tests run without the VS Code API. No standalone app is added.
 
 - Engine contract tests now require the v0.10 inspection shape, with the group
   tree under `groups_list.tree` and no retired `groups_tree` insight.

@@ -13,7 +13,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { asMaterialOpener, DEFAULT_MATERIAL_OPENER, type MaterialOpener } from "./materialOpener";
-import { PynakesProtocolError, PynakesUnavailableError } from "./pynakes";
+import { PynakesProtocolError, PynakesUnavailableError } from "../engine/pynakes";
 
 export interface TempMirror {
   /** Path pynakes should read. */

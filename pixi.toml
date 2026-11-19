@@ -17,9 +17,8 @@ platforms = ["linux-64", "osx-arm64", "osx-64", "win-64"]
 nodejs = ">=20"
 # `vendor-engine` runs `pip wheel` against this repository to build the engine
 # bundle that ships inside the VSIX. Pinned to the floor of `requires-python`,
-# which is also what CI builds the bundle with: the wheels are pure-Python and
-# universal, but resolving them on a newer interpreter can pick different
-# versions, and a bundle should not depend on which Python happened to build it.
+# which is also what CI resolves the bundle with. Pydantic Core variants for
+# the supported CPython/platform combinations are downloaded explicitly.
 python = "3.12.*"
 pip = "*"
 

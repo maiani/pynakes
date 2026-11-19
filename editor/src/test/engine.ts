@@ -16,8 +16,8 @@ import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { applyMutation, describeMutation, previewMutation, type Mutation } from "../library.js";
-import type { PynakesCommand } from "../pynakes.js";
+import { applyMutation, describeMutation, previewMutation, type Mutation } from "../core/library.js";
+import type { PynakesCommand } from "../engine/pynakes.js";
 
 // out/test/engine.js -> out/test -> out -> editor -> repo root
 export const repoRoot = path.resolve(__dirname, "..", "..", "..");
