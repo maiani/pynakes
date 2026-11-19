@@ -1,0 +1,19 @@
+{
+  "id": "zotero-project-setup-refresh",
+  "prompt": "Create a BibLaTeX project from the direct members of the History Zotero collection. Inspect a diff before applying, bind the apply to the reviewed source revision and project bytes, and explain omitted subcollections. Use at most four CLI calls. After metadata is corrected in Zotero, refresh every project binding in one call. Never write to Zotero.",
+  "fixture": "tests.zotero_fixtures.LocalAPI, with both bibliographic records in History",
+  "reference": [
+    {"phase": "setup", "argv": ["init", "{file}", "--dialect", "biblatex", "--json"]},
+    {"phase": "setup", "argv": ["zotero", "collections", "--json"]},
+    {"phase": "setup", "argv": ["zotero", "select", "{file}", "--collection", "DEFGHJKL", "--dry-run", "--diff", "--json"]},
+    {"phase": "setup", "argv": ["zotero", "select", "{file}", "--collection", "DEFGHJKL", "--expect-revision", "{revision}", "--expect-sha256", "{sha256}", "--json"]},
+    {"phase": "refresh", "argv": ["zotero", "refresh", "{file}", "--json"]}
+  ],
+  "acceptance": {
+    "setup_calls": 4,
+    "refresh_calls": 1,
+    "entries": 2,
+    "source_writes": 0,
+    "blind_agent_run": false
+  }
+}

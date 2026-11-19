@@ -1513,6 +1513,29 @@ List attachment metadata without resolving paths or fetching bytes.
 | `--json` | boolean | no | false | — |  |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
+## zotero refresh
+
+**Stability: stable**
+
+Refresh all bindings to this Zotero instance in one guarded project write.
+
+`pynakes zotero refresh [FILE] [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Existing project bibliography |
+| `--port` | integer | no | 23119 | — |  |
+| `--expect-revision` | string | no | null | — |  |
+| `--resolve` | list[string] | no | null | — | ITEM:FIELD=source&#124;project; requires both preconditions |
+| `--max-items` | integer | no | 1000 | — | Maximum bindings to refresh |
+| `--dry-run` | boolean | no | false | — |  |
+| `--diff` | boolean | no | false | — |  |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
+| `--json` | boolean | no | false | — |  |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
 ## zotero scan
 
 **Stability: stable**
@@ -1531,22 +1554,43 @@ Read one bounded source page; optional --where filters its citation projection.
 | `--json` | boolean | no | false | — |  |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
+## zotero search
+
+**Stability: stable**
+
+Search across pages within a budget; report exhaustion and a continuation cursor.
+
+`pynakes zotero search [TEXT] [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `TEXT` | string | no | — | — | Native Zotero title/creator/year search |
+| `--where` | string | no | null | — | Local predicate over citation projections |
+| `--collection` | string | no | null | — | Restrict to direct collection members |
+| `--max-items` | integer | no | 1000 | — | Maximum candidate items to scan this call |
+| `--cursor` | string | no | null | — |  |
+| `--port` | integer | no | 23119 | — |  |
+| `--json` | boolean | no | false | — |  |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
 ## zotero select
 
 **Stability: stable**
 
-Stage or refresh one reference in a project; never write to Zotero.
+Select or refresh items in one guarded plan and one project write.
 
 `pynakes zotero select [FILE] [OPTIONS]`
 
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Existing project bibliography |
-| `--item` | string | yes | null | — | Source Zotero item key |
+| `--item` | list[string] | no | null | — | Source Zotero item key; repeatable |
+| `--collection` | string | no | null | — | Select direct members of a collection |
+| `--max-items` | integer | no | 1000 | — | Maximum source items to scan/select |
 | `--key` | string | no | null | — | Independent project citation key |
 | `--port` | integer | no | 23119 | — |  |
 | `--expect-revision` | string | no | null | — | Source revision digest from a reviewed preview |
-| `--resolve` | list[string] | no | null | — | Reviewed FIELD=source&#124;project decision; repeatable; @type selects entry type. Requires both preconditions |
+| `--resolve` | list[string] | no | null | — | Reviewed ITEM:FIELD=source&#124;project (FIELD for one item); repeatable; @type selects entry type. Requires both preconditions |
 | `--dry-run` | boolean | no | false | — |  |
 | `--diff` | boolean | no | false | — |  |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |

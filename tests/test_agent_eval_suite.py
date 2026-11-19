@@ -78,3 +78,16 @@ def test_prepare_and_collect_run_a_task_through_the_logging_wrapper(tmp_path: Pa
     assert transcript["calls"][0]["argv"][:2] == ["ref", "edit"]
     assert '"dry_run":true' in transcript["calls"][0]["stdout"]
     assert "concurrent-edit" in (run / "summary.md").read_text(encoding="utf-8")
+
+
+def test_zotero_project_reference_workflow(tmp_path: Path) -> None:
+    spec = importlib.util.spec_from_file_location(
+        "zotero_agent_eval", ROOT / "scripts" / "zotero_agent_eval.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    report = module.measure(tmp_path)
+    assert report["passed"], report["failed_checks"]
+    assert (report["setup_calls"], report["refresh_calls"]) == (4, 1)
+    assert report["response_bytes"] > 0

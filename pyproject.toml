@@ -45,7 +45,7 @@ classifiers = [
 dependencies = [
     "click>=8.1.0",
     "httpx>=0.27.0",
-    "typer>=0.26.0",
+    "typer>=0.26.0,<0.29",
     "rich>=13.8.0",
 ]
 
@@ -135,7 +135,7 @@ include = ["src/pynakes"]
 include = ["src/pynakes/bibtex_writer.py"]
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
-unresolved-attribute = "ignore"
+missing-attribute = "ignore"
 
 [[tool.ty.overrides]]
 include = ["src/pynakes/cli/_app.py"]
@@ -183,8 +183,8 @@ include = ["src/pynakes/cli/_discovery.py"]
 invalid-argument-type = "ignore"
 invalid-assignment = "ignore"
 invalid-attribute-access = "ignore"
-invalid-method-override = "ignore"
-unresolved-attribute = "ignore"
+incompatible-method-override = "ignore"
+missing-attribute = "ignore"
 
 [[tool.ty.overrides]]
 include = ["src/pynakes/cli/_surface.py"]

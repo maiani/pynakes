@@ -41,6 +41,8 @@ def _flags(command: str) -> set[str]:
 POSITIONALS: dict[str, tuple[tuple[str, bool, bool], ...]] = {
     "zotero status": (),
     "zotero scan": (),
+    "zotero search": (("text", False, False),),
+    "zotero refresh": (("file", False, False),),
     "zotero show": (("item", True, False),),
     "zotero collections": (),
     "zotero materials": (("item", True, False),),
@@ -193,6 +195,8 @@ def test_every_writing_command_previews() -> None:
 SAMPLES: dict[str, tuple[str, list[str]]] = {
     "zotero status": ("read", ["zotero", "status"]),
     "zotero scan": ("read", ["zotero", "scan"]),
+    "zotero search": ("read", ["zotero", "search", "Principia"]),
+    "zotero refresh": ("modify", ["zotero", "refresh", "{bib}", "--dry-run"]),
     "zotero show": ("read", ["zotero", "show", "ABCDEFGH"]),
     "zotero collections": ("read", ["zotero", "collections"]),
     "zotero materials": ("read", ["zotero", "materials", "ABCDEFGH"]),
@@ -353,6 +357,7 @@ NO_LIBRARY_READ = {
     "keys usage",
     "zotero status",
     "zotero scan",
+    "zotero search",
     "zotero show",
     "zotero collections",
     "zotero materials",

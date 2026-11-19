@@ -13,7 +13,7 @@ import re
 from dataclasses import asdict, dataclass
 from functools import partial
 from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import unquote, urlencode, urlsplit
 
 import httpx
 
@@ -24,6 +24,7 @@ from pynakes.library.backends.base import (
     ReadPage,
     ReferenceView,
     Revision,
+    SearchResult,
     SourceChanged,
     SourceMissing,
     SourceUnavailable,
@@ -32,6 +33,7 @@ from pynakes.library.backends.base import (
     _page_start,
     _search_page,
 )
+from pynakes.model import BibEntry
 
 
 @dataclass(frozen=True)
@@ -205,12 +207,34 @@ class ZoteroLibraryBackend:
             raise SourceChanged("Zotero changed while reading; restart the operation")
 
     def _page(
-        self, path: str, limit: int, cursor: str | None
+        self,
+        path: str,
+        limit: int,
+        cursor: str | None,
+        *,
+        params: dict | None = None,
+        search_scope: dict | None = None,
     ) -> tuple[list[dict], Revision, str | None, int]:
         revision = self._revision()
-        request = request_digest(source=self.source, path=path, limit=limit, mapping=1)
+        request = request_digest(
+            source=self.source,
+            path=path,
+            limit=limit if search_scope is None else None,
+            params=params,
+            search_scope=search_scope,
+            mapping=1,
+        )
         start = _page_start(limit, cursor, revision, request)
-        h, raw = self._request(f"{path}?limit={limit}&start={start}&sort=dateAdded&direction=asc")
+        query = urlencode(
+            {
+                "limit": limit,
+                "start": start,
+                "sort": "dateAdded",
+                "direction": "asc",
+                **(params or {}),
+            }
+        )
+        h, raw = self._request(f"{path}?{query}")
         if (
             not isinstance(raw, list)
             or len(raw) > limit
@@ -262,6 +286,73 @@ class ZoteroLibraryBackend:
             if x["data"].get("itemType") not in ("note", "attachment", "annotation")
         )
         return ReadPage(items, revision, following, total, len(raw), len(raw) - len(items))
+
+    def search(
+        self,
+        text: str | None = None,
+        *,
+        where: str | None = None,
+        collection: str | None = None,
+        max_items: int = 1000,
+        cursor: str | None = None,
+    ) -> SearchResult:
+        """Search across pages within an explicit raw-item budget.
+
+        ``text`` opts into Zotero's native title/creator/year quick search.
+        ``where`` independently filters citation projections with pynakes query
+        syntax. With only ``where``, candidates are the whole library or direct
+        collection. The cursor binds both queries, scope, budget and revision.
+        No matches are returned from a read that changes revision between pages.
+        """
+        from pynakes.query import parse_query
+
+        if type(max_items) is not int or max_items < 1:
+            raise ValueError("Search budget must be a positive integer")
+        if text is not None and not text.strip():
+            raise ValueError("Native search text must not be empty")
+        if text is None and where is None:
+            raise ValueError("Supply native search text or --where")
+        predicate = parse_query(where) if where is not None else None
+        path = (
+            f"users/0/collections/{self._key(collection)}/items"
+            if collection is not None
+            else "users/0/items"
+        )
+        params = {"q": text, "qmode": "titleCreatorYear"} if text is not None else None
+        scope = {"where": where, "max_items": max_items}
+        scanned = 0
+        items = []
+        observed = None
+        while scanned < max_items:
+            raw, revision, cursor, total = self._page(
+                path,
+                min(100, max_items - scanned),
+                cursor,
+                params=params,
+                search_scope=scope,
+            )
+            if observed is not None and revision != observed:
+                raise SourceChanged("Zotero changed during search")
+            observed = revision
+            scanned += len(raw)
+            for row in raw:
+                if row["data"].get("itemType") in ("note", "attachment", "annotation"):
+                    continue
+                record = project(row["data"], self.item_ref(row["key"]), revision, native=False)
+                if predicate is None or (
+                    record.entry_type is not None
+                    and predicate.matches(
+                        BibEntry(
+                            key=record.citation_key or "",
+                            type=record.entry_type,
+                            fields=dict(record.fields),
+                        )
+                    )
+                ):
+                    items.append(record)
+            if cursor is None:
+                break
+        return SearchResult(tuple(items), revision, cursor, total, scanned, scanned - len(items))
 
     def get(
         self, ref: ItemRef, *, expected_revision: Revision | None = None, native: bool = False

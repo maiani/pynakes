@@ -1,26 +1,18 @@
 """Explicit local Zotero reads and guarded selection into project files."""
 
-from dataclasses import asdict
-
 import typer
 
 from pynakes.cli._common import (
     _BACKUP_OPTION,
     _EXPECT_SHA256_OPTION,
     RunParams,
-    _check_expected_sha256,
     _emit,
-    _emit_conflict,
-    _finish_mod,
     _resolve_input_bib,
     _safe,
-    _source_sha256,
     bib_file_argument,
 )
-from pynakes.engine import Bibliography
-from pynakes.library.backends.base import SourceChanged
+from pynakes.cli.commands._zotero_selection import run_selection
 from pynakes.library.backends.zotero import ZoteroLibraryBackend
-from pynakes.project_selection import SelectionConflict, prepare_selection
 
 
 def status(
@@ -85,6 +77,33 @@ def show(
         )
 
 
+def search(
+    text: str | None = typer.Argument(None, help="Native Zotero title/creator/year search"),
+    where: str | None = typer.Option(None, help="Local predicate over citation projections"),
+    collection: str | None = typer.Option(None, help="Restrict to direct collection members"),
+    max_items: int = typer.Option(1000, min=1, help="Maximum candidate items to scan this call"),
+    cursor: str | None = typer.Option(None),
+    port: int = typer.Option(23119),
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
+    """Search across pages within a budget; report exhaustion and a continuation cursor.
+
+    Supply TEXT, --where, or both. TEXT uses Zotero quick search; --where always
+    uses the pynakes query grammar. A budget-limited empty result is incomplete.
+    """
+    with ZoteroLibraryBackend(port=port) as backend:
+        result = backend.search(
+            text, where=where, collection=collection, max_items=max_items, cursor=cursor
+        )
+        _emit(
+            json_output,
+            {"status": "success", "action": "zotero_search", "warnings": [], **result.to_dict()},
+            [f"{r.ref.key}: {dict(r.fields).get('title', '')}" for r in result.items]
+            + [f"Scanned {result.scanned}; complete: {result.complete}"]
+            + ([f"Next cursor: {result.next_cursor}"] if result.next_cursor else []),
+        )
+
+
 def collections(
     port: int = typer.Option(23119),
     limit: int = typer.Option(50, min=1, max=100),
@@ -122,7 +141,9 @@ def materials(
 
 def select(
     file: str | None = bib_file_argument(help="Existing project bibliography"),
-    item: str = typer.Option(..., help="Source Zotero item key"),
+    item: list[str] | None = typer.Option(None, help="Source Zotero item key; repeatable"),
+    collection: str | None = typer.Option(None, help="Select direct members of a collection"),
+    max_items: int = typer.Option(1000, min=1, help="Maximum source items to scan/select"),
     key: str | None = typer.Option(None, help="Independent project citation key"),
     port: int = typer.Option(23119),
     expect_revision: str | None = typer.Option(
@@ -131,7 +152,7 @@ def select(
     resolve: list[str] | None = typer.Option(
         None,
         "--resolve",
-        help="Reviewed FIELD=source|project decision; repeatable; @type selects entry type. Requires both preconditions",
+        help="Reviewed ITEM:FIELD=source|project (FIELD for one item); repeatable; @type selects entry type. Requires both preconditions",
     ),
     dry_run: bool = typer.Option(False, "--dry-run"),
     diff: bool = typer.Option(False, "--diff"),
@@ -139,88 +160,80 @@ def select(
     expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Stage or refresh one reference in a project; never write to Zotero.
+    """Select or refresh items in one guarded plan and one project write.
 
-    Persists source and target baselines in an attached comment. Same-field
-    conflicts report values for review. Resolve each with --resolve and both
-    --expect-revision and --expect-sha256. Does not copy PDFs or private notes.
+    Collection selection includes direct members and reports omitted children.
+    Batch decisions use --resolve ITEM:FIELD=source|project with both preconditions.
     """
-    from typing import Literal
-
-    resolutions: dict[str, Literal["source", "project"]] = {}
-    for value in resolve or []:
-        field, separator, choice = value.partition("=")
-        if not separator or not field or choice not in ("source", "project"):
-            raise ValueError("Use --resolve FIELD=source or FIELD=project")
-        if field in resolutions:
-            raise ValueError("Repeated conflict decision for " + field)
-        resolutions[field] = "source" if choice == "source" else "project"
-    if resolutions and (expect_revision is None or expect_sha256 is None):
-        raise ValueError("--resolve requires --expect-revision and --expect-sha256 from review")
     file = _resolve_input_bib(file, json_output)
-    coll = Bibliography.open(file)
-    params = RunParams(
-        dry_run=dry_run,
-        diff=diff,
-        backup=backup,
-        expect_sha256=expect_sha256,
-        json_output=json_output,
+    run_selection(
+        file,
+        backend_factory=ZoteroLibraryBackend,
+        items=item or [],
+        collection=collection,
+        refresh=False,
+        key=key,
+        port=port,
+        expect_revision=expect_revision,
+        resolve=resolve or [],
+        max_items=max_items,
+        params=RunParams(
+            dry_run=dry_run,
+            diff=diff,
+            backup=backup,
+            expect_sha256=expect_sha256,
+            json_output=json_output,
+        ),
     )
-    _check_expected_sha256(file, coll, params)
-    with ZoteroLibraryBackend(port=port) as backend:
-        ref = backend.item_ref(item)
-        expected = None
-        if expect_revision is not None:
-            expected = backend.get(ref).revision
-            if expect_revision != expected.digest:
-                raise SourceChanged("Zotero differs from the reviewed source revision")
-        try:
-            plan = prepare_selection(
-                backend, ref, coll, key=key, resolutions=resolutions, expected_revision=expected
-            )
-        except SelectionConflict as exc:
-            if not exc.conflicts or exc.source_revision is None:
-                raise
-            _emit_conflict(
-                json_output,
-                "SourceChanged",
-                str(exc),
-                file=file,
-                key=key,
-                source_ref=ref.to_dict(),
-                source_sha256=_source_sha256(coll),
-                source_revision=asdict(exc.source_revision),
-                source_revision_digest=exc.source_revision.digest,
-                conflicts=[asdict(c) for c in exc.conflicts],
-                options=[
-                    {
-                        "id": choice,
-                        "description": f"Review each field; use --resolve FIELD={choice} with both preconditions",
-                    }
-                    for choice in ("source", "project")
-                ],
-            )
-        revision = plan.reference.revision
-        _finish_mod(
-            file,
-            "zotero_select",
-            coll,
-            params,
-            [f"Project reference: {plan.key}"],
-            warnings=list(plan.issues),
-            source_ref=plan.reference.ref.to_dict(),
-            source_revision=asdict(revision),
-            source_revision_digest=revision.digest,
-            key=plan.key,
-            changes=list(plan.changes),
-            resolutions=resolutions,
-        )
+
+
+def refresh(
+    file: str | None = bib_file_argument(help="Existing project bibliography"),
+    port: int = typer.Option(23119),
+    expect_revision: str | None = typer.Option(None),
+    resolve: list[str] | None = typer.Option(
+        None, help="ITEM:FIELD=source|project; requires both preconditions"
+    ),
+    max_items: int = typer.Option(1000, min=1, help="Maximum bindings to refresh"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    diff: bool = typer.Option(False, "--diff"),
+    backup: bool = _BACKUP_OPTION,
+    expect_sha256: str | None = _EXPECT_SHA256_OPTION,
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
+    """Refresh all bindings to this Zotero instance in one guarded project write.
+
+    Other-source bindings are reported and retained. Unresolved findings refuse
+    the entire batch. Reviewed decisions use --resolve ITEM:FIELD=source|project.
+    """
+    file = _resolve_input_bib(file, json_output)
+    run_selection(
+        file,
+        backend_factory=ZoteroLibraryBackend,
+        items=[],
+        collection=None,
+        refresh=True,
+        key=None,
+        port=port,
+        expect_revision=expect_revision,
+        resolve=resolve or [],
+        max_items=max_items,
+        params=RunParams(
+            dry_run=dry_run,
+            diff=diff,
+            backup=backup,
+            expect_sha256=expect_sha256,
+            json_output=json_output,
+        ),
+    )
 
 
 def register(app: typer.Typer) -> None:
     app.command("status")(_safe(status))
     app.command("scan")(_safe(scan))
+    app.command("search")(_safe(search))
     app.command("show")(_safe(show))
     app.command("collections")(_safe(collections))
     app.command("materials")(_safe(materials))
     app.command("select")(_safe(select))
+    app.command("refresh")(_safe(refresh))

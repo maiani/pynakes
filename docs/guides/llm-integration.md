@@ -195,23 +195,31 @@ python_api`), so prefer `batch` when either would do.
 ## Zotero-backed Library
 
 The explicit `zotero` family reads a running local Zotero 10 personal Library.
-Use `scan` and its cursor for bounded discovery, `show` for a selected reference,
-and `select PROJECT.bib --item KEY --dry-run --diff --json` to review a project
-selection or refresh. Source writes and cloud fallback are unsupported.
-`scan --collection KEY --where EXPR` filters a bounded page of direct collection
-members; continue through empty pages while `next_cursor` is present.
-`select` uses the usual modification envelope; the read commands return
-source-scoped records rather than fabricated bibliography paths. Divergent refresh
-edits return exit 2 with `conflicts` (field, accepted source/project values and
-current source/project values), `source_revision_digest`, and the target
-`source_sha256`. After review, repeat `select` with one `--resolve FIELD=source`
-or `--resolve FIELD=project` per conflict, plus `--expect-revision` and
-`--expect-sha256`. Both preconditions are required; unknown/nonconflicting decisions
-are rejected. `@type` selects entry type; null field values represent absence.
-Successful selection reports `changes` and `resolutions` alongside the standard
-envelope. Decisions accept the current difference, not a permanent overwrite
-preference. See the
-[Zotero guide](zotero.md) for freshness, conversion and privacy limits.
+Start with `init PROJECT.bib`, discover `zotero collections`, preview
+`zotero select PROJECT.bib --collection KEY --dry-run --diff --json`, then apply
+with that preview's `--expect-revision` and `--expect-sha256`. Repeatable
+`--item KEY` can be used with or without a collection. Direct members only are
+selected; omitted child collections are reported. Source writes and cloud
+fallback are unsupported.
+
+`scan` reads one bounded source page; `search [TEXT] --where EXPR --max-items N`
+pages internally within a raw-item budget. TEXT explicitly uses native Zotero
+quick search; EXPR always filters citation projections locally. Search
+`complete` means exhausted; follow `next_cursor` with the same arguments when
+false, even if no matches were returned. `scan` completeness instead describes
+page coverage; its cursor still determines exhaustion.
+
+`select` and `refresh PROJECT.bib` use the standard modification envelope.
+`selections` lists each source item and independent project key. `refresh` covers
+all current-source bindings and reports foreign bindings without changing them.
+Any unresolved finding refuses the whole batch. Exit 2 includes per-item
+`findings`, field `conflicts`, source revision digest and target SHA-256. Review
+accepted/current source and project values, then repeat with
+`--resolve ITEM:FIELD=source|project` and both preconditions. `@type` means entry
+type; null means absence. For one explicit item, unscoped `FIELD=source|project`
+and top-level `conflicts`/`changes` remain available. Unknown/nonconflicting
+choices are rejected. Decisions accept a current difference, not a permanent
+overwrite preference. See the [Zotero guide](zotero.md) for scope and privacy limits.
 
 ## Choosing the right operation
 

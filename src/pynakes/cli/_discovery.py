@@ -287,10 +287,11 @@ class AutoBibGroup(TyperGroup):
         current: click.Command = self
         while args:
             name = args[0]
-            cmd = current.commands.get(name) if hasattr(current, "commands") else None
+            commands = getattr(current, "commands", {})
+            cmd = commands.get(name)
             if cmd is None:
                 break
-            if len(args) > 1 or incomplete not in current.commands:
+            if len(args) > 1 or incomplete not in commands:
                 args.pop(0)
                 current = cmd
                 continue

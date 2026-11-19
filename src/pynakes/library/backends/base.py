@@ -140,6 +140,27 @@ class LibraryBackend(Protocol):
     ) -> ReferenceView: ...
 
 
+@dataclass(frozen=True)
+class SearchResult(ReadPage[ReferenceView]):
+    """Matches within a scan budget; complete means the search is exhausted.
+
+    Unlike a single ``ReadPage``, completeness includes pagination exhaustion.
+    Resume ``next_cursor`` with the same search arguments after budget exhaustion.
+    ``source_total`` counts candidates, not necessarily matching references.
+    """
+
+    @property
+    def complete(self) -> bool:
+        return not self.issues and self.next_cursor is None
+
+    def to_dict(self) -> dict:
+        return {
+            **super().to_dict(),
+            "exhausted": self.next_cursor is None,
+            "stop_reason": "budget" if self.next_cursor else "exhausted",
+        }
+
+
 def _page_start(limit: int, cursor: str | None, revision: Revision, request: str) -> int:
     if type(limit) is not int or not 1 <= limit <= 100:
         raise ValueError("Page limit must be between 1 and 100")

@@ -39,6 +39,47 @@ source deletions, return a conflict (exit 2) without writing. A repeat with no
 source changes is idempotent. A potentially matching unbound project record
 requires reconciliation rather than being silently adopted or duplicated.
 
+### Start a project from a collection
+
+```bash
+pynakes init paper.bib --dialect biblatex
+pynakes zotero collections --json
+pynakes zotero select paper.bib --collection DEFGHJKL --dry-run --diff --json
+pynakes zotero select paper.bib --collection DEFGHJKL \
+    --expect-revision SOURCE_DIGEST --expect-sha256 PROJECT_DIGEST --json
+```
+
+Replace the digests with `source_revision_digest` and `source_sha256` from the
+preview. Selection accepts repeatable `--item KEY`, a `--collection KEY`, or both;
+repeated identities are selected once. Collection selection includes direct
+members only and warns about omitted child collections. Notes and attachments
+are skipped. The default `--max-items 1000` bounds collection candidates and
+selected references; an oversized collection refuses the entire selection.
+Increase the explicit budget to select it. Missing project files point to `init`.
+
+A batch has one source revision, one diff and one atomic project write. Its
+`selections` report lists each item's source identity, project key, changes and
+projection issues. Missing/unsupported items, duplicate works within the batch,
+existing unbound matches and divergent edits produce per-item `findings`; any
+unresolved finding refuses the whole batch. No partial subset is written.
+
+```bash
+pynakes zotero refresh paper.bib --dry-run --diff --json
+pynakes zotero refresh paper.bib --expect-revision SOURCE_DIGEST \
+    --expect-sha256 PROJECT_DIGEST --json
+```
+
+`refresh` finds every binding to the current Zotero instance in the project,
+including references no longer in the original collection. It reports other-source
+bindings in `foreign_bindings` and leaves them unchanged. Deleted source items
+require review; they do not silently delete project entries. With no current-source
+bindings, refresh is an explicit no-op. `--max-items` bounds the binding count.
+
+The project's existing key pattern generates new citation keys; `--key` is
+available for one explicit item. Better BibTeX `Citation Key:` lines in `Extra`
+are not adopted. After selection, keys remain project-owned and survive refresh.
+Automatic source-key adoption and collection-to-group mapping are outside v0.10.
+
 ### Resolve a refresh conflict
 
 A conflicting `select` returns `conflicts`: each record names a `field` and
@@ -87,13 +128,45 @@ title markup and page ranges are converted using the existing engine helpers.
 Native metadata is available only through `show --native` and can contain private
 content. Notes, annotations and standalone attachments never become paper records.
 
+For batches and `refresh`, use `findings[].conflicts` and scope each decision to
+the source item, for example `--resolve ABCDEFGH:title=source` and
+`--resolve CDEFGHJK:@type=project`. Supply both reviewed preconditions. Resolve all
+conflicts before the batch can apply; decisions for unknown items or
+nonconflicting fields are rejected. Single explicit-item selection retains the
+unscoped `FIELD=source|project` form and its existing top-level report fields.
+
+## Search across pages
+
+```bash
+# Local query grammar, evaluated across up to 1000 source items:
+pynakes zotero search --where 'year < 1900' --max-items 1000 --json
+# Explicit Zotero title/creator/year quick search, optionally filtered locally:
+pynakes zotero search 'Newton' --where 'type = book' --json
+pynakes zotero search --collection DEFGHJKL --where 'year < 1900' --json
+```
+
+`search` pages internally. `max_items` counts raw candidates, including skipped
+notes and attachments; returned matches never exceed that budget. `complete`
+means the candidate search was exhausted. When false, retain `next_cursor` and
+repeat with exactly the same query, collection and budget. Empty results with a
+cursor do not establish that there are no matches. `scanned` and `skipped` cover
+this invocation; `source_total` counts candidates, not local predicate matches.
+`stop_reason` is `budget` or `exhausted`. A changed source rejects continuation.
+
+TEXT explicitly uses Zotero's `q` / `qmode=titleCreatorYear`; `--where` always uses
+pynakes predicates over the citation projection. A local-only query does not
+silently become native quick search. Zotero's native semantics need not match
+pynakes predicates or Zotero cloud search. See the
+[Zotero search contract](https://www.zotero.org/support/dev/web_api/v3/basics#searching).
+
 ## Bounded reads and freshness
 
 `scan`, `collections` and `materials` read at most 100 source items per page
 (default 50). Follow `next_cursor` until it is null. `source_total` includes
 non-reference items; a page with no references can still have a next cursor.
 `scanned` counts source items in that page; `skipped` counts filtered items.
-`complete` describes source coverage, not whether pagination has ended.
+For these single-page commands, `complete` describes source coverage, not whether
+pagination has ended. This differs from the multi-page `search` result above.
 
 `scan --where 'year < 1900'` applies the existing query grammar locally to each
 citation projection page. It does not mean Zotero quick search, relevance ranking
@@ -174,3 +247,12 @@ rename or adopt the file into Pinax; missing files are an explicit error.
 Source writes, group libraries, annotation transfer, automatic PDF recognition,
 two-way synchronization and automatic rebinding after instance changes are not
 implemented. Native PDF ingestion and Pinax adoption remain a separate workflow.
+
+For source-neutral batch staging, use `prepare_selections(source, refs, project)`
+from `pynakes.project_selection`. It returns `SelectionBatchPlan` and stages
+nothing if any item fails; catch `SelectionBatchConflict` to inspect `findings`.
+`project_bindings(project)` enumerates attached source identities. Batch
+`resolutions` and optional `keys` mappings are keyed by `ItemRef`; decisions
+require `expected_revision`. Keep the source open through the single project
+commit. Zotero's `source.search(text=None, where="year < 1900", max_items=1000)`
+returns the same resumable `SearchResult` as the CLI.

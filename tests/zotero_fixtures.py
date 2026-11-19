@@ -90,6 +90,21 @@ class LocalAPI:
                 rows = [x for x in self.items if collection in x["data"].get("collections", [])]
             else:
                 rows = self.items
+            if "q" in request.url.params:
+                assert request.url.params["qmode"] == "titleCreatorYear"
+                query = request.url.params["q"].casefold()
+                rows = [
+                    row
+                    for row in rows
+                    if query
+                    in " ".join(
+                        [
+                            row["data"].get("title", ""),
+                            row["data"].get("date", ""),
+                            *[str(v) for c in row["data"].get("creators", []) for v in c.values()],
+                        ]
+                    ).casefold()
+                ]
             start = int(request.url.params.get("start", 0))
             limit = int(request.url.params["limit"])
             headers["Total-Results"] = str(len(rows))

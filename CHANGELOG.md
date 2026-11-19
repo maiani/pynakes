@@ -40,6 +40,18 @@ The compatibility forms deprecated in 0.9 are removed in v0.10:
 
 ### Added
 
+- Zotero batch project selection: repeatable `--item` and direct `--collection`
+  selection share one preview, source revision and atomic commit. Reconciliation
+  findings are aggregated; scoped `--resolve ITEM:FIELD=source|project` decisions
+  require both reviewed preconditions. Omitted child collections are reported.
+  `zotero refresh FILE` refreshes all current-source bindings in one transaction
+  and reports foreign bindings. The source-neutral `prepare_selections` planner
+  supports native Libraries too. Missing project files point to `init`.
+- `zotero search [TEXT] --where EXPR --max-items N` searches across pages with
+  explicit exhaustion and resumable cursors. TEXT opts into native Zotero
+  title/creator/year quick search; predicates stay local. The agent reference
+  workflow verifies four-call project setup and one-call whole-project refresh.
+
 - Zotero collection browsing with `zotero scan --collection KEY`, composable with
   bounded `--where` queries and cursors scoped to the collection. Refresh conflicts
   expose accepted and current values; `zotero select --resolve FIELD=source|project`
@@ -104,6 +116,11 @@ The compatibility forms deprecated in 0.9 are removed in v0.10:
   Import-boundary tests guard these dependencies and declared eager-import cycles.
 
 ### Fixed
+
+- Zotero batch selection preserves connection and malformed-response failures as
+  source errors (exit 1), without staging or writing a partial selection.
+- Bound Typer to versions below 0.29, whose changed parameter API breaks CLI
+  construction; retain the supported 0.26–0.28 interface pending migration.
 
 - Python `search_entries(..., limit=0, rank=False)` now returns no results,
   consistent with ranked search, instead of returning the first match.

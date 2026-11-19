@@ -12,7 +12,7 @@ from __future__ import annotations
 import base64
 import binascii
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Literal
 
@@ -27,6 +27,8 @@ from pynakes.library.backends.base import (
     ReferenceView,
     Revision,
     SourceChanged,
+    SourceError,
+    SourceUnavailable,
     SourceUnsupported,
 )
 from pynakes.metadata import library_dialect
@@ -143,13 +145,19 @@ def prepare_selection(
     a deliberate project difference is idempotent. Future divergent edits still
     require review. These are one-operation decisions, not persistent policies.
     """
-    resolutions = dict(resolutions or {})
-    if any(
-        not isinstance(k, str) or v not in ("source", "project") for k, v in resolutions.items()
-    ):
-        raise ValueError("Resolutions must map field names to source or project")
-    if resolutions and expected_revision is None:
-        raise ValueError("Conflict decisions require the reviewed source revision")
+    _validate_target(bibliography)
+    record = backend.get(ref, expected_revision=expected_revision)
+    return _stage_selection(
+        backend,
+        record,
+        bibliography,
+        key=key,
+        resolutions=resolutions,
+        expected_revision=expected_revision,
+    )
+
+
+def _validate_target(bibliography: Bibliography) -> None:
     if bibliography.preview() != bibliography.pristine_text:
         raise SelectionConflict(
             "Select into a pristine Bibliography; commit or reset staged changes first"
@@ -158,7 +166,25 @@ def prepare_selection(
         raise SelectionConflict("Project contains duplicate citation keys")
     if bibliography.path is not None and bibliography._fingerprint is None:
         raise SelectionConflict("Open the project file with Bibliography.open for guarded writes")
-    record = backend.get(ref, expected_revision=expected_revision)
+
+
+def _stage_selection(
+    backend: LibraryBackend,
+    record: ReferenceView,
+    bibliography: Bibliography,
+    *,
+    key: str | None = None,
+    resolutions: Mapping[str, Literal["source", "project"]] | None = None,
+    expected_revision: Revision | None = None,
+) -> SelectionPlan:
+    ref = record.ref
+    resolutions = dict(resolutions or {})
+    if any(
+        not isinstance(k, str) or v not in ("source", "project") for k, v in resolutions.items()
+    ):
+        raise ValueError("Resolutions must map field names to source or project")
+    if resolutions and expected_revision is None:
+        raise ValueError("Conflict decisions require the reviewed source revision")
     if record.entry_type is None:
         raise SourceUnsupported("Source item has no supported citation projection")
     projected = BibEntry(key="", type=record.entry_type, fields=dict(record.fields))
@@ -292,3 +318,123 @@ def prepare_selection(
 
     bibliography._commit_guards.append(guard)
     return SelectionPlan(bibliography, record, entry.key, tuple(sorted(changes)), record.issues)
+
+
+@dataclass(frozen=True)
+class SelectionFinding:
+    """One item that prevents applying a complete selection batch."""
+
+    ref: ItemRef
+    message: str
+    conflicts: tuple[SelectionFieldConflict, ...] = ()
+
+
+class SelectionBatchConflict(SelectionConflict):
+    """All review findings from a batch; the target remains unchanged."""
+
+    def __init__(self, findings: Sequence[SelectionFinding], revision: Revision | None):
+        super().__init__("Selection batch requires review", source_revision=revision)
+        self.findings = tuple(findings)
+
+
+@dataclass(frozen=True)
+class SelectionBatchPlan:
+    """One bibliography buffer and one shared source revision, committed once."""
+
+    bibliography: Bibliography
+    selections: tuple[SelectionPlan, ...]
+    revision: Revision | None
+
+
+def project_bindings(bibliography: Bibliography) -> tuple[ItemRef, ...]:
+    """Return every valid attached binding, refusing ambiguous project identity."""
+    _validate_target(bibliography)
+    refs = []
+    for entry in bibliography.entries.values():
+        comments = [t for _, t in bibliography.entry_comments(entry.key) if t.startswith(_PREFIX)]
+        if len(comments) > 1:
+            raise SelectionConflict("Multiple source bindings on a project entry")
+        for comment in comments:
+            ref = ItemRef(**_decode(comment)["ref"])
+            if ref in refs:
+                raise SelectionConflict("Source is bound to several project entries")
+            refs.append(ref)
+    return tuple(refs)
+
+
+def prepare_selections(
+    backend: LibraryBackend,
+    refs: Sequence[ItemRef],
+    bibliography: Bibliography,
+    *,
+    keys: Mapping[ItemRef, str] | None = None,
+    resolutions: Mapping[ItemRef, Mapping[str, Literal["source", "project"]]] | None = None,
+    expected_revision: Revision | None = None,
+) -> SelectionBatchPlan:
+    """Stage an entire selection/refresh batch or leave the target untouched.
+
+    Read every item against one revision, aggregate reconciliation findings on
+    an isolated editing buffer, then replay the validated edits in place. No
+    source or target files are written. Commit the bibliography once afterwards.
+    Different source items matching one work require review, including matches
+    within this batch. Decisions are scoped by source item, never by citation key.
+    """
+    _validate_target(bibliography)
+    refs = tuple(dict.fromkeys(refs))
+    keys, resolutions = dict(keys or {}), dict(resolutions or {})
+    if (set(keys) | set(resolutions)) - set(refs):
+        raise ValueError("Keys and decisions must refer to selected source items")
+    if resolutions and expected_revision is None:
+        raise ValueError("Conflict decisions require the reviewed source revision")
+    revision = expected_revision
+    records = []
+    findings = []
+    for ref in refs:
+        try:
+            record = backend.get(ref, expected_revision=revision)
+            if record.ref != ref:
+                raise SourceChanged("Backend returned another source reference")
+            if revision is not None and record.revision != revision:
+                raise SourceChanged("Batch contains different source revisions")
+            revision = record.revision
+            records.append(record)
+        except SourceUnavailable:
+            # A connection/protocol failure cannot be resolved by choosing fields.
+            raise
+        except SourceError as exc:
+            findings.append(SelectionFinding(ref, str(exc)))
+    # Reparse the pristine bytes rather than deepcopying identity-keyed spans.
+    trial = Bibliography.from_text(bibliography.pristine_text, path=bibliography.path)
+    trial._fingerprint = bibliography._fingerprint
+    for record in records:
+        try:
+            _stage_selection(
+                backend,
+                record,
+                trial,
+                key=keys.get(record.ref),
+                resolutions=resolutions.get(record.ref),
+                expected_revision=revision,
+            )
+        except (SourceError, ValueError) as exc:
+            findings.append(
+                SelectionFinding(
+                    record.ref,
+                    str(exc),
+                    exc.conflicts if isinstance(exc, SelectionConflict) else (),
+                )
+            )
+    if findings:
+        raise SelectionBatchConflict(findings, revision)
+    plans = tuple(
+        _stage_selection(
+            backend,
+            record,
+            bibliography,
+            key=keys.get(record.ref),
+            resolutions=resolutions.get(record.ref),
+            expected_revision=revision,
+        )
+        for record in records
+    )
+    return SelectionBatchPlan(bibliography, plans, revision)
