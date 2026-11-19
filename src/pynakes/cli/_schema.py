@@ -1,5 +1,8 @@
 """CLI introspection for machine-readable capability and command references."""
 
+from enum import Enum
+from typing import get_args
+
 # Stable type vocabulary for command-schema introspection. The on-disk click
 # type names are mapped to this small, version-independent set so the pinned
 # `capabilities` schema does not change shape when Typer/click internals do.
@@ -27,8 +30,22 @@ def _stable_type(param) -> str:
     """Map a click parameter's type to the stable vocabulary, marking lists."""
     if getattr(param, "is_flag", False):
         return "boolean"
-    raw = (getattr(param.type, "name", "") or "").lower()
-    base = _TYPE_VOCABULARY.get(raw, "string")
+    descriptor = getattr(param, "type_descriptor", None)
+    if descriptor is not None:
+        annotation = descriptor.annotation
+        if descriptor.is_list:
+            annotation = get_args(annotation)[0]
+        if descriptor.is_choice:
+            base = "choice"
+        elif descriptor.is_path or descriptor.is_file:
+            base = "path"
+        else:
+            base = {str: "string", int: "integer", float: "number", bool: "boolean"}.get(
+                annotation, "string"
+            )
+    else:
+        raw = (getattr(param.type, "name", "") or "").lower()
+        base = _TYPE_VOCABULARY.get(raw, "string")
     is_list = bool(getattr(param, "multiple", False)) or getattr(param, "nargs", 1) == -1
     return f"list[{base}]" if is_list else base
 
@@ -53,7 +70,12 @@ def _param_schema(param) -> dict:
     help_text = _plain_help((getattr(param, "help", "") or "").strip())
     if help_text:
         entry["help"] = help_text
-    if getattr(param.type, "name", "") == "choice":
+    descriptor = getattr(param, "type_descriptor", None)
+    if descriptor is not None and descriptor.choices is not None:
+        entry["choices"] = [
+            choice.value if isinstance(choice, Enum) else choice for choice in descriptor.choices
+        ]
+    elif descriptor is None and getattr(param.type, "name", "") == "choice":
         entry["choices"] = list(param.type.choices)
     if param.param_type_name == "argument":
         entry["arg"] = True

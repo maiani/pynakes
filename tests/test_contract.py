@@ -529,11 +529,14 @@ def test_capabilities_describe_every_option_as_the_cli_parses_it() -> None:
             # Every spelling, including --no-* halves, -f, and the wired --file.
             assert set(option["flags"]) == {*param.opts, *param.secondary_opts}, (name, param.name)
             assert option["required"] == bool(param.required)
-            if getattr(param.type, "name", "") == "choice":
-                assert option["choices"] == list(param.type.choices), (name, param.name)
+            descriptor = param.type_descriptor
+            if descriptor.choices is not None:
+                assert option["choices"] == [
+                    getattr(choice, "value", choice) for choice in descriptor.choices
+                ], (name, param.name)
             if getattr(param, "is_flag", False):
                 assert option["type"] == "boolean", (name, param.name)
-            elif getattr(param.type, "name", "") in {"int", "int range"}:
+            elif descriptor.annotation is int:
                 assert option["type"].endswith("integer"), (name, param.name)
 
 

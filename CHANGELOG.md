@@ -119,8 +119,9 @@ The compatibility forms deprecated in 0.9 are removed in v0.10:
 
 - Zotero batch selection preserves connection and malformed-response failures as
   source errors (exit 1), without staging or writing a partial selection.
-- Bound Typer to versions below 0.29, whose changed parameter API breaks CLI
-  construction; retain the supported 0.26–0.28 interface pending migration.
+- Support Typer 0.29.2 and its parameter validation API. Shared CLI options use
+  annotated Typer declarations; command introspection preserves stable types and
+  choices across the migration. The minimum Typer version is now 0.29.2.
 
 - Python `search_entries(..., limit=0, rank=False)` now returns no results,
   consistent with ranked search, instead of returning the first match.

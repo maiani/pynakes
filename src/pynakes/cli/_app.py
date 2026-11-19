@@ -13,7 +13,8 @@ from pynakes.cli._choices import GroupsSeparator
 from pynakes.cli._completion import _bibfile_completer, _metadata_key_completer
 from pynakes.cli._completion import _citekey_completer as _complete_fn
 from pynakes.cli._discovery import AutoBibGroup
-from pynakes.cli._surface import FILE_OPTION, FILE_OPTION_HELP, LIBRARY_ARGUMENT
+from pynakes.cli._parameters import shared_option
+from pynakes.cli._surface import LIBRARY_ARGUMENT
 from pynakes.cli.commands import (
     add,
     analyze,
@@ -257,13 +258,7 @@ def _file_option() -> TyperOption:
     into the leading FILE argument before Click parses the line. It exists as a
     real option so help, completion, and ``capabilities`` all show it.
     """
-    option = TyperOption(
-        param_decls=["file_option", *FILE_OPTION],
-        default=None,
-        metavar="FILE",
-        expose_value=False,
-        help=FILE_OPTION_HELP,
-    )
+    option = shared_option("file_option")
     option.shell_complete = _bibfile_completer  # type: ignore[method-assign]
     return option
 
@@ -277,13 +272,7 @@ def _pretty_option() -> TyperOption:
     :meth:`pynakes.cli._discovery.AutoBibGroup.parse_args`); it exists here so
     help, completion, and ``capabilities`` show it.
     """
-    return TyperOption(
-        param_decls=["pretty_json", "--pretty"],
-        is_flag=True,
-        default=False,
-        expose_value=False,
-        help="Indent --json output for reading (default: compact, one line)",
-    )
+    return shared_option("pretty_json")
 
 
 def _wire_command(command, path=()) -> None:
