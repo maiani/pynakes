@@ -205,15 +205,17 @@ class TestPreCommitHooks:
         hooks = yaml.safe_load(manifest.read_text())
         ids = {h["id"] for h in hooks}
         assert ids == {
+            "pynakes-fix",
             "pynakes-lint",
             "pynakes-keys-check",
             "pynakes-files-check",
             "pynakes-dedupe-check",
         }
         for hook in hooks:
-            # Every gate hook is a read-only, strict pynakes check on .bib files.
+            # Checks are strict and read-only; the formatter is an opt-in writer.
             assert hook["entry"].startswith("pynakes ")
-            assert "--strict" in shlex.split(hook["entry"])
+            if hook["id"] != "pynakes-fix":
+                assert "--strict" in shlex.split(hook["entry"])
             assert hook["language"] == "python"
             assert hook["files"] == r"\.bib$"
 

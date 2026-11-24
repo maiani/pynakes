@@ -31,6 +31,7 @@ from pynakes.cli.commands import (
     edit,
     fetch,
     fields,
+    fix,
     format,
     from_pdf,
     groups,
@@ -137,6 +138,7 @@ groups.register(groups_app)
 keys.register(keys_app)
 fields.register(fields_app)
 normalize.register(app)
+fix.register(app)
 format.register(app)
 convert.register(app)
 capabilities.register(app)

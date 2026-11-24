@@ -327,6 +327,7 @@ COMMAND_GROUPS: dict[str, list[str]] = {
     ],
     "Edit references": [
         "ref",
+        "fix",
         "format",
         "normalize",
         "convert",
@@ -609,6 +610,7 @@ def get_capabilities() -> dict:
             "(list, set, remove, adopt-jabref)",
             "normalize": "Normalize entries (titles, encoding, authors, journals, DOIs, "
             "identifier case, ordering) per the bibliography's configured settings",
+            "fix": "Apply configured normalization and formatting offline, or layout only.",
             "format": "Lint, then rewrite bibliography layout with portable profile settings "
             "and explicit policy overrides",
             "convert": "Convert between BibTeX/BibLaTeX dialects and interchange "
@@ -707,6 +709,8 @@ def get_capabilities() -> dict:
         "saved_queries": _SAVED_QUERIES,
         "analysis": _ANALYSIS,
         "formatting": {
+            "multiple_files": True,
+            "single_input_options": ["--out", "--expect-sha256", "--recursive", "stdin"],
             "lint_gate": (
                 "Formatting runs lint and refuses findings that make a canonical "
                 "rewrite lossy (currently repeated fields)."

@@ -38,7 +38,23 @@ The compatibility forms deprecated in 0.9 are removed in v0.10:
   `deprecated_metadata_key` finding is retired. Python `encode_field()` now
   requires an explicit `to="latex"` or `to="unicode"` value.
 
+### Deprecated
+
+- `pynakes-keys-check` duplicates `pynakes-lint`'s citation-key validation.
+  Use `pynakes-lint`, optionally with `args: [--only, duplicate_key]`.
+  The old hook ID remains through v0.10; removal is no earlier than v0.11.
+  The supported hook set is `pynakes-fix`, `pynakes-lint`, and the manual
+  `pynakes-files-check` / `pynakes-dedupe-check` checks.
+
 ### Added
+
+- `fix` and its opt-in `pynakes-fix` hook apply configured normalization followed
+  by formatting in one transaction per bibliography. `--mode` / `fix-mode`
+  choose `normalize-and-format` or `layout-only`; `Bibliography.fix()` exposes
+  the same policy. Key regeneration remains opt-in through `normalize-keys`.
+- `format`, `normalize`, and `fix` accept multiple bibliography paths with
+  per-file settings, previews, and failures. Successful files can be written
+  independently of failed inputs; single-file JSON remains unchanged.
 
 - Zotero batch project selection: repeatable `--item` and direct `--collection`
   selection share one preview, source revision and atomic commit. Reconciliation

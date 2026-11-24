@@ -243,6 +243,15 @@ def place_library(
     indices = _positional_indices(command, tokens)
     positional = [tokens[index] for index in indices]
 
+    if arguments[0].nargs == -1:
+        if file_values and (len(file_values) > 1 or positional):
+            raise _usage_error("Use either --file or positional bibliography paths")
+        if file_values:
+            return [file_values[0], *tokens]
+        if positional or "--recursive" in tokens:
+            return tokens
+        return [_autodetected(json_output), *tokens]
+
     if file_values:
         if len(file_values) > 1:
             raise _usage_error("The library is named more than once with --file")

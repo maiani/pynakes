@@ -153,17 +153,73 @@ top-level `status` is `"error"` if any file could not be read.
 
 ## pre-commit
 
-`pynakes` ships a [`.pre-commit-hooks.yaml`](https://github.com/maiani/pynakes/blob/main/.pre-commit-hooks.yaml).
-Add it to your repository's `.pre-commit-config.yaml`:
+Four hooks cover the supported workflows:
+
+| Hook | Purpose | Default stage |
+| --- | --- | --- |
+| `pynakes-fix` | Configured normalization followed by formatting | pre-commit |
+| `pynakes-lint` | Read-only quality checks, including duplicate citation keys | pre-commit |
+| `pynakes-files-check` | Validate linked material paths | manual |
+| `pynakes-dedupe-check` | Detect duplicate works | manual |
+
+The usual setup is fix followed by lint. For read-only checks, omit the fixer.
+Add to your repository's `.pre-commit-config.yaml`:
 
 ```yaml
 repos:
   - repo: https://github.com/maiani/pynakes
-    rev: vX.Y.Z  # a released tag; pre-commit autoupdate moves it
+    rev: vX.Y.Z  # a released tag that includes pynakes-fix
     hooks:
+      - id: pynakes-fix
       - id: pynakes-lint
-      - id: pynakes-keys-check
 ```
+
+`pynakes-fix` runs `pynakes fix`: ordinary normalization settings and defaults,
+then the bibliography's `format-*` layout. It is offline and does not guess
+missing data or execute every remedy suggested by lint. Keys are regenerated
+only if `normalize-keys` is explicitly enabled; linked TeX and material rename
+safeguards still apply. Review any linked-file changes too. Hooks run serially
+to avoid concurrent edits to shared linked sources.
+
+For layout alone, use the same hook with an argument:
+
+```yaml
+      - id: pynakes-fix
+        args: [--mode, layout-only]
+```
+
+Or store that policy with `pynakes metadata set references.bib fix-mode layout-only`.
+`--mode normalize-and-format` overrides it in the other direction. The Python
+API is `Bibliography.fix(mode=None)`, followed by preview/commit as usual.
+
+When the fixer changes files, pre-commit stops the commit. Review the diff,
+re-stage the changes, and retry. Lint can still report issues requiring a human
+fix. The standalone `format` command remains available for layout-only work;
+there is no separate formatting hook.
+
+`pynakes-keys-check` is a deprecated compatibility ID: `pynakes-lint` already
+checks duplicate citation keys and follows the same ignore rules. Remove it
+when lint is enabled, or use lint with `args: [--only, duplicate_key]` if that
+is the only check wanted. The old ID remains through v0.10; removal is no
+earlier than v0.11.
+
+The commands also accept several files directly:
+
+```bash
+pynakes fix references.bib archive.bib --dry-run --diff
+pynakes normalize references.bib archive.bib
+pynakes format references.bib archive.bib --check
+```
+
+Each file uses its own settings and transaction; successful files may be
+written even if another fails. Normalization and formatting within `fix` are
+both staged before any write for that file. Multi-file JSON has per-file
+`files` results and a `summary`; one input retains its single-file envelope.
+Errors return exit 1; `fix` and `normalize` preserve conflicts as exit 2 when
+there are no errors. `format --check` writes nothing and returns 1 if any file
+needs formatting. `--expect-sha256` requires one input; format's `--out`, stdin
+(`-`), and `--recursive` also require one input. With no input, the existing
+single-bibliography auto-detection applies.
 
 Then:
 
@@ -183,10 +239,7 @@ therefore reports a placeholder such as `0.1.0.dev1`. The code is the release
 `rev` names; only the label is missing. To check which release a hook runs, read
 `rev`, not the version string.
 
-`pynakes-lint` and `pynakes-keys-check` (which runs
-`lint --only duplicate_key --strict`, so it honors `lint-ignore`) run on every
-commit. Two more hooks are
-defined but gated behind pre-commit's `manual` stage, because they have
+The file and duplicate-work checks use pre-commit's `manual` stage because they have
 preconditions you may not always meet (linked PDFs checked into the repo;
 deciding duplicates are truly unwanted):
 

@@ -28,7 +28,12 @@ from pynakes import metadata as metadata_ops
 from pynakes import normalize as normalize_ops
 from pynakes import scrub as scrub_ops
 from pynakes._entry_comments import attached_comment_indices
-from pynakes.canonical import CanonicalLayout, format_selected_entries, validate_format_input
+from pynakes.canonical import (
+    CanonicalLayout,
+    format_selected_entries,
+    layout_from_metadata,
+    validate_format_input,
+)
 from pynakes.editing import set_entry_field, set_entry_type
 from pynakes.engine._entry_style import apply_library_style
 from pynakes.engine._insert import add_entry_ordered
@@ -344,6 +349,27 @@ class BibliographyOperations:
             self._rewrite_tex_for_renames(
                 report.renamed_keys, allow_missing_sources=force_key_renames
             )
+        return report
+
+    def fix(self, mode: str | None = None) -> normalize_ops.NormalizeResult | None:
+        """Stage configured normalization followed by formatting, without writing.
+
+        ``mode`` overrides the ``fix-mode`` setting in either direction:
+        ``normalize-and-format`` (default), or ``layout-only``. Normalization
+        uses the library's ordinary settings and defaults; key regeneration is
+        off unless ``normalize-keys`` enables it. Existing TeX and material
+        rename safeguards still apply. Layout-only returns ``None``; otherwise
+        the return value is the normalization report. Commit to apply the work.
+        """
+        resolved = (
+            mode or metadata_ops.metadata_value(self.lib, "fix-mode") or "normalize-and-format"
+        )
+        if resolved not in {"normalize-and-format", "layout-only"}:
+            raise ValueError(f"Invalid fix mode {resolved!r}")
+        # Refuse lossy input before normalization can remove repeated fields.
+        validate_format_input(self.lib)
+        report = self.normalize() if resolved == "normalize-and-format" else None
+        self.format(layout_from_metadata(self.lib))
         return report
 
     def scrub(self, options: scrub_ops.ScrubOptions | None = None) -> scrub_ops.ScrubReport:

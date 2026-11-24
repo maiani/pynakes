@@ -12,6 +12,12 @@ from pynakes.normalize import ENCODING_FIELDS
 # Meaning, default when absent, accepted format, overriding command/flag.
 # None means unset, not an unknown default. Conditional defaults are explicit.
 _DETAILS: dict[str, tuple[str, object, str, str | None]] = {
+    "fix-mode": (
+        "Fix configured conventions and layout, or layout only.",
+        "normalize-and-format",
+        "choice",
+        "fix --mode",
+    ),
     "normalize-proper-nouns": (
         "Protect internal capitalized names in sentence-case titles.",
         False,

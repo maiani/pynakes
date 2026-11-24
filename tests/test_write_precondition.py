@@ -70,6 +70,7 @@ STALE = "0" * 64
 # One invocation per modifying command, each of which changes the library;
 # ``{bib}`` is the library.
 WRITES = {
+    "fix": ["fix", "{bib}"],
     "ref edit": ["ref", "edit", "{bib}", "Newton1687", "--field", "note=first edition"],
     "ref directive": ["ref", "directive", "{bib}", "ignore", "missing_doi", "--key", "Newton1687"],
     "ref comment": ["ref", "comment", "{bib}", "checked by hand", "--key", "Newton1687"],

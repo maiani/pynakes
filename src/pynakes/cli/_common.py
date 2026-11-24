@@ -23,6 +23,7 @@ from pynakes.cli._files import bib_file_argument as bib_file_argument
 from pynakes.cli._files import is_auxiliary_bib_file as is_auxiliary_bib_file
 from pynakes.cli._files import missing_bib_message as missing_bib_message
 from pynakes.cli._files import single_bib_file as single_bib_file
+from pynakes.cli._result_collection import RESULT_COLLECTOR
 from pynakes.dedupe import DedupeConflictError
 from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography, ExternalModificationError
@@ -82,6 +83,9 @@ def _emit_json(payload: dict) -> None:
     """
     if "warnings" in payload:
         payload["warnings"] = [_warning_object(w) for w in payload["warnings"] or []]
+    if (collector := RESULT_COLLECTOR.get()) is not None:
+        collector.append(payload)
+        return
     if _PRETTY_JSON.get():
         typer.echo(json.dumps(payload, indent=2))
     else:

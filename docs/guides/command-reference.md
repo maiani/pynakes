@@ -489,17 +489,37 @@ Set or replace a field on matching references.
 | `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
+## fix
+
+**Stability: stable**
+
+Apply configured normalization, then formatting, offline.
+
+`pynakes fix [FILE...] [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | list[string] | no | — | — | Paths to .bib files (default: auto-detect one) |
+| `--mode` | choice | no | null | normalize-and-format, layout-only | Apply configured normalization and layout, or layout only (setting: fix-mode) |
+| `--dry-run` | boolean | no | false | — | Preview without writing |
+| `--diff` | boolean | no | false | — | Show a unified diff |
+| `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
 ## format
 
 **Stability: stable**
 
 Rewrite layout only; never change bibliographic values or conventions.
 
-`pynakes format [FILE] [OPTIONS]`
+`pynakes format [FILE...] [OPTIONS]`
 
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
-| `FILE` | string | no | — | — | Path, directory with --recursive, or - for stdin |
+| `FILE` | list[string] | no | — | — | Paths to .bib files, one directory with --recursive, or - for stdin |
 | `--indent` | string | no | null | — | Field indentation string (setting: format-indent) |
 | `--alignment` | choice | no | null | compact, equals | Field/value alignment policy (setting: format-alignment) |
 | `--trailing-comma, --no-trailing-comma` | boolean | no | null | — | Comma after the last field (setting: format-trailing-comma) |
@@ -956,11 +976,11 @@ Set one top-level metadata block (jabref-meta or pynakes-meta).
 
 Normalize entries: titles, authors, journals, DOIs, encoding, identifier case, order.
 
-`pynakes normalize [FILE] [OPTIONS]`
+`pynakes normalize [FILE...] [OPTIONS]`
 
 | Parameter | Type | Required | Default | Choices | Description |
 | --- | --- | --- | --- | --- | --- |
-| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `FILE` | list[string] | no | — | — | Paths to .bib files (default: auto-detect one) |
 | `--title-protection` | choice | no | "metadata" | metadata, on, off | Brace-protect capitalization-sensitive title words (setting: normalize-protect-titles) |
 | `--proper-nouns, --no-proper-nouns` | boolean | no | null | — | Protect internal capitalized names in sentence-case titles (setting: normalize-proper-nouns; default: off) |
 | `--title-field` | list[string] | no | null | — | Title-like field to brace-protect; can be repeated (setting: normalize-title-fields) |

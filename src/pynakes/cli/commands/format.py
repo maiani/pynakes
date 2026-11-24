@@ -150,18 +150,19 @@ def _check_payload(
 
 
 def _failure_code(exc: Exception) -> str:
-    """Return the catalogued code for one file's failure in a recursive run."""
+    """Return the catalogued code for one file's failure in a multi-file run."""
     if isinstance(exc, FormatLintError):
         return "FormatLintError"
     return error_code_for(exc).value
 
 
-def _run_recursive(
+def _run_many(
     files: list[Path],
     overrides: FormatOverrides,
     params: RunParams,
     *,
     check: bool,
+    recursive: bool = False,
     where: str | None = None,
     keys: list[str] | None = None,
 ) -> None:
@@ -173,7 +174,8 @@ def _run_recursive(
         try:
             coll = Bibliography.open(path)
             layout = _layout(coll.lib, overrides)
-            coll.format(layout, bind_where_filter(coll, where, keys=keys))
+            warnings: list[dict] = []
+            coll.format(layout, bind_where_filter(coll, where, keys=keys, warnings=warnings))
             plan = coll.change_plan()
             payload: dict[str, object]
             if check:
@@ -198,6 +200,9 @@ def _run_recursive(
                 }
                 if params.diff and diff_text:
                     payload["diff"] = diff_text
+            payload["warnings"] = warnings
+            if check and params.diff and coll.is_modified:
+                payload["diff"] = coll.diff()
             results.append(payload)
         except Exception as exc:
             failures += 1
@@ -221,7 +226,7 @@ def _run_recursive(
         "status": "error" if failures else "success",
         "action": "format",
         "check": check,
-        "file": str(files[0].parent) if files else ".",
+        "file": (str(files[0].parent) if files else ".") if recursive else None,
         "dry_run": check or params.dry_run,
         "modified": bool(dirty if check else modified_count),
         "modified_entries": sum(
@@ -236,9 +241,22 @@ def _run_recursive(
         },
     }
     if failures:
-        payload["error"] = "RecursiveFormatError"
+        if recursive:
+            payload["error"] = "RecursiveFormatError"
+        else:
+            payload["error"] = "MultiFileFormatError"
         payload["message"] = f"{failures} file(s) failed"
-    human = [
+    human = []
+    for item in results:
+        state = item.get("message") or (
+            ("needs formatting" if params.dry_run else "formatted")
+            if item["modified"]
+            else "already formatted"
+        )
+        human.append(f"{item['file']}: {state}")
+        if item.get("diff"):
+            human.append(str(item["diff"]))
+    human += [
         f"{len(files)} file(s): {dirty if check else modified_count} need/received formatting, "
         f"{failures} failed"
     ]
@@ -248,7 +266,9 @@ def _run_recursive(
 
 
 def format_bibliography(
-    file: str | None = bib_file_argument("Path, directory with --recursive, or - for stdin"),
+    file: list[str] | None = bib_file_argument(
+        "Paths to .bib files, one directory with --recursive, or - for stdin"
+    ),
     indent: str | None = typer.Option(
         None, "--indent", help="Field indentation string (setting: format-indent)"
     ),
@@ -319,6 +339,20 @@ def format_bibliography(
     be combined with it. Entry order is not layout: `normalize --sort-by`
     sorts entries, and format keeps the order it is given.
     """
+    inputs = file or []
+    if len(inputs) > 1:
+        restricted = []
+        if out is not None:
+            restricted.append("--out")
+        if expect_sha256 is not None:
+            restricted.append("--expect-sha256")
+        if recursive:
+            restricted.append("--recursive")
+        if "-" in inputs:
+            restricted.append("stdin (-)")
+        if restricted:
+            _emit_error(json_output, "InvalidInput", f"{', '.join(restricted)} requires one input")
+    source = inputs[0] if inputs else None
     to_stdout = out == "-"
     if out is not None and (check or recursive):
         _emit_error(
@@ -326,7 +360,7 @@ def format_bibliography(
         )
     if to_stdout and json_output:
         _emit_error(json_output, "InvalidInput", "--out - writes the bibliography itself, not JSON")
-    if file == "-" and not to_stdout:
+    if source == "-" and not to_stdout:
         _emit_error(json_output, "InvalidInput", "stdin input (-) requires --out -")
     if recursive and expect_sha256 is not None:
         _emit_error(json_output, "InvalidInput", "--expect-sha256 names one file's digest")
@@ -368,12 +402,24 @@ def format_bibliography(
     )
 
     if recursive:
-        target = Path(file or ".")
+        target = Path(source or ".")
         files = _recursive_files(target)
         if not files:
             _emit_error(json_output, "FileNotFound", f"No .bib files found under {target}")
-        _run_recursive(
+        _run_many(
             files,
+            overrides,
+            params,
+            check=check,
+            recursive=True,
+            where=where,
+            keys=selected_keys,
+        )
+        return
+
+    if len(inputs) > 1:
+        _run_many(
+            [Path(value) for value in dict.fromkeys(inputs)],
             overrides,
             params,
             check=check,
@@ -382,7 +428,7 @@ def format_bibliography(
         )
         return
 
-    if file == "-":
+    if source == "-":
         coll = Bibliography.from_text(sys.stdin.read())
         try:
             coll.format(_layout(coll.lib, overrides), bind_where_filter(coll, where, keys=key))
@@ -396,7 +442,7 @@ def format_bibliography(
         sys.stdout.write(coll.preview())
         return
 
-    resolved = _resolve_input_bib(file, json_output)
+    resolved = _resolve_input_bib(source, json_output)
     if out is not None and not to_stdout:
         _refuse_input_as_output(json_output, out, [resolved])
         _refuse_existing_output(json_output, out, force)
@@ -424,7 +470,12 @@ def format_bibliography(
     if check:
         payload = _check_payload(resolved, coll, where, selected_keys)
         payload["warnings"] = warnings
-        _emit(json_output, payload, [f"{resolved}: {str(payload['message']).lower()}"])
+        if diff and coll.is_modified:
+            payload["diff"] = coll.diff()
+        human = [f"{resolved}: {str(payload['message']).lower()}"]
+        if payload.get("diff"):
+            human.append(str(payload["diff"]))
+        _emit(json_output, payload, human)
         if payload["modified"]:
             raise typer.Exit(code=1)
         return

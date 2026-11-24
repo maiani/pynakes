@@ -103,6 +103,7 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     "normalize-journal-source": CATEGORY_NORMALIZATION,
     "normalize-journal-table": CATEGORY_NORMALIZATION,
     "normalize-ltwa-table": CATEGORY_NORMALIZATION,
+    "fix-mode": CATEGORY_NORMALIZATION,
     "format-indent": CATEGORY_FORMATTING,
     "format-alignment": CATEGORY_FORMATTING,
     "format-trailing-comma": CATEGORY_FORMATTING,
@@ -175,6 +176,7 @@ _FORMAT_CHOICES = {
     "format-block-order": {"preserve", "canonical"},
     "format-wrap-values": {"off", "stable", "canonical"},
     "format-entry-type-case": {"lower", "preserve"},
+    "fix-mode": {"normalize-and-format", "layout-only"},
 }
 
 

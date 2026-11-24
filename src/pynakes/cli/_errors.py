@@ -34,6 +34,8 @@ class ErrorCode(StrEnum):
     NO_SOURCES = "NoSources"
     MISSING_TEX_SOURCE = "MissingTexSource"
     INVALID_NORMALIZE_OPTION = "InvalidNormalizeOption"
+    MULTI_FILE_ERROR = "MultiFileError"
+    MULTI_FILE_FORMAT_ERROR = "MultiFileFormatError"
     RECURSIVE_FORMAT_ERROR = "RecursiveFormatError"
     FORMAT_LINT_ERROR = "FormatLintError"
     MISSING_CONVERT_TARGET = "MissingConvertTarget"
@@ -119,6 +121,8 @@ CATALOGUE: dict[ErrorCode, ErrorSpec] = {
         "--ignore-missing-tex to proceed without rewriting it (includes 'sources').",
     ),
     _E.INVALID_NORMALIZE_OPTION: ErrorSpec(1, "normalize: an option value was not allowed."),
+    _E.MULTI_FILE_ERROR: ErrorSpec(1, "One or more input files failed; see per-file results."),
+    _E.MULTI_FILE_FORMAT_ERROR: ErrorSpec(1, "format: one or more input files failed."),
     _E.RECURSIVE_FORMAT_ERROR: ErrorSpec(1, "format --recursive: one or more files failed."),
     _E.FORMAT_LINT_ERROR: ErrorSpec(
         1, "format: lint findings make a lossless rewrite unsafe (includes 'issues')."

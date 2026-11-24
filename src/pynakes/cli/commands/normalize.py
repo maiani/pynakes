@@ -24,6 +24,7 @@ from pynakes.cli._common import (
     select_keys,
     where_option,
 )
+from pynakes.cli._multi_mod import run_many
 from pynakes.engine import Bibliography
 from pynakes.normalize import SKIPPABLE_STEPS, skipped_step_flag
 from pynakes.usage import MissingTexSourcesError
@@ -44,7 +45,7 @@ def _optional_bool(value: str) -> bool | None:
 
 
 def normalize(
-    file: str | None = bib_file_argument(),
+    file: list[str] | None = bib_file_argument("Paths to .bib files (default: auto-detect one)"),
     title_protection: Switch = typer.Option(
         Switch.METADATA,
         "--title-protection",
@@ -190,6 +191,10 @@ def normalize(
     `normalize --key Newton1687,Euler1748 --only journals` abbreviates two
     journal names and changes nothing else.
     """
+    if file and len(file) > 1:
+        run_many(normalize, "normalize", locals().copy())
+        return
+    source = file[0] if file else None
     params = RunParams(
         dry_run=dry_run,
         diff=diff,
@@ -198,14 +203,14 @@ def normalize(
         expect_sha256=expect_sha256,
     )
 
-    if file == "-":
+    if source == "-":
         _emit_error(
             json_output,
             "InvalidInput",
             "normalize requires a file; stdin is supported by format - --out -",
         )
 
-    file = _resolve_input_bib(file, json_output)
+    resolved = _resolve_input_bib(source, json_output)
     steps = _only_steps(only, json_output)
     _refuse_contradictions(
         json_output,
@@ -260,7 +265,7 @@ def normalize(
         options.remove_invisible = _optional_bool(invisible_characters)
         options.encoding = str(encoding)
         options.encoding_fields = encoding_field
-        coll = Bibliography.open(file)
+        coll = Bibliography.open(resolved)
         selected = select_keys(
             coll, where, key, json_output, "normalize", warnings=selection_warnings
         )
@@ -330,7 +335,7 @@ def normalize(
         )
 
     _finish_mod(
-        file,
+        resolved,
         "normalize",
         coll,
         params,

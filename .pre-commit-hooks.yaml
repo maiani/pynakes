@@ -6,15 +6,25 @@
 #     - repo: https://github.com/maiani/pynakes
 #       rev: vX.Y.Z  # a released tag
 #       hooks:
+#         - id: pynakes-fix       # opt-in: configured normalization and layout
 #         - id: pynakes-lint
-#         - id: pynakes-keys-check
 #         - id: pynakes-files-check   # opt-in: validates linked-file paths
 #         - id: pynakes-dedupe-check  # opt-in: flags duplicate works
 #
-# Every hook is read-only, offline, and deterministic. pre-commit passes the
-# staged .bib files as arguments; --strict makes a finding fail the commit.
+# All hooks are offline and deterministic; only pynakes-fix writes files.
+# pre-commit passes staged .bib files as arguments; --strict makes a finding
+# fail the commit for the read-only checks.
 # pynakes-lint gates on warnings and errors; info findings are not reported
 # (add `args: [--severity, info]` to gate on them too).
+
+- id: pynakes-fix
+  name: pynakes fix
+  description: Apply configured normalization and formatting; use args [--mode, layout-only] for layout alone. Review and re-stage changes before retrying.
+  entry: pynakes fix
+  require_serial: true
+  language: python
+  files: \.bib$
+  types: [file]
 
 - id: pynakes-lint
   name: pynakes lint
@@ -25,8 +35,8 @@
   types: [file]
 
 - id: pynakes-keys-check
-  name: pynakes lint --only duplicate_key
-  description: Fail if any citation key is duplicated (unless lint-ignore suppresses it).
+  name: pynakes keys check (deprecated; use pynakes-lint)
+  description: Deprecated compatibility hook; pynakes-lint already checks duplicate citation keys. Retained through v0.10; removal no earlier than v0.11.
   entry: pynakes lint --only duplicate_key --strict
   language: python
   files: \.bib$
