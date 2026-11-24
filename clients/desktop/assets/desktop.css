@@ -1,0 +1,46 @@
+/* Host-specific dialogs and unavailable first-version actions. */
+.desktop-prompt {
+  color: var(--pynakes-foreground);
+  background: var(--pynakes-editor-background);
+  border: 1px solid var(--pynakes-panel-border);
+  border-radius: 8px;
+  width: min(480px, 90vw);
+  padding: 24px;
+}
+.desktop-prompt::backdrop { background: rgb(0 0 0 / 35%); }
+.desktop-prompt h2 { margin-top: 0; font-size: 18px; }
+.desktop-prompt label { display: grid; gap: 6px; margin: 16px 0; }
+.desktop-prompt input, .desktop-prompt select {
+  font: inherit; padding: 8px; color: var(--pynakes-input-foreground);
+  background: var(--pynakes-input-background); border: 1px solid var(--pynakes-input-border);
+}
+.desktop-prompt-actions { display: flex; justify-content: flex-end; gap: 12px; }
+.desktop-prompt button { font: inherit; padding: 7px 16px; cursor: pointer; }
+/* Material downloading needs a desktop progress/cancellation host; browsing works. */
+.material-fetch, #fetch-materials { display: none !important; }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pynakes-editor-background: #1e2228;
+    --pynakes-foreground: #e1e6ed;
+    --pynakes-descriptionForeground: #a7b0bd;
+    --pynakes-sideBar-background: #252a32;
+    --pynakes-editorWidget-background: #252a32;
+    --pynakes-editorGroup-border: #343c47;
+    --pynakes-panel-border: #424c59;
+    --pynakes-input-background: #2a313b;
+    --pynakes-input-foreground: #e1e6ed;
+    --pynakes-input-border: #536174;
+    --pynakes-button-secondaryBackground: #343f50;
+    --pynakes-button-secondaryForeground: #e1e6ed;
+    --pynakes-button-secondaryHoverBackground: #45536a;
+    --pynakes-list-hoverBackground: #303a47;
+    --pynakes-list-activeSelectionBackground: #26456f;
+    --pynakes-list-activeSelectionForeground: #ffffff;
+    --pynakes-badge-background: #343f50;
+    --pynakes-badge-foreground: #e1e6ed;
+    --pynakes-focusBorder: #7caeff;
+    --pynakes-textLink-foreground: #8bb9ff;
+    --pynakes-diffEditor-insertedTextBackground: #214132;
+    --pynakes-diffEditor-removedTextBackground: #4a292f;
+  }
+}

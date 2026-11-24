@@ -132,7 +132,7 @@ jobs:
       - name: Build docs
         run: zensical build --strict
 
-  editor:
+  vscode:
     name: Editor extension
     runs-on: ubuntu-latest
     steps:
@@ -147,7 +147,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: editor/package-lock.json
+          cache-dependency-path: clients/vscode/package-lock.json
 
       # The floor from pyproject's requires-python, so the bundle is proven
       # against the oldest interpreter the engine claims to support rather than
@@ -159,11 +159,11 @@ jobs:
           cache: pip
 
       - name: Install Node dependencies
-        working-directory: editor
+        working-directory: clients/vscode
         run: npm ci
 
       - name: Compile
-        working-directory: editor
+        working-directory: clients/vscode
         run: npm run compile
 
       # The contract and webview tests run this repository's engine; without its
@@ -172,43 +172,43 @@ jobs:
         run: python -m pip install -e .
 
       - name: Run tests
-        working-directory: editor
+        working-directory: clients/vscode
         env:
           PYNAKES_REQUIRE_ENGINE: "1"
         run: npm test
 
       - name: Vendor the engine
-        working-directory: editor
+        working-directory: clients/vscode
         run: node scripts/vendor-engine.mjs
 
       # The vendored tree is generated and must never be committed; a missing
       # ignore rule would otherwise add ~1200 files to the repository unnoticed.
       - name: Check the vendored engine stays out of git
-        run: git check-ignore --quiet editor/engine
+        run: git check-ignore --quiet clients/vscode/engine
 
       # End-to-end through the bundle: the path a user with no pynakes install
       # takes, exercising the generated launcher rather than the developer's own
       # installed engine.
       - name: Smoke-test the bundled engine
         run: |
-          python -P editor/engine/pynakes_launcher.py --version
-          python -P editor/engine/pynakes_launcher.py \
+          python -P clients/vscode/engine/pynakes_launcher.py --version
+          python -P clients/vscode/engine/pynakes_launcher.py \
             inspect tests/fixtures/biblatex_sample.bib --json > /dev/null
 
       - name: Check native wheel selection
         env:
-          PYTHONPATH: editor/engine
-        run: python -m unittest discover -s editor/scripts -p 'test_bundle_*.py'
+          PYTHONPATH: clients/vscode/engine
+        run: python -m unittest discover -s clients/vscode/scripts -p 'test_bundle_*.py'
 
       - name: Save bundled engine for platform checks
         uses: actions/upload-artifact@v7
         with:
-          name: editor-engine
-          path: editor/engine/
+          name: vscode-engine
+          path: clients/vscode/engine/
 
-  editor-runtime:
+  vscode-runtime:
     name: Bundled engine (${{ matrix.os }}, Python ${{ matrix.python }})
-    needs: editor
+    needs: vscode
     strategy:
       fail-fast: false
       matrix:
@@ -222,12 +222,12 @@ jobs:
           python-version: ${{ matrix.python }}
       - uses: actions/download-artifact@v8
         with:
-          name: editor-engine
-          path: editor/engine/
+          name: vscode-engine
+          path: clients/vscode/engine/
       - name: Run isolated bundle without installed engine dependencies
         run: |
-          python -I -S editor/engine/pynakes_launcher.py --version
-          python -I -S editor/engine/pynakes_launcher.py inspect tests/fixtures/biblatex_sample.bib --json
+          python -I -S clients/vscode/engine/pynakes_launcher.py --version
+          python -I -S clients/vscode/engine/pynakes_launcher.py inspect tests/fixtures/biblatex_sample.bib --json
 
   package:
     name: Distribution
@@ -259,3 +259,24 @@ jobs:
           python -m pip install --force-reinstall dist/*.whl
           pynakes --version
           pynakes capabilities --json
+
+  desktop:
+    name: Standalone editor
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: clients/desktop/package-lock.json
+      - run: python -m pip install -e .
+      - run: npm ci
+        working-directory: clients/desktop
+      - run: npm test
+        working-directory: clients/desktop
+      - run: xvfb-run -a npm run smoke
+        working-directory: clients/desktop

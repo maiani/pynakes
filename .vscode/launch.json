@@ -2,12 +2,12 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run Extension (editor/)",
+      "name": "Run Extension (clients/vscode/)",
       "type": "extensionHost",
       "request": "launch",
-      "args": ["--extensionDevelopmentPath=${workspaceFolder}/editor"],
-      "outFiles": ["${workspaceFolder}/editor/out/**/*.js"],
-      "preLaunchTask": "editor: compile"
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}/clients/vscode"],
+      "outFiles": ["${workspaceFolder}/clients/vscode/out/**/*.js"],
+      "preLaunchTask": "vscode: compile"
     }
   ]
 }

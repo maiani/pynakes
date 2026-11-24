@@ -83,23 +83,33 @@ src/pynakes/
   batch.py setops.py diff.py capabilities.py
 tests/                pytest suite, conformance fixtures, and CLI workflow tests
 evals/agent/          agent evaluation tasks and fixtures (run by scripts/agent_eval.py)
-editor/               VS Code extension companion (TypeScript, own toolchain)
+clients/vscode/       VS Code extension host (TypeScript)
+clients/desktop/      Electron host (own npm toolchain)
+packages/client-core/ Shared application logic and Node engine transport
+packages/client-ui/   Shared browser interface and HTML shell
 ```
 
-`editor/` is a separate client, not part of the Python distribution: it has its
+`clients/desktop/` is the initial standalone local bibliography editor, not yet the
+planned Library/Catalogue manager. Both clients consume `packages/client-core` and
+`packages/client-ui`; keep Electron APIs in `clients/desktop/src` and
+VS Code APIs in `clients/vscode/src/vscode`. Run `npm test --prefix clients/desktop` and
+`npm run smoke --prefix clients/desktop` for desktop changes. Both clients are excluded
+from Python artifacts. See [clients/desktop/README.md](clients/desktop/README.md).
+
+`clients/vscode/` is a separate client, not part of the Python distribution: it has its
 own `npm` toolchain, is excluded from the sdist and wheel, and is not touched by
 `pytest` or `ruff check src tests`. It must stay a thin consumer of the engine's
 JSON envelope — no BibTeX parser or metadata schema of its own. See
-[editor/README.md](editor/README.md).
+[clients/vscode/README.md](clients/vscode/README.md).
 
-When work on `editor/` reveals a gap in the engine — a command that does not
+When work on `clients/vscode/` reveals a gap in the engine — a command that does not
 exist, a value missing from an envelope, two failures the client cannot tell
 apart — close the gap in `pynakes` itself: implement it, or document the
 intended behavior. Do not work around it on the TypeScript side. A workaround
 in the client puts bibliography logic exactly where it must never live, and it
 hides a gap that every other consumer of the JSON envelope shares.
 
-`editor/` is the **project-scoped** client: a bibliography belonging to a
+`clients/vscode/` is the **project-scoped** client: a bibliography belonging to a
 document or repository being edited. VS Code hands a custom editor a single owned
 `TextDocument`, so this is imposed by the host, not chosen. Library-scoped work —
 exploring a collection that belongs to no project and outlives any workspace — is
@@ -108,9 +118,8 @@ axis is project versus library, not one file versus many: a master library is
 often a single `.bib`, and `tex ... scan` spans one `.bib` with many `.tex` files.
 The extension may *read* library-scoped things; it never owns or curates them.
 Avoid "corpus" when naming this axis — the word already has several meanings
-here, and the `corpus` command group was retired for that reason. Until Bimas starts, the CLI and the extension are
-developed concurrently in this repository; a second client is what would justify
-splitting them apart. See
+here, and the `corpus` command group was retired for that reason. The CLI, extension and initial desktop host are developed together in this
+monorepo; shared client logic lives in `packages/`. See
 [docs/vision.md](docs/vision.md#graphical-clients-and-their-scope).
 
 The `engine`, `analysis`, `lint`, `filestore`, `fetch` and `library` packages retain their
@@ -150,7 +159,7 @@ generated from the live CLI by `scripts/command_reference.py`; rerun it after a
 CLI change (a test fails while the committed page is stale).
 
 For code changes, run the test suite, both Ruff checks, and ty before
-considering the change done. Changes under `editor/` run their own checks instead
+considering the change done. Changes under `clients/vscode/` run their own checks instead
 (`npm run compile && npm test` in that directory, or `pixi run test-extension`
 from the root). `pixi.toml` provides Node plus a pinned Python 3.12 for building
 the extension — `pixi run build-extension` — and does not replace the pip
@@ -201,7 +210,7 @@ tests pass:
   [docs/vision.md](docs/vision.md#reviewable-automation).
 - Try to limit file length preferably to ~500 lines, with a maximum limit of 800.
 - Add tests and a `CHANGELOG.md` entry with each behavioral change. Changes to
-  the extension go in `editor/CHANGELOG.md` instead: it is versioned on its own.
+  the extension go in `clients/vscode/CHANGELOG.md` instead: it is versioned on its own.
 - Use generic invented references or old, famous historical works in code,
   tests, comments, docstrings, and `CHANGELOG.md`. Never commit examples derived
   from private data, recent bug reports, or user-provided `.bib` entries;
@@ -221,6 +230,6 @@ tests pass:
 - Don't claim a feature is implemented when it is a stub. Keep `capabilities`,
   README, and docs honest; keep DEVPLAN forward-looking and put completed work
   in `CHANGELOG.md`.
-- Don't work around a missing engine capability inside `editor/`. If the
+- Don't work around a missing engine capability inside `clients/vscode/`. If the
   extension needs something pynakes does not expose, add it to pynakes — see
-  the `editor/` note under [Layout](#layout).
+  the `clients/vscode/` note under [Layout](#layout).

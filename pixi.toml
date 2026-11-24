@@ -31,22 +31,22 @@ pynakes = { path = ".", editable = true }
 [tasks.build-extension]
 description = "Build the VS Code extension into an installable .vsix"
 cmd = "npm install --no-audit --no-fund && npm run package"
-cwd = "editor"
+cwd = "clients/vscode"
 
 [tasks.install-extension]
 description = "Build the extension, then install it into VS Code"
 # `code` comes from the host, not from this environment: installing into the
 # editor you actually run is the point, so it is deliberately not a dependency.
 cmd = "npm run install-vsix"
-cwd = "editor"
+cwd = "clients/vscode"
 depends-on = ["build-extension"]
 
 [tasks.test-extension]
 description = "Compile the extension and run its unit tests"
 cmd = "npm install --no-audit --no-fund && npm test"
-cwd = "editor"
+cwd = "clients/vscode"
 
 [tasks.clean-extension]
 description = "Remove the vendored engine, compiled output, and packaged .vsix"
 cmd = "npm run clean"
-cwd = "editor"
+cwd = "clients/vscode"

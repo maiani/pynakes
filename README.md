@@ -24,7 +24,21 @@ JabRef interoperability keeps existing files usable across tools.
 > follow the
 > [compatibility policy](https://github.com/maiani/pynakes/blob/main/docs/guides/public-api.md);
 > the Python API is experimental until 1.0.
-> The VS Code editor is an unpublished **Alpha**.
+> The VS Code editor and [standalone Electron editor](clients/desktop/README.md) are unpublished **Alpha** clients.
+
+## Repository layout
+
+This monorepo contains one Python engine and two graphical clients:
+
+- `src/pynakes/`: Python library and CLI.
+- `clients/vscode/`: VS Code extension and host integration.
+- `clients/desktop/`: standalone Electron application.
+- `packages/client-core/`: shared edit sessions, projections and engine transport.
+- `packages/client-ui/`: shared browser interface, theme and HTML shell.
+
+The clients have separate npm toolchains and release cycles. Shared source is
+built into each client; the Python distribution excludes both clients and the
+shared packages. See [shared client architecture](packages/README.md).
 
 ## What it offers
 
@@ -104,12 +118,12 @@ for `preview()`, `change_plan()`, and the other `Bibliography` operations.
 
 ## VS Code editor
 
-The [editor companion](https://github.com/maiani/pynakes/blob/main/editor/README.md)
+The [editor companion](https://github.com/maiani/pynakes/blob/main/clients/vscode/README.md)
 provides a bibliography table, entry and metadata editing, groups, citation
 navigation, and material access using the same engine. It is a project-scoped
 editor, currently an unpublished alpha. Its
-[user guide](https://github.com/maiani/pynakes/blob/main/editor/docs/usage.md) and
-[build instructions](https://github.com/maiani/pynakes/blob/main/editor/docs/development.md)
+[user guide](https://github.com/maiani/pynakes/blob/main/clients/vscode/docs/usage.md) and
+[build instructions](https://github.com/maiani/pynakes/blob/main/clients/vscode/docs/development.md)
 are maintained separately.
 
 ## Documentation

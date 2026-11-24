@@ -1,0 +1,209 @@
+{
+  "name": "pynakes-vscode",
+  "displayName": "Pynakes for VS Code",
+  "description": "Browse BibTeX/BibLaTeX bibliographies in VS Code, powered by the pynakes engine.",
+  "version": "0.1.0",
+  "publisher": "pynakes",
+  "license": "MIT",
+  "private": true,
+  "preview": true,
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maiani/pynakes.git",
+    "directory": "clients/vscode"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "bibtex",
+    "biblatex",
+    "bibliography",
+    "citations",
+    "latex"
+  ],
+  "main": "./out/clients/vscode/src/extension.js",
+  "activationEvents": [
+    "onLanguage:latex",
+    "onLanguage:tex"
+  ],
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "pynakes.bibliography",
+        "displayName": "Pynakes Bibliography",
+        "selector": [
+          {
+            "filenamePattern": "*.bib"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "commands": [
+      {
+        "command": "pynakes.openBibliography",
+        "title": "Open with Pynakes",
+        "category": "Pynakes"
+      },
+      {
+        "command": "pynakes.refreshBibliography",
+        "title": "Refresh Bibliography View",
+        "category": "Pynakes"
+      },
+      {
+        "command": "pynakes.insertCitation",
+        "title": "Insert Citation",
+        "category": "Pynakes"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "pynakes.openBibliography",
+          "when": "resourceExtname == .bib",
+          "group": "navigation@20"
+        }
+      ],
+      "clients/vscode/title/context": [
+        {
+          "command": "pynakes.openBibliography",
+          "when": "resourceExtname == .bib",
+          "group": "1_open@20"
+        }
+      ],
+      "clients/vscode/context": [
+        {
+          "command": "pynakes.insertCitation",
+          "when": "editorLangId =~ /^(latex|tex|plaintex|context|latex-expl3|doctex)$/ || resourceExtname =~ /^\\.(tex|ltx)$/i",
+          "group": "1_modification@90"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "pynakes.insertCitation",
+          "when": "editorLangId =~ /^(latex|tex|plaintex|context|latex-expl3|doctex)$/ || resourceExtname =~ /^\\.(tex|ltx)$/i"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Pynakes",
+      "properties": {
+        "pynakes.executable": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Command used to invoke the pynakes engine. Leave empty to use the bundled engine, or an installed pynakes when it is newer. Setting this overrides discovery entirely; pair it with `#pynakes.executableArgs#` when it names a Python interpreter.",
+          "scope": "machine-overridable"
+        },
+        "pynakes.executableArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Arguments inserted before every pynakes subcommand. Set to `[\"-m\", \"pynakes\"]` when `#pynakes.executable#` is a Python interpreter.",
+          "scope": "machine-overridable"
+        },
+        "pynakes.engine": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "bundled",
+            "installed"
+          ],
+          "enumDescriptions": [
+            "Use the bundled engine, unless an installed one is newer.",
+            "Always use the engine bundled with the extension.",
+            "Always use the pynakes found on PATH."
+          ],
+          "default": "auto",
+          "markdownDescription": "Which pynakes engine to run. Ignored when `#pynakes.executable#` is set.",
+          "scope": "machine-overridable"
+        },
+        "pynakes.search.fuzzy": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Start the view's search with `--fuzzy` enabled, matching misspellings and inflections by similarity. Can be toggled per search in the view.",
+          "scope": "window"
+        },
+        "pynakes.showFindings": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show `lint` findings in the bibliography view: a severity marker per row and a findings panel. Findings are advisory and never change the file.",
+          "scope": "window"
+        },
+        "pynakes.openMaterialsWith": {
+          "type": "string",
+          "enum": [
+            "editor",
+            "system"
+          ],
+          "enumDescriptions": [
+            "Open materials inside VS Code, in whatever editor is associated with the file (a PDF viewer extension, the image preview, the text editor).",
+            "Open materials with the operating system's default application."
+          ],
+          "default": "editor",
+          "markdownDescription": "Where materials open, including entry double-clicks configured to open a PDF and clicks in the detail pane's **Materials** list. `editor` (the default) opens it inside VS Code, beside the view; this never runs the file. VS Code has no built-in PDF viewer, so without a PDF viewer extension a PDF opens to the binary-file placeholder and a one-time notification offers the system viewer instead. `system` hands it to the operating system's default application. Each material also offers the other choice as a secondary action, and Alt-click (Option-click) takes it. A directory is revealed rather than opened: in the Explorer when it is inside the workspace and `editor` applies, otherwise in the system file manager.",
+          "scope": "window"
+        },
+        "pynakes.allowOnlineLookups": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Allow the bibliography view to reach the network: \"Compare with remote\" (`ref compare --online`), importing a reference by identifier (`ref import`), and fetching an entry's missing materials (`asset fetch`). On by default; disable to keep the view fully offline \u2014 compare still runs and reports that lookups are disabled, and Import and Fetch say so instead of failing at the provider.",
+          "scope": "window"
+        },
+        "pynakes.doubleClickAction": {
+          "type": "string",
+          "enum": [
+            "openPdf",
+            "source"
+          ],
+          "enumDescriptions": [
+            "Open a local PDF attached to the entry.",
+            "Open the entry declaration in the BibTeX source."
+          ],
+          "default": "openPdf",
+          "markdownDescription": "What double-clicking an entry does. PDF opening uses `#pynakes.openMaterialsWith#`; when several PDFs are available, choose one from a list.",
+          "scope": "window"
+        },
+        "pynakes.citationCommand": {
+          "type": "string",
+          "default": "cite",
+          "markdownDescription": "The macro a new citation is written with when entries are cited from the view or with **Insert Citation**, without its backslash: `cite`, `citep`, `autocite`, `parencite`, and so on. It must be one the engine counts as a citation. Keys cited inside an existing citation join it, whatever its macro.",
+          "scope": "resource"
+        },
+        "pynakes.citationCompletion": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Complete citation keys inside a `\\cite{\u2026}` in TeX files, from the bibliographies open in the Pynakes view: those that link the file through `tex-sources`, or every open one when none does. Turn off when another extension already completes them.",
+          "scope": "resource"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node scripts/prepare-build.mjs && tsc -p .",
+    "watch": "node scripts/prepare-build.mjs --watch",
+    "pretest": "npm run compile",
+    "test": "node --require ./scripts/test-vscode-stub.cjs --test \"out/clients/vscode/src/test/**/*.test.js\"",
+    "package": "npx --yes @vscode/vsce package --no-dependencies",
+    "vendor-engine": "node scripts/vendor-engine.mjs",
+    "vscode:prepublish": "npm run vendor-engine && npm run compile",
+    "package:clean": "node -e \"require('fs').rmSync('engine',{recursive:true,force:true})\" && npm run package",
+    "install-vsix": "node -e \"const p=require('./package.json');const f=p.name+'-'+p.version+'.vsix';require('node:child_process').execFileSync('code',['--install-extension',f,'--force'],{stdio:'inherit'});console.log('Installed '+f)\"",
+    "clean": "node -e \"const fs=require('fs');for (const t of ['engine','out']) fs.rmSync(t,{recursive:true,force:true});for (const f of fs.readdirSync('.')) if (f.endsWith('.vsix')) fs.rmSync(f)\"",
+    "package:prerelease": "npx --yes @vscode/vsce package --pre-release --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^30.0.0",
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.90.0",
+    "jsdom": "^30.1.2",
+    "typescript": "^5.7.0"
+  }
+}

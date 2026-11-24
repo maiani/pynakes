@@ -33,7 +33,7 @@ htmlcov/
 # and the repo root carries the same launch/tasks for root-workspace sessions.
 !/.vscode/launch.json
 !/.vscode/tasks.json
-!/editor/.vscode/
+!/clients/vscode/.vscode/
 .idea/
 *.swp
 *~

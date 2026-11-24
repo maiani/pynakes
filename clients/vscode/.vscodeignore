@@ -1,0 +1,20 @@
+.vscode/**
+src/**
+out/clients/vscode/src/test/**
+out/**/*.map
+tsconfig.json
+.gitignore
+node_modules/**
+scripts/**
+engine/**/__pycache__/**
+engine/**/*.pyc
+
+# Local validation artifacts must not ship in the alpha.
+.coverage*
+coverage.xml
+htmlcov/**
+.pytest_cache/**
+.cache/**
+
+.engine-build-*/**
+engine.previous/**

@@ -1316,7 +1316,7 @@ form is a `UsageError`, never silently reinterpreted.
 ### Editor
 
 The VS Code extension now keeps its own changelog,
-[editor/CHANGELOG.md](editor/CHANGELOG.md), and its own version (0.1.0).
+[clients/vscode/CHANGELOG.md](clients/vscode/CHANGELOG.md), and its own version (0.1.0).
 
 ## [0.6.5] - 2026-09-30
 

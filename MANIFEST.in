@@ -8,7 +8,8 @@ include pyproject.toml README.md LICENSE MANIFEST.in .pre-commit-hooks.yaml
 prune .github
 prune .vscode
 prune docs
-prune editor
+prune clients
+prune packages
 prune scripts
 prune evals
 

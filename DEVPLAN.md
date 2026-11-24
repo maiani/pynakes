@@ -152,7 +152,7 @@ repository being edited, not library-scoped exploration (see
 The editor consumes the 0.8 group memberships, entry-field schemas and selection
 exports. Pending companion changes add citation insertion/completion, type-aware
 creation with generated keys, selected-key regeneration and copy/export actions;
-see [editor/CHANGELOG.md](editor/CHANGELOG.md). The engine additions for citation
+see [clients/vscode/CHANGELOG.md](clients/vscode/CHANGELOG.md). The engine additions for citation
 grammar and headless generated-key creation must ship with that companion.
 Host-level acceptance still needs interactive VS Code checks of these workflows.
 Local attachment, exact lint repair actions, and identifier discovery for an
