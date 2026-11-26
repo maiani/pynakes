@@ -35,8 +35,10 @@ in [CHANGELOG.md](CHANGELOG.md); usage and persisted ingestion formats are in
 
 Private inventories, provider caches, extracted text, metadata and trial projects
 remain under `/tmp`, outside this repository. No private examples appear in
-repository fixtures or public release notes. The original plan's private
-Zotero upload/recognition rehearsal was not repeated: this live Zotero check was
+repository fixtures or public release notes. The Zotero half of the private
+archive rehearsal (preserving the PDFs in a Zotero review collection) was not
+run: it needs Zotero writes that pynakes never makes, and it is deferred out of
+the v0.10 gate (DEVPLAN, order of work, item 5). This live Zotero check was
 read-only and used existing records. Any further archive migration remains an
 explicit operation, separate from shipping the read adapter.
 

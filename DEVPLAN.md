@@ -279,13 +279,15 @@ Release validation and remaining operational gates are tracked in [RELEASE.md](R
    covered by the synthetic and private trial gates recorded in RELEASE.md.
    Ambiguous/unidentified PDFs stay pending without invented entries.
 5. **Private archive rehearsal.** Use an explicitly authorized old PDF archive
-   to exercise both routes. First preserve PDFs in a dedicated Zotero review
-   collection, with stored-byte verification and source-occurrence receipts;
-   bibliographic recognition is a separate, reported outcome. Reuse locally
-   cached recovery evidence, preserving uncertain candidates. Exercise native
-   ingestion with reviewed plans and copy mode. Private data and
+   to exercise native ingestion with reviewed plans and copy mode. Reuse locally
+   cached recovery evidence, preserving uncertain candidates. Private data and
    credentials never enter the engine repository. This operational migration is
    not proof that a reusable adapter or native ingestion feature has shipped.
+   Preserving the same PDFs in a dedicated Zotero review collection, with
+   stored-byte verification and source-occurrence receipts, needs Zotero
+   writes that pynakes never makes. It is deferred out of the v0.10 gate to a
+   separately authorized rehearsal; bibliographic recognition stays a
+   separate, reported outcome.
 
 **Done when:** the Zotero read/select/project gate and native migration gate both
 pass with reproducible synthetic coverage and separately recorded live trials.
