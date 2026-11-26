@@ -42,6 +42,42 @@ the v0.10 gate (DEVPLAN, order of work, item 5). This live Zotero check was
 read-only and used existing records. Any further archive migration remains an
 explicit operation, separate from shipping the read adapter.
 
+## CI and code review (PR #8)
+
+The first CI run on the v0.10 commits (`e90c621`) passed on Linux and macOS
+and in the docs, distribution and bundled-engine jobs, but failed three ways:
+
+- **Windows:** Zotero reports attachments as `file:///C:/...`, which the
+  adapter turned into a non-absolute path, so every attachment read as
+  missing. Fixed with `url2pathname`; the test now also needs percent-decoding.
+- **Lowest dependencies:** the PDF tests import PyMuPDF, which that job did not
+  install. It now installs `.[pdf]` at its floors and checks PyMuPDF's floor;
+  the PDF tests pass locally with PyMuPDF 1.26.0. The release workflow's
+  installed-wheel tests had the same gap and now install the wheel's `[pdf]` extra.
+- **Desktop smoke:** Ubuntu 24.04 blocks unprivileged user namespaces, so
+  Electron aborted on its SUID sandbox fallback. The job now allows them.
+
+The second run (`b485a95`) passed every job. An independent review of
+`3ef3641` then found that a moved original that could not be removed after
+commit (open in a Windows viewer, read-only, edited meanwhile) left a journal
+that blocked every later command. Such originals are now kept and reported.
+The review also led to these fixes:
+
+- Libraries reached through symlinked, mapped or short-name directories are
+  accepted.
+- Adoption refuses a read-only bibliography before anything moves, and
+  re-parses the bibliography first.
+- A source that is the stored copy itself is never removed.
+
+Known and deferred past 0.10.0:
+
+- Variant presence hashes every adopted object on `asset check`, `analyze` and
+  entry reads, a cost that grows with the adopted store.
+- An unknown variant role makes `asset check` fail instead of reporting drift.
+- An empty ingestion lock left by a crash must be removed by hand.
+- `library ingest` reports `modified` for every plan, because the ledger is
+  always written.
+
 ## Dependencies and handoff
 
 PDF inspection needs the existing optional **`PyMuPDF>=1.26,<2`** extra
@@ -53,9 +89,10 @@ uses setuptools, setuptools-scm and wheel; development checks use the declared
 dev/docs extras. The committed `uv.lock` records resolved development dependencies;
 ty is pinned to the verified **0.0.111** for pip-based checks as well.
 
-Before publishing, review the final diff, commit the intended files, pass CI on
-the exact release revision, and create the authorized release tag. Build and
-verify publication artifacts from that tag, then check a fresh installation.
+Before publishing, pass CI on the exact release revision and a manual
+`release.yml` dry run on it, then obtain the owner's authorization to merge
+PR #8 and create the release tag. Build and verify publication artifacts from
+that tag, then check a fresh installation.
 No commit, tag, push, upload to Zotero, or release publication was performed in
 this validation. The earlier v0.9 release record follows for provenance.
 
