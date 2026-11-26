@@ -118,7 +118,7 @@ def dedupe_merge(
         human,
         modified_entries=report.modified_entries,
         keys=selected,
-        **report.to_dict(),
+        report_details=report.to_dict(),
     )
 
 

@@ -97,8 +97,10 @@ def import_pdfs(
     key: str | None = None,
     key_source: str | None = None,
     cache_file: str | Path | None = None,
+    mode: str | None = None,
+    role: str | None = None,
 ) -> PDFImportReport:
-    """Stage references and links to original PDFs; never copy or rewrite PDFs.
+    """Stage references and attachments, adopting files when Pinax is configured.
 
     Paths can be files or directories (immediate PDFs only, sorted by filename).
     ``identifier`` explicitly confirms a DOI/arXiv candidate for a single PDF;
@@ -109,6 +111,8 @@ def import_pdfs(
     Repeating an import recognizes linked bytes and existing work identifiers.
 
     Requires a bound bibliography path so attachment links are meaningful.
+    Pinax defaults to moving originals after durable storage; ``mode="copy"``
+    preserves them. Without Pinax, links continue to reference the originals.
     Source hashes are checked again at commit. The returned report carries
     evidence/provenance and should be saved by callers needing an import log.
     """
@@ -124,8 +128,8 @@ def import_pdfs(
         raise ValueError("--identifier and --key require exactly one PDF")
     if identifier is not None:
         kind, _ = resolve_identifier(identifier)
-        if kind not in {"doi", "arxiv"}:
-            raise ValueError("PDF identifier selection supports DOI and arXiv identifiers")
+        if kind not in {"doi", "arxiv", "isbn"}:
+            raise ValueError("PDF identifier selection supports DOI, arXiv and ISBN identifiers")
     source = library_key_source(bibliography.lib, key_source)
     if source not in {"generated", "provider"}:
         raise ValueError("key_source must be generated or provider")
@@ -161,6 +165,10 @@ def import_pdfs(
                         result.update(
                             status="ambiguous", reason="existing_pdf_has_different_identity"
                         )
+                if result["status"] == "existing" and bibliography.files is not None:
+                    result["adoption"] = bibliography.adopt_file(
+                        byte_matches[0], inspection.path, mode=mode, role=role
+                    )
             else:
                 entry, reason = _select_entry(
                     bibliography, inspection, online, identifier, cache_file, result
@@ -168,7 +176,9 @@ def import_pdfs(
                 if entry is None:
                     result.update(status=reason)
                 else:
-                    _stage(bibliography, inspection, entry, key, source, result)
+                    _stage(
+                        bibliography, inspection, entry, key, source, result, mode=mode, role=role
+                    )
         except (OSError, ValueError, subprocess.SubprocessError) as exc:
             result.update(status="failed", message=str(exc))
         results.append(result)
@@ -216,10 +226,11 @@ def _select_entry(
     result: dict,
 ) -> tuple[BibEntry | None, str]:
     from pynakes import importer
+    from pynakes._pdf_review import metadata_problems
     from pynakes.provider_cache import cache_scope
 
+    complete = []
     if identifier is None:
-        complete = []
         for record in inspection.records:
             fields = record["fields"]
             if not (
@@ -235,9 +246,15 @@ def _select_entry(
             ):
                 continue
             entry = _record_entry(record)
+            problems = metadata_problems(entry)
+            if problems:
+                result.setdefault("metadata_issues", []).append(
+                    {"source": record["source"], "problems": problems, "record": record}
+                )
+                continue
             if not any(e.type == entry.type and e.fields == entry.fields for e in complete):
                 complete.append(entry)
-        if len(complete) == 1:
+        if len(complete) == 1 and not online:
             result["selected_from"] = "embedded_metadata"
             return complete[0], "ready"
         if len(complete) > 1:
@@ -248,11 +265,31 @@ def _select_entry(
         if identifier is not None
         else list(
             dict.fromkeys(
-                ("arXiv:" if candidate["kind"] == "arxiv" else "") + candidate["value"]
+                (
+                    "arXiv:"
+                    if candidate["kind"] == "arxiv"
+                    else "ISBN:"
+                    if candidate["kind"] == "isbn"
+                    else ""
+                )
+                + candidate["value"]
                 for candidate in inspection.identifiers
             )
         )
     )
+    # Complete embedded records can carry identifiers absent from page text.
+    for embedded in complete:
+        for work_id in evidence_from_entry(embedded).identifiers.items:
+            kind, value = work_id.kind, work_id.value
+            if kind in {"doi", "arxiv", "isbn"}:
+                candidate = (
+                    "arXiv:" if kind == "arxiv" else "ISBN:" if kind == "isbn" else ""
+                ) + value
+                if candidate not in identifiers:
+                    identifiers.append(candidate)
+    if not identifiers and len(complete) == 1:
+        result["selected_from"] = "embedded_metadata"
+        return complete[0], "ready"
     if not identifiers:
         result["reason"] = "no_complete_metadata_or_identifier"
         return None, "unresolved"
@@ -279,13 +316,44 @@ def _select_entry(
                 inspection, entry.fields.get("title", "")
             )
             attempts.append(
-                {"identifier": value, "title": entry.fields.get("title"), "supported": supported}
+                {
+                    "identifier": value,
+                    "title": entry.fields.get("title"),
+                    "supported": supported,
+                    "entry_type": entry.type,
+                    "fields": dict(entry.fields),
+                }
             )
-            if supported:
+            problems = metadata_problems(entry)
+            if problems:
+                attempts[-1]["metadata_issues"] = problems
+            if supported and not problems:
                 resolved.append(entry)
         except (importer.ReferenceImportError, ValueError, OSError) as exc:
             attempts.append({"identifier": value, "error": str(exc)})
     result["resolution"] = attempts
+    if complete and resolved:
+        from pynakes._pdf_evidence import normalized_title
+
+        embedded = complete[0]
+        provider = resolved[0]
+        differences = {
+            name: {"embedded": embedded.fields.get(name), "provider": provider.fields.get(name)}
+            for name in embedded.fields.keys() & provider.fields.keys()
+            if embedded.fields[name] != provider.fields[name]
+            and not (
+                name == "title"
+                and normalized_title(embedded.fields[name])
+                == normalized_title(provider.fields[name])
+            )
+        }
+        if differences or embedded.type != provider.type:
+            result.update(
+                reason="metadata_disagreement",
+                field_choices=differences,
+                type_choices=[embedded.type, provider.type],
+            )
+            return None, "ambiguous"
     if len(resolved) == 1 and not any("error" in attempt for attempt in attempts):
         result["selected_from"] = "user_identifier" if identifier else "identifier_and_title"
         return resolved[0], "ready"
@@ -306,6 +374,10 @@ def _stage(
     key: str | None,
     key_source: str,
     result: dict,
+    *,
+    managed: bool = True,
+    mode: str | None = None,
+    role: str | None = None,
 ) -> None:
     assert coll.path is not None
     candidate = evidence_from_entry(entry)
@@ -360,21 +432,31 @@ def _stage(
             check_field_value(name, value)
         apply_library_style(coll.lib, entry, base_dir=coll.path.parent)
         target = entry
-    # Absolute paths link the exact original without guessing a material kind
-    # (preprint/published) or changing its name, bytes or embedded annotations.
-    path = Path(inspection.path).as_posix().replace(":", "\\:").replace(";", "\\;")
-    descriptor = f":{path}:PDF"
-    old = target.fields.get("file", "")
-    value = f"{old};{descriptor}" if old else descriptor
-    check_field_value("file", value)
-    set_entry_field(target, "file", value)
-    if not exact:
-        add_entry_ordered(coll.lib, target)
-        coll._appended_entries.append(target)
+    if managed and coll.files is not None:
+        if not exact:
+            add_entry_ordered(coll.lib, target)
+            coll._appended_entries.append(target)
+        try:
+            result["adoption"] = coll.adopt_file(target.key, inspection.path, mode=mode, role=role)
+        except (OSError, ValueError):
+            if not exact:
+                coll.lib.entries.remove(target)
+                coll._appended_entries.remove(target)
+            raise
+    else:
+        path = Path(inspection.path).as_posix().replace(":", "\\:").replace(";", "\\;")
+        descriptor = f":{path}:PDF"
+        old = target.fields.get("file", "")
+        value = f"{old};{descriptor}" if old else descriptor
+        check_field_value("file", value)
+        set_entry_field(target, "file", value)
+        if not exact:
+            add_entry_ordered(coll.lib, target)
+            coll._appended_entries.append(target)
     coll._pdf_import_sources.append((Path(inspection.path), inspection.sha256))
     result.update(
         status="linked" if exact else "imported",
         key=target.key,
         title=target.fields.get("title"),
-        attachment=inspection.path,
+        attachment=result.get("adoption", {}).get("target", inspection.path),
     )

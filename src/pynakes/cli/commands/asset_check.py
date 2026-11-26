@@ -126,16 +126,20 @@ def _coverage(
     }
     if pinax is None:
         return {"linked_files": linked, "materials": None}
-    with_pdf = [item for item in pinax.entries if item.published_pdf or item.preprint_pdf]
+    with_pdf = [
+        item
+        for item in pinax.entries
+        if item.published_pdf
+        or item.preprint_pdf
+        or any(v["intact"] and v["path"].endswith(".pdf") for v in item.variants)
+    ]
     return {
         "linked_files": linked,
         "materials": {
             "entries": len(pinax.entries),
             "with_pdf": len(with_pdf),
             "with_any": sum(1 for item in pinax.entries if item.any_present),
-            "without_pdf": [
-                item.key for item in pinax.entries if not (item.published_pdf or item.preprint_pdf)
-            ],
+            "without_pdf": [item.key for item in pinax.entries if item not in with_pdf],
             "misclassified": len(misclassified),
         },
     }

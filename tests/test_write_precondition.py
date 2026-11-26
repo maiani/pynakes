@@ -284,4 +284,5 @@ def test_capabilities_list_exactly_the_commands_that_accept_the_precondition() -
     assert set(described["commands"]) == set(WRITES) | NETWORK_WRITES | {
         "ref from-pdf",
         "library add",
+        "asset adopt",
     }

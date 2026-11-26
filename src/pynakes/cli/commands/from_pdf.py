@@ -2,7 +2,7 @@
 
 import typer
 
-from pynakes.cli._choices import KeySource
+from pynakes.cli._choices import AdoptionMode, KeySource, MaterialRole
 from pynakes.cli._common import (
     _BACKUP_OPTION,
     _CACHE_FILE_OPTION,
@@ -25,15 +25,21 @@ def from_pdf(
     online: bool = typer.Option(
         False,
         "--online",
-        help="Resolve DOI/arXiv candidates through metadata providers; never upload PDFs",
+        help="Resolve DOI/arXiv/ISBN candidates through metadata providers; never upload PDFs",
     ),
     identifier: str | None = typer.Option(
-        None, "--identifier", help="Confirm a DOI/arXiv identifier for one PDF, including scans"
+        None,
+        "--identifier",
+        help="Confirm a DOI/arXiv/ISBN identifier for one PDF, including scans",
     ),
     key: str | None = typer.Option(None, "--key", help="Citation key for a single PDF"),
     key_source: KeySource | None = typer.Option(
         None, "--key-source", help="Override import-key-source: generated or provider"
     ),
+    mode: AdoptionMode | None = typer.Option(
+        None, "--mode", help="Override pinax-adopt-mode when Pinax is configured"
+    ),
+    role: MaterialRole | None = typer.Option(None, "--role", help="Override pinax-adopt-role"),
     backup: bool = _BACKUP_OPTION,
     expect_sha256: str | None = _EXPECT_SHA256_OPTION,
     dry_run: bool = typer.Option(
@@ -45,7 +51,7 @@ def from_pdf(
         False, "--json", help="Emit per-file evidence and outcomes as JSON"
     ),
 ) -> None:
-    """Import references from PDFs and link their unchanged originals.
+    """Import references from PDFs; adopt materials when Pinax is configured.
 
     Offline by default: use embedded BibTeX/XMP, or --online to resolve
     identifiers corroborated by document titles. Ambiguous and unresolved PDFs
@@ -69,6 +75,8 @@ def from_pdf(
         key=key,
         key_source=key_source.value if key_source else None,
         cache_file=cache_file,
+        mode=mode.value if mode else None,
+        role=role.value if role else None,
     ).to_dict()
     summary = report["summary"]
     accepted = summary["imported"] + summary["linked"] + summary["existing"]

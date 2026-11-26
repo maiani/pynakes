@@ -14,6 +14,11 @@ sections. Historical releases retain their original headings.
 
 ### Breaking changes
 
+- PDF import into configured Pinax storage now moves accepted local sources
+  after durable storage, provenance and bibliography commit. Use `--mode copy`
+  or `pinax-adopt-mode: copy` to keep originals. Imports without Pinax retain
+  the external-link workflow.
+
 The compatibility forms deprecated in 0.9 are removed in v0.10:
 
 - `corpus combine`, `corpus split` and `corpus batch`: use the top-level
@@ -48,99 +53,87 @@ The compatibility forms deprecated in 0.9 are removed in v0.10:
 
 ### Added
 
-- `fix` and its opt-in `pynakes-fix` hook apply configured normalization followed
-  by formatting in one transaction per bibliography. `--mode` / `fix-mode`
-  choose `normalize-and-format` or `layout-only`; `Bibliography.fix()` exposes
-  the same policy. Key regeneration remains opt-in through `normalize-keys`.
-- `format`, `normalize`, and `fix` accept multiple bibliography paths with
-  per-file settings, previews, and failures. Successful files can be written
-  independently of failed inputs; single-file JSON remains unchanged.
-
-- Zotero batch project selection: repeatable `--item` and direct `--collection`
-  selection share one preview, source revision and atomic commit. Reconciliation
-  findings are aggregated; scoped `--resolve ITEM:FIELD=source|project` decisions
-  require both reviewed preconditions. Omitted child collections are reported.
-  `zotero refresh FILE` refreshes all current-source bindings in one transaction
-  and reports foreign bindings. The source-neutral `prepare_selections` planner
-  supports native Libraries too. Missing project files point to `init`.
-- `zotero search [TEXT] --where EXPR --max-items N` searches across pages with
-  explicit exhaustion and resumable cursors. TEXT opts into native Zotero
-  title/creator/year quick search; predicates stay local. The agent reference
-  workflow verifies four-call project setup and one-call whole-project refresh.
-
-- Zotero collection browsing with `zotero scan --collection KEY`, composable with
-  bounded `--where` queries and cursors scoped to the collection. Refresh conflicts
-  expose accepted and current values; `zotero select --resolve FIELD=source|project`
-  records reviewed field/type decisions with mandatory source and project
-  preconditions. Accepted differences remain idempotent without becoming permanent
-  overwrite policies. The Python API exposes the same scoped reads and decisions.
-- Zotero collection/material text output now includes continuation cursors.
-  Malformed record identities, missing item types, invalid collection parents and
-  inconsistent attachment ownership fail explicitly. Application upgrades during
-  an open connection require reconnection.
-- Read-only Zotero 10 local Library backend with bounded, revision-checked reads,
-  explicit native expansion, collection and attachment discovery, and local file
-  resolution. The `zotero` CLI selects references into independent project files
-  and refreshes them with persisted baselines and three-way conflict detection.
-  No cloud fallback, source writes or authorization dialog is required.
-- Source-neutral `LibraryBackend` read protocol and `BibTeXLibraryBackend` wrapper
-  preserve existing native Library APIs and duplicate-key occurrence identity.
-  Project selection commits attached provenance atomically with new entries.
-
-- Library manifests accept explicit routing rules and a fallback member. Higher
-  priorities win; conflicting destinations at the highest priority require
-  review. `Library.route`, `Library.stage_entry` and `library add` check existing
-  work across all members, explain placement, and stage one destination through
-  `Bibliography`. Manifest/member changes invalidate guarded writes and reviewed
-  previews. Routing does not copy or move PDFs; cross-member material relocation
-  remains planned.
-
-- `ref from-pdf` and `Bibliography.import_pdfs` inspect local PDFs with the
-  optional PyMuPDF backend (`pynakes[pdf]`, AGPL/commercial terms), stage complete
-  embedded BibTeX/XMP records, and optionally resolve title-corroborated DOI/arXiv
-  candidates with `--online`. Per-file evidence and outcomes preserve ambiguity;
-  `--identifier` selects one document's identity explicitly. Imports link
-  unchanged originals, retain PDF variants, recognize repeated linked bytes,
-  and check source hashes again before commit. Mixed batches retain unresolved
-  files in their reports. The first version has no OCR or managed material copies.
-
-- The Python `Library` API reads explicitly selected bibliographies or a
-  version-1 `<name>.library.toml` manifest. Manifests accept membership,
-  exclusions, routing, a name and a reserved Catalogue path; bibliography settings stay
-  in the `.bib` files. Key lookup and cross-file search preserve every matching
-  occurrence, including duplicate keys, with file, entry index, source line and
-  source-byte fingerprint. Search retains field scopes and match explanations
-  and ranks across members before applying a result limit.
-- Library reads report missing, unreadable, malformed or changing members and
-  unmatched patterns alongside usable results. A held Library is an in-memory
-  view; reopening reads current membership and bytes. General cross-file work
-  identity reports, analysis rollups and the Catalogue remain planned.
+- **Native Library discovery and routing.** `Library` reads selected `.bib`
+  files or a version-1 `.library.toml` manifest, preserving duplicate-key
+  occurrences, source locations, fingerprints and cross-member search ranking.
+  Missing or changing members remain visible as diagnostics. Manifest routing
+  rules and fallback placement power `Library.route`, `Library.stage_entry`
+  and `library add`; existing-work checks and source guards prevent ambiguous
+  ownership or stale writes. Reopen a held Library to refresh its view.
+- **PDF recovery and review.** `ref from-pdf` / `Bibliography.import_pdfs` use
+  optional `pynakes[pdf]` (PyMuPDF, under AGPL/commercial terms) for bounded
+  twelve-page inspection of embedded BibTeX/XMP and document text. Reports
+  retain page/block evidence, excluded recommendations/references, mathematical
+  title normalization, metadata-quality findings and explicit provider field
+  disagreements. `--online` resolves DOI/arXiv/ISBN candidates; `--identifier`
+  confirms a reviewed identity. Ambiguous works and competing editions remain
+  unresolved. Explicit text lookup requires a supplied query; PDFs stay local.
+- **Managed ingestion.** `library ingest`, `library review` and `library recover`
+  combine PDF recovery, guarded routing and portable member-owned Pinax stores.
+  Every selected source receives a durable receipt or pending review record,
+  with decisions, provenance, plan/output hashes and retry history. Reviewed
+  plans guard source and Library bytes. Interrupted writes resume from verified
+  payloads, and copy mode preserves originals. Exit success does not imply every
+  source was identified. See [PDF ingestion](docs/guides/pdf-import.md).
+- **Local attachment adoption.** `asset adopt`, `asset recover` and
+  `Bibliography.adopt_file` store unchanged bytes with relative links and
+  provenance before moving originals. `--mode` / `pinax-adopt-mode` and
+  `--role` / `pinax-adopt-role` control policy. Immutable variants support
+  multiple files per role, including `unclassified`, without overwriting
+  annotated copies. Repeated bytes, collisions, missing/changed materials and
+  key renames are handled alongside existing fixed-role Pinax layouts.
+- **Read-only Zotero Library.** The Zotero 10 local backend and `zotero` CLI
+  provide revision-checked reads, explicit native expansion, collection and
+  attachment discovery, and local material resolution. Collection-scoped
+  scans and budgeted `zotero search [TEXT] --where EXPR --max-items N` expose
+  continuation cursors and incomplete results; text uses native quick search
+  while predicates stay local. No cloud fallback or source writes are involved.
+- **Guarded Zotero project selection and refresh.** Repeatable `--item` and
+  direct `--collection` selection share one preview and project commit, with
+  persisted baselines and three-way conflict detection. `--resolve
+  ITEM:FIELD=source|project` requires source/project preconditions and records
+  reviewed field/type choices. Child collections and foreign bindings are
+  reported. `zotero refresh FILE` refreshes all current-source bindings in one
+  transaction. The reference workflow verifies four-call setup and one-call
+  refresh; accepted differences remain idempotent.
+- **Shared source adapters.** `LibraryBackend`, `BibTeXLibraryBackend` and
+  `prepare_selections` expose source-neutral reads and batch selection while
+  preserving native Library APIs and duplicate-key occurrence identity. Project
+  entries and their source provenance commit together.
+- **Configured fixes and multi-file transforms.** `fix`, `Bibliography.fix()`
+  and the opt-in `pynakes-fix` hook combine normalization and formatting in one
+  transaction per bibliography. `--mode` / `fix-mode` choose
+  `normalize-and-format` or `layout-only`; key regeneration stays opt-in.
+  `format`, `normalize` and `fix` accept multiple paths with per-file settings,
+  previews and failures. Successful files can be written independently of failed
+  inputs; the single-file JSON contract is preserved.
 
 ### Changed
 
-- Grouped the engine, analysis, lint, Pinax filestore, fetch and native Library into
-  packages with their private helpers. Existing public import paths remain
-  supported. Library read contracts, native reads and Zotero reads now live in
-  separate `library.backends` modules; `library_backend` and `zotero` retain
-  compatibility exports. Project selection remains a separate coordinator.
-- Consolidated CLI assembly, callbacks and infrastructure under `cli/`, preserving
-  the `pynakes.cli:app` console entry point. CLI infrastructure imports do not
-  construct the application. Private CLI implementation paths have moved.
-- Separated shared offline material URL rules from download orchestration, so
-  Pinax storage does not depend on acquisition. Provider transport and the public
-  version attribute share a lazy version lookup without an upward facade import.
-  Import-boundary tests guard these dependencies and declared eager-import cycles.
+- Grouped engine, analysis, lint, filestore, fetch and Library implementations
+  into packages with owned private helpers. Native/Zotero adapters share
+  `library.backends` contracts; existing public imports and compatibility
+  exports remain supported. CLI assembly lives under `cli/`, retaining
+  `pynakes.cli:app` and lightweight infrastructure imports.
+- Consolidated attachment policy, link staging and transaction construction
+  across Library, Bibliography and FileStore. Shared offline material URL rules
+  keep Pinax independent of downloads; provider transport and the public version
+  attribute share lazy version lookup. Tests guard import boundaries and cycles.
+- Removed all twelve ty override blocks and remaining source-level type-ignore
+  comments by fixing or narrowing the affected types. Ruff now checks for unused
+  suppressions; the intentional line-length exemption remains.
 
 ### Fixed
 
-- Zotero batch selection preserves connection and malformed-response failures as
-  source errors (exit 1), without staging or writing a partial selection.
-- Support Typer 0.29.2 and its parameter validation API. Shared CLI options use
-  annotated Typer declarations; command introspection preserves stable types and
-  choices across the migration. The minimum Typer version is now 0.29.2.
-
-- Python `search_entries(..., limit=0, rank=False)` now returns no results,
-  consistent with ranked search, instead of returning the first match.
+- Zotero batch connection/malformed-response failures remain source errors
+  (exit 1) without partial selection. Invalid identities, item types, collection
+  parents and attachment ownership fail explicitly; application upgrades during
+  an open connection require reconnection.
+- Support Typer 0.29.2 and its parameter validation API. Shared options use
+  annotated declarations, while introspection preserves stable types and
+  choices. The minimum Typer version is now 0.29.2.
+- `search_entries(..., limit=0, rank=False)` returns no results, consistently
+  with ranked search.
 
 ## [0.9.0] - 2026-11-04
 

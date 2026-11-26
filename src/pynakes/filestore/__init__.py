@@ -11,6 +11,10 @@ from collections.abc import Callable, Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pynakes.filestore._adoption import MaterialAdoption
 
 from pynakes._text_utils import strip_meta_terminator
 from pynakes.filestore._atomic import (
@@ -75,11 +79,13 @@ class MaterialPresence:
     preprint_source: bool
     supplement_pdf: bool
     erratum_pdf: bool
+    variants: tuple[dict, ...] = ()
 
     @property
     def any_present(self) -> bool:
         return (
-            self.published_pdf
+            any(v["present"] for v in self.variants)
+            or self.published_pdf
             or self.preprint_pdf
             or self.preprint_source
             or self.supplement_pdf
@@ -96,6 +102,7 @@ class MaterialPresence:
             "supplement_pdf": self.supplement_pdf,
             "erratum_pdf": self.erratum_pdf,
             "any_present": self.any_present,
+            "variants": list(self.variants),
         }
 
 
@@ -170,6 +177,28 @@ class FileStore(PinaxManifest):
         path = resolve_files_dir(value, bib_path)
         return cls(root=path, bib_path=_absolute_bib_path(bib_path))
 
+    def plan_adoption(
+        self, key: str, source: str | Path, *, role: str = "unclassified"
+    ) -> "MaterialAdoption":
+        """Preview local-file adoption without creating a store or manifest."""
+        from pynakes.filestore._adoption import plan_adoption
+
+        return plan_adoption(self, key, source, role=role)
+
+    def adopt_file(
+        self, key: str, source: str | Path, *, role: str = "unclassified", mode: str = "move"
+    ) -> "MaterialAdoption":
+        """Adopt an unchanged local file as an immutable material variant."""
+        from pynakes.filestore._adoption import adopt_file
+
+        return adopt_file(self, key, source, role=role, mode=mode)
+
+    def material_variants(self, key: str) -> list[dict]:
+        """Inspect all local variants, including missing or modified bytes."""
+        from pynakes.filestore._adoption import material_variants
+
+        return material_variants(self, key)
+
     def paths_for(self, key: str) -> MaterialPaths:
         """Return deterministic material paths for ``key``."""
         key = _validate_key(key)
@@ -193,6 +222,7 @@ class FileStore(PinaxManifest):
             preprint_source=paths.preprint_source.is_dir(),
             supplement_pdf=paths.supplement_pdf.is_file(),
             erratum_pdf=paths.erratum_pdf.is_file(),
+            variants=tuple(self.material_variants(key)),
         )
 
     def ensure_root(self) -> Path:
@@ -337,6 +367,7 @@ class FileStore(PinaxManifest):
             "preprint_source": _path_or_none(preprint_source),
             "supplement_pdf": _path_or_none(supplement_pdf),
             "erratum_pdf": _path_or_none(erratum_pdf),
+            "variants": self.material_variants(key),
             "canonical_pdf": _path_or_none(canonical_pdf),
             "canonical_source": _path_or_none(canonical_source),
             "refetchable": bool(refetchable or _manifest_refetchable(self.read_manifest(), key)),
@@ -351,6 +382,9 @@ class FileStore(PinaxManifest):
         can't hold a ``.files`` directory (e.g. a ``/dev/null`` discard
         bucket) doesn't fail.
         """
+        from pynakes.filestore._adoption import variant_copy_plan
+
+        variants = variant_copy_plan(source, self, key)
         copied: list[dict[str, str]] = []
         source_paths = source.paths_for(key)
         target_paths = self.paths_for(key)
@@ -378,6 +412,12 @@ class FileStore(PinaxManifest):
                     shutil.rmtree(dst)
                 shutil.copytree(src, dst)
                 copied.append({"key": key, "kind": kind, "path": str(dst)})
+        for item in variants:
+            dst = Path(item["path"])
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            if not dst.exists():
+                self._atomic_write(dst, Path(item["source_path"]).read_bytes())
+            copied.append({k: v for k, v in item.items() if k != "source_path"})
         _copy_manifest_row(source, self, key)
         return copied
 
@@ -396,6 +436,12 @@ class FileStore(PinaxManifest):
             dst = getattr(target_paths, kind)
             if src.exists() and src.resolve() != dst.resolve():
                 planned.append({"key": key, "kind": kind, "path": str(dst)})
+        from pynakes.filestore._adoption import variant_copy_plan
+
+        planned.extend(
+            {k: v for k, v in item.items() if k != "source_path"}
+            for item in variant_copy_plan(source, self, key)
+        )
         return planned
 
     def plan_material_merge(self, old: str, new: str) -> list[dict[str, str]]:
@@ -562,6 +608,9 @@ class FileStore(PinaxManifest):
         if not self.root.is_dir():
             return []
         paths = self.paths_for(key)
+        from pynakes.filestore._adoption import removable_variants
+
+        variants = removable_variants(self, key)
         removed: list[str] = []
         for path in [
             paths.published_pdf,
@@ -573,6 +622,7 @@ class FileStore(PinaxManifest):
                 removed.append(str(path.relative_to(self.root)))
         if paths.preprint_source.is_dir():
             removed.append(str(paths.preprint_source.relative_to(self.root)))
+        removed.extend(str(p.relative_to(self.root)) for p in variants if p.exists())
         return removed
 
     def remove_materials(self, key: str) -> list[str]:
@@ -585,6 +635,9 @@ class FileStore(PinaxManifest):
         if not self.root.is_dir():
             return []
         paths = self.paths_for(key)
+        from pynakes.filestore._adoption import removable_variants
+
+        variants = removable_variants(self, key)
         removed: list[str] = []
         for path in [
             paths.published_pdf,
@@ -607,6 +660,10 @@ class FileStore(PinaxManifest):
                 del files[key]
                 manifest["files"] = files
                 self.write_manifest(manifest)
+        for path in variants:
+            if path.exists():
+                path.unlink()
+                removed.append(str(path.relative_to(self.root)))
         return removed
 
     def scan(self, keys: Iterable[str]) -> FileStoreScan:

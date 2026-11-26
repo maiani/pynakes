@@ -4,11 +4,20 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, cast
 
-import click
+if TYPE_CHECKING:
+    from typer._click import core as click
+else:
+    import click
 import typer
 import typer.core
-from click.shell_completion import CompletionItem
+
+if TYPE_CHECKING:
+    from typer._click.shell_completion import CompletionItem
+else:
+    from click.shell_completion import CompletionItem
 from typer.core import TyperGroup
 
 from pynakes.cli._common import _emit_error, set_pretty_json
@@ -22,8 +31,9 @@ _JSON_META_KEY = "pynakes_json_output"
 # its parser produces are not the public ``click`` classes. Take typer's usage
 # error from a public typer class rather than importing its private module; on
 # older typer, which uses click itself, this is simply ``click.UsageError``.
-_TYPER_USAGE_ERROR: type[Exception] = next(
-    cls for cls in typer.BadParameter.__mro__ if cls.__name__ == "UsageError"
+_TYPER_USAGE_ERROR = cast(
+    type[click.UsageError],
+    next(cls for cls in typer.BadParameter.__mro__ if cls.__name__ == "UsageError"),
 )
 _USAGE_ERRORS = (click.UsageError, _TYPER_USAGE_ERROR)
 
@@ -121,10 +131,10 @@ def _annotate_usage_error(exc: click.UsageError) -> None:
     removed = _removed_option_hint(exc)
     if removed and getattr(exc, "possibilities", None):
         # A near-miss suggestion beside the replacement is noise.
-        exc.possibilities = []  # type: ignore[attr-defined]
+        setattr(exc, "possibilities", [])
     hint = removed or _selector_hint(exc)
     if hint and hint not in str(exc.message):
-        exc.message = f"{exc.message} ({hint})"
+        setattr(exc, "message", f"{exc.message} ({hint})")
 
 
 def _command_path(ctx: click.Context, name: str) -> tuple[str, ...]:
@@ -139,7 +149,7 @@ def _command_path(ctx: click.Context, name: str) -> tuple[str, ...]:
 
 def _exit_one(exc: click.UsageError) -> None:
     """Report a usage error with exit code 1, the code of every other error."""
-    exc.exit_code = 1
+    setattr(exc, "exit_code", 1)
 
 
 #: Whether Rich is installed at all; per invocation, help uses it only on a terminal.
@@ -305,7 +315,7 @@ class AutoBibGroup(TyperGroup):
                     continue
                 for opt in [*param.opts, *param.secondary_opts]:
                     if opt.startswith(incomplete):
-                        results.append(CompletionItem(opt, help=param.help))
+                        results.append(CompletionItem(opt, help=getattr(param, "help", None)))
             return results
 
         # Suggest subcommand names when the current command is a group.
@@ -323,7 +333,7 @@ class AutoBibGroup(TyperGroup):
                 current.name or "", list(args), parent=ctx.parent, resilient_parsing=True
             ) as sub_ctx:
                 obj, inc = AutoBibGroup._resolve_incomplete_typer(sub_ctx, list(args), incomplete)
-                return obj.shell_complete(sub_ctx, inc)  # type: ignore[no-any-return]
+                return obj.shell_complete(sub_ctx, inc)
         except Exception:
             return []
 
@@ -355,7 +365,13 @@ class AutoBibGroup(TyperGroup):
             raise
 
     def main(
-        self, args: list[str] | None = None, prog_name: str | None = None, **extra: object
+        self,
+        args: Sequence[str] | None = None,
+        prog_name: str | None = None,
+        complete_var: str | None = None,
+        standalone_mode: bool = True,
+        windows_expand_args: bool = True,
+        **extra: Any,
     ) -> object:
         """Override :meth:`click.BaseCommand.main` to report usage errors as pynakes does.
 
@@ -370,7 +386,14 @@ class AutoBibGroup(TyperGroup):
         # bytes. Decided per invocation, from where the help is going.
         typer.core.HAS_RICH = _RICH_INSTALLED and sys.stdout.isatty()
         try:
-            return super().main(args=args, prog_name=prog_name, **extra)
+            return super().main(
+                args=args,
+                prog_name=prog_name,
+                complete_var=complete_var,
+                standalone_mode=standalone_mode,
+                windows_expand_args=windows_expand_args,
+                **extra,
+            )
         except _USAGE_ERRORS as exc:
             _annotate_usage_error(exc)
             _exit_one(exc)

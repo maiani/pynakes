@@ -17,7 +17,7 @@ from typing import Any
 
 
 def _load_rules() -> list[dict[str, Any]]:
-    ref = files(__package__) / "pdf_overrides.json"  # type: ignore[arg-type]
+    ref = files(__package__) / "pdf_overrides.json"
     data = json.loads(ref.read_text(encoding="utf-8"))
     return data.get("rules", [])
 

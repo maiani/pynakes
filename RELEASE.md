@@ -1,3 +1,64 @@
+# Engine v0.10 release validation
+
+Validation date: **2026-11-26**, development checkout. This is an untagged
+release candidate, not publication authorization. The CLI/API work is described
+in [CHANGELOG.md](CHANGELOG.md); usage and persisted ingestion formats are in
+[PDF ingestion](docs/guides/pdf-import.md).
+
+## Verified locally
+
+- Python 3.12 source suite: **3,822 passed, 93.72% coverage**.
+- Ruff lint/format, ty **0.0.93 and 0.0.111** with no overrides or source type-ignore
+  comments, generated command reference and strict Zensical build passed.
+- Wheel and sdist built from the working tree as a `0.10.0.dev...` version;
+  Twine checks passed. **3,822 installed-wheel tests passed**, with imports confirmed from the
+  installation directory and pytest's checkout-source path disabled.
+- Synthetic Zotero reference workflow passed: four setup calls, one refresh
+  call, no source writes. This is reference-solution validation, not a blind
+  agent evaluation.
+- Fresh live check against **Zotero 10.0.8 / API 3 / schema 44 on Linux** passed:
+  bounded pagination, budgeted native search, collection/material discovery, two-record guarded project
+  selection, repeat selection and refresh. The source revision was unchanged;
+  every request was a localhost GET. No live source edit was made, so changed
+  source values and conflict reconciliation remain covered by synthetic tests.
+- An authorized six-PDF private native trial accounted for every source:
+  **2 accepted references, 4 pending**, with all original hashes unchanged in
+  copy mode. Identifier-only lookups used approved DOI/Crossref endpoints;
+  requests outside the approved destinations were blocked and stayed pending.
+  Cached replay made no network requests. Both accepted materials and relative
+  links verified after copying the Library to a different root. This diagnostic
+  sample is not an archive-wide recognition rate or a complete migration.
+- The live native run took about **18 seconds**, with measured peak RSS about
+  **50 MiB**. This small-run measurement is not a hard parser memory bound.
+  Generated fixtures cover interruption/recovery, changed sources/destinations,
+  decisions, routing, variants, collisions, stale plans and portable restoration.
+
+Private inventories, provider caches, extracted text, metadata and trial projects
+remain under `/tmp`, outside this repository. No private examples appear in
+repository fixtures or public release notes. The original plan's private
+Zotero upload/recognition rehearsal was not repeated: this live Zotero check was
+read-only and used existing records. Any further archive migration remains an
+explicit operation, separate from shipping the read adapter.
+
+## Dependencies and handoff
+
+PDF inspection needs the existing optional **`PyMuPDF>=1.26,<2`** extra
+(`pip install 'pynakes[pdf]'`), with its separate AGPL/commercial terms.
+Managed storage, ledger and recovery add no runtime dependencies. Zotero uses
+existing HTTPX and requires a running supported local Zotero API. OCR, a database,
+Git LFS and a background service are not required. The existing build toolchain
+uses setuptools, setuptools-scm and wheel; development checks use the declared
+dev/docs extras. The committed `uv.lock` records resolved development dependencies;
+ty is pinned to the verified **0.0.111** for pip-based checks as well.
+
+Before publishing, review the final diff, commit the intended files, pass CI on
+the exact release revision, and create the authorized release tag. Build and
+verify publication artifacts from that tag, then check a fresh installation.
+No commit, tag, push, upload to Zotero, or release publication was performed in
+this validation. The earlier v0.9 release record follows for provenance.
+
+---
+
 # Engine v0.9.0 release preparation
 
 The engine release is **0.9.0 Beta**, authorized for publication on

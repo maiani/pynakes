@@ -623,3 +623,21 @@ recompute or compare SHA-256 checksums. Hashes recorded at installation or
 reconciliation provide provenance; their presence is not evidence that a
 subsequent check verified the material bytes. `asset repair` reconciles the
 manifest explicitly and supports a dry-run preview.
+
+## Adopting existing local attachments
+
+`asset adopt FILE KEY SOURCE` uses the same staged transaction as managed
+[PDF ingestion](pdf-import.md#managed-library-ingestion-and-review). It moves
+originals by default; `--mode copy` keeps them. Stored bytes and relative links
+are durable before source removal. `--role` defaults to `unclassified` and
+supports published, preprint, supplement and erratum. The corresponding
+`pinax-adopt-mode` and `pinax-adopt-role` metadata settings configure defaults.
+
+The existing version-1 manifest gains an optional `variants` list per citation
+key: SHA-256, role, relative object path, source occurrences and refetchability.
+Immutable objects coexist with existing fixed-role paths; neither old stores
+nor PDFs are rewritten during migration. Missing or changed variants appear in
+asset diagnostics. Generic attachments preserve their filename extension/type.
+Use `Bibliography.adopt_file()` followed by `commit()` for bibliography-aware
+adoption. `FileStore.adopt_file()` is a lower-level bytes/provenance operation
+and deliberately does not edit bibliography links.

@@ -44,6 +44,29 @@ Describe a bibliography: what it holds and how complete its records are.
 | `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
+## asset adopt
+
+**Stability: stable**
+
+Move a file into Pinax and link it; --mode copy keeps the original.
+
+`pynakes asset adopt [FILE] KEY SOURCE [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `KEY` | string | yes | — | — | Citation key owning this attachment |
+| `SOURCE` | string | yes | — | — | Existing local file |
+| `--mode` | choice | no | null | move, copy | Override pinax-adopt-mode (default move) |
+| `--role` | choice | no | null | unclassified, published, preprint, supplement, erratum | Override pinax-adopt-role |
+| `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
+| `--dry-run` | boolean | no | false | — | Preview without moving any files |
+| `--diff` | boolean | no | false | — | Show bibliography changes |
+| `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
+| `--json` | boolean | no | false | — | Emit a JSON envelope |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
 ## asset check
 
 **Stability: stable**
@@ -85,6 +108,21 @@ Download Pinax materials, optionally using existing institutional network access
 | `--key` | list[string] | no | null | — | Select entries by citation key: comma-separated, repeatable. Shorthand for --where 'key in [..]', and narrows a --where given alongside it. |
 | `--strict` | boolean | no | false | — | Exit 1 when a requested material failed to download or was unavailable (materials already present pass) (for CI and pre-commit gating) |
 | `--json` | boolean | no | false | — | Emit machine-readable JSON |
+| `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## asset recover
+
+**Stability: stable**
+
+Complete a journaled material adoption without fetching or inspecting PDFs.
+
+`pynakes asset recover [FILE] [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
+| `--json` | boolean | no | false | — | Emit a JSON envelope |
 | `--file, -f` | string | no | null | — | The bibliography to read, as an alternative to the leading FILE argument (default: the single .bib in the working directory) |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
@@ -871,6 +909,58 @@ Add supplied reference metadata to its routed Library member.
 | `--json` | boolean | no | false | — | Emit the addition and routing evidence as JSON |
 | `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
 
+## library ingest
+
+**Stability: stable**
+
+Recover PDFs into member-owned Pinax stores; keep unresolved sources pending.
+
+`pynakes library ingest MANIFEST PATHS... [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `MANIFEST` | string | yes | — | — | Library manifest |
+| `PATHS` | list[string] | yes | — | — | Files or directories (all immediate inputs are accounted for) |
+| `--online` | boolean | no | false | — | Allow requested metadata provider lookups |
+| `--decisions` | string | no | null | — | Private JSON mapping source paths to hash-bound decisions |
+| `--destination` | string | no | null | — | Override placement with a member path |
+| `--mode` | choice | no | null | move, copy | Override pinax-adopt-mode (default move) |
+| `--role` | choice | no | null | unclassified, published, preprint, supplement, erratum | Override pinax-adopt-role |
+| `--expect-plan` | string | no | null | — | Require the full plan hash from a reviewed preview |
+| `--cache-file` | string | no | null | — | Keep provider responses in a reusable cache file at this path (safe to delete or .gitignore). Omit it and nothing is written to disk: responses are reused for this run only |
+| `--dry-run` | boolean | no | false | — | Preview without writing ledger, materials or bibliographies |
+| `--diff` | boolean | no | false | — | Include member bibliography diffs |
+| `--json` | boolean | no | false | — | Emit per-source evidence and outcomes |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## library recover
+
+**Stability: stable**
+
+Complete an interrupted ingestion from verified journal payloads.
+
+`pynakes library recover MANIFEST [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `MANIFEST` | string | yes | — | — | Library manifest |
+| `--json` | boolean | no | false | — | Emit recovery report |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
+## library review
+
+**Stability: stable**
+
+Read source receipts and pending review reasons; includes private paths.
+
+`pynakes library review MANIFEST [OPTIONS]`
+
+| Parameter | Type | Required | Default | Choices | Description |
+| --- | --- | --- | --- | --- | --- |
+| `MANIFEST` | string | yes | — | — | Library manifest |
+| `--json` | boolean | no | false | — | Emit private ledger records |
+| `--pretty` | boolean | no | false | — | Indent --json output for reading (default: compact, one line) |
+
 ## lint
 
 **Stability: stable**
@@ -1186,7 +1276,7 @@ Patch fields or type on one uniquely identified reference.
 
 **Stability: stable**
 
-Import references from PDFs and link their unchanged originals.
+Import references from PDFs; adopt materials when Pinax is configured.
 
 `pynakes ref from-pdf [FILE] PATHS... [OPTIONS]`
 
@@ -1194,10 +1284,12 @@ Import references from PDFs and link their unchanged originals.
 | --- | --- | --- | --- | --- | --- |
 | `FILE` | string | no | — | — | Path to the .bib file (default: auto-detect single .bib in cwd) |
 | `PATHS` | list[string] | yes | — | — | PDF files or directories (immediate PDFs only) |
-| `--online` | boolean | no | false | — | Resolve DOI/arXiv candidates through metadata providers; never upload PDFs |
-| `--identifier` | string | no | null | — | Confirm a DOI/arXiv identifier for one PDF, including scans |
+| `--online` | boolean | no | false | — | Resolve DOI/arXiv/ISBN candidates through metadata providers; never upload PDFs |
+| `--identifier` | string | no | null | — | Confirm a DOI/arXiv/ISBN identifier for one PDF, including scans |
 | `--key` | string | no | null | — | Citation key for a single PDF |
 | `--key-source` | choice | no | null | generated, provider | Override import-key-source: generated or provider |
+| `--mode` | choice | no | null | move, copy | Override pinax-adopt-mode when Pinax is configured |
+| `--role` | choice | no | null | unclassified, published, preprint, supplement, erratum | Override pinax-adopt-role |
 | `--backup` | boolean | no | false | — | Also write a <file>.bak copy before overwriting, or <file>.bak.1, .bak.2, ... when earlier backups exist, which are never overwritten (off by default; writes are already atomic and re-parse-validated) |
 | `--expect-sha256` | string | no | null | — | Refuse with an exit-2 ExternalModification conflict, writing nothing, unless the file's sha256 still equals this value: pass back the source_sha256 a --dry-run reported, so an edit made in between is never overwritten |
 | `--dry-run` | boolean | no | false | — | Inspect and preview accepted imports without writing |

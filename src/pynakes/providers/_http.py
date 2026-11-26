@@ -7,6 +7,7 @@ import json
 import threading
 import time
 from collections.abc import Callable, Mapping
+from contextlib import AbstractContextManager
 from contextvars import ContextVar
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -321,7 +322,10 @@ def _fetch_bytes_urllib(
 
     request = _UrllibRequest(url, headers=headers)
     try:
-        with opener(request, timeout=timeout) as response:  # type: ignore[arg-type]
+        manager = opener(request, timeout=timeout)
+        if not isinstance(manager, AbstractContextManager):
+            raise TypeError("Injected opener must return a context manager")
+        with manager as response:
             _describe_response(info, url, response)
             data = _read_bounded(
                 response,
@@ -633,7 +637,10 @@ def _fetch_text_once(
 
     request = _UrllibRequest(url, headers=request_headers)
     try:
-        with opener(request, timeout=timeout) as response:  # type: ignore[arg-type]
+        manager = opener(request, timeout=timeout)
+        if not isinstance(manager, AbstractContextManager):
+            raise TypeError("Injected opener must return a context manager")
+        with manager as response:
             data = _read_bounded(
                 response,
                 max_bytes=MAX_METADATA_BYTES,

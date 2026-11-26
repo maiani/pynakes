@@ -5,7 +5,7 @@ import json
 import os
 import re
 import sys
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,6 +27,7 @@ from pynakes.cli._result_collection import RESULT_COLLECTOR
 from pynakes.dedupe import DedupeConflictError
 from pynakes.diff import generate_diff
 from pynakes.engine import Bibliography, ExternalModificationError
+from pynakes.filestore._transaction import MaterialConflictError
 from pynakes.io import SaveResult, save_text
 from pynakes.library.backends.base import SourceChanged, SourceError
 from pynakes.model import BibFile
@@ -501,6 +502,13 @@ def _safe(fn: Callable[_P, _R]) -> Callable[_P, _R]:
                 file=str(exc.path),
                 options=_EXTERNAL_MODIFICATION_OPTIONS,
             )
+        except MaterialConflictError as exc:
+            _emit_conflict(
+                json_output,
+                "ExternalModification",
+                str(exc),
+                options=_EXTERNAL_MODIFICATION_OPTIONS,
+            )
         except InvalidInputError as exc:
             _emit_error(json_output, "InvalidInput", str(exc))
         except NoCitationSourcesError as exc:
@@ -537,7 +545,7 @@ def _safe(fn: Callable[_P, _R]) -> Callable[_P, _R]:
             _emit_error(json_output, "InvalidInput", f"Invalid regular expression: {exc}")
         except _CLICK_ERRORS:
             raise
-        except Exception as exc:  # noqa: BLE001 - last resort; never a traceback
+        except Exception as exc:  # last resort; never a traceback
             _emit_error(
                 json_output,
                 "InternalError",
@@ -555,7 +563,7 @@ def _preview_or_commit(coll: Bibliography, params: RunParams) -> tuple[str, bool
     Use ``params.backup`` to also leave a ``<file>.bak`` (or ``.bak.N``) copy behind.
     """
     if params.dry_run:
-        return coll.diff(), coll.is_modified, coll.changed_entries_count()
+        return coll.diff(), coll.is_dirty, coll.changed_entries_count()
     result = coll.commit(backup=params.backup)
     return result.diff, result.modified, result.changed_entries
 
@@ -630,6 +638,7 @@ def _finish_mod(
     diff_text: str | None = None,
     warnings=None,
     modified_entries: int | None = None,
+    report_details: Mapping[str, object] | None = None,
     **details,
 ) -> None:
     """Preview/commit a bibliography and emit the standard modifying-command result.
@@ -672,6 +681,7 @@ def _finish_mod(
         "warnings": warnings or [],
         "plan": plan,
         "source_sha256": source_sha256,
+        **(report_details or {}),
         **details,
     }
     _emit(params.json_output, result, human, diff_text, params.diff)

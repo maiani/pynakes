@@ -39,7 +39,7 @@ jobs:
       - name: Ruff format check
         run: ruff format --check src tests
 
-      # Existing annotation debt is recorded per module and rule in pyproject.
+      # Keep the engine fully checked without per-module rule overrides.
       - name: Ty
         run: ty check
 

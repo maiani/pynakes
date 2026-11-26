@@ -55,7 +55,13 @@ class TestGetCapabilities:
         assert api["library"]["facade"] == "pynakes.Library"
         assert api["library"]["reads"] == ["lookup", "search"]
         assert api["library"]["cli_integration"] is True
-        assert api["library"]["commands"] == ["library add"]
+        assert api["library"]["commands"] == [
+            "library add",
+            "library ingest",
+            "library review",
+            "library recover",
+        ]
+        assert api["library"]["ingestion"]["default_mode"] == "move"
         assert api["library"]["catalogue"] is False
 
     def test_work_matching_contract_is_explicit(self) -> None:
@@ -263,3 +269,14 @@ def test_settings_cover_schema_and_live_overrides() -> None:
     result = runner.invoke(app, ["capabilities", "--section", "settings", "--json"])
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["settings"] == settings
+
+
+def test_every_capabilities_section_and_all_run_without_error() -> None:
+    from pynakes.cli.commands.capabilities import CapabilitySection
+
+    for section in CapabilitySection:
+        result = runner.invoke(app, ["capabilities", "--section", section.value, "--json"])
+        assert result.exit_code == 0, f"{section.value}: {result.output}"
+        assert section.value in json.loads(result.output)
+    result = runner.invoke(app, ["capabilities", "--all", "--json"])
+    assert result.exit_code == 0, result.output

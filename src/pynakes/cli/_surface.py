@@ -12,8 +12,12 @@ library was omitted and the lone local ``.bib`` is used.
 from __future__ import annotations
 
 from pathlib import Path, PurePath
+from typing import TYPE_CHECKING, cast
 
-import click
+if TYPE_CHECKING:
+    from typer._click import core as click
+else:
+    import click
 import typer
 
 from pynakes.cli._common import (
@@ -53,8 +57,9 @@ NO_AUTODETECT_COMMANDS = {("init",)}
 
 #: Typer 0.26+ vendors its own click, and only its exceptions reach the
 #: standalone handler, so a usage error raised here must be typer's class.
-_UsageError: type[click.UsageError] = next(
-    cls for cls in typer.BadParameter.__mro__ if cls.__name__ == "UsageError"
+_UsageError = cast(
+    type[click.UsageError],
+    next(cls for cls in typer.BadParameter.__mro__ if cls.__name__ == "UsageError"),
 )
 
 

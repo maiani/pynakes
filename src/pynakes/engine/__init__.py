@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from pynakes.filestore._adoption import MaterialAdoption
     from pynakes.pdf_import import PDFImportReport
 
 from pynakes import _tex_rewrite
@@ -108,6 +109,7 @@ class Bibliography(
     _tex_rewrites: list[_tex_rewrite.TexRewrite] = field(default_factory=list)
     _after_commit: list[Callable[[], object]] = field(default_factory=list)
     _pdf_import_sources: list[tuple[Path, str]] = field(default_factory=list)
+    _material_adoptions: list[tuple["MaterialAdoption", str]] = field(default_factory=list)
     _commit_guards: list[Callable[[], None]] = field(default_factory=list)
 
     @classmethod
@@ -167,7 +169,9 @@ class Bibliography(
     @property
     def is_dirty(self) -> bool:
         """Return whether output or a deferred Pinax transaction is staged."""
-        return self.is_modified or bool(self._pinax_renames or self._pinax_material_merges)
+        return self.is_modified or bool(
+            self._pinax_renames or self._pinax_material_merges or self._material_adoptions
+        )
 
     @property
     def is_modified(self) -> bool:
@@ -200,6 +204,8 @@ class Bibliography(
         key: str | None = None,
         key_source: str | None = None,
         cache_file: str | Path | None = None,
+        mode: str | None = None,
+        role: str | None = None,
     ) -> "PDFImportReport":
         """Stage PDF references and original-file links; return a PDFImportReport.
 
@@ -216,7 +222,35 @@ class Bibliography(
             key=key,
             key_source=key_source,
             cache_file=cache_file,
+            mode=mode,
+            role=role,
         )
+
+    def adopt_file(
+        self, key: str, source: str | Path, *, mode: str | None = None, role: str | None = None
+    ) -> dict:
+        """Stage a local attachment in Pinax; move by default, or explicitly copy.
+
+        Commit writes verified bytes, provenance and relative links before source
+        removal. The pinax-adopt-mode/role metadata settings supply defaults.
+        Reset discards the operation without moving any files.
+        """
+        from pynakes.engine._adoption import stage_adoption
+
+        return stage_adoption(self, key, source, mode=mode, role=role)
+
+    def recover_adoptions(self) -> dict:
+        """Complete an interrupted material commit, then reload the bibliography."""
+        from pynakes.filestore._transaction import recover
+
+        if self.path is None:
+            raise ValueError("Recovery requires a bound bibliography")
+        result = recover(
+            self.path.parent.resolve(),
+            self.path.parent.resolve() / ".pynakes-ingest" / self.path.name,
+        )
+        self.reload()
+        return result
 
     # --- lifecycle -------------------------------------------------------
 
@@ -314,7 +348,7 @@ class Bibliography(
                     raise ExternalModificationError(source)
         diff_text = self.diff()
         new_text = self.preview()
-        modified = new_text != self._pristine_text
+        modified = new_text != self._pristine_text or bool(self._material_adoptions)
         tex_rewrites = list(self._tex_rewrites)
         after_commit = list(self._after_commit)
         # Check every staged TeX source before touching anything, so a source
@@ -327,7 +361,14 @@ class Bibliography(
         try:
             transactions = self._apply_pinax_renames()
             transactions.extend(self._apply_pinax_material_merges())
-            if modified:
+            if self._material_adoptions:
+                from pynakes.engine._adoption import commit_adoptions
+                from pynakes.io import _write_backup
+
+                if backup and modified:
+                    _write_backup(self.path)
+                commit_adoptions(self, new_text)
+            elif modified:
                 result = save_text(
                     new_text,
                     str(self.path),
@@ -374,6 +415,7 @@ class Bibliography(
         self._tex_rewrites.clear()
         self._after_commit.clear()
         self._pdf_import_sources.clear()
+        self._material_adoptions.clear()
         self._commit_guards.clear()
 
     def reset(self) -> None:

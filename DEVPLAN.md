@@ -255,7 +255,9 @@ implemented; see [Zotero integration](docs/guides/zotero.md) and the changelog.
 The read/select/refresh workflow includes direct collection browsing, local
 budgeted multi-page queries, native quick search, batch selection, all-bindings
 refresh, structured field conflicts and guarded per-field reconciliation.
-End-to-end native migration remains unimplemented.
+Managed native ingestion, review, variant adoption and recovery are implemented;
+see [PDF ingestion](docs/guides/pdf-import.md#managed-library-ingestion-and-review).
+Release validation and remaining operational gates are tracked in [RELEASE.md](RELEASE.md).
 
 #### Order of work and release gates
 
@@ -272,16 +274,16 @@ End-to-end native migration remains unimplemented.
    projections, cross-instance rebinding and a persistent connection registry
    require their own reviewable contracts. Keep source writes, two-way sync and
    multi-source project assembly (v0.12 `pick`) outside this release gate.
-4. **Native PDF ingestion.** Complete the acquisition sequence below: evidence,
-   metadata review, variant-aware adoption, guarded routing, a durable ledger and
-   interruption recovery. Keep ambiguous/unidentified PDFs pending without
-   invented bibliography entries. Ship the native migration gate in this release.
+4. **Maintain native ingestion acceptance.** Keep evidence review, variant
+   adoption, guarded routing, durable accounting and interruption recovery
+   covered by the synthetic and private trial gates recorded in RELEASE.md.
+   Ambiguous/unidentified PDFs stay pending without invented entries.
 5. **Private archive rehearsal.** Use an explicitly authorized old PDF archive
    to exercise both routes. First preserve PDFs in a dedicated Zotero review
    collection, with stored-byte verification and source-occurrence receipts;
    bibliographic recognition is a separate, reported outcome. Reuse locally
    cached recovery evidence, preserving uncertain candidates. Exercise native
-   ingestion as its guarded operation becomes available. Private data and
+   ingestion with reviewed plans and copy mode. Private data and
    credentials never enter the engine repository. This operational migration is
    not proof that a reusable adapter or native ingestion feature has shipped.
 
@@ -336,172 +338,27 @@ property must never silently become an accepted paper title.
 
 #### Native sequence: PDF archive to managed Library
 
-Local import trials establish useful failure classes, not a general recovery
-rate. Keep their source inventories, extracted text, candidate bibliographies
-and provider caches in the private Library. Public tests use invented fixtures
-and recorded synthetic provider responses. Preserve the existing PDF command's
-external-link workflow while adding managed ingestion explicitly. Each new API
-and CLI option must follow the setting/override conventions in `AGENTS.md`;
-routing policy stays in the manifest. Keep capabilities, error codes and the
-generated command reference synchronized as each slice ships.
+The acquisition, review, routing, variant adoption and recovery sequence is
+implemented. Its user contract, private version-1 ledger/journal formats,
+resource limits and restoration workflow are documented in
+[PDF ingestion](docs/guides/pdf-import.md). Completed changes belong in
+[CHANGELOG.md](CHANGELOG.md); reproducible and live validation is recorded in
+[RELEASE.md](RELEASE.md).
 
-The engine backlog is:
+Keep those gates passing as the engine evolves: invented fixtures must retain
+ambiguous identities and competing editions for review, preserve bytes and
+annotations, guard source/member/routing changes, resume interrupted writes,
+recognize completed receipts and resolve relative links after restoration.
+Continue reporting accepted references separately from stored bytes and pending
+sources. No diagnostic private sample establishes an archive-wide recovery rate.
 
-| Gap | Required outcome |
-| --- | --- |
-| Unrelated identifiers on cover sheets or reference pages | Attribute identity evidence to the document; retain competing candidates for review |
-| Mathematical and typographic title differences | Compare equivalent representations without relaxing identity checks broadly |
-| Complete-looking embedded metadata with weak values | Validate type, names and dates; offer attributable field choices |
-| Books with identifiers beyond the opening pages | Bounded front-matter inspection and ISBN/edition evidence |
-| Recovered records still linked to external files | Guarded routing plus portable Pinax copies and provenance |
-| Failed, unidentified or interrupted imports | Persistent accounting and safe retry without fabricated records |
-
-**1. Improve document identity evidence.** Extend the inspection evidence model
-before changing acceptance rules.
-
-- Retain page and available block/region locations for candidate identifiers and
-  titles. Distinguish the document's citation/title block from publisher
-  recommendations, reference lists and other embedded works. Do not assume
-  everything before an abstract describes the document itself.
-- Keep included and rejected evidence with reasons. Multiple supported works,
-  contradictory metadata or failed competing lookups still require review;
-  neither the first DOI nor a provider's successful response establishes identity.
-- Add comparison-only normalization for Unicode/LaTeX mathematical notation,
-  ligatures, spacing and line-break hyphenation. Preserve original title fields
-  and evidence. Do not solve mismatches by globally lowering a similarity cutoff.
-- **Gate:** invented positive fixtures cover equivalent mathematical titles and
-  layout variations; negative fixtures cover similar titles, recommendations,
-  reference-list identifiers and genuinely different works. Every automatic
-  choice has inspectable supporting locations; uncertain cases stay unwritten.
-
-**2. Recover and review metadata, including books.** Build on existing providers
-and lookup rather than introducing another resolution stack.
-
-- Separate field presence from metadata quality. Validate embedded author/editor
-  structure, publication dates and entry type; preserve questionable values as
-  evidence instead of guessing author splits or treating PDF creation dates as
-  publication dates. A successful lint run is not identity certification.
-- Provide explicit provider comparison/enrichment for embedded records. Online
-  mode currently accepts complete-looking embedded records before resolving
-  identifiers; new review behavior must expose disagreements and chosen field
-  provenance without silently replacing existing metadata.
-- Add bounded front-matter inspection beyond the initial two-page window, with
-  documented page/text/time/size budgets and structured limit failures. Measure
-  peak memory; an input-size limit and timeout are not a hard memory bound. Extract
-  and checksum ISBNs, reuse the existing ISBN resolver, and distinguish editions,
-  volumes and print/electronic identifiers. Several ISBNs need evidence or a
-  reviewed choice, not a first-match rule.
-- Connect existing title/reference lookup as an explicitly requested online
-  fallback. Preview the query and candidate evidence: sending title/author text
-  is a different disclosure from identifier-only lookup. No filename guessing or
-  page-count rule may silently classify a document as a book.
-- **Gate:** book fixtures place identifiers after page two and include conflicting
-  editions and irrelevant ISBNs. Metadata disagreements remain reviewable; an
-  accepted book type triggers the transversal book rule before subject rules.
-  OCR and repair of corrupt originals remain optional later work, not migration
-  prerequisites. Password, unreadable-file and resource-limit failures remain
-  distinguishable and leave the source untouched.
-
-**3. Settle material adoption and variant identity.** This is a prerequisite for
-copying any accepted PDF into Pinax, independent of recovery quality.
-
-- Distinguish source occurrence, byte identity (SHA-256), bibliographic work and
-  material role. Identical bytes can be recognized without merging distinct
-  work records; different bytes for one work must remain distinguishable.
-- Define an explicit unclassified role and multiple variants within a role.
-  An annotated PDF must not overwrite an unannotated copy, or vice versa. Keep
-  published/preprint distinctions and unresolved work relationships explicit.
-  Decide the manifest/addressing schema and migration of existing Pinax layouts
-  before exposing it; retain citation-key lookup as the public entry point.
-- Implement general local-file adoption using Pinax's write/provenance helpers.
-  Copy unchanged bytes by default, check source and destination hashes, record
-  provenance, detect collisions and recognize an already-adopted artifact.
-  Never rename, delete, repair or rewrite the external original implicitly.
-- Use distinct member-owned stores and relative attachment links. Define key
-  rename behavior for all variants and manifest records. A shared Library store
-  or member-to-member move is a subsequent operation, not an assumption hidden
-  inside import.
-- **Gate:** test repeated bytes, multiple annotated variants, unknown roles,
-  missing roots, destination collisions and key renames. Accepted materials
-  retain their original hashes and are addressable after relocating the entire
-  Library. Preserving embedded annotation bytes is required now; extracting
-  annotations into the v0.15 model is separate work.
-
-**4. Compose a guarded Library acquisition operation.** Reuse PDF inspection,
-provider resolution, Library routing and Bibliography staging. Settle the Python
-entry point and CLI spelling before exposing them; do not duplicate bibliography
-logic in a migration script or client.
-
-- Produce one reviewable plan with source hashes, identity evidence, metadata
-  choices, generated keys, destination and routing reasons, bibliography diffs,
-  material copies and provenance changes. Stage only candidates whose identity,
-  metadata choices and destination are sufficiently resolved.
-- Check work/key collisions across all members and other accepted records in
-  the same batch. For an existing work, offer attachment to its current owner;
-  do not add a second entry just because new routing rules choose another file.
-  Probable matches and conflicting identifiers need review before attachment.
-- Apply the selected member's key, dialect and normalization settings. Explicit
-  destination overrides and priority ties keep the existing routing semantics.
-  An inbox fallback applies to an identified reference without a matching route;
-  it must not turn an unidentified PDF into invented bibliographic metadata.
-- Recheck source PDFs, manifest/rules, membership, destination and relevant
-  existing materials against the reviewed plan before mutation. Incomplete
-  Library reads block uniqueness-dependent writes. A preview must not create
-  destination files, Pinax directories or provenance records.
-- Define the commit unit and recovery protocol for bibliography, material bytes
-  and Pinax manifest writes. Prepare outputs before mutation, with rollback or
-  a durable recovery journal for interruption. Several filesystem renames are
-  not a globally atomic transaction. Report completed and pending units honestly.
-- **Gate:** fixture imports route books and unmatched articles to separate
-  members, attach variants to existing owners and reject duplicate/stale plans.
-  Failure injection at each write boundary proves recovery without lost bytes,
-  dangling accepted links or unreported partial changes. Retrying completed
-  units produces no duplicate entries, copies or provenance records.
-
-**5. Persist a minimal import ledger and review queue.** Ship this with managed
-Library ingestion; v0.16 generalizes it to other operations.
-
-- Inventory every selected source, including unsupported formats, with its hash
-  and extraction/version information. Record candidates, resolution evidence,
-  explicit selections, routing reasons, plan fingerprints and resulting
-  bibliography/material hashes. Non-PDF files stay accounted for and are never
-  executed. Do not require a fake citation key to retain an unresolved source.
-- Distinguish candidate recovery, review acceptance and committed ingestion in
-  reports. Track pending, ambiguous, failed, already-present and committed
-  outcomes separately, with reasons and actions available to the reviewer.
-- Resume from verified receipts and current hashes. Changed source bytes,
-  metadata choices, rules or members invalidate affected plans; retain previous
-  evidence without applying stale decisions. Make extraction/provider caches
-  disposable, while explicit decisions and write receipts remain authoritative.
-- Preserve offline operation and explicit network scope. Cached responses may
-  be reused with provenance; uncached lookups require the requested online mode.
-  Retry must not silently widen the selected sources, queries or providers.
-- **Gate:** interrupt and resume a mixed batch, modify a source and a routing rule,
-  remove a cache, and retry failures. Every source remains accounted for; no
-  completed write repeats and no stale selection applies. Persisted formats are
-  versioned and documented, with private paths/text excluded from public exports.
-
-**6. Rehearse migration and restoration.** Run deterministic synthetic end-to-end
-fixtures first, then separately authorized private trials. Real inventories,
-metadata and reports stay outside the software repository.
-
-- Start with a reviewed cohort covering each failure class and material role;
-  expand only after the preceding gates pass. Keep live provider availability
-  checks separate from reproducible correctness tests, and do not extrapolate a
-  diagnostic sample into a collection-wide success rate.
-- Reconcile all selected sources against committed materials, byte duplicates,
-  explicit exclusions and outstanding review/failure items. Check bibliography
-  links, Pinax manifests, hashes, routing reasons and unchanged source originals.
-  A fully accounted-for batch can still have unresolved work; report both facts.
-- Restore a Git-managed Library at a different root with the original archive
-  unavailable. Demonstrate working relative links for restored PDF bytes and
-  explicit missing-material diagnostics for a metadata-only clone. Document
-  ordinary Git, optional LFS and external material backup choices without
-  making the engine stage, commit, configure remotes or push anything.
-- **Migration gate:** accepted references have one owner and intact, attributable
-  materials; retries and restoration work; every unresolved source has a durable
-  review record. No claim of a complete archive import while pending items
-  remain. Keep the source archive intact after the rehearsal.
+Remaining operational work is explicit review of pending private cases and any
+separately authorized Zotero upload/recognition rehearsal. Preserve originals in
+copy mode for rehearsals; never publish inventories, extracted text, caches or
+private records. OCR, corrupt-PDF repair, general cross-member material moves,
+annotation extraction and general-purpose transaction receipts remain later
+features. Pinax acquisition moves originals by default after durable commit;
+copy mode is the explicit archive-preservation choice.
 
 #### Accepted Library backend design
 

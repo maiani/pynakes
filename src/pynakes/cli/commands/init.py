@@ -203,7 +203,7 @@ def _convert_to_pinax(
         + [f"  {w['message']}" for w in warnings]
         + ([f"  {_pointer_human(pointer)}"] if pointer else []),
         warnings=warnings,
-        **extra,
+        report_details=extra,
     )
 
 

@@ -45,11 +45,11 @@ def _windows_process_alive(pid: int) -> bool:
     process_query_limited_information = 0x1000
     error_access_denied = 5
     still_active = 259
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     handle = kernel32.OpenProcess(process_query_limited_information, False, pid)
     if not handle:
         # Denied means it exists but belongs to someone else: not ours to sweep.
-        return ctypes.get_last_error() == error_access_denied  # type: ignore[attr-defined]
+        return ctypes.get_last_error() == error_access_denied
     try:
         exit_code = ctypes.c_ulong()
         if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):

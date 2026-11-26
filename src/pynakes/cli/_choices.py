@@ -195,3 +195,16 @@ class TextEncoding(StrEnum):
 class FieldEncoding(StrEnum):
     LATEX = "latex"
     UNICODE = "unicode"
+
+
+class AdoptionMode(StrEnum):
+    MOVE = "move"
+    COPY = "copy"
+
+
+class MaterialRole(StrEnum):
+    UNCLASSIFIED = "unclassified"
+    PUBLISHED = "published"
+    PREPRINT = "preprint"
+    SUPPLEMENT = "supplement"
+    ERRATUM = "erratum"

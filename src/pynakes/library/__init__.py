@@ -4,7 +4,8 @@
 explicit files. Both read member files once using the normal BibTeX reader.
 Lookup and search use that in-memory view until the caller opens it again.
 Additions select one member and stage through Bibliography. There is no index,
-background refresh, network access or multi-file mutation.
+background refresh. Managed ingestion explicitly stages multi-file transactions;
+metadata provider lookups require online=True.
 """
 
 from __future__ import annotations
@@ -12,9 +13,13 @@ from __future__ import annotations
 import hashlib
 import json
 import stat
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pynakes.library._ingest import IngestionPlan
 
 from pynakes.bibtex_parser import ParseError
 from pynakes.io import _load_source
@@ -273,6 +278,50 @@ class Library:
         from pynakes.library._add import stage_entry
 
         return stage_entry(self, entry, destination)
+
+    def prepare_ingestion(
+        self,
+        paths: Sequence[str | Path],
+        *,
+        online: bool = False,
+        decisions: dict | None = None,
+        destination: str | Path | None = None,
+        mode: str | None = None,
+        role: str | None = None,
+        cache_file: str | Path | None = None,
+    ) -> IngestionPlan:
+        """Plan native PDF ingestion, retaining unresolved sources in a durable queue.
+
+        See :func:`pynakes.library._ingest.prepare_ingestion`. Preview creates no
+        directories; plan.commit() rechecks source and Library fingerprints.
+        """
+        from pynakes.library._ingest import prepare_ingestion
+
+        return prepare_ingestion(
+            self,
+            paths,
+            online=online,
+            decisions=decisions,
+            destination=destination,
+            mode=mode,
+            role=role,
+            cache_file=cache_file,
+        )
+
+    def ingestion_ledger(self) -> dict:
+        """Read private, versioned ingestion receipts and pending review records."""
+        from pynakes.library._ingest import read_ledger
+
+        return read_ledger(self)
+
+    def recover_ingestion(self) -> dict:
+        """Finish a journaled ingestion without repeating provider requests."""
+        from pynakes.filestore._transaction import recover
+        from pynakes.library._ingest import state_path
+
+        if self.manifest is None:
+            raise ValueError("Recovery requires a manifest")
+        return recover(self.manifest.parent, state_path(self))
 
     @classmethod
     def from_files(cls, files: Iterable[str | Path]) -> Library:

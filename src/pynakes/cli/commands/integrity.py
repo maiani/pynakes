@@ -332,12 +332,11 @@ def enrich(
                 f"{_entries(preprints.linked)}"
             )
     lookups = _lookup_coverage(warnings, concurrency, cache_file)
-    if lookups["not_checked"]:
+    not_checked = lookups["not_checked"]
+    assert isinstance(not_checked, list)
+    if not_checked:
         retry = f" (retry with {lookups['retry']})" if lookups["retry"] else ""
-        detail.append(
-            f"  not checked: {len(lookups['not_checked'])} "
-            f"{_entries(len(lookups['not_checked']))}{retry}"
-        )
+        detail.append(f"  not checked: {len(not_checked)} {_entries(len(not_checked))}{retry}")
     # Counted over every update this command applied, preprint work included, so
     # the dry-run summary matches both the diff below it and the JSON envelope.
     changed_entries = len({update.key for update in updates})
@@ -361,7 +360,7 @@ def enrich(
         selected=None if selected is None else len(selected),
         lookups=lookups,
         only_fields=fields,
-        **extra,
+        report_details=extra,
     )
 
 

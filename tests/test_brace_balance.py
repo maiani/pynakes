@@ -44,7 +44,7 @@ def test_unbalanced_brace_mirrors_the_parser(value: str, expected: str | None) -
     if expected is None:
         assert parse_bib(text).entries["K"].fields["title"] == value
     else:
-        with pytest.raises(Exception):  # noqa: B017 - any parse failure will do
+        with pytest.raises(Exception):
             reparsed = parse_bib(text)
             assert reparsed.entries["K"].fields["title"] == value
 

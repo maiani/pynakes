@@ -58,7 +58,7 @@ dev = [
     "pytest-cov>=4.1.0",
     "coverage>=7.10",
     "hypothesis>=6.100.0",
-    "ty==0.0.93",
+    "ty==0.0.111",
     "pyyaml>=6.0",
     "ruff>=0.16,<0.17",
     "build>=1.2.0",
@@ -107,7 +107,7 @@ target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "PLW1514"]
+select = ["E", "F", "W", "I", "PLW1514", "RUF100"]
 ignore = ["E501"]
 # PLW1514 (text I/O without an explicit encoding) is a preview rule. A bare
 # open()/read_text() uses the locale's code page on Windows, not UTF-8.
@@ -126,72 +126,3 @@ python-platform = "all"
 
 [tool.ty.src]
 include = ["src/pynakes"]
-
-# Type-checking baseline: suppress only recorded rule families in each
-# module. Shrink this list; never broaden it.
-
-
-[[tool.ty.overrides]]
-include = ["src/pynakes/bibtex_writer.py"]
-[tool.ty.overrides.rules]
-invalid-argument-type = "ignore"
-missing-attribute = "ignore"
-
-[[tool.ty.overrides]]
-include = ["src/pynakes/cli/_app.py"]
-[tool.ty.overrides.rules]
-invalid-assignment = "ignore"
-
-[[tool.ty.overrides]]
-include = ["src/pynakes/cli/commands/dedupe.py"]
-[tool.ty.overrides.rules]
-invalid-argument-type = "ignore"
-
-[[tool.ty.overrides]]
-include = ["src/pynakes/cli/commands/import_ref.py"]
-[tool.ty.overrides.rules]
-invalid-argument-type = "ignore"
-
-[[tool.ty.overrides]]
-include = ["src/pynakes/cli/commands/init.py"]
-[tool.ty.overrides.rules]
-invalid-argument-type = "ignore"
-
-[[tool.ty.overrides]]
-include = ["src/pynakes/cli/commands/integrity.py"]
-[tool.ty.overrides.rules]
-invalid-argument-type = "ignore"
-
-[[tool.ty.overrides]]
-include = ["src/pynakes/cli/commands/keys.py"]
-[tool.ty.overrides.rules]
-invalid-argument-type = "ignore"
-
-[[tool.ty.overrides]]
-include = ["src/pynakes/cli/commands/remove.py"]
-[tool.ty.overrides.rules]
-invalid-argument-type = "ignore"
-
-[[tool.ty.overrides]]
-include = ["src/pynakes/cli/commands/setops.py"]
-[tool.ty.overrides.rules]
-invalid-argument-type = "ignore"
-
-[[tool.ty.overrides]]
-include = ["src/pynakes/cli/_discovery.py"]
-[tool.ty.overrides.rules]
-invalid-argument-type = "ignore"
-invalid-assignment = "ignore"
-invalid-attribute-access = "ignore"
-incompatible-method-override = "ignore"
-missing-attribute = "ignore"
-
-[[tool.ty.overrides]]
-include = ["src/pynakes/cli/_surface.py"]
-[tool.ty.overrides.rules]
-invalid-assignment = "ignore"
-
-[[tool.ty.overrides]]
-include = ["src/pynakes/providers/_http.py"]
-[tool.ty.overrides.rules]
-invalid-context-manager = "ignore"

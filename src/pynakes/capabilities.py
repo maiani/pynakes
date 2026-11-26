@@ -120,7 +120,7 @@ _NETWORK_ACCESS = {
         "ref add --fetch",
         "ref import --fetch",
     ],
-    "with_online": ["verify", "enrich", "ref compare", "ref from-pdf"],
+    "with_online": ["verify", "enrich", "ref compare", "ref from-pdf", "library ingest"],
     "local_ipc_by_running": ["zotero"],
 }
 
@@ -460,8 +460,16 @@ def get_capabilities() -> dict:
                 "freshness": "Direct-read view; reopen to refresh members and bytes.",
                 "partial_failures": "Every read report includes member issues and completeness.",
                 "cli_integration": True,
-                "commands": ["library add"],
-                "staging": ["route", "stage_entry"],
+                "commands": ["library add", "library ingest", "library review", "library recover"],
+                "staging": ["route", "stage_entry", "prepare_ingestion"],
+                "ingestion": {
+                    "default_mode": "move",
+                    "copy_mode": True,
+                    "review": "ingestion_ledger",
+                    "recovery": "recover_ingestion",
+                    "plan_precondition": "--expect-plan",
+                    "ledger_version": 1,
+                },
                 "routing": {
                     "configuration": "Library manifest [routing] and [[routing.rules]]",
                     "precedence": "Explicit destination, highest priority, fallback; ties conflict",

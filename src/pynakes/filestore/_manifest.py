@@ -206,6 +206,19 @@ class PinaxManifest:
             if not isinstance(row, dict):
                 drift.append({"key": key, "kind": "manifest", "reason": "invalid manifest row"})
                 continue
+            from pynakes.filestore._adoption import variant_path
+
+            for record in row.get("variants", []):
+                material = variant_path(self.root, record)
+                if not material.is_file() or _sha256_path(material) != record["sha256"]:
+                    drift.append(
+                        {
+                            "key": key,
+                            "kind": "variant",
+                            "reason": "missing or changed variant",
+                            "path": str(material),
+                        }
+                    )
             paths = self.paths_for(key)
             for kind in ARTIFACT_KINDS:
                 if kind not in row:
@@ -272,6 +285,10 @@ class PinaxManifest:
         new_row = files.setdefault(new, {})
         if not isinstance(new_row, dict):
             raise ValueError(f"Cannot merge Pinax manifest row {old!r}: invalid target row {new!r}")
+        variants = new_row.setdefault("variants", []) if old_row.get("variants") else []
+        for record in old_row.get("variants", []):
+            if record not in variants:
+                variants.append(record)
         for kind in moved_kinds:
             if kind in old_row:
                 new_row[kind] = old_row[kind]
@@ -335,7 +352,7 @@ def _manifest_refetchable(manifest: dict[str, object], key: str) -> bool:
 
 
 def _manifest_row_has_state(row: Mapping[str, object]) -> bool:
-    return any(kind in row for kind in ARTIFACT_KINDS)
+    return bool(row.get("variants")) or any(kind in row for kind in ARTIFACT_KINDS)
 
 
 def _copy_manifest_row(source: FileStore, target: FileStore, key: str) -> None:

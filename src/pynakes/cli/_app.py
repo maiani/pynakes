@@ -17,6 +17,7 @@ from pynakes.cli._parameters import shared_option
 from pynakes.cli._surface import LIBRARY_ARGUMENT
 from pynakes.cli.commands import (
     add,
+    adopt,
     analyze,
     asset_check,
     batch,
@@ -36,6 +37,7 @@ from pynakes.cli.commands import (
     from_pdf,
     groups,
     import_ref,
+    ingest,
     init,
     inspect,
     integrity,
@@ -167,6 +169,7 @@ tex_scan.register(tex_app)
 # asset: Pinax materials (fetch download + linked-file check)
 fetch.register(asset_app)
 asset_check.register(asset_app)
+adopt.register(asset_app)
 
 # query: named selector queries saved in pynakes-meta
 query.register(query_app)
@@ -174,6 +177,7 @@ query.register(query_app)
 # biblink: declared parent/child links between bibliographies
 biblink.register(biblink_app)
 library.register(library_app)
+ingest.register(library_app)
 zotero.register(zotero_app)
 
 setops.register(app)
@@ -236,6 +240,7 @@ app.registered_groups.sort(key=lambda info: _panel_sort_key(info.name or ""))
 
 # Maps (command_path, parameter_name) → shell_complete callback.
 _CITEKEY_ARGS: dict[tuple[str, ...], str] = {
+    ("asset", "adopt"): "key",
     ("ref", "show"): "key",
     ("ref", "edit"): "key",
     ("ref", "compare"): "key",
@@ -261,7 +266,7 @@ def _file_option() -> TyperOption:
     real option so help, completion, and ``capabilities`` all show it.
     """
     option = shared_option("file_option")
-    option.shell_complete = _bibfile_completer  # type: ignore[method-assign]
+    setattr(option, "shell_complete", _bibfile_completer)
     return option
 
 
@@ -310,7 +315,7 @@ def _get_command_patched(typer_instance):
     return cmd
 
 
-typer.main.get_command = _get_command_patched
+setattr(typer.main, "get_command", _get_command_patched)
 
 
 if __name__ == "__main__":

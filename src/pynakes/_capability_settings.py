@@ -157,6 +157,18 @@ _DETAILS: dict[str, tuple[str, object, str, str | None]] = {
         "relative path inside bibliography directory",
         None,
     ),
+    "pinax-adopt-mode": (
+        "Whether adopting an existing file into the Pinax moves or copies it.",
+        "move",
+        "choice",
+        "asset adopt --mode",
+    ),
+    "pinax-adopt-role": (
+        "Role recorded for an adopted file when none is given.",
+        "unclassified",
+        "choice",
+        "asset adopt --role",
+    ),
     "pinax-fetch-policy": (
         "Material kinds requested by asset fetch.",
         "bestpdf",

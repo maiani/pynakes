@@ -13,7 +13,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from pynakes._identifiers import normalize_arxiv, normalize_doi
+from pynakes._identifiers import normalize_arxiv, normalize_doi, normalize_isbn
 from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.model import undefined_string_references
 
@@ -48,6 +48,8 @@ class PDFInspection:
     page_count: int = 0
     identifiers: list[dict] = field(default_factory=list)
     records: list[dict] = field(default_factory=list)
+    locations: list[dict] = field(default_factory=list)
+    rejected: list[dict] = field(default_factory=list)
     title: str = ""
     warnings: list[str] = field(default_factory=list)
     opening_text: str = field(default="", repr=False)
@@ -90,7 +92,7 @@ def _read_pdf(path: Path) -> dict:
 def inspect_pdf(path: str | Path) -> PDFInspection:
     """Inspect one PDF offline in a worker with a 30-second wall timeout.
 
-    Reads at most the first two pages for text evidence. Files over 128 MiB,
+    Reads at most the first twelve pages for text evidence. Files over 128 MiB,
     encrypted PDFs and malformed PDFs are rejected. No OCR is performed.
     Hashes before and after extraction detect changed source bytes. The timeout
     limits duration, not peak memory of the optional PDF parser.
@@ -122,18 +124,71 @@ def inspect_pdf(path: str | Path) -> PDFInspection:
         _bibtex(result, attachment["text"], attachment["source"])
     if data.get("xmp"):
         _xmp(result, data["xmp"])
+    references = False
     for page in data.get("pages", []):
-        # References are not evidence identifying the document itself. They may
-        # begin even on the first page of a short communication.
-        text = re.split(r"(?im)^\s*(?:references|bibliography)\s*$", page["text"])[0]
-        _identifiers(result, text, "page-text", page["page"])
-        result.opening_text += text + "\n"
+        text = page["text"]
+        parts = re.split(r"(?im)^\s*(?:references|bibliography)\s*$", text, maxsplit=1)
+        accepted = "" if references else parts[0]
+        recommendations = re.split(
+            r"(?im)^\s*(?:recommended articles|you may also like|related articles|other books in this series)\s*:?\s*$",
+            accepted,
+            maxsplit=1,
+        )
+        if len(recommendations) > 1:
+            other = PDFInspection(result.path, result.sha256, result.extractor)
+            _identifiers(other, recommendations[1], "recommendations", page["page"])
+            result.rejected.extend(
+                {**item, "reason": "recommendation"} for item in other.identifiers
+            )
+            accepted = recommendations[0]
+        rejected = text if references else (parts[1] if len(parts) > 1 else "")
+        if rejected:
+            other = PDFInspection(result.path, result.sha256, result.extractor)
+            _identifiers(other, rejected, "reference-list", page["page"])
+            result.rejected.extend(
+                {**item, "reason": "reference_list"} for item in other.identifiers
+            )
+        _identifiers(result, accepted, "page-text", page["page"])
+        for index, block in enumerate(page.get("blocks", [])):
+            block_text = block["text"]
+            excluded = references or block_text.strip() not in accepted
+            result.locations.append(
+                {
+                    "page": page["page"],
+                    "block": index,
+                    "bbox": block["bbox"],
+                    "text": block_text[:4000],
+                    "included": not excluded,
+                    "reason": "other_work_or_reference" if excluded else "front_matter",
+                }
+            )
+        if page["page"] <= 2:
+            result.opening_text += accepted + "\n"
+        references = references or len(parts) > 1
     if not result.opening_text.strip():
         result.warnings.append("No usable opening-page text; OCR is not available")
     return result
 
 
 def _identifiers(result: PDFInspection, text: str, source: str, page: int | None = None) -> None:
+    isbn_pattern = re.compile(r"ISBN(?:-1[03])?\s*:?\s*([0-9][0-9Xx -]{8,24}[0-9Xx])", re.I)
+    for match in isbn_pattern.finditer(text):
+        try:
+            value = normalize_isbn(match.group(1))
+        except ValueError:
+            result.rejected.append(
+                {
+                    "kind": "isbn",
+                    "value": match.group(1),
+                    "source": source,
+                    "page": page,
+                    "reason": "invalid_checksum",
+                }
+            )
+        else:
+            result.identifiers.append(
+                {"kind": "isbn", "value": value, "source": source, "page": page}
+            )
     for kind, pattern in (("doi", _DOI), ("arxiv", _ARXIV)):
         for match in pattern.finditer(text):
             value = match.group(0).rstrip(".,;") if kind == "doi" else match.group(1)
@@ -245,8 +300,47 @@ def normalized_title(value: str) -> str:
     """Compare Unicode/LaTeX title text without punctuation or layout whitespace."""
     from pynakes._text_utils import _normalize_text
 
+    for name, glyph in {
+        "alpha": "α",
+        "beta": "β",
+        "gamma": "γ",
+        "delta": "δ",
+        "epsilon": "ε",
+        "theta": "θ",
+        "lambda": "λ",
+        "mu": "μ",
+        "nu": "ν",
+        "pi": "π",
+        "rho": "ρ",
+        "sigma": "σ",
+        "tau": "τ",
+        "phi": "φ",
+        "chi": "χ",
+        "psi": "ψ",
+        "omega": "ω",
+    }.items():
+        value = re.sub(r"\\" + name + r"\b", glyph, value, flags=re.I)
+    value = re.sub(r"(?<=\w)-\s*\n\s*(?=\w)", "", value)
     value = unicodedata.normalize("NFKD", _normalize_text(value))
     return "".join(char for char in value.casefold() if char.isalnum())
+
+
+def document_title_locations(inspection: PDFInspection, title: str) -> list[dict]:
+    """Locate an included title beginning a text line, without altering its value."""
+    candidate = normalized_title(title)
+    if len(candidate) < 12:
+        return []
+    support = []
+    for location in inspection.locations:
+        if not location["included"]:
+            continue
+        lines = location["text"].splitlines()
+        if any(
+            normalized_title(" ".join(lines[index:])).startswith(candidate)
+            for index in range(len(lines))
+        ):
+            support.append({k: v for k, v in location.items() if k != "text"})
+    return support
 
 
 def title_supported(inspection: PDFInspection, title: str) -> bool:
@@ -257,4 +351,6 @@ def title_supported(inspection: PDFInspection, title: str) -> bool:
     if candidate == normalized_title(inspection.title):
         return True
     opening = re.split(r"(?i)\babstract\b", inspection.opening_text, maxsplit=1)[0][:4000]
-    return candidate in normalized_title(opening)
+    return candidate in normalized_title(opening) or bool(
+        document_title_locations(inspection, title)
+    )

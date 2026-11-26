@@ -114,6 +114,8 @@ PYNAKES_EXACT_KEYS: dict[str, MetadataCategory] = {
     "format-line-width": CATEGORY_FORMATTING,
     "format-entry-type-case": CATEGORY_FORMATTING,
     "pinax-files-dir": CATEGORY_PINAX,
+    "pinax-adopt-mode": CATEGORY_PINAX,
+    "pinax-adopt-role": CATEGORY_PINAX,
     "pinax-fetch-policy": CATEGORY_PINAX,
     # How `asset fetch` reaches publisher copies, and whether it looks up
     # missing arXiv ids; both only shape a run the user already started.
@@ -186,6 +188,8 @@ _SETTING_CHOICES: dict[str, set[str]] = {
     "normalize-encoding": {"latex", "unicode", "off"},
     "groups-separator": {"auto", "comma", "semicolon"},
     "pinax-fetch-access": {"open", "institutional"},
+    "pinax-adopt-mode": {"move", "copy"},
+    "pinax-adopt-role": {"unclassified", "published", "preprint", "supplement", "erratum"},
     "import-key-source": {"generated", "provider"},
     "lint-severity": {"error", "warning", "info"},
 }

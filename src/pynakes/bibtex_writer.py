@@ -61,6 +61,7 @@ def _source_layout_matches(lib: BibFile) -> bool:
         elif kind == "preamble":
             preambles += 1
         elif kind == "entry":
+            assert isinstance(ref, BibEntry)
             entries.append(ref)
         # "raw" segments carry their own text and are always renderable.
 
@@ -94,7 +95,11 @@ def _canonical_layout(lib: BibFile) -> list:
         if gap is None:
             gap = "" if not segments else le * 2
             _gap, last_kind, last_ref = segments[-1] if segments else ("", "", None)
-            if last_kind == "comment" and lib.raw_comments[last_ref].endswith("\n"):
+            if (
+                last_kind == "comment"
+                and isinstance(last_ref, int)
+                and lib.raw_comments[last_ref].endswith("\n")
+            ):
                 # A ``%`` comment carries its own newline; count it toward the gap.
                 gap = le
         segments.append((gap, kind, ref))
@@ -136,17 +141,22 @@ def _render_layout(lib: BibFile, layout: list[tuple[str, str, object]], trailing
     for gap, kind, ref in layout:
         parts.append(gap)
         if kind == "entry":
+            assert isinstance(ref, BibEntry)
             if ref.raw_content and not ref.modified:
                 parts.append(ref.raw_content)
             else:
                 parts.append(_reconstruct_entry(ref, le))
         elif kind == "comment":
+            assert isinstance(ref, int)
             parts.append(lib.raw_comments[ref])
         elif kind == "string":
+            assert isinstance(ref, int)
             parts.append(lib.raw_strings[ref])
         elif kind == "preamble":
+            assert isinstance(ref, int)
             parts.append(lib.preamble[ref])
         elif kind == "raw":
+            assert isinstance(ref, str)
             parts.append(ref)
     parts.append(trailing)
     return "".join(parts)

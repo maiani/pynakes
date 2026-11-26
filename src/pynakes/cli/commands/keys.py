@@ -229,7 +229,7 @@ def keys_generate(
         human,
         diff_text=diff_text,
         warnings=[*selection_warnings, *source_warnings],
-        **({"key": key} if key is not None else {}),
+        report_details=({"key": key} if key is not None else {}),
         source_occurrences=total_source_occurrences,
         sources=source_changes,
         pinax_materials=pinax_materials,

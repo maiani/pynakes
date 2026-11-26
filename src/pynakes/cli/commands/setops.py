@@ -437,6 +437,7 @@ def split(
     human = [f"Split {len(merged.inputs)} input(s) into {len(rules)} output(s):"]
     for entry in outputs:
         count = entry["entries"]
+        assert isinstance(count, int)
         human.append(
             f"  {_verb('write', params, 'Wrote')} {count} {_entries(count)} → {entry['path']}  [{entry['predicate']}]"
         )

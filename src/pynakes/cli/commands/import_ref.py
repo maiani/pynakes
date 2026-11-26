@@ -315,7 +315,7 @@ def import_reference(
         params,
         human,
         warnings=warnings,
-        **details,
+        report_details=details,
     )
 
 

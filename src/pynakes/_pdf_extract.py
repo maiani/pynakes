@@ -15,7 +15,7 @@ MAX_TEXT = 40_000
 
 
 def extract(path: str | Path) -> dict:
-    """Read document information, XMP, embedded BibTeX and two opening pages."""
+    """Read document information, XMP, embedded BibTeX and bounded front matter."""
     import pymupdf
 
     result: dict = {"info": {}, "xmp": "", "bibtex": [], "pages": [], "warnings": []}
@@ -53,10 +53,24 @@ def extract(path: str | Path) -> dict:
                 else:
                     result["warnings"].append(f"Ignored oversized BibTeX attachment: {name}")
         result["page_count"] = len(reader)
-        for index in range(min(2, len(reader))):
+        for index in range(min(12, len(reader))):
             try:
                 text = reader[index].get_text("text", sort=True) or ""
-                result["pages"].append({"page": index + 1, "text": text[:MAX_TEXT]})
+                blocks = reader[index].get_text("blocks", sort=True) or []
+                bounded_blocks = []
+                remaining = MAX_TEXT
+                for block in blocks[:128]:
+                    if isinstance(block[4], str) and remaining > 0:
+                        value = block[4][:remaining]
+                        bounded_blocks.append({"bbox": list(block[:4]), "text": value})
+                        remaining -= len(value)
+                result["pages"].append(
+                    {
+                        "page": index + 1,
+                        "text": text[:MAX_TEXT],
+                        "blocks": bounded_blocks,
+                    }
+                )
                 if len(text) > MAX_TEXT:
                     result["warnings"].append(f"Truncated extracted text on page {index + 1}")
             except Exception as exc:

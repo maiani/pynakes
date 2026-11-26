@@ -39,7 +39,7 @@ def inspect_insights(
                 "warnings": [],
                 **read(),
             }
-        except Exception as exc:  # noqa: BLE001 - supplementary reads must not hide the table
+        except Exception as exc:  # supplementary reads must not hide the table
             return _error_envelope(exc)
 
     return {
@@ -58,7 +58,7 @@ def _guarded(read: Callable[[], dict]) -> dict:
     """Return a complete envelope, or the error one if building it failed."""
     try:
         return read()
-    except Exception as exc:  # noqa: BLE001 - supplementary reads must not hide the table
+    except Exception as exc:  # supplementary reads must not hide the table
         return _error_envelope(exc)
 
 

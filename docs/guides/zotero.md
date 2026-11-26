@@ -5,8 +5,11 @@ select references into independent project bibliographies. Zotero keeps its
 records and PDFs; pynakes writes only the selected project `.bib`.
 
 The initial backend supports **Zotero 10, local API 3, personal library `users/0`**.
-Live checks used Zotero 10.0.7 (Flatpak, Linux). Other platforms have synthetic
-transport coverage only. Enable **Allow other applications on this computer to
+Live checks used Zotero 10.0.7 (Flatpak, Linux) and 10.0.8 (Linux). The latter
+covered bounded pagination, native search, collection/material discovery and
+guarded project selection/repeat/refresh. The repository's `RELEASE.md` records
+the validation details.
+Other platforms have synthetic transport coverage only. Enable **Allow other applications on this computer to
 communicate with Zotero** in Zotero's advanced settings. Reads require no API key,
 cloud account, sync or authorization dialog. The backend refuses other major
 versions rather than assuming their revision behavior is equivalent.
