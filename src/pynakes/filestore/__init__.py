@@ -193,11 +193,14 @@ class FileStore(PinaxManifest):
 
         return adopt_file(self, key, source, role=role, mode=mode)
 
-    def material_variants(self, key: str) -> list[dict]:
-        """Inspect all local variants, including missing or modified bytes."""
+    def material_variants(self, key: str, *, verify: bool = True) -> list[dict]:
+        """Inspect all local variants, including missing or modified bytes.
+
+        ``verify=False`` reports presence only, leaving ``intact`` as None.
+        """
         from pynakes.filestore._adoption import material_variants
 
-        return material_variants(self, key)
+        return material_variants(self, key, verify=verify)
 
     def paths_for(self, key: str) -> MaterialPaths:
         """Return deterministic material paths for ``key``."""
@@ -211,8 +214,15 @@ class FileStore(PinaxManifest):
             erratum_pdf=self.root / f"{key}{ERRATUM_SUFFIX}.pdf",
         )
 
-    def presence_for(self, key: str) -> MaterialPresence:
-        """Return live filesystem presence for one citation key."""
+    def presence_for(self, key: str, *, manifest: dict | None = None) -> MaterialPresence:
+        """Return live filesystem presence for one citation key.
+
+        Presence only: variant bytes are not hashed (``intact`` is None), so
+        reads stay cheap however large the store. ``asset check`` verifies them.
+        Pass an already-read ``manifest`` when looking up many keys.
+        """
+        from pynakes.filestore._adoption import material_variants
+
         paths = self.paths_for(key)
         return MaterialPresence(
             key=key,
@@ -222,7 +232,7 @@ class FileStore(PinaxManifest):
             preprint_source=paths.preprint_source.is_dir(),
             supplement_pdf=paths.supplement_pdf.is_file(),
             erratum_pdf=paths.erratum_pdf.is_file(),
-            variants=tuple(self.material_variants(key)),
+            variants=tuple(material_variants(self, key, verify=False, manifest=manifest)),
         )
 
     def ensure_root(self) -> Path:
@@ -367,7 +377,7 @@ class FileStore(PinaxManifest):
             "preprint_source": _path_or_none(preprint_source),
             "supplement_pdf": _path_or_none(supplement_pdf),
             "erratum_pdf": _path_or_none(erratum_pdf),
-            "variants": self.material_variants(key),
+            "variants": list(presence.variants),
             "canonical_pdf": _path_or_none(canonical_pdf),
             "canonical_source": _path_or_none(canonical_source),
             "refetchable": bool(refetchable or _manifest_refetchable(self.read_manifest(), key)),
@@ -674,12 +684,13 @@ class FileStore(PinaxManifest):
         """
         key_list = _unique_keys(keys)
         known = set(key_list)
-        entries = [self.presence_for(key) for key in key_list]
+        manifest = self.read_manifest()
+        entries = [self.presence_for(key, manifest=manifest) for key in key_list]
         return FileStoreScan(
             root=self.root,
             entries=entries,
             orphans=self._orphans(known),
-            drift=self._manifest_drift(known),
+            drift=self._manifest_drift(known, manifest),
         )
 
     def scan_entries(self, entries: Iterable[BibEntry]) -> FileStoreScan:

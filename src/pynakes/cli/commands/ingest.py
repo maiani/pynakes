@@ -75,7 +75,7 @@ def ingest(
             "action": "library_ingest",
             "file": manifest,
             "dry_run": dry_run,
-            "modified": bool(plan.outputs),
+            "modified": plan.modifies,
             "source_sha256": lib.source_sha256,
             "modified_entries": report["modified_entries"],
             "warnings": retained_warnings(report),

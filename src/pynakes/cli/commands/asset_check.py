@@ -131,7 +131,7 @@ def _coverage(
         for item in pinax.entries
         if item.published_pdf
         or item.preprint_pdf
-        or any(v["intact"] and v["path"].endswith(".pdf") for v in item.variants)
+        or any(v["present"] and v["path"].endswith(".pdf") for v in item.variants)
     ]
     return {
         "linked_files": linked,

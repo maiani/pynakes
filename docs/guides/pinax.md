@@ -638,8 +638,11 @@ supports published, preprint, supplement and erratum. The corresponding
 The existing version-1 manifest gains an optional `variants` list per citation
 key: SHA-256, role, relative object path, source occurrences and refetchability.
 Immutable objects coexist with existing fixed-role paths; neither old stores
-nor PDFs are rewritten during migration. Missing or changed variants appear in
-asset diagnostics. Generic attachments preserve their filename extension/type.
+nor PDFs are rewritten during migration. Reads report variant presence without
+hashing (`intact` is null), so they stay cheap however large the store; `asset
+check` verifies the bytes and reports missing, changed or unreadable variants,
+including records with a role this version does not know. Generic attachments
+preserve their filename extension/type.
 Use `Bibliography.adopt_file()` followed by `commit()` for bibliography-aware
 adoption. `FileStore.adopt_file()` is a lower-level bytes/provenance operation
 and deliberately does not edit bibliography links.

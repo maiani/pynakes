@@ -13,7 +13,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
+import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -85,29 +87,35 @@ class Output:
     data: bytes | Path
 
 
+_LOCK_NAME = re.compile(r"lock-(\d+)-(\d+)")
+
+
 @contextmanager
 def locked(state: Path) -> Generator[None, None, None]:
-    """Serialize cooperating ingest/recover commands; reclaim dead-process locks."""
+    """Serialize cooperating ingest/recover commands; reclaim dead-process locks.
+
+    Each holder claims ``lock-<pid>-<thread>``. The holder is in the name, which
+    is created in one step, so a crash never leaves an anonymous lock behind.
+    A claim stands only if no live process holds another; claims of exited
+    processes are swept, and two racing claims both withdraw.
+    """
     state.mkdir(parents=True, exist_ok=True)
-    lock = state / "lock"
+    mine = state / f"lock-{os.getpid()}-{threading.get_ident()}"
+    with mine.open("x", encoding="ascii"):
+        pass
     try:
-        stream = lock.open("x", encoding="ascii")
-    except FileExistsError:
-        try:
-            pid = int(lock.read_text(encoding="ascii"))
-        except (ValueError, OSError):
-            raise ValueError(f"Unrecognised ingestion lock; inspect {lock}") from None
-        if _process_alive(pid):
-            raise ValueError("Another ingestion operation is running") from None
-        lock.unlink()
-        stream = lock.open("x", encoding="ascii")
-    try:
-        with stream:
-            stream.write(str(os.getpid()))
-            sync_file(stream)
+        for other in state.glob("lock-*"):
+            if other == mine:
+                continue
+            match = _LOCK_NAME.fullmatch(other.name)
+            if match is None:
+                raise ValueError(f"Unrecognised ingestion lock; inspect {other}")
+            if _process_alive(int(match[1])):
+                raise ValueError("Another ingestion operation is running")
+            other.unlink(missing_ok=True)
         yield
     finally:
-        lock.unlink(missing_ok=True)
+        mine.unlink(missing_ok=True)
 
 
 def _install(root: Path, state: Path, journal: dict) -> dict:

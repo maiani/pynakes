@@ -49,7 +49,7 @@ class PinaxManifest:
         def _require_real_bookkeeping(self) -> None: ...
         def _atomic_write(self, path: Path, data: bytes) -> None: ...
         def paths_for(self, key: str) -> MaterialPaths: ...
-        def presence_for(self, key: str) -> MaterialPresence: ...
+        def presence_for(self, key: str, *, manifest: dict | None = None) -> MaterialPresence: ...
 
     @property
     def manifest_path(self) -> Path:
@@ -169,7 +169,7 @@ class PinaxManifest:
                 del files[key]
 
         for key in key_list:
-            presence = self.presence_for(key)
+            presence = self.presence_for(key, manifest=manifest)
             row_existed = key in files
             row = files.setdefault(key, {})
             if not isinstance(row, dict):
@@ -191,10 +191,13 @@ class PinaxManifest:
 
         return manifest, fixed
 
-    def _manifest_drift(self, known: set[str]) -> list[dict[str, str]]:
+    def _manifest_drift(
+        self, known: set[str], manifest: dict | None = None
+    ) -> list[dict[str, str]]:
         # An absent manifest reads as an empty one, so every material file found
         # is drift: exactly what reconcile_manifest (asset repair) would record.
-        manifest = self.read_manifest()
+        if manifest is None:
+            manifest = self.read_manifest()
         files = manifest["files"]
         if not isinstance(files, dict):
             raise TypeError("Pinax manifest 'files' must be a dict")
@@ -208,8 +211,17 @@ class PinaxManifest:
                 continue
             from pynakes.filestore._adoption import variant_path
 
-            for record in row.get("variants", []):
-                material = variant_path(self.root, record)
+            variants = row.get("variants", [])
+            if not isinstance(variants, list):
+                drift.append({"key": key, "kind": "variant", "reason": "invalid variants list"})
+                variants = []
+            for record in variants:
+                try:
+                    material = variant_path(self.root, record)
+                except ValueError as exc:
+                    # A newer version's record, or a damaged one: report, never act on it.
+                    drift.append({"key": key, "kind": "variant", "reason": str(exc)})
+                    continue
                 if not material.is_file() or _sha256_path(material) != record["sha256"]:
                     drift.append(
                         {
@@ -228,7 +240,7 @@ class PinaxManifest:
                 if not exists:
                     drift.append({"key": key, "kind": kind, "reason": "manifest without file"})
         for key in sorted(known):
-            presence = self.presence_for(key)
+            presence = self.presence_for(key, manifest=manifest)
             row = files.get(key, {})
             if not isinstance(row, dict):
                 row = {}

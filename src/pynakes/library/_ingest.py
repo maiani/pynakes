@@ -105,6 +105,23 @@ class IngestionPlan:
         }
         return hashlib.sha256(json_bytes(value)).hexdigest()
 
+    @property
+    def modifies(self) -> bool:
+        """Whether applying the plan changes any file: an output's bytes or a source.
+
+        The ledger is always an output, so its presence alone says nothing; a
+        repeated plan that would rewrite identical bytes modifies nothing.
+        """
+        for output in self.outputs:
+            after = (
+                self.guards[output.data]
+                if isinstance(output.data, Path)
+                else hashlib.sha256(output.data).hexdigest()
+            )
+            if after != output.before:
+                return True
+        return bool(self.removals)
+
     def to_dict(self) -> dict:
         return {
             **self.report,
@@ -181,6 +198,8 @@ def prepare_ingestion(
     staged_library._loaded = tuple(replace(m, bib=collections[m.path].lib) for m in library._loaded)
     removals: list[dict] = []
     results = []
+    pinned: dict[str, str] = {}
+    row_occurrence: dict[int, str] = {}
     touched: set[Path] = set()
     decisions = decisions or {}
     if not isinstance(decisions, dict) or any(
@@ -330,9 +349,15 @@ def prepare_ingestion(
                 *previous.get("history", []),
                 {k: v for k, v in previous.items() if k not in {"history", "plan_sha256"}},
             ]
-        elif previous and previous.get("history"):
-            row["history"] = previous["history"]
+        elif previous:
+            # Unchanged: the receipt keeps naming the plan that produced it, so
+            # a repeated run leaves the ledger byte-identical.
+            if previous.get("history"):
+                row["history"] = previous["history"]
+            if isinstance(previous.get("plan_sha256"), str):
+                pinned[occurrence] = previous["plan_sha256"]
         ledger["sources"][occurrence] = row
+        row_occurrence[id(row)] = occurrence
     outputs: list[Output] = []
     for path in sorted(touched):
         coll = collections[path]
@@ -376,6 +401,6 @@ def prepare_ingestion(
     plan = IngestionPlan(library, report, outputs, guards, removals)
     fingerprint = plan.sha256
     for row in results:
-        row["plan_sha256"] = fingerprint
+        row["plan_sha256"] = pinned.get(row_occurrence.get(id(row), ""), fingerprint)
     outputs[-1] = Output(ledger_path, guards[ledger_path], json_bytes(ledger))
     return plan

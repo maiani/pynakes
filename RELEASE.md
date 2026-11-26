@@ -69,14 +69,19 @@ The review also led to these fixes:
   re-parses the bibliography first.
 - A source that is the stored copy itself is never removed.
 
-Known and deferred past 0.10.0:
+The remaining review findings were also fixed before release:
 
-- Variant presence hashes every adopted object on `asset check`, `analyze` and
-  entry reads, a cost that grows with the adopted store.
-- An unknown variant role makes `asset check` fail instead of reporting drift.
-- An empty ingestion lock left by a crash must be removed by hand.
-- `library ingest` reports `modified` for every plan, because the ledger is
-  always written.
+- **Variant hashing:** presence reads no longer hash variants or re-read the
+  manifest per key. `asset check` hashes each variant once, where it had
+  hashed it twice.
+- **Unknown variant roles:** a record with an unknown role is reported as drift
+  instead of failing the check.
+- **Locks:** locks name their holder (`lock-<pid>-<thread>`) and are created in
+  one step, so a crash cannot leave an anonymous lock.
+- **`modified`:** `library ingest` reports `modified` only when a file would
+  change. A receipt's plan hash now names the plan that last changed the
+  record, so repeating a completed batch leaves the ledger byte-identical;
+  before, every repeat rewrote it.
 
 ## Dependencies and handoff
 

@@ -159,7 +159,9 @@ uncertain results and leave them pending until reviewed.
 Apply writes a version-1 private ledger at
 `.pynakes-ingest/<manifest-stem>/ledger.json`. It records source occurrences and
 hashes, candidates, decisions, routing, plan fingerprints, output hashes and
-previous outcomes. `pending` and `complete` describe unresolved work; exit 0 only
+previous outcomes. A record's `plan_sha256` names the plan that last changed
+it, so repeating a completed batch leaves the ledger unchanged and reports
+`modified: false`. `pending` and `complete` describe unresolved work; exit 0 only
 means the operation completed. `accepted_records` counts unique accepted works,
 including already-present records; `modified_entries` counts bibliography edits.
 The manifest filename/stem identifies its ledger; keep it when restoring.
@@ -190,7 +192,9 @@ Recovery needs no provider calls. It accepts only original or planned output
 bytes; external changes stop recovery for review. This is recoverable sequential
 publication, not a globally atomic multi-file filesystem transaction. Do not
 remove a live journal or its payloads. Reopen the Library after applying a plan.
-Completed receipts recognize already-present materials on retry.
+Completed receipts recognize already-present materials on retry. Concurrent
+commands are serialized by `lock-<pid>-<thread>` files in the same directory;
+claims left by processes that have exited are removed automatically.
 
 Back up the manifest, member bibliographies, entire Pinax stores (including
 hidden `.pinax` directories), and private ledger together. Relative links work

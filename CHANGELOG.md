@@ -74,7 +74,10 @@ The compatibility forms deprecated in 0.9 are removed in v0.10:
   with decisions, provenance, plan/output hashes and retry history. Reviewed
   plans guard source and Library bytes. Interrupted writes resume from verified
   payloads, and copy mode preserves originals. Exit success does not imply every
-  source was identified. See [PDF ingestion](docs/guides/pdf-import.md).
+  source was identified. Repeating a completed batch leaves the ledger
+  byte-identical and reports `modified: false`; lock files name their holder,
+  so a crash never leaves one to remove by hand. See
+  [PDF ingestion](docs/guides/pdf-import.md).
 - **Local attachment adoption.** `asset adopt`, `asset recover` and
   `Bibliography.adopt_file` store unchanged bytes with relative links and
   provenance before moving originals. `--mode` / `pinax-adopt-mode` and
@@ -85,7 +88,10 @@ The compatibility forms deprecated in 0.9 are removed in v0.10:
   original that cannot be removed after the commit (open elsewhere, read-only,
   edited, or the stored copy itself) is kept and reported in `warnings` and
   `CommitResult.warnings`, never left blocking later commands. Adoption
-  refuses a read-only bibliography before moving anything.
+  refuses a read-only bibliography before moving anything. Presence reads
+  (entry reads, `analyze`, fetch reports) never hash variants; `asset check`
+  verifies them once and reports records it cannot use, such as an unknown
+  role, as drift instead of failing.
 - **Read-only Zotero Library.** The Zotero 10 local backend and `zotero` CLI
   provide revision-checked reads, explicit native expansion, collection and
   attachment discovery, and local material resolution. Collection-scoped

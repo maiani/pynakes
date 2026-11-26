@@ -209,7 +209,7 @@ class EntryReader:
 
     def _presence(self, key: str) -> dict[str, object]:
         assert self._store is not None
-        presence = self._store.presence_for(key)
+        presence = self._store.presence_for(key, manifest=self._manifest)
         paths = presence.paths
         available = [kind for kind in _MATERIAL_KINDS if getattr(presence, kind)]
         canonical = (

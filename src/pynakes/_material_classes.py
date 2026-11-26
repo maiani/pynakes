@@ -49,12 +49,13 @@ def misclassified_published(store: FileStore, entries: Iterable[BibEntry]) -> li
     ``conflict`` when a preprint PDF is already there (nothing is overwritten).
     """
     rows = _manifest_rows(store)
+    manifest = {"version": 1, "files": rows}
     findings: list[dict] = []
     for entry in entries:
         key = entry.key
         if not key.strip():
             continue
-        presence = store.presence_for(key)
+        presence = store.presence_for(key, manifest=manifest)
         if not presence.published_pdf:
             continue
         path = store.paths_for(key).published_pdf

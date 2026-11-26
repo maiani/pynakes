@@ -184,24 +184,40 @@ def adopt_file(
     return plan
 
 
-def material_variants(store: FileStore, key: str) -> list[dict]:
-    """Return variants with explicit presence and checksum diagnostics."""
-    row = _manifest_row(store.read_manifest(), key, create=False) or {}
+def material_variants(
+    store: FileStore, key: str, *, verify: bool = True, manifest: dict | None = None
+) -> list[dict]:
+    """Return variants with explicit presence and checksum diagnostics.
+
+    ``verify=False`` skips hashing and reports ``intact`` as None, for reads that
+    need only presence. A record this version cannot use (an unknown role, say,
+    from a newer version) is reported with ``invalid`` instead of raising, and
+    its path is never touched. ``manifest`` reuses an already-read manifest.
+    """
+    data = manifest if manifest is not None else store.read_manifest()
+    row = _manifest_row(data, key, create=False) or {}
     variants = row.get("variants", [])
     if not isinstance(variants, list):
         raise ValueError("Invalid Pinax variants")
     result = []
     for record in variants:
-        path = variant_path(store.root, record)
+        try:
+            path = variant_path(store.root, record)
+        except ValueError as exc:
+            base = record if isinstance(record, dict) else {}
+            result.append(
+                {
+                    **base,
+                    "absolute_path": None,
+                    "present": False,
+                    "intact": False,
+                    "invalid": str(exc),
+                }
+            )
+            continue
         present = path.is_file()
-        result.append(
-            {
-                **record,
-                "absolute_path": str(path),
-                "present": present,
-                "intact": present and _sha256_path(path) == record["sha256"],
-            }
-        )
+        intact = (present and _sha256_path(path) == record["sha256"]) if verify else None
+        result.append({**record, "absolute_path": str(path), "present": present, "intact": intact})
     return result
 
 

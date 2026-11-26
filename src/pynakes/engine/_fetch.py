@@ -79,11 +79,12 @@ class FetchLoopResult:
         reasons = self._pdf_reasons()
         with_pdf = 0
         missing: list[dict[str, object]] = []
+        manifest = store.read_manifest()
         for entry in queue:
             if not entry.key.strip():
                 missing.append({"key": entry.key, "materials": ["pdf"], "reason": "empty key"})
                 continue
-            presence = store.presence_for(entry.key)
+            presence = store.presence_for(entry.key, manifest=manifest)
             has_pdf = presence.published_pdf or presence.preprint_pdf
             with_pdf += bool(has_pdf)
             lacking: list[str] = []
