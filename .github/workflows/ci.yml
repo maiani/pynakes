@@ -93,8 +93,9 @@ jobs:
       - name: Install uv
         run: python -m pip install uv
 
+      # The pdf extra has a floor too, and the PDF tests need it.
       - name: Install package at its dependency floors
-        run: uv pip install --system --resolution lowest-direct -e .
+        run: uv pip install --system --resolution lowest-direct -e ".[pdf]"
 
       # Test tools at their current versions: the floors under test are the
       # runtime ones, not pytest's.
@@ -278,5 +279,9 @@ jobs:
         working-directory: clients/desktop
       - run: npm test
         working-directory: clients/desktop
+      # Ubuntu 24.04 restricts unprivileged user namespaces, so Electron falls back
+      # to its SUID sandbox helper, which npm cannot install setuid, and aborts.
+      # Allowing the namespaces keeps the smoke test sandboxed.
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: xvfb-run -a npm run smoke
         working-directory: clients/desktop

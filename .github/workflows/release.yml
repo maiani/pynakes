@@ -122,8 +122,10 @@ jobs:
           name: dist
           path: dist/
 
+      # The PDF tests need the optional pdf extra; installing it through the
+      # wheel's own metadata also checks the wheel declares it.
       - name: Install the wheel and test tools
-        run: python -m pip install dist/*.whl pytest hypothesis pyyaml
+        run: python -m pip install "$(ls dist/*.whl)[pdf]" pytest hypothesis pyyaml
 
       # pytest puts src/ on sys.path; without it, only the wheel can be imported.
       - name: Remove the source tree
