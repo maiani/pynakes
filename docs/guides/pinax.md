@@ -629,7 +629,9 @@ manifest explicitly and supports a dry-run preview.
 `asset adopt FILE KEY SOURCE` uses the same staged transaction as managed
 [PDF ingestion](pdf-import.md#managed-library-ingestion-and-review). It moves
 originals by default; `--mode copy` keeps them. Stored bytes and relative links
-are durable before source removal. `--role` defaults to `unclassified` and
+are durable before source removal; an original that cannot then be removed
+stays in place with a warning. A read-only bibliography is refused before
+anything moves. `--role` defaults to `unclassified` and
 supports published, preprint, supplement and erratum. The corresponding
 `pinax-adopt-mode` and `pinax-adopt-role` metadata settings configure defaults.
 

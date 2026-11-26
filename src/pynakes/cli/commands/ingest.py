@@ -7,6 +7,7 @@ import typer
 
 from pynakes.cli._choices import AdoptionMode, MaterialRole
 from pynakes.cli._common import _CACHE_FILE_OPTION, _emit, _emit_conflict, _safe
+from pynakes.filestore._transaction import retained_warnings
 from pynakes.library import Library
 
 
@@ -77,7 +78,7 @@ def ingest(
             "modified": bool(plan.outputs),
             "source_sha256": lib.source_sha256,
             "modified_entries": report["modified_entries"],
-            "warnings": [],
+            "warnings": retained_warnings(report),
             **report,
         },
         [f"{report['accepted_records']} accepted records; {report['pending']} pending review."],
@@ -125,7 +126,7 @@ def recover(
             "dry_run": False,
             "modified": report["recovered"],
             "modified_entries": 0,
-            "warnings": [],
+            "warnings": retained_warnings(report),
             **report,
         },
         ["Ingestion recovery complete."],

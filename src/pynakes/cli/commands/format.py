@@ -182,7 +182,7 @@ def _run_many(
                 payload = _check_payload(str(path), coll, where, keys)
                 dirty += int(bool(payload["modified"]))
             else:
-                diff_text, modified, changed = _preview_or_commit(coll, params)
+                diff_text, modified, changed, _ = _preview_or_commit(coll, params)
                 modified_count += int(modified)
                 payload = {
                     "status": "success",

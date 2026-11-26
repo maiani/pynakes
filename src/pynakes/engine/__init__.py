@@ -358,6 +358,7 @@ class Bibliography(
         except _tex_rewrite.TexSourceChangedError as exc:
             raise ExternalModificationError(exc.path) from exc
         transactions: list[PinaxRenameTransaction] = []
+        warnings: list[str] = []
         try:
             transactions = self._apply_pinax_renames()
             transactions.extend(self._apply_pinax_material_merges())
@@ -367,7 +368,7 @@ class Bibliography(
 
                 if backup and modified:
                     _write_backup(self.path)
-                commit_adoptions(self, new_text)
+                warnings = commit_adoptions(self, new_text)
             elif modified:
                 result = save_text(
                     new_text,
@@ -387,7 +388,7 @@ class Bibliography(
         _tex_rewrite.apply(tex_rewrites, backup=backup)
         for action in after_commit:
             action()
-        return CommitResult(changed_entries, diff_text, modified)
+        return CommitResult(changed_entries, diff_text, modified, warnings)
 
     def after_commit(self, action: Callable[[], object]) -> None:
         """Run ``action`` once the next commit has written the ``.bib``.

@@ -6,11 +6,12 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from pynakes.bibtex_parser import ParseError, parse_bib
 from pynakes.editing import set_entry_field
 from pynakes.fields import check_field_value
 from pynakes.filestore._adoption import ROLES, adoption_outputs, plan_adoption
-from pynakes.filestore._transaction import Output, commit, contained
-from pynakes.io import encode_text
+from pynakes.filestore._transaction import Output, commit, contained, retained_warnings
+from pynakes.io import _decode_bytes, encode_text
 from pynakes.metadata import metadata_value
 
 if TYPE_CHECKING:
@@ -86,32 +87,38 @@ def stage_adoption(
     return {**plan.to_dict(), "mode": mode, "key": key}
 
 
-def commit_adoptions(coll: Bibliography, new_text: str) -> None:
-    """Commit material bytes before links; journal survives any interrupted write."""
+def commit_adoptions(coll: Bibliography, new_text: str) -> list[str]:
+    """Commit material bytes before links; journal survives any interrupted write.
+
+    Returns warnings for moved originals that had to be kept.
+    """
     assert coll.path is not None and coll.files is not None
     store = coll.files
     root = coll.path.parent.resolve()
     if coll._pinax_renames or coll._pinax_material_merges or coll._tex_rewrites:
         raise ValueError("Commit adoption separately from key renames, merges or TeX rewrites")
+    bib = coll.path.resolve()
+    # The checks save_text makes, before any material moves.
+    if bib.exists() and not os.access(bib, os.W_OK):
+        raise OSError(f"{coll.path} is read-only; nothing was written")
+    data = encode_text(new_text, coll.lib.encoding)
+    try:
+        parse_bib(_decode_bytes(data)[0])
+    except ParseError as exc:
+        raise OSError(f"Validation failed: {exc}") from exc
     outputs, guards, removals = adoption_outputs(store, coll._material_adoptions, root)
-    guards[coll.path.resolve()] = (
-        coll.source_fingerprint.sha256 if coll.source_fingerprint else None
-    )
-    outputs.append(
-        Output(
-            coll.path.resolve(),
-            guards[coll.path.resolve()],
-            encode_text(new_text, coll.lib.encoding),
-        )
-    )
-    commit(
+    guards[bib] = coll.source_fingerprint.sha256 if coll.source_fingerprint else None
+    outputs.append(Output(bib, guards[bib], data))
+    report = commit(
         root,
         root / ".pynakes-ingest" / coll.path.name,
         outputs,
         guards,
         {"file": str(coll.path), "materials": len(coll._material_adoptions)},
         remove_sources=removals,
+        recover_command="asset recover",
     )
+    return retained_warnings(report)
 
 
 def check_source_owners(coll: Bibliography, source: Path, key: str | None) -> None:

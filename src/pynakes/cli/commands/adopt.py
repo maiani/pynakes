@@ -16,6 +16,7 @@ from pynakes.cli._common import (
     bib_file_argument,
 )
 from pynakes.engine import Bibliography
+from pynakes.filestore._transaction import retained_warnings
 
 
 def adopt(
@@ -79,7 +80,7 @@ def recover(
             "dry_run": False,
             "modified": report["recovered"],
             "modified_entries": 0,
-            "warnings": [],
+            "warnings": retained_warnings(report),
             **report,
         },
         ["Adoption recovery complete."],

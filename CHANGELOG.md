@@ -81,7 +81,11 @@ The compatibility forms deprecated in 0.9 are removed in v0.10:
   `--role` / `pinax-adopt-role` control policy. Immutable variants support
   multiple files per role, including `unclassified`, without overwriting
   annotated copies. Repeated bytes, collisions, missing/changed materials and
-  key renames are handled alongside existing fixed-role Pinax layouts.
+  key renames are handled alongside existing fixed-role Pinax layouts. An
+  original that cannot be removed after the commit (open elsewhere, read-only,
+  edited, or the stored copy itself) is kept and reported in `warnings` and
+  `CommitResult.warnings`, never left blocking later commands. Adoption
+  refuses a read-only bibliography before moving anything.
 - **Read-only Zotero Library.** The Zotero 10 local backend and `zotero` CLI
   provide revision-checked reads, explicit native expansion, collection and
   attachment discovery, and local material resolution. Collection-scoped

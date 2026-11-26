@@ -555,17 +555,18 @@ def _safe(fn: Callable[_P, _R]) -> Callable[_P, _R]:
     return wrapper
 
 
-def _preview_or_commit(coll: Bibliography, params: RunParams) -> tuple[str, bool, int]:
-    """Return ``(diff, modified, changed_entries)`` for a staged collection.
+def _preview_or_commit(coll: Bibliography, params: RunParams) -> tuple[str, bool, int, list[str]]:
+    """Return ``(diff, modified, changed_entries, warnings)`` for a staged collection.
 
     In ``--dry-run`` mode this previews without writing; otherwise it commits
-    (atomic write + re-parse validation) and reports the committed outcome.
+    (atomic write + re-parse validation) and reports the committed outcome,
+    including what the commit could not do (such as keeping a moved original).
     Use ``params.backup`` to also leave a ``<file>.bak`` (or ``.bak.N``) copy behind.
     """
     if params.dry_run:
-        return coll.diff(), coll.is_dirty, coll.changed_entries_count()
+        return coll.diff(), coll.is_dirty, coll.changed_entries_count(), []
     result = coll.commit(backup=params.backup)
-    return result.diff, result.modified, result.changed_entries
+    return result.diff, result.modified, result.changed_entries, result.warnings
 
 
 _BACKUP_OPTION = typer.Option(
@@ -666,9 +667,9 @@ def _finish_mod(
     source_sha256 = _source_sha256(coll)
     plan = coll.change_plan()
     if diff_text is None:
-        diff_text, modified, changed = _preview_or_commit(coll, params)
+        diff_text, modified, changed, commit_warnings = _preview_or_commit(coll, params)
     else:
-        _, modified, changed = _preview_or_commit(coll, params)
+        _, modified, changed, commit_warnings = _preview_or_commit(coll, params)
     if modified_entries is not None:
         changed = modified_entries
     result = {
@@ -678,7 +679,7 @@ def _finish_mod(
         "dry_run": params.dry_run,
         "modified": modified,
         "modified_entries": changed,
-        "warnings": warnings or [],
+        "warnings": [*(warnings or []), *commit_warnings],
         "plan": plan,
         "source_sha256": source_sha256,
         **(report_details or {}),

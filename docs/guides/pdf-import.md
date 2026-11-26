@@ -176,7 +176,11 @@ are never uploaded. Keep decision files and ledgers private.
 
 Writes stage and verify payloads before publishing a version-1 recovery journal.
 Materials precede manifests, bibliographies and receipts; moving originals is
-last. Interruptions retain the journal and payloads. Recover with:
+last. An original that cannot be removed at that point — open in another
+program, read-only, edited since it was inspected, or the stored copy itself —
+is kept, listed under `retained_sources` and reported as a warning; the
+transaction still completes. Interruptions retain the journal and payloads.
+Recover with:
 
 ```sh
 pynakes library recover research.library.toml --json

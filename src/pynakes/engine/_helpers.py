@@ -7,7 +7,7 @@ They are not part of the public API; importers should use the re-exports in
 
 import hashlib
 from collections.abc import Generator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
@@ -54,11 +54,14 @@ class CommitResult:
 
     ``diff`` compares the pre-commit pristine text with the staged output;
     ``modified`` distinguishes a successful no-op commit from one that wrote.
+    ``warnings`` names what a completed commit could not do, such as a moved
+    original that had to be kept.
     """
 
     changed_entries: int
     diff: str
     modified: bool
+    warnings: list[str] = field(default_factory=list)
 
 
 class ExternalModificationError(Exception):

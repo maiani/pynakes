@@ -408,12 +408,15 @@ def test_destination_collision_and_source_edit_retain_original(manifest, tmp_pat
 
     with monkeypatch.context() as patch:
         patch.setattr(_transaction, "_atomic_write_bytes", edit_source)
-        with pytest.raises(ValueError, match="source changed"):
-            plan.commit()
+        report = plan.commit()
+    # The outputs are committed, so the edited original is kept and reported
+    # rather than leaving a journal that blocks every later import.
+    [kept] = report["retained_sources"]
+    assert Path(kept["path"]) == source
+    assert kept["reason"] == "source changed after the stored copy was committed"
     assert source.read_bytes() == b"Changed after staging"
     assert target.exists()
-    with pytest.raises(ValueError, match="source changed"):
-        Library.open(manifest).recover_ingestion()
+    assert Library.open(manifest).recover_ingestion()["recovered"] is False
 
 
 def test_embedded_metadata_is_compared_online(manifest, tmp_path, monkeypatch):

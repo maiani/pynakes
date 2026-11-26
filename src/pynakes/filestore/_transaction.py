@@ -3,7 +3,9 @@
 Every output is staged and fsynced before the journal is published. Recovery
 accepts only original or intended bytes, checks all targets before changing any,
 and installs materials before manifests, bibliographies and finally receipts.
-An external edit blocks recovery rather than being overwritten.
+An external edit blocks recovery rather than being overwritten. Moved originals
+are removed only after every output is verified; one that cannot be removed is
+kept and reported, since the transaction is already complete.
 """
 
 from __future__ import annotations
@@ -38,21 +40,42 @@ def json_bytes(value: dict) -> bytes:
     return (json.dumps(value, indent=2, sort_keys=True, ensure_ascii=True) + "\n").encode()
 
 
-def contained(root: Path, path: Path) -> str:
-    """Require a real, contained path, including currently absent parents."""
+def _inside(root: Path, path: Path) -> str | None:
+    """Return ``path`` relative to ``root``, or None when it lies outside.
+
+    Containment compares real locations, so a root reached through a symlinked,
+    mapped or short-name directory still owns its files. Below the root, no
+    component may be a symlink, and ``..`` is refused.
+    """
+    real_root = root.resolve()
     path = path.absolute()
-    try:
-        relative = path.relative_to(root)
-    except ValueError:
-        raise ValueError(f"Managed ingestion target is outside the Library root: {path}") from None
+    for anchor in (path, *path.parents):
+        if anchor.resolve() == real_root:
+            break
+    else:
+        return None
+    relative = path.relative_to(anchor)
     if ".." in relative.parts:
         raise ValueError("Invalid ingestion target")
-    for parent in (path, *path.parents):
-        if parent == root.parent:
-            break
-        if parent.is_symlink():
-            raise ValueError(f"Symlink in ingestion target: {parent}")
+    current = anchor
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            raise ValueError(f"Symlink in ingestion target: {current}")
     return relative.as_posix()
+
+
+def contained(root: Path, path: Path) -> str:
+    """Require a real, contained path, including currently absent parents."""
+    relative = _inside(root, path)
+    if relative is None:
+        raise ValueError(f"Managed ingestion target is outside the Library root: {path}")
+    return relative
+
+
+def retained_warnings(report: dict) -> list[str]:
+    """Render the originals a completed move had to keep as envelope warnings."""
+    return [f"Kept {item['path']}: {item['reason']}" for item in report.get("retained_sources", [])]
 
 
 @dataclass(frozen=True)
@@ -119,26 +142,44 @@ def _install(root: Path, state: Path, journal: dict) -> dict:
         contained(root, target)
         if digest(target) != output["after"]:
             raise MaterialConflictError(f"Committed output changed; sources retained: {target}")
+    retained = []
     for item in journal.get("remove_sources", []):
-        source = Path(item["path"])
-        if not source.exists():
-            continue
-        if source.is_symlink() or digest(source) != item["sha256"]:
-            raise MaterialConflictError(
-                f"Stored material is committed; source changed, removal pending: {source}"
-            )
-        # Check the stored copy again immediately before retiring the source.
-        target = root / item["target"]
-        contained(root, target)
-        if digest(target) != item["sha256"]:
-            raise MaterialConflictError(f"Stored material changed; source retained: {source}")
-        source.unlink()
-        sync_directory(source.parent)
-    result = journal["report"]
+        reason = _retire_source(root, item)
+        if reason is not None:
+            retained.append({"path": item["path"], "reason": reason})
+    result = {**journal["report"], "retained_sources": retained}
     (state / "journal.json").unlink()
     sync_directory(state)
     shutil.rmtree(state / "payloads", ignore_errors=True)
     return result
+
+
+def _retire_source(root: Path, item: dict) -> str | None:
+    """Remove one moved original, or return why it was kept.
+
+    Every output is committed and verified by now, so nothing here may block
+    the transaction: an original that changed, is the stored copy itself (a
+    hard link or case-insensitive alias), or cannot be removed (open in a
+    viewer, read-only) stays in place and is reported.
+    """
+    source = Path(item["path"])
+    target = root / item["target"]
+    contained(root, target)
+    try:
+        if not source.exists() and not source.is_symlink():
+            return None
+        if source.is_symlink() or digest(source) != item["sha256"]:
+            return "source changed after the stored copy was committed"
+        # Check the stored copy again immediately before retiring the source.
+        if digest(target) != item["sha256"]:
+            return "stored copy changed before the source could be removed"
+        if os.path.samefile(source, target):
+            return "source is the stored copy"
+        source.unlink()
+    except (OSError, ValueError) as exc:
+        return f"source could not be removed ({exc})"
+    sync_directory(source.parent)
+    return None
 
 
 def recover(root: Path, state: Path) -> dict:
@@ -162,13 +203,14 @@ def commit(
     report: dict,
     *,
     remove_sources: list[dict] | None = None,
+    recover_command: str = "library recover",
 ) -> dict:
     """Prepare all bytes and publish a replayable transaction before mutation."""
     contained(root, state)
     with locked(state):
         journal_path = state / "journal.json"
         if journal_path.exists():
-            raise ValueError("Interrupted ingestion: run library recover before another import")
+            raise ValueError(f"Interrupted ingestion: run {recover_command} before another import")
         for path, expected in guards.items():
             if digest(path) != expected:
                 raise MaterialConflictError(f"Ingestion input changed: {path}")
@@ -207,11 +249,13 @@ def commit(
                 raise MaterialConflictError(f"Ingestion input changed while staging: {path}")
         output_paths = {output.path for output in outputs}
         sources = {output.data for output in outputs if isinstance(output.data, Path)}
-        stable = {
-            contained(root, p): h
-            for p, h in guards.items()
-            if p not in output_paths and p not in sources and p.is_relative_to(root)
-        }
+        stable = {}
+        for p, h in guards.items():
+            if p in output_paths or p in sources:
+                continue
+            name = _inside(root, p)
+            if name is not None:
+                stable[name] = h
         journal = {
             "version": 1,
             "outputs": items,
