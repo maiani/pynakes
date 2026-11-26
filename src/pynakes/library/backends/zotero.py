@@ -13,7 +13,8 @@ import re
 from dataclasses import asdict, dataclass
 from functools import partial
 from pathlib import Path
-from urllib.parse import unquote, urlencode, urlsplit
+from urllib.parse import urlencode, urlsplit
+from urllib.request import url2pathname
 
 import httpx
 
@@ -443,7 +444,11 @@ class ZoteroLibraryBackend:
         url = urlsplit(h.get("Location", ""))
         if url.scheme != "file" or url.netloc not in ("", "localhost") or url.query or url.fragment:
             raise SourceUnsupported("Attachment does not resolve to a local file")
-        path = Path(unquote(url.path))
+        try:
+            # Windows locations carry a drive (file:///C:/...); url2pathname maps it.
+            path = Path(url2pathname(url.path))
+        except OSError:
+            raise SourceUnsupported("Attachment does not resolve to a local file") from None
         if not path.is_absolute() or not path.is_file():
             raise SourceMissing("Attachment URL resolves to an absent file")
         self._check_revision(revision)

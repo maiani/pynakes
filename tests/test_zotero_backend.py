@@ -160,7 +160,8 @@ def test_collections_materials_and_local_path(local, tmp_path):
     assert "path" not in material.to_dict()
     with pytest.raises(SourceMissing):
         b.material_path(material)
-    pdf = tmp_path / "example.pdf"
+    # A space is percent-encoded in the URL; on Windows the URL also carries a drive.
+    pdf = tmp_path / "example scan.pdf"
     pdf.write_bytes(b"test bytes")
     api.location = pdf.as_uri()
     assert b.material_path(material) == pdf
